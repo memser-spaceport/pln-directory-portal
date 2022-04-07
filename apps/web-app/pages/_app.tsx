@@ -6,7 +6,7 @@ function CustomApp({ Component, pageProps }: AppProps) {
   return (
     <>
       <Head>
-        <title>Welcome to web-app!</title>
+        <title>Protocol Labs Network</title>
       </Head>
       <main className="app">
         <Component {...pageProps} />
