@@ -1,5 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const withNx = require('@nrwl/next/plugins/with-nx');
+const { withSentryConfig } = require('@sentry/nextjs');
 
 /**
  * @type {import('@nrwl/next/plugins/with-nx').WithNxOptions}
@@ -12,4 +13,11 @@ const nextConfig = {
   },
 };
 
-module.exports = withNx(nextConfig);
+const sentryWebpackPluginOptions = {
+  silent: true,
+  include: 'dist/apps/web-app/.next',
+};
+
+module.exports = process.env.NEXT_PUBLIC_SENTRY_DSN
+  ? withSentryConfig(withNx(nextConfig), sentryWebpackPluginOptions)
+  : withNx(nextConfig);
