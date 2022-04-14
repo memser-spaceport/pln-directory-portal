@@ -10,6 +10,7 @@
   "private": true,
   "dependencies": {
     "@headlessui/react": "^1.5.0",
+    "@heroicons/react": "^1.0.6",
     "@nrwl/next": "13.9.7",
     "@sentry/nextjs": "^6.19.6",
     "autoprefixer": "^10.4.4",
