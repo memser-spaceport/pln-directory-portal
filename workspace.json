@@ -1,6 +1,7 @@
 {
   "version": 2,
   "projects": {
+    "airtable": "libs/airtable",
     "ui": "libs/ui",
     "web-app": "apps/web-app",
     "web-app-e2e": "apps/web-app-e2e"
