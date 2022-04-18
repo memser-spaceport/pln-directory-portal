@@ -15,6 +15,7 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
+      "@protocol-labs-network/airtable": ["libs/airtable/src/index.ts"],
       "@protocol-labs-network/ui": ["libs/ui/src/index.ts"]
     }
   },
