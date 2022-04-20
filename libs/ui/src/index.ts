@@ -1,1 +1,2 @@
-export * from './lib/sample-component/sample-component';
+export * from './lib/AnchorLink/AnchorLink';
+export * from './lib/Tags/Tags';
