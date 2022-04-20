@@ -1,4 +1,4 @@
-import { UserGroupIcon, UserIcon } from '@heroicons/react/outline';
+import { UserGroupIcon, UserIcon } from '@heroicons/react/solid';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
