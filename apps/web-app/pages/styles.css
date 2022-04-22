@@ -5,10 +5,3 @@
 body {
   @apply bg-slate-100;
 }
-
-@layer components {
-  .card {
-    background-color: theme('colors.white');
-    border-radius: theme('borderRadius.lg');
-  }
-}
