@@ -30,7 +30,7 @@ export function TeamCard({ teamData }: TeamCardProps) {
       <h6 className="text-base text-slate-900 font-semibold">{name}</h6>
       <p className="mt-0.5 h-24 text-clip">{shortDescription}</p>
 
-      <div className="flex flex-wrap h-12 overflow-hidden text-xs text-slate-400 font-medium py-3 border-b border-slate-200">
+      <div className="text-xs text-slate-400 font-medium pt-3 h-[50px] border-b border-slate-200">
         {industry && industry.length ? (
           <Tags tagsList={industry} />
         ) : (
