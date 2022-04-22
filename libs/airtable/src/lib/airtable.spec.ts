@@ -1,40 +1,105 @@
-const teamMock = { id: 'team_01' } as IAirtableTeam;
+const teamMock: IAirtableTeam = {
+  id: 'team_id_01',
+  fields: {
+    Name: 'Team 01',
+    'Short description': 'Short description for Team 01',
+    'Long description': 'Long description for Team 01',
+    Website: 'http://team01.com/',
+    Twitter: '@team01',
+    'Funding Vehicle': ['Seed'],
+    'Network members': ['labber_id_01'],
+    Logo: [{ id: 'team_logo_01', url: 'http://team01.com/logo.svg' }],
+    Industry: ['IT'],
+    'Last Audited': new Date('28/02/1904'),
+    Notes: 'Some notes.',
+    'Last Modified': new Date('28/02/1904'),
+    'Eligible for marketplace credits': true,
+    'Grants program': true,
+    Blog: 'http://team01.com/blog/',
+    'IPFS User': true,
+    'Filecoin User': true,
+    Created: '28/02/1904',
+    Video: 'http://team01.com/video.mp4',
+    'Funding Stage': 'Seed',
+    'Accelerator Programs': ['Outplay - Pilot'],
+    'Friend of PLN': true,
+  },
+};
 const teamsMock = [teamMock];
-const teamsTableMock: Airtable.Table<object> = {
+const teamsTableMock: Airtable.Table<Record<string, string>> = {
   select: jest.fn().mockReturnValue({
     all: jest.fn().mockReturnValue(teamsMock),
   }),
   find: jest.fn().mockReturnValue(teamMock),
-};
+} as unknown as Airtable.Table<Record<string, string>>;
 
-const labberMock = { id: 'labber_01' } as IAirtableLabber;
+const labberMock: IAirtableLabber = {
+  id: 'labber_id_01',
+  fields: {
+    Name: 'Aarsh Dan Shah',
+    'Display Name': 'Aarsh Shah',
+    'PLN Start Date': new Date('28/02/1904'),
+    'PLN End Date': new Date('28/02/1904'),
+    'Profile picture': [
+      {
+        id: 'att2TxEATPkbk9dta',
+        url: 'https://dl.airtable.com/.attachments/f3ce65a21764f91ed7a907bb330ca60e/4dbc4f0c/adam_photo2.jpg?ts=1650540687&userId=usr6bGImQsm8pYc83&cs=9de9f8e366186ad5',
+      },
+    ],
+    Skills: ['Product'],
+    'Github Handle': 'aarshkshah1992',
+    'Office hours link': 'https://calendly.com/protoadin',
+    'Team lead': true,
+    Teams: ['team_id_01'],
+    Role: 'CEO',
+    Location: 'Seattle, WA',
+    Email: 'aarsh.shah@protocol.ai',
+    Twitter: '@labber01',
+    'Discord Handle': '@labber01',
+    Notes: 'Some notes.',
+    'Date contacted': new Date('28/02/1904'),
+    'State / Province': 'Washington',
+    Country: 'United States',
+    City: 'Seattle',
+    Created: '28/02/1904',
+    Technology: ['IPFS'],
+    'Did we miss something?': 'Nope.',
+    'Notes INTERNAL': 'Some notes.',
+    'Tagged in Discord': true,
+    'What industry or industries do you specialize in?': ['IT'],
+    'Professional Functions': ['Engineering'],
+    'Metro Area': 'Seattle Metro',
+    'Location backup': 'Seattle, WA',
+    'Friend of PLN': true,
+  },
+};
 const labbersMock = [labberMock];
-const labbersTableMock: Airtable.Table<object> = {
+const labbersTableMock: Airtable.Table<Record<string, string>> = {
   select: jest.fn().mockReturnValue({
     all: jest.fn().mockReturnValue(labbersMock),
   }),
   find: jest.fn().mockReturnValue(labberMock),
-};
+} as unknown as Airtable.Table<Record<string, string>>;
 
-const baseFunctionMock = jest.fn().mockImplementation((tableId: string) => {
+const baseFunctionMock = jest.fn((tableId: string) => {
   return tableId === process.env.AIRTABLE_TEAMS_TABLE_ID
     ? teamsTableMock
     : labbersTableMock;
 });
-const baseMock = jest.fn().mockImplementation(() => baseFunctionMock);
-const airtableMock = jest.fn().mockImplementation(() => {
-  return {
-    base: baseMock,
-  };
-});
+const baseMock = jest.fn(() => baseFunctionMock);
+const airtableMock = jest.fn(() => ({
+  base: baseMock,
+}));
 
-jest.mock('airtable', () => {
-  return airtableMock;
-});
+jest.mock('airtable', () => ({
+  __esModule: true,
+  default: airtableMock,
+}));
 
-import Airtable = require('airtable');
+import { ILabber, ITeam } from '@protocol-labs-network/api';
 import { IAirtableLabber, IAirtableTeam } from '../models';
 import airtableService from './airtable';
+import Airtable = require('airtable');
 
 describe('AirtableService', () => {
   describe('when initialized', () => {
@@ -61,11 +126,11 @@ describe('AirtableService', () => {
     });
   });
 
-  describe('#getAllTeams', () => {
-    let teams: IAirtableTeam[];
+  describe('#getTeams', () => {
+    let teams: ITeam[];
 
     beforeEach(async () => {
-      teams = await airtableService.getAllTeams();
+      teams = await airtableService.getTeams();
     });
 
     it('should select all teams from teams table', () => {
@@ -74,12 +139,28 @@ describe('AirtableService', () => {
     });
 
     it('should retrieve all teams', () => {
-      expect(teams).toEqual(teamsMock);
+      expect(teams).toEqual([
+        {
+          filecoinUser: teamMock.fields['Filecoin User'],
+          fundingStage: teamMock.fields['Funding Stage'],
+          fundingVehicle: teamMock.fields['Funding Vehicle'],
+          id: teamMock.id,
+          industry: teamMock.fields.Industry,
+          ipfsUser: teamMock.fields['IPFS User'],
+          labbers: teamMock.fields['Network members'],
+          logo: teamMock.fields.Logo?.[0].url,
+          longDescription: teamMock.fields['Long description'],
+          name: teamMock.fields.Name,
+          shortDescription: teamMock.fields['Short description'],
+          twitter: teamMock.fields.Twitter,
+          website: teamMock.fields.Website,
+        },
+      ]);
     });
   });
 
   describe('#getTeam', () => {
-    let team: IAirtableTeam;
+    let team: ITeam;
 
     beforeEach(async () => {
       team = await airtableService.getTeam(teamMock.id);
@@ -91,15 +172,29 @@ describe('AirtableService', () => {
     });
 
     it('should retrieve the team with the provided id', () => {
-      expect(team).toEqual(teamMock);
+      expect(team).toEqual({
+        filecoinUser: teamMock.fields['Filecoin User'],
+        fundingStage: teamMock.fields['Funding Stage'],
+        fundingVehicle: teamMock.fields['Funding Vehicle'],
+        id: teamMock.id,
+        industry: teamMock.fields.Industry,
+        ipfsUser: teamMock.fields['IPFS User'],
+        labbers: teamMock.fields['Network members'],
+        logo: teamMock.fields.Logo?.[0].url,
+        longDescription: teamMock.fields['Long description'],
+        name: teamMock.fields.Name,
+        shortDescription: teamMock.fields['Short description'],
+        twitter: teamMock.fields.Twitter,
+        website: teamMock.fields.Website,
+      });
     });
   });
 
-  describe('#getAllLabbers', () => {
-    let labbers: IAirtableLabber[];
+  describe('#getLabbers', () => {
+    let labbers: ILabber[];
 
     beforeEach(async () => {
-      labbers = await airtableService.getAllLabbers();
+      labbers = await airtableService.getLabbers();
     });
 
     it('should select all labbers from labbers table', () => {
@@ -108,12 +203,23 @@ describe('AirtableService', () => {
     });
 
     it('should retrieve all labbers', () => {
-      expect(labbers).toEqual(labbersMock);
+      expect(labbers).toEqual([
+        {
+          discordHandle: labberMock.fields['Discord Handle'],
+          displayName: labberMock.fields['Display Name'],
+          email: labberMock.fields.Email,
+          id: labberMock.id,
+          image: labberMock.fields['Profile picture']?.[0].url,
+          name: labberMock.fields.Name,
+          role: labberMock.fields.Role,
+          twitter: labberMock.fields.Twitter,
+        },
+      ]);
     });
   });
 
   describe('#getLabber', () => {
-    let labber: IAirtableLabber;
+    let labber: ILabber;
 
     beforeEach(async () => {
       labber = await airtableService.getLabber(labberMock.id);
@@ -125,7 +231,16 @@ describe('AirtableService', () => {
     });
 
     it('should retrieve the labber with the provided id', () => {
-      expect(labber).toEqual(labberMock);
+      expect(labber).toEqual({
+        discordHandle: labberMock.fields['Discord Handle'],
+        displayName: labberMock.fields['Display Name'],
+        email: labberMock.fields.Email,
+        id: labberMock.id,
+        image: labberMock.fields['Profile picture']?.[0].url,
+        name: labberMock.fields.Name,
+        role: labberMock.fields.Role,
+        twitter: labberMock.fields.Twitter,
+      });
     });
   });
 });
