@@ -1,5 +1,5 @@
 import { ILabber, ITeam } from '@protocol-labs-network/api';
-import * as Airtable from 'airtable';
+import Airtable from 'airtable';
 import { IAirtableLabber, IAirtableTeam } from '../models';
 
 /**
@@ -10,8 +10,8 @@ import { IAirtableLabber, IAirtableTeam } from '../models';
 class AirtableService {
   private static _instance: AirtableService;
 
-  private _teamsTable: Airtable.Table<Airtable.FieldSet>;
-  private _labbersTable: Airtable.Table<Airtable.FieldSet>;
+  private _teamsTable!: Airtable.Table<Airtable.FieldSet>;
+  private _labbersTable!: Airtable.Table<Airtable.FieldSet>;
 
   constructor() {
     if (!AirtableService._instance) {
