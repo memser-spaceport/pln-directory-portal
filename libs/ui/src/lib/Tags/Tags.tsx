@@ -27,16 +27,7 @@ export function Tags({ tagsList }: TagsProps) {
       if (isOnLimitX) {
         el.style.display = 'none';
       }
-      console.group();
-      console.log('rightLimit', rightLimit);
-      console.log('>>> el', el, el.offsetLeft, el.offsetWidth);
-      console.log('isOnLimit', isOnLimitX);
-      console.log('childrenArr', childrenArr);
-      console.groupEnd();
     });
-
-    //offsetLeft offsetTop offsetWidth
-    //.5rem
   }, []);
 
   return (
