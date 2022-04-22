@@ -3,7 +3,7 @@ import { MOCK_TEAMS_LIST as TEAMS_LIST } from '../../utils';
 
 export const sortTeams = (teams) =>
   teams.sort((a, b) => {
-    return a.fields.Name < b.fields.Name ? -1 : 1;
+    return a.fields.name < b.fields.name ? -1 : 1;
   });
 
 export function Teams() {
