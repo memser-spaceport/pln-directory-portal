@@ -17,28 +17,25 @@ export function Teams() {
         {sortedTeams.map((item, index) => {
           const {
             fields: {
-              Name,
-              ['Short description']: ShortDescription,
-              Twitter,
-              Logo,
-              Industry,
-              Website,
+              name,
+              shortDescription,
+              twitter,
+              logo,
+              industry,
+              website,
             },
           } = item;
-
-          const thumbnails = Logo && Logo[0].thumbnails;
-          const logoImage = thumbnails && thumbnails.large.url;
 
           return (
             <TeamCard
               key={index}
               teamData={{
-                Name,
-                ShortDescription,
-                Twitter,
-                logoImage,
-                Industry,
-                Website,
+                name,
+                shortDescription,
+                twitter,
+                logo,
+                industry,
+                website,
               }}
             />
           );
