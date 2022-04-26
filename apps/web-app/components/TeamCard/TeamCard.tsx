@@ -2,6 +2,7 @@
 import { ExternalLinkIcon } from '@heroicons/react/solid';
 import { Tags } from '@protocol-labs-network/ui';
 import Link from 'next/link';
+import { getClickableLink } from '../../utils';
 import { DirectoryCard } from '../DirectoryCard/DirectoryCard';
 import { ReactComponent as TwitterLogo } from '/public/assets/images/icons/twitter-logo-icon.svg';
 
@@ -39,7 +40,7 @@ export function TeamCard({ teamData }: TeamCardProps) {
       </div>
       <div className="flex pt-4">
         {website ? (
-          <Link href={website}>
+          <Link href={getClickableLink(website)}>
             <a target="_blank">
               <ExternalLinkIcon className="mr-2 h-5 fill-slate-500 hover:fill-slate-900" />
             </a>

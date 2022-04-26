@@ -13,7 +13,7 @@ export function Teams() {
     <section className="px-28 pt-8">
       <h1 className="text-3xl font-bold text-slate-900 mb-10">Teams</h1>
 
-      <div className="grid gap-5 grid-cols-4">
+      <div className="grid gap-5 grid-cols-4 min-w-[1000px]">
         {sortedTeams.map((item, index) => {
           const {
             fields: {
