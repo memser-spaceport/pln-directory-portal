@@ -1,3 +1,9 @@
+export const getClickableLink = (link) => {
+  return link.startsWith('http://') || link.startsWith('https://')
+    ? link
+    : `http://${link}`;
+};
+
 export const MOCK_TEAMS_LIST = [
   {
     id: 'rec0QV8JDzCJEOI3v',

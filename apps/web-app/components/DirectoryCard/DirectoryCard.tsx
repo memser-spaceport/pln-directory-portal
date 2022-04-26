@@ -10,7 +10,7 @@ export function DirectoryCard({
   children,
 }: DirectoryCardProps) {
   return (
-    <div className="bg-white border rounded-lg shadow-md text-sm px-6 pt-6 pb-4">
+    <div className="bg-white border rounded-lg shadow-md text-sm px-6 pt-6 pb-4 min-w-[250px]">
       {children}
     </div>
   );
