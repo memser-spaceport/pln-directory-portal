@@ -6,16 +6,13 @@ export interface TagsProps {
   tagsList: string[];
 }
 
-const MARGIN_BETWEEN_TAGS = 8;
-const TOOLTIP_SIZE = 26;
-
 const renderTooltip = (hiddenTags: string[]) => {
   return (
     <Tooltip.Provider delayDuration={0}>
       <Tooltip.Root>
         <Tooltip.Trigger>
           <span
-            className={`h-[${TOOLTIP_SIZE}px] w-[${TOOLTIP_SIZE}px] border hover:border-indigo-600 rounded-full flex items-center justify-center group`}
+            className={`h-[26px] w-[26px] border hover:border-indigo-600 rounded-full flex items-center justify-center group`}
           >
             {hiddenTags.length}
             <PlusIcon className="h-2 fill-slate-500 group-hover:fill-indigo-600" />
@@ -39,7 +36,7 @@ export const renderTags = (arr: string[]) => {
   return arr.map((item: string, i: number) => (
     <span
       key={i}
-      className={`text-xs px-3 py-1 mr-[${MARGIN_BETWEEN_TAGS}px] mb-2 border rounded-full`}
+      className={`text-xs px-3 py-1 mr-[8px] mb-2 border rounded-full`}
     >
       {item}
     </span>

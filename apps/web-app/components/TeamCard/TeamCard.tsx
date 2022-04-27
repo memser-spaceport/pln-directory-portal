@@ -8,7 +8,7 @@ import { ReactComponent as TwitterLogo } from '/public/assets/images/icons/twitt
 
 export interface TeamCardProps {
   teamData: {
-    id?: number;
+    id?: string;
     name?: string;
     shortDescription?: string;
     twitter?: string;
