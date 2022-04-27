@@ -8,6 +8,7 @@ import { ReactComponent as TwitterLogo } from '/public/assets/images/icons/twitt
 
 export interface TeamCardProps {
   teamData: {
+    id?: number;
     name?: string;
     shortDescription?: string;
     twitter?: string;
@@ -17,11 +18,21 @@ export interface TeamCardProps {
   };
 }
 
+const handleClick = (target, id) => {
+  const parentHasClass = target.closest('div').classList.contains('PLN-links');
+
+  if (target.tagName === 'a' || parentHasClass) {
+    return;
+  }
+  //TODO: implement dynamic route (uses id) after creating team page
+};
+
 export function TeamCard({ teamData }: TeamCardProps) {
-  const { name, shortDescription, twitter, logo, industry, website } = teamData;
+  const { id, name, shortDescription, twitter, logo, industry, website } =
+    teamData;
 
   return (
-    <DirectoryCard isGrid={true} clickEv={() => alert('teste')}>
+    <DirectoryCard isGrid={true} clickEv={(e) => handleClick(e.target, id)}>
       <div
         className={`w-full h-24 rounded-lg mb-5 ${
           logo ? 'bg-no-repeat bg-center bg-contain' : 'bg-slate-200'
@@ -38,7 +49,7 @@ export function TeamCard({ teamData }: TeamCardProps) {
           'Industry not Provided'
         )}
       </div>
-      <div className="flex pt-4">
+      <div className="PLN-links flex pt-4">
         {website ? (
           <Link href={getClickableLink(website)}>
             <a target="_blank">

@@ -17,7 +17,8 @@ const renderTooltip = (hiddenTags: string[]) => {
           <span
             className={`h-[${TOOLTIP_SIZE}px] w-[${TOOLTIP_SIZE}px] border hover:border-indigo-600 rounded-full flex items-center justify-center group`}
           >
-            <PlusIcon className="h-3 fill-slate-500 group-hover:fill-indigo-600" />
+            {hiddenTags.length}
+            <PlusIcon className="h-2 fill-slate-500 group-hover:fill-indigo-600" />
           </span>
         </Tooltip.Trigger>
         <Tooltip.Content
@@ -47,33 +48,34 @@ export const renderTags = (arr: string[]) => {
 
 export function Tags({ tagsList }: TagsProps) {
   const containerRef = useRef<HTMLHeadingElement>(null);
-  const [isOverflowing, setIsOverflowing] = useState(false);
-  const [hiddenTags, setHiddenTags] = useState([]);
+  let isOverflowing = false;
+  const [hiddenTags, setHiddenTags] = useState<string[]>([]);
 
   useEffect(() => {
+    if (!containerRef.current) {
+      return;
+    }
     const rightLimit =
-      containerRef.current.offsetLeft + containerRef.current.offsetWidth;
+      containerRef.current?.offsetLeft + containerRef.current?.offsetWidth;
 
-    const childrenArr = containerRef.current
-      ? [].slice.call(containerRef.current.children)
-      : [];
+    const childrenArr = Array.from(containerRef.current.children);
 
-    childrenArr.forEach((el: HTMLElement) => {
-      const TOOLTIP_SPACE = MARGIN_BETWEEN_TAGS + TOOLTIP_SIZE;
-      const elOverflows =
-        el.offsetLeft + el.offsetWidth + TOOLTIP_SPACE >= rightLimit;
-      setIsOverflowing(elOverflows);
-      if (elOverflows) {
-        setHiddenTags((tags) => [...tags, el.innerText]);
-        el.style.display = 'none';
+    childrenArr.forEach((el: Element) => {
+      if (el instanceof HTMLElement) {
+        isOverflowing = el.offsetLeft + el.offsetWidth >= rightLimit;
+
+        if (isOverflowing && el.innerText) {
+          setHiddenTags((tags) => [...tags, el.innerText]);
+          el.style.display = 'none';
+        }
       }
     });
-  }, []);
+  }, [isOverflowing]);
 
   return (
     <div className="flex items-start justify-start" ref={containerRef}>
       {renderTags(tagsList)}
-      {isOverflowing && renderTooltip(hiddenTags)}
+      {hiddenTags.length ? renderTooltip(hiddenTags) : null}
     </div>
   );
 }

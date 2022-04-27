@@ -1,7 +1,7 @@
 import { TeamCard } from '../../components/TeamCard/TeamCard';
 import { MOCK_TEAMS_LIST as TEAMS_LIST } from '../../utils';
 
-export const sortTeams = (teams) =>
+const sortTeams = (teams) =>
   teams.sort((a, b) => {
     return a.fields.name < b.fields.name ? -1 : 1;
   });
@@ -13,9 +13,10 @@ export function Teams() {
     <section className="px-28 pt-8">
       <h1 className="text-3xl font-bold text-slate-900 mb-10">Teams</h1>
 
-      <div className="grid gap-5 grid-cols-4 min-w-[1000px]">
+      <div className="grid gap-5 grid-cols-4 min-w-[1100px]">
         {sortedTeams.map((item, index) => {
           const {
+            id,
             fields: {
               name,
               shortDescription,
@@ -30,6 +31,7 @@ export function Teams() {
             <TeamCard
               key={index}
               teamData={{
+                id,
                 name,
                 shortDescription,
                 twitter,
