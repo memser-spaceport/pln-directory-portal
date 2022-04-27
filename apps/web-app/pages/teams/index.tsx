@@ -10,7 +10,7 @@ export function Teams() {
   const sortedTeams = sortTeams(TEAMS_LIST);
 
   return (
-    <section className="px-28 pt-8">
+    <section className="px-28 py-8">
       <h1 className="text-3xl font-bold text-slate-900 mb-10">Teams</h1>
 
       <div className="grid gap-5 grid-cols-4 min-w-[1100px]">
