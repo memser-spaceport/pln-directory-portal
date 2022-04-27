@@ -2,8 +2,12 @@
 import { ExternalLinkIcon } from '@heroicons/react/solid';
 import { Tags } from '@protocol-labs-network/ui';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { getClickableLink } from '../../utils';
-import { DirectoryCard } from '../DirectoryCard/DirectoryCard';
+import {
+  DirectoryCard,
+  DirectoryCardProps,
+} from '../DirectoryCard/DirectoryCard';
 import { ReactComponent as TwitterLogo } from '/public/assets/images/icons/twitter-logo-icon.svg';
 
 export interface TeamCardProps {
@@ -18,21 +22,29 @@ export interface TeamCardProps {
   };
 }
 
-const handleClick = (target, id) => {
-  const parentHasClass = target.closest('div').classList.contains('PLN-links');
-
-  if (target.tagName === 'a' || parentHasClass) {
-    return;
-  }
-  //TODO: implement dynamic route (uses id) after creating team page
-};
-
 export function TeamCard({ teamData }: TeamCardProps) {
   const { id, name, shortDescription, twitter, logo, industry, website } =
     teamData;
 
+  const { push } = useRouter();
+
+  const handleClick = (
+    e: Parameters<DirectoryCardProps['onClick']>[0],
+    id: string
+  ) => {
+    const parentHasClass = e.currentTarget
+      .closest('div')
+      .classList.contains('PLN-links');
+
+    if (e.currentTarget.tagName === 'a' || parentHasClass) {
+      e.stopPropagation();
+      return;
+    }
+    push(`/teams/${id}`);
+  };
+
   return (
-    <DirectoryCard isGrid={true} clickEv={(e) => handleClick(e.target, id)}>
+    <DirectoryCard isGrid={true} onClick={(e) => handleClick(e, id)}>
       <div
         className={`w-full h-24 rounded-lg mb-5 ${
           logo ? 'bg-no-repeat bg-center bg-contain' : 'bg-slate-200'
