@@ -46,22 +46,20 @@ export function TeamCard({
           'Industry not Provided'
         )}
       </div>
-      <div className={`${TEAM_CARD_LINKS_CLASSNAME} flex px-6 py-4`}>
+      <div className={`${TEAM_CARD_LINKS_CLASSNAME} flex px-6 py-4 space-x-2`}>
         <AnchorLink href={website}>
           <ExternalLinkIcon
-            className={`mr-2 h-5 ${
-              website ? 'fill-slate-500 hover:fill-slate-900' : 'fill-slate-300'
+            className={`w-5 h-5 ${
+              website ? 'text-slate-500 hover:text-slate-900' : 'text-slate-300'
             }`}
           />
         </AnchorLink>
         <AnchorLink href={twitter}>
           <TwitterLogo
-            className={`mr-2 mt-1 ${
-              twitter ? 'fill-slate-500 hover:fill-slate-900' : 'fill-slate-300'
+            className={`w-5 h-5 ${
+              twitter ? 'text-slate-500 hover:text-slate-900' : 'text-slate-300'
             } `}
             title="Twitter Logo Icon"
-            width="auto"
-            height="13px"
           />
         </AnchorLink>
       </div>
