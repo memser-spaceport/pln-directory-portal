@@ -9,7 +9,7 @@ type TeamsProps = {
 
 export default function Teams({ teams }: TeamsProps) {
   return (
-    <section className="px-28 py-8 min-w-[768px] max-w-[1324px] mx-auto">
+    <section className="p-8 min-w-[768px] max-w-[1164px] mx-auto">
       <Head>
         <title>Teams</title>
       </Head>
@@ -30,9 +30,7 @@ export default function Teams({ teams }: TeamsProps) {
   );
 }
 
-export const getServerSideProps: GetServerSideProps<TeamsProps> = async (
-  context
-) => {
+export const getServerSideProps: GetServerSideProps<TeamsProps> = async () => {
   return {
     props: { teams: TEAMS_LIST }, // will be passed to the page component as props
   };
