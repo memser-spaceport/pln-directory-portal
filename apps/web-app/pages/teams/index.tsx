@@ -1,54 +1,39 @@
-import { TeamCard } from '../../components/TeamCard/TeamCard';
+import { GetServerSideProps } from 'next';
+import Head from 'next/head';
+import { TeamCard, TeamCardProps } from '../../components/TeamCard/TeamCard';
 import { MOCK_TEAMS_LIST as TEAMS_LIST } from '../../utils';
 
-const sortTeams = (teams) =>
-  teams.sort((a, b) => {
-    return a.fields.name < b.fields.name ? -1 : 1;
-  });
+type TeamsProps = {
+  teams: TeamCardProps[];
+};
 
-export function Teams() {
-  const sortedTeams = sortTeams(TEAMS_LIST);
-
+export default function Teams({ teams }: TeamsProps) {
   return (
-    <section className="px-28 py-8">
+    <section className="px-28 py-8 min-w-[768px] max-w-[1324px] mx-auto">
+      <Head>
+        <title>Teams</title>
+      </Head>
       <h1 className="text-3xl font-bold text-slate-900 mb-10">Teams</h1>
 
-      <div className="grid gap-5 grid-cols-4 min-w-[1100px]">
-        {sortedTeams.map((item, index) => {
-          const {
-            id,
-            fields: {
-              name,
-              shortDescription,
-              twitter,
-              logo,
-              industry,
-              website,
-            },
-          } = item;
+      <div className="flex flex-wrap gap-5">
+        {teams.map((team) => {
+          const { id, ...fields } = team;
 
-          return (
-            <TeamCard
-              key={index}
-              teamData={{
-                id,
-                name,
-                shortDescription,
-                twitter,
-                logo,
-                industry,
-                website,
-              }}
-            />
-          );
+          return <TeamCard key={id} {...{ id, ...fields }} />;
         })}
       </div>
 
       <div className="mt-8 text-sm text-slate-500">
-        Showing <b>{TEAMS_LIST.length}</b> results
+        Showing <b>{teams.length}</b> results
       </div>
     </section>
   );
 }
 
-export default Teams;
+export const getServerSideProps: GetServerSideProps<TeamsProps> = async (
+  context
+) => {
+  return {
+    props: { teams: TEAMS_LIST }, // will be passed to the page component as props
+  };
+};
