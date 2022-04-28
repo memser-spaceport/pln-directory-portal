@@ -8,7 +8,7 @@ export const MOCK_TEAMS_LIST = [
     Blog: 'https://exorde.network/blog',
     logo: 'https://dl.airtable.com/.attachmentThumbnails/d7f7ce5944503f69ed4bf759006115f6/8030f5c1',
     Labbers: ['recRRfUBNdYG5G2EK'],
-    industry: ['Analytics', 'Metaverse', 'DAbsdO'],
+    industry: ['Analytics', 'Metaverse', 'DAO'],
     'Long description':
       'Exorde is a protocol aimed at analyzing the propagation of information across the Web. Leveraging a decentralized community, Exorde reaches far out into Web2 to create a dynamic map of content that is being created and relayed on the Web in real time. ',
     website: 'https://exorde.network/',

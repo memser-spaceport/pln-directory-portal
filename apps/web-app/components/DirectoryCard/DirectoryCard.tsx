@@ -6,7 +6,7 @@ export type DirectoryCardProps = {
 
 export function DirectoryCard({ isGrid, children }: DirectoryCardProps) {
   return (
-    <div className="w-[260px] bg-white border rounded-lg shadow-md text-sm  pb-4  cursor-pointer">
+    <div className="w-[260px] bg-white border rounded-lg shadow-md text-sm">
       {children}
     </div>
   );

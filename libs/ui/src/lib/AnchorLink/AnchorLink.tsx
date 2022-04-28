@@ -2,30 +2,30 @@ import Link, { LinkProps } from 'next/link';
 
 export type AnchorLinkProps = React.PropsWithChildren<Partial<LinkProps>>;
 
-function isExternalLink(link: LinkProps['href']) {
+function isExternalLink(link: string) {
   const href = link.toString();
 
   return href.startsWith('http://') || href.startsWith('https://');
 }
 
-function normalizeLink(link: LinkProps['href']) {
+function parseLink(link: LinkProps['href']) {
   const href = link.toString();
+  const isExternal = isExternalLink(href);
 
-  if (href.startsWith('/')) {
-    return href;
+
+  return {
+    link: href.startsWith('/') ? href : isExternal ? href : `http://${link}`,
+    isExternal,
   }
-
-  return isExternalLink(href) ? href : `http://${link}`;
 }
 
 export function AnchorLink({ href, children }: AnchorLinkProps) {
   if (href) {
-    const link = normalizeLink(href);
-    const isExternal = isExternalLink(link);
+    const { link, isExternal } = parseLink(href);
 
     return (
       <Link href={link}>
-        <a target={isExternal ? '_blank' : '_self'}>{children}</a>
+        <a target={isExternal ? '_blank' : '_self'} {...(isExternal ? { rel:"noopener noreferrer" } : {})}>{children}</a>
       </Link>
     );
   }

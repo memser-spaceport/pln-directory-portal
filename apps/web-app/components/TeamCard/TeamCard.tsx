@@ -26,7 +26,7 @@ export function TeamCard({
   return (
     <DirectoryCard isGrid={true}>
       <AnchorLink href={`/teams/${id}`}>
-        <div className="cardHeader px-6 pt-6">
+        <div className="px-6 pt-6">
           <div
             className={`w-full h-24 rounded-lg mb-5 ${
               logo ? 'bg-no-repeat bg-center bg-contain' : 'bg-slate-200'
@@ -46,7 +46,7 @@ export function TeamCard({
           'Industry not Provided'
         )}
       </div>
-      <div className={`${TEAM_CARD_LINKS_CLASSNAME} flex px-6 pt-4`}>
+      <div className={`${TEAM_CARD_LINKS_CLASSNAME} flex px-6 py-4`}>
         <AnchorLink href={website}>
           <ExternalLinkIcon
             className={`mr-2 h-5 ${
