@@ -1,30 +1,31 @@
-/* eslint-disable jsx-a11y/anchor-is-valid */
 import { ExternalLinkIcon } from '@heroicons/react/solid';
-import { Tags } from '@protocol-labs-network/ui';
-import Link from 'next/link';
+import { AnchorLink, Tags } from '@protocol-labs-network/ui';
 import { useRouter } from 'next/router';
-import { getClickableLink } from '../../utils';
 import {
   DirectoryCard,
   DirectoryCardProps,
 } from '../DirectoryCard/DirectoryCard';
 import { ReactComponent as TwitterLogo } from '/public/assets/images/icons/twitter-logo-icon.svg';
-
 export interface TeamCardProps {
-  teamData: {
-    id?: string;
-    name?: string;
-    shortDescription?: string;
-    twitter?: string;
-    logo?: string;
-    industry?: string[];
-    website?: string;
-  };
+  id?: string;
+  name?: string;
+  shortDescription?: string;
+  twitter?: string;
+  logo?: string;
+  industry?: string[];
+  website?: string;
 }
 
-export function TeamCard({ teamData }: TeamCardProps) {
-  const { id, name, shortDescription, twitter, logo, industry, website } =
-    teamData;
+export function TeamCard({
+  id,
+  name,
+  shortDescription,
+  twitter,
+  logo,
+  industry,
+  website,
+}: TeamCardProps) {
+  const TEAM_CARD_LINKS_CLASSNAME = 'PLN-links';
 
   const { push } = useRouter();
 
@@ -32,11 +33,12 @@ export function TeamCard({ teamData }: TeamCardProps) {
     e: Parameters<DirectoryCardProps['onClick']>[0],
     id: string
   ) => {
-    const parentHasClass = e.currentTarget
+    const currentEl = e.target as HTMLElement;
+    const parentHasClass = currentEl
       .closest('div')
-      .classList.contains('PLN-links');
+      .classList.contains(TEAM_CARD_LINKS_CLASSNAME);
 
-    if (e.currentTarget.tagName === 'a' || parentHasClass) {
+    if (currentEl.tagName === 'a' || parentHasClass) {
       e.stopPropagation();
       return;
     }
@@ -45,54 +47,44 @@ export function TeamCard({ teamData }: TeamCardProps) {
 
   return (
     <DirectoryCard isGrid={true} onClick={(e) => handleClick(e, id)}>
-      <div
-        className={`w-full h-24 rounded-lg mb-5 ${
-          logo ? 'bg-no-repeat bg-center bg-contain' : 'bg-slate-200'
-        } `}
-        style={{ backgroundImage: `url(${logo})` }}
-      ></div>
-      <h6 className="text-base text-slate-900 font-semibold">{name}</h6>
-      <p className="mt-0.5 h-24 text-clip">{shortDescription}</p>
+      <div className="cardHeader px-6 pt-6">
+        <div
+          className={`w-full h-24 rounded-lg mb-5 ${
+            logo ? 'bg-no-repeat bg-center bg-contain' : 'bg-slate-200'
+          } `}
+          style={{ backgroundImage: `url(${logo})` }}
+        ></div>
 
-      <div className="text-xs text-slate-400 font-medium pt-3 h-[50px] border-b border-slate-200">
+        <h6 className="text-base text-slate-900 font-semibold">{name}</h6>
+        <p className="mt-0.5 h-16 overflow-clip">{shortDescription}</p>
+      </div>
+
+      <div className="text-xs text-slate-400 font-medium px-6 pt-3 h-[50px] border-b border-slate-200">
         {industry && industry.length ? (
-          <Tags tagsList={industry} />
+          <Tags items={industry} />
         ) : (
           'Industry not Provided'
         )}
       </div>
-      <div className="PLN-links flex pt-4">
-        {website ? (
-          <Link href={getClickableLink(website)}>
-            <a target="_blank">
-              <ExternalLinkIcon className="mr-2 h-5 fill-slate-500 hover:fill-slate-900" />
-            </a>
-          </Link>
-        ) : (
-          <ExternalLinkIcon className="mr-2 h-5 fill-slate-300" />
-        )}
-        {twitter ? (
-          <Link href={twitter}>
-            <a target="_blank">
-              <TwitterLogo
-                className="mr-2 mt-1 fill-slate-500 hover:fill-slate-900"
-                title="Twitter Logo Icon"
-                width="auto"
-                height="13px"
-              />
-            </a>
-          </Link>
-        ) : (
+      <div className={`${TEAM_CARD_LINKS_CLASSNAME} flex px-6 pt-4`}>
+        <AnchorLink href={website}>
+          <ExternalLinkIcon
+            className={`mr-2 h-5 ${
+              website ? 'fill-slate-500 hover:fill-slate-900' : 'fill-slate-300'
+            }`}
+          />
+        </AnchorLink>
+        <AnchorLink href={twitter}>
           <TwitterLogo
-            className="mr-2 mt-1 fill-slate-300"
+            className={`mr-2 mt-1 ${
+              twitter ? 'fill-slate-500 hover:fill-slate-900' : 'fill-slate-300'
+            } `}
             title="Twitter Logo Icon"
             width="auto"
             height="13px"
           />
-        )}
+        </AnchorLink>
       </div>
     </DirectoryCard>
   );
 }
-
-export default TeamCard;

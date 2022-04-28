@@ -11,12 +11,10 @@ export function DirectoryCard({
 }: DirectoryCardProps) {
   return (
     <div
-      className="bg-white border rounded-lg shadow-md text-sm px-6 pt-6 pb-4 min-w-[260px] cursor-pointer"
+      className="w-[260px] bg-white border rounded-lg shadow-md text-sm  pb-4  cursor-pointer"
       onClick={onClick}
     >
       {children}
     </div>
   );
 }
-
-export default DirectoryCard;
