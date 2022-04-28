@@ -1,10 +1,6 @@
 import { ExternalLinkIcon } from '@heroicons/react/solid';
 import { AnchorLink, Tags } from '@protocol-labs-network/ui';
-import { useRouter } from 'next/router';
-import {
-  DirectoryCard,
-  DirectoryCardProps,
-} from '../DirectoryCard/DirectoryCard';
+import { DirectoryCard } from '../DirectoryCard/DirectoryCard';
 import { ReactComponent as TwitterLogo } from '/public/assets/images/icons/twitter-logo-icon.svg';
 export interface TeamCardProps {
   id?: string;
@@ -27,37 +23,21 @@ export function TeamCard({
 }: TeamCardProps) {
   const TEAM_CARD_LINKS_CLASSNAME = 'PLN-links';
 
-  const { push } = useRouter();
-
-  const handleClick = (
-    e: Parameters<DirectoryCardProps['onClick']>[0],
-    id: string
-  ) => {
-    const currentEl = e.target as HTMLElement;
-    const parentHasClass = currentEl
-      .closest('div')
-      .classList.contains(TEAM_CARD_LINKS_CLASSNAME);
-
-    if (currentEl.tagName === 'a' || parentHasClass) {
-      e.stopPropagation();
-      return;
-    }
-    push(`/teams/${id}`);
-  };
-
   return (
-    <DirectoryCard isGrid={true} onClick={(e) => handleClick(e, id)}>
-      <div className="cardHeader px-6 pt-6">
-        <div
-          className={`w-full h-24 rounded-lg mb-5 ${
-            logo ? 'bg-no-repeat bg-center bg-contain' : 'bg-slate-200'
-          } `}
-          style={{ backgroundImage: `url(${logo})` }}
-        ></div>
+    <DirectoryCard isGrid={true}>
+      <AnchorLink href={`/teams/${id}`}>
+        <div className="cardHeader px-6 pt-6">
+          <div
+            className={`w-full h-24 rounded-lg mb-5 ${
+              logo ? 'bg-no-repeat bg-center bg-contain' : 'bg-slate-200'
+            } `}
+            style={{ backgroundImage: `url(${logo})` }}
+          ></div>
 
-        <h6 className="text-base text-slate-900 font-semibold">{name}</h6>
-        <p className="mt-0.5 h-16 overflow-clip">{shortDescription}</p>
-      </div>
+          <h6 className="text-base text-slate-900 font-semibold">{name}</h6>
+          <p className="mt-0.5 h-16 overflow-clip">{shortDescription}</p>
+        </div>
+      </AnchorLink>
 
       <div className="text-xs text-slate-400 font-medium px-6 pt-3 h-[50px] border-b border-slate-200">
         {industry && industry.length ? (
