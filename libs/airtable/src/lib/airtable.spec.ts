@@ -82,7 +82,7 @@ const labbersTableMock: Airtable.Table<Record<string, string>> = {
 } as unknown as Airtable.Table<Record<string, string>>;
 
 const baseFunctionMock = jest.fn((tableId: string) => {
-  return tableId === process.env.AIRTABLE_TEAMS_TABLE_ID
+  return tableId === 'MOCK_AIRTABLE_TEAMS_TABLE_ID'
     ? teamsTableMock
     : labbersTableMock;
 });
@@ -106,22 +106,22 @@ describe('AirtableService', () => {
     it('should create a new Airtable instance', () => {
       expect(airtableMock).toHaveBeenCalledTimes(1);
       expect(airtableMock).toHaveBeenCalledWith({
-        apiKey: process.env.AIRTABLE_API_KEY,
+        apiKey: 'MOCK_AIRTABLE_API_KEY',
       });
     });
 
     it('should get the Airtable base', () => {
       expect(baseMock).toHaveBeenCalledTimes(1);
-      expect(baseMock).toHaveBeenCalledWith(process.env.AIRTABLE_BASE_ID);
+      expect(baseMock).toHaveBeenCalledWith('MOCK_AIRTABLE_BASE_ID');
     });
 
     it('should get the Airtable tables', () => {
       expect(baseFunctionMock).toHaveBeenCalledTimes(2);
       expect(baseFunctionMock).toHaveBeenCalledWith(
-        process.env.AIRTABLE_TEAMS_TABLE_ID
+        'MOCK_AIRTABLE_TEAMS_TABLE_ID'
       );
       expect(baseFunctionMock).toHaveBeenCalledWith(
-        process.env.AIRTABLE_LABBERS_TABLE_ID
+        'MOCK_AIRTABLE_LABBERS_TABLE_ID'
       );
     });
   });
