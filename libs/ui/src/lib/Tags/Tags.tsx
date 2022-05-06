@@ -43,15 +43,15 @@ export function Tags({ items }: TagsProps) {
     const { left, width } = containerRef.current.getBoundingClientRect();
     const rightLimit = left + width;
 
-    const childrenArr = Array.from(
-      containerRef.current.children
-      ).filter(e => e.tagName === 'SPAN') as HTMLElement[];
+    const childrenArr = Array.from(containerRef.current.children).filter(
+      (e) => e.tagName === 'SPAN'
+    ) as HTMLElement[];
 
     for (let i = 0; i < childrenArr.length; i++) {
       const el = childrenArr[i];
 
       const { left, width } = el.getBoundingClientRect();
-      const isOverflowing = (left + width) >= rightLimit;
+      const isOverflowing = left + width >= rightLimit;
 
       if (isOverflowing) {
         setHiddenStartIndex(i);
@@ -66,7 +66,9 @@ export function Tags({ items }: TagsProps) {
         {items.map((item, i) => (
           <span
             key={i}
-            className={`text-xs px-3 py-1 mr-[8px] mb-2 border rounded-full ${i >= hiddenStartIndex ? 'invisible' : 'visible'}`}
+            className={`text-xs px-3 py-1 mr-2 border rounded-full ${
+              i >= hiddenStartIndex ? 'invisible' : 'visible'
+            }`}
             style={{ order: i >= hiddenStartIndex ? i + 1 : i }}
           >
             {item}

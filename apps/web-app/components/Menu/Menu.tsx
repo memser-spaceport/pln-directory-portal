@@ -39,7 +39,10 @@ export function Menu() {
                   router.pathname == item.path ? 'text-indigo-600' : ''
                 } flex items-center px-2 py-2 hover:text-indigo-600`}
               >
-                <Icon data-testid={`${item.name}-icon`} className="mr-2 h-4" />
+                <Icon
+                  data-testid={`${item.name}-icon`}
+                  className="mr-2 w-5 h-5"
+                />
                 {item.name}
               </a>
             </Link>
