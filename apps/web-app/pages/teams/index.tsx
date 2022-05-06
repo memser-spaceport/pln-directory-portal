@@ -2,6 +2,8 @@ import airtableService from '@protocol-labs-network/airtable';
 import { ITeam } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
+import { SelectViewType } from '../../components/select-view-type/select-view-type';
+import { useViewType } from '../../components/select-view-type/use-view-type.hook';
 import { TeamCard } from '../../components/TeamCard/TeamCard';
 
 type TeamsProps = {
@@ -9,16 +11,25 @@ type TeamsProps = {
 };
 
 export default function Teams({ teams }: TeamsProps) {
+  const { selectedViewType } = useViewType();
+  const isGrid = selectedViewType === 'grid';
+
   return (
     <section className="p-8 min-w-[768px] max-w-[1164px] mx-auto">
       <Head>
         <title>Teams</title>
       </Head>
-      <h1 className="text-3xl font-bold text-slate-900 mb-10">Teams</h1>
+
+      <div className="flex justify-between items-center mb-10">
+        <h1 className="text-3xl font-bold text-slate-900">Teams</h1>
+        <div>
+          <SelectViewType />
+        </div>
+      </div>
 
       <div className="flex flex-wrap gap-5">
         {teams.map((team) => {
-          return <TeamCard key={team.id} team={team} />;
+          return <TeamCard key={team.id} team={team} isGrid={isGrid} />;
         })}
       </div>
 
