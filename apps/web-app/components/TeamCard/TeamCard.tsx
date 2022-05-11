@@ -40,14 +40,7 @@ export function TeamCard({ team }: TeamCardProps) {
       </div>
 
       <div className={`${TEAM_CARD_LINKS_CLASSNAME} flex px-6 py-4 space-x-2`}>
-        {/**
-         * TODO: Remove the website split when Airtable data gets fixed.
-         *
-         * It is necessary considering that there's one team on Airtable with
-         * an invalid website value (`http://xpto.com/ http://otpx.com/`)
-         * which needs to be parsed this way.
-         */}
-        <AnchorLink href={team.website?.split(' ')[0]}>
+        <AnchorLink href={team.website}>
           <ExternalLinkIcon
             className={`w-5 h-5 ${
               team.website

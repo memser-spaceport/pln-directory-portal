@@ -4,7 +4,7 @@ const teamMock: IAirtableTeam = {
     Name: 'Team 01',
     'Short description': 'Short description for Team 01',
     'Long description': 'Long description for Team 01',
-    Website: 'http://team01.com/',
+    Website: 'http://team01.com/ http://team0X.com/',
     Twitter: '@team01',
     'Funding Vehicle': ['Seed'],
     'Network members': ['labber_id_01'],
@@ -155,7 +155,7 @@ describe('AirtableService', () => {
           name: teamMock.fields.Name,
           shortDescription: teamMock.fields['Short description'],
           twitter: teamMock.fields.Twitter,
-          website: teamMock.fields.Website,
+          website: 'http://team01.com/',
         },
         {
           filecoinUser: false,
@@ -202,7 +202,7 @@ describe('AirtableService', () => {
         name: teamMock.fields.Name,
         shortDescription: teamMock.fields['Short description'],
         twitter: teamMock.fields.Twitter,
-        website: teamMock.fields.Website,
+        website: 'http://team01.com/',
       });
     });
   });
