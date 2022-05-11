@@ -11,3 +11,5 @@ export function DirectoryCard({ isGrid, children }: DirectoryCardProps) {
     </div>
   );
 }
+
+export default DirectoryCard;
