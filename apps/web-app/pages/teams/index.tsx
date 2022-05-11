@@ -2,7 +2,7 @@ import airtableService from '@protocol-labs-network/airtable';
 import { ITeam } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
-import TeamCard from '../../components/TeamCard/TeamCard';
+import { TeamCard } from '../../components/TeamCard/TeamCard';
 
 type TeamsProps = {
   teams: ITeam[];
