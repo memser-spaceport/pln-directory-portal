@@ -12,7 +12,7 @@ export default function Teams({ teams }: TeamsProps) {
   return (
     <section className="p-8 min-w-[768px] max-w-[1164px] mx-auto">
       <Head>
-        <title>Teams | Protocol Labs Network</title>
+        <title>Teams</title>
       </Head>
       <h1 className="text-3xl font-bold text-slate-900 mb-10">Teams</h1>
 
