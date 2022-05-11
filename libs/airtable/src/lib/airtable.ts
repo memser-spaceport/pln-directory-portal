@@ -86,19 +86,19 @@ class AirtableService {
    */
   private _parseTeam(team: IAirtableTeam): ITeam {
     return {
-      filecoinUser: team.fields['Filecoin User'],
-      fundingStage: team.fields['Funding Stage'],
-      fundingVehicle: team.fields['Funding Vehicle'],
+      filecoinUser: !!team.fields['Filecoin User'],
+      fundingStage: team.fields['Funding Stage'] || null,
+      fundingVehicle: team.fields['Funding Vehicle'] || [],
       id: team.id,
-      industry: team.fields.Industry,
-      ipfsUser: team.fields['IPFS User'],
-      labbers: team.fields['Network members'],
-      logo: team.fields.Logo && team.fields.Logo[0]?.url,
-      longDescription: team.fields['Long description'],
-      name: team.fields.Name,
-      shortDescription: team.fields['Short description'],
-      twitter: team.fields.Twitter,
-      website: team.fields.Website,
+      industry: team.fields.Industry || [],
+      ipfsUser: !!team.fields['IPFS User'],
+      labbers: team.fields['Network members'] || [],
+      logo: (team.fields.Logo && team.fields.Logo[0]?.url) || null,
+      longDescription: team.fields['Long description'] || null,
+      name: team.fields.Name || null,
+      shortDescription: team.fields['Short description'] || null,
+      twitter: team.fields.Twitter || null,
+      website: team.fields.Website || null,
     };
   }
 
@@ -114,16 +114,17 @@ class AirtableService {
    */
   private _parseLabber(labber: IAirtableLabber): ILabber {
     return {
-      discordHandle: labber.fields['Discord Handle'],
-      displayName: labber.fields['Display Name'],
-      email: labber.fields.Email,
+      discordHandle: labber.fields['Discord Handle'] || null,
+      displayName: labber.fields['Display Name'] || null,
+      email: labber.fields.Email || null,
       id: labber.id,
       image:
-        labber.fields['Profile picture'] &&
-        labber.fields['Profile picture'][0].url,
-      name: labber.fields.Name,
-      role: labber.fields.Role,
-      twitter: labber.fields.Twitter,
+        (labber.fields['Profile picture'] &&
+          labber.fields['Profile picture'][0]?.url) ||
+        null,
+      name: labber.fields.Name || null,
+      role: labber.fields.Role || null,
+      twitter: labber.fields.Twitter || null,
     };
   }
 }
