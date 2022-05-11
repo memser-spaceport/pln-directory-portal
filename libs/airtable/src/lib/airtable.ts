@@ -98,7 +98,15 @@ class AirtableService {
       name: team.fields.Name || null,
       shortDescription: team.fields['Short description'] || null,
       twitter: team.fields.Twitter || null,
-      website: team.fields.Website || null,
+      /**
+       * TODO: Remove the website split when Airtable data gets fixed.
+       *
+       * It is necessary considering that there's one team on Airtable with
+       * an invalid website value (`http://xpto.com/ http://otpx.com/`)
+       * which needs to be parsed this way.
+       */
+      website:
+        (team.fields.Website && team.fields.Website.split(' ')[0]) || null,
     };
   }
 
