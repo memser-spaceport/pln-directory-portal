@@ -25,7 +25,8 @@ const teamMock: IAirtableTeam = {
     'Friend of PLN': true,
   },
 };
-const teamsMock = [teamMock];
+const emptyTeamMock: IAirtableTeam = { id: 'team_id_02', fields: {} };
+const teamsMock = [teamMock, emptyTeamMock];
 const teamsTableMock: Airtable.Table<Record<string, string>> = {
   select: jest.fn().mockReturnValue({
     all: jest.fn().mockReturnValue(teamsMock),
@@ -73,7 +74,8 @@ const labberMock: IAirtableLabber = {
     'Friend of PLN': true,
   },
 };
-const labbersMock = [labberMock];
+const emptyLabberMock: IAirtableLabber = { id: 'labber_id_02', fields: {} };
+const labbersMock = [labberMock, emptyLabberMock];
 const labbersTableMock: Airtable.Table<Record<string, string>> = {
   select: jest.fn().mockReturnValue({
     all: jest.fn().mockReturnValue(labbersMock),
@@ -155,6 +157,21 @@ describe('AirtableService', () => {
           twitter: teamMock.fields.Twitter,
           website: teamMock.fields.Website,
         },
+        {
+          filecoinUser: false,
+          fundingStage: null,
+          fundingVehicle: [],
+          id: emptyTeamMock.id,
+          industry: [],
+          ipfsUser: false,
+          labbers: [],
+          logo: null,
+          longDescription: null,
+          name: null,
+          shortDescription: null,
+          twitter: null,
+          website: null,
+        },
       ]);
     });
   });
@@ -213,6 +230,16 @@ describe('AirtableService', () => {
           name: labberMock.fields.Name,
           role: labberMock.fields.Role,
           twitter: labberMock.fields.Twitter,
+        },
+        {
+          discordHandle: null,
+          displayName: null,
+          email: null,
+          id: emptyLabberMock.id,
+          image: null,
+          name: null,
+          role: null,
+          twitter: null,
         },
       ]);
     });
