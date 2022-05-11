@@ -71,5 +71,3 @@ export function TeamCard({ team }: TeamCardProps) {
     </DirectoryCard>
   );
 }
-
-export default TeamCard;
