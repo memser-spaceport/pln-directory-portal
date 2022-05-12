@@ -27,11 +27,7 @@ export function SelectViewType() {
     return (
       <button
         className={`group w-10 h-10 border first:rounded-l-lg first:border-r-0 last:rounded-r-lg
-        ${
-          isActive
-            ? 'bg-indigo-50 border-indigo-600'
-            : 'bg-white border-slate-500'
-        }
+        ${isActive ? 'bg-sky-50 border-sky-600' : 'bg-white border-slate-500'}
         `}
         onClick={() => changeView(viewType)}
         disabled={isActive}
@@ -40,8 +36,8 @@ export function SelectViewType() {
         <ViewTypeIcon
           className={`h-6 w-6 m-auto ${
             isActive
-              ? 'stroke-indigo-600'
-              : 'stroke-slate-500 group-hover:stroke-indigo-600'
+              ? 'stroke-sky-600'
+              : 'stroke-slate-500 group-hover:stroke-sky-600'
           }`}
           aria-hidden="true"
         />

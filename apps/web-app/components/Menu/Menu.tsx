@@ -36,8 +36,8 @@ export function Menu() {
             <Link href={item.path}>
               <a
                 className={`${
-                  router.pathname == item.path ? 'text-indigo-600' : ''
-                } flex items-center px-2 py-2 hover:text-indigo-600`}
+                  router.pathname == item.path ? 'text-sky-600' : ''
+                } flex items-center px-2 py-2 hover:text-sky-600`}
               >
                 <Icon
                   data-testid={`${item.name}-icon`}
