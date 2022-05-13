@@ -2,6 +2,7 @@ import airtableService from '@protocol-labs-network/airtable';
 import { ITeam } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
+import { DirectorySort } from '../../components/directory-sort/directory-sort';
 import { SelectViewType } from '../../components/select-view-type/select-view-type';
 import { useViewType } from '../../components/select-view-type/use-view-type.hook';
 import { TeamCard } from '../../components/TeamCard/TeamCard';
@@ -21,8 +22,9 @@ export default function Teams({ teams }: TeamsProps) {
       </Head>
 
       <div className="flex justify-between items-center mb-10">
-        <h1 className="text-3xl font-bold text-slate-900">Teams</h1>
-        <div>
+        <h1 className="text-3xl font-bold">Teams</h1>
+        <div className="flex space-x-4">
+          <DirectorySort></DirectorySort>
           <SelectViewType />
         </div>
       </div>
