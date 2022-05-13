@@ -26,8 +26,12 @@ export function SelectViewType() {
 
     return (
       <button
-        className={`group w-10 h-10 border first:rounded-l-lg first:border-r-0 last:rounded-r-lg
-        ${isActive ? 'bg-sky-50 border-sky-600' : 'bg-white border-slate-500'}
+        className={`group relative w-10 h-10 border first:rounded-l-lg last:rounded-r-lg ml-[-1px] first:ml-0
+        ${
+          isActive
+            ? 'bg-sky-100 border-sky-600 z-10'
+            : 'bg-white border-slate-300'
+        }
         `}
         onClick={() => changeView(viewType)}
         disabled={isActive}
@@ -37,7 +41,7 @@ export function SelectViewType() {
           className={`h-6 w-6 m-auto ${
             isActive
               ? 'stroke-sky-600'
-              : 'stroke-slate-500 group-hover:stroke-sky-600'
+              : 'stroke-slate-600 group-hover:stroke-sky-600'
           }`}
           aria-hidden="true"
         />
