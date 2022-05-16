@@ -1,94 +1,61 @@
+![Protocol Labs logo](./apps/web-app/public/assets/images/protocol-labs-logo-horizontal-white.svg#gh-dark-mode-only)
+![Protocol Labs logo](./apps/web-app/public/assets/images/protocol-labs-logo-horizontal-black.svg#gh-light-mode-only)
 
+# Protocol Labs Network
 
-# ProtocolLabsNetwork
+This project was generated using [Nx](https://nx.dev). Check the docs to learn more.
 
-This project was generated using [Nx](https://nx.dev).
+## Setting up the project
 
-<p style="text-align: center;"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="450"></p>
+1. Run `yarn install` in the root of the project
+2. Setup the environment variables via the `.env` file:
+   1. Run `cp .env.example .env` at the root of the project
+   2. Copy & paste the necessary environment variables values from the 1Password vault
 
-🔎 **Smart, Fast and Extensible Build System**
+### Run development server
 
-## Adding capabilities to your workspace
+Run `nx serve web-app` for a dev server. Navigate to [localhost:4200](http://localhost:4200). The app will automatically reload if you change any of the source files.
+
+### Build the app
+
+Run `nx build web-app` to build the project. The build artifacts will be stored in the `dist/` directory. Use the `--prod` flag for a production build.
+
+### Run unit tests
+
+Run `nx test web-app` to execute the unit tests via [Jest](https://jestjs.io).
+
+Run `nx affected:test` to execute the unit tests affected by a change.
+
+### Run end-to-end tests
+
+Run `nx e2e web-app` to execute the end-to-end tests via [Cypress](https://www.cypress.io).
+
+Run `nx affected:e2e` to execute the end-to-end tests affected by a change.
+
+## Adding capabilities to our workspace
 
 Nx supports many plugins which add capabilities for developing different types of applications and different tools.
 
 These capabilities include generating applications, libraries, etc as well as the devtools to test, and build projects as well.
 
-Below are our core plugins:
+### Scaffold a new component
 
-- [React](https://reactjs.org)
-  - `npm install --save-dev @nrwl/react`
-- Web (no framework frontends)
-  - `npm install --save-dev @nrwl/web`
-- [Angular](https://angular.io)
-  - `npm install --save-dev @nrwl/angular`
-- [Nest](https://nestjs.com)
-  - `npm install --save-dev @nrwl/nest`
-- [Express](https://expressjs.com)
-  - `npm install --save-dev @nrwl/express`
-- [Node](https://nodejs.org)
-  - `npm install --save-dev @nrwl/node`
+Run `nx g @nrwl/react:component my-component --project=web-app` to generate a new component.
 
-There are also many [community plugins](https://nx.dev/community) you could add.
+### Generate a React application
 
-## Generate an application
+Run `nx g @nrwl/react:app my-react-app` to generate an application.
 
-Run `nx g @nrwl/react:app my-app` to generate an application.
+### Generate a Next.js application
 
-> You can use any of the plugins above to generate applications as well.
+Run `nx g @nrwl/next:app my-nextjs-app` to generate an application.
 
-When using Nx, you can create multiple applications and libraries in the same workspace.
-
-## Generate a library
+### Generate a library
 
 Run `nx g @nrwl/react:lib my-lib` to generate a library.
 
-> You can also use any of the plugins above to generate libraries as well.
-
 Libraries are shareable across libraries and applications. They can be imported from `@protocol-labs-network/mylib`.
 
-## Development server
-
-Run `nx serve my-app` for a dev server. Navigate to http://localhost:4200/. The app will automatically reload if you change any of the source files.
-
-## Code scaffolding
-
-Run `nx g @nrwl/react:component my-component --project=my-app` to generate a new component.
-
-## Build
-
-Run `nx build my-app` to build the project. The build artifacts will be stored in the `dist/` directory. Use the `--prod` flag for a production build.
-
-## Running unit tests
-
-Run `nx test my-app` to execute the unit tests via [Jest](https://jestjs.io).
-
-Run `nx affected:test` to execute the unit tests affected by a change.
-
-## Running end-to-end tests
-
-Run `nx e2e my-app` to execute the end-to-end tests via [Cypress](https://www.cypress.io).
-
-Run `nx affected:e2e` to execute the end-to-end tests affected by a change.
-
-## Understand your workspace
+### Understand the workspace
 
 Run `nx graph` to see a diagram of the dependencies of your projects.
-
-## Further help
-
-Visit the [Nx Documentation](https://nx.dev) to learn more.
-
-
-
-## ☁ Nx Cloud
-
-### Distributed Computation Caching & Distributed Task Execution
-
-<p style="text-align: center;"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-cloud-card.png"></p>
-
-Nx Cloud pairs with Nx in order to enable you to build and test code more rapidly, by up to 10 times. Even teams that are new to Nx can connect to Nx Cloud and start saving time instantly.
-
-Teams using Nx gain the advantage of building full-stack applications with their preferred framework alongside Nx’s advanced code generation and project dependency graph, plus a unified experience for both frontend and backend developers.
-
-Visit [Nx Cloud](https://nx.app/) to learn more.
