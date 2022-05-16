@@ -31,8 +31,6 @@ export function Dropdown({
     if (selectedDropdownOption) {
       setSelectedOption(selectedDropdownOption);
       onChange && onChange(selectedDropdownOption);
-    } else {
-      throw new Error('🚫 The provided option is not valid');
     }
   }
 
