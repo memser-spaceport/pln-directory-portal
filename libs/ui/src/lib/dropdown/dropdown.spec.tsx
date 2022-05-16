@@ -13,25 +13,21 @@ describe('Dropdown', () => {
     expect(dropdownBtn.textContent).toEqual('Apples');
   });
 
-  describe('when an initial option gets passed as a prop', () => {
-    it('should have the passed option selected by default', () => {
-      render(<Dropdown options={options} initialOption={options[1]} />);
-      const dropdownBtn = screen.getByTestId('dropdown__button');
-      expect(dropdownBtn.textContent).toEqual(options[1].label);
-    });
+  it('should have the appropriate option selected by default when an initial option gets passed as a prop', () => {
+    render(<Dropdown options={options} initialOption={options[1]} />);
+    const dropdownBtn = screen.getByTestId('dropdown__button');
+    expect(dropdownBtn.textContent).toEqual(options[1].label);
   });
 
-  describe('when the user selects another option', () => {
-    it('should update the selected option', () => {
-      render(<Dropdown options={options} />);
+  it('should update the selected option when the user changes the selection', () => {
+    render(<Dropdown options={options} />);
 
-      const dropdownBtn = screen.getByTestId('dropdown__button');
-      fireEvent.click(dropdownBtn);
+    const dropdownBtn = screen.getByTestId('dropdown__button');
+    fireEvent.click(dropdownBtn);
 
-      const secondOption = screen.getByText(options[1].label);
-      fireEvent.click(secondOption);
+    const secondOption = screen.getByText(options[1].label);
+    fireEvent.click(secondOption);
 
-      expect(dropdownBtn.textContent).toEqual(options[1].label);
-    });
+    expect(dropdownBtn.textContent).toEqual(options[1].label);
   });
 });
