@@ -24,7 +24,7 @@ export default function Teams({ teams }: TeamsProps) {
       <div className="flex justify-between items-center mb-10">
         <h1 className="text-3xl font-bold">Teams</h1>
         <div className="flex space-x-4">
-          <DirectorySort></DirectorySort>
+          <DirectorySort />
           <SelectViewType />
         </div>
       </div>
