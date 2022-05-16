@@ -15,16 +15,10 @@ export function useDirectorySortOption(
       : initialOption;
 
   function changeDirectorySortOption(sortOption: TDirectorySortOption) {
-    push(
-      {
-        pathname,
-        query: { ...query, sort: sortOption },
-      },
-      undefined,
-      {
-        shallow: true,
-      }
-    );
+    push({
+      pathname,
+      query: { ...query, sort: sortOption },
+    });
   }
 
   return { selectedDirectorySortOption, changeDirectorySortOption };

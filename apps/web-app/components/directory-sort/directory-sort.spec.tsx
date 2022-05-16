@@ -16,62 +16,55 @@ describe('DirectorySort', () => {
     expect(sortBtn).toHaveTextContent('A-Z');
   });
 
-  describe('when the sort option changes', () => {
-    it('should call the router push method with the selected sort option', () => {
-      const push = jest.fn();
+  it('should call the router push method with the selected sort option when sort changes', () => {
+    const push = jest.fn();
 
+    render(
+      <RouterContext.Provider value={createMockRouter({ push })}>
+        <DirectorySort />
+      </RouterContext.Provider>
+    );
+
+    const sortBtn = screen.getByText(/sorted:/i);
+    fireEvent.click(sortBtn);
+
+    const descendingOption = screen.getByText(/z-a/i);
+    fireEvent.click(descendingOption);
+
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith({
+      pathname: '/',
+      query: { sort: 'Name,desc' },
+    });
+  });
+
+  describe('when a sort query parameter is defined', () => {
+    it('should select the defined option by default', () => {
       render(
-        <RouterContext.Provider value={createMockRouter({ push })}>
+        <RouterContext.Provider
+          value={createMockRouter({ query: { sort: 'Name,desc' } })}
+        >
           <DirectorySort />
         </RouterContext.Provider>
       );
 
       const sortBtn = screen.getByText(/sorted:/i);
-      fireEvent.click(sortBtn);
 
-      const descendingOption = screen.getByText(/z-a/i);
-      fireEvent.click(descendingOption);
+      expect(sortBtn).toHaveTextContent('Z-A');
+    });
 
-      expect(push).toHaveBeenCalledTimes(1);
-      expect(push).toHaveBeenCalledWith(
-        { pathname: '/', query: { sort: 'Name,desc' } },
-        undefined,
-        { shallow: true }
+    it('should keep the default option if it has an invalid value', () => {
+      render(
+        <RouterContext.Provider
+          value={createMockRouter({ query: { sort: 'invalid' } })}
+        >
+          <DirectorySort />
+        </RouterContext.Provider>
       );
-    });
-  });
 
-  describe('when a sort query parameter is defined', () => {
-    describe('and it has a valid value', () => {
-      it('should select the defined option by default', () => {
-        render(
-          <RouterContext.Provider
-            value={createMockRouter({ query: { sort: 'Name,desc' } })}
-          >
-            <DirectorySort />
-          </RouterContext.Provider>
-        );
+      const sortBtn = screen.getByText(/sorted:/i);
 
-        const sortBtn = screen.getByText(/sorted:/i);
-
-        expect(sortBtn).toHaveTextContent('Z-A');
-      });
-    });
-
-    describe('and it has an invalid value', () => {
-      it('should keep the default option', () => {
-        render(
-          <RouterContext.Provider
-            value={createMockRouter({ query: { sort: 'invalid' } })}
-          >
-            <DirectorySort />
-          </RouterContext.Provider>
-        );
-
-        const sortBtn = screen.getByText(/sorted:/i);
-
-        expect(sortBtn).toHaveTextContent('A-Z');
-      });
+      expect(sortBtn).toHaveTextContent('A-Z');
     });
   });
 });
