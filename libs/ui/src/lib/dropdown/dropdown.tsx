@@ -45,7 +45,7 @@ export function Dropdown({
     >
       <div className="relative">
         <Listbox.Button
-          className={`flex items-center rounded-md border bg-white px-3 h-10 border-slate-300 focus:outline-none focus:ring focus:ring-sky-300/30 focus:border-sky-300 transition ease-in-out duration-150 `}
+          className={`flex items-center rounded-lg border bg-white px-3 h-10 border-slate-300 focus:outline-none focus:ring focus:ring-sky-300/30 focus:border-sky-300 transition ease-in-out duration-150 `}
           data-testid="dropdown__button"
         >
           {buttonContent ? (
@@ -58,7 +58,7 @@ export function Dropdown({
 
         <Listbox.Options
           as="div"
-          className="absolute w-full rounded-md bg-white border border-slate-300 mt-1 leading-6 shadow-md focus:outline-none"
+          className="absolute w-full rounded-lg bg-white border border-slate-300 mt-1 leading-6 shadow-md focus:outline-none"
         >
           {options.map((option) => (
             <Listbox.Option
@@ -71,7 +71,7 @@ export function Dropdown({
                   className={`${
                     active ? 'bg-sky-500 text-white' : 'bg-white'
                   } ${selected && 'font-semibold'}
-                    select-none relative py-1 pl-8 pr-4 first:rounded-t-md last:rounded-b-md overflow-hidden cursor-pointer`}
+                    select-none relative py-1 pl-8 pr-4 first:rounded-t-lg last:rounded-b-lg overflow-hidden cursor-pointer`}
                 >
                   {selected && (
                     <CheckIcon
