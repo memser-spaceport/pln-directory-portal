@@ -1,6 +1,6 @@
 import { SortAscendingIcon, SortDescendingIcon } from '@heroicons/react/solid';
 import { Dropdown } from '@protocol-labs-network/ui';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { DirectorySortButtonContent } from './directory-sort-button-content';
 import { IDirectorySortDropdownOption } from './directory-sort.types';
 import { useDirectorySortOption } from './use-directory-sort-option.hook';
@@ -13,8 +13,9 @@ const DIRECTORY_SORT_DROPDOWN_OPTIONS: IDirectorySortDropdownOption[] = [
 export function DirectorySort() {
   const { selectedDirectorySortOption, changeDirectorySortOption } =
     useDirectorySortOption();
-  const [directorySortDropdownOptions] = useState(
-    DIRECTORY_SORT_DROPDOWN_OPTIONS
+  const directorySortDropdownOptions = useMemo(
+    () => DIRECTORY_SORT_DROPDOWN_OPTIONS,
+    []
   );
 
   const onDropdownOptionChange = useCallback(
