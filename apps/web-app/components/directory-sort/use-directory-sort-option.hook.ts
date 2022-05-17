@@ -1,4 +1,5 @@
 import { useRouter } from 'next/router';
+import { useCallback } from 'react';
 import {
   directorySortOptions,
   TDirectorySortOption,
@@ -14,12 +15,15 @@ export function useDirectorySortOption(
       ? querySortOption
       : initialOption;
 
-  function changeDirectorySortOption(sortOption: TDirectorySortOption) {
-    push({
-      pathname,
-      query: { ...query, sort: sortOption },
-    });
-  }
+  const changeDirectorySortOption = useCallback(
+    (sortOption: TDirectorySortOption) => {
+      push({
+        pathname,
+        query: { ...query, sort: sortOption },
+      });
+    },
+    [query, push, pathname]
+  );
 
   return { selectedDirectorySortOption, changeDirectorySortOption };
 }
