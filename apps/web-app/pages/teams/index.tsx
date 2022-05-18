@@ -6,6 +6,7 @@ import { DirectorySort } from '../../components/directory-sort/directory-sort';
 import { SelectViewType } from '../../components/select-view-type/select-view-type';
 import { useViewType } from '../../components/select-view-type/use-view-type.hook';
 import { TeamCard } from '../../components/TeamCard/TeamCard';
+import { getListRequestOptionsFromQuery } from '../../utils/api/list.utils';
 
 type TeamsProps = {
   teams: ITeam[];
@@ -42,8 +43,11 @@ export default function Teams({ teams }: TeamsProps) {
   );
 }
 
-export const getServerSideProps: GetServerSideProps<TeamsProps> = async () => {
-  const teams = await airtableService.getTeams();
+export const getServerSideProps: GetServerSideProps<TeamsProps> = async (
+  context
+) => {
+  const options = getListRequestOptionsFromQuery(context.query);
+  const teams = await airtableService.getTeams(options);
 
   return {
     props: { teams },
