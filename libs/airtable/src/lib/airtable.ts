@@ -1,4 +1,4 @@
-import { ILabber, ITeam } from '@protocol-labs-network/api';
+import { ILabber, IListOptions, ITeam } from '@protocol-labs-network/api';
 import Airtable from 'airtable';
 import { IAirtableLabber, IAirtableTeam } from '../models';
 
@@ -25,9 +25,11 @@ class AirtableService {
   /**
    * Get teams from Airtable.
    */
-  public async getTeams() {
+  public async getTeams(options: IListOptions) {
     const teams: IAirtableTeam[] = (await this._teamsTable
-      .select()
+      .select({
+        sort: [options.sort],
+      })
       .all()) as unknown as IAirtableTeam[];
 
     return this._parseTeams(teams);

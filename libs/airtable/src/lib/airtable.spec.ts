@@ -98,98 +98,45 @@ jest.mock('airtable', () => ({
   default: airtableMock,
 }));
 
-import { ILabber, ITeam } from '@protocol-labs-network/api';
 import { IAirtableLabber, IAirtableTeam } from '../models';
 import airtableService from './airtable';
 import Airtable = require('airtable');
 
 describe('AirtableService', () => {
-  describe('when initialized', () => {
-    it('should create a new Airtable instance', () => {
-      expect(airtableMock).toHaveBeenCalledTimes(1);
-      expect(airtableMock).toHaveBeenCalledWith({
-        apiKey: 'MOCK_AIRTABLE_API_KEY',
-      });
-    });
-
-    it('should get the Airtable base', () => {
-      expect(baseMock).toHaveBeenCalledTimes(1);
-      expect(baseMock).toHaveBeenCalledWith('MOCK_AIRTABLE_BASE_ID');
-    });
-
-    it('should get the Airtable tables', () => {
-      expect(baseFunctionMock).toHaveBeenCalledTimes(2);
-      expect(baseFunctionMock).toHaveBeenCalledWith(
-        'MOCK_AIRTABLE_TEAMS_TABLE_ID'
-      );
-      expect(baseFunctionMock).toHaveBeenCalledWith(
-        'MOCK_AIRTABLE_LABBERS_TABLE_ID'
-      );
+  it('should create a new Airtable instance', () => {
+    expect(airtableMock).toHaveBeenCalledTimes(1);
+    expect(airtableMock).toHaveBeenCalledWith({
+      apiKey: 'MOCK_AIRTABLE_API_KEY',
     });
   });
 
-  describe('#getTeams', () => {
-    let teams: ITeam[];
-
-    beforeEach(async () => {
-      teams = await airtableService.getTeams();
-    });
-
-    it('should select all teams from teams table', () => {
-      expect(teamsTableMock.select).toHaveBeenCalledTimes(1);
-      expect(teamsTableMock.select().all).toHaveBeenCalledTimes(1);
-    });
-
-    it('should retrieve all teams', () => {
-      expect(teams).toEqual([
-        {
-          filecoinUser: teamMock.fields['Filecoin User'],
-          fundingStage: teamMock.fields['Funding Stage'],
-          fundingVehicle: teamMock.fields['Funding Vehicle'],
-          id: teamMock.id,
-          industry: teamMock.fields.Industry,
-          ipfsUser: teamMock.fields['IPFS User'],
-          labbers: teamMock.fields['Network members'],
-          logo: teamMock.fields.Logo?.[0].url,
-          longDescription: teamMock.fields['Long description'],
-          name: teamMock.fields.Name,
-          shortDescription: teamMock.fields['Short description'],
-          twitter: teamMock.fields.Twitter,
-          website: 'http://team01.com/',
-        },
-        {
-          filecoinUser: false,
-          fundingStage: null,
-          fundingVehicle: [],
-          id: emptyTeamMock.id,
-          industry: [],
-          ipfsUser: false,
-          labbers: [],
-          logo: null,
-          longDescription: null,
-          name: null,
-          shortDescription: null,
-          twitter: null,
-          website: null,
-        },
-      ]);
-    });
+  it('should get the Airtable base', () => {
+    expect(baseMock).toHaveBeenCalledTimes(1);
+    expect(baseMock).toHaveBeenCalledWith('MOCK_AIRTABLE_BASE_ID');
   });
 
-  describe('#getTeam', () => {
-    let team: ITeam;
+  it('should get the Airtable tables', () => {
+    expect(baseFunctionMock).toHaveBeenCalledTimes(2);
+    expect(baseFunctionMock).toHaveBeenCalledWith(
+      'MOCK_AIRTABLE_TEAMS_TABLE_ID'
+    );
+    expect(baseFunctionMock).toHaveBeenCalledWith(
+      'MOCK_AIRTABLE_LABBERS_TABLE_ID'
+    );
+  });
 
-    beforeEach(async () => {
-      team = await airtableService.getTeam(teamMock.id);
+  it('should be able to select and retrieve all teams from teams table', async () => {
+    const teams = await airtableService.getTeams({
+      sort: { field: 'Name', direction: 'asc' },
     });
 
-    it('should find the team with the provided id on teams table', () => {
-      expect(teamsTableMock.find).toHaveBeenCalledTimes(1);
-      expect(teamsTableMock.find).toHaveBeenCalledWith(teamMock.id);
+    expect(teamsTableMock.select).toHaveBeenCalledTimes(1);
+    expect(teamsTableMock.select).toHaveBeenCalledWith({
+      sort: [{ field: 'Name', direction: 'asc' }],
     });
-
-    it('should retrieve the team with the provided id', () => {
-      expect(team).toEqual({
+    expect(teamsTableMock.select().all).toHaveBeenCalledTimes(1);
+    expect(teams).toEqual([
+      {
         filecoinUser: teamMock.fields['Filecoin User'],
         fundingStage: teamMock.fields['Funding Stage'],
         fundingVehicle: teamMock.fields['Funding Vehicle'],
@@ -203,62 +150,54 @@ describe('AirtableService', () => {
         shortDescription: teamMock.fields['Short description'],
         twitter: teamMock.fields.Twitter,
         website: 'http://team01.com/',
-      });
+      },
+      {
+        filecoinUser: false,
+        fundingStage: null,
+        fundingVehicle: [],
+        id: emptyTeamMock.id,
+        industry: [],
+        ipfsUser: false,
+        labbers: [],
+        logo: null,
+        longDescription: null,
+        name: null,
+        shortDescription: null,
+        twitter: null,
+        website: null,
+      },
+    ]);
+  });
+
+  it('should be able to find and retrieve the team with the provided id on teams table', async () => {
+    const team = await airtableService.getTeam(teamMock.id);
+
+    expect(teamsTableMock.find).toHaveBeenCalledTimes(1);
+    expect(teamsTableMock.find).toHaveBeenCalledWith(teamMock.id);
+    expect(team).toEqual({
+      filecoinUser: teamMock.fields['Filecoin User'],
+      fundingStage: teamMock.fields['Funding Stage'],
+      fundingVehicle: teamMock.fields['Funding Vehicle'],
+      id: teamMock.id,
+      industry: teamMock.fields.Industry,
+      ipfsUser: teamMock.fields['IPFS User'],
+      labbers: teamMock.fields['Network members'],
+      logo: teamMock.fields.Logo?.[0].url,
+      longDescription: teamMock.fields['Long description'],
+      name: teamMock.fields.Name,
+      shortDescription: teamMock.fields['Short description'],
+      twitter: teamMock.fields.Twitter,
+      website: 'http://team01.com/',
     });
   });
 
-  describe('#getLabbers', () => {
-    let labbers: ILabber[];
+  it('should be able to select and retrieve all labbers from labbers table', async () => {
+    const labbers = await airtableService.getLabbers();
 
-    beforeEach(async () => {
-      labbers = await airtableService.getLabbers();
-    });
-
-    it('should select all labbers from labbers table', () => {
-      expect(labbersTableMock.select).toHaveBeenCalledTimes(1);
-      expect(labbersTableMock.select().all).toHaveBeenCalledTimes(1);
-    });
-
-    it('should retrieve all labbers', () => {
-      expect(labbers).toEqual([
-        {
-          discordHandle: labberMock.fields['Discord Handle'],
-          displayName: labberMock.fields['Display Name'],
-          email: labberMock.fields.Email,
-          id: labberMock.id,
-          image: labberMock.fields['Profile picture']?.[0].url,
-          name: labberMock.fields.Name,
-          role: labberMock.fields.Role,
-          twitter: labberMock.fields.Twitter,
-        },
-        {
-          discordHandle: null,
-          displayName: null,
-          email: null,
-          id: emptyLabberMock.id,
-          image: null,
-          name: null,
-          role: null,
-          twitter: null,
-        },
-      ]);
-    });
-  });
-
-  describe('#getLabber', () => {
-    let labber: ILabber;
-
-    beforeEach(async () => {
-      labber = await airtableService.getLabber(labberMock.id);
-    });
-
-    it('should find the labber with the provided id on labbers table', () => {
-      expect(labbersTableMock.find).toHaveBeenCalledTimes(1);
-      expect(labbersTableMock.find).toHaveBeenCalledWith(labberMock.id);
-    });
-
-    it('should retrieve the labber with the provided id', () => {
-      expect(labber).toEqual({
+    expect(labbersTableMock.select).toHaveBeenCalledTimes(1);
+    expect(labbersTableMock.select().all).toHaveBeenCalledTimes(1);
+    expect(labbers).toEqual([
+      {
         discordHandle: labberMock.fields['Discord Handle'],
         displayName: labberMock.fields['Display Name'],
         email: labberMock.fields.Email,
@@ -267,7 +206,34 @@ describe('AirtableService', () => {
         name: labberMock.fields.Name,
         role: labberMock.fields.Role,
         twitter: labberMock.fields.Twitter,
-      });
+      },
+      {
+        discordHandle: null,
+        displayName: null,
+        email: null,
+        id: emptyLabberMock.id,
+        image: null,
+        name: null,
+        role: null,
+        twitter: null,
+      },
+    ]);
+  });
+
+  it('should be able to find and retrieve the labber with the provided id on labbers table', async () => {
+    const labber = await airtableService.getLabber(labberMock.id);
+
+    expect(labbersTableMock.find).toHaveBeenCalledTimes(1);
+    expect(labbersTableMock.find).toHaveBeenCalledWith(labberMock.id);
+    expect(labber).toEqual({
+      discordHandle: labberMock.fields['Discord Handle'],
+      displayName: labberMock.fields['Display Name'],
+      email: labberMock.fields.Email,
+      id: labberMock.id,
+      image: labberMock.fields['Profile picture']?.[0].url,
+      name: labberMock.fields.Name,
+      role: labberMock.fields.Role,
+      twitter: labberMock.fields.Twitter,
     });
   });
 });

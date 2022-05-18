@@ -8,6 +8,11 @@ jest.mock('@protocol-labs-network/airtable', () => ({
   getTeams: jest.fn(() => mockTeams),
 }));
 
+const mockOptions = { sort: { field: 'Name', direction: 'desc' } };
+jest.mock('../../../utils/api/list.utils', () => ({
+  getListRequestOptionsFromQuery: jest.fn(() => mockOptions),
+}));
+
 describe('/api/teams', () => {
   const json = jest.fn();
   const end = jest.fn();
@@ -15,6 +20,7 @@ describe('/api/teams', () => {
   const status = jest.fn(() => ({ json, end }));
   const req: NextApiRequest = {
     method: 'GET',
+    query: {},
   } as unknown as NextApiRequest;
   const res: NextApiResponse = {
     status,
@@ -50,7 +56,7 @@ describe('/api/teams', () => {
 
   it('should get the teams from AirtableService', () => {
     expect(airtableService.getTeams).toHaveBeenCalledTimes(1);
-    expect(airtableService.getTeams).toHaveBeenCalledWith();
+    expect(airtableService.getTeams).toHaveBeenCalledWith(mockOptions);
   });
 
   describe('and AirtableService successfully retrieves the teams', () => {
