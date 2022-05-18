@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import Menu from '../Menu/Menu';
+import Menu from '../menu/menu';
 import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/protocol-labs-logo-horizontal-black.svg';
 
 export function Navbar() {

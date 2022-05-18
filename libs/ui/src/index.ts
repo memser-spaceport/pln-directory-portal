@@ -1,3 +1,3 @@
-export * from './lib/AnchorLink/AnchorLink';
+export * from './lib/anchor-link/anchor-link';
 export * from './lib/dropdown/dropdown';
-export * from './lib/Tags/Tags';
+export * from './lib/tags/tags';

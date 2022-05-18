@@ -1,6 +1,6 @@
 import { AppProps } from 'next/app';
 import Head from 'next/head';
-import Navbar from '../components/Navbar/Navbar';
+import Navbar from '../components/navbar/navbar';
 import './styles.css';
 
 function CustomApp({ Component, pageProps }: AppProps) {

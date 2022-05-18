@@ -12,11 +12,10 @@ function parseLink(link: LinkProps['href']) {
   const href = link.toString();
   const isExternal = isExternalLink(href);
 
-
   return {
     link: href.startsWith('/') ? href : isExternal ? href : `http://${link}`,
     isExternal,
-  }
+  };
 }
 
 export function AnchorLink({ href, children }: AnchorLinkProps) {
@@ -25,7 +24,12 @@ export function AnchorLink({ href, children }: AnchorLinkProps) {
 
     return (
       <Link href={link}>
-        <a target={isExternal ? '_blank' : '_self'} {...(isExternal ? { rel:"noopener noreferrer" } : {})}>{children}</a>
+        <a
+          target={isExternal ? '_blank' : '_self'}
+          {...(isExternal ? { rel: 'noopener noreferrer' } : {})}
+        >
+          {children}
+        </a>
       </Link>
     );
   }
