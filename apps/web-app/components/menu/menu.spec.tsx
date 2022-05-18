@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react';
 import { RouterContext } from 'next/dist/shared/lib/router-context';
 import { createMockRouter } from '../../utils/test/createMockRouter';
-import Menu from './Menu';
+import Menu from './menu';
 
 describe('Menu', () => {
   it('should render teams link', () => {

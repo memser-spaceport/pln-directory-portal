@@ -5,7 +5,7 @@ import Head from 'next/head';
 import { DirectorySort } from '../../components/directory-sort/directory-sort';
 import { SelectViewType } from '../../components/select-view-type/select-view-type';
 import { useViewType } from '../../components/select-view-type/use-view-type.hook';
-import { TeamCard } from '../../components/TeamCard/TeamCard';
+import { TeamCard } from '../../components/team-card/team-card';
 import { getListRequestOptionsFromQuery } from '../../utils/api/list.utils';
 
 type TeamsProps = {

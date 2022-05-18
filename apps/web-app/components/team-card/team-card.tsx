@@ -1,7 +1,7 @@
 import { ExternalLinkIcon } from '@heroicons/react/solid';
 import { ITeam } from '@protocol-labs-network/api';
 import { AnchorLink, Tags } from '@protocol-labs-network/ui';
-import { DirectoryCard } from '../DirectoryCard/DirectoryCard';
+import { DirectoryCard } from '../directory-card/directory-card';
 import { ReactComponent as TwitterLogo } from '/public/assets/images/icons/twitter-logo-icon.svg';
 
 export interface TeamCardProps {
