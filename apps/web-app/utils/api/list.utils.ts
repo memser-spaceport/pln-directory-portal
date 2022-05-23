@@ -12,7 +12,7 @@ export function getListRequestOptionsFromQuery(queryParams: ParsedUrlQuery) {
   const { sort } = queryParams;
 
   return {
-    sort: getSortFromQuery(sort?.toString()),
+    sort: [getSortFromQuery(sort?.toString())],
   };
 }
 
