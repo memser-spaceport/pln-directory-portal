@@ -127,7 +127,7 @@ describe('AirtableService', () => {
 
   it('should be able to select and retrieve all teams from teams table', async () => {
     const teams = await airtableService.getTeams({
-      sort: { field: 'Name', direction: 'asc' },
+      sort: [{ field: 'Name', direction: 'asc' }],
     });
 
     expect(teamsTableMock.select).toHaveBeenCalledTimes(1);

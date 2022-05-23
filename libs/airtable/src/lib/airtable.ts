@@ -27,9 +27,7 @@ class AirtableService {
    */
   public async getTeams(options: IListOptions) {
     const teams: IAirtableTeam[] = (await this._teamsTable
-      .select({
-        sort: [options.sort],
-      })
+      .select(options)
       .all()) as unknown as IAirtableTeam[];
 
     return this._parseTeams(teams);

@@ -1,5 +1,5 @@
 export interface IListOptions {
-  sort: IListSort;
+  sort: IListSort[];
 }
 
 interface IListSort {
