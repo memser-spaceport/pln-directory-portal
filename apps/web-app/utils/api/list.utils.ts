@@ -38,3 +38,10 @@ function isSortValid(sortQuery?: string) {
     directorySortOptions.includes(sortQuery as TDirectorySortOption)
   );
 }
+
+/**
+ * Returns formula to find matching results with names starting with the provided search query parameter
+ */
+function getSearchFormulaFromQuery(searchQuery: string) {
+  return `REGEX_MATCH({Name}, "(?i)^(${searchQuery})")`;
+}
