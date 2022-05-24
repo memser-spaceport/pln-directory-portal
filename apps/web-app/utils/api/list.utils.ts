@@ -2,7 +2,7 @@ import { ParsedUrlQuery } from 'querystring';
 import {
   directorySortOptions,
   TDirectorySortOption,
-} from '../../components/directory-sort/directory-sort.types';
+} from '../../components/directory/directory-sort/directory-sort.types';
 
 /**
  * Returns an options for requesting a list of teams or labbers, by parsing

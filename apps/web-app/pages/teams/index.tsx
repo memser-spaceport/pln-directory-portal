@@ -3,7 +3,7 @@ import { ITeam } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import { DirectorySearch } from '../../components/directory-search/directory-search';
-import { DirectorySort } from '../../components/directory-sort/directory-sort';
+import { DirectorySort } from '../../components/directory/directory-sort/directory-sort';
 import { SelectViewType } from '../../components/select-view-type/select-view-type';
 import { useViewType } from '../../components/select-view-type/use-view-type.hook';
 import { TeamCard } from '../../components/team-card/team-card';

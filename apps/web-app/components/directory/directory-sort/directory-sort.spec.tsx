@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { RouterContext } from 'next/dist/shared/lib/router-context';
-import { createMockRouter } from '../../utils/test/createMockRouter';
+import { createMockRouter } from '../../../utils/test/createMockRouter';
 import { DirectorySort } from './directory-sort';
 
 describe('DirectorySort', () => {
@@ -65,6 +65,33 @@ describe('DirectorySort', () => {
       const sortBtn = screen.getByText(/sorted:/i);
 
       expect(sortBtn).toHaveTextContent('A-Z');
+    });
+
+    it('should call the router push method with no sort option when sort changes to the default', () => {
+      const push = jest.fn();
+
+      render(
+        <RouterContext.Provider
+          value={createMockRouter({
+            push,
+            query: { sort: 'Name,desc', industry: 'SEO' },
+          })}
+        >
+          <DirectorySort />
+        </RouterContext.Provider>
+      );
+
+      const sortBtn = screen.getByText(/sorted:/i);
+      fireEvent.click(sortBtn);
+
+      const ascendingOption = screen.getByText(/a-z/i);
+      fireEvent.click(ascendingOption);
+
+      expect(push).toHaveBeenCalledTimes(1);
+      expect(push).toHaveBeenCalledWith({
+        pathname: '/',
+        query: { industry: 'SEO' },
+      });
     });
   });
 });
