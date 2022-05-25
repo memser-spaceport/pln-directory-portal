@@ -11,6 +11,11 @@ const nextConfig = {
     // See: https://github.com/gregberge/svgr
     svgr: true,
   },
+  images: {
+    // List remote domains that have access to Next.js Image Optimization API,
+    // to protect the app from malicious users
+    domains: ['dl.airtable.com'],
+  },
 };
 
 const sentryWebpackPluginOptions = {

@@ -1,8 +1,7 @@
-import { ExternalLinkIcon } from '@heroicons/react/solid';
 import { ITeam } from '@protocol-labs-network/api';
 import { AnchorLink, Tags } from '@protocol-labs-network/ui';
 import { DirectoryCard } from '../directory-card/directory-card';
-import { ReactComponent as TwitterLogo } from '/public/assets/images/icons/twitter-logo-icon.svg';
+import { SocialLinks } from '../social-links/social-links';
 
 export interface TeamCardProps {
   team: ITeam;
@@ -14,12 +13,12 @@ export function TeamCard({ team, isGrid }: TeamCardProps) {
     <DirectoryCard isGrid={isGrid}>
       <AnchorLink href={`/teams/${team.id}`}>
         <div
-          className={`flex ${isGrid ? 'flex-col px-6 pt-6' : 'flex-row p-6'} `}
+          className={`flex ${isGrid ? 'flex-col px-6 pt-6' : 'flex-row p-6'}`}
         >
           <div
             className={`h-24 rounded-lg ${
               team.logo ? 'bg-no-repeat bg-center bg-contain' : 'bg-slate-200'
-            } ${isGrid ? 'w-full mb-5' : 'w-56 mr-6'} `}
+            } ${isGrid ? 'w-full mb-5' : 'w-56 mr-6'}`}
             style={{
               ...(team.logo && { backgroundImage: `url(${team.logo})` }),
             }}
@@ -37,17 +36,19 @@ export function TeamCard({ team, isGrid }: TeamCardProps) {
         className={`${
           !isGrid &&
           'sm:w-full lg:w-6/12 lg:ml-auto lg:justify-end flex flex-row'
-        } `}
+        }`}
       >
         <div
-          className={`text-xs text-slate-400 font-medium h-[50px] flex ${
+          className={`h-[50px] flex ${
             isGrid ? 'px-6 pt-3' : 'ml-6 self-center items-center sm:w-6/12'
-          } `}
+          }`}
         >
           {team.industry && team.industry.length ? (
             <Tags items={team.industry} />
           ) : (
-            'Industry not provided'
+            <span className="text-xs text-slate-400">
+              Industry not provided
+            </span>
           )}
         </div>
         <div
@@ -57,25 +58,7 @@ export function TeamCard({ team, isGrid }: TeamCardProps) {
               : 'ml-6 justify-center items-center border-l border-slate-200 sm:flex-auto sm:w-6/1'
           }`}
         >
-          <AnchorLink href={team.website}>
-            <ExternalLinkIcon
-              className={`w-5 h-5 ${
-                team.website
-                  ? 'text-slate-500 hover:text-slate-900'
-                  : 'text-slate-300'
-              }`}
-            />
-          </AnchorLink>
-          <AnchorLink href={team.twitter}>
-            <TwitterLogo
-              className={`w-5 h-5 ${
-                team.twitter
-                  ? 'text-slate-500 hover:text-slate-900'
-                  : 'text-slate-300'
-              } `}
-              title="Twitter"
-            />
-          </AnchorLink>
+          <SocialLinks website={team.website} twitter={team.twitter} />
         </div>
       </div>
     </DirectoryCard>
