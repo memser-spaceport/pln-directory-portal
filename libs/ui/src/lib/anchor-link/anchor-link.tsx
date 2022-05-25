@@ -25,6 +25,7 @@ export function AnchorLink({ href, children }: AnchorLinkProps) {
     return (
       <Link href={link}>
         <a
+          className="cursor-pointer"
           target={isExternal ? '_blank' : '_self'}
           {...(isExternal ? { rel: 'noopener noreferrer' } : {})}
         >
