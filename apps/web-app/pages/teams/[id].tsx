@@ -2,9 +2,10 @@ import airtableService from '@protocol-labs-network/airtable';
 import { ITeam } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
+import TeamProfileDetails from '../../components/team-profile/team-profile-details/team-profile-details';
 import TeamProfileSidebar from '../../components/team-profile/team-profile-sidebar/team-profile-sidebar';
 
-export interface TeamProps {
+interface TeamProps {
   team: ITeam;
 }
 
@@ -15,8 +16,9 @@ export default function Team({ team }: TeamProps) {
         <title>Team {team.name}</title>
       </Head>
 
-      <div className="flex">
+      <div className="flex items-stretch">
         <TeamProfileSidebar team={team} />
+        <TeamProfileDetails team={team} />
       </div>
     </section>
   );

@@ -1,10 +1,15 @@
+import { ITeam } from '@protocol-labs-network/api';
 import { Tags } from '@protocol-labs-network/ui';
 import Image from 'next/image';
 import { SocialLinks } from '../../social-links/social-links';
 
-export default function TeamProfileSidebar({ team }) {
+interface TeamProfileSidebarProps {
+  team: ITeam;
+}
+
+export default function TeamProfileSidebar({ team }: TeamProfileSidebarProps) {
   return (
-    <div className="w-1/3 bg-white shadow-slate-200 px-6 py-9 border rounded-lg shadow-md text-sm cursor-default">
+    <div className="w-80 flex-none card">
       <div
         className={`w-24 h-24 mb-4 rounded-lg ${
           team.logo ? '' : 'bg-slate-200'
