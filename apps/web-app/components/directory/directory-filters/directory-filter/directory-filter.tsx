@@ -5,7 +5,7 @@ interface DirectoryFilterProps {
   children: ReactNode;
 }
 
-export function DirectoryFilter({ title, children }: DirectoryFilterProps) {
+function DirectoryFilter({ title, children }: DirectoryFilterProps) {
   return (
     <>
       <div className="text-sm font-semibold leading-5 mb-4">{title}</div>
