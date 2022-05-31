@@ -1,4 +1,3 @@
-import { PlusIcon } from '@heroicons/react/solid';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useEffect, useRef, useState } from 'react';
 
@@ -12,18 +11,16 @@ function HiddenTagsTooltip({ items }: TagsProps) {
     <Tooltip.Provider delayDuration={0}>
       <Tooltip.Root>
         <Tooltip.Trigger>
-          <span className="text-xs text-slate-400 h-[26px] w-[26px] border hover:border-sky-600 rounded-full flex items-center justify-center group">
-            {items.length}
-            <PlusIcon className="h-2 fill-slate-500 group-hover:fill-sky-600" />
+          <span className="flex items-center justify-center w-[26px] h-[26px] text-xs font-medium text-slate-600 rounded-full bg-slate-100 group">
+            +{items.length}
           </span>
         </Tooltip.Trigger>
         <Tooltip.Content
           side="top"
           align="center"
-          sideOffset={5}
-          className="flex-shrink-0 bg-sky-600 border border-sky-600 rounded-full text-white text-xs min-w-[50px] text-center font-light py-0.5 px-2"
+          sideOffset={8}
+          className="flex-shrink-0 bg-slate-900 rounded py-1 px-2 text-white text-xs font-medium min-w-[50px]"
         >
-          <Tooltip.Arrow className="fill-sky-600" />
           {items.toString()}
         </Tooltip.Content>
       </Tooltip.Root>
@@ -71,7 +68,7 @@ export function Tags({ items, isInline = true }: TagsProps) {
       {items.map((item, i) => (
         <span
           key={i}
-          className={`text-xs text-slate-400 font-medium px-3 py-1 mr-2 border rounded-full whitespace-nowrap ${
+          className={`h-[26px] px-3 py-1.5 mr-2 text-xs font-medium text-slate-600 rounded-3xl bg-slate-100 whitespace-nowrap ${
             isInline && i >= hiddenStartIndex ? 'invisible' : 'visible mb-2'
           }`}
           style={{ order: i >= hiddenStartIndex ? i + 1 : i }}

@@ -1,37 +1,29 @@
-import { ExternalLinkIcon } from '@heroicons/react/solid';
-import { AnchorLink } from '@protocol-labs-network/ui';
+import { ExternalLinkIcon, MailIcon } from '@heroicons/react/solid';
+import { SocialLink } from './social-link';
 import { ReactComponent as TwitterLogo } from '/public/assets/images/icons/twitter-logo-icon.svg';
 
-type SocialLinksProps = {
-  website?: string;
-  twitter?: string;
-};
+interface ISocialLink {
+  link?: string;
+}
 
-export function SocialLinks({ website, twitter }: SocialLinksProps) {
-  const websiteLinkProps = {
-    ...(website && { href: website }),
-  };
-  const twitterLinkProps = {
-    ...(twitter && { href: `https://twitter.com/${twitter}` }),
-  };
+interface SocialLinksProps {
+  email?: ISocialLink;
+  website?: ISocialLink;
+  twitter?: ISocialLink;
+}
 
+export function SocialLinks({ email, website, twitter }: SocialLinksProps) {
   return (
     <>
-      <AnchorLink {...websiteLinkProps}>
-        <ExternalLinkIcon
-          className={`w-5 h-5 ${
-            website ? 'text-slate-500 hover:text-slate-900' : 'text-slate-300'
-          }`}
-        />
-      </AnchorLink>
-      <AnchorLink {...twitterLinkProps}>
-        <TwitterLogo
-          className={`w-5 h-5 ${
-            twitter ? 'text-slate-500 hover:text-slate-900' : 'text-slate-300'
-          }`}
-          title="Twitter"
-        />
-      </AnchorLink>
+      {email ? (
+        <SocialLink linkObj={email} linkIcon={MailIcon} type={'email'} />
+      ) : null}
+      {website ? (
+        <SocialLink linkObj={website} linkIcon={ExternalLinkIcon} />
+      ) : null}
+      {twitter ? (
+        <SocialLink linkObj={twitter} linkIcon={TwitterLogo} type={'twitter'} />
+      ) : null}
     </>
   );
 }

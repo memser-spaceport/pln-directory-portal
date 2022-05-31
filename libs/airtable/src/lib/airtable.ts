@@ -1,4 +1,9 @@
-import { IListOptions, IMember, ITeam } from '@protocol-labs-network/api';
+import {
+  IListOptions,
+  IMember,
+  IMemberWithTeams,
+  ITeam,
+} from '@protocol-labs-network/api';
 import Airtable from 'airtable';
 import {
   IAirtableMember,
@@ -91,33 +96,11 @@ class AirtableService {
       fields: ['Name', 'Role', 'Profile picture', 'Email', 'Twitter', 'Teams'],
       sort: [{ field: 'Name', direction: 'asc' }],
     };
-    return await airtableService.getMembers(membersOptions);
-  }
 
-  /**
-   * Get names for the teams of the provided members
-   */
-  public async getMembersTeamsNames(members: IMember[]) {
-    const uniqueTeamsIds = members.reduce(
-      (teamIds, member) => [...new Set([...teamIds, ...member.teams])],
-      [] as string[]
-    );
+    const members = await airtableService.getMembers(membersOptions);
+    const membersTeamsNames = await this._getMembersTeamsNames(members);
 
-    const formulaByTeamId = uniqueTeamsIds.map((id) => {
-      return `RECORD_ID()='${id}'`;
-    });
-    const listOptions = {
-      filterByFormula: `OR(${formulaByTeamId.join(',')})`,
-      fields: ['Name'],
-    };
-
-    const membersTeams = await this.getTeams(listOptions);
-
-    return membersTeams.reduce((namesByTeamId, team) => {
-      namesByTeamId[team.id] = team.name || '';
-
-      return namesByTeamId;
-    }, {} as { [teamId: string]: string });
+    return this._parseMemberTeams(members, membersTeamsNames);
   }
 
   /**
@@ -278,6 +261,50 @@ class AirtableService {
     Object.values(filtersValues).forEach((value) => value.sort());
 
     return filtersValues;
+  }
+
+  /**
+   * Get names for the teams of the provided members
+   */
+  private async _getMembersTeamsNames(
+    members: IMember[]
+  ): Promise<{ [teamId: string]: string }> {
+    const uniqueTeamsIds = members.reduce(
+      (teamIds, member) => [...new Set([...teamIds, ...member.teams])],
+      [] as string[]
+    );
+
+    const formulaByTeamId = uniqueTeamsIds.map((id) => {
+      return `RECORD_ID()='${id}'`;
+    });
+    const listOptions = {
+      filterByFormula: `OR(${formulaByTeamId.join(',')})`,
+      fields: ['Name'],
+    };
+
+    const membersTeams = await this.getTeams(listOptions);
+
+    return membersTeams.reduce((namesByTeamId, team) => {
+      namesByTeamId[team.id] = team.name || '';
+
+      return namesByTeamId;
+    }, {} as { [teamId: string]: string });
+  }
+
+  /**
+   * Returns members with the names of the teams they belong to
+   */
+  private _parseMemberTeams(
+    members: IMember[],
+    membersTeamsNames: { [teamId: string]: string }
+  ): IMemberWithTeams[] {
+    return members.map((member) => ({
+      ...member,
+      teams: member.teams.reduce((teams, id) => {
+        teams[id] = membersTeamsNames[id];
+        return teams;
+      }, {} as { [teamId: string]: string }),
+    }));
   }
 
   /**
