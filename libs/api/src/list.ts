@@ -1,6 +1,7 @@
 export interface IListOptions {
-  sort: IListSort[];
-  filterByFormula: string;
+  sort?: IListSort[];
+  filterByFormula?: string;
+  fields?: string[];
 }
 
 interface IListSort {

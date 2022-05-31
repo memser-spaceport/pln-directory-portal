@@ -7,4 +7,5 @@ export interface ILabber {
   name: string | null;
   role: string | null;
   twitter: string | null;
+  teams: string[];
 }

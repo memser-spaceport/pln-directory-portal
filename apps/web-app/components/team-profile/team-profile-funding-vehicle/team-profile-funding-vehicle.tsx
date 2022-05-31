@@ -11,7 +11,9 @@ export default function TeamProfileFundingVehicle({
 
   return (
     <div className="w-1/2 card">
-      <h3 className="text-base mb-4">Funding Vehicle</h3>
+      <h3 className="text-base text-slate-500 font-medium mb-4">
+        Funding Vehicle
+      </h3>
       <div>
         {hasFundingVehicles ? <Tags items={fundingVehicle} /> : 'Not provided'}
       </div>
