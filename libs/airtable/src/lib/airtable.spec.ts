@@ -191,6 +191,93 @@ describe('AirtableService', () => {
     });
   });
 
+  it('should be able to get all teams filter values and available teams filter values from teams table', async () => {
+    (teamsTableMock.select as jest.Mock)
+      .mockReset()
+      .mockReturnValueOnce({
+        all: jest.fn().mockReturnValue([
+          {
+            fields: {
+              Industry: ['Industry 01', 'Industry 02'],
+              'Funding Stage': 'Funding Stage 01',
+              'Funding Vehicle': ['Funding Vehicle 01', 'Funding Vehicle 02'],
+            },
+          },
+          {
+            fields: {
+              Industry: ['Industry 01', 'Industry 02', 'Industry 03'],
+              'Funding Stage': 'Funding Stage 02',
+              'Funding Vehicle': ['Funding Vehicle 02', 'Funding Vehicle 03'],
+            },
+          },
+          {
+            fields: {
+              Industry: ['Industry 04', 'Industry 05'],
+              'Funding Stage': 'Funding Stage 03',
+              'Funding Vehicle': ['Funding Vehicle 04'],
+            },
+          },
+          {
+            fields: {},
+          },
+        ]),
+      })
+      .mockReturnValueOnce({
+        all: jest.fn().mockReturnValue([
+          {
+            fields: {
+              Industry: ['Industry 01', 'Industry 02'],
+              'Funding Stage': 'Funding Stage 01',
+              'Funding Vehicle': ['Funding Vehicle 01', 'Funding Vehicle 02'],
+            },
+          },
+          {
+            fields: {
+              Industry: ['Industry 01', 'Industry 02', 'Industry 03'],
+              'Funding Stage': 'Funding Stage 02',
+              'Funding Vehicle': ['Funding Vehicle 02', 'Funding Vehicle 03'],
+            },
+          },
+        ]),
+      });
+
+    const filtersValues = await airtableService.getTeamsFiltersValues({
+      sort: [{ field: 'Name', direction: 'asc' }],
+    });
+
+    expect(filtersValues).toEqual({
+      valuesByFilter: {
+        industry: [
+          'Industry 01',
+          'Industry 02',
+          'Industry 03',
+          'Industry 04',
+          'Industry 05',
+        ],
+        fundingStage: [
+          'Funding Stage 01',
+          'Funding Stage 02',
+          'Funding Stage 03',
+        ],
+        fundingVehicle: [
+          'Funding Vehicle 01',
+          'Funding Vehicle 02',
+          'Funding Vehicle 03',
+          'Funding Vehicle 04',
+        ],
+      },
+      availableValuesByFilter: {
+        industry: ['Industry 01', 'Industry 02', 'Industry 03'],
+        fundingStage: ['Funding Stage 01', 'Funding Stage 02'],
+        fundingVehicle: [
+          'Funding Vehicle 01',
+          'Funding Vehicle 02',
+          'Funding Vehicle 03',
+        ],
+      },
+    });
+  });
+
   it('should be able to select and retrieve all labbers from labbers table', async () => {
     const labbers = await airtableService.getLabbers();
 

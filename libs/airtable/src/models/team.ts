@@ -44,3 +44,9 @@ export interface IAirtableTeamLogo {
     full?: IAirtableImage;
   };
 }
+
+export interface IAirtableTeamsFiltersValues {
+  industry: string[];
+  fundingStage: string[];
+  fundingVehicle: string[];
+}
