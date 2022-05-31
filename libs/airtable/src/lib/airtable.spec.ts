@@ -295,6 +295,7 @@ describe('AirtableService', () => {
         image: labberMock.fields['Profile picture']?.[0].url,
         name: labberMock.fields.Name,
         role: labberMock.fields.Role,
+        teams: labberMock.fields.Teams,
         twitter: labberMock.fields.Twitter,
       },
       {
@@ -305,6 +306,7 @@ describe('AirtableService', () => {
         image: null,
         name: null,
         role: null,
+        teams: [],
         twitter: null,
       },
     ]);
@@ -323,6 +325,7 @@ describe('AirtableService', () => {
       image: labberMock.fields['Profile picture']?.[0].url,
       name: labberMock.fields.Name,
       role: labberMock.fields.Role,
+      teams: labberMock.fields.Teams,
       twitter: labberMock.fields.Twitter,
     });
   });

@@ -64,9 +64,9 @@ class AirtableService {
   /**
    * Get labbers from Airtable.
    */
-  public async getLabbers() {
+  public async getLabbers(options: IListOptions = {}) {
     const labbers: IAirtableLabber[] = (await this._labbersTable
-      .select()
+      .select(options)
       .all()) as unknown as IAirtableTeam[];
 
     return this._parseLabbers(labbers);
@@ -79,6 +79,45 @@ class AirtableService {
     const labber: IAirtableLabber = await this._labbersTable.find(id);
 
     return this._parseLabber(labber);
+  }
+
+  /**
+   * Get Name, Role, Profile picture, Email, Twitter and Teams
+   * fields for the members of the provided team
+   */
+  public async getTeamMembers(teamName: string) {
+    const labbersOptions: IListOptions = {
+      filterByFormula: this._getSearchFormula(teamName, 'Teams'),
+      fields: ['Name', 'Role', 'Profile picture', 'Email', 'Twitter', 'Teams'],
+      sort: [{ field: 'Name', direction: 'asc' }],
+    };
+    return await airtableService.getLabbers(labbersOptions);
+  }
+
+  /**
+   * Get names for the teams of the provided members
+   */
+  public async getMembersTeamsNames(members: ILabber[]) {
+    const uniqueTeamsIds = members.reduce(
+      (teamIds, member) => [...new Set([...teamIds, ...member.teams])],
+      [] as string[]
+    );
+
+    const formulaByTeamId = uniqueTeamsIds.map((id) => {
+      return `RECORD_ID()='${id}'`;
+    });
+    const listOptions = {
+      filterByFormula: `OR(${formulaByTeamId.join(',')})`,
+      fields: ['Name'],
+    };
+
+    const membersTeams = await this.getTeams(listOptions);
+
+    return membersTeams.reduce((namesByTeamId, team) => {
+      namesByTeamId[team.id] = team.name || '';
+
+      return namesByTeamId;
+    }, {} as { [teamId: string]: string });
   }
 
   /**
@@ -152,6 +191,7 @@ class AirtableService {
       name: labber.fields.Name || null,
       role: labber.fields.Role || null,
       twitter: labber.fields.Twitter || null,
+      teams: labber.fields.Teams || [],
     };
   }
 
@@ -218,6 +258,14 @@ class AirtableService {
     Object.values(filtersValues).forEach((value) => value.sort());
 
     return filtersValues;
+  }
+
+  /**
+   * Returns a formula to search results that match provided string
+   * to a given field
+   */
+  private _getSearchFormula(queryValue: string, field: string) {
+    return `SEARCH("${queryValue}",${field})`;
   }
 }
 
