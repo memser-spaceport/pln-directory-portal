@@ -1,30 +1,25 @@
 import airtableService from '@protocol-labs-network/airtable';
-import { IMember, ITeam } from '@protocol-labs-network/api';
+import { IMemberWithTeams, ITeam } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
-import TeamProfileDetails from '../../components/team-profile/team-profile-details/team-profile-details';
-import TeamProfileSidebar from '../../components/team-profile/team-profile-sidebar/team-profile-sidebar';
+import TeamProfileDetails from '../../components/teams/team-profile/team-profile-details/team-profile-details';
+import TeamProfileSidebar from '../../components/teams/team-profile/team-profile-sidebar/team-profile-sidebar';
 
 interface TeamProps {
   team: ITeam;
-  members: IMember[];
-  membersTeamsNames: { [teamId: string]: string };
+  members: IMemberWithTeams[];
 }
 
-export default function Team({ team, members, membersTeamsNames }: TeamProps) {
+export default function Team({ team, members }: TeamProps) {
   return (
-    <section className="p-8 mx-36">
+    <section>
       <Head>
         <title>Team {team.name}</title>
       </Head>
 
-      <div className="flex items-stretch gap-x-6">
+      <div className="pt-10 flex">
         <TeamProfileSidebar team={team} />
-        <TeamProfileDetails
-          team={team}
-          members={members}
-          membersTeamsNames={membersTeamsNames}
-        />
+        <TeamProfileDetails team={team} members={members} />
       </div>
     </section>
   );
@@ -37,7 +32,6 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
   const { id } = query as { id: string };
   const team = await airtableService.getTeam(id);
   const members = await airtableService.getTeamMembers(team.name);
-  const membersTeamsNames = await airtableService.getMembersTeamsNames(members);
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
@@ -47,6 +41,6 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
   );
 
   return {
-    props: { team, members, membersTeamsNames },
+    props: { team, members },
   };
 };

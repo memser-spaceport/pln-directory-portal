@@ -58,7 +58,10 @@ export function TeamCard({ team, isGrid }: TeamCardProps) {
               : 'ml-6 justify-center items-center border-l border-slate-200 sm:flex-auto sm:w-6/1'
           }`}
         >
-          <SocialLinks website={team.website} twitter={team.twitter} />
+          <SocialLinks
+            website={{ link: team.website }}
+            twitter={{ link: team.twitter }}
+          />
         </div>
       </div>
     </DirectoryCard>

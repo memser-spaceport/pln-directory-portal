@@ -9,3 +9,7 @@ export interface IMember {
   twitter: string | null;
   teams: string[];
 }
+
+export interface IMemberWithTeams extends Omit<IMember, 'teams'> {
+  teams: { [teamId: string]: string };
+}

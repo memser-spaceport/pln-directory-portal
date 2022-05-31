@@ -1,22 +1,9 @@
 import Link, { LinkProps } from 'next/link';
+import { parseLink } from './anchor-link.utils';
 
-export type AnchorLinkProps = React.PropsWithChildren<Partial<LinkProps>>;
-
-function isExternalLink(link: string) {
-  const href = link.toString();
-
-  return href.startsWith('http://') || href.startsWith('https://');
-}
-
-function parseLink(link: LinkProps['href']) {
-  const href = link.toString();
-  const isExternal = isExternalLink(href);
-
-  return {
-    link: href.startsWith('/') ? href : isExternal ? href : `http://${link}`,
-    isExternal,
-  };
-}
+export type AnchorLinkProps = { email?: string } & React.PropsWithChildren<
+  Partial<LinkProps>
+>;
 
 export function AnchorLink({ href, children }: AnchorLinkProps) {
   if (href) {

@@ -335,4 +335,145 @@ describe('AirtableService', () => {
       twitter: memberMock.fields.Twitter,
     });
   });
+
+  it('should be able to return members with the teams they belong to, identified by an id and name', async () => {
+    (membersTableMock.select as jest.Mock).mockReset().mockReturnValueOnce({
+      all: jest.fn().mockReturnValue([
+        {
+          id: 'member_id_01',
+          fields: {
+            Name: 'Aarsh Dan Shah',
+            'Display Name': 'Aarsh Shah',
+            'Profile picture': [
+              {
+                id: 'att2TxEATPkbk9dta',
+                url: 'https://dl.airtable.com/.attachments/f3ce65a21764f91ed7a907bb330ca60e/4dbc4f0c/adam_photo2.jpg?ts=1650540687&userId=usr6bGImQsm8pYc83&cs=9de9f8e366186ad5',
+              },
+            ],
+            Teams: ['team_id_01', 'team_id_02'],
+            Role: 'CEO',
+            Email: 'aarsh.shah@protocol.ai',
+            Twitter: '@member01',
+          },
+        },
+        {
+          id: 'member_id_02',
+          fields: {
+            Name: 'Dan Shah',
+            'Display Name': 'Dan Shah',
+            'Profile picture': [
+              {
+                id: 'att2TxEATPkbk9dta',
+                url: '',
+              },
+            ],
+            Teams: ['team_id_03'],
+            Role: 'CEO',
+            Email: 'dan.shah@protocol.ai',
+            Twitter: '@member01',
+          },
+        },
+        {
+          id: 'member_id_03',
+          fields: {
+            Name: 'Shah',
+            'Display Name': 'Shah',
+            'Profile picture': [
+              {
+                id: 'att2TxEATPkbk9dta',
+                url: 'https://dl.airtable.com/.attachments/f3ce65a21764f91ed7a907bb330ca60e/4dbc4f0c/adam_photo2.jpg?ts=1650540687&userId=usr6bGImQsm8pYc83&cs=9de9f8e366186ad5',
+              },
+            ],
+            Teams: ['team_id_02', 'team_id_01'],
+            Role: 'CEO',
+            Email: 'shah@protocol.ai',
+            Twitter: '@member03',
+          },
+        },
+      ]),
+    });
+
+    (teamsTableMock.select as jest.Mock).mockReset().mockReturnValueOnce({
+      all: jest.fn().mockReturnValue([
+        {
+          id: 'team_id_01',
+          fields: {
+            Name: 'Team 01',
+          },
+        },
+        {
+          id: 'team_id_02',
+          fields: {
+            Name: 'Team 02',
+          },
+        },
+        {
+          id: 'team_id_03',
+          fields: {
+            Name: 'Team 03',
+          },
+        },
+        {
+          id: 'team_id_04',
+          fields: {
+            Name: 'Team 04',
+          },
+        },
+      ]),
+    });
+
+    const members = await airtableService.getTeamMembers('Team 01');
+
+    expect(membersTableMock.select).toHaveBeenCalledTimes(1);
+    expect(teamsTableMock.select).toHaveBeenCalledTimes(1);
+
+    expect(membersTableMock.select).toHaveBeenCalledWith({
+      filterByFormula: 'SEARCH("Team 01",Teams)',
+      fields: ['Name', 'Role', 'Profile picture', 'Email', 'Twitter', 'Teams'],
+      sort: [{ field: 'Name', direction: 'asc' }],
+    });
+    expect(teamsTableMock.select).toHaveBeenCalledWith({
+      filterByFormula:
+        "OR(RECORD_ID()='team_id_01',RECORD_ID()='team_id_02',RECORD_ID()='team_id_03')",
+      fields: ['Name'],
+    });
+
+    expect(members).toStrictEqual([
+      {
+        discordHandle: null,
+        displayName: 'Aarsh Shah',
+        email: 'aarsh.shah@protocol.ai',
+        id: 'member_id_01',
+        image:
+          'https://dl.airtable.com/.attachments/f3ce65a21764f91ed7a907bb330ca60e/4dbc4f0c/adam_photo2.jpg?ts=1650540687&userId=usr6bGImQsm8pYc83&cs=9de9f8e366186ad5',
+        name: 'Aarsh Dan Shah',
+        role: 'CEO',
+        teams: { team_id_01: 'Team 01', team_id_02: 'Team 02' },
+        twitter: '@member01',
+      },
+      {
+        discordHandle: null,
+        displayName: 'Dan Shah',
+        email: 'dan.shah@protocol.ai',
+        id: 'member_id_02',
+        image: null,
+        name: 'Dan Shah',
+        role: 'CEO',
+        teams: { team_id_03: 'Team 03' },
+        twitter: '@member01',
+      },
+      {
+        discordHandle: null,
+        displayName: 'Shah',
+        email: 'shah@protocol.ai',
+        id: 'member_id_03',
+        image:
+          'https://dl.airtable.com/.attachments/f3ce65a21764f91ed7a907bb330ca60e/4dbc4f0c/adam_photo2.jpg?ts=1650540687&userId=usr6bGImQsm8pYc83&cs=9de9f8e366186ad5',
+        name: 'Shah',
+        role: 'CEO',
+        teams: { team_id_01: 'Team 01', team_id_02: 'Team 02' },
+        twitter: '@member03',
+      },
+    ]);
+  });
 });
