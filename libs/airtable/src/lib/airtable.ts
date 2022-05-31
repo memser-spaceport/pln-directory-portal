@@ -1,6 +1,10 @@
 import { ILabber, IListOptions, ITeam } from '@protocol-labs-network/api';
 import Airtable from 'airtable';
-import { IAirtableLabber, IAirtableTeam } from '../models';
+import {
+  IAirtableLabber,
+  IAirtableTeam,
+  IAirtableTeamsFiltersValues,
+} from '../models';
 
 /**
  * Service to collect data from Airtable.
@@ -40,6 +44,21 @@ class AirtableService {
     const team: IAirtableTeam = await this._teamsTable.find(id);
 
     return this._parseTeam(team);
+  }
+
+  /**
+   * Get values (and available values) for teams filters.
+   */
+  public async getTeamsFiltersValues(options: IListOptions) {
+    const [valuesByFilter, availableValuesByFilter] = await Promise.all([
+      this._getAllTeamsFiltersValues(),
+      this._getAvailableTeamsFiltersValues(options),
+    ]);
+
+    return {
+      valuesByFilter,
+      availableValuesByFilter,
+    };
   }
 
   /**
@@ -134,6 +153,71 @@ class AirtableService {
       role: labber.fields.Role || null,
       twitter: labber.fields.Twitter || null,
     };
+  }
+
+  /**
+   * Get all unique values for Teams Directory filters fields.
+   */
+  private async _getAllTeamsFiltersValues() {
+    const teams: IAirtableTeam[] = (await this._teamsTable
+      .select({
+        fields: ['Industry', 'Funding Stage', 'Funding Vehicle'],
+      })
+      .all()) as unknown as IAirtableTeam[];
+
+    return this._parseTeamsFilters(teams);
+  }
+
+  /**
+   * Get available unique values for Teams Directory filters fields.
+   */
+  private async _getAvailableTeamsFiltersValues(options: IListOptions) {
+    const teams: IAirtableTeam[] = (await this._teamsTable
+      .select({
+        fields: ['Industry', 'Funding Stage', 'Funding Vehicle'],
+        ...options,
+      })
+      .all()) as unknown as IAirtableTeam[];
+
+    return this._parseTeamsFilters(teams);
+  }
+
+  /**
+   * Parse teams fields values into lists of unique values per field.
+   */
+  private _parseTeamsFilters(teams: IAirtableTeam[]) {
+    const filtersValues: IAirtableTeamsFiltersValues = teams.reduce(
+      (values, team) => {
+        const industry = [
+          ...new Set([...values.industry, ...(team.fields.Industry || [])]),
+        ];
+        const fundingStage = [
+          ...new Set([
+            ...values.fundingStage,
+            ...(team.fields['Funding Stage']
+              ? [team.fields['Funding Stage']]
+              : []),
+          ]),
+        ];
+        const fundingVehicle = [
+          ...new Set([
+            ...values.fundingVehicle,
+            ...(team.fields['Funding Vehicle'] || []),
+          ]),
+        ];
+
+        return { industry, fundingStage, fundingVehicle };
+      },
+      {
+        industry: [],
+        fundingStage: [],
+        fundingVehicle: [],
+      } as IAirtableTeamsFiltersValues
+    );
+
+    Object.values(filtersValues).forEach((value) => value.sort());
+
+    return filtersValues;
   }
 }
 
