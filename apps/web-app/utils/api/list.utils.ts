@@ -3,16 +3,24 @@ import {
   directorySortOptions,
   TDirectorySortOption,
 } from '../../components/directory/directory-sort/directory-sort.types';
+import { URL_QUERY_VALUE_SEPARATOR } from '../../constants';
 
 /**
  * Returns an options for requesting a list of teams or labbers, by parsing
  * the provided query parameters.
  */
 export function getListRequestOptionsFromQuery(queryParams: ParsedUrlQuery) {
-  const { sort } = queryParams;
+  const { sort, industry, fundingVehicle, fundingStage, searchBy } =
+    queryParams;
 
   return {
     sort: [getSortFromQuery(sort?.toString())],
+    filterByFormula: getFormula({
+      industry,
+      fundingVehicle,
+      fundingStage,
+      searchBy,
+    }),
   };
 }
 
@@ -40,8 +48,54 @@ function isSortValid(sortQuery?: string) {
 }
 
 /**
+ * Get formula for list filtering.
+ */
+function getFormula({
+  industry,
+  fundingVehicle,
+  fundingStage,
+  searchBy,
+}: {
+  [key: string]: string | string[] | undefined;
+}) {
+  const formula = [
+    'AND(',
+    [
+      ...(searchBy ? [getSearchFormulaFromQuery(searchBy)] : []),
+      ...(industry ? [getFieldFromQuery('Industry', industry)] : []),
+      ...(fundingVehicle
+        ? [getFieldFromQuery('Funding Vehicle', fundingVehicle)]
+        : []),
+      ...(fundingStage
+        ? [getFieldFromQuery('Funding Stage', fundingStage)]
+        : []),
+    ].join(', '),
+    ')',
+  ].join('');
+
+  return formula;
+}
+
+/**
  * Returns formula to find matching results with names starting with the provided search query parameter
  */
-function getSearchFormulaFromQuery(searchQuery: string) {
-  return `REGEX_MATCH({Name}, "(?i)^(${searchQuery})")`;
+function getSearchFormulaFromQuery(searchQuery: string | string[] = '') {
+  return `REGEX_MATCH({Name}, "(?i)^(${searchQuery.toString()})")`;
+}
+
+/**
+ * Get the Airtable filtering formula for a multiple value filter.
+ */
+function getFieldFromQuery(
+  fieldName: string,
+  queryValue: string | string[] = []
+) {
+  const values = Array.isArray(queryValue)
+    ? queryValue
+    : queryValue.split(URL_QUERY_VALUE_SEPARATOR);
+  const valuesFormulas = values.map(
+    (value) => `SEARCH("${value}", {${fieldName}})`
+  );
+
+  return valuesFormulas.join(', ');
 }
