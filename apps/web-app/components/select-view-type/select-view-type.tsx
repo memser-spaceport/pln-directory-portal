@@ -26,7 +26,7 @@ export function SelectViewType() {
 
     return (
       <button
-        className={`group relative w-10 h-10 border first:rounded-l-lg last:rounded-r-lg ml-[-1px] first:ml-0
+        className={`group relative w-10 h-10 border first:rounded-l-lg last:rounded-r-lg ml-[-1px] first:ml-0 focus:outline-none focus:ring focus:ring-sky-300/30 focus:border-sky-300 focus:z-20
         ${
           isActive
             ? 'bg-sky-100 border-sky-600 z-10'

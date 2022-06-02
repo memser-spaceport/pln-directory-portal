@@ -40,8 +40,8 @@ export function InputField({
       <input
         {...props}
         className={`text-sm text-slate-600 leading-6 placeholder:text-sm placeholder:text-slate-600 block bg-white border border-slate-300 w-full rounded-lg 
-        ${icon ? 'pl-8' : 'pl-3'} pr-2 py-2
-        shadow-sm shadow-slate-900/16 focus:outline-none focus:border-sky-500 focus:ring-sky-500 focus:ring-1 ${
+        ${icon ? 'pl-8' : 'pl-3'} pr-2 h-10 leading-10
+        shadow-sm shadow-slate-900/16 focus:outline-none focus:ring focus:ring-sky-300/30 focus:border-sky-300 ${
           props.className || ''
         }`}
         onChange={composeEventHandlers(props.onChange, handleUserInput)}
