@@ -2,14 +2,14 @@ import airtableService from '@protocol-labs-network/airtable';
 import { ITeam } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
-import { DirectorySearch } from '../../components/directory-search/directory-search';
+import { DirectorySearch } from '../../components/directory/directory-search/directory-search';
 import { DirectorySort } from '../../components/directory/directory-sort/directory-sort';
-import { SelectViewType } from '../../components/select-view-type/select-view-type';
-import { useViewType } from '../../components/select-view-type/use-view-type.hook';
-import { TeamCard } from '../../components/team-card/team-card';
-import TeamsDirectoryFilters from '../../components/teams-directory/teams-directory-filters/teams-directory-filters';
-import { ITeamsFiltersValues } from '../../components/teams-directory/teams-directory-filters/teams-directory-filters.types';
-import { parseTeamsFilters } from '../../components/teams-directory/teams-directory-filters/teams-directory-filters.utils';
+import { DirectoryViewType } from '../../components/directory/directory-view-type/directory-view-type';
+import { useViewType } from '../../components/directory/directory-view-type/use-view-type.hook';
+import { TeamCard } from '../../components/teams/team-card/team-card';
+import TeamsDirectoryFilters from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters';
+import { ITeamsFiltersValues } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.types';
+import { parseTeamsFilters } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.utils';
 import { getListRequestOptionsFromQuery } from '../../utils/api/list.utils';
 
 type TeamsProps = {
@@ -39,7 +39,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
               <DirectorySearch />
               <span className="w-px h-6 bg-slate-300" />
               <DirectorySort />
-              <SelectViewType />
+              <DirectoryViewType />
             </div>
           </div>
 

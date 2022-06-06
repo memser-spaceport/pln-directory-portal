@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { RouterContext } from 'next/dist/shared/lib/router-context';
-import { createMockRouter } from '../../utils/test/createMockRouter';
+import { createMockRouter } from '../../../utils/test/createMockRouter';
 import { DirectorySearch } from './directory-search';
 
 describe('DirectorySearch', () => {

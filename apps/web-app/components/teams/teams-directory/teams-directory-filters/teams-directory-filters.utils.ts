@@ -1,7 +1,7 @@
 import { IAirtableTeamsFiltersValues } from '@protocol-labs-network/airtable';
 import { ParsedUrlQuery } from 'querystring';
-import { URL_QUERY_VALUE_SEPARATOR } from '../../../constants';
-import { IFilterTag } from '../../directory/directory-filters/directory-tags-filter/directory-tags-filter.types';
+import { URL_QUERY_VALUE_SEPARATOR } from '../../../../constants';
+import { IFilterTag } from '../../../directory/directory-filters/directory-tags-filter/directory-tags-filter.types';
 import { ITeamsFiltersValues } from './teams-directory-filters.types';
 
 /**

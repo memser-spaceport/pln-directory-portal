@@ -1,7 +1,7 @@
 import { ITeam } from '@protocol-labs-network/api';
 import { AnchorLink, Tags } from '@protocol-labs-network/ui';
-import { DirectoryCard } from '../directory-card/directory-card';
-import { SocialLinks } from '../social-links/social-links';
+import { DirectoryCard } from '../../directory/directory-card/directory-card';
+import { SocialLinks } from '../../shared/social-links/social-links';
 
 export interface TeamCardProps {
   team: ITeam;

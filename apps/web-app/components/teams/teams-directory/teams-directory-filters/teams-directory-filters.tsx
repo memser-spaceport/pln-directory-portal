@@ -1,8 +1,8 @@
-import FundingStageFilter from '../../../components/teams-directory/teams-directory-filters/funding-stage-filter/funding-stage-filter';
-import FundingVehicleFilter from '../../../components/teams-directory/teams-directory-filters/funding-vehicle-filter/funding-vehicle-filter';
-import { ITeamsFiltersValues } from '../../../components/teams-directory/teams-directory-filters/teams-directory-filters.types';
-import DirectoryFilters from '../../directory/directory-filters/directory-filters';
+import DirectoryFilters from '../../../directory/directory-filters/directory-filters';
+import FundingStageFilter from './funding-stage-filter/funding-stage-filter';
+import FundingVehicleFilter from './funding-vehicle-filter/funding-vehicle-filter';
 import IndustryFilter from './industry-filter/industry-filter';
+import { ITeamsFiltersValues } from './teams-directory-filters.types';
 
 export interface TeamsDirectoryFiltersProps {
   filtersValues: ITeamsFiltersValues;

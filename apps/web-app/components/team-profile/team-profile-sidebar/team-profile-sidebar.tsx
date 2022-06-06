@@ -1,7 +1,7 @@
 import { ITeam } from '@protocol-labs-network/api';
 import { Tags } from '@protocol-labs-network/ui';
 import Image from 'next/image';
-import { SocialLinks } from '../../social-links/social-links';
+import { SocialLinks } from '../../shared/social-links/social-links';
 
 interface TeamProfileSidebarProps {
   team: ITeam;

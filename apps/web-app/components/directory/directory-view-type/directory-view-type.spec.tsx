@@ -1,13 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { RouterContext } from 'next/dist/shared/lib/router-context';
-import { createMockRouter } from '../../utils/test/createMockRouter';
-import { SelectViewType } from './select-view-type';
+import { createMockRouter } from '../../../utils/test/createMockRouter';
+import { DirectoryViewType } from './directory-view-type';
 
-describe('SelectViewType', () => {
+describe('DirectoryViewType', () => {
   it('should show grid button as active and disable at first render', () => {
     render(
       <RouterContext.Provider value={createMockRouter()}>
-        <SelectViewType />
+        <DirectoryViewType />
       </RouterContext.Provider>
     );
 
@@ -24,7 +24,7 @@ describe('SelectViewType', () => {
 
     render(
       <RouterContext.Provider value={createMockRouter({ push })}>
-        <SelectViewType />
+        <DirectoryViewType />
       </RouterContext.Provider>
     );
 
@@ -47,7 +47,7 @@ describe('SelectViewType', () => {
       <RouterContext.Provider
         value={createMockRouter({ query: { viewType: 'list' } })}
       >
-        <SelectViewType />
+        <DirectoryViewType />
       </RouterContext.Provider>
     );
 

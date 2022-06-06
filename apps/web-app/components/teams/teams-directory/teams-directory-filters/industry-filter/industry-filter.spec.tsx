@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { RouterContext } from 'next/dist/shared/lib/router-context';
-import { IFilterTag } from '../../../../components/directory/directory-filters/directory-tags-filter/directory-tags-filter.types';
-import { createMockRouter } from '../../../../utils/test/createMockRouter';
+import { createMockRouter } from '../../../../../utils/test/createMockRouter';
+import { IFilterTag } from '../../../../directory/directory-filters/directory-tags-filter/directory-tags-filter.types';
 import IndustryFilter from './industry-filter';
 
 const tags: IFilterTag[] = [

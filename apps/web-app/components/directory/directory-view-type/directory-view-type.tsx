@@ -2,25 +2,25 @@ import { ViewGridIcon, ViewListIcon } from '@heroicons/react/outline';
 import { useViewType } from './use-view-type.hook';
 import { TViewType } from './view-types.types';
 
-interface SelectViewTypeBtnProps {
+interface DirectoryViewTypeBtnProps {
   viewType: TViewType;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   label: string;
 }
 
-export function SelectViewType() {
+export function DirectoryViewType() {
   const { selectedViewType, changeView } = useViewType();
 
-  const viewTypeOptions: SelectViewTypeBtnProps[] = [
+  const viewTypeOptions: DirectoryViewTypeBtnProps[] = [
     { viewType: 'grid', icon: ViewGridIcon, label: 'Change to grid view' },
     { viewType: 'list', icon: ViewListIcon, label: 'Change to list view' },
   ];
 
-  function SelectViewTypeBtn({
+  function DirectoryViewTypeBtn({
     viewType,
     icon,
     label,
-  }: SelectViewTypeBtnProps) {
+  }: DirectoryViewTypeBtnProps) {
     const ViewTypeIcon = icon;
     const isActive = viewType === selectedViewType;
 
@@ -53,7 +53,7 @@ export function SelectViewType() {
     <div className="flex">
       {viewTypeOptions.map((option) => {
         return (
-          <SelectViewTypeBtn
+          <DirectoryViewTypeBtn
             key={option.viewType}
             viewType={option.viewType}
             icon={option.icon}
