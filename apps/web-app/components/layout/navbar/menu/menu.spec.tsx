@@ -14,13 +14,13 @@ describe('Menu', () => {
     expect(getByText('Teams')).toBeInTheDocument();
   });
 
-  it('should render labbers link', () => {
+  it('should render members link', () => {
     const { getByTestId, getByText } = render(
       <RouterContext.Provider value={createMockRouter()}>
         <Menu />
       </RouterContext.Provider>
     );
-    expect(getByTestId('Labbers-icon')).toBeInTheDocument();
-    expect(getByText('Labbers')).toBeInTheDocument();
+    expect(getByTestId('Members-icon')).toBeInTheDocument();
+    expect(getByText('Members')).toBeInTheDocument();
   });
 });

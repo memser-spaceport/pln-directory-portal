@@ -1,16 +1,16 @@
 import { IAirtableImage } from './common';
 
-export interface IAirtableLabber {
+export interface IAirtableMember {
   id: string;
-  fields: IAirtableLabberFields;
+  fields: IAirtableMemberFields;
 }
 
-export interface IAirtableLabberFields {
+export interface IAirtableMemberFields {
   Name?: string;
   'Display Name'?: string;
   'PLN Start Date'?: Date;
   'PLN End Date'?: Date;
-  'Profile picture'?: IAirtableLabberPicture[];
+  'Profile picture'?: IAirtableMemberPicture[];
   Skills?: string[];
   'Github Handle'?: string;
   'Office hours link'?: string;
@@ -38,7 +38,7 @@ export interface IAirtableLabberFields {
   'Friend of PLN'?: boolean;
 }
 
-export interface IAirtableLabberPicture {
+export interface IAirtableMemberPicture {
   id?: string;
   width?: number;
   height?: number;

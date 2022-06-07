@@ -1,3 +1,3 @@
 export * from './common';
-export * from './labber';
+export * from './member';
 export * from './team';

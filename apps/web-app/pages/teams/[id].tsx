@@ -1,5 +1,5 @@
 import airtableService from '@protocol-labs-network/airtable';
-import { ILabber, ITeam } from '@protocol-labs-network/api';
+import { IMember, ITeam } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import TeamProfileDetails from '../../components/team-profile/team-profile-details/team-profile-details';
@@ -7,7 +7,7 @@ import TeamProfileSidebar from '../../components/team-profile/team-profile-sideb
 
 interface TeamProps {
   team: ITeam;
-  members: ILabber[];
+  members: IMember[];
   membersTeamsNames: { [teamId: string]: string };
 }
 

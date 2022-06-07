@@ -6,7 +6,7 @@ import {
 import { URL_QUERY_VALUE_SEPARATOR } from '../../constants';
 
 /**
- * Returns an options for requesting a list of teams or labbers, by parsing
+ * Returns an options for requesting a list of teams or members, by parsing
  * the provided query parameters.
  */
 export function getListRequestOptionsFromQuery(queryParams: ParsedUrlQuery) {
