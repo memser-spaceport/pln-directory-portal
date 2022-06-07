@@ -10,13 +10,34 @@ jobs:
   main:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - uses: nrwl/nx-set-shas@v2
-      - run: yarn install --immutable --immutable-cache --check-cache
-      - run: npx nx workspace-lint
-      - run: npx nx format:check
-      - run: npx nx affected --target=lint --parallel=3
-      - run: npx nx affected --target=test --parallel=3 --ci --code-coverage
-      - run: npx nx affected --target=build --parallel=3
+
+      - name: Derive base and head SHAs required for `nx affected` commands
+        uses: nrwl/nx-set-shas@v2
+
+      - name: Install dependencies
+        run: yarn install --immutable --immutable-cache --check-cache
+
+      - name: Run linter for NX-specific workspace files
+        run: npx nx workspace-lint
+
+      - name: Check code format
+        run: npx nx format:check
+
+      - name: Run linter for affected apps/libraries
+        run: npx nx affected --target=lint --parallel=3
+
+      - name: Run tests for affected apps/libraries
+        run: npx nx affected --target=test --parallel=3 --ci --code-coverage
+
+      - name: Build affected apps/libraries
+        run: npx nx affected --target=build --parallel=3
+
+      - name: Release a new version
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: npx semantic-release
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
