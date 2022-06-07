@@ -1,4 +1,4 @@
-export interface ILabber {
+export interface IMember {
   discordHandle: string | null;
   displayName: string | null;
   email: string | null;

@@ -1,7 +1,7 @@
-import { ILabber, IListOptions, ITeam } from '@protocol-labs-network/api';
+import { IListOptions, IMember, ITeam } from '@protocol-labs-network/api';
 import Airtable from 'airtable';
 import {
-  IAirtableLabber,
+  IAirtableMember,
   IAirtableTeam,
   IAirtableTeamsFiltersValues,
 } from '../models';
@@ -15,7 +15,7 @@ class AirtableService {
   private static _instance: AirtableService;
 
   private _teamsTable!: Airtable.Table<Airtable.FieldSet>;
-  private _labbersTable!: Airtable.Table<Airtable.FieldSet>;
+  private _membersTable!: Airtable.Table<Airtable.FieldSet>;
 
   constructor() {
     if (!AirtableService._instance) {
@@ -62,23 +62,23 @@ class AirtableService {
   }
 
   /**
-   * Get labbers from Airtable.
+   * Get members from Airtable.
    */
-  public async getLabbers(options: IListOptions = {}) {
-    const labbers: IAirtableLabber[] = (await this._labbersTable
+  public async getMembers(options: IListOptions = {}) {
+    const members: IAirtableMember[] = (await this._membersTable
       .select(options)
       .all()) as unknown as IAirtableTeam[];
 
-    return this._parseLabbers(labbers);
+    return this._parseMembers(members);
   }
 
   /**
-   * Get a specific labber from Airtable.
+   * Get a specific member from Airtable.
    */
-  public async getLabber(id: string) {
-    const labber: IAirtableLabber = await this._labbersTable.find(id);
+  public async getMember(id: string) {
+    const member: IAirtableMember = await this._membersTable.find(id);
 
-    return this._parseLabber(labber);
+    return this._parseMember(member);
   }
 
   /**
@@ -86,18 +86,18 @@ class AirtableService {
    * fields for the members of the provided team
    */
   public async getTeamMembers(teamName: string) {
-    const labbersOptions: IListOptions = {
+    const membersOptions: IListOptions = {
       filterByFormula: this._getSearchFormula(teamName, 'Teams'),
       fields: ['Name', 'Role', 'Profile picture', 'Email', 'Twitter', 'Teams'],
       sort: [{ field: 'Name', direction: 'asc' }],
     };
-    return await airtableService.getLabbers(labbersOptions);
+    return await airtableService.getMembers(membersOptions);
   }
 
   /**
    * Get names for the teams of the provided members
    */
-  public async getMembersTeamsNames(members: ILabber[]) {
+  public async getMembersTeamsNames(members: IMember[]) {
     const uniqueTeamsIds = members.reduce(
       (teamIds, member) => [...new Set([...teamIds, ...member.teams])],
       [] as string[]
@@ -129,7 +129,7 @@ class AirtableService {
     }).base(`${process.env.AIRTABLE_BASE_ID}`);
 
     this._teamsTable = base(`${process.env.AIRTABLE_TEAMS_TABLE_ID}`);
-    this._labbersTable = base(`${process.env.AIRTABLE_LABBERS_TABLE_ID}`);
+    this._membersTable = base(`${process.env.AIRTABLE_MEMBERS_TABLE_ID}`);
   }
 
   /**
@@ -150,7 +150,7 @@ class AirtableService {
       id: team.id,
       industry: team.fields.Industry || [],
       ipfsUser: !!team.fields['IPFS User'],
-      labbers: team.fields['Network members'] || [],
+      members: team.fields['Network members'] || [],
       logo: (team.fields.Logo && team.fields.Logo[0]?.url) || null,
       longDescription: team.fields['Long description'] || null,
       name: team.fields.Name || null,
@@ -169,29 +169,29 @@ class AirtableService {
   }
 
   /**
-   * Parse Airtable's labber records into the appropriate format.
+   * Parse Airtable's member records into the appropriate format.
    */
-  private _parseLabbers(labbers: IAirtableLabber[]): ILabber[] {
-    return labbers.map((labber) => this._parseLabber(labber));
+  private _parseMembers(members: IAirtableMember[]): IMember[] {
+    return members.map((member) => this._parseMember(member));
   }
 
   /**
-   * Parse Airtable's labber record into the appropriate format.
+   * Parse Airtable's member record into the appropriate format.
    */
-  private _parseLabber(labber: IAirtableLabber): ILabber {
+  private _parseMember(member: IAirtableMember): IMember {
     return {
-      discordHandle: labber.fields['Discord Handle'] || null,
-      displayName: labber.fields['Display Name'] || null,
-      email: labber.fields.Email || null,
-      id: labber.id,
+      discordHandle: member.fields['Discord Handle'] || null,
+      displayName: member.fields['Display Name'] || null,
+      email: member.fields.Email || null,
+      id: member.id,
       image:
-        (labber.fields['Profile picture'] &&
-          labber.fields['Profile picture'][0]?.url) ||
+        (member.fields['Profile picture'] &&
+          member.fields['Profile picture'][0]?.url) ||
         null,
-      name: labber.fields.Name || null,
-      role: labber.fields.Role || null,
-      twitter: labber.fields.Twitter || null,
-      teams: labber.fields.Teams || [],
+      name: member.fields.Name || null,
+      role: member.fields.Role || null,
+      twitter: member.fields.Twitter || null,
+      teams: member.fields.Teams || [],
     };
   }
 

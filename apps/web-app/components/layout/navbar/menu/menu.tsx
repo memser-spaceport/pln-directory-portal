@@ -19,8 +19,8 @@ export function Menu() {
     },
     {
       icon: UserIcon,
-      name: 'Labbers',
-      path: '/labbers',
+      name: 'Members',
+      path: '/members',
     },
   ];
 

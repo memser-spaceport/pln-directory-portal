@@ -5,7 +5,7 @@ export interface ITeam {
   id: string;
   industry: string[];
   ipfsUser: boolean;
-  labbers: string[];
+  members: string[];
   logo: string | null;
   longDescription: string | null;
   name: string | null;

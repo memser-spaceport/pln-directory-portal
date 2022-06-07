@@ -1,15 +1,15 @@
 import airtableService from '@protocol-labs-network/airtable';
-import { ILabber } from '@protocol-labs-network/api';
+import { IMember } from '@protocol-labs-network/api';
 import { NextApiRequest, NextApiResponse } from 'next';
-import getLabberHandler from '../../../../pages/api/labbers/[id]';
+import getMemberHandler from '../../../../pages/api/members/[id]';
 
-const mockLabber = {} as ILabber;
+const mockMember = {} as IMember;
 jest.mock('@protocol-labs-network/airtable', () => ({
-  getLabber: jest.fn(() => mockLabber),
+  getMember: jest.fn(() => mockMember),
 }));
 
-describe('/api/labbers/:id', () => {
-  const id = 'labberId_01';
+describe('/api/members/:id', () => {
+  const id = 'memberId_01';
   const json = jest.fn();
   const end = jest.fn();
   const setHeader = jest.fn();
@@ -25,7 +25,7 @@ describe('/api/labbers/:id', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    getLabberHandler(req, res);
+    getMemberHandler(req, res);
   });
 
   describe('and the request method is not supported', () => {
@@ -50,23 +50,23 @@ describe('/api/labbers/:id', () => {
     });
   });
 
-  it('should get the labber with the provided id from AirtableService', () => {
-    expect(airtableService.getLabber).toHaveBeenCalledTimes(1);
-    expect(airtableService.getLabber).toHaveBeenCalledWith(id);
+  it('should get the member with the provided id from AirtableService', () => {
+    expect(airtableService.getMember).toHaveBeenCalledTimes(1);
+    expect(airtableService.getMember).toHaveBeenCalledWith(id);
   });
 
-  describe('and AirtableService successfully retrieves a labber', () => {
-    it('should respond with the provided labber', () => {
+  describe('and AirtableService successfully retrieves a member', () => {
+    it('should respond with the provided member', () => {
       expect(status).toHaveBeenCalledTimes(1);
       expect(status).toHaveBeenCalledWith(200);
       expect(json).toHaveBeenCalledTimes(1);
-      expect(json).toHaveBeenCalledWith(mockLabber);
+      expect(json).toHaveBeenCalledWith(mockMember);
     });
   });
 
-  describe('and AirtableService fails to retrieve a labber', () => {
+  describe('and AirtableService fails to retrieve a member', () => {
     beforeAll(() => {
-      jest.spyOn(airtableService, 'getLabber').mockImplementationOnce(() => {
+      jest.spyOn(airtableService, 'getMember').mockImplementationOnce(() => {
         throw new Error();
       });
     });

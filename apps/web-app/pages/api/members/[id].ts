@@ -1,7 +1,7 @@
 import airtableService from '@protocol-labs-network/airtable';
 import { NextApiRequest, NextApiResponse } from 'next';
 
-export default async function getLabberHandler(
+export default async function getMemberHandler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -15,8 +15,8 @@ export default async function getLabberHandler(
   const { id } = req.query as { id: string };
 
   try {
-    const labber = await airtableService.getLabber(id);
-    res.status(200).json(labber);
+    const member = await airtableService.getMember(id);
+    res.status(200).json(member);
   } catch (error) {
     res.status(500).json({ msg: 'Ups, something went wrong 😕' });
   }
