@@ -1,6 +1,7 @@
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const withNx = require('@nrwl/next/plugins/with-nx');
 const { withSentryConfig } = require('@sentry/nextjs');
+const path = require('path');
 
 /**
  * @type {import('@nrwl/next/plugins/with-nx').WithNxOptions}
@@ -15,6 +16,10 @@ const nextConfig = {
     // List remote domains that have access to Next.js Image Optimization API,
     // to protect the app from malicious users
     domains: ['dl.airtable.com'],
+  },
+  experimental: {
+    // this includes files from the monorepo base two directories up
+    outputFileTracingRoot: path.join(__dirname, '../../'),
   },
 };
 
