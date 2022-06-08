@@ -20,12 +20,6 @@
         "cacheableOperations": ["build", "lint", "test", "e2e"],
         "accessToken": "MjgwMzk0ZWQtNDBmZi00YmM1LTgwNTUtMTdkZWZlZjllM2RifHJlYWQtd3JpdGU="
       }
-    },
-    "no-cloud": {
-      "runner": "@nrwl/workspace/src/tasks-runner/default-tasks-runner",
-      "options": {
-        "cacheableOperations": ["build", "lint", "test", "e2e"]
-      }
     }
   },
   "targetDependencies": {
