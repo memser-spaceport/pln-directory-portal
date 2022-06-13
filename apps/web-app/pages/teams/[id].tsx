@@ -30,13 +30,21 @@ export default function Team({ team, members, membersTeamsNames }: TeamProps) {
   );
 }
 
-export const getServerSideProps: GetServerSideProps<TeamProps> = async (
-  context
-) => {
-  const { id } = context.query as { id: string };
+export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
+  query,
+  res,
+}) => {
+  const { id } = query as { id: string };
   const team = await airtableService.getTeam(id);
   const members = await airtableService.getTeamMembers(team.name);
   const membersTeamsNames = await airtableService.getMembersTeamsNames(members);
+
+  // Cache response data in the browser for 1 minute,
+  // and in the CDN for 5 minutes, while keeping it stale for 7 days
+  res.setHeader(
+    'Cache-Control',
+    'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
+  );
 
   return {
     props: { team, members, membersTeamsNames },

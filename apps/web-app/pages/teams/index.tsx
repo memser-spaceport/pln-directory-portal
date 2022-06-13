@@ -58,15 +58,23 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
   );
 }
 
-export const getServerSideProps: GetServerSideProps<TeamsProps> = async (
-  context
-) => {
-  const options = getListRequestOptionsFromQuery(context.query);
+export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
+  query,
+  res,
+}) => {
+  const options = getListRequestOptionsFromQuery(query);
   const [teams, filtersValues] = await Promise.all([
     airtableService.getTeams(options),
     airtableService.getTeamsFiltersValues(options),
   ]);
-  const parsedFilters = parseTeamsFilters(filtersValues, context.query);
+  const parsedFilters = parseTeamsFilters(filtersValues, query);
+
+  // Cache response data in the browser for 1 minute,
+  // and in the CDN for 5 minutes, while keeping it stale for 7 days
+  res.setHeader(
+    'Cache-Control',
+    'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
+  );
 
   return {
     props: { teams, filtersValues: parsedFilters },
