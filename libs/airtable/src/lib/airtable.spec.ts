@@ -203,6 +203,8 @@ describe('AirtableService', () => {
               Industry: ['Industry 01', 'Industry 02'],
               'Funding Stage': 'Funding Stage 01',
               'Funding Vehicle': ['Funding Vehicle 01', 'Funding Vehicle 02'],
+              'IPFS User': true,
+              'Filecoin User': true,
             },
           },
           {
@@ -231,6 +233,8 @@ describe('AirtableService', () => {
               Industry: ['Industry 01', 'Industry 02'],
               'Funding Stage': 'Funding Stage 01',
               'Funding Vehicle': ['Funding Vehicle 01', 'Funding Vehicle 02'],
+              'IPFS User': true,
+              'Filecoin User': true,
             },
           },
           {
@@ -268,6 +272,7 @@ describe('AirtableService', () => {
           'Funding Vehicle 03',
           'Funding Vehicle 04',
         ],
+        technology: ['Filecoin', 'IPFS'],
       },
       availableValuesByFilter: {
         industry: ['Industry 01', 'Industry 02', 'Industry 03'],
@@ -277,6 +282,7 @@ describe('AirtableService', () => {
           'Funding Vehicle 02',
           'Funding Vehicle 03',
         ],
+        technology: ['Filecoin', 'IPFS'],
       },
     });
   });

@@ -4,4 +4,5 @@ export interface ITeamsFiltersValues {
   fundingStage: IFilterTag[];
   fundingVehicle: IFilterTag[];
   industry: IFilterTag[];
+  technology: IFilterTag[];
 }

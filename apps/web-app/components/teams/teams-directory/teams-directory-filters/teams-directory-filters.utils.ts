@@ -30,6 +30,11 @@ export function parseTeamsFilters(
       filtersValues.availableValuesByFilter.fundingStage,
       query.fundingStage
     ),
+    technology: getTagsFromValues(
+      filtersValues.valuesByFilter.technology,
+      filtersValues.availableValuesByFilter.technology,
+      query.technology
+    ),
   };
 }
 

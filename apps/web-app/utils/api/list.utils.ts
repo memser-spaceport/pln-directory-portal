@@ -10,7 +10,7 @@ import { URL_QUERY_VALUE_SEPARATOR } from '../../constants';
  * the provided query parameters.
  */
 export function getListRequestOptionsFromQuery(queryParams: ParsedUrlQuery) {
-  const { sort, industry, fundingVehicle, fundingStage, searchBy } =
+  const { sort, industry, fundingVehicle, fundingStage, searchBy, technology } =
     queryParams;
 
   return {
@@ -20,6 +20,7 @@ export function getListRequestOptionsFromQuery(queryParams: ParsedUrlQuery) {
       fundingVehicle,
       fundingStage,
       searchBy,
+      technology,
     }),
   };
 }
@@ -55,6 +56,7 @@ function getFormula({
   fundingVehicle,
   fundingStage,
   searchBy,
+  technology,
 }: {
   [key: string]: string | string[] | undefined;
 }) {
@@ -69,6 +71,7 @@ function getFormula({
       ...(fundingStage
         ? [getFieldFromQuery('Funding Stage', fundingStage)]
         : []),
+      ...(technology ? [getTechnologyFormulaFromQuery(technology)] : []),
     ].join(', '),
     ')',
   ].join('');
@@ -98,4 +101,17 @@ function getFieldFromQuery(
   );
 
   return valuesFormulas.join(', ');
+}
+
+/**
+ * Get the Airtable technology filtering formulas.
+ */
+function getTechnologyFormulaFromQuery(
+  technologyQuery: string | string[] = []
+) {
+  const values = Array.isArray(technologyQuery)
+    ? technologyQuery
+    : technologyQuery.split(URL_QUERY_VALUE_SEPARATOR);
+
+  return values.map((value) => `{${value} User} = TRUE()`).join(', ');
 }
