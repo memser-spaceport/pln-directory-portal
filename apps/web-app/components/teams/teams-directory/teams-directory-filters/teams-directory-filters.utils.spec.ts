@@ -17,15 +17,18 @@ describe('#parseTeamsFilters', () => {
               'Funding Stage 02',
               'Funding Stage 03',
             ],
+            technology: ['Filecoin', 'IPFS'],
           },
           availableValuesByFilter: {
             industry: ['Industry 01', 'Industry 03'],
             fundingVehicle: ['Funding Vehicle 01', 'Funding Vehicle 03'],
             fundingStage: ['Funding Stage 01', 'Funding Stage 02'],
+            technology: ['Filecoin'],
           },
         },
         {
           industry: 'Industry 01',
+          technology: 'Filecoin',
         }
       )
     ).toEqual({
@@ -43,6 +46,10 @@ describe('#parseTeamsFilters', () => {
         { value: 'Funding Stage 01', selected: false, disabled: false },
         { value: 'Funding Stage 02', selected: false, disabled: false },
         { value: 'Funding Stage 03', selected: false, disabled: true },
+      ],
+      technology: [
+        { value: 'Filecoin', selected: true, disabled: false },
+        { value: 'IPFS', selected: false, disabled: true },
       ],
     });
   });

@@ -9,11 +9,12 @@ describe('#getListRequestOptionsFromQuery', () => {
         fundingStage: 'Seed',
         fundingVehicle: 'IPFS',
         searchBy: 'void',
+        technology: 'IPFS',
       })
     ).toEqual({
       sort: [{ field: 'Name', direction: 'desc' }],
       filterByFormula:
-        'AND(REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", {Industry}), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}))',
+        'AND(REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", {Industry}), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())',
     });
   });
 
@@ -35,11 +36,12 @@ describe('#getListRequestOptionsFromQuery', () => {
         fundingStage: 'Seed',
         fundingVehicle: 'IPFS',
         searchBy: 'void',
+        technology: 'IPFS|Filecoin',
       })
     ).toEqual({
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula:
-        'AND(REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", {Industry}), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}))',
+        'AND(REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", {Industry}), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())',
     });
   });
 });

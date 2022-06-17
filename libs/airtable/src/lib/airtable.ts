@@ -201,7 +201,13 @@ class AirtableService {
   private async _getAllTeamsFiltersValues() {
     const teams: IAirtableTeam[] = (await this._teamsTable
       .select({
-        fields: ['Industry', 'Funding Stage', 'Funding Vehicle'],
+        fields: [
+          'Industry',
+          'Funding Stage',
+          'Funding Vehicle',
+          'IPFS User',
+          'Filecoin User',
+        ],
       })
       .all()) as unknown as IAirtableTeam[];
 
@@ -214,7 +220,13 @@ class AirtableService {
   private async _getAvailableTeamsFiltersValues(options: IListOptions) {
     const teams: IAirtableTeam[] = (await this._teamsTable
       .select({
-        fields: ['Industry', 'Funding Stage', 'Funding Vehicle'],
+        fields: [
+          'Industry',
+          'Funding Stage',
+          'Funding Vehicle',
+          'IPFS User',
+          'Filecoin User',
+        ],
         ...options,
       })
       .all()) as unknown as IAirtableTeam[];
@@ -245,13 +257,21 @@ class AirtableService {
             ...(team.fields['Funding Vehicle'] || []),
           ]),
         ];
+        const technology = [
+          ...new Set([
+            ...values.technology,
+            ...(team.fields['IPFS User'] ? ['IPFS'] : []),
+            ...(team.fields['Filecoin User'] ? ['Filecoin'] : []),
+          ]),
+        ];
 
-        return { industry, fundingStage, fundingVehicle };
+        return { industry, fundingStage, fundingVehicle, technology };
       },
       {
         industry: [],
         fundingStage: [],
         fundingVehicle: [],
+        technology: [],
       } as IAirtableTeamsFiltersValues
     );
 

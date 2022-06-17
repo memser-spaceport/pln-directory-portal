@@ -49,4 +49,5 @@ export interface IAirtableTeamsFiltersValues {
   industry: string[];
   fundingStage: string[];
   fundingVehicle: string[];
+  technology: string[];
 }
