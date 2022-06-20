@@ -10,8 +10,8 @@ export default function TeamProfileFundingVehicle({
   const hasFundingVehicles = fundingVehicle && fundingVehicle.length;
 
   return (
-    <div className="w-1/2 card">
-      <h3 className="text-sm font-semibold mb-3">Funding Vehicle</h3>
+    <div className="card w-1/2">
+      <h3 className="mb-3 text-sm font-semibold">Funding Vehicle</h3>
       <div>
         {hasFundingVehicles ? <Tags items={fundingVehicle} /> : 'Not provided'}
       </div>

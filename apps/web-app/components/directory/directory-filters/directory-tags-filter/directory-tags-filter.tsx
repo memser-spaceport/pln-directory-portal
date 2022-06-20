@@ -39,13 +39,13 @@ function DirectoryTagsFilter({
                 />
               ))}
             </Collapsible.Content>
-            <Collapsible.Trigger className="flex items-center mt-2">
-              <span className="text-xs font-semibold leading-4 mr-1">
+            <Collapsible.Trigger className="mt-2 flex items-center">
+              <span className="mr-1 text-xs font-semibold leading-4">
                 Show {open ? 'less' : 'more'}
               </span>
               {open ? null : <Badge text={`${collapsibleTags.length}`} />}
               <ChevronDownIcon
-                className={`h-5 ml-2 ${open ? 'rotate-180' : ''}`}
+                className={`ml-2 h-5 ${open ? 'rotate-180' : ''}`}
               />
             </Collapsible.Trigger>
           </>

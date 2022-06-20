@@ -28,16 +28,16 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
       </Head>
 
       <section className="flex">
-        <div className="w-[291px] flex-shrink-0 bg-white border-r border-r-slate-200">
+        <div className="w-[291px] flex-shrink-0 border-r border-r-slate-200 bg-white">
           <TeamsDirectoryFilters filtersValues={filtersValues} />
         </div>
 
-        <div className="p-8 w-[1164px] flex-shrink-0 mx-auto">
-          <div className="flex justify-between items-center mb-10">
+        <div className="mx-auto w-[1164px] flex-shrink-0 p-8">
+          <div className="mb-10 flex items-center justify-between">
             <h1 className="text-3xl font-bold">Teams</h1>
-            <div className="flex space-x-4 items-center">
+            <div className="flex items-center space-x-4">
               <DirectorySearch />
-              <span className="w-px h-6 bg-slate-300" />
+              <span className="h-6 w-px bg-slate-300" />
               <DirectorySort />
               <DirectoryViewType />
             </div>

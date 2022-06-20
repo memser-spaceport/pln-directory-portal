@@ -8,6 +8,6 @@ body {
 
 @layer components {
   .card {
-    @apply bg-white shadow-slate-200 px-5 pt-5 pb-6 border rounded-xl shadow-md text-sm;
+    @apply rounded-xl border bg-white px-5 pt-5 pb-6 text-sm shadow-md shadow-slate-200;
   }
 }

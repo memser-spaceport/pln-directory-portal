@@ -5,7 +5,7 @@ import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/protoc
 
 export function Navbar() {
   return (
-    <nav className="w-full bg-white/95 py-3 px-8 border-b border-slate-200 flex items-center justify-between">
+    <nav className="flex w-full items-center justify-between border-b border-slate-200 bg-white/95 py-3 px-8">
       <div className="flex items-center space-x-5">
         <Link href="/">
           <a>

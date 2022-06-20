@@ -28,9 +28,9 @@ const JOIN_NETWORK_MENU_OPTIONS: IMenuOption[] = [
 export function JoinNetworkMenu() {
   return (
     <Menu as="div" className="relative">
-      <Menu.Button className="inline-flex w-full justify-center rounded-full px-6 py-2 leading-6 text-[15px] font-semibold text-white bg-gradient-to-r from-[#427DFF] to-[#44D5BB] hover:from-[#1A61FF] hover:to-[#2CC3A8] shadow-special-button-default hover:shadow-special-button-hover focus:shadow-special-button-focus outline-none">
+      <Menu.Button className="shadow-special-button-default hover:shadow-special-button-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-[15px] font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]">
         Join the Network
-        <div className="ml-3.5 my-auto">
+        <div className="my-auto ml-3.5">
           <ArrowIcon />
         </div>
       </Menu.Button>
@@ -44,14 +44,14 @@ export function JoinNetworkMenu() {
         leaveFrom="opacity-100"
         leaveTo="opacity-0"
       >
-        <Menu.Items className="absolute right-0 mt-2 p-2 w-full rounded-lg bg-white shadow-md focus:outline-none">
+        <Menu.Items className="absolute right-0 mt-2 w-full rounded-lg bg-white p-2 shadow-md focus:outline-none">
           {JOIN_NETWORK_MENU_OPTIONS.map((option) => {
             const OptionIcon = option.icon;
             return (
               <Menu.Item key={option.label}>
                 {({ active }) => (
                   <OptionLink href={option.url} active={active}>
-                    <OptionIcon className="mr-2 w-5 h-5" />
+                    <OptionIcon className="mr-2 h-5 w-5" />
                     {option.label}
                   </OptionLink>
                 )}

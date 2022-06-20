@@ -43,7 +43,7 @@ export function Dropdown({
     >
       <div className="relative">
         <Listbox.Button
-          className={`flex items-center rounded-lg border bg-white px-3 h-10 border-slate-300 focus:outline-none focus:ring focus:ring-sky-300/30 focus:border-sky-300 transition ease-in-out duration-150 `}
+          className={`flex h-10 items-center rounded-lg border border-slate-300 bg-white px-3 transition duration-150 ease-in-out focus:border-sky-300 focus:outline-none focus:ring focus:ring-sky-300/30 `}
           data-testid="dropdown__button"
         >
           {buttonContent ? (
@@ -51,12 +51,12 @@ export function Dropdown({
           ) : (
             <div className="leading-6">{selectedOption.label}</div>
           )}
-          <ChevronDownIcon className="h-4 ml-5 pointer-events-none" />
+          <ChevronDownIcon className="pointer-events-none ml-5 h-4" />
         </Listbox.Button>
 
         <Listbox.Options
           as="div"
-          className="absolute w-full rounded-lg bg-white border border-slate-300 mt-1 leading-6 shadow-md focus:outline-none"
+          className="absolute mt-1 w-full rounded-lg border border-slate-300 bg-white leading-6 shadow-md focus:outline-none"
         >
           {options.map((option) => (
             <Listbox.Option
@@ -69,13 +69,13 @@ export function Dropdown({
                   className={`${
                     active ? 'bg-sky-500 text-white' : 'bg-white'
                   } ${selected && 'font-semibold'}
-                    select-none relative py-1 pl-8 pr-4 first:rounded-t-lg last:rounded-b-lg overflow-hidden cursor-pointer`}
+                    relative cursor-pointer select-none overflow-hidden py-1 pl-8 pr-4 first:rounded-t-lg last:rounded-b-lg`}
                 >
                   {selected && (
                     <CheckIcon
                       className={`${
                         active ? 'text-white' : 'text-sky-600'
-                      } h-4 absolute inset-y-0 left-2 my-auto pointer-events-none`}
+                      } pointer-events-none absolute inset-y-0 left-2 my-auto h-4`}
                     />
                   )}
                   {option.label}

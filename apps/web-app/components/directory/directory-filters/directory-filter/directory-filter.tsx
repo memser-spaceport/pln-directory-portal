@@ -8,7 +8,7 @@ interface DirectoryFilterProps {
 function DirectoryFilter({ title, children }: DirectoryFilterProps) {
   return (
     <>
-      <div className="text-sm font-semibold leading-5 mb-4">{title}</div>
+      <div className="mb-4 text-sm font-semibold leading-5">{title}</div>
       <div>{children}</div>
     </>
   );

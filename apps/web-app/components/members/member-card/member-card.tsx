@@ -22,7 +22,7 @@ export default function MemberCard({
     <div className="card w-[295px] space-y-4">
       <div className="flex gap-3">
         <div
-          className={`w-20 h-20 rounded-full ${image ? '' : 'bg-slate-200'}`}
+          className={`h-20 w-20 rounded-full ${image ? '' : 'bg-slate-200'}`}
         >
           {image ? (
             <Image
