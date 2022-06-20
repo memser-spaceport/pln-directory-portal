@@ -21,10 +21,10 @@ function DirectoryFilters({
 
   return (
     <>
-      <div className="flex justify-between p-5 border-b border-b-slate-200">
+      <div className="flex justify-between border-b border-b-slate-200 p-5">
         <span className="text-lg font-semibold leading-7">Filters</span>
         <button
-          className="text-xs text-sky-600 hover:text-sky-500 transition-colors"
+          className="text-xs text-sky-600 transition-colors hover:text-sky-500"
           onClick={clearFilters}
         >
           Clear all

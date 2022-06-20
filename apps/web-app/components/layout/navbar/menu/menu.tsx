@@ -27,7 +27,7 @@ export function Menu() {
   const router = useRouter();
 
   return (
-    <ul className="text-sm text-gray-700 flex">
+    <ul className="flex text-sm text-gray-700">
       {MENU_ITEMS.map((item) => {
         const Icon = item.icon;
 
@@ -41,7 +41,7 @@ export function Menu() {
               >
                 <Icon
                   data-testid={`${item.name}-icon`}
-                  className="mr-2 w-5 h-5"
+                  className="mr-2 h-5 w-5"
                 />
                 {item.name}
               </a>

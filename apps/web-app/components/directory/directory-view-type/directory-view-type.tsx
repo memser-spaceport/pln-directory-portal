@@ -26,11 +26,11 @@ export function DirectoryViewType() {
 
     return (
       <button
-        className={`group relative w-10 h-10 border first:rounded-l-lg last:rounded-r-lg ml-[-1px] first:ml-0 focus:outline-none focus:ring focus:ring-sky-300/30 focus:border-sky-300 focus:z-20
+        className={`group relative ml-[-1px] h-10 w-10 border first:ml-0 first:rounded-l-lg last:rounded-r-lg focus:z-20 focus:border-sky-300 focus:outline-none focus:ring focus:ring-sky-300/30
         ${
           isActive
-            ? 'bg-sky-100 border-sky-600 z-10'
-            : 'bg-white border-slate-300'
+            ? 'z-10 border-sky-600 bg-sky-100'
+            : 'border-slate-300 bg-white'
         }
         `}
         onClick={() => changeView(viewType)}
@@ -38,7 +38,7 @@ export function DirectoryViewType() {
       >
         <span className="sr-only">{label}</span>
         <ViewTypeIcon
-          className={`h-6 w-6 m-auto ${
+          className={`m-auto h-6 w-6 ${
             isActive
               ? 'stroke-sky-600'
               : 'stroke-slate-600 group-hover:stroke-sky-600'

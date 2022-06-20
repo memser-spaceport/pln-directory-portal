@@ -17,17 +17,17 @@ export function TeamCard({ team, isGrid }: TeamCardProps) {
         >
           <div
             className={`h-24 rounded-lg ${
-              team.logo ? 'bg-no-repeat bg-center bg-contain' : 'bg-slate-200'
-            } ${isGrid ? 'w-full mb-5' : 'w-56 mr-6'}`}
+              team.logo ? 'bg-contain bg-center bg-no-repeat' : 'bg-slate-200'
+            } ${isGrid ? 'mb-5 w-full' : 'mr-6 w-56'}`}
             style={{
               ...(team.logo && { backgroundImage: `url(${team.logo})` }),
             }}
           />
           <div className="w-52 grow-0">
-            <h3 className="text-base text-slate-900 font-semibold">
+            <h3 className="text-base font-semibold text-slate-900">
               {team.name}
             </h3>
-            <p className="mt-0.5 h-16 line-clamp-3">{team.shortDescription}</p>
+            <p className="line-clamp-3 mt-0.5 h-16">{team.shortDescription}</p>
           </div>
         </div>
       </AnchorLink>
@@ -35,12 +35,12 @@ export function TeamCard({ team, isGrid }: TeamCardProps) {
       <div
         className={`${
           !isGrid &&
-          'sm:w-full lg:w-6/12 lg:ml-auto lg:justify-end flex flex-row'
+          'flex flex-row sm:w-full lg:ml-auto lg:w-6/12 lg:justify-end'
         }`}
       >
         <div
-          className={`h-[50px] flex ${
-            isGrid ? 'px-6 pt-3' : 'ml-6 self-center items-center sm:w-6/12'
+          className={`flex h-[50px] ${
+            isGrid ? 'px-6 pt-3' : 'ml-6 items-center self-center sm:w-6/12'
           }`}
         >
           {team.industry && team.industry.length ? (
@@ -52,10 +52,10 @@ export function TeamCard({ team, isGrid }: TeamCardProps) {
           )}
         </div>
         <div
-          className={`flex px-6 py-4 space-x-2 ${
+          className={`flex space-x-2 px-6 py-4 ${
             isGrid
               ? 'border-t border-slate-200'
-              : 'ml-6 justify-center items-center border-l border-slate-200 sm:flex-auto sm:w-6/1'
+              : 'sm:w-6/1 ml-6 items-center justify-center border-l border-slate-200 sm:flex-auto'
           }`}
         >
           <SocialLinks

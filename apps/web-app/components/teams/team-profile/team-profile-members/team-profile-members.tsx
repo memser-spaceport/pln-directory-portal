@@ -10,13 +10,13 @@ export default function TeamProfileMembers({
 }: TeamProfileMembersProps) {
   return (
     <>
-      <h3 className="text-slate-500 font-medium mb-4">Members</h3>
+      <h3 className="mb-4 font-medium text-slate-500">Members</h3>
       <div className="flex flex-wrap gap-4">
         {members.map((member) => (
           <MemberCard key={member.id} {...member} />
         ))}
       </div>
-      <div className="text-sm text-slate-500 mt-8 mb-20">
+      <div className="mt-8 mb-20 text-sm text-slate-500">
         Showing <b>{members.length}</b> results
       </div>
     </>

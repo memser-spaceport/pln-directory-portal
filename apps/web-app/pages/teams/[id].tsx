@@ -17,7 +17,7 @@ export default function Team({ team, members }: TeamProps) {
         <title>Team {team.name}</title>
       </Head>
 
-      <div className="pt-10 flex">
+      <div className="flex pt-10">
         <TeamProfileSidebar team={team} />
         <TeamProfileDetails team={team} members={members} />
       </div>

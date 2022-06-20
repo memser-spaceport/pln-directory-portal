@@ -20,11 +20,11 @@ function TeamsDirectoryFilters({ filtersValues }: TeamsDirectoryFiltersProps) {
       ]}
     >
       <IndustryFilter industryTags={filtersValues.industry} />
-      <div className="h-px bg-slate-200 my-5" />
+      <div className="my-5 h-px bg-slate-200" />
       <FundingVehicleFilter fundingVehicleTags={filtersValues.fundingVehicle} />
-      <div className="h-px bg-slate-200 my-5" />
+      <div className="my-5 h-px bg-slate-200" />
       <FundingStageFilter fundingStageTags={filtersValues.fundingStage} />
-      <div className="h-px bg-slate-200 my-5" />
+      <div className="my-5 h-px bg-slate-200" />
       <TechnologyFilter technologyTags={filtersValues.technology} />
     </DirectoryFilters>
   );

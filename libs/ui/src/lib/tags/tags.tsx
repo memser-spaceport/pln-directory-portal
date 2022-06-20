@@ -11,7 +11,7 @@ function HiddenTagsTooltip({ items }: TagsProps) {
     <Tooltip.Provider delayDuration={0}>
       <Tooltip.Root>
         <Tooltip.Trigger>
-          <span className="flex items-center justify-center w-[26px] h-[26px] text-xs font-medium text-slate-600 rounded-full bg-slate-100 group">
+          <span className="group flex h-[26px] w-[26px] items-center justify-center rounded-full bg-slate-100 text-xs font-medium text-slate-600">
             +{items.length}
           </span>
         </Tooltip.Trigger>
@@ -19,7 +19,7 @@ function HiddenTagsTooltip({ items }: TagsProps) {
           side="top"
           align="center"
           sideOffset={8}
-          className="flex-shrink-0 bg-slate-900 rounded py-1 px-2 text-white text-xs font-medium min-w-[50px]"
+          className="min-w-[50px] flex-shrink-0 rounded bg-slate-900 py-1 px-2 text-xs font-medium text-white"
         >
           {items.toString()}
         </Tooltip.Content>
@@ -60,7 +60,7 @@ export function Tags({ items, isInline = true }: TagsProps) {
 
   return (
     <div
-      className={`flex items-start w-full ${
+      className={`flex w-full items-start ${
         isInline ? 'overflow-hidden' : 'flex-wrap'
       }`}
       ref={containerRef}
@@ -68,7 +68,7 @@ export function Tags({ items, isInline = true }: TagsProps) {
       {items.map((item, i) => (
         <span
           key={i}
-          className={`h-[26px] px-3 py-1.5 mr-2 text-xs font-medium text-slate-600 rounded-3xl bg-slate-100 whitespace-nowrap ${
+          className={`mr-2 h-[26px] whitespace-nowrap rounded-3xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 ${
             isInline && i >= hiddenStartIndex ? 'invisible' : 'visible mb-2'
           }`}
           style={{ order: i >= hiddenStartIndex ? i + 1 : i }}

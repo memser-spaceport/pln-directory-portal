@@ -28,7 +28,7 @@ export function SocialLink({ linkObj, linkIcon, type }: SocialLinkProps) {
   return (
     <AnchorLink {...linkProps}>
       <Icon
-        className={`w-5 h-5 ${
+        className={`h-5 w-5 ${
           isActive ? 'text-slate-500 hover:text-slate-600' : 'text-slate-300'
         }`}
       />

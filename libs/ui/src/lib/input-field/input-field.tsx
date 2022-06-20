@@ -35,13 +35,13 @@ export function InputField({
     <label className="relative block">
       <span className="sr-only">{label}</span>
       {InputIcon ? (
-        <InputIcon className="absolute left-2 inset-y-0 my-auto w-4 h-4 fill-slate-600" />
+        <InputIcon className="absolute inset-y-0 left-2 my-auto h-4 w-4 fill-slate-600" />
       ) : null}
       <input
         {...props}
-        className={`text-sm text-slate-600 leading-6 placeholder:text-sm placeholder:text-slate-600 block bg-white border border-slate-300 w-full rounded-lg 
-        ${icon ? 'pl-8' : 'pl-3'} pr-2 h-10 leading-10
-        shadow-sm shadow-slate-900/16 focus:outline-none focus:ring focus:ring-sky-300/30 focus:border-sky-300 ${
+        className={`block w-full rounded-lg border border-slate-300 bg-white text-sm leading-6 text-slate-600 placeholder:text-sm placeholder:text-slate-600 
+        ${icon ? 'pl-8' : 'pl-3'} shadow-slate-900/16 h-10 pr-2
+        leading-10 shadow-sm focus:border-sky-300 focus:outline-none focus:ring focus:ring-sky-300/30 ${
           props.className || ''
         }`}
         onChange={composeEventHandlers(props.onChange, handleUserInput)}
@@ -54,7 +54,7 @@ export function InputField({
           }`}
           onClick={handleClear}
         >
-          <XIcon className="w-3 h-3 fill-slate-600" />
+          <XIcon className="h-3 w-3 fill-slate-600" />
         </button>
       ) : null}
     </label>
