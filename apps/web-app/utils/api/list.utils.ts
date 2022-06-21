@@ -63,6 +63,8 @@ function getFormula({
   const formula = [
     'AND(',
     [
+      '{Name} != ""',
+      '{Short description} != ""',
       ...(searchBy ? [getSearchFormulaFromQuery(searchBy)] : []),
       ...(industry ? [getFieldFromQuery('Industry', industry)] : []),
       ...(fundingVehicle
