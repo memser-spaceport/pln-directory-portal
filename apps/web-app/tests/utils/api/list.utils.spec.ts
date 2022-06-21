@@ -14,7 +14,7 @@ describe('#getListRequestOptionsFromQuery', () => {
     ).toEqual({
       sort: [{ field: 'Name', direction: 'desc' }],
       filterByFormula:
-        'AND(REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", {Industry}), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())',
+        'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", {Industry}), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())',
     });
   });
 
@@ -25,7 +25,7 @@ describe('#getListRequestOptionsFromQuery', () => {
       })
     ).toEqual({
       sort: [{ field: 'Name', direction: 'asc' }],
-      filterByFormula: 'AND()',
+      filterByFormula: 'AND({Name} != "", {Short description} != "")',
     });
   });
 
@@ -41,7 +41,7 @@ describe('#getListRequestOptionsFromQuery', () => {
     ).toEqual({
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula:
-        'AND(REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", {Industry}), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())',
+        'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", {Industry}), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())',
     });
   });
 });
