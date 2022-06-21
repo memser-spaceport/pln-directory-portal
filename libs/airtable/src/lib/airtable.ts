@@ -278,7 +278,14 @@ class AirtableService {
       return `RECORD_ID()='${id}'`;
     });
     const listOptions = {
-      filterByFormula: `OR(${formulaByTeamId.join(',')})`,
+      filterByFormula: [
+        'AND(',
+        'AND(',
+        ['{Name} != ""', '{Short description} != ""'].join(', '),
+        '), ',
+        `OR(${formulaByTeamId.join(', ')})`,
+        ')',
+      ].join(''),
       fields: ['Name'],
     };
 

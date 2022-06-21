@@ -434,7 +434,7 @@ describe('AirtableService', () => {
     });
     expect(teamsTableMock.select).toHaveBeenCalledWith({
       filterByFormula:
-        "OR(RECORD_ID()='team_id_01',RECORD_ID()='team_id_02',RECORD_ID()='team_id_03')",
+        "AND(AND({Name} != \"\", {Short description} != \"\"), OR(RECORD_ID()='team_id_01', RECORD_ID()='team_id_02', RECORD_ID()='team_id_03'))",
       fields: ['Name'],
     });
 
