@@ -1,23 +1,39 @@
 import airtableService from '@protocol-labs-network/airtable';
 import { IMemberWithTeams, ITeam } from '@protocol-labs-network/api';
+import { Breadcrumb, IBreadcrumbItem } from '@protocol-labs-network/ui';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import TeamProfileDetails from '../../components/teams/team-profile/team-profile-details/team-profile-details';
 import TeamProfileSidebar from '../../components/teams/team-profile/team-profile-sidebar/team-profile-sidebar';
 
 interface TeamProps {
   team: ITeam;
   members: IMemberWithTeams[];
+  backLink: string;
 }
 
-export default function Team({ team, members }: TeamProps) {
+export default function Team({ team, members, backLink }: TeamProps) {
+  const router = useRouter();
+  const breadcrumbItems: IBreadcrumbItem[] = [
+    { label: 'Teams', href: backLink },
+    { label: team.name },
+  ];
+
+  if (router.query.backLink) {
+    const { backLink, ...query } = router.query;
+    router.replace({ query }, undefined, { shallow: true });
+  }
+
   return (
-    <section>
+    <section className="mx-10 my-3">
       <Head>
         <title>Team {team.name}</title>
       </Head>
 
-      <div className="flex pt-10">
+      <Breadcrumb items={breadcrumbItems} />
+
+      <div className="mt-6 flex space-x-10">
         <TeamProfileSidebar team={team} />
         <TeamProfileDetails team={team} members={members} />
       </div>
@@ -29,7 +45,10 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
   query,
   res,
 }) => {
-  const { id } = query as { id: string };
+  const { id, backLink = '/teams' } = query as {
+    id: string;
+    backLink: string;
+  };
   const team = await airtableService.getTeam(id);
   const members = await airtableService.getTeamMembers(team.name);
 
@@ -41,6 +60,6 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
   );
 
   return {
-    props: { team, members },
+    props: { team, members, backLink },
   };
 };
