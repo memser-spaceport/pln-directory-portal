@@ -4,6 +4,7 @@ import { Breadcrumb, IBreadcrumbItem } from '@protocol-labs-network/ui';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { AskToEditLink } from '../../components/shared/ask-to-edit-link/ask-to-edit-link';
 import TeamProfileDetails from '../../components/teams/team-profile/team-profile-details/team-profile-details';
 import TeamProfileSidebar from '../../components/teams/team-profile/team-profile-sidebar/team-profile-sidebar';
 
@@ -31,7 +32,10 @@ export default function Team({ team, members, backLink }: TeamProps) {
         <title>Team {team.name}</title>
       </Head>
 
-      <Breadcrumb items={breadcrumbItems} />
+      <div className="flex items-center justify-between">
+        <Breadcrumb items={breadcrumbItems} />
+        <AskToEditLink profileType="team" profileName={team.name} />
+      </div>
 
       <div className="mt-6 flex space-x-10">
         <TeamProfileSidebar team={team} />
