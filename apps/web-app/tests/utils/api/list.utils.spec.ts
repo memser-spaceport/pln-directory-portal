@@ -1,9 +1,9 @@
-import { getListRequestOptionsFromQuery } from '../../../utils/api/list.utils';
+import { getTeamsDirectoryRequestOptionsFromQuery } from '../../../utils/api/list.utils';
 
-describe('#getListRequestOptionsFromQuery', () => {
+describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
   it('should return valid options when sort is provided and is valid', () => {
     expect(
-      getListRequestOptionsFromQuery({
+      getTeamsDirectoryRequestOptionsFromQuery({
         sort: 'Name,desc',
         industry: 'Analytics',
         fundingStage: 'Seed',
@@ -20,7 +20,7 @@ describe('#getListRequestOptionsFromQuery', () => {
 
   it('should return valid options when sort is provided and is invalid', () => {
     expect(
-      getListRequestOptionsFromQuery({
+      getTeamsDirectoryRequestOptionsFromQuery({
         sort: 'invalid',
       })
     ).toEqual({
@@ -31,7 +31,7 @@ describe('#getListRequestOptionsFromQuery', () => {
 
   it('should return valid options when sort is not provided', () => {
     expect(
-      getListRequestOptionsFromQuery({
+      getTeamsDirectoryRequestOptionsFromQuery({
         industry: 'Analytics',
         fundingStage: 'Seed',
         fundingVehicle: 'IPFS',

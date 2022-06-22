@@ -6,16 +6,18 @@ import {
 import { URL_QUERY_VALUE_SEPARATOR } from '../../constants';
 
 /**
- * Returns an options for requesting a list of teams or members, by parsing
- * the provided query parameters.
+ * Returns the options for requesting the teams on the teams directory,
+ * by parsing the provided query parameters.
  */
-export function getListRequestOptionsFromQuery(queryParams: ParsedUrlQuery) {
+export function getTeamsDirectoryRequestOptionsFromQuery(
+  queryParams: ParsedUrlQuery
+) {
   const { sort, industry, fundingVehicle, fundingStage, searchBy, technology } =
     queryParams;
 
   return {
     sort: [getSortFromQuery(sort?.toString())],
-    filterByFormula: getFormula({
+    filterByFormula: getTeamsDirectoryFormula({
       industry,
       fundingVehicle,
       fundingStage,
@@ -49,9 +51,9 @@ function isSortValid(sortQuery?: string) {
 }
 
 /**
- * Get formula for list filtering.
+ * Get formula for teams directory filtering.
  */
-function getFormula({
+function getTeamsDirectoryFormula({
   industry,
   fundingVehicle,
   fundingStage,
@@ -82,7 +84,8 @@ function getFormula({
 }
 
 /**
- * Returns formula to find matching results with names starting with the provided search query parameter
+ * Returns formula to find matching results with names starting with the
+ * provided search query parameter.
  */
 function getSearchFormulaFromQuery(searchQuery: string | string[] = '') {
   return `REGEX_MATCH({Name}, "(?i)^(${searchQuery.toString()})")`;
