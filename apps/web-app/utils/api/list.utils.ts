@@ -28,6 +28,16 @@ export function getTeamsDirectoryRequestOptionsFromQuery(
 }
 
 /**
+ * Returns the options for requesting the members on the members directory,
+ * by parsing the provided query parameters.
+ */
+export function getMembersDirectoryRequestOptionsFromQuery() {
+  return {
+    filterByFormula: getMembersDirectoryFormula(),
+  };
+}
+
+/**
  * Gets sort options by parsing the provided sort query parameter.
  */
 function getSortFromQuery(sortQuery?: string) {
@@ -77,6 +87,19 @@ function getTeamsDirectoryFormula({
         : []),
       ...(technology ? [getTechnologyFormulaFromQuery(technology)] : []),
     ].join(', '),
+    ')',
+  ].join('');
+
+  return formula;
+}
+
+/**
+ * Get formula for members directory filtering.
+ */
+function getMembersDirectoryFormula() {
+  const formula = [
+    'AND(',
+    ['{Name} != ""', '{Teams} != ""'].join(', '),
     ')',
   ].join('');
 

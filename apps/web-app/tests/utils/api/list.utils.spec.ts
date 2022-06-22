@@ -1,4 +1,7 @@
-import { getTeamsDirectoryRequestOptionsFromQuery } from '../../../utils/api/list.utils';
+import {
+  getMembersDirectoryRequestOptionsFromQuery,
+  getTeamsDirectoryRequestOptionsFromQuery,
+} from '../../../utils/api/list.utils';
 
 describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
   it('should return valid options when sort is provided and is valid', () => {
@@ -42,6 +45,14 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula:
         'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", {Industry}), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())',
+    });
+  });
+});
+
+describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
+  it('should return valid options', () => {
+    expect(getMembersDirectoryRequestOptionsFromQuery()).toEqual({
+      filterByFormula: 'AND({Name} != "", {Teams} != "")',
     });
   });
 });
