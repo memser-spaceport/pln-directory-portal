@@ -14,8 +14,8 @@ export default function TeamProfileDetails({
   members,
 }: TeamProfileDetailsProps) {
   return (
-    <div className="mx-14 w-full">
-      <div className="flex max-w-[1225px] flex-col gap-y-6">
+    <div className="w-full">
+      <div className="flex flex-col gap-y-6">
         <div className="card">
           <h1 className="mb-4 text-3xl font-bold">
             {team.name || 'Not provided'}

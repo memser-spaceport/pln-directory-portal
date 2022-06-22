@@ -1,5 +1,6 @@
 import { ITeam } from '@protocol-labs-network/api';
 import { AnchorLink, Tags } from '@protocol-labs-network/ui';
+import { useRouter } from 'next/router';
 import { DirectoryCard } from '../../directory/directory-card/directory-card';
 import { SocialLinks } from '../../shared/social-links/social-links';
 
@@ -9,9 +10,13 @@ export interface TeamCardProps {
 }
 
 export function TeamCard({ team, isGrid }: TeamCardProps) {
+  const router = useRouter();
+
   return (
     <DirectoryCard isGrid={isGrid}>
-      <AnchorLink href={`/teams/${team.id}`}>
+      <AnchorLink
+        href={`/teams/${team.id}?backLink=${encodeURIComponent(router.asPath)}`}
+      >
         <div
           className={`flex ${isGrid ? 'flex-col px-6 pt-6' : 'flex-row p-6'}`}
         >

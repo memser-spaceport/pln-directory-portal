@@ -9,7 +9,7 @@ interface TeamProfileSidebarProps {
 
 export default function TeamProfileSidebar({ team }: TeamProfileSidebarProps) {
   return (
-    <div className="card ml-10 w-80 shrink-0 space-y-4 self-start">
+    <div className="card w-80 shrink-0 space-y-4 self-start">
       <div className="flex gap-3">
         <div className={`h-20 w-20 rounded ${team.logo ? '' : 'bg-slate-200'}`}>
           {team.logo ? (
