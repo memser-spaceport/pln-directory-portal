@@ -1,4 +1,5 @@
-import { Tags } from '@protocol-labs-network/ui';
+import { TagsGroup } from '../../../shared/tags-group/tags-group';
+import { parseStringsIntoTagsGroupItems } from '../../../shared/tags-group/tags-group.utils';
 
 interface TeamProfileFundingVehicleProps {
   fundingVehicle?: string[];
@@ -13,7 +14,11 @@ export default function TeamProfileFundingVehicle({
     <div className="card w-1/2">
       <h3 className="mb-3 text-sm font-semibold">Funding Vehicle</h3>
       <div>
-        {hasFundingVehicles ? <Tags items={fundingVehicle} /> : 'Not provided'}
+        {hasFundingVehicles ? (
+          <TagsGroup items={parseStringsIntoTagsGroupItems(fundingVehicle)} />
+        ) : (
+          'Not provided'
+        )}
       </div>
     </div>
   );
