@@ -10,7 +10,7 @@ import { TeamCard } from '../../components/teams/team-card/team-card';
 import TeamsDirectoryFilters from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters';
 import { ITeamsFiltersValues } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.types';
 import { parseTeamsFilters } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.utils';
-import { getListRequestOptionsFromQuery } from '../../utils/api/list.utils';
+import { getTeamsDirectoryRequestOptionsFromQuery } from '../../utils/api/list.utils';
 
 type TeamsProps = {
   teams: ITeam[];
@@ -62,7 +62,7 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
   query,
   res,
 }) => {
-  const options = getListRequestOptionsFromQuery(query);
+  const options = getTeamsDirectoryRequestOptionsFromQuery(query);
   const [teams, filtersValues] = await Promise.all([
     airtableService.getTeams(options),
     airtableService.getTeamsFiltersValues(options),
