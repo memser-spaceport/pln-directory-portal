@@ -44,7 +44,7 @@ export function JoinNetworkMenu() {
         leaveFrom="opacity-100"
         leaveTo="opacity-0"
       >
-        <Menu.Items className="absolute right-0 mt-2 w-full rounded-lg bg-white p-2 shadow-md focus:outline-none">
+        <Menu.Items className="absolute right-0 z-50 mt-2 w-full rounded-lg bg-white p-2 shadow-md focus:outline-none">
           {JOIN_NETWORK_MENU_OPTIONS.map((option) => {
             const OptionIcon = option.icon;
             return (
