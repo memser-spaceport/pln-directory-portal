@@ -52,6 +52,35 @@ class AirtableService {
   }
 
   /**
+   * Get Name, Logo, Short description, Industry, Website
+   * and Twitter fields for provided teams
+   */
+  public async getTeamCardsData(teams: string[]) {
+    const teamsByIdFormula = this._getTeamIdSearchFormula(teams);
+    const listOptions: IListOptions = {
+      filterByFormula: [
+        'AND(',
+        'AND(',
+        ['{Name} != ""', '{Short description} != ""'].join(', '),
+        '), ',
+        `OR(${teamsByIdFormula.join(', ')})`,
+        ')',
+      ].join(''),
+      fields: [
+        'Name',
+        'Logo',
+        'Short description',
+        'Industry',
+        'Website',
+        'Twitter',
+      ],
+      sort: [{ field: 'Name', direction: 'asc' }],
+    };
+
+    return await airtableService.getTeams(listOptions);
+  }
+
+  /**
    * Get values (and available values) for teams filters.
    */
   public async getTeamsFiltersValues(options: IListOptions) {
@@ -310,16 +339,14 @@ class AirtableService {
       [] as string[]
     );
 
-    const formulaByTeamId = uniqueTeamsIds.map((id) => {
-      return `RECORD_ID()='${id}'`;
-    });
+    const teamsByIdFormula = this._getTeamIdSearchFormula(uniqueTeamsIds);
     const listOptions = {
       filterByFormula: [
         'AND(',
         'AND(',
         ['{Name} != ""', '{Short description} != ""'].join(', '),
         '), ',
-        `OR(${formulaByTeamId.join(', ')})`,
+        `OR(${teamsByIdFormula.join(', ')})`,
         ')',
       ].join(''),
       fields: ['Name'],
@@ -356,6 +383,15 @@ class AirtableService {
    */
   private _getSearchFormula(queryValue: string, field: string) {
     return `SEARCH("${queryValue}",${field})`;
+  }
+
+  /**
+   * Returns a formula to search results for teams by id
+   */
+  private _getTeamIdSearchFormula(teams: string[]) {
+    return teams.map((id) => {
+      return `RECORD_ID()='${id}'`;
+    });
   }
 }
 
