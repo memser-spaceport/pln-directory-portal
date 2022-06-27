@@ -20,7 +20,7 @@ export interface IAirtableMemberFields {
   Location?: string;
   Email?: string;
   Twitter?: string;
-  'Discord Handle'?: string;
+  'Discord handle'?: string;
   Notes?: string;
   'Date contacted'?: Date;
   'State / Province'?: string;
