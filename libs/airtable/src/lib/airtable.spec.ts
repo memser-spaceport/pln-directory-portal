@@ -222,6 +222,103 @@ describe('AirtableService', () => {
     });
   });
 
+  it('should be able to get teams details with the provided id from teams table', async () => {
+    (teamsTableMock.select as jest.Mock).mockReset().mockReturnValueOnce({
+      all: jest.fn().mockReturnValue([
+        {
+          id: 'team_id_01',
+          fields: {
+            Name: 'Team 01',
+            'Short description': 'Short description for Team 01',
+            'Long description': 'Long description for Team 01',
+            Website: 'http://team01.com/ http://team0X.com/',
+            Twitter: '@team01',
+            'Funding Vehicle': ['Seed'],
+            'Network members': ['member_id_01'],
+            Logo: [{ id: 'team_logo_01', url: 'http://team01.com/logo.svg' }],
+            Industry: ['IT'],
+            'Last Audited': new Date('28/02/1904'),
+            Notes: 'Some notes.',
+            'Last Modified': new Date('28/02/1904'),
+            'Eligible for marketplace credits': true,
+            'Grants program': true,
+          },
+        },
+        {
+          id: 'team_id_02',
+          fields: {
+            Name: 'Team 02',
+            'Short description': 'Short description for Team 02',
+            'Long description': 'Long description for Team 02',
+            Website: 'http://team02.com/ http://team0X.com/',
+            Twitter: '@team02',
+            'Funding Vehicle': ['Seed'],
+            'Network members': ['member_id_02'],
+            Logo: [{ id: 'team_logo_02', url: 'http://team02.com/logo.svg' }],
+            Industry: ['IT'],
+            'Last Audited': new Date('28/02/1904'),
+            Notes: 'Some notes.',
+            'Last Modified': new Date('28/02/1904'),
+            'Eligible for marketplace credits': true,
+            'Grants program': true,
+          },
+        },
+      ]),
+    });
+
+    const teams = await airtableService.getTeamCardsData([
+      'team_id_01',
+      'team_id_02',
+    ]);
+
+    expect(teamsTableMock.select).toHaveBeenCalledWith({
+      filterByFormula:
+        'AND(AND({Name} != "", {Short description} != ""), OR(RECORD_ID()=\'team_id_01\', RECORD_ID()=\'team_id_02\'))',
+      fields: [
+        'Name',
+        'Logo',
+        'Short description',
+        'Industry',
+        'Website',
+        'Twitter',
+      ],
+      sort: [{ direction: 'asc', field: 'Name' }],
+    });
+
+    expect(teams).toEqual([
+      {
+        id: 'team_id_01',
+        logo: 'http://team01.com/logo.svg',
+        longDescription: 'Long description for Team 01',
+        members: ['member_id_01'],
+        name: 'Team 01',
+        shortDescription: 'Short description for Team 01',
+        twitter: '@team01',
+        website: 'http://team01.com/',
+        fundingStage: null,
+        filecoinUser: false,
+        fundingVehicle: ['Seed'],
+        industry: ['IT'],
+        ipfsUser: false,
+      },
+      {
+        id: 'team_id_02',
+        logo: 'http://team02.com/logo.svg',
+        longDescription: 'Long description for Team 02',
+        members: ['member_id_02'],
+        name: 'Team 02',
+        shortDescription: 'Short description for Team 02',
+        twitter: '@team02',
+        website: 'http://team02.com/',
+        fundingStage: null,
+        filecoinUser: false,
+        fundingVehicle: ['Seed'],
+        industry: ['IT'],
+        ipfsUser: false,
+      },
+    ]);
+  });
+
   it('should be able to get all teams filter values and available teams filter values from teams table', async () => {
     (teamsTableMock.select as jest.Mock)
       .mockReset()

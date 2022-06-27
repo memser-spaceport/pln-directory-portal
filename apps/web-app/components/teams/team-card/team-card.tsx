@@ -7,17 +7,25 @@ import { TagsGroup } from '../../shared/tags-group/tags-group';
 import { parseStringsIntoTagsGroupItems } from '../../shared/tags-group/tags-group.utils';
 
 export interface TeamCardProps {
+  isClickable?: boolean;
   team: ITeam;
-  isGrid: boolean;
+  isGrid?: boolean;
 }
 
-export function TeamCard({ team, isGrid }: TeamCardProps) {
+export function TeamCard({
+  isClickable = false,
+  team,
+  isGrid = true,
+}: TeamCardProps) {
   const router = useRouter();
   const backLink = encodeURIComponent(router.asPath);
+  const anchorLinkProps = {
+    ...(isClickable ? { href: `/teams/${team.id}?backLink=${backLink}` } : {}),
+  };
 
   return (
     <DirectoryCard isGrid={isGrid}>
-      <AnchorLink href={`/teams/${team.id}?backLink=${backLink}`}>
+      <AnchorLink {...anchorLinkProps}>
         <div className={`flex ${isGrid ? 'flex-col space-y-4' : 'flex-row'}`}>
           <div className={`${isGrid ? 'w-full' : 'w-[496px]'} flex space-x-4`}>
             <div

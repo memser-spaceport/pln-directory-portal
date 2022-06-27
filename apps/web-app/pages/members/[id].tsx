@@ -1,17 +1,19 @@
 import airtableService from '@protocol-labs-network/airtable';
-import { IMember } from '@protocol-labs-network/api';
+import { IMember, ITeam } from '@protocol-labs-network/api';
 import { Breadcrumb } from '@protocol-labs-network/ui';
 import Head from 'next/head';
 import { MemberProfileHeader } from '../../components/members/member-profile/member-profile-header';
 import { MemberProfileOfficeHours } from '../../components/members/member-profile/member-profile-office-hours';
+import { MemberProfileTeams } from '../../components/members/member-profile/member-profile-teams';
 import { useProfileBreadcrumb } from '../../hooks/profile/use-profile-breadcrumb.hook';
 
 interface MemberProps {
   member: IMember;
+  teams: ITeam[];
   backLink: string;
 }
 
-export default function Member({ member, backLink }: MemberProps) {
+export default function Member({ member, teams, backLink }: MemberProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
     directoryName: 'Members',
@@ -25,7 +27,10 @@ export default function Member({ member, backLink }: MemberProps) {
       </Head>
       <Breadcrumb items={breadcrumbItems} />
       <div className="mt-6 flex items-start space-x-10">
-        <MemberProfileHeader member={member} />
+        <div className="flex grow flex-col space-y-8">
+          <MemberProfileHeader member={member} />
+          <MemberProfileTeams teams={teams} />
+        </div>
         <MemberProfileOfficeHours url={member.officeHours} />
       </div>
     </section>
@@ -38,6 +43,7 @@ export const getServerSideProps = async ({ query, res }) => {
     backLink: string;
   };
   const member = await airtableService.getMember(id);
+  const teams = await airtableService.getTeamCardsData(member.teams);
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
@@ -47,6 +53,6 @@ export const getServerSideProps = async ({ query, res }) => {
   );
 
   return {
-    props: { member, backLink },
+    props: { member, teams, backLink },
   };
 };
