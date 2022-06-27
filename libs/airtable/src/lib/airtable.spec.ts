@@ -56,7 +56,7 @@ const memberMock: IAirtableMember = {
     Location: 'Seattle, WA',
     Email: 'aarsh.shah@protocol.ai',
     Twitter: '@member01',
-    'Discord Handle': '@member01',
+    'Discord handle': '@member01',
     Notes: 'Some notes.',
     'Date contacted': new Date('28/02/1904'),
     'State / Province': 'Washington',
@@ -294,13 +294,15 @@ describe('AirtableService', () => {
     expect(membersTableMock.select().all).toHaveBeenCalledTimes(1);
     expect(members).toEqual([
       {
-        discordHandle: memberMock.fields['Discord Handle'],
+        discordHandle: memberMock.fields['Discord handle'],
         displayName: memberMock.fields['Display Name'],
         email: memberMock.fields.Email,
+        githubHandle: memberMock.fields['Github Handle'],
         id: memberMock.id,
         image: memberMock.fields['Profile picture']?.[0].url,
         name: memberMock.fields.Name,
         role: memberMock.fields.Role,
+        skills: [memberMock.fields.Skills?.[0]],
         teams: memberMock.fields.Teams,
         twitter: memberMock.fields.Twitter,
       },
@@ -310,8 +312,10 @@ describe('AirtableService', () => {
         email: null,
         id: emptyMemberMock.id,
         image: null,
+        githubHandle: null,
         name: null,
         role: null,
+        skills: [],
         teams: [],
         twitter: null,
       },
@@ -324,13 +328,15 @@ describe('AirtableService', () => {
     expect(membersTableMock.find).toHaveBeenCalledTimes(1);
     expect(membersTableMock.find).toHaveBeenCalledWith(memberMock.id);
     expect(member).toEqual({
-      discordHandle: memberMock.fields['Discord Handle'],
+      discordHandle: memberMock.fields['Discord handle'],
       displayName: memberMock.fields['Display Name'],
       email: memberMock.fields.Email,
+      githubHandle: memberMock.fields['Github Handle'],
       id: memberMock.id,
       image: memberMock.fields['Profile picture']?.[0].url,
       name: memberMock.fields.Name,
       role: memberMock.fields.Role,
+      skills: [memberMock.fields.Skills?.[0]],
       teams: memberMock.fields.Teams,
       twitter: memberMock.fields.Twitter,
     });
@@ -354,6 +360,8 @@ describe('AirtableService', () => {
             Role: 'CEO',
             Email: 'aarsh.shah@protocol.ai',
             Twitter: '@member01',
+            'Discord handle': 'member01#123',
+            'Github Handle': 'member01',
           },
         },
         {
@@ -371,6 +379,8 @@ describe('AirtableService', () => {
             Role: 'CEO',
             Email: 'dan.shah@protocol.ai',
             Twitter: '@member01',
+            'Discord handle': 'member02#123',
+            'Github Handle': 'member02',
           },
         },
         {
@@ -388,6 +398,8 @@ describe('AirtableService', () => {
             Role: 'CEO',
             Email: 'shah@protocol.ai',
             Twitter: '@member03',
+            'Discord handle': 'member03#123',
+            'Github Handle': 'member03',
           },
         },
       ]),
@@ -429,7 +441,16 @@ describe('AirtableService', () => {
 
     expect(membersTableMock.select).toHaveBeenCalledWith({
       filterByFormula: 'SEARCH("Team 01",Teams)',
-      fields: ['Name', 'Role', 'Profile picture', 'Email', 'Twitter', 'Teams'],
+      fields: [
+        'Name',
+        'Role',
+        'Profile picture',
+        'Email',
+        'Twitter',
+        'Teams',
+        'Github Handle',
+        'Discord handle',
+      ],
       sort: [{ field: 'Name', direction: 'asc' }],
     });
     expect(teamsTableMock.select).toHaveBeenCalledWith({
@@ -440,37 +461,43 @@ describe('AirtableService', () => {
 
     expect(members).toStrictEqual([
       {
-        discordHandle: null,
+        discordHandle: 'member01#123',
         displayName: 'Aarsh Shah',
         email: 'aarsh.shah@protocol.ai',
+        githubHandle: 'member01',
         id: 'member_id_01',
         image:
           'https://dl.airtable.com/.attachments/f3ce65a21764f91ed7a907bb330ca60e/4dbc4f0c/adam_photo2.jpg?ts=1650540687&userId=usr6bGImQsm8pYc83&cs=9de9f8e366186ad5',
         name: 'Aarsh Dan Shah',
         role: 'CEO',
+        skills: [],
         teams: { team_id_01: 'Team 01', team_id_02: 'Team 02' },
         twitter: '@member01',
       },
       {
-        discordHandle: null,
+        discordHandle: 'member02#123',
         displayName: 'Dan Shah',
         email: 'dan.shah@protocol.ai',
+        githubHandle: 'member02',
         id: 'member_id_02',
         image: null,
         name: 'Dan Shah',
         role: 'CEO',
+        skills: [],
         teams: { team_id_03: 'Team 03' },
         twitter: '@member01',
       },
       {
-        discordHandle: null,
+        discordHandle: 'member03#123',
         displayName: 'Shah',
         email: 'shah@protocol.ai',
+        githubHandle: 'member03',
         id: 'member_id_03',
         image:
           'https://dl.airtable.com/.attachments/f3ce65a21764f91ed7a907bb330ca60e/4dbc4f0c/adam_photo2.jpg?ts=1650540687&userId=usr6bGImQsm8pYc83&cs=9de9f8e366186ad5',
         name: 'Shah',
         role: 'CEO',
+        skills: [],
         teams: { team_id_01: 'Team 01', team_id_02: 'Team 02' },
         twitter: '@member03',
       },

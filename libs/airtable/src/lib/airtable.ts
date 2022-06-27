@@ -93,7 +93,16 @@ class AirtableService {
   public async getTeamMembers(teamName: string) {
     const membersOptions: IListOptions = {
       filterByFormula: this._getSearchFormula(teamName, 'Teams'),
-      fields: ['Name', 'Role', 'Profile picture', 'Email', 'Twitter', 'Teams'],
+      fields: [
+        'Name',
+        'Role',
+        'Profile picture',
+        'Email',
+        'Twitter',
+        'Teams',
+        'Github Handle',
+        'Discord handle',
+      ],
       sort: [{ field: 'Name', direction: 'asc' }],
     };
 
@@ -163,9 +172,10 @@ class AirtableService {
    */
   private _parseMember(member: IAirtableMember): IMember {
     return {
-      discordHandle: member.fields['Discord Handle'] || null,
+      discordHandle: member.fields['Discord handle'] || null,
       displayName: member.fields['Display Name'] || null,
       email: member.fields.Email || null,
+      githubHandle: member.fields['Github Handle'] || null,
       id: member.id,
       image:
         (member.fields['Profile picture'] &&
@@ -173,8 +183,9 @@ class AirtableService {
         null,
       name: member.fields.Name || null,
       role: member.fields.Role || null,
-      twitter: member.fields.Twitter || null,
+      skills: member.fields.Skills || [],
       teams: member.fields.Teams || [],
+      twitter: member.fields.Twitter || null,
     };
   }
 
