@@ -35,7 +35,10 @@ export function HiddenTagsTooltip({ items }: HiddenTagsTooltipProps) {
               </a>
             </Link>
           ) : (
-            <span className="after:mr-1 after:content-[',']  last:after:content-['']">
+            <span
+              key={i}
+              className="after:mr-1 after:content-[',']  last:after:content-['']"
+            >
               {item.label}
             </span>
           )
