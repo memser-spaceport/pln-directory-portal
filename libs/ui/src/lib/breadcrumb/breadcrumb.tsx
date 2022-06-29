@@ -14,7 +14,7 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
   return (
     <nav
       aria-label="breadcrumb"
-      className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-2 leading-6"
+      className="inline-flex rounded-lg border border-slate-200 px-3 py-2 leading-6"
     >
       {items.map((item, index, items) => {
         const isLastItem = index === items.length - 1;
@@ -23,29 +23,27 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
         };
 
         return (
-          <>
-            <div
-              className={`${isLastItem ? 'font-semibold' : ''}`}
-              key={item.label}
-              {...ariaCurrent}
-            >
-              {item.href ? (
-                <Link href={item.href} passHref>
-                  <a
-                    href="replace"
-                    className="text-slate-500 hover:text-slate-700 active:text-slate-900"
-                  >
-                    {item.label}
-                  </a>
-                </Link>
-              ) : (
-                item.label
-              )}
-            </div>
-            {isLastItem ? null : (
-              <ChevronRightIcon className="mx-1 h-4 w-4 text-slate-500"></ChevronRightIcon>
+          <div
+            className={`flex items-center ${isLastItem ? 'font-semibold' : ''}`}
+            key={item.label}
+            {...ariaCurrent}
+          >
+            {item.href ? (
+              <Link href={item.href} passHref>
+                <a
+                  href="replace"
+                  className="text-slate-500 hover:text-slate-700 active:text-slate-900"
+                >
+                  {item.label}
+                </a>
+              </Link>
+            ) : (
+              item.label
             )}
-          </>
+            {isLastItem ? null : (
+              <ChevronRightIcon className="mx-1 h-4 w-4 text-slate-500" />
+            )}
+          </div>
         );
       })}
     </nav>
