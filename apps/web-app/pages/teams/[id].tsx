@@ -4,6 +4,7 @@ import { Breadcrumb, IBreadcrumbItem } from '@protocol-labs-network/ui';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { useEffect } from 'react';
 import { AskToEditLink } from '../../components/shared/ask-to-edit-link/ask-to-edit-link';
 import TeamProfileDetails from '../../components/teams/team-profile/team-profile-details/team-profile-details';
 import TeamProfileSidebar from '../../components/teams/team-profile/team-profile-sidebar/team-profile-sidebar';
@@ -21,10 +22,12 @@ export default function Team({ team, members, backLink }: TeamProps) {
     { label: team.name },
   ];
 
-  if (router.query.backLink) {
-    const { backLink, ...query } = router.query;
-    router.replace({ query }, undefined, { shallow: true });
-  }
+  useEffect(() => {
+    if (router.query.backLink) {
+      const { backLink, ...query } = router.query;
+      router.replace({ query }, undefined, { shallow: true });
+    }
+  }, [router]);
 
   return (
     <section className="mx-10 my-3">
