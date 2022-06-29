@@ -1,25 +1,18 @@
 import { AnchorLink, isValidEmail } from '@protocol-labs-network/ui';
-
-interface ISocialLink {
-  link?: string;
-}
+import { ISocialLink, TSocialLinkType } from './social-link.types';
+import { getSocialLinkUrl } from './social-link.utils';
 
 interface SocialLinkProps {
   linkObj: ISocialLink;
   linkIcon: (props: React.ComponentProps<'svg'>) => JSX.Element;
-  type?: 'email' | 'twitter';
+  type?: TSocialLinkType;
 }
 
 export function SocialLink({ linkObj, linkIcon, type }: SocialLinkProps) {
   const Icon = linkIcon;
 
   const isActive = type === 'email' ? isValidEmail(linkObj.link) : linkObj.link;
-  const url =
-    type === 'email'
-      ? `mailto:${linkObj.link}`
-      : type === 'twitter'
-      ? `https://twitter.com/${linkObj.link}`
-      : linkObj.link;
+  const url = getSocialLinkUrl(linkObj.link, type);
 
   const linkProps = {
     ...(isActive && { href: url }),
