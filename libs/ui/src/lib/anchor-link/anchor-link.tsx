@@ -22,5 +22,5 @@ export function AnchorLink({ href, children }: AnchorLinkProps) {
     );
   }
 
-  return <span>{children}</span>;
+  return children as JSX.Element;
 }
