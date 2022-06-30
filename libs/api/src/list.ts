@@ -1,3 +1,5 @@
+export type TListSortDirection = 'asc' | 'desc';
+
 export interface IListOptions {
   sort?: IListSort[];
   filterByFormula?: string;
@@ -6,5 +8,5 @@ export interface IListOptions {
 
 interface IListSort {
   field: string;
-  direction: 'asc' | 'desc';
+  direction: TListSortDirection;
 }
