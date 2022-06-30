@@ -181,12 +181,36 @@ class AirtableService {
         (member.fields['Profile picture'] &&
           member.fields['Profile picture'][0]?.url) ||
         null,
+      location: this._parseMemberLocation(member),
       name: member.fields.Name || null,
       role: member.fields.Role || null,
       skills: member.fields.Skills || [],
       teams: member.fields.Teams || [],
       twitter: member.fields.Twitter || null,
     };
+  }
+
+  /**
+   * Parse member location based on available member information.
+   */
+  private _parseMemberLocation(member: IAirtableMember) {
+    if (member.fields['Metro Area']) {
+      return member.fields['Metro Area'];
+    }
+
+    if (member.fields.Country) {
+      if (member.fields.City) {
+        return `${member.fields.City}, ${member.fields.Country}`;
+      }
+
+      if (member.fields['State / Province']) {
+        return `${member.fields['State / Province']}, ${member.fields.Country}`;
+      }
+
+      return member.fields.Country;
+    }
+
+    return 'Not provided';
   }
 
   /**
