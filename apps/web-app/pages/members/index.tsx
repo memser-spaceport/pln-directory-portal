@@ -1,0 +1,65 @@
+import airtableService from '@protocol-labs-network/airtable';
+import { IMember } from '@protocol-labs-network/api';
+import { GetServerSideProps } from 'next';
+import Head from 'next/head';
+import { MemberCard } from '../../components/shared/members/member-card/member-card';
+import { getMembersDirectoryRequestOptionsFromQuery } from '../../utils/api/list.utils';
+
+type MembersProps = {
+  members: IMember[];
+};
+
+export default function Members({ members }: MembersProps) {
+  return (
+    <>
+      <Head>
+        <title>Teams</title>
+      </Head>
+
+      <section className="flex">
+        <div className="mx-auto p-8">
+          <div className="w-[917px] flex-shrink-0">
+            <div className="mb-10 flex items-center justify-between">
+              <h1 className="text-3xl font-bold">Members</h1>
+            </div>
+
+            <div className="flex flex-wrap gap-4">
+              {members.map((member) => (
+                <MemberCard
+                  key={member.id}
+                  member={member}
+                  isGrid
+                  showLocation
+                  showSkills
+                  showTeams={false}
+                />
+              ))}
+            </div>
+
+            <div className="mt-8 text-sm text-slate-500">
+              Showing <b>{members.length}</b> results
+            </div>
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}
+
+export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
+  res,
+}) => {
+  const options = getMembersDirectoryRequestOptionsFromQuery();
+  const members = await airtableService.getMembers(options);
+
+  // Cache response data in the browser for 1 minute,
+  // and in the CDN for 5 minutes, while keeping it stale for 7 days
+  res.setHeader(
+    'Cache-Control',
+    'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
+  );
+
+  return {
+    props: { members },
+  };
+};
