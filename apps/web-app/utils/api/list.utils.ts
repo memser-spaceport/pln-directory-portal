@@ -1,3 +1,4 @@
+import { IListOptions, TListSortDirection } from '@protocol-labs-network/api';
 import { ParsedUrlQuery } from 'querystring';
 import {
   directorySortOptions,
@@ -11,7 +12,7 @@ import { URL_QUERY_VALUE_SEPARATOR } from '../../constants';
  */
 export function getTeamsDirectoryRequestOptionsFromQuery(
   queryParams: ParsedUrlQuery
-) {
+): IListOptions {
   const { sort, industry, fundingVehicle, fundingStage, searchBy, technology } =
     queryParams;
 
@@ -31,9 +32,10 @@ export function getTeamsDirectoryRequestOptionsFromQuery(
  * Returns the options for requesting the members on the members directory,
  * by parsing the provided query parameters.
  */
-export function getMembersDirectoryRequestOptionsFromQuery() {
+export function getMembersDirectoryRequestOptionsFromQuery(): IListOptions {
   return {
     filterByFormula: getMembersDirectoryFormula(),
+    sort: [{ field: 'Name', direction: 'asc' }],
   };
 }
 
@@ -46,7 +48,7 @@ function getSortFromQuery(sortQuery?: string) {
 
   return {
     field: sortSettings[0],
-    direction: sortSettings[1] as 'asc' | 'desc',
+    direction: sortSettings[1] as TListSortDirection,
   };
 }
 

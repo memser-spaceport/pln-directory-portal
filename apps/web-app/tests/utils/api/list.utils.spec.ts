@@ -53,6 +53,7 @@ describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
   it('should return valid options', () => {
     expect(getMembersDirectoryRequestOptionsFromQuery()).toEqual({
       filterByFormula: 'AND({Name} != "", {Teams} != "")',
+      sort: [{ field: 'Name', direction: 'asc' }],
     });
   });
 });
