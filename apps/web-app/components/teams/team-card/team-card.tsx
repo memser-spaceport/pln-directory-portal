@@ -13,63 +13,65 @@ export interface TeamCardProps {
 
 export function TeamCard({ team, isGrid }: TeamCardProps) {
   const router = useRouter();
+  const backLink = encodeURIComponent(router.asPath);
 
   return (
     <DirectoryCard isGrid={isGrid}>
-      <AnchorLink
-        href={`/teams/${team.id}?backLink=${encodeURIComponent(router.asPath)}`}
-      >
-        <div
-          className={`flex ${isGrid ? 'flex-col px-6 pt-6' : 'flex-row p-6'}`}
-        >
-          <div
-            className={`h-24 rounded-lg ${
-              team.logo ? 'bg-contain bg-center bg-no-repeat' : 'bg-slate-200'
-            } ${isGrid ? 'mb-5 w-full' : 'mr-6 w-56'}`}
-            style={{
-              ...(team.logo && { backgroundImage: `url(${team.logo})` }),
-            }}
-          />
-          <div className="w-52 grow-0">
-            <h3 className="text-base font-semibold text-slate-900">
-              {team.name}
-            </h3>
-            <p className="line-clamp-3 mt-0.5 h-16">{team.shortDescription}</p>
+      <AnchorLink href={`/teams/${team.id}?backLink=${backLink}`}>
+        <div className={`flex ${isGrid ? 'flex-col space-y-4' : 'flex-row'}`}>
+          <div className={`${isGrid ? 'w-full' : 'w-[496px]'} flex space-x-4`}>
+            <div
+              className={`h-20 w-20 rounded ${
+                team.logo ? 'bg-contain bg-center bg-no-repeat' : 'bg-slate-200'
+              }`}
+              style={{
+                ...(team.logo && { backgroundImage: `url(${team.logo})` }),
+              }}
+            />
+            <div>
+              <h3 className="text-base font-semibold text-slate-900">
+                {team.name}
+              </h3>
+              {!isGrid ? (
+                <div className="w-[400px] grow-0">
+                  <p className="line-clamp-2 mt-1 leading-5">
+                    {team.shortDescription}
+                  </p>
+                </div>
+              ) : null}
+            </div>
           </div>
+          {isGrid ? (
+            <p className="line-clamp-3 h-[60px] leading-5">
+              {team.shortDescription}
+            </p>
+          ) : null}
         </div>
       </AnchorLink>
 
       <div
-        className={`${
-          !isGrid &&
-          'flex flex-row sm:w-full lg:ml-auto lg:w-6/12 lg:justify-end'
+        className={`h-[28px] ${isGrid ? 'my-4' : 'mx-4 w-[248px] self-center'}`}
+      >
+        {team.industry && team.industry.length ? (
+          <TagsGroup items={parseStringsIntoTagsGroupItems(team.industry)} />
+        ) : (
+          <span className="text-xs leading-7 text-slate-400">
+            Industry not provided
+          </span>
+        )}
+      </div>
+
+      <div
+        className={`flex space-x-2 border-slate-200 ${
+          isGrid
+            ? 'border-t pt-4'
+            : 'h-20 w-[99px] items-center justify-center self-center border-l pl-5 sm:flex-auto'
         }`}
       >
-        <div
-          className={`flex h-[50px] ${
-            isGrid ? 'px-6 pt-3' : 'ml-6 items-center self-center sm:w-6/12'
-          }`}
-        >
-          {team.industry && team.industry.length ? (
-            <TagsGroup items={parseStringsIntoTagsGroupItems(team.industry)} />
-          ) : (
-            <span className="text-xs text-slate-400">
-              Industry not provided
-            </span>
-          )}
-        </div>
-        <div
-          className={`flex space-x-2 px-6 py-4 ${
-            isGrid
-              ? 'border-t border-slate-200'
-              : 'sm:w-6/1 ml-6 items-center justify-center border-l border-slate-200 sm:flex-auto'
-          }`}
-        >
-          <SocialLinks
-            website={{ link: team.website }}
-            twitter={{ link: team.twitter }}
-          />
-        </div>
+        <SocialLinks
+          website={{ link: team.website }}
+          twitter={{ link: team.twitter }}
+        />
       </div>
     </DirectoryCard>
   );

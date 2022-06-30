@@ -32,25 +32,27 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
           <TeamsDirectoryFilters filtersValues={filtersValues} />
         </div>
 
-        <div className="mx-auto w-[1164px] flex-shrink-0 p-8">
-          <div className="mb-10 flex items-center justify-between">
-            <h1 className="text-3xl font-bold">Teams</h1>
-            <div className="flex items-center space-x-4">
-              <DirectorySearch />
-              <span className="h-6 w-px bg-slate-300" />
-              <DirectorySort />
-              <DirectoryViewType />
+        <div className="mx-auto p-8">
+          <div className="w-[917px] flex-shrink-0">
+            <div className="mb-10 flex items-center justify-between">
+              <h1 className="text-3xl font-bold">Teams</h1>
+              <div className="flex items-center space-x-4">
+                <DirectorySearch />
+                <span className="h-6 w-px bg-slate-300" />
+                <DirectorySort />
+                <DirectoryViewType />
+              </div>
             </div>
-          </div>
 
-          <div className="flex flex-wrap gap-5">
-            {teams.map((team) => {
-              return <TeamCard key={team.id} team={team} isGrid={isGrid} />;
-            })}
-          </div>
+            <div className="flex flex-wrap gap-4">
+              {teams.map((team) => {
+                return <TeamCard key={team.id} team={team} isGrid={isGrid} />;
+              })}
+            </div>
 
-          <div className="mt-8 text-sm text-slate-500">
-            Showing <b>{teams.length}</b> results
+            <div className="mt-8 text-sm text-slate-500">
+              Showing <b>{teams.length}</b> results
+            </div>
           </div>
         </div>
       </section>
