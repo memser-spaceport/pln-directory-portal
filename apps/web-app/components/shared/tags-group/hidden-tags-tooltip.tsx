@@ -8,7 +8,7 @@ export interface HiddenTagsTooltipProps {
 
 export function HiddenTagsTooltip({ items }: HiddenTagsTooltipProps) {
   return (
-    <HoverCard.Root>
+    <HoverCard.Root openDelay={0}>
       <HoverCard.Trigger>
         <span className="tag tag--clickable group flex h-7 w-7 cursor-pointer items-center justify-center rounded-full">
           +{items.length}
@@ -35,7 +35,10 @@ export function HiddenTagsTooltip({ items }: HiddenTagsTooltipProps) {
               </a>
             </Link>
           ) : (
-            <span className="after:mr-1 after:content-[',']  last:after:content-['']">
+            <span
+              key={i}
+              className="after:mr-1 after:content-[',']  last:after:content-['']"
+            >
               {item.label}
             </span>
           )
