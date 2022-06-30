@@ -8,7 +8,7 @@ body {
 
 @layer components {
   .card {
-    @apply rounded-xl border bg-white px-5 pt-5 pb-6 text-sm shadow-md shadow-slate-200;
+    @apply rounded-xl border bg-white p-5 text-sm shadow-md shadow-slate-200;
   }
   .tag {
     @apply mr-2 cursor-default whitespace-nowrap rounded-3xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600;

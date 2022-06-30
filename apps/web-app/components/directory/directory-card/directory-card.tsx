@@ -8,8 +8,8 @@ export type DirectoryCardProps = { isGrid: boolean } & Pick<
 export function DirectoryCard({ isGrid, children }: DirectoryCardProps) {
   return (
     <div
-      className={`flex rounded-lg border bg-white text-sm shadow-md  ${
-        isGrid ? 'w-[260px] flex-col' : 'w-full flex-row flex-wrap'
+      className={`card flex  ${
+        isGrid ? 'w-[295px] flex-col' : 'w-full flex-row flex-wrap'
       }`}
     >
       {children}
