@@ -1,6 +1,6 @@
 import { IMemberWithTeams } from '@protocol-labs-network/api';
 import { useRouter } from 'next/router';
-import MemberCard from '../../../shared/members/member-card/member-card';
+import { MemberCard } from '../../../shared/members/member-card/member-card';
 
 interface TeamProfileMembersProps {
   members: IMemberWithTeams[];
@@ -21,7 +21,7 @@ export default function TeamProfileMembers({
           <MemberCard
             key={`${id}.${member.id}`}
             teamId={id as string}
-            {...member}
+            member={member}
           />
         ))}
       </div>
