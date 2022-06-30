@@ -34,7 +34,7 @@ const teamsTableMock: Airtable.Table<Record<string, string>> = {
   find: jest.fn().mockReturnValue(teamMock),
 } as unknown as Airtable.Table<Record<string, string>>;
 
-const memberMock: IAirtableMember = {
+const memberMock01: IAirtableMember = {
   id: 'member_id_01',
   fields: {
     Name: 'Aarsh Dan Shah',
@@ -74,13 +74,42 @@ const memberMock: IAirtableMember = {
     'Friend of PLN': true,
   },
 };
+const memberMock02: IAirtableMember = {
+  id: 'member_id_02',
+  fields: {
+    Name: 'John Doe',
+    Country: 'United Kingdom',
+    City: 'London',
+  },
+};
+const memberMock03: IAirtableMember = {
+  id: 'member_id_03',
+  fields: {
+    Name: 'Jane Doe',
+    Country: 'Portugal',
+    'State / Province': 'Aveiro',
+  },
+};
+const memberMock04: IAirtableMember = {
+  id: 'member_id_04',
+  fields: {
+    Name: 'Ayrton Senna',
+    Country: 'Brazil',
+  },
+};
 const emptyMemberMock: IAirtableMember = { id: 'member_id_02', fields: {} };
-const membersMock = [memberMock, emptyMemberMock];
+const membersMock = [
+  memberMock01,
+  memberMock02,
+  memberMock03,
+  memberMock04,
+  emptyMemberMock,
+];
 const membersTableMock: Airtable.Table<Record<string, string>> = {
   select: jest.fn().mockReturnValue({
     all: jest.fn().mockReturnValue(membersMock),
   }),
-  find: jest.fn().mockReturnValue(memberMock),
+  find: jest.fn().mockReturnValue(memberMock01),
 } as unknown as Airtable.Table<Record<string, string>>;
 
 const baseFunctionMock = jest.fn((tableId: string) => {
@@ -294,25 +323,69 @@ describe('AirtableService', () => {
     expect(membersTableMock.select().all).toHaveBeenCalledTimes(1);
     expect(members).toEqual([
       {
-        discordHandle: memberMock.fields['Discord handle'],
-        displayName: memberMock.fields['Display Name'],
-        email: memberMock.fields.Email,
-        githubHandle: memberMock.fields['Github Handle'],
-        id: memberMock.id,
-        image: memberMock.fields['Profile picture']?.[0].url,
-        name: memberMock.fields.Name,
-        role: memberMock.fields.Role,
-        skills: [memberMock.fields.Skills?.[0]],
-        teams: memberMock.fields.Teams,
-        twitter: memberMock.fields.Twitter,
+        discordHandle: memberMock01.fields['Discord handle'],
+        displayName: memberMock01.fields['Display Name'],
+        email: memberMock01.fields.Email,
+        githubHandle: memberMock01.fields['Github Handle'],
+        id: memberMock01.id,
+        image: memberMock01.fields['Profile picture']?.[0].url,
+        location: memberMock01.fields['Metro Area'],
+        name: memberMock01.fields.Name,
+        role: memberMock01.fields.Role,
+        skills: [memberMock01.fields.Skills?.[0]],
+        teams: memberMock01.fields.Teams,
+        twitter: memberMock01.fields.Twitter,
       },
       {
         discordHandle: null,
         displayName: null,
         email: null,
+        githubHandle: null,
+        id: memberMock02.id,
+        image: null,
+        location: `${memberMock02.fields.City}, ${memberMock02.fields.Country}`,
+        name: memberMock02.fields.Name,
+        role: null,
+        skills: [],
+        teams: [],
+        twitter: null,
+      },
+      {
+        discordHandle: null,
+        displayName: null,
+        email: null,
+        githubHandle: null,
+        id: memberMock03.id,
+        image: null,
+        location: `${memberMock03.fields['State / Province']}, ${memberMock03.fields.Country}`,
+        name: memberMock03.fields.Name,
+        role: null,
+        skills: [],
+        teams: [],
+        twitter: null,
+      },
+      {
+        discordHandle: null,
+        displayName: null,
+        email: null,
+        githubHandle: null,
+        id: memberMock04.id,
+        image: null,
+        location: memberMock04.fields.Country,
+        name: memberMock04.fields.Name,
+        role: null,
+        skills: [],
+        teams: [],
+        twitter: null,
+      },
+      {
+        discordHandle: null,
+        displayName: null,
+        email: null,
+        githubHandle: null,
         id: emptyMemberMock.id,
         image: null,
-        githubHandle: null,
+        location: 'Not provided',
         name: null,
         role: null,
         skills: [],
@@ -323,22 +396,23 @@ describe('AirtableService', () => {
   });
 
   it('should be able to find and retrieve the member with the provided id on members table', async () => {
-    const member = await airtableService.getMember(memberMock.id);
+    const member = await airtableService.getMember(memberMock01.id);
 
     expect(membersTableMock.find).toHaveBeenCalledTimes(1);
-    expect(membersTableMock.find).toHaveBeenCalledWith(memberMock.id);
+    expect(membersTableMock.find).toHaveBeenCalledWith(memberMock01.id);
     expect(member).toEqual({
-      discordHandle: memberMock.fields['Discord handle'],
-      displayName: memberMock.fields['Display Name'],
-      email: memberMock.fields.Email,
-      githubHandle: memberMock.fields['Github Handle'],
-      id: memberMock.id,
-      image: memberMock.fields['Profile picture']?.[0].url,
-      name: memberMock.fields.Name,
-      role: memberMock.fields.Role,
-      skills: [memberMock.fields.Skills?.[0]],
-      teams: memberMock.fields.Teams,
-      twitter: memberMock.fields.Twitter,
+      discordHandle: memberMock01.fields['Discord handle'],
+      displayName: memberMock01.fields['Display Name'],
+      email: memberMock01.fields.Email,
+      githubHandle: memberMock01.fields['Github Handle'],
+      id: memberMock01.id,
+      image: memberMock01.fields['Profile picture']?.[0].url,
+      location: memberMock01.fields['Metro Area'],
+      name: memberMock01.fields.Name,
+      role: memberMock01.fields.Role,
+      skills: [memberMock01.fields.Skills?.[0]],
+      teams: memberMock01.fields.Teams,
+      twitter: memberMock01.fields.Twitter,
     });
   });
 
@@ -468,6 +542,7 @@ describe('AirtableService', () => {
         id: 'member_id_01',
         image:
           'https://dl.airtable.com/.attachments/f3ce65a21764f91ed7a907bb330ca60e/4dbc4f0c/adam_photo2.jpg?ts=1650540687&userId=usr6bGImQsm8pYc83&cs=9de9f8e366186ad5',
+        location: 'Not provided',
         name: 'Aarsh Dan Shah',
         role: 'CEO',
         skills: [],
@@ -481,6 +556,7 @@ describe('AirtableService', () => {
         githubHandle: 'member02',
         id: 'member_id_02',
         image: null,
+        location: 'Not provided',
         name: 'Dan Shah',
         role: 'CEO',
         skills: [],
@@ -495,6 +571,7 @@ describe('AirtableService', () => {
         id: 'member_id_03',
         image:
           'https://dl.airtable.com/.attachments/f3ce65a21764f91ed7a907bb330ca60e/4dbc4f0c/adam_photo2.jpg?ts=1650540687&userId=usr6bGImQsm8pYc83&cs=9de9f8e366186ad5',
+        location: 'Not provided',
         name: 'Shah',
         role: 'CEO',
         skills: [],

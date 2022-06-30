@@ -5,6 +5,7 @@ export interface IMember {
   githubHandle: string | null;
   id: string | null;
   image: string | null;
+  location: string;
   name: string | null;
   role: string | null;
   skills: string[];
