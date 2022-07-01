@@ -65,7 +65,7 @@ export function TeamCard({ team, isGrid }: TeamCardProps) {
         className={`border-slate-200 ${
           isGrid
             ? 'border-t pt-4'
-            : 'h-20 w-[99px] items-center justify-center self-center border-l pl-5'
+            : 'flex h-20 w-[99px] items-center justify-center self-center border-l pl-5'
         }`}
       >
         <SocialLinks
