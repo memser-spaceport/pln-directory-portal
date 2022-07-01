@@ -1,13 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { RouterContext } from 'next/dist/shared/lib/router-context';
 import { createMockRouter } from '../../../utils/test/createMockRouter';
-import { DirectoryViewType } from './directory-view-type';
+import { DirectoryView } from './directory-view';
 
-describe('DirectoryViewType', () => {
+describe('DirectoryView', () => {
   it('should show grid button as active and disable at first render', () => {
     render(
       <RouterContext.Provider value={createMockRouter()}>
-        <DirectoryViewType />
+        <DirectoryView />
       </RouterContext.Provider>
     );
 
@@ -24,7 +24,7 @@ describe('DirectoryViewType', () => {
 
     render(
       <RouterContext.Provider value={createMockRouter({ push })}>
-        <DirectoryViewType />
+        <DirectoryView />
       </RouterContext.Provider>
     );
 
@@ -47,7 +47,7 @@ describe('DirectoryViewType', () => {
       <RouterContext.Provider
         value={createMockRouter({ query: { viewType: 'list' } })}
       >
-        <DirectoryViewType />
+        <DirectoryView />
       </RouterContext.Provider>
     );
 
@@ -60,5 +60,28 @@ describe('DirectoryViewType', () => {
 
     expect(listBtn).toHaveAttribute('disabled');
     expect(gridBtn).not.toHaveAttribute('disabled');
+  });
+
+  it('should remove view type query parameter when default view type gets clicked', () => {
+    const push = jest.fn();
+
+    render(
+      <RouterContext.Provider
+        value={createMockRouter({ query: { viewType: 'list' }, push })}
+      >
+        <DirectoryView />
+      </RouterContext.Provider>
+    );
+
+    const gridBtn = screen.getByRole('button', {
+      name: /change to grid view/i,
+    });
+
+    fireEvent.click(gridBtn);
+
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith({ pathname: '/', query: {} }, undefined, {
+      shallow: true,
+    });
   });
 });

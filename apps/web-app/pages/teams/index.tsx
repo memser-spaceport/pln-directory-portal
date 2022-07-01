@@ -4,8 +4,8 @@ import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import { DirectorySearch } from '../../components/directory/directory-search/directory-search';
 import { DirectorySort } from '../../components/directory/directory-sort/directory-sort';
-import { DirectoryViewType } from '../../components/directory/directory-view-type/directory-view-type';
-import { useViewType } from '../../components/directory/directory-view-type/use-view-type.hook';
+import { DirectoryView } from '../../components/directory/directory-view/directory-view';
+import { useViewType } from '../../components/directory/directory-view/use-directory-view-type.hook';
 import { TeamCard } from '../../components/teams/team-card/team-card';
 import TeamsDirectoryFilters from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters';
 import { ITeamsFiltersValues } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.types';
@@ -40,7 +40,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
                 <DirectorySearch />
                 <span className="h-6 w-px bg-slate-300" />
                 <DirectorySort />
-                <DirectoryViewType />
+                <DirectoryView />
               </div>
             </div>
 
