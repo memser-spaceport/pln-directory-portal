@@ -11,9 +11,9 @@ describe('DirectorySort', () => {
       </RouterContext.Provider>
     );
 
-    const sortBtn = screen.getByText(/sorted:/i);
+    const sortBtn = screen.getByTestId('dropdown__button');
 
-    expect(sortBtn).toHaveTextContent('A-Z');
+    expect(sortBtn).toHaveTextContent('Ascending');
   });
 
   it('should call the router push method with the selected sort option when sort changes', () => {
@@ -25,10 +25,10 @@ describe('DirectorySort', () => {
       </RouterContext.Provider>
     );
 
-    const sortBtn = screen.getByText(/sorted:/i);
+    const sortBtn = screen.getByTestId('dropdown__button');
     fireEvent.click(sortBtn);
 
-    const descendingOption = screen.getByText(/z-a/i);
+    const descendingOption = screen.getByText(/descending/i);
     fireEvent.click(descendingOption);
 
     expect(push).toHaveBeenCalledTimes(1);
@@ -48,9 +48,9 @@ describe('DirectorySort', () => {
         </RouterContext.Provider>
       );
 
-      const sortBtn = screen.getByText(/sorted:/i);
+      const sortBtn = screen.getByTestId('dropdown__button');
 
-      expect(sortBtn).toHaveTextContent('Z-A');
+      expect(sortBtn).toHaveTextContent('Descending');
     });
 
     it('should keep the default option if it has an invalid value', () => {
@@ -62,9 +62,9 @@ describe('DirectorySort', () => {
         </RouterContext.Provider>
       );
 
-      const sortBtn = screen.getByText(/sorted:/i);
+      const sortBtn = screen.getByTestId('dropdown__button');
 
-      expect(sortBtn).toHaveTextContent('A-Z');
+      expect(sortBtn).toHaveTextContent('Ascending');
     });
 
     it('should call the router push method with no sort option when sort changes to the default', () => {
@@ -81,10 +81,10 @@ describe('DirectorySort', () => {
         </RouterContext.Provider>
       );
 
-      const sortBtn = screen.getByText(/sorted:/i);
+      const sortBtn = screen.getByTestId('dropdown__button');
       fireEvent.click(sortBtn);
 
-      const ascendingOption = screen.getByText(/a-z/i);
+      const ascendingOption = screen.getByText(/ascending/i);
       fireEvent.click(ascendingOption);
 
       expect(push).toHaveBeenCalledTimes(1);
