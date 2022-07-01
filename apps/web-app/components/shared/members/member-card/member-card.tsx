@@ -68,7 +68,7 @@ export function MemberCard({
               ) : null}
             </div>
             <div>
-              <h3 className="text-base font-semibold text-slate-900">
+              <h3 className="line-clamp-1 text-base font-semibold text-slate-900">
                 {member.name}
               </h3>
               <p className="line-clamp-1">{member.role}</p>
