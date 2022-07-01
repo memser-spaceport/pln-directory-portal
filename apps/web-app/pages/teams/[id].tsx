@@ -1,13 +1,12 @@
 import airtableService from '@protocol-labs-network/airtable';
 import { IMemberWithTeams, ITeam } from '@protocol-labs-network/api';
-import { Breadcrumb, IBreadcrumbItem } from '@protocol-labs-network/ui';
+import { Breadcrumb } from '@protocol-labs-network/ui';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
-import { useRouter } from 'next/router';
-import { useEffect } from 'react';
 import { AskToEditLink } from '../../components/shared/ask-to-edit-link/ask-to-edit-link';
 import TeamProfileDetails from '../../components/teams/team-profile/team-profile-details/team-profile-details';
 import TeamProfileSidebar from '../../components/teams/team-profile/team-profile-sidebar/team-profile-sidebar';
+import { useProfileBreadcrumb } from '../../hooks/profile/use-profile-breadcrumb.hook';
 
 interface TeamProps {
   team: ITeam;
@@ -16,18 +15,11 @@ interface TeamProps {
 }
 
 export default function Team({ team, members, backLink }: TeamProps) {
-  const router = useRouter();
-  const breadcrumbItems: IBreadcrumbItem[] = [
-    { label: 'Teams', href: backLink },
-    { label: team.name },
-  ];
-
-  useEffect(() => {
-    if (router.query.backLink) {
-      const { backLink, ...query } = router.query;
-      router.replace({ query }, undefined, { shallow: true });
-    }
-  }, [router]);
+  const { breadcrumbItems } = useProfileBreadcrumb({
+    backLink,
+    directoryName: 'Teams',
+    pageName: team.name,
+  });
 
   return (
     <section className="mx-10 my-3">

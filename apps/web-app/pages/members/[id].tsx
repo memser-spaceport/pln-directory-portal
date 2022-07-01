@@ -1,20 +1,30 @@
 import airtableService from '@protocol-labs-network/airtable';
 import { IMember } from '@protocol-labs-network/api';
+import { Breadcrumb } from '@protocol-labs-network/ui';
 import Head from 'next/head';
 import { MemberProfileHeader } from '../../components/members/member-profile/member-profile-header';
 import { MemberProfileOfficeHours } from '../../components/members/member-profile/member-profile-office-hours';
+import { useProfileBreadcrumb } from '../../hooks/profile/use-profile-breadcrumb.hook';
 
 interface MemberProps {
   member: IMember;
+  backLink: string;
 }
 
-export default function Member({ member }: MemberProps) {
+export default function Member({ member, backLink }: MemberProps) {
+  const { breadcrumbItems } = useProfileBreadcrumb({
+    backLink,
+    directoryName: 'Members',
+    pageName: member.name,
+  });
+
   return (
     <section className="mx-10 my-3">
       <Head>
         <title>Member {member.name}</title>
       </Head>
-      <div className="flex items-start gap-8 p-8">
+      <Breadcrumb items={breadcrumbItems} />
+      <div className="mt-6 flex items-start space-x-10">
         <MemberProfileHeader member={member} />
         <MemberProfileOfficeHours url={member.officeHours} />
       </div>
@@ -23,7 +33,10 @@ export default function Member({ member }: MemberProps) {
 }
 
 export const getServerSideProps = async ({ query, res }) => {
-  const { id } = query as { id: string };
+  const { id, backLink = '/members' } = query as {
+    id: string;
+    backLink: string;
+  };
   const member = await airtableService.getMember(id);
 
   // Cache response data in the browser for 1 minute,
@@ -34,6 +47,6 @@ export const getServerSideProps = async ({ query, res }) => {
   );
 
   return {
-    props: { member },
+    props: { member, backLink },
   };
 };
