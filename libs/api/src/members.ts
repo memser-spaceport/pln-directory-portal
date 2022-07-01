@@ -11,6 +11,7 @@ export interface IMember {
   skills: string[];
   teams: string[];
   twitter: string | null;
+  officeHours: string | null;
 }
 
 export interface IMemberWithTeams extends Omit<IMember, 'teams'> {

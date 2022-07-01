@@ -2,6 +2,7 @@ import airtableService from '@protocol-labs-network/airtable';
 import { IMember } from '@protocol-labs-network/api';
 import Head from 'next/head';
 import { MemberProfileHeader } from '../../components/members/member-profile/member-profile-header';
+import { MemberProfileOfficeHours } from '../../components/members/member-profile/member-profile-office-hours';
 
 interface MemberProps {
   member: IMember;
@@ -13,7 +14,10 @@ export default function Member({ member }: MemberProps) {
       <Head>
         <title>Member {member.name}</title>
       </Head>
-      <MemberProfileHeader member={member} />
+      <div className="flex items-start gap-8 p-8">
+        <MemberProfileHeader member={member} />
+        <MemberProfileOfficeHours url={member.officeHours} />
+      </div>
     </section>
   );
 }
