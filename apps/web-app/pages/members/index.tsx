@@ -29,6 +29,7 @@ export default function Members({ members }: MembersProps) {
                   key={member.id}
                   member={member}
                   isGrid
+                  isClickable
                   showLocation
                   showSkills
                   showTeams={false}

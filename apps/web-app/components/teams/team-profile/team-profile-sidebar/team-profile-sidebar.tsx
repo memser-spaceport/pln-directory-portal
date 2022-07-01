@@ -42,7 +42,7 @@ export default function TeamProfileSidebar({ team }: TeamProfileSidebarProps) {
           'Industry not provided'
         )}
       </div>
-      <div className="flex space-x-2 border-t border-slate-200 pt-4">
+      <div className="border-t border-slate-200 pt-4">
         <SocialLinks
           website={{ link: team.website }}
           twitter={{ link: team.twitter }}

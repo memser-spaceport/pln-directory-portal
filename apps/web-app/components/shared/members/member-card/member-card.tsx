@@ -109,10 +109,10 @@ export function MemberCard({
       ) : null}
 
       <div
-        className={`flex space-x-2 border-slate-200 ${
+        className={`border-slate-200 ${
           isGrid
             ? 'border-t pt-4'
-            : 'h-20 w-[99px] items-center justify-center self-center border-l pl-5 sm:flex-auto'
+            : 'h-20 w-[99px] items-center justify-center self-center border-l pl-5'
         }`}
       >
         <SocialLinks
