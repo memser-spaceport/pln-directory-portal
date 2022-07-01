@@ -19,7 +19,7 @@ export function SocialLinks({
   website,
 }: SocialLinksProps) {
   return (
-    <>
+    <div className="flex space-x-2">
       {email ? (
         <SocialLink linkObj={email} linkIcon={MailIcon} type={'email'} />
       ) : null}
@@ -32,6 +32,6 @@ export function SocialLinks({
       {twitter ? (
         <SocialLink linkObj={twitter} linkIcon={TwitterLogo} type={'twitter'} />
       ) : null}
-    </>
+    </div>
   );
 }
