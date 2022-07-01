@@ -1,4 +1,4 @@
-import { LocationMarkerIcon } from '@heroicons/react/solid';
+import { LocationMarkerIcon } from '@heroicons/react/outline';
 import { IMember } from '@protocol-labs-network/api';
 import Image from 'next/image';
 import { SocialLinks } from '../../shared/social-links/social-links';
@@ -11,9 +11,9 @@ interface MemberProfileHeaderProps {
 
 export function MemberProfileHeader({ member }: MemberProfileHeaderProps) {
   return (
-    <section className="m-8 rounded-t-3xl bg-white pt-4">
-      <div className="flex items-center justify-end px-7 text-xs">
-        <LocationMarkerIcon className="mr-1 h-4 w-4 fill-sky-600" />
+    <section className="grow rounded-t-3xl bg-white pt-4">
+      <div className="flex items-center justify-end px-7 text-xs text-slate-500">
+        <LocationMarkerIcon className="mr-1 h-4 w-4" />
         {member.location}
       </div>
 

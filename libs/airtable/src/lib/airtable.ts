@@ -187,6 +187,7 @@ class AirtableService {
       skills: member.fields.Skills || [],
       teams: member.fields.Teams || [],
       twitter: member.fields.Twitter || null,
+      officeHours: member.fields['Office hours link'] || null,
     };
   }
 

@@ -18,7 +18,7 @@ export default function Members({ members }: MembersProps) {
   return (
     <>
       <Head>
-        <title>Teams</title>
+        <title>Members</title>
       </Head>
 
       <section className="flex">

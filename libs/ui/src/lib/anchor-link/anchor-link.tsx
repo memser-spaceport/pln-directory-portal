@@ -1,18 +1,18 @@
 import Link, { LinkProps } from 'next/link';
 import { parseLink } from './anchor-link.utils';
 
-export type AnchorLinkProps = { email?: string } & React.PropsWithChildren<
-  Partial<LinkProps>
->;
+export type AnchorLinkProps = {
+  linkClassName?: string;
+} & React.PropsWithChildren<Partial<LinkProps>>;
 
-export function AnchorLink({ href, children }: AnchorLinkProps) {
+export function AnchorLink({ href, linkClassName, children }: AnchorLinkProps) {
   if (href) {
     const { link, isExternal } = parseLink(href);
 
     return (
       <Link href={link}>
         <a
-          className="cursor-pointer"
+          className={`cursor-pointer ${linkClassName}`}
           target={isExternal ? '_blank' : '_self'}
           {...(isExternal ? { rel: 'noopener noreferrer' } : {})}
         >
