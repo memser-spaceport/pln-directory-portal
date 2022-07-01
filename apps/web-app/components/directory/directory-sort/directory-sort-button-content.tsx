@@ -13,7 +13,7 @@ export function DirectorySortButtonContent({
   return (
     <>
       <SortIcon className="pointer-events-none relative top-px mr-1 h-4" />
-      <div className="leading-6">Sorted: {selectedOption.label}</div>
+      <div className="leading-6">{selectedOption.label}</div>
     </>
   );
 }

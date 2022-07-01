@@ -20,7 +20,7 @@ export function DirectoryViewTypeButton({
 
   return (
     <button
-      className={`group relative h-10 w-10 border first:rounded-l-lg last:rounded-r-lg focus:outline-none active:outline-none
+      className={`group relative h-10 w-10 border transition duration-150 ease-in-out first:rounded-l-lg last:rounded-r-lg focus:outline-none active:outline-none
         ${
           isActive
             ? 'border-blue-100 bg-blue-100'

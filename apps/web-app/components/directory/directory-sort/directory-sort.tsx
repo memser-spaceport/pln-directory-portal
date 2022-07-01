@@ -25,15 +25,18 @@ export function DirectorySort() {
   );
 
   return (
-    <Dropdown
-      options={directorySortDropdownOptions}
-      onChange={onDropdownOptionChange}
-      initialOption={selectedDirectorySortDropdownOption}
-      buttonContent={
-        <DirectorySortButtonContent
-          selectedOption={selectedDirectorySortDropdownOption}
-        />
-      }
-    />
+    <div className="flex items-center">
+      <span className="mr-2 text-sm">Sort by:</span>
+      <Dropdown
+        options={directorySortDropdownOptions}
+        onChange={onDropdownOptionChange}
+        initialOption={selectedDirectorySortDropdownOption}
+        buttonContent={
+          <DirectorySortButtonContent
+            selectedOption={selectedDirectorySortDropdownOption}
+          />
+        }
+      />
+    </div>
   );
 }
