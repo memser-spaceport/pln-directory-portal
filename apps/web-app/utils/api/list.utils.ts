@@ -32,10 +32,14 @@ export function getTeamsDirectoryRequestOptionsFromQuery(
  * Returns the options for requesting the members on the members directory,
  * by parsing the provided query parameters.
  */
-export function getMembersDirectoryRequestOptionsFromQuery(): IListOptions {
+export function getMembersDirectoryRequestOptionsFromQuery(
+  queryParams: ParsedUrlQuery
+): IListOptions {
+  const { sort } = queryParams;
+
   return {
+    sort: [getSortFromQuery(sort?.toString())],
     filterByFormula: getMembersDirectoryFormula(),
-    sort: [{ field: 'Name', direction: 'asc' }],
   };
 }
 

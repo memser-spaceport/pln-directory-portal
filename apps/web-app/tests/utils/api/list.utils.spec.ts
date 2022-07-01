@@ -50,10 +50,32 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
 });
 
 describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
-  it('should return valid options', () => {
-    expect(getMembersDirectoryRequestOptionsFromQuery()).toEqual({
+  it('should return valid options when sort is provided and is valid', () => {
+    expect(
+      getMembersDirectoryRequestOptionsFromQuery({
+        sort: 'Name,desc',
+      })
+    ).toEqual({
+      sort: [{ field: 'Name', direction: 'desc' }],
       filterByFormula: 'AND({Name} != "", {Teams} != "")',
+    });
+  });
+
+  it('should return valid options when sort is provided and is invalid', () => {
+    expect(
+      getMembersDirectoryRequestOptionsFromQuery({
+        sort: 'invalid',
+      })
+    ).toEqual({
       sort: [{ field: 'Name', direction: 'asc' }],
+      filterByFormula: 'AND({Name} != "", {Teams} != "")',
+    });
+  });
+
+  it('should return valid options when sort is not provided', () => {
+    expect(getMembersDirectoryRequestOptionsFromQuery({})).toEqual({
+      sort: [{ field: 'Name', direction: 'asc' }],
+      filterByFormula: 'AND({Name} != "", {Teams} != "")',
     });
   });
 });

@@ -2,6 +2,7 @@ import airtableService from '@protocol-labs-network/airtable';
 import { IMember } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
+import { DirectorySort } from '../../components/directory/directory-sort/directory-sort';
 import { DirectoryView } from '../../components/directory/directory-view/directory-view';
 import { useViewType } from '../../components/directory/directory-view/use-directory-view-type.hook';
 import { MemberCard } from '../../components/shared/members/member-card/member-card';
@@ -27,6 +28,7 @@ export default function Members({ members }: MembersProps) {
             <div className="mb-10 flex items-center justify-between">
               <h1 className="text-3xl font-bold">Members</h1>
               <div className="flex items-center space-x-4">
+                <DirectorySort />
                 <DirectoryView />
               </div>
             </div>
@@ -56,9 +58,10 @@ export default function Members({ members }: MembersProps) {
 }
 
 export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
+  query,
   res,
 }) => {
-  const options = getMembersDirectoryRequestOptionsFromQuery();
+  const options = getMembersDirectoryRequestOptionsFromQuery(query);
   const members = await airtableService.getMembers(options);
 
   // Cache response data in the browser for 1 minute,
