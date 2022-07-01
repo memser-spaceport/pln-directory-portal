@@ -2,6 +2,8 @@ import airtableService from '@protocol-labs-network/airtable';
 import { IMember } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
+import { DirectoryView } from '../../components/directory/directory-view/directory-view';
+import { useViewType } from '../../components/directory/directory-view/use-directory-view-type.hook';
 import { MemberCard } from '../../components/shared/members/member-card/member-card';
 import { getMembersDirectoryRequestOptionsFromQuery } from '../../utils/api/list.utils';
 
@@ -10,6 +12,9 @@ type MembersProps = {
 };
 
 export default function Members({ members }: MembersProps) {
+  const { selectedViewType } = useViewType();
+  const isGrid = selectedViewType === 'grid';
+
   return (
     <>
       <Head>
@@ -21,6 +26,9 @@ export default function Members({ members }: MembersProps) {
           <div className="w-[917px] flex-shrink-0">
             <div className="mb-10 flex items-center justify-between">
               <h1 className="text-3xl font-bold">Members</h1>
+              <div className="flex items-center space-x-4">
+                <DirectoryView />
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-4">
@@ -28,8 +36,8 @@ export default function Members({ members }: MembersProps) {
                 <MemberCard
                   key={member.id}
                   member={member}
-                  isGrid
                   isClickable
+                  isGrid={isGrid}
                   showLocation
                   showSkills
                   showTeams={false}
