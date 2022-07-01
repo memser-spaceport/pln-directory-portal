@@ -6,7 +6,7 @@ export function DirectoryView() {
   const { selectedViewType, changeView } = useViewType();
 
   return (
-    <div className="flex">
+    <div className="flex rounded-lg shadow-sm shadow-slate-300">
       {DIRECTORY_VIEW_TYPE_OPTIONS.map((option) => {
         return (
           <DirectoryViewTypeButton

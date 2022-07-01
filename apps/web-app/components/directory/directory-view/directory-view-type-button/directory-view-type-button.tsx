@@ -20,11 +20,11 @@ export function DirectoryViewTypeButton({
 
   return (
     <button
-      className={`group relative ml-[-1px] h-10 w-10 border first:ml-0 first:rounded-l-lg last:rounded-r-lg focus:z-20 focus:border-sky-300 focus:outline-none focus:ring focus:ring-sky-300/30
+      className={`group relative h-10 w-10 border first:rounded-l-lg last:rounded-r-lg focus:outline-none active:outline-none
         ${
           isActive
-            ? 'z-10 border-sky-600 bg-sky-100'
-            : 'border-slate-300 bg-white'
+            ? 'border-blue-100 bg-blue-100'
+            : 'border-white bg-white hover:z-10 hover:border-slate-200 hover:ring-2 hover:ring-blue-300 focus:z-10 focus:ring-2 focus:ring-blue-300 active:z-10 active:border-blue-600 active:ring-2 active:ring-blue-300'
         }
         `}
       onClick={() => onClick(viewType)}
@@ -34,8 +34,8 @@ export function DirectoryViewTypeButton({
       <ViewTypeIcon
         className={`m-auto h-6 w-6 ${
           isActive
-            ? 'stroke-sky-600'
-            : 'stroke-slate-600 group-hover:stroke-sky-600'
+            ? 'stroke-blue-700'
+            : 'stroke-slate-600 group-focus:stroke-slate-900'
         }`}
         aria-hidden="true"
       />
