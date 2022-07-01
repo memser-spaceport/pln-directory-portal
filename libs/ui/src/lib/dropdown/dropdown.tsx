@@ -1,6 +1,6 @@
 import { Listbox } from '@headlessui/react';
-import { CheckIcon, ChevronDownIcon } from '@heroicons/react/solid';
 import React, { Fragment, useState } from 'react';
+import { ArrowIcon } from '../icons/arrow/arrow';
 
 interface DropdownProps {
   buttonContent?: React.ReactNode;
@@ -41,50 +41,68 @@ export function Dropdown({
       onChange={onChangeHandler}
       className="text-sm"
     >
-      <div className="relative">
-        <Listbox.Button
-          className={`flex h-10 items-center rounded-lg border border-slate-300 bg-white px-3 transition duration-150 ease-in-out focus:border-sky-300 focus:outline-none focus:ring focus:ring-sky-300/30 `}
-          data-testid="dropdown__button"
-        >
-          {buttonContent ? (
-            buttonContent
-          ) : (
-            <div className="leading-6">{selectedOption.label}</div>
-          )}
-          <ChevronDownIcon className="pointer-events-none ml-5 h-4" />
-        </Listbox.Button>
+      {({ open }) => (
+        <div className="relative">
+          <Listbox.Button
+            className={`flex h-10 items-center rounded-lg border border-white bg-white px-3 shadow-sm shadow-slate-300 transition duration-150 ease-in-out hover:border-slate-200 hover:ring-2 hover:ring-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300 active:border-blue-600 active:ring-2 active:ring-blue-300 ${
+              open
+                ? 'border-blue-600 ring-2 ring-blue-300 hover:border-blue-600'
+                : ''
+            }`}
+            data-testid="dropdown__button"
+          >
+            {buttonContent ? (
+              buttonContent
+            ) : (
+              <div className="leading-6">{selectedOption.label}</div>
+            )}
+            <div className="ml-4">
+              <ArrowIcon />
+            </div>
+          </Listbox.Button>
 
-        <Listbox.Options
-          as="div"
-          className="absolute mt-1 w-full rounded-lg border border-slate-300 bg-white leading-6 shadow-md focus:outline-none"
-        >
-          {options.map((option) => (
-            <Listbox.Option
-              as={Fragment}
-              key={option.value}
-              value={option.value}
-            >
-              {({ active, selected }) => (
-                <div
-                  className={`${
-                    active ? 'bg-sky-500 text-white' : 'bg-white'
-                  } ${selected && 'font-semibold'}
-                    relative cursor-pointer select-none overflow-hidden py-1 pl-8 pr-4 first:rounded-t-lg last:rounded-b-lg`}
+          <Listbox.Options
+            as="div"
+            className="absolute z-20 mt-2 w-full space-y-1 rounded-lg bg-white p-2 leading-6 shadow-md focus:outline-none"
+          >
+            {options.map((option) => {
+              const OptionIcon = option.icon;
+
+              return (
+                <Listbox.Option
+                  as={Fragment}
+                  key={option.value}
+                  value={option.value}
                 >
-                  {selected && (
-                    <CheckIcon
+                  {({ active, selected }) => (
+                    <div
                       className={`${
-                        active ? 'text-white' : 'text-sky-600'
-                      } pointer-events-none absolute inset-y-0 left-2 my-auto h-4`}
-                    />
+                        selected
+                          ? 'border-blue-600 bg-blue-600 text-white'
+                          : 'border-white bg-white'
+                      } ${
+                        !selected && active
+                          ? 'border-slate-100 bg-slate-100 active:border-blue-600 active:bg-white active:ring-2 active:ring-blue-300'
+                          : ''
+                      }
+                      relative cursor-pointer select-none overflow-hidden rounded-lg border py-1 pl-8 pr-4 transition duration-150 ease-in-out`}
+                    >
+                      {OptionIcon && (
+                        <OptionIcon
+                          className={`${
+                            selected ? 'text-white' : ''
+                          } pointer-events-none absolute inset-y-0 left-2 my-auto h-4`}
+                        />
+                      )}
+                      {option.label}
+                    </div>
                   )}
-                  {option.label}
-                </div>
-              )}
-            </Listbox.Option>
-          ))}
-        </Listbox.Options>
-      </div>
+                </Listbox.Option>
+              );
+            })}
+          </Listbox.Options>
+        </div>
+      )}
     </Listbox>
   );
 }
