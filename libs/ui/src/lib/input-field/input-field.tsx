@@ -39,9 +39,9 @@ export function InputField({
       ) : null}
       <input
         {...props}
-        className={`block w-full rounded-lg border border-slate-300 bg-white text-sm leading-6 text-slate-600 placeholder:text-sm placeholder:text-slate-600 
-        ${icon ? 'pl-8' : 'pl-3'} shadow-slate-900/16 h-10 pr-2
-        leading-10 shadow-sm focus:border-sky-300 focus:outline-none focus:ring focus:ring-sky-300/30 ${
+        className={`block w-full rounded-lg border border-white bg-white text-sm leading-6 text-slate-900 shadow-sm shadow-slate-300 transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-600
+        ${icon ? 'pl-8' : 'pl-3'} ${hasClear ? 'pr-6' : ''} h-10 pr-2
+        leading-10 hover:border-slate-200 hover:ring-2 hover:ring-blue-300 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300 ${
           props.className || ''
         }`}
         onChange={composeEventHandlers(props.onChange, handleUserInput)}
