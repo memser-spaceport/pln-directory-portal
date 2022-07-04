@@ -7,7 +7,7 @@ export function Navbar() {
   return (
     <nav className="flex w-full items-center justify-between border-b border-slate-200 bg-white/95 py-3 px-8">
       <div className="flex items-center space-x-5">
-        <Link href="/">
+        <Link href="/teams">
           <a>
             <ProtocolLabsLogo
               title="Protocol Labs Network Black Logo"
