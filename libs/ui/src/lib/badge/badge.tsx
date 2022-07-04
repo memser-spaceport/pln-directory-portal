@@ -9,5 +9,3 @@ export function Badge({ text }: BadgeProps) {
     </div>
   );
 }
-
-export default Badge;

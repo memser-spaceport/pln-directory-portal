@@ -4,7 +4,7 @@ import { composeEventHandlers } from '../../utils/event-handlers.utils';
 
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
-interface InputFieldProps extends React.ComponentProps<'input'> {
+export interface InputFieldProps extends React.ComponentProps<'input'> {
   label: string;
   icon?: HeroIcon;
   hasClear?: boolean;

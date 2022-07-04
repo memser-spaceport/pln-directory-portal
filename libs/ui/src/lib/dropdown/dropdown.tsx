@@ -2,7 +2,7 @@ import { Listbox } from '@headlessui/react';
 import React, { Fragment, useState } from 'react';
 import { ArrowIcon } from '../icons/arrow/arrow';
 
-interface DropdownProps {
+export interface DropdownProps {
   buttonContent?: React.ReactNode;
   initialOption?: IDropdownOption;
   onChange?: (value: IDropdownOption) => void;
@@ -44,7 +44,7 @@ export function Dropdown({
       {({ open }) => (
         <div className="relative">
           <Listbox.Button
-            className={`flex h-10 items-center rounded-lg border border-white bg-white px-3 shadow-sm shadow-slate-300 transition duration-150 ease-in-out hover:border-slate-200 hover:ring-2 hover:ring-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300 active:border-blue-600 active:ring-2 active:ring-blue-300 ${
+            className={`flex h-10 grow items-center rounded-lg border border-white bg-white px-3 shadow-sm shadow-slate-300 transition duration-150 ease-in-out hover:border-slate-200 hover:ring-2 hover:ring-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300 active:border-blue-600 active:ring-2 active:ring-blue-300 ${
               open
                 ? 'border-blue-600 ring-2 ring-blue-300 hover:border-blue-600'
                 : ''
