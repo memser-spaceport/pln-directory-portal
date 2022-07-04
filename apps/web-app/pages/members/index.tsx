@@ -2,6 +2,7 @@ import airtableService from '@protocol-labs-network/airtable';
 import { IMember } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
+import { DirectorySearch } from '../../components/directory/directory-search/directory-search';
 import { DirectorySort } from '../../components/directory/directory-sort/directory-sort';
 import { DirectoryView } from '../../components/directory/directory-view/directory-view';
 import { useViewType } from '../../components/directory/directory-view/use-directory-view-type.hook';
@@ -28,6 +29,8 @@ export default function Members({ members }: MembersProps) {
             <div className="mb-10 flex items-center justify-between">
               <h1 className="text-3xl font-bold">Members</h1>
               <div className="flex items-center space-x-4">
+                <DirectorySearch />
+                <span className="h-6 w-px bg-slate-300" />
                 <DirectorySort />
                 <DirectoryView />
               </div>

@@ -35,11 +35,11 @@ export function getTeamsDirectoryRequestOptionsFromQuery(
 export function getMembersDirectoryRequestOptionsFromQuery(
   queryParams: ParsedUrlQuery
 ): IListOptions {
-  const { sort } = queryParams;
+  const { sort, searchBy } = queryParams;
 
   return {
     sort: [getSortFromQuery(sort?.toString())],
-    filterByFormula: getMembersDirectoryFormula(),
+    filterByFormula: getMembersDirectoryFormula({ searchBy }),
   };
 }
 
@@ -102,10 +102,18 @@ function getTeamsDirectoryFormula({
 /**
  * Get formula for members directory filtering.
  */
-function getMembersDirectoryFormula() {
+function getMembersDirectoryFormula({
+  searchBy,
+}: {
+  [key: string]: string | string[] | undefined;
+}) {
   const formula = [
     'AND(',
-    ['{Name} != ""', '{Teams} != ""'].join(', '),
+    [
+      '{Name} != ""',
+      '{Teams} != ""',
+      ...(searchBy ? [getSearchFormulaFromQuery(searchBy)] : []),
+    ].join(', '),
     ')',
   ].join('');
 
