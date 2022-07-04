@@ -21,6 +21,15 @@ const nextConfig = {
     // this includes files from the monorepo base two directories up
     outputFileTracingRoot: path.join(__dirname, '../../'),
   },
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/teams',
+        permanent: false,
+      },
+    ];
+  },
 };
 
 const sentryWebpackPluginOptions = {
