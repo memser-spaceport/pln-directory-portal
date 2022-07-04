@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { RouterContext } from 'next/dist/shared/lib/router-context';
 import { createMockRouter } from '../../../../../utils/test/createMockRouter';
 import { IFilterTag } from '../../../../directory/directory-filters/directory-tags-filter/directory-tags-filter.types';
-import TechnologyFilter from './technology-filter';
+import { TechnologyFilter } from './technology-filter';
 
 const tags: IFilterTag[] = [
   {

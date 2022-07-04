@@ -3,7 +3,7 @@ import { Badge, Tag } from '@protocol-labs-network/ui';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { useState } from 'react';
 import { IFilterTag } from '../../../../components/directory/directory-filters/directory-tags-filter/directory-tags-filter.types';
-import DirectoryFilter from '../directory-filter/directory-filter';
+import { DirectoryFilter } from '../directory-filter/directory-filter';
 
 export interface DirectoryTagsFilterProps {
   title: string;
@@ -13,7 +13,7 @@ export interface DirectoryTagsFilterProps {
 
 const VISIBLE_TAGS_COUNT = 10;
 
-function DirectoryTagsFilter({
+export function DirectoryTagsFilter({
   title,
   tags,
   onTagToggle,
@@ -54,5 +54,3 @@ function DirectoryTagsFilter({
     </DirectoryFilter>
   );
 }
-
-export default DirectoryTagsFilter;

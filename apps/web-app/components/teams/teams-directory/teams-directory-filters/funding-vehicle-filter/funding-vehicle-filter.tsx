@@ -1,4 +1,4 @@
-import DirectoryTagsFilter from '../../../../directory/directory-filters/directory-tags-filter/directory-tags-filter';
+import { DirectoryTagsFilter } from '../../../../directory/directory-filters/directory-tags-filter/directory-tags-filter';
 import { IFilterTag } from '../../../../directory/directory-filters/directory-tags-filter/directory-tags-filter.types';
 import { useTagsFilter } from '../../../../directory/directory-filters/directory-tags-filter/use-tags-filter.hook';
 
@@ -6,7 +6,7 @@ export interface FundingVehicleFilterProps {
   fundingVehicleTags: IFilterTag[];
 }
 
-function FundingVehicleFilter({
+export function FundingVehicleFilter({
   fundingVehicleTags,
 }: FundingVehicleFilterProps) {
   const [tags, toggleTag] = useTagsFilter('fundingVehicle', fundingVehicleTags);
@@ -19,5 +19,3 @@ function FundingVehicleFilter({
     />
   );
 }
-
-export default FundingVehicleFilter;
