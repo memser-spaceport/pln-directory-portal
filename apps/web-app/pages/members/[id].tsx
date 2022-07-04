@@ -5,6 +5,7 @@ import Head from 'next/head';
 import { MemberProfileHeader } from '../../components/members/member-profile/member-profile-header';
 import { MemberProfileOfficeHours } from '../../components/members/member-profile/member-profile-office-hours';
 import { MemberProfileTeams } from '../../components/members/member-profile/member-profile-teams';
+import { AskToEditLink } from '../../components/shared/ask-to-edit-link/ask-to-edit-link';
 import { useProfileBreadcrumb } from '../../hooks/profile/use-profile-breadcrumb.hook';
 
 interface MemberProps {
@@ -25,7 +26,10 @@ export default function Member({ member, teams, backLink }: MemberProps) {
       <Head>
         <title>Member {member.name}</title>
       </Head>
-      <Breadcrumb items={breadcrumbItems} />
+      <div className="flex items-center justify-between">
+        <Breadcrumb items={breadcrumbItems} />
+        <AskToEditLink profileType="member" profileName={member.name} />
+      </div>
       <div className="mt-6 flex items-start space-x-10">
         <div className="flex grow flex-col space-y-8">
           <MemberProfileHeader member={member} />

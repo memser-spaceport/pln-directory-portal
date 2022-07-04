@@ -14,7 +14,7 @@ export function AskToEditLink({
   profileType,
   profileName,
 }: AskToEditLinkProps) {
-  const bodyText = `Hello,${LINE_BREAK}${LINE_BREAK}I’d like to request the following changes to the ${profileType} ${profileName}:${LINE_BREAK}1.${LINE_BREAK}2.`;
+  const bodyText = `Hello,${LINE_BREAK}${LINE_BREAK}I’d like to request the following changes to the ${profileType} ${profileName}'s profile:${LINE_BREAK}1.${LINE_BREAK}2.${LINE_BREAK}3.`;
 
   return (
     <Link
