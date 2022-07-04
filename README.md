@@ -1,5 +1,5 @@
-![Protocol Labs logo](./apps/web-app/public/assets/images/protocol-labs-logo-horizontal-white.svg#gh-dark-mode-only)
-![Protocol Labs logo](./apps/web-app/public/assets/images/protocol-labs-logo-horizontal-black.svg#gh-light-mode-only)
+![Protocol Labs Network logo](./apps/web-app/public/assets/images/protocol-labs-network-logo-horizontal-white.svg#gh-dark-mode-only)
+![Protocol Labs Network logo](./apps/web-app/public/assets/images/protocol-labs-network-logo-horizontal-black.svg#gh-light-mode-only)
 
 # Protocol Labs Network
 

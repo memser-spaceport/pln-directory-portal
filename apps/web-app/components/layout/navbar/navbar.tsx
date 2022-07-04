@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { JoinNetworkMenu } from './join-network-menu/join-network-menu';
 import Menu from './menu/menu';
-import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/protocol-labs-logo-horizontal-black.svg';
+import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/protocol-labs-network-logo-horizontal-black.svg';
 
 export function Navbar() {
   return (
@@ -11,8 +11,8 @@ export function Navbar() {
           <a>
             <ProtocolLabsLogo
               title="Protocol Labs Network Black Logo"
-              width={173}
-              height={47}
+              width={200}
+              height={66}
             />
           </a>
         </Link>
