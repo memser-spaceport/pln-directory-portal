@@ -22,5 +22,3 @@ export function Tag({ disabled, onClick, selected, value }: TagProps) {
     </button>
   );
 }
-
-export default Tag;
