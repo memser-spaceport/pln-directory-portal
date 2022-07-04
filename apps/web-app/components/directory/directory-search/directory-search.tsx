@@ -2,7 +2,13 @@ import { SearchIcon } from '@heroicons/react/solid';
 import { InputField } from '@protocol-labs-network/ui';
 import { useRouter } from 'next/router';
 
-export function DirectorySearch() {
+interface DirectorySearchProps {
+  placeholder?: string;
+}
+
+export function DirectorySearch({
+  placeholder = 'Search',
+}: DirectorySearchProps) {
   const { query, push, pathname } = useRouter();
   const searchTerm = query.searchBy as string;
 
@@ -20,7 +26,7 @@ export function DirectorySearch() {
       label="Search"
       name="searchBy"
       icon={SearchIcon}
-      placeholder="Search for a team"
+      placeholder={placeholder}
       defaultValue={searchTerm}
       onKeyUp={(event) => {
         if (event.key === 'Enter' || event.keyCode === 13) {
