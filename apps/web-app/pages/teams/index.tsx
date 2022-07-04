@@ -37,7 +37,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
             <div className="mb-10 flex items-center justify-between">
               <h1 className="text-3xl font-bold">Teams</h1>
               <div className="flex items-center space-x-4">
-                <DirectorySearch />
+                <DirectorySearch placeholder="Search for a team" />
                 <span className="h-6 w-px bg-slate-300" />
                 <DirectorySort />
                 <DirectoryView />

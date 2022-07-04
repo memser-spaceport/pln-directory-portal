@@ -29,7 +29,7 @@ export default function Members({ members }: MembersProps) {
             <div className="mb-10 flex items-center justify-between">
               <h1 className="text-3xl font-bold">Members</h1>
               <div className="flex items-center space-x-4">
-                <DirectorySearch />
+                <DirectorySearch placeholder="Search for a member" />
                 <span className="h-6 w-px bg-slate-300" />
                 <DirectorySort />
                 <DirectoryView />
