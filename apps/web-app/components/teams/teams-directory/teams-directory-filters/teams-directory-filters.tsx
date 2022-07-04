@@ -1,15 +1,17 @@
-import DirectoryFilters from '../../../directory/directory-filters/directory-filters';
-import FundingStageFilter from './funding-stage-filter/funding-stage-filter';
-import FundingVehicleFilter from './funding-vehicle-filter/funding-vehicle-filter';
-import IndustryFilter from './industry-filter/industry-filter';
+import { DirectoryFilters } from '../../../directory/directory-filters/directory-filters';
+import { FundingStageFilter } from './funding-stage-filter/funding-stage-filter';
+import { FundingVehicleFilter } from './funding-vehicle-filter/funding-vehicle-filter';
+import { IndustryFilter } from './industry-filter/industry-filter';
 import { ITeamsFiltersValues } from './teams-directory-filters.types';
-import TechnologyFilter from './technology-filter/technology-filter';
+import { TechnologyFilter } from './technology-filter/technology-filter';
 
 export interface TeamsDirectoryFiltersProps {
   filtersValues: ITeamsFiltersValues;
 }
 
-function TeamsDirectoryFilters({ filtersValues }: TeamsDirectoryFiltersProps) {
+export function TeamsDirectoryFilters({
+  filtersValues,
+}: TeamsDirectoryFiltersProps) {
   return (
     <DirectoryFilters
       filterProperties={[
@@ -29,5 +31,3 @@ function TeamsDirectoryFilters({ filtersValues }: TeamsDirectoryFiltersProps) {
     </DirectoryFilters>
   );
 }
-
-export default TeamsDirectoryFilters;

@@ -5,7 +5,7 @@ interface DirectoryFiltersProps {
   filterProperties: string[];
 }
 
-function DirectoryFilters({
+export function DirectoryFilters({
   children,
   filterProperties,
 }: DirectoryFiltersProps) {
@@ -34,5 +34,3 @@ function DirectoryFilters({
     </>
   );
 }
-
-export default DirectoryFilters;
