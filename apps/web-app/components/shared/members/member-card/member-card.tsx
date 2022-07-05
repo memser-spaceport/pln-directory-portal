@@ -73,8 +73,8 @@ export function MemberCard({
               </h3>
               <p className="line-clamp-1">{member.role}</p>
               {showLocation ? (
-                <div className="mt-3 flex text-slate-500">
-                  <LocationMarkerIcon className="mr-1 -ml-0.5 h-5 w-5 flex-shrink-0" />
+                <div className="mt-2 flex items-center text-sm text-slate-500">
+                  <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0" />
                   <span className="line-clamp-1">{member.location}</span>
                 </div>
               ) : null}
