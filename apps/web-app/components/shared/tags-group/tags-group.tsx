@@ -1,7 +1,5 @@
 import Link from 'next/link';
-import { useRef } from 'react';
 import { HiddenTagsTooltip } from './hidden-tags-tooltip';
-import { useHideOverflowingTags } from './use-hide-overflowing-tags.hook';
 
 export interface ITagsGroupItem {
   disabled?: boolean;
@@ -11,37 +9,33 @@ export interface ITagsGroupItem {
 
 export interface TagsGroupProps {
   items: ITagsGroupItem[];
-  isInline?: boolean;
+  isSingleLine?: boolean;
 }
 
-export function TagsGroup({ items, isInline = true }: TagsGroupProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { hiddenStartIndex, hiddenTags } = useHideOverflowingTags(
-    containerRef,
-    items
-  );
+export function TagsGroup({ items, isSingleLine = false }: TagsGroupProps) {
+  let visibleTags: ITagsGroupItem[];
+  let hiddenTags: ITagsGroupItem[];
+
+  if (isSingleLine && items.length > 1) {
+    visibleTags = [items[0]];
+    hiddenTags = items.slice(1);
+  }
 
   return (
     <div
-      className={`flex w-full items-start ${
-        isInline ? 'overflow-hidden' : 'flex-wrap'
-      }`}
-      ref={containerRef}
+      className={`flex w-full items-start ${!isSingleLine ? 'flex-wrap' : ''}`}
     >
-      {items.map((item, i) => {
-        if (item?.url) {
+      {(visibleTags || items).map((item, i) => {
+        if (item.url) {
           return (
             <Link key={i} href={item.url}>
               <a
-                className={`tag ${!isInline ? 'mb-2' : ''}
+                className={`tag ${!isSingleLine ? 'mb-2' : 'truncate'}
                 ${
                   item.disabled
                     ? 'pointer-events-none'
                     : 'tag--clickable border border-slate-200 bg-white'
-                } ${
-                  isInline && i >= hiddenStartIndex ? 'invisible' : 'visible'
-                }`}
-                style={{ order: i >= hiddenStartIndex ? i + 1 : i }}
+                } `}
               >
                 {item.label}
               </a>
@@ -51,10 +45,7 @@ export function TagsGroup({ items, isInline = true }: TagsGroupProps) {
           return (
             <span
               key={i}
-              className={`tag ${
-                isInline && i >= hiddenStartIndex ? 'invisible' : 'visible mb-2'
-              }`}
-              style={{ order: i >= hiddenStartIndex ? i + 1 : i }}
+              className={`tag ${!isSingleLine ? 'mb-2' : 'truncate'}`}
             >
               {item.label}
             </span>
@@ -62,11 +53,7 @@ export function TagsGroup({ items, isInline = true }: TagsGroupProps) {
         }
       })}
 
-      {isInline ? (
-        <div style={{ order: hiddenStartIndex }}>
-          {hiddenTags.length ? <HiddenTagsTooltip items={hiddenTags} /> : null}
-        </div>
-      ) : null}
+      {hiddenTags ? <HiddenTagsTooltip items={hiddenTags} /> : null}
     </div>
   );
 }
