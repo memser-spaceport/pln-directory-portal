@@ -51,3 +51,9 @@ export interface IAirtableMemberPicture {
     large?: IAirtableImage;
   };
 }
+
+export interface IAirtableMembersFiltersValues {
+  skills: string[];
+  country: string[];
+  metroArea: string[];
+}

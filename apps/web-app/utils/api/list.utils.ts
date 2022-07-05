@@ -35,11 +35,16 @@ export function getTeamsDirectoryRequestOptionsFromQuery(
 export function getMembersDirectoryRequestOptionsFromQuery(
   queryParams: ParsedUrlQuery
 ): IListOptions {
-  const { sort, searchBy } = queryParams;
+  const { sort, searchBy, skills, country, metroArea } = queryParams;
 
   return {
     sort: [getSortFromQuery(sort?.toString())],
-    filterByFormula: getMembersDirectoryFormula({ searchBy }),
+    filterByFormula: getMembersDirectoryFormula({
+      searchBy,
+      skills,
+      country,
+      metroArea,
+    }),
   };
 }
 
@@ -104,6 +109,9 @@ function getTeamsDirectoryFormula({
  */
 function getMembersDirectoryFormula({
   searchBy,
+  skills,
+  country,
+  metroArea,
 }: {
   [key: string]: string | string[] | undefined;
 }) {
@@ -113,6 +121,9 @@ function getMembersDirectoryFormula({
       '{Name} != ""',
       '{Teams} != ""',
       ...(searchBy ? [getSearchFormulaFromQuery(searchBy)] : []),
+      ...(skills ? [getFieldFromQuery('Skills', skills)] : []),
+      ...(country ? [getFieldFromQuery('Country', country)] : []),
+      ...(metroArea ? [getFieldFromQuery('Metro Area', metroArea)] : []),
     ].join(', '),
     ')',
   ].join('');

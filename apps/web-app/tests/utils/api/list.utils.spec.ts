@@ -53,13 +53,16 @@ describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
   it('should return valid options when sort is provided and is valid', () => {
     expect(
       getMembersDirectoryRequestOptionsFromQuery({
-        sort: 'Name,desc',
+        country: 'Portugal',
+        metroArea: 'Porto',
         searchBy: 'void',
+        skills: 'Engineering|Leadership',
+        sort: 'Name,desc',
       })
     ).toEqual({
       sort: [{ field: 'Name', direction: 'desc' }],
       filterByFormula:
-        'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"))',
+        'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}))',
     });
   });
 
@@ -77,12 +80,15 @@ describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
   it('should return valid options when sort is not provided', () => {
     expect(
       getMembersDirectoryRequestOptionsFromQuery({
+        country: 'Portugal',
+        metroArea: 'Porto',
         searchBy: 'void',
+        skills: 'Engineering|Leadership',
       })
     ).toEqual({
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula:
-        'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"))',
+        'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}))',
     });
   });
 });
