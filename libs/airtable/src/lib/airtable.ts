@@ -7,6 +7,7 @@ import {
 import Airtable from 'airtable';
 import {
   IAirtableMember,
+  IAirtableMembersFiltersValues,
   IAirtableTeam,
   IAirtableTeamsFiltersValues,
 } from '../models';
@@ -85,8 +86,8 @@ class AirtableService {
    */
   public async getTeamsFiltersValues(options: IListOptions) {
     const [valuesByFilter, availableValuesByFilter] = await Promise.all([
-      this._getAllTeamsFiltersValues(),
-      this._getAvailableTeamsFiltersValues(options),
+      this._getTeamsFiltersValues(),
+      this._getTeamsFiltersValues(options),
     ]);
 
     return {
@@ -113,6 +114,21 @@ class AirtableService {
     const member: IAirtableMember = await this._membersTable.find(id);
 
     return this._parseMember(member);
+  }
+
+  /**
+   * Get values (and available values) for members filters.
+   */
+  public async getMembersFiltersValues(options: IListOptions) {
+    const [valuesByFilter, availableValuesByFilter] = await Promise.all([
+      this._getMembersFiltersValues(),
+      this._getMembersFiltersValues(options),
+    ]);
+
+    return {
+      valuesByFilter,
+      availableValuesByFilter,
+    };
   }
 
   /**
@@ -244,42 +260,42 @@ class AirtableService {
   }
 
   /**
-   * Get all unique values for Teams Directory filters fields.
+   * Get all values for provided directory filters fields.
    */
-  private async _getAllTeamsFiltersValues() {
-    const teams: IAirtableTeam[] = (await this._teamsTable
+  private async _getFiltersValues(
+    table: Airtable.Table<Airtable.FieldSet>,
+    fields: string[],
+    options: IListOptions,
+    parser:
+      | ((members: IAirtableMember[]) => IAirtableMembersFiltersValues)
+      | ((teams: IAirtableTeam[]) => IAirtableTeamsFiltersValues)
+  ) {
+    const results: IAirtableMember[] | IAirtableTeam[] = (await table
       .select({
-        fields: [
-          'Industry',
-          'Funding Stage',
-          'Funding Vehicle',
-          'IPFS User',
-          'Filecoin User',
-        ],
+        fields,
+        ...options,
       })
-      .all()) as unknown as IAirtableTeam[];
+      .all()) as unknown as IAirtableMember[] | IAirtableTeam[];
 
-    return this._parseTeamsFilters(teams);
+    return parser(results);
   }
 
   /**
-   * Get available unique values for Teams Directory filters fields.
+   * Get values for Teams Directory filters fields.
    */
-  private async _getAvailableTeamsFiltersValues(options: IListOptions) {
-    const teams: IAirtableTeam[] = (await this._teamsTable
-      .select({
-        fields: [
-          'Industry',
-          'Funding Stage',
-          'Funding Vehicle',
-          'IPFS User',
-          'Filecoin User',
-        ],
-        ...options,
-      })
-      .all()) as unknown as IAirtableTeam[];
-
-    return this._parseTeamsFilters(teams);
+  private async _getTeamsFiltersValues(options: IListOptions = {}) {
+    return (await this._getFiltersValues(
+      this._teamsTable,
+      [
+        'Industry',
+        'Funding Stage',
+        'Funding Vehicle',
+        'IPFS User',
+        'Filecoin User',
+      ],
+      options,
+      this._parseTeamsFilters
+    )) as IAirtableTeamsFiltersValues;
   }
 
   /**
@@ -321,6 +337,57 @@ class AirtableService {
         fundingVehicle: [],
         technology: [],
       } as IAirtableTeamsFiltersValues
+    );
+
+    Object.values(filtersValues).forEach((value) => value.sort());
+
+    return filtersValues;
+  }
+
+  /**
+   * Get values for Members Directory filters fields.
+   */
+  private async _getMembersFiltersValues(options: IListOptions = {}) {
+    return (await this._getFiltersValues(
+      this._membersTable,
+      ['Skills', 'Country', 'Metro Area'],
+      options,
+      this._parseMembersFilters
+    )) as IAirtableMembersFiltersValues;
+  }
+
+  /**
+   * Parse members fields values into lists of unique values per field.
+   */
+  private _parseMembersFilters(members: IAirtableMember[]) {
+    const filtersValues: IAirtableMembersFiltersValues = members.reduce(
+      (values, member) => {
+        const skills = [
+          ...new Set([...values.skills, ...(member.fields.Skills || [])]),
+        ];
+        const country = [
+          ...new Set([
+            ...values.country,
+            ...(member.fields['Country'] ? [member.fields['Country']] : []),
+          ]),
+        ];
+        const metroArea = [
+          ...new Set([
+            ...values.metroArea,
+            ...(member.fields['Metro Area']
+              ? [member.fields['Metro Area']]
+              : []),
+          ]),
+        ];
+
+        return { skills, country, metroArea };
+      },
+      {
+        skills: [],
+        country: [],
+        metroArea: [],
+        technology: [],
+      } as IAirtableMembersFiltersValues
     );
 
     Object.values(filtersValues).forEach((value) => value.sort());

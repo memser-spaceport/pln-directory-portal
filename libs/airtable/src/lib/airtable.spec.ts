@@ -155,6 +155,9 @@ describe('AirtableService', () => {
   });
 
   it('should be able to select and retrieve all teams from teams table', async () => {
+    (<jest.Mock>teamsTableMock.select().all).mockClear();
+    (<jest.Mock>teamsTableMock.select).mockClear();
+
     const teams = await airtableService.getTeams({
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula: '',
@@ -201,6 +204,8 @@ describe('AirtableService', () => {
   });
 
   it('should be able to find and retrieve the team with the provided id on teams table', async () => {
+    (<jest.Mock>teamsTableMock.find).mockClear();
+
     const team = await airtableService.getTeam(teamMock.id);
 
     expect(teamsTableMock.find).toHaveBeenCalledTimes(1);
@@ -223,7 +228,7 @@ describe('AirtableService', () => {
   });
 
   it('should be able to get teams details with the provided id from teams table', async () => {
-    (teamsTableMock.select as jest.Mock).mockReset().mockReturnValueOnce({
+    (teamsTableMock.select as jest.Mock).mockClear().mockReturnValueOnce({
       all: jest.fn().mockReturnValue([
         {
           id: 'team_id_01',
@@ -321,7 +326,7 @@ describe('AirtableService', () => {
 
   it('should be able to get all teams filter values and available teams filter values from teams table', async () => {
     (teamsTableMock.select as jest.Mock)
-      .mockReset()
+      .mockClear()
       .mockReturnValueOnce({
         all: jest.fn().mockReturnValue([
           {
@@ -374,7 +379,27 @@ describe('AirtableService', () => {
       });
 
     const filtersValues = await airtableService.getTeamsFiltersValues({
-      sort: [{ field: 'Name', direction: 'asc' }],
+      filterByFormula: '',
+    });
+
+    expect(teamsTableMock.select).toHaveBeenCalledTimes(2);
+    expect(teamsTableMock.select).toHaveBeenNthCalledWith(1, {
+      fields: [
+        'Industry',
+        'Funding Stage',
+        'Funding Vehicle',
+        'IPFS User',
+        'Filecoin User',
+      ],
+    });
+    expect(teamsTableMock.select).toHaveBeenNthCalledWith(2, {
+      fields: [
+        'Industry',
+        'Funding Stage',
+        'Funding Vehicle',
+        'IPFS User',
+        'Filecoin User',
+      ],
       filterByFormula: '',
     });
 
@@ -414,6 +439,9 @@ describe('AirtableService', () => {
   });
 
   it('should be able to select and retrieve all members from members table', async () => {
+    (<jest.Mock>membersTableMock.select().all).mockClear();
+    (<jest.Mock>membersTableMock.select).mockClear();
+
     const members = await airtableService.getMembers();
 
     expect(membersTableMock.select).toHaveBeenCalledTimes(1);
@@ -498,6 +526,8 @@ describe('AirtableService', () => {
   });
 
   it('should be able to find and retrieve the member with the provided id on members table', async () => {
+    (<jest.Mock>membersTableMock.find).mockClear();
+
     const member = await airtableService.getMember(memberMock01.id);
 
     expect(membersTableMock.find).toHaveBeenCalledTimes(1);
@@ -519,8 +549,85 @@ describe('AirtableService', () => {
     });
   });
 
+  it('should be able to get all members filter values and available members filter values from members table', async () => {
+    (membersTableMock.select as jest.Mock)
+      .mockClear()
+      .mockReturnValueOnce({
+        all: jest.fn().mockReturnValue([
+          {
+            fields: {
+              Skills: ['Skill 01', 'Skill 02'],
+              Country: 'Country 01',
+              'Metro Area': 'Metro Area 01',
+            },
+          },
+          {
+            fields: {
+              Skills: ['Skill 01', 'Skill 02', 'Skill 03'],
+              Country: 'Country 02',
+              'Metro Area': 'Metro Area 02',
+            },
+          },
+          {
+            fields: {
+              Skills: ['Skill 04', 'Skill 05'],
+              Country: 'Country 03',
+              'Metro Area': 'Metro Area 03',
+            },
+          },
+          {
+            fields: {},
+          },
+        ]),
+      })
+      .mockReturnValueOnce({
+        all: jest.fn().mockReturnValue([
+          {
+            fields: {
+              Skills: ['Skill 01', 'Skill 02'],
+              Country: 'Country 01',
+              'Metro Area': 'Metro Area 01',
+            },
+          },
+          {
+            fields: {
+              Skills: ['Skill 01', 'Skill 02', 'Skill 03'],
+              Country: 'Country 02',
+              'Metro Area': 'Metro Area 02',
+            },
+          },
+        ]),
+      });
+
+    const filtersValues = await airtableService.getMembersFiltersValues({
+      filterByFormula: '',
+    });
+
+    expect(membersTableMock.select).toHaveBeenCalledTimes(2);
+    expect(membersTableMock.select).toHaveBeenNthCalledWith(1, {
+      fields: ['Skills', 'Country', 'Metro Area'],
+    });
+    expect(membersTableMock.select).toHaveBeenNthCalledWith(2, {
+      fields: ['Skills', 'Country', 'Metro Area'],
+      filterByFormula: '',
+    });
+
+    expect(filtersValues).toEqual({
+      valuesByFilter: {
+        skills: ['Skill 01', 'Skill 02', 'Skill 03', 'Skill 04', 'Skill 05'],
+        country: ['Country 01', 'Country 02', 'Country 03'],
+        metroArea: ['Metro Area 01', 'Metro Area 02', 'Metro Area 03'],
+      },
+      availableValuesByFilter: {
+        skills: ['Skill 01', 'Skill 02', 'Skill 03'],
+        country: ['Country 01', 'Country 02'],
+        metroArea: ['Metro Area 01', 'Metro Area 02'],
+      },
+    });
+  });
+
   it('should be able to return members with the teams they belong to, identified by an id and name', async () => {
-    (membersTableMock.select as jest.Mock).mockReset().mockReturnValueOnce({
+    (membersTableMock.select as jest.Mock).mockClear().mockReturnValueOnce({
       all: jest.fn().mockReturnValue([
         {
           id: 'member_id_01',
@@ -583,7 +690,7 @@ describe('AirtableService', () => {
       ]),
     });
 
-    (teamsTableMock.select as jest.Mock).mockReset().mockReturnValueOnce({
+    (teamsTableMock.select as jest.Mock).mockClear().mockReturnValueOnce({
       all: jest.fn().mockReturnValue([
         {
           id: 'team_id_01',
@@ -615,8 +722,6 @@ describe('AirtableService', () => {
     const members = await airtableService.getTeamMembers('Team 01');
 
     expect(membersTableMock.select).toHaveBeenCalledTimes(1);
-    expect(teamsTableMock.select).toHaveBeenCalledTimes(1);
-
     expect(membersTableMock.select).toHaveBeenCalledWith({
       filterByFormula: 'SEARCH("Team 01",Teams)',
       fields: [
@@ -631,6 +736,8 @@ describe('AirtableService', () => {
       ],
       sort: [{ field: 'Name', direction: 'asc' }],
     });
+
+    expect(teamsTableMock.select).toHaveBeenCalledTimes(1);
     expect(teamsTableMock.select).toHaveBeenCalledWith({
       filterByFormula:
         "AND(AND({Name} != \"\", {Short description} != \"\"), OR(RECORD_ID()='team_id_01', RECORD_ID()='team_id_02', RECORD_ID()='team_id_03'))",

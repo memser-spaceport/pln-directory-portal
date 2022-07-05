@@ -6,14 +6,18 @@ import { DirectorySearch } from '../../components/directory/directory-search/dir
 import { DirectorySort } from '../../components/directory/directory-sort/directory-sort';
 import { DirectoryView } from '../../components/directory/directory-view/directory-view';
 import { useViewType } from '../../components/directory/directory-view/use-directory-view-type.hook';
+import { MembersDirectoryFilters } from '../../components/members/members-directory/members-directory-filters/members-directory-filters';
+import { IMembersFiltersValues } from '../../components/members/members-directory/members-directory-filters/members-directory-filters.types';
+import { parseMembersFilters } from '../../components/members/members-directory/members-directory-filters/members-directory-filters.utils';
 import { MemberCard } from '../../components/shared/members/member-card/member-card';
 import { getMembersDirectoryRequestOptionsFromQuery } from '../../utils/api/list.utils';
 
 type MembersProps = {
   members: IMember[];
+  filtersValues: IMembersFiltersValues;
 };
 
-export default function Members({ members }: MembersProps) {
+export default function Members({ members, filtersValues }: MembersProps) {
   const { selectedViewType } = useViewType();
   const isGrid = selectedViewType === 'grid';
 
@@ -24,6 +28,10 @@ export default function Members({ members }: MembersProps) {
       </Head>
 
       <section className="flex">
+        <div className="w-[291px] flex-shrink-0 border-r border-r-slate-200 bg-white">
+          <MembersDirectoryFilters filtersValues={filtersValues} />
+        </div>
+
         <div className="mx-auto p-8">
           <div className="w-[917px] flex-shrink-0">
             <div className="mb-10 flex items-center justify-between">
@@ -65,7 +73,11 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
   res,
 }) => {
   const options = getMembersDirectoryRequestOptionsFromQuery(query);
-  const members = await airtableService.getMembers(options);
+  const [members, filtersValues] = await Promise.all([
+    airtableService.getMembers(options),
+    airtableService.getMembersFiltersValues(options),
+  ]);
+  const parsedFilters = parseMembersFilters(filtersValues, query);
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
@@ -75,6 +87,6 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
   );
 
   return {
-    props: { members },
+    props: { members, filtersValues: parsedFilters },
   };
 };
