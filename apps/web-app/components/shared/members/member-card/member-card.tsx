@@ -1,4 +1,5 @@
 import { LocationMarkerIcon } from '@heroicons/react/outline';
+import { UserIcon } from '@heroicons/react/solid';
 import { IMember, IMemberWithTeams } from '@protocol-labs-network/api';
 import { AnchorLink } from '@protocol-labs-network/ui';
 import Image from 'next/image';
@@ -51,7 +52,7 @@ export function MemberCard({
         <div className={`flex ${isGrid ? 'flex-col space-y-4' : 'flex-row'}`}>
           <div className={`${isGrid ? 'w-full' : 'w-[396px]'} flex space-x-4`}>
             <div
-              className={`h-20 w-20 flex-shrink-0 rounded-full ${
+              className={`relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full ${
                 member.image ? '' : 'bg-slate-200'
               }`}
             >
@@ -60,12 +61,13 @@ export function MemberCard({
                   className="rounded-full"
                   alt={`${member.name} Logo`}
                   src={member.image}
-                  width="100%"
-                  height="100%"
-                  layout="responsive"
-                  objectFit="cover"
+                  layout="fill"
+                  objectFit="contain"
+                  objectPosition="center"
                 />
-              ) : null}
+              ) : (
+                <UserIcon className="w-22 h-22 mt-2 fill-white" />
+              )}
             </div>
             <div>
               <h3 className="line-clamp-1 text-base font-semibold text-slate-900">
