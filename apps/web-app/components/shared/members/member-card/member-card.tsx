@@ -88,7 +88,7 @@ export function MemberCard({
       {showTeams ? (
         <div className={`${isGrid ? 'my-4' : 'mx-4 w-[348px] self-center'}`}>
           <h4 className="mb-2 text-sm font-medium text-slate-500">Teams</h4>
-          <TagsGroup items={memberTeamsTags} isInline={true} />
+          <TagsGroup items={memberTeamsTags} isSingleLine={true} />
         </div>
       ) : null}
 
@@ -102,7 +102,7 @@ export function MemberCard({
           {member.skills.length ? (
             <TagsGroup
               items={parseStringsIntoTagsGroupItems(member.skills)}
-              isInline={true}
+              isSingleLine={true}
             />
           ) : (
             <div className="leading-7">-</div>

@@ -73,7 +73,10 @@ export function TeamCard({
         className={`h-[28px] ${isGrid ? 'my-4' : 'mx-4 w-[248px] self-center'}`}
       >
         {team.industry && team.industry.length ? (
-          <TagsGroup items={parseStringsIntoTagsGroupItems(team.industry)} />
+          <TagsGroup
+            isSingleLine
+            items={parseStringsIntoTagsGroupItems(team.industry)}
+          />
         ) : (
           <span className="text-xs leading-7 text-slate-400">
             Industry not provided

@@ -40,10 +40,7 @@ export default function TeamProfileSidebar({ team }: TeamProfileSidebarProps) {
       <div>{team.shortDescription || 'Not provided'}</div>
       <div>
         {team.industry && team.industry.length ? (
-          <TagsGroup
-            items={parseStringsIntoTagsGroupItems(team.industry)}
-            isInline={false}
-          />
+          <TagsGroup items={parseStringsIntoTagsGroupItems(team.industry)} />
         ) : (
           'Industry not provided'
         )}
