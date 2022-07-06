@@ -27,7 +27,7 @@ export function Menu() {
   const router = useRouter();
 
   return (
-    <ul className="flex text-sm text-gray-700">
+    <ul className="flex space-x-4 text-sm text-gray-700">
       {MENU_ITEMS.map((item) => {
         const Icon = item.icon;
 
@@ -35,13 +35,19 @@ export function Menu() {
           <li key={item.path}>
             <Link href={item.path}>
               <a
-                className={`${
-                  router.pathname == item.path ? 'text-sky-600' : ''
-                } flex items-center px-2 py-2 hover:text-sky-600`}
+                className={`focus:shadow-special-button-hover group flex items-center rounded-lg px-3 py-2.5 text-sm hover:text-slate-900 ${
+                  router.pathname == item.path
+                    ? 'bg-slate-100 text-slate-900'
+                    : 'text-slate-600'
+                }`}
               >
                 <Icon
                   data-testid={`${item.name}-icon`}
-                  className="mr-2 h-5 w-5"
+                  className={`mr-2 h-5 w-5 group-hover:fill-slate-900 ${
+                    router.pathname == item.path
+                      ? 'fill-slate-900'
+                      : 'fill-slate-600'
+                  }`}
                 />
                 {item.name}
               </a>
