@@ -16,6 +16,10 @@ const nextConfig = {
     // List remote domains that have access to Next.js Image Optimization API,
     // to protect the app from malicious users
     domains: ['dl.airtable.com'],
+    // Enable `dangerouslyAllowSVG` and `contentSecurityPolicy` to serve
+    // SVG images using the default Image Optimization API
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   experimental: {
     // this includes files from the monorepo base two directories up

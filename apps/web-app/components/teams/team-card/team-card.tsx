@@ -1,5 +1,7 @@
+import { UserGroupIcon } from '@heroicons/react/solid';
 import { ITeam } from '@protocol-labs-network/api';
 import { AnchorLink } from '@protocol-labs-network/ui';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { DirectoryCard } from '../../directory/directory-card/directory-card';
 import { SocialLinks } from '../../shared/social-links/social-links';
@@ -29,13 +31,23 @@ export function TeamCard({
         <div className={`flex ${isGrid ? 'flex-col space-y-4' : 'flex-row'}`}>
           <div className={`${isGrid ? 'w-full' : 'w-[496px]'} flex space-x-4`}>
             <div
-              className={`h-20 w-20 rounded ${
-                team.logo ? 'bg-contain bg-center bg-no-repeat' : 'bg-slate-200'
+              className={`relative h-20 w-20 overflow-hidden rounded ${
+                team.logo ? '' : 'bg-slate-200'
               }`}
-              style={{
-                ...(team.logo && { backgroundImage: `url(${team.logo})` }),
-              }}
-            />
+            >
+              {team.logo ? (
+                <Image
+                  className="rounded"
+                  alt={`${team.name} Logo`}
+                  src={team.logo}
+                  layout="fill"
+                  objectFit="contain"
+                  objectPosition="center"
+                />
+              ) : (
+                <UserGroupIcon className="w-22 h-22 mt-2 fill-white" />
+              )}
+            </div>
             <div>
               <h3 className="text-base font-semibold text-slate-900">
                 {team.name}
