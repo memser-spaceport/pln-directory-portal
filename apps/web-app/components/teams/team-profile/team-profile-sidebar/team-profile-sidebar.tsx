@@ -1,3 +1,4 @@
+import { UserGroupIcon } from '@heroicons/react/solid';
 import { ITeam } from '@protocol-labs-network/api';
 import Image from 'next/image';
 import { SocialLinks } from '../../../shared/social-links/social-links';
@@ -12,18 +13,23 @@ export default function TeamProfileSidebar({ team }: TeamProfileSidebarProps) {
   return (
     <div className="card w-80 shrink-0 space-y-4 self-start">
       <div className="flex gap-3">
-        <div className={`h-20 w-20 rounded ${team.logo ? '' : 'bg-slate-200'}`}>
+        <div
+          className={`relative h-20 w-20 overflow-hidden rounded ${
+            team.logo ? '' : 'bg-slate-200'
+          }`}
+        >
           {team.logo ? (
             <Image
               className="rounded"
               alt={`${team.name} Logo`}
               src={team.logo}
-              width="100%"
-              height="100%"
-              layout="responsive"
+              layout="fill"
               objectFit="contain"
+              objectPosition="center"
             />
-          ) : null}
+          ) : (
+            <UserGroupIcon className="w-22 h-22 mt-2 fill-white" />
+          )}
         </div>
         <div>
           <h3 className="text-lg font-semibold">
