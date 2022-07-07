@@ -22,19 +22,21 @@ export function DirectorySearch({
   }
 
   return (
-    <InputField
-      label="Search"
-      name="searchBy"
-      icon={SearchIcon}
-      placeholder={placeholder}
-      defaultValue={searchTerm}
-      onKeyUp={(event) => {
-        if (event.key === 'Enter' || event.keyCode === 13) {
-          pushQuery(event.currentTarget.value);
-        }
-      }}
-      hasClear
-      onClear={() => pushQuery()}
-    />
+    <div className="w-[350px]">
+      <InputField
+        label="Search"
+        name="searchBy"
+        icon={SearchIcon}
+        placeholder={placeholder}
+        defaultValue={searchTerm}
+        onKeyUp={(event) => {
+          if (event.key === 'Enter' || event.keyCode === 13) {
+            pushQuery(event.currentTarget.value);
+          }
+        }}
+        hasClear
+        onClear={() => pushQuery()}
+      />
+    </div>
   );
 }
