@@ -11,7 +11,7 @@ export function MetroAreaFilter({ metroAreaTags }: MetroAreaFilterProps) {
 
   return (
     <DirectoryTagsFilter
-      title="MetroArea"
+      title="Metro Area"
       tags={tags}
       onTagToggle={toggleTag}
     />
