@@ -53,10 +53,9 @@ class AirtableService {
   }
 
   /**
-   * Get Name, Logo, Short description, Industry, Website
-   * and Twitter fields for provided teams
+   * Get provided fields for provided teams
    */
-  public async getTeamCardsData(teams: string[]) {
+  public async getTeamCardsData(teams: string[], fields: string[]) {
     const teamsByIdFormula = this._getTeamIdSearchFormula(teams);
     const listOptions: IListOptions = {
       filterByFormula: [
@@ -67,14 +66,7 @@ class AirtableService {
         `OR(${teamsByIdFormula.join(', ')})`,
         ')',
       ].join(''),
-      fields: [
-        'Name',
-        'Logo',
-        'Short description',
-        'Industry',
-        'Website',
-        'Twitter',
-      ],
+      fields,
       sort: [{ field: 'Name', direction: 'asc' }],
     };
 
@@ -132,22 +124,12 @@ class AirtableService {
   }
 
   /**
-   * Get Name, Role, Profile picture, Email, Twitter and Teams
-   * fields for the members of the provided team
+   * Get provided fields for the members of the provided team
    */
-  public async getTeamMembers(teamName: string) {
+  public async getTeamMembers(teamName: string, fields: string[]) {
     const membersOptions: IListOptions = {
       filterByFormula: this._getSearchFormula(teamName, 'Teams'),
-      fields: [
-        'Name',
-        'Role',
-        'Profile picture',
-        'Email',
-        'Twitter',
-        'Teams',
-        'Github Handle',
-        'Discord handle',
-      ],
+      fields,
       sort: [{ field: 'Name', direction: 'asc' }],
     };
 

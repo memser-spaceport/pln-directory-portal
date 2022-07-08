@@ -4,6 +4,7 @@ import { Breadcrumb } from '@protocol-labs-network/ui';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import { AskToEditLink } from '../../components/shared/ask-to-edit-link/ask-to-edit-link';
+import { MEMBER_CARD_FIELDS } from '../../components/shared/members/member-card/member-card.constants';
 import TeamProfileDetails from '../../components/teams/team-profile/team-profile-details/team-profile-details';
 import TeamProfileSidebar from '../../components/teams/team-profile/team-profile-sidebar/team-profile-sidebar';
 import { useProfileBreadcrumb } from '../../hooks/profile/use-profile-breadcrumb.hook';
@@ -49,7 +50,10 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
     backLink: string;
   };
   const team = await airtableService.getTeam(id);
-  const members = await airtableService.getTeamMembers(team.name);
+  const members = await airtableService.getTeamMembers(
+    team.name,
+    MEMBER_CARD_FIELDS
+  );
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days

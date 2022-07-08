@@ -271,22 +271,15 @@ describe('AirtableService', () => {
       ]),
     });
 
-    const teams = await airtableService.getTeamCardsData([
-      'team_id_01',
-      'team_id_02',
-    ]);
+    const teams = await airtableService.getTeamCardsData(
+      ['team_id_01', 'team_id_02'],
+      ['Name']
+    );
 
     expect(teamsTableMock.select).toHaveBeenCalledWith({
       filterByFormula:
         'AND(AND({Name} != "", {Short description} != ""), OR(RECORD_ID()=\'team_id_01\', RECORD_ID()=\'team_id_02\'))',
-      fields: [
-        'Name',
-        'Logo',
-        'Short description',
-        'Industry',
-        'Website',
-        'Twitter',
-      ],
+      fields: ['Name'],
       sort: [{ direction: 'asc', field: 'Name' }],
     });
 
@@ -719,21 +712,12 @@ describe('AirtableService', () => {
       ]),
     });
 
-    const members = await airtableService.getTeamMembers('Team 01');
+    const members = await airtableService.getTeamMembers('Team 01', ['Name']);
 
     expect(membersTableMock.select).toHaveBeenCalledTimes(1);
     expect(membersTableMock.select).toHaveBeenCalledWith({
       filterByFormula: 'SEARCH("Team 01",Teams)',
-      fields: [
-        'Name',
-        'Role',
-        'Profile picture',
-        'Email',
-        'Twitter',
-        'Teams',
-        'Github Handle',
-        'Discord handle',
-      ],
+      fields: ['Name'],
       sort: [{ field: 'Name', direction: 'asc' }],
     });
 

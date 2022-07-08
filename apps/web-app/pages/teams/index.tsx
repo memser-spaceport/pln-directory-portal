@@ -6,7 +6,7 @@ import { DirectorySearch } from '../../components/directory/directory-search/dir
 import { DirectorySort } from '../../components/directory/directory-sort/directory-sort';
 import { DirectoryView } from '../../components/directory/directory-view/directory-view';
 import { useViewType } from '../../components/directory/directory-view/use-directory-view-type.hook';
-import { TeamCard } from '../../components/teams/team-card/team-card';
+import { TeamCard } from '../../components/shared/teams/team-card/team-card';
 import { TeamsDirectoryFilters } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters';
 import { ITeamsFiltersValues } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.types';
 import { parseTeamsFilters } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.utils';

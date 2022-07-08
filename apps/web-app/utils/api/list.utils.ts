@@ -4,6 +4,8 @@ import {
   directorySortOptions,
   TDirectorySortOption,
 } from '../../components/directory/directory-sort/directory-sort.types';
+import { MEMBER_CARD_FIELDS } from '../../components/shared/members/member-card/member-card.constants';
+import { TEAM_CARD_FIELDS } from '../../components/shared/teams/team-card/team-card.constants';
 import { URL_QUERY_VALUE_SEPARATOR } from '../../constants';
 
 /**
@@ -17,6 +19,7 @@ export function getTeamsDirectoryRequestOptionsFromQuery(
     queryParams;
 
   return {
+    fields: TEAM_CARD_FIELDS,
     sort: [getSortFromQuery(sort?.toString())],
     filterByFormula: getTeamsDirectoryFormula({
       industry,
@@ -38,6 +41,7 @@ export function getMembersDirectoryRequestOptionsFromQuery(
   const { sort, searchBy, skills, country, metroArea } = queryParams;
 
   return {
+    fields: MEMBER_CARD_FIELDS,
     sort: [getSortFromQuery(sort?.toString())],
     filterByFormula: getMembersDirectoryFormula({
       searchBy,

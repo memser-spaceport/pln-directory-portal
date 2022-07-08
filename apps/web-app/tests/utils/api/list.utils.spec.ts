@@ -1,3 +1,5 @@
+import { MEMBER_CARD_FIELDS } from '../../../components/shared/members/member-card/member-card.constants';
+import { TEAM_CARD_FIELDS } from '../../../components/shared/teams/team-card/team-card.constants';
 import {
   getMembersDirectoryRequestOptionsFromQuery,
   getTeamsDirectoryRequestOptionsFromQuery,
@@ -15,6 +17,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
         technology: 'IPFS',
       })
     ).toEqual({
+      fields: TEAM_CARD_FIELDS,
       sort: [{ field: 'Name', direction: 'desc' }],
       filterByFormula:
         'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", {Industry}), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())',
@@ -27,6 +30,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
         sort: 'invalid',
       })
     ).toEqual({
+      fields: TEAM_CARD_FIELDS,
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula: 'AND({Name} != "", {Short description} != "")',
     });
@@ -42,6 +46,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
         technology: 'IPFS|Filecoin',
       })
     ).toEqual({
+      fields: TEAM_CARD_FIELDS,
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula:
         'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", {Industry}), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())',
@@ -60,6 +65,7 @@ describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
         sort: 'Name,desc',
       })
     ).toEqual({
+      fields: MEMBER_CARD_FIELDS,
       sort: [{ field: 'Name', direction: 'desc' }],
       filterByFormula:
         'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}))',
@@ -72,6 +78,7 @@ describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
         sort: 'invalid',
       })
     ).toEqual({
+      fields: MEMBER_CARD_FIELDS,
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula: 'AND({Name} != "", {Teams} != "")',
     });
@@ -86,6 +93,7 @@ describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
         skills: 'Engineering|Leadership',
       })
     ).toEqual({
+      fields: MEMBER_CARD_FIELDS,
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula:
         'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}))',

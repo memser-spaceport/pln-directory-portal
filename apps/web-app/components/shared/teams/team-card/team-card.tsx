@@ -3,10 +3,10 @@ import { ITeam } from '@protocol-labs-network/api';
 import { AnchorLink } from '@protocol-labs-network/ui';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { DirectoryCard } from '../../directory/directory-card/directory-card';
-import { SocialLinks } from '../../shared/social-links/social-links';
-import { TagsGroup } from '../../shared/tags-group/tags-group';
-import { parseStringsIntoTagsGroupItems } from '../../shared/tags-group/tags-group.utils';
+import { DirectoryCard } from '../../../directory/directory-card/directory-card';
+import { SocialLinks } from '../../social-links/social-links';
+import { TagsGroup } from '../../tags-group/tags-group';
+import { parseStringsIntoTagsGroupItems } from '../../tags-group/tags-group.utils';
 
 export interface TeamCardProps {
   isClickable?: boolean;

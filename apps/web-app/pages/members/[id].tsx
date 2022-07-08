@@ -6,6 +6,7 @@ import { MemberProfileHeader } from '../../components/members/member-profile/mem
 import { MemberProfileOfficeHours } from '../../components/members/member-profile/member-profile-office-hours';
 import { MemberProfileTeams } from '../../components/members/member-profile/member-profile-teams';
 import { AskToEditLink } from '../../components/shared/ask-to-edit-link/ask-to-edit-link';
+import { TEAM_CARD_FIELDS } from '../../components/shared/teams/team-card/team-card.constants';
 import { useProfileBreadcrumb } from '../../hooks/profile/use-profile-breadcrumb.hook';
 
 interface MemberProps {
@@ -47,7 +48,10 @@ export const getServerSideProps = async ({ query, res }) => {
     backLink: string;
   };
   const member = await airtableService.getMember(id);
-  const teams = await airtableService.getTeamCardsData(member.teams);
+  const teams = await airtableService.getTeamCardsData(
+    member.teams,
+    TEAM_CARD_FIELDS
+  );
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
