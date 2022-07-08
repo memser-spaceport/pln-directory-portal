@@ -6,18 +6,13 @@ import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { DirectoryCard } from '../../../../components/directory/directory-card/directory-card';
 import { SocialLinks } from '../../../../components/shared/social-links/social-links';
-import { TagsGroup } from '../../../shared/tags-group/tags-group';
-import { parseStringsIntoTagsGroupItems } from '../../../shared/tags-group/tags-group.utils';
-import { ITagsGroupItem } from '../../tags-group/tags-group';
+import { TagsGroup } from '../../tags-group/tags-group';
 
 interface MemberCardProps {
   isClickable?: boolean;
   isGrid?: boolean;
   member: IMember;
   showLocation?: boolean;
-  showSkills?: boolean;
-  showTeams?: boolean;
-  teamId?: string;
 }
 
 export function MemberCard({
@@ -25,9 +20,6 @@ export function MemberCard({
   isGrid = true,
   member,
   showLocation = false,
-  showSkills = false,
-  showTeams = true,
-  teamId,
 }: MemberCardProps) {
   const router = useRouter();
   const backLink = encodeURIComponent(router.asPath);
@@ -36,15 +28,7 @@ export function MemberCard({
       ? { href: `/members/${member.id}?backLink=${backLink}` }
       : {}),
   };
-  let memberTeamsTags: ITagsGroupItem[];
-
-  if (showTeams) {
-    memberTeamsTags = member.teams.map((team) => ({
-      url: `/teams/${team.id}`,
-      label: team.name,
-      disabled: teamId === team.id,
-    }));
-  }
+  const teamsNames = member.teams.map(({ name }) => name);
 
   return (
     <DirectoryCard isGrid={isGrid}>
@@ -85,30 +69,10 @@ export function MemberCard({
         </div>
       </AnchorLink>
 
-      {showTeams ? (
-        <div className={`${isGrid ? 'my-4' : 'mx-4 w-[348px] self-center'}`}>
-          <h4 className="mb-2 text-sm font-medium text-slate-500">Teams</h4>
-          <TagsGroup items={memberTeamsTags} isSingleLine={true} />
-        </div>
-      ) : null}
-
-      {showSkills ? (
-        <div
-          className={`text-slate-500 ${
-            isGrid ? 'mt-4 mb-2' : 'mx-4 w-[348px] self-center'
-          }`}
-        >
-          <h4 className="mb-2 text-sm font-medium">Skills</h4>
-          {member.skills.length ? (
-            <TagsGroup
-              items={parseStringsIntoTagsGroupItems(member.skills)}
-              isSingleLine={true}
-            />
-          ) : (
-            <div className="leading-7">-</div>
-          )}
-        </div>
-      ) : null}
+      <div className={`${isGrid ? 'my-4' : 'mx-4 w-[348px] self-center'}`}>
+        <h4 className="mb-2 text-sm font-medium text-slate-500">Teams</h4>
+        <TagsGroup items={teamsNames} isSingleLine={true} />
+      </div>
 
       <div
         className={`border-slate-200 ${

@@ -18,11 +18,7 @@ export default function TeamProfileMembers({
       <h3 className="mb-4 font-medium text-slate-500">Members</h3>
       <div className="flex flex-wrap gap-4">
         {members.map((member) => (
-          <MemberCard
-            key={`${id}.${member.id}`}
-            teamId={id as string}
-            member={member}
-          />
+          <MemberCard key={`${id}.${member.id}`} member={member} />
         ))}
       </div>
       <div className="mt-8 mb-20 text-sm text-slate-500">

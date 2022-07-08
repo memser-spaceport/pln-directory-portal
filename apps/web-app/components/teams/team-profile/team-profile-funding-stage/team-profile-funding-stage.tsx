@@ -1,5 +1,4 @@
 import { TagsGroup } from '../../../shared/tags-group/tags-group';
-import { parseStringsIntoTagsGroupItems } from '../../../shared/tags-group/tags-group.utils';
 interface TeamProfileFundingStageProps {
   fundingStage?: string;
 }
@@ -14,7 +13,7 @@ export default function TeamProfileFundingStage({
       <h3 className="mb-3 text-sm font-semibold">Funding Stage</h3>
       <div>
         {hasFundingStage ? (
-          <TagsGroup items={parseStringsIntoTagsGroupItems([fundingStage])} />
+          <TagsGroup items={[fundingStage]} />
         ) : (
           'Not provided'
         )}
