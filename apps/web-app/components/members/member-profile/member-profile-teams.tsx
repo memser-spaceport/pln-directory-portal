@@ -1,5 +1,5 @@
 import { ITeam } from '@protocol-labs-network/api';
-import { TeamCard } from '../../teams/team-card/team-card';
+import { TeamCard } from '../../shared/teams/team-card/team-card';
 
 interface MemberProfileTeamsProps {
   teams: ITeam[];
