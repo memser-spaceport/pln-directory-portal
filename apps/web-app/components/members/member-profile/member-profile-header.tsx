@@ -4,7 +4,6 @@ import { IMember } from '@protocol-labs-network/api';
 import Image from 'next/image';
 import { SocialLinks } from '../../shared/social-links/social-links';
 import { TagsGroup } from '../../shared/tags-group/tags-group';
-import { parseStringsIntoTagsGroupItems } from '../../shared/tags-group/tags-group.utils';
 
 interface MemberProfileHeaderProps {
   member: IMember;
@@ -46,7 +45,7 @@ export function MemberProfileHeader({ member }: MemberProfileHeaderProps) {
       <div className="px-7 py-6">
         <h3 className="mb-2 text-sm font-medium text-slate-400">Skills</h3>
         {member.skills.length ? (
-          <TagsGroup items={parseStringsIntoTagsGroupItems(member.skills)} />
+          <TagsGroup items={member.skills} />
         ) : (
           <div className="text-xs leading-7">-</div>
         )}

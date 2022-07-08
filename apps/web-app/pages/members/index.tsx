@@ -45,8 +45,6 @@ export default function Members({ members, filtersValues }: MembersProps) {
                   isClickable
                   isGrid={isGrid}
                   showLocation
-                  showSkills
-                  showTeams={false}
                 />
               ))}
             </div>

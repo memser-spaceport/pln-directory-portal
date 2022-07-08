@@ -3,7 +3,6 @@ import { ITeam } from '@protocol-labs-network/api';
 import Image from 'next/image';
 import { SocialLinks } from '../../../shared/social-links/social-links';
 import { TagsGroup } from '../../../shared/tags-group/tags-group';
-import { parseStringsIntoTagsGroupItems } from '../../../shared/tags-group/tags-group.utils';
 
 interface TeamProfileSidebarProps {
   team: ITeam;
@@ -43,7 +42,7 @@ export default function TeamProfileSidebar({ team }: TeamProfileSidebarProps) {
       <div>{team.shortDescription || 'Not provided'}</div>
       <div>
         {team.tags && team.tags.length ? (
-          <TagsGroup items={parseStringsIntoTagsGroupItems(team.tags)} />
+          <TagsGroup items={team.tags} />
         ) : (
           'Tags not provided'
         )}

@@ -6,7 +6,6 @@ import { useRouter } from 'next/router';
 import { DirectoryCard } from '../../../directory/directory-card/directory-card';
 import { SocialLinks } from '../../social-links/social-links';
 import { TagsGroup } from '../../tags-group/tags-group';
-import { parseStringsIntoTagsGroupItems } from '../../tags-group/tags-group.utils';
 
 export interface TeamCardProps {
   isClickable?: boolean;
@@ -75,10 +74,7 @@ export function TeamCard({
         className={`h-[28px] ${isGrid ? 'my-4' : 'mx-4 w-[248px] self-center'}`}
       >
         {team.tags && team.tags.length ? (
-          <TagsGroup
-            isSingleLine
-            items={parseStringsIntoTagsGroupItems(team.tags)}
-          />
+          <TagsGroup isSingleLine items={team.tags} />
         ) : (
           <span className="text-xs leading-7 text-slate-400">
             Tags not provided
