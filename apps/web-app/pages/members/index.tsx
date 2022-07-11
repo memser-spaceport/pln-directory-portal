@@ -2,9 +2,7 @@ import airtableService from '@protocol-labs-network/airtable';
 import { IMember } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
-import { DirectorySearch } from '../../components/directory/directory-search/directory-search';
-import { DirectorySort } from '../../components/directory/directory-sort/directory-sort';
-import { DirectoryView } from '../../components/directory/directory-view/directory-view';
+import { DirectoryHeader } from '../../components/directory/directory-header/directory-header';
 import { useViewType } from '../../components/directory/directory-view/use-directory-view-type.hook';
 import { MembersDirectoryFilters } from '../../components/members/members-directory/members-directory-filters/members-directory-filters';
 import { IMembersFiltersValues } from '../../components/members/members-directory/members-directory-filters/members-directory-filters.types';
@@ -33,16 +31,11 @@ export default function Members({ members, filtersValues }: MembersProps) {
         </div>
 
         <div className="mx-auto p-8">
-          <div className="w-[917px] flex-shrink-0">
-            <div className="mb-10 flex items-center justify-between">
-              <h1 className="text-3xl font-bold">Members</h1>
-              <div className="flex items-center space-x-4">
-                <DirectorySearch placeholder="Search for a member" />
-                <span className="h-6 w-px bg-slate-300" />
-                <DirectorySort />
-                <DirectoryView />
-              </div>
-            </div>
+          <div className="w-[917px] space-y-10">
+            <DirectoryHeader
+              title="Members"
+              searchPlaceholder="Search for a member"
+            />
 
             <div className="flex flex-wrap gap-4">
               {members.map((member) => (
@@ -58,7 +51,7 @@ export default function Members({ members, filtersValues }: MembersProps) {
               ))}
             </div>
 
-            <div className="mt-8 text-sm text-slate-500">
+            <div className="text-sm text-slate-500">
               Showing <b>{members.length}</b> results
             </div>
           </div>

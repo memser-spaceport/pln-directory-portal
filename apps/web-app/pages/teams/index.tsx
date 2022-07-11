@@ -2,9 +2,7 @@ import airtableService from '@protocol-labs-network/airtable';
 import { ITeam } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
-import { DirectorySearch } from '../../components/directory/directory-search/directory-search';
-import { DirectorySort } from '../../components/directory/directory-sort/directory-sort';
-import { DirectoryView } from '../../components/directory/directory-view/directory-view';
+import { DirectoryHeader } from '../../components/directory/directory-header/directory-header';
 import { useViewType } from '../../components/directory/directory-view/use-directory-view-type.hook';
 import { TeamCard } from '../../components/shared/teams/team-card/team-card';
 import { TeamsDirectoryFilters } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters';
@@ -33,16 +31,11 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
         </div>
 
         <div className="mx-auto p-8">
-          <div className="w-[917px] flex-shrink-0">
-            <div className="mb-10 flex items-center justify-between">
-              <h1 className="text-3xl font-bold">Teams</h1>
-              <div className="flex items-center space-x-4">
-                <DirectorySearch placeholder="Search for a team" />
-                <span className="h-6 w-px bg-slate-300" />
-                <DirectorySort />
-                <DirectoryView />
-              </div>
-            </div>
+          <div className="w-[917px] space-y-10">
+            <DirectoryHeader
+              title="Teams"
+              searchPlaceholder="Search for a team"
+            />
 
             <div className="flex flex-wrap gap-4">
               {teams.map((team) => {
@@ -57,7 +50,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
               })}
             </div>
 
-            <div className="mt-8 text-sm text-slate-500">
+            <div className="text-sm text-slate-500">
               Showing <b>{teams.length}</b> results
             </div>
           </div>
