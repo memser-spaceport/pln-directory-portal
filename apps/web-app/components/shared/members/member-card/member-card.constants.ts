@@ -3,6 +3,7 @@ export const MEMBER_CARD_FIELDS = [
   'Profile picture',
   'Role',
   'Teams',
+  'Team name',
   'Country',
   'State / Province',
   'City',

@@ -1,6 +1,6 @@
 import { LocationMarkerIcon } from '@heroicons/react/outline';
 import { UserIcon } from '@heroicons/react/solid';
-import { IMember, IMemberWithTeams } from '@protocol-labs-network/api';
+import { IMember } from '@protocol-labs-network/api';
 import { AnchorLink } from '@protocol-labs-network/ui';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -13,7 +13,7 @@ import { ITagsGroupItem } from '../../tags-group/tags-group';
 interface MemberCardProps {
   isClickable?: boolean;
   isGrid?: boolean;
-  member: IMember | IMemberWithTeams;
+  member: IMember;
   showLocation?: boolean;
   showSkills?: boolean;
   showTeams?: boolean;
@@ -39,10 +39,10 @@ export function MemberCard({
   let memberTeamsTags: ITagsGroupItem[];
 
   if (showTeams) {
-    memberTeamsTags = Object.keys(member.teams).map((memberTeamId) => ({
-      url: `/teams/${memberTeamId}`,
-      label: member.teams[memberTeamId],
-      disabled: teamId === memberTeamId,
+    memberTeamsTags = member.teams.map((team) => ({
+      url: `/teams/${team.id}`,
+      label: team.name,
+      disabled: teamId === team.id,
     }));
   }
 

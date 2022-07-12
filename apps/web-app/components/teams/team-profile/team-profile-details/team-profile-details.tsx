@@ -1,4 +1,4 @@
-import { IMemberWithTeams, ITeam } from '@protocol-labs-network/api';
+import { IMember, ITeam } from '@protocol-labs-network/api';
 import TeamProfileDescription from '../team-profile-description/team-profile-description';
 import TeamProfileFundingStage from '../team-profile-funding-stage/team-profile-funding-stage';
 import TeamProfileFundingVehicle from '../team-profile-funding-vehicle/team-profile-funding-vehicle';
@@ -6,7 +6,7 @@ import TeamProfileMembers from '../team-profile-members/team-profile-members';
 
 interface TeamProfileDetailsProps {
   team: ITeam;
-  members: IMemberWithTeams[];
+  members: IMember[];
 }
 
 export default function TeamProfileDetails({

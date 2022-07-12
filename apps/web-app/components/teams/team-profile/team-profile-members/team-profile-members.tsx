@@ -1,9 +1,9 @@
-import { IMemberWithTeams } from '@protocol-labs-network/api';
+import { IMember } from '@protocol-labs-network/api';
 import { useRouter } from 'next/router';
 import { MemberCard } from '../../../shared/members/member-card/member-card';
 
 interface TeamProfileMembersProps {
-  members: IMemberWithTeams[];
+  members: IMember[];
 }
 
 export default function TeamProfileMembers({

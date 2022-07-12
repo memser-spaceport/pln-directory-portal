@@ -36,6 +36,7 @@ export interface IAirtableMemberFields {
   'Metro Area'?: string;
   'Location backup'?: string;
   'Friend of PLN'?: boolean;
+  'Team name'?: string[];
 }
 
 export interface IAirtableMemberPicture {
