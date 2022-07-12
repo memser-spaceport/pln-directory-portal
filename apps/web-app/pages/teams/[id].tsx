@@ -1,5 +1,5 @@
 import airtableService from '@protocol-labs-network/airtable';
-import { IMemberWithTeams, ITeam } from '@protocol-labs-network/api';
+import { IMember, ITeam } from '@protocol-labs-network/api';
 import { Breadcrumb } from '@protocol-labs-network/ui';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
@@ -11,7 +11,7 @@ import { useProfileBreadcrumb } from '../../hooks/profile/use-profile-breadcrumb
 
 interface TeamProps {
   team: ITeam;
-  members: IMemberWithTeams[];
+  members: IMember[];
   backLink: string;
 }
 

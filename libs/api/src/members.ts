@@ -9,11 +9,12 @@ export interface IMember {
   name: string | null;
   role: string | null;
   skills: string[];
-  teams: string[];
+  teams: IMemberTeam[];
   twitter: string | null;
   officeHours: string | null;
 }
 
-export interface IMemberWithTeams extends Omit<IMember, 'teams'> {
-  teams: { [teamId: string]: string };
+export interface IMemberTeam {
+  id: string;
+  name: string;
 }

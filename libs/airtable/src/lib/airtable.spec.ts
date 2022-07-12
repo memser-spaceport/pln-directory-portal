@@ -52,6 +52,7 @@ const memberMock01: IAirtableMember = {
     'Office hours link': 'https://calendly.com/protoadin',
     'Team lead': true,
     Teams: ['team_id_01'],
+    'Team name': ['team 01'],
     Role: 'CEO',
     Location: 'Seattle, WA',
     Email: 'aarsh.shah@protocol.ai',
@@ -272,7 +273,10 @@ describe('AirtableService', () => {
     });
 
     const teams = await airtableService.getTeamCardsData(
-      ['team_id_01', 'team_id_02'],
+      [
+        { id: 'team_id_01', name: 'team 01' },
+        { id: 'team_id_02', name: 'team 02' },
+      ],
       ['Name']
     );
 
@@ -446,7 +450,12 @@ describe('AirtableService', () => {
         officeHours: memberMock01.fields['Office hours link'],
         role: memberMock01.fields.Role,
         skills: [memberMock01.fields.Skills?.[0]],
-        teams: memberMock01.fields.Teams,
+        teams: [
+          {
+            id: memberMock01.fields.Teams?.[0],
+            name: memberMock01.fields['Team name']?.[0],
+          },
+        ],
         twitter: memberMock01.fields.Twitter,
       },
       {
@@ -531,7 +540,12 @@ describe('AirtableService', () => {
       officeHours: memberMock01.fields['Office hours link'],
       role: memberMock01.fields.Role,
       skills: [memberMock01.fields.Skills?.[0]],
-      teams: memberMock01.fields.Teams,
+      teams: [
+        {
+          id: memberMock01.fields.Teams?.[0],
+          name: memberMock01.fields['Team name']?.[0],
+        },
+      ],
       twitter: memberMock01.fields.Twitter,
     });
   });
@@ -628,6 +642,7 @@ describe('AirtableService', () => {
               },
             ],
             Teams: ['team_id_01', 'team_id_02'],
+            'Team name': ['team 01', 'team 02'],
             Role: 'CEO',
             Email: 'aarsh.shah@protocol.ai',
             Twitter: '@member01',
@@ -648,6 +663,7 @@ describe('AirtableService', () => {
               },
             ],
             Teams: ['team_id_03'],
+            'Team name': ['team 03'],
             Role: 'CEO',
             Email: 'dan.shah@protocol.ai',
             Twitter: '@member01',
@@ -667,6 +683,7 @@ describe('AirtableService', () => {
               },
             ],
             Teams: ['team_id_02', 'team_id_01'],
+            'Team name': ['team 02', 'team 01'],
             Role: 'CEO',
             Email: 'shah@protocol.ai',
             Twitter: '@member03',
@@ -706,20 +723,16 @@ describe('AirtableService', () => {
       ]),
     });
 
-    const members = await airtableService.getTeamMembers('Team 01', ['Name']);
+    const members = await airtableService.getTeamMembers('team_id_01', [
+      'Name',
+    ]);
 
     expect(membersTableMock.select).toHaveBeenCalledTimes(1);
+
     expect(membersTableMock.select).toHaveBeenCalledWith({
-      filterByFormula: 'SEARCH("Team 01",Teams)',
+      filterByFormula: 'SEARCH("team_id_01",Teams)',
       fields: ['Name'],
       sort: [{ field: 'Name', direction: 'asc' }],
-    });
-
-    expect(teamsTableMock.select).toHaveBeenCalledTimes(1);
-    expect(teamsTableMock.select).toHaveBeenCalledWith({
-      filterByFormula:
-        "AND(AND({Name} != \"\", {Short description} != \"\"), OR(RECORD_ID()='team_id_01', RECORD_ID()='team_id_02', RECORD_ID()='team_id_03'))",
-      fields: ['Name'],
     });
 
     expect(members).toStrictEqual([
@@ -736,7 +749,10 @@ describe('AirtableService', () => {
         officeHours: 'https://calendly.com/protoadin',
         role: 'CEO',
         skills: [],
-        teams: { team_id_01: 'Team 01', team_id_02: 'Team 02' },
+        teams: [
+          { id: 'team_id_01', name: 'team 01' },
+          { id: 'team_id_02', name: 'team 02' },
+        ],
         twitter: '@member01',
       },
       {
@@ -751,7 +767,7 @@ describe('AirtableService', () => {
         officeHours: null,
         role: 'CEO',
         skills: [],
-        teams: { team_id_03: 'Team 03' },
+        teams: [{ id: 'team_id_03', name: 'team 03' }],
         twitter: '@member01',
       },
       {
@@ -767,7 +783,10 @@ describe('AirtableService', () => {
         officeHours: null,
         role: 'CEO',
         skills: [],
-        teams: { team_id_01: 'Team 01', team_id_02: 'Team 02' },
+        teams: [
+          { id: 'team_id_02', name: 'team 02' },
+          { id: 'team_id_01', name: 'team 01' },
+        ],
         twitter: '@member03',
       },
     ]);
