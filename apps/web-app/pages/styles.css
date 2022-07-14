@@ -6,6 +6,12 @@ body {
   @apply bg-slate-100 text-slate-900;
 }
 
+@layer base {
+  html {
+    font-family: Inter, sans-serif;
+  }
+}
+
 @layer components {
   .card {
     @apply rounded-xl border bg-white p-5 text-sm shadow-md shadow-slate-200;
