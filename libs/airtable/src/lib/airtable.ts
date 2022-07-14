@@ -167,7 +167,7 @@ class AirtableService {
       fundingStage: team.fields['Funding Stage'] || null,
       fundingVehicle: team.fields['Funding Vehicle'] || [],
       id: team.id,
-      industry: team.fields.Industry || [],
+      tags: team.fields['Tags lookup'] || [],
       ipfsUser: !!team.fields['IPFS User'],
       members: team.fields['Network members'] || [],
       logo: (team.fields.Logo && team.fields.Logo[0]?.url) || null,
@@ -269,7 +269,7 @@ class AirtableService {
     return (await this._getFiltersValues(
       this._teamsTable,
       [
-        'Industry',
+        'Tags lookup',
         'Funding Stage',
         'Funding Vehicle',
         'IPFS User',
@@ -286,8 +286,8 @@ class AirtableService {
   private _parseTeamsFilters(teams: IAirtableTeam[]) {
     const filtersValues: IAirtableTeamsFiltersValues = teams.reduce(
       (values, team) => {
-        const industry = [
-          ...new Set([...values.industry, ...(team.fields.Industry || [])]),
+        const tags = [
+          ...new Set([...values.tags, ...(team.fields['Tags lookup'] || [])]),
         ];
         const fundingStage = [
           ...new Set([
@@ -311,10 +311,10 @@ class AirtableService {
           ]),
         ];
 
-        return { industry, fundingStage, fundingVehicle, technology };
+        return { tags, fundingStage, fundingVehicle, technology };
       },
       {
-        industry: [],
+        tags: [],
         fundingStage: [],
         fundingVehicle: [],
         technology: [],

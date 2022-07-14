@@ -2,14 +2,14 @@ import { DirectoryTagsFilter } from '../../../../directory/directory-filters/dir
 import { IFilterTag } from '../../../../directory/directory-filters/directory-tags-filter/directory-tags-filter.types';
 import { useTagsFilter } from '../../../../directory/directory-filters/directory-tags-filter/use-tags-filter.hook';
 
-export interface IndustryFilterProps {
-  industryTags: IFilterTag[];
+export interface TagsFilterProps {
+  tagsTags: IFilterTag[];
 }
 
-export function IndustryFilter({ industryTags }: IndustryFilterProps) {
-  const [tags, toggleTag] = useTagsFilter('industry', industryTags);
+export function TagsFilter({ tagsTags }: TagsFilterProps) {
+  const [tags, toggleTag] = useTagsFilter('tags', tagsTags);
 
   return (
-    <DirectoryTagsFilter title="Industry" tags={tags} onTagToggle={toggleTag} />
+    <DirectoryTagsFilter title="Tags" tags={tags} onTagToggle={toggleTag} />
   );
 }

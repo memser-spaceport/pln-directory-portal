@@ -1,7 +1,7 @@
 import { DirectoryFilters } from '../../../directory/directory-filters/directory-filters';
 import { FundingStageFilter } from './funding-stage-filter/funding-stage-filter';
 import { FundingVehicleFilter } from './funding-vehicle-filter/funding-vehicle-filter';
-import { IndustryFilter } from './industry-filter/industry-filter';
+import { TagsFilter } from './tags-filter/tags-filter';
 import { ITeamsFiltersValues } from './teams-directory-filters.types';
 import { TechnologyFilter } from './technology-filter/technology-filter';
 
@@ -15,13 +15,13 @@ export function TeamsDirectoryFilters({
   return (
     <DirectoryFilters
       filterProperties={[
-        'industry',
+        'tags',
         'fundingStage',
         'fundingVehicle',
         'technology',
       ]}
     >
-      <IndustryFilter industryTags={filtersValues.industry} />
+      <TagsFilter tagsTags={filtersValues.tags} />
       <div className="my-5 h-px bg-slate-200" />
       <FundingVehicleFilter fundingVehicleTags={filtersValues.fundingVehicle} />
       <div className="my-5 h-px bg-slate-200" />

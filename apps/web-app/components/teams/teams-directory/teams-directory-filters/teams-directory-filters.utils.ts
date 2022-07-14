@@ -14,10 +14,10 @@ export function parseTeamsFilters(
   query: ParsedUrlQuery
 ): ITeamsFiltersValues {
   return {
-    industry: getTagsFromValues(
-      filtersValues.valuesByFilter.industry,
-      filtersValues.availableValuesByFilter.industry,
-      query.industry
+    tags: getTagsFromValues(
+      filtersValues.valuesByFilter.tags,
+      filtersValues.availableValuesByFilter.tags,
+      query.tags
     ),
     fundingVehicle: getTagsFromValues(
       filtersValues.valuesByFilter.fundingVehicle,

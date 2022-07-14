@@ -15,14 +15,14 @@ import { URL_QUERY_VALUE_SEPARATOR } from '../../constants';
 export function getTeamsDirectoryRequestOptionsFromQuery(
   queryParams: ParsedUrlQuery
 ): IListOptions {
-  const { sort, industry, fundingVehicle, fundingStage, searchBy, technology } =
+  const { sort, tags, fundingVehicle, fundingStage, searchBy, technology } =
     queryParams;
 
   return {
     fields: TEAM_CARD_FIELDS,
     sort: [getSortFromQuery(sort?.toString())],
     filterByFormula: getTeamsDirectoryFormula({
-      industry,
+      tags,
       fundingVehicle,
       fundingStage,
       searchBy,
@@ -79,7 +79,7 @@ function isSortValid(sortQuery?: string) {
  * Get formula for teams directory filtering.
  */
 function getTeamsDirectoryFormula({
-  industry,
+  tags,
   fundingVehicle,
   fundingStage,
   searchBy,
@@ -93,7 +93,7 @@ function getTeamsDirectoryFormula({
       '{Name} != ""',
       '{Short description} != ""',
       ...(searchBy ? [getSearchFormulaFromQuery(searchBy)] : []),
-      ...(industry ? [getFieldFromQuery('Industry', industry)] : []),
+      ...(tags ? [getFieldFromQuery('Tags lookup', tags, true)] : []),
       ...(fundingVehicle
         ? [getFieldFromQuery('Funding Vehicle', fundingVehicle)]
         : []),
@@ -148,13 +148,17 @@ function getSearchFormulaFromQuery(searchQuery: string | string[] = '') {
  */
 function getFieldFromQuery(
   fieldName: string,
-  queryValue: string | string[] = []
+  queryValue: string | string[] = [],
+  isLookupField = false
 ) {
   const values = Array.isArray(queryValue)
     ? queryValue
     : queryValue.split(URL_QUERY_VALUE_SEPARATOR);
+  const whereToSearch = isLookupField
+    ? `ARRAYJOIN({${fieldName}})`
+    : `{${fieldName}}`;
   const valuesFormulas = values.map(
-    (value) => `SEARCH("${value}", {${fieldName}})`
+    (value) => `SEARCH("${value}", ${whereToSearch})`
   );
 
   return valuesFormulas.join(', ');

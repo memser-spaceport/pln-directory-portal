@@ -6,7 +6,7 @@ describe('#parseTeamsFilters', () => {
       parseTeamsFilters(
         {
           valuesByFilter: {
-            industry: ['Industry 01', 'Industry 02', 'Industry 03'],
+            tags: ['Tag 01', 'Tag 02', 'Tag 03'],
             fundingVehicle: [
               'Funding Vehicle 01',
               'Funding Vehicle 02',
@@ -20,22 +20,22 @@ describe('#parseTeamsFilters', () => {
             technology: ['Filecoin', 'IPFS'],
           },
           availableValuesByFilter: {
-            industry: ['Industry 01', 'Industry 03'],
+            tags: ['Tag 01', 'Tag 03'],
             fundingVehicle: ['Funding Vehicle 01', 'Funding Vehicle 03'],
             fundingStage: ['Funding Stage 01', 'Funding Stage 02'],
             technology: ['Filecoin'],
           },
         },
         {
-          industry: 'Industry 01',
+          tags: 'Tag 01',
           technology: 'Filecoin',
         }
       )
     ).toEqual({
-      industry: [
-        { value: 'Industry 01', selected: true, disabled: false },
-        { value: 'Industry 02', selected: false, disabled: true },
-        { value: 'Industry 03', selected: false, disabled: false },
+      tags: [
+        { value: 'Tag 01', selected: true, disabled: false },
+        { value: 'Tag 02', selected: false, disabled: true },
+        { value: 'Tag 03', selected: false, disabled: false },
       ],
       fundingVehicle: [
         { value: 'Funding Vehicle 01', selected: false, disabled: false },

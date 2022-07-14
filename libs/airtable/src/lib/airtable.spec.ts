@@ -9,7 +9,7 @@ const teamMock: IAirtableTeam = {
     'Funding Vehicle': ['Seed'],
     'Network members': ['member_id_01'],
     Logo: [{ id: 'team_logo_01', url: 'http://team01.com/logo.svg' }],
-    Industry: ['IT'],
+    'Tags lookup': ['IT'],
     'Last Audited': new Date('28/02/1904'),
     Notes: 'Some notes.',
     'Last Modified': new Date('28/02/1904'),
@@ -175,7 +175,7 @@ describe('AirtableService', () => {
         fundingStage: teamMock.fields['Funding Stage'],
         fundingVehicle: teamMock.fields['Funding Vehicle'],
         id: teamMock.id,
-        industry: teamMock.fields.Industry,
+        tags: teamMock.fields['Tags lookup'],
         ipfsUser: teamMock.fields['IPFS User'],
         members: teamMock.fields['Network members'],
         logo: teamMock.fields.Logo?.[0].url,
@@ -190,7 +190,7 @@ describe('AirtableService', () => {
         fundingStage: null,
         fundingVehicle: [],
         id: emptyTeamMock.id,
-        industry: [],
+        tags: [],
         ipfsUser: false,
         members: [],
         logo: null,
@@ -215,7 +215,7 @@ describe('AirtableService', () => {
       fundingStage: teamMock.fields['Funding Stage'],
       fundingVehicle: teamMock.fields['Funding Vehicle'],
       id: teamMock.id,
-      industry: teamMock.fields.Industry,
+      tags: teamMock.fields['Tags lookup'],
       ipfsUser: teamMock.fields['IPFS User'],
       members: teamMock.fields['Network members'],
       logo: teamMock.fields.Logo?.[0].url,
@@ -241,7 +241,7 @@ describe('AirtableService', () => {
             'Funding Vehicle': ['Seed'],
             'Network members': ['member_id_01'],
             Logo: [{ id: 'team_logo_01', url: 'http://team01.com/logo.svg' }],
-            Industry: ['IT'],
+            'Tags lookup': ['IT'],
             'Last Audited': new Date('28/02/1904'),
             Notes: 'Some notes.',
             'Last Modified': new Date('28/02/1904'),
@@ -260,7 +260,7 @@ describe('AirtableService', () => {
             'Funding Vehicle': ['Seed'],
             'Network members': ['member_id_02'],
             Logo: [{ id: 'team_logo_02', url: 'http://team02.com/logo.svg' }],
-            Industry: ['IT'],
+            'Tags lookup': ['IT'],
             'Last Audited': new Date('28/02/1904'),
             Notes: 'Some notes.',
             'Last Modified': new Date('28/02/1904'),
@@ -296,7 +296,7 @@ describe('AirtableService', () => {
         fundingStage: null,
         filecoinUser: false,
         fundingVehicle: ['Seed'],
-        industry: ['IT'],
+        tags: ['IT'],
         ipfsUser: false,
       },
       {
@@ -311,7 +311,7 @@ describe('AirtableService', () => {
         fundingStage: null,
         filecoinUser: false,
         fundingVehicle: ['Seed'],
-        industry: ['IT'],
+        tags: ['IT'],
         ipfsUser: false,
       },
     ]);
@@ -324,7 +324,7 @@ describe('AirtableService', () => {
         all: jest.fn().mockReturnValue([
           {
             fields: {
-              Industry: ['Industry 01', 'Industry 02'],
+              'Tags lookup': ['Tag 01', 'Tag 02'],
               'Funding Stage': 'Funding Stage 01',
               'Funding Vehicle': ['Funding Vehicle 01', 'Funding Vehicle 02'],
               'IPFS User': true,
@@ -333,14 +333,14 @@ describe('AirtableService', () => {
           },
           {
             fields: {
-              Industry: ['Industry 01', 'Industry 02', 'Industry 03'],
+              'Tags lookup': ['Tag 01', 'Tag 02', 'Tag 03'],
               'Funding Stage': 'Funding Stage 02',
               'Funding Vehicle': ['Funding Vehicle 02', 'Funding Vehicle 03'],
             },
           },
           {
             fields: {
-              Industry: ['Industry 04', 'Industry 05'],
+              'Tags lookup': ['Tag 04', 'Tag 05'],
               'Funding Stage': 'Funding Stage 03',
               'Funding Vehicle': ['Funding Vehicle 04'],
             },
@@ -354,7 +354,7 @@ describe('AirtableService', () => {
         all: jest.fn().mockReturnValue([
           {
             fields: {
-              Industry: ['Industry 01', 'Industry 02'],
+              'Tags lookup': ['Tag 01', 'Tag 02'],
               'Funding Stage': 'Funding Stage 01',
               'Funding Vehicle': ['Funding Vehicle 01', 'Funding Vehicle 02'],
               'IPFS User': true,
@@ -363,7 +363,7 @@ describe('AirtableService', () => {
           },
           {
             fields: {
-              Industry: ['Industry 01', 'Industry 02', 'Industry 03'],
+              'Tags lookup': ['Tag 01', 'Tag 02', 'Tag 03'],
               'Funding Stage': 'Funding Stage 02',
               'Funding Vehicle': ['Funding Vehicle 02', 'Funding Vehicle 03'],
             },
@@ -378,7 +378,7 @@ describe('AirtableService', () => {
     expect(teamsTableMock.select).toHaveBeenCalledTimes(2);
     expect(teamsTableMock.select).toHaveBeenNthCalledWith(1, {
       fields: [
-        'Industry',
+        'Tags lookup',
         'Funding Stage',
         'Funding Vehicle',
         'IPFS User',
@@ -387,7 +387,7 @@ describe('AirtableService', () => {
     });
     expect(teamsTableMock.select).toHaveBeenNthCalledWith(2, {
       fields: [
-        'Industry',
+        'Tags lookup',
         'Funding Stage',
         'Funding Vehicle',
         'IPFS User',
@@ -398,13 +398,7 @@ describe('AirtableService', () => {
 
     expect(filtersValues).toEqual({
       valuesByFilter: {
-        industry: [
-          'Industry 01',
-          'Industry 02',
-          'Industry 03',
-          'Industry 04',
-          'Industry 05',
-        ],
+        tags: ['Tag 01', 'Tag 02', 'Tag 03', 'Tag 04', 'Tag 05'],
         fundingStage: [
           'Funding Stage 01',
           'Funding Stage 02',
@@ -419,7 +413,7 @@ describe('AirtableService', () => {
         technology: ['Filecoin', 'IPFS'],
       },
       availableValuesByFilter: {
-        industry: ['Industry 01', 'Industry 02', 'Industry 03'],
+        tags: ['Tag 01', 'Tag 02', 'Tag 03'],
         fundingStage: ['Funding Stage 01', 'Funding Stage 02'],
         fundingVehicle: [
           'Funding Vehicle 01',

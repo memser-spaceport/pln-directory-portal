@@ -74,7 +74,7 @@ describe('DirectorySort', () => {
         <RouterContext.Provider
           value={createMockRouter({
             push,
-            query: { sort: 'Name,desc', industry: 'SEO' },
+            query: { sort: 'Name,desc', tags: 'SEO' },
           })}
         >
           <DirectorySort />
@@ -90,7 +90,7 @@ describe('DirectorySort', () => {
       expect(push).toHaveBeenCalledTimes(1);
       expect(push).toHaveBeenCalledWith({
         pathname: '/',
-        query: { industry: 'SEO' },
+        query: { tags: 'SEO' },
       });
     });
   });
