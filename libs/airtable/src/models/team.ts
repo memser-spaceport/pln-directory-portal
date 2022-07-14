@@ -14,7 +14,7 @@ export interface IAirtableTeamFields {
   'Funding Vehicle'?: string[];
   'Network members'?: string[];
   Logo?: IAirtableTeamLogo[];
-  Industry?: string[];
+  'Tags lookup'?: string[];
   'Last Audited'?: Date;
   Notes?: string;
   'Last Modified'?: Date;
@@ -46,7 +46,7 @@ export interface IAirtableTeamLogo {
 }
 
 export interface IAirtableTeamsFiltersValues {
-  industry: string[];
+  tags: string[];
   fundingStage: string[];
   fundingVehicle: string[];
   technology: string[];

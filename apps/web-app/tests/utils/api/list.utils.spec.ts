@@ -10,7 +10,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
     expect(
       getTeamsDirectoryRequestOptionsFromQuery({
         sort: 'Name,desc',
-        industry: 'Analytics',
+        tags: 'Analytics',
         fundingStage: 'Seed',
         fundingVehicle: 'IPFS',
         searchBy: 'void',
@@ -20,7 +20,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
       fields: TEAM_CARD_FIELDS,
       sort: [{ field: 'Name', direction: 'desc' }],
       filterByFormula:
-        'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", {Industry}), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())',
+        'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())',
     });
   });
 
@@ -39,7 +39,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
   it('should return valid options when sort is not provided', () => {
     expect(
       getTeamsDirectoryRequestOptionsFromQuery({
-        industry: 'Analytics',
+        tags: 'Analytics',
         fundingStage: 'Seed',
         fundingVehicle: 'IPFS',
         searchBy: 'void',
@@ -49,7 +49,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
       fields: TEAM_CARD_FIELDS,
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula:
-        'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", {Industry}), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())',
+        'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())',
     });
   });
 });

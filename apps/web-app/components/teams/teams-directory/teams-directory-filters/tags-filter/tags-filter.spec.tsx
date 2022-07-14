@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { RouterContext } from 'next/dist/shared/lib/router-context';
 import { createMockRouter } from '../../../../../utils/test/createMockRouter';
 import { IFilterTag } from '../../../../directory/directory-filters/directory-tags-filter/directory-tags-filter.types';
-import { IndustryFilter } from './industry-filter';
+import { TagsFilter } from './tags-filter';
 
 const tags: IFilterTag[] = [
   {
@@ -17,13 +17,13 @@ const tags: IFilterTag[] = [
   },
 ];
 
-describe('IndustryFilter', () => {
+describe('TagsFilter', () => {
   it('should call the router push method with the selected options when a tag gets clicked', () => {
     const push = jest.fn();
 
     render(
       <RouterContext.Provider value={createMockRouter({ push, query: {} })}>
-        <IndustryFilter industryTags={tags} />
+        <TagsFilter tagsTags={tags} />
       </RouterContext.Provider>
     );
 
@@ -33,7 +33,7 @@ describe('IndustryFilter', () => {
     expect(push).toHaveBeenCalledTimes(1);
     expect(push).toHaveBeenCalledWith({
       pathname: '/',
-      query: { industry: 'Tag 01' },
+      query: { tags: 'Tag 01' },
     });
   });
 });

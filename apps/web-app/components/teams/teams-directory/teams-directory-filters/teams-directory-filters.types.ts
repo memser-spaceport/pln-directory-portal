@@ -3,6 +3,6 @@ import { IFilterTag } from '../../../directory/directory-filters/directory-tags-
 export interface ITeamsFiltersValues {
   fundingStage: IFilterTag[];
   fundingVehicle: IFilterTag[];
-  industry: IFilterTag[];
+  tags: IFilterTag[];
   technology: IFilterTag[];
 }

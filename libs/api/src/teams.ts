@@ -3,7 +3,7 @@ export interface ITeam {
   fundingStage: string | null;
   fundingVehicle: string[];
   id: string;
-  industry: string[];
+  tags: string[];
   ipfsUser: boolean;
   members: string[];
   logo: string | null;
