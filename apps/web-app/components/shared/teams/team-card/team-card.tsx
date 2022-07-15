@@ -19,6 +19,8 @@ export function TeamCard({
   team,
   isGrid = true,
 }: TeamCardProps) {
+  const teamNameLastChar = team.name.slice(-1).toLowerCase();
+  const possessiveMark = teamNameLastChar == 's' ? "'" : "'s";
   const router = useRouter();
   const backLink = encodeURIComponent(router.asPath);
   const anchorLinkProps = {
@@ -92,8 +94,11 @@ export function TeamCard({
         }`}
       >
         <SocialLinks
-          website={{ link: team.website }}
-          twitter={{ link: team.twitter }}
+          website={{
+            link: team.website,
+            label: team.website ? `${team.name}${possessiveMark} website` : '',
+          }}
+          twitter={{ link: team.twitter, label: team.twitter }}
         />
       </div>
     </DirectoryCard>

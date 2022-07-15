@@ -1,4 +1,4 @@
-import { AnchorLink, isValidEmail } from '@protocol-labs-network/ui';
+import { AnchorLink, isValidEmail, Tooltip } from '@protocol-labs-network/ui';
 import { ISocialLink, TSocialLinkType } from './social-link.types';
 import { getSocialLinkUrl } from './social-link.utils';
 
@@ -18,13 +18,23 @@ export function SocialLink({ linkObj, linkIcon, type }: SocialLinkProps) {
     ...(isActive && { href: url }),
   };
 
-  return (
-    <AnchorLink {...linkProps}>
+  const SocialIcon = () => {
+    return (
       <Icon
         className={`h-5 w-5 ${
           isActive ? 'text-slate-500 hover:text-slate-600' : 'text-slate-300'
         }`}
       />
+    );
+  };
+
+  return (
+    <AnchorLink {...linkProps}>
+      {linkObj.label ? (
+        <Tooltip Trigger={SocialIcon}>{linkObj.label}</Tooltip>
+      ) : (
+        <SocialIcon />
+      )}
     </AnchorLink>
   );
 }

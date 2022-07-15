@@ -6,3 +6,4 @@ export * from './lib/dropdown/dropdown';
 export * from './lib/icons/arrow/arrow';
 export * from './lib/input-field/input-field';
 export * from './lib/tag/tag';
+export * from './lib/tooltip/tooltip';
