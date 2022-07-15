@@ -118,9 +118,12 @@ export function MemberCard({
         }`}
       >
         <SocialLinks
-          email={{ link: member.email }}
-          twitter={{ link: member.twitter }}
-          github={{ link: member.githubHandle }}
+          email={{ link: member.email, label: member.email }}
+          twitter={{ link: member.twitter, label: member.twitter }}
+          github={{
+            link: member.githubHandle,
+            label: member.githubHandle ? `@${member.githubHandle}` : '',
+          }}
         />
       </div>
     </DirectoryCard>

@@ -10,6 +10,9 @@ interface TeamProfileSidebarProps {
 }
 
 export default function TeamProfileSidebar({ team }: TeamProfileSidebarProps) {
+  const teamNameLastChar = team.name.slice(-1).toLowerCase();
+  const possessiveMark = teamNameLastChar == 's' ? "'" : "'s";
+
   return (
     <div className="card w-80 shrink-0 space-y-4 self-start">
       <div className="flex gap-3">
@@ -47,8 +50,11 @@ export default function TeamProfileSidebar({ team }: TeamProfileSidebarProps) {
       </div>
       <div className="border-t border-slate-200 pt-4">
         <SocialLinks
-          website={{ link: team.website }}
-          twitter={{ link: team.twitter }}
+          website={{
+            link: team.website,
+            label: team.website ? `${team.name}${possessiveMark} website` : '',
+          }}
+          twitter={{ link: team.twitter, label: team.twitter }}
         />
       </div>
     </div>

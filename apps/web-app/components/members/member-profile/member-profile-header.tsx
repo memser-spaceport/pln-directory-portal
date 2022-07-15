@@ -60,9 +60,12 @@ export function MemberProfileHeader({ member }: MemberProfileHeaderProps) {
       </div>
       <div className="border-t border-slate-200 px-7 py-4">
         <SocialLinks
-          email={{ link: member.email }}
-          github={{ link: member.githubHandle }}
-          twitter={{ link: member.twitter }}
+          email={{ link: member.email, label: member.email }}
+          github={{
+            link: member.githubHandle,
+            label: member.githubHandle ? `@${member.githubHandle}` : '',
+          }}
+          twitter={{ link: member.twitter, label: member.twitter }}
         />
       </div>
     </section>
