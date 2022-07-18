@@ -4,6 +4,7 @@ export * from './lib/badge/badge';
 export * from './lib/breadcrumb/breadcrumb';
 export * from './lib/dropdown/dropdown';
 export * from './lib/icons/arrow/arrow';
+export * from './lib/icons/spinner/spinner';
 export * from './lib/input-field/input-field';
 export * from './lib/tag/tag';
 export * from './lib/tooltip/tooltip';
