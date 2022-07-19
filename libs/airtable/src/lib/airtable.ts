@@ -40,7 +40,7 @@ class AirtableService {
       .select(options)
       .all()) as unknown as IAirtableTeam[];
 
-    return this._parseTeams(teams);
+    return this.parseTeams(teams);
   }
 
   /**
@@ -51,7 +51,7 @@ class AirtableService {
       .select(options)
       .firstPage()) as unknown as IAirtableTeam[];
 
-    return this._parseTeams(teams);
+    return this.parseTeams(teams);
   }
 
   /**
@@ -151,6 +151,13 @@ class AirtableService {
   }
 
   /**
+   * Parse Airtable's team records into the appropriate format.
+   */
+  public parseTeams(teams: IAirtableTeam[]): ITeam[] {
+    return teams.map((team) => this._parseTeam(team));
+  }
+
+  /**
    * Service initialization.
    */
   private _init() {
@@ -160,13 +167,6 @@ class AirtableService {
 
     this._teamsTable = base(`${process.env.AIRTABLE_TEAMS_TABLE_ID}`);
     this._membersTable = base(`${process.env.AIRTABLE_MEMBERS_TABLE_ID}`);
-  }
-
-  /**
-   * Parse Airtable's team records into the appropriate format.
-   */
-  private _parseTeams(teams: IAirtableTeam[]): ITeam[] {
-    return teams.map((team) => this._parseTeam(team));
   }
 
   /**

@@ -225,7 +225,7 @@ describe('AirtableService', () => {
       {
         filecoinUser: teamMock.fields['Filecoin User'],
         fundingStage: teamMock.fields['Funding Stage'],
-        fundingVehicle: teamMock.fields['Funding Vehicle'],
+        acceleratorPrograms: teamMock.fields['Accelerator Programs'],
         id: teamMock.id,
         tags: teamMock.fields['Tags lookup'],
         ipfsUser: teamMock.fields['IPFS User'],
@@ -240,7 +240,7 @@ describe('AirtableService', () => {
       {
         filecoinUser: false,
         fundingStage: null,
-        fundingVehicle: [],
+        acceleratorPrograms: [],
         id: emptyTeamMock.id,
         tags: [],
         ipfsUser: false,
@@ -852,6 +852,41 @@ describe('AirtableService', () => {
           { id: 'team_id_01', name: 'team 01' },
         ],
         twitter: '@member03',
+      },
+    ]);
+  });
+
+  it('should be able to parse the provided teams into the intended format', () => {
+    expect(airtableService.parseTeams(teamsMock)).toEqual([
+      {
+        filecoinUser: teamMock.fields['Filecoin User'],
+        fundingStage: teamMock.fields['Funding Stage'],
+        acceleratorPrograms: teamMock.fields['Accelerator Programs'],
+        id: teamMock.id,
+        tags: teamMock.fields['Tags lookup'],
+        ipfsUser: teamMock.fields['IPFS User'],
+        members: teamMock.fields['Network members'],
+        logo: teamMock.fields.Logo?.[0].url,
+        longDescription: teamMock.fields['Long description'],
+        name: teamMock.fields.Name,
+        shortDescription: teamMock.fields['Short description'],
+        twitter: teamMock.fields.Twitter,
+        website: 'http://team01.com/',
+      },
+      {
+        filecoinUser: false,
+        fundingStage: null,
+        acceleratorPrograms: [],
+        id: emptyTeamMock.id,
+        tags: [],
+        ipfsUser: false,
+        members: [],
+        logo: null,
+        longDescription: null,
+        name: null,
+        shortDescription: null,
+        twitter: null,
+        website: null,
       },
     ]);
   });
