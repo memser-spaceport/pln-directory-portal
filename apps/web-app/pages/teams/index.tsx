@@ -63,7 +63,7 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
   const optionsFromQuery = getTeamsDirectoryRequestOptionsFromQuery(query);
   const listOptions = getTeamsDirectoryListOptions(optionsFromQuery);
   const [teams, filtersValues] = await Promise.all([
-    airtableService.getTeams(listOptions),
+    airtableService.getFirstTeamsPage(listOptions),
     airtableService.getTeamsFiltersValues(optionsFromQuery),
   ]);
   const parsedFilters = parseTeamsFilters(filtersValues, query);
