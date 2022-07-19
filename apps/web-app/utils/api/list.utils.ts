@@ -10,7 +10,7 @@ import { URL_QUERY_VALUE_SEPARATOR } from '../../constants';
 
 /**
  * Returns the options for requesting the teams on the teams directory,
- * by parsing the provided query parameters.
+ * based on the provided query parameters.
  */
 export function getTeamsDirectoryRequestOptionsFromQuery(
   queryParams: ParsedUrlQuery
@@ -25,7 +25,6 @@ export function getTeamsDirectoryRequestOptionsFromQuery(
   } = queryParams;
 
   return {
-    fields: TEAM_CARD_FIELDS,
     sort: [getSortFromQuery(sort?.toString())],
     filterByFormula: getTeamsDirectoryFormula({
       tags,
@@ -34,6 +33,18 @@ export function getTeamsDirectoryRequestOptionsFromQuery(
       searchBy,
       technology,
     }),
+  };
+}
+
+/**
+ * Get the options for requesting the teams on the teams directory.
+ */
+export function getTeamsDirectoryListOptions(
+  options: IListOptions
+): IListOptions {
+  return {
+    ...options,
+    fields: TEAM_CARD_FIELDS,
   };
 }
 

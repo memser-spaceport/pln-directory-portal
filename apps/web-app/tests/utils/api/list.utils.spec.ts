@@ -3,6 +3,7 @@ import { TEAM_CARD_FIELDS } from '../../../components/shared/teams/team-card/tea
 import {
   getMembersDirectoryListOptions,
   getMembersDirectoryRequestOptionsFromQuery,
+  getTeamsDirectoryListOptions,
   getTeamsDirectoryRequestOptionsFromQuery,
 } from '../../../utils/api/list.utils';
 
@@ -18,7 +19,6 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
         technology: 'IPFS',
       })
     ).toEqual({
-      fields: TEAM_CARD_FIELDS,
       sort: [{ field: 'Name', direction: 'desc' }],
       filterByFormula:
         'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())',
@@ -31,7 +31,6 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
         sort: 'invalid',
       })
     ).toEqual({
-      fields: TEAM_CARD_FIELDS,
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula: 'AND({Name} != "", {Short description} != "")',
     });
@@ -47,10 +46,24 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
         technology: 'IPFS|Filecoin',
       })
     ).toEqual({
-      fields: TEAM_CARD_FIELDS,
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula:
         'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())',
+    });
+  });
+});
+
+describe('#getTeamsDirectoryListOptions', () => {
+  it('should append teams cards list properties to the provided options', () => {
+    expect(
+      getTeamsDirectoryListOptions({
+        sort: [{ field: 'Name', direction: 'desc' }],
+        filterByFormula: 'AND({Name} != "", {Short description} != "")',
+      })
+    ).toEqual({
+      sort: [{ field: 'Name', direction: 'desc' }],
+      filterByFormula: 'AND({Name} != "", {Short description} != "")',
+      fields: TEAM_CARD_FIELDS,
     });
   });
 });
