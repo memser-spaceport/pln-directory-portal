@@ -8,7 +8,10 @@ import { MembersDirectoryFilters } from '../../components/members/members-direct
 import { IMembersFiltersValues } from '../../components/members/members-directory/members-directory-filters/members-directory-filters.types';
 import { parseMembersFilters } from '../../components/members/members-directory/members-directory-filters/members-directory-filters.utils';
 import { MemberCard } from '../../components/shared/members/member-card/member-card';
-import { getMembersDirectoryRequestOptionsFromQuery } from '../../utils/api/list.utils';
+import {
+  getMembersDirectoryListOptions,
+  getMembersDirectoryRequestOptionsFromQuery,
+} from '../../utils/api/list.utils';
 
 type MembersProps = {
   members: IMember[];
@@ -63,10 +66,11 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
   query,
   res,
 }) => {
-  const options = getMembersDirectoryRequestOptionsFromQuery(query);
+  const optionsFromQuery = getMembersDirectoryRequestOptionsFromQuery(query);
+  const listOptions = getMembersDirectoryListOptions(optionsFromQuery);
   const [members, filtersValues] = await Promise.all([
-    airtableService.getMembers(options),
-    airtableService.getMembersFiltersValues(options),
+    airtableService.getMembers(listOptions),
+    airtableService.getMembersFiltersValues(optionsFromQuery),
   ]);
   const parsedFilters = parseMembersFilters(filtersValues, query);
 

@@ -1,6 +1,7 @@
 import { MEMBER_CARD_FIELDS } from '../../../components/shared/members/member-card/member-card.constants';
 import { TEAM_CARD_FIELDS } from '../../../components/shared/teams/team-card/team-card.constants';
 import {
+  getMembersDirectoryListOptions,
   getMembersDirectoryRequestOptionsFromQuery,
   getTeamsDirectoryRequestOptionsFromQuery,
 } from '../../../utils/api/list.utils';
@@ -65,7 +66,6 @@ describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
         sort: 'Name,desc',
       })
     ).toEqual({
-      fields: MEMBER_CARD_FIELDS,
       sort: [{ field: 'Name', direction: 'desc' }],
       filterByFormula:
         'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}))',
@@ -78,7 +78,6 @@ describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
         sort: 'invalid',
       })
     ).toEqual({
-      fields: MEMBER_CARD_FIELDS,
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula: 'AND({Name} != "", {Teams} != "")',
     });
@@ -93,10 +92,24 @@ describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
         skills: 'Engineering|Leadership',
       })
     ).toEqual({
-      fields: MEMBER_CARD_FIELDS,
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula:
         'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}))',
+    });
+  });
+});
+
+describe('#getMembersDirectoryListOptions', () => {
+  it('should append members cards list properties to the provided options', () => {
+    expect(
+      getMembersDirectoryListOptions({
+        sort: [{ field: 'Name', direction: 'desc' }],
+        filterByFormula: 'AND({Name} != "", {Teams} != "")',
+      })
+    ).toEqual({
+      sort: [{ field: 'Name', direction: 'desc' }],
+      filterByFormula: 'AND({Name} != "", {Teams} != "")',
+      fields: MEMBER_CARD_FIELDS,
     });
   });
 });
