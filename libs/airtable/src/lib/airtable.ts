@@ -44,6 +44,17 @@ class AirtableService {
   }
 
   /**
+   * Get first page of teams from Airtable.
+   */
+  public async getFirstTeamsPage(options: IListOptions) {
+    const teams: IAirtableTeam[] = (await this._teamsTable
+      .select(options)
+      .firstPage()) as unknown as IAirtableTeam[];
+
+    return this._parseTeams(teams);
+  }
+
+  /**
    * Get a specific team from Airtable.
    */
   public async getTeam(id: string) {

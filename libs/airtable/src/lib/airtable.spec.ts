@@ -29,6 +29,7 @@ const teamsMock = [teamMock, emptyTeamMock];
 const teamsTableMock: Airtable.Table<Record<string, string>> = {
   select: jest.fn().mockReturnValue({
     all: jest.fn().mockReturnValue(teamsMock),
+    firstPage: jest.fn().mockReturnValue(teamsMock),
   }),
   find: jest.fn().mockReturnValue(teamMock),
 } as unknown as Airtable.Table<Record<string, string>>;
@@ -189,6 +190,57 @@ describe('AirtableService', () => {
         filecoinUser: false,
         fundingStage: null,
         acceleratorPrograms: [],
+        id: emptyTeamMock.id,
+        tags: [],
+        ipfsUser: false,
+        members: [],
+        logo: null,
+        longDescription: null,
+        name: null,
+        shortDescription: null,
+        twitter: null,
+        website: null,
+      },
+    ]);
+  });
+
+  it('should be able to select and retrieve the first page of teams from teams table', async () => {
+    (<jest.Mock>teamsTableMock.select().firstPage).mockClear();
+    (<jest.Mock>teamsTableMock.select).mockClear();
+
+    const teams = await airtableService.getFirstTeamsPage({
+      sort: [{ field: 'Name', direction: 'asc' }],
+      filterByFormula: '',
+      pageSize: 9,
+    });
+
+    expect(teamsTableMock.select).toHaveBeenCalledTimes(1);
+    expect(teamsTableMock.select).toHaveBeenCalledWith({
+      sort: [{ field: 'Name', direction: 'asc' }],
+      filterByFormula: '',
+      pageSize: 9,
+    });
+    expect(teamsTableMock.select().firstPage).toHaveBeenCalledTimes(1);
+    expect(teams).toEqual([
+      {
+        filecoinUser: teamMock.fields['Filecoin User'],
+        fundingStage: teamMock.fields['Funding Stage'],
+        fundingVehicle: teamMock.fields['Funding Vehicle'],
+        id: teamMock.id,
+        tags: teamMock.fields['Tags lookup'],
+        ipfsUser: teamMock.fields['IPFS User'],
+        members: teamMock.fields['Network members'],
+        logo: teamMock.fields.Logo?.[0].url,
+        longDescription: teamMock.fields['Long description'],
+        name: teamMock.fields.Name,
+        shortDescription: teamMock.fields['Short description'],
+        twitter: teamMock.fields.Twitter,
+        website: 'http://team01.com/',
+      },
+      {
+        filecoinUser: false,
+        fundingStage: null,
+        fundingVehicle: [],
         id: emptyTeamMock.id,
         tags: [],
         ipfsUser: false,
