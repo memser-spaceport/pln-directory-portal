@@ -451,6 +451,7 @@ describe('AirtableService', () => {
         'IPFS User',
         'Filecoin User',
       ],
+      filterByFormula: 'AND({Name} != "", {Short description} != "")',
     });
     expect(teamsTableMock.select).toHaveBeenNthCalledWith(2, {
       fields: [

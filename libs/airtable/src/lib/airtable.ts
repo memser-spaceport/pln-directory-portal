@@ -90,7 +90,9 @@ class AirtableService {
    */
   public async getTeamsFiltersValues(options: IListOptions) {
     const [valuesByFilter, availableValuesByFilter] = await Promise.all([
-      this._getTeamsFiltersValues(),
+      this._getTeamsFiltersValues({
+        filterByFormula: 'AND({Name} != "", {Short description} != "")',
+      }),
       this._getTeamsFiltersValues(options),
     ]);
 
