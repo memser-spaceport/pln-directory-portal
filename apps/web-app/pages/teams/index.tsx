@@ -30,7 +30,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
           <TeamsDirectoryFilters filtersValues={filtersValues} />
         </div>
 
-        <div className="mx-auto p-8 pl-[291px]">
+        <div className="mx-auto p-8">
           <div className="w-[917px] space-y-10">
             <DirectoryHeader
               title="Teams"
