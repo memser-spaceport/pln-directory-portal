@@ -6,7 +6,7 @@ import {
 } from '../../components/directory/directory-sort/directory-sort.types';
 import { MEMBER_CARD_FIELDS } from '../../components/shared/members/member-card/member-card.constants';
 import { TEAM_CARD_FIELDS } from '../../components/shared/teams/team-card/team-card.constants';
-import { URL_QUERY_VALUE_SEPARATOR } from '../../constants';
+import { ITEMS_PER_PAGE, URL_QUERY_VALUE_SEPARATOR } from '../../constants';
 
 /**
  * Returns the options for requesting the teams on the teams directory,
@@ -45,6 +45,7 @@ export function getTeamsDirectoryListOptions(
   return {
     ...options,
     fields: TEAM_CARD_FIELDS,
+    pageSize: ITEMS_PER_PAGE,
   };
 }
 
