@@ -607,6 +607,7 @@ describe('AirtableService', () => {
     expect(membersTableMock.select).toHaveBeenCalledTimes(2);
     expect(membersTableMock.select).toHaveBeenNthCalledWith(1, {
       fields: ['Skills', 'Country', 'Metro Area'],
+      filterByFormula: 'AND({Name} != "", {Teams} != "")',
     });
     expect(membersTableMock.select).toHaveBeenNthCalledWith(2, {
       fields: ['Skills', 'Country', 'Metro Area'],

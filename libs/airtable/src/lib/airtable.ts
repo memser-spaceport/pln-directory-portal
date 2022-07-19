@@ -114,7 +114,9 @@ class AirtableService {
    */
   public async getMembersFiltersValues(options: IListOptions) {
     const [valuesByFilter, availableValuesByFilter] = await Promise.all([
-      this._getMembersFiltersValues(),
+      this._getMembersFiltersValues({
+        filterByFormula: 'AND({Name} != "", {Teams} != "")',
+      }),
       this._getMembersFiltersValues(options),
     ]);
 
