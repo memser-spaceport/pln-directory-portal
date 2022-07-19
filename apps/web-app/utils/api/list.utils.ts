@@ -33,7 +33,7 @@ export function getTeamsDirectoryRequestOptionsFromQuery(
 
 /**
  * Returns the options for requesting the members on the members directory,
- * by parsing the provided query parameters.
+ * based on the provided query parameters.
  */
 export function getMembersDirectoryRequestOptionsFromQuery(
   queryParams: ParsedUrlQuery
@@ -41,7 +41,6 @@ export function getMembersDirectoryRequestOptionsFromQuery(
   const { sort, searchBy, skills, country, metroArea } = queryParams;
 
   return {
-    fields: MEMBER_CARD_FIELDS,
     sort: [getSortFromQuery(sort?.toString())],
     filterByFormula: getMembersDirectoryFormula({
       searchBy,
@@ -49,6 +48,18 @@ export function getMembersDirectoryRequestOptionsFromQuery(
       country,
       metroArea,
     }),
+  };
+}
+
+/**
+ * Get the options for requesting the members on the members directory.
+ */
+export function getMembersDirectoryListOptions(
+  options: IListOptions
+): IListOptions {
+  return {
+    ...options,
+    fields: MEMBER_CARD_FIELDS,
   };
 }
 
