@@ -20,7 +20,7 @@ export function DirectoryTagsFilter({
 }: DirectoryTagsFilterProps) {
   const visibleTags = tags.slice(0, VISIBLE_TAGS_COUNT);
   const collapsibleTags = tags.slice(VISIBLE_TAGS_COUNT);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(tags.some((tag) => tag.selected));
 
   return (
     <DirectoryFilter title={title}>
