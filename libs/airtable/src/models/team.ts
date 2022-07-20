@@ -11,7 +11,6 @@ export interface IAirtableTeamFields {
   'Long description'?: string;
   Website?: string;
   Twitter?: string;
-  'Funding Vehicle'?: string[];
   'Network members'?: string[];
   Logo?: IAirtableTeamLogo[];
   'Tags lookup'?: string[];
@@ -47,7 +46,7 @@ export interface IAirtableTeamLogo {
 
 export interface IAirtableTeamsFiltersValues {
   tags: string[];
+  acceleratorPrograms: string[];
   fundingStage: string[];
-  fundingVehicle: string[];
   technology: string[];
 }

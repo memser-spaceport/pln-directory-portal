@@ -15,15 +15,21 @@ import { URL_QUERY_VALUE_SEPARATOR } from '../../constants';
 export function getTeamsDirectoryRequestOptionsFromQuery(
   queryParams: ParsedUrlQuery
 ): IListOptions {
-  const { sort, tags, fundingVehicle, fundingStage, searchBy, technology } =
-    queryParams;
+  const {
+    sort,
+    tags,
+    acceleratorPrograms,
+    fundingStage,
+    searchBy,
+    technology,
+  } = queryParams;
 
   return {
     fields: TEAM_CARD_FIELDS,
     sort: [getSortFromQuery(sort?.toString())],
     filterByFormula: getTeamsDirectoryFormula({
       tags,
-      fundingVehicle,
+      acceleratorPrograms,
       fundingStage,
       searchBy,
       technology,
@@ -91,7 +97,7 @@ function isSortValid(sortQuery?: string) {
  */
 function getTeamsDirectoryFormula({
   tags,
-  fundingVehicle,
+  acceleratorPrograms,
   fundingStage,
   searchBy,
   technology,
@@ -105,8 +111,8 @@ function getTeamsDirectoryFormula({
       '{Short description} != ""',
       ...(searchBy ? [getSearchFormulaFromQuery(searchBy)] : []),
       ...(tags ? [getFieldFromQuery('Tags lookup', tags, true)] : []),
-      ...(fundingVehicle
-        ? [getFieldFromQuery('Funding Vehicle', fundingVehicle)]
+      ...(acceleratorPrograms
+        ? [getFieldFromQuery('Accelerator Programs', acceleratorPrograms)]
         : []),
       ...(fundingStage
         ? [getFieldFromQuery('Funding Stage', fundingStage)]
