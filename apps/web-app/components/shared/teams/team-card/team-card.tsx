@@ -4,31 +4,20 @@ import { AnchorLink } from '@protocol-labs-network/ui';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { DirectoryCard } from '../../../directory/directory-card/directory-card';
-import { SocialLinks } from '../../social-links/social-links';
 import { TagsGroup } from '../../tags-group/tags-group';
 
 export interface TeamCardProps {
-  isClickable?: boolean;
   team: ITeam;
   isGrid?: boolean;
 }
 
-export function TeamCard({
-  isClickable = false,
-  team,
-  isGrid = true,
-}: TeamCardProps) {
-  const teamNameLastChar = team.name.slice(-1).toLowerCase();
-  const possessiveMark = teamNameLastChar == 's' ? "'" : "'s";
+export function TeamCard({ team, isGrid = true }: TeamCardProps) {
   const router = useRouter();
   const backLink = encodeURIComponent(router.asPath);
-  const anchorLinkProps = {
-    ...(isClickable ? { href: `/teams/${team.id}?backLink=${backLink}` } : {}),
-  };
 
   return (
     <DirectoryCard isGrid={isGrid}>
-      <AnchorLink {...anchorLinkProps}>
+      <AnchorLink href={`/teams/${team.id}?backLink=${backLink}`}>
         <div className={`flex ${isGrid ? 'flex-col space-y-4' : 'flex-row'}`}>
           <div className={`${isGrid ? 'w-full' : 'w-[496px]'} flex space-x-4`}>
             <div
@@ -68,35 +57,21 @@ export function TeamCard({
             </p>
           ) : null}
         </div>
+
+        <div
+          className={`h-[28px] ${
+            isGrid ? 'mt-4' : 'mx-4 w-[248px] self-center'
+          }`}
+        >
+          {team.tags && team.tags.length ? (
+            <TagsGroup isSingleLine items={team.tags} />
+          ) : (
+            <span className="text-xs leading-7 text-slate-400">
+              Tags not provided
+            </span>
+          )}
+        </div>
       </AnchorLink>
-
-      <div
-        className={`h-[28px] ${isGrid ? 'my-4' : 'mx-4 w-[248px] self-center'}`}
-      >
-        {team.tags && team.tags.length ? (
-          <TagsGroup isSingleLine items={team.tags} />
-        ) : (
-          <span className="text-xs leading-7 text-slate-400">
-            Tags not provided
-          </span>
-        )}
-      </div>
-
-      <div
-        className={`border-slate-200 ${
-          isGrid
-            ? 'border-t pt-4'
-            : 'flex h-20 w-[99px] items-center justify-center self-center border-l pl-5'
-        }`}
-      >
-        <SocialLinks
-          website={{
-            link: team.website,
-            label: team.website ? `${team.name}${possessiveMark} website` : '',
-          }}
-          twitter={{ link: team.twitter, label: team.twitter }}
-        />
-      </div>
     </DirectoryCard>
   );
 }

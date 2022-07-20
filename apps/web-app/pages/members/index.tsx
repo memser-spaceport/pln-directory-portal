@@ -42,13 +42,7 @@ export default function Members({ members, filtersValues }: MembersProps) {
 
             <div className="flex flex-wrap gap-4">
               {members.map((member) => (
-                <MemberCard
-                  key={member.id}
-                  member={member}
-                  isClickable
-                  isGrid={isGrid}
-                  showLocation
-                />
+                <MemberCard key={member.id} member={member} isGrid={isGrid} />
               ))}
             </div>
 

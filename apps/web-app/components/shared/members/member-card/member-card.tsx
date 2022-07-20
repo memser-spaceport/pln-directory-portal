@@ -5,34 +5,21 @@ import { AnchorLink } from '@protocol-labs-network/ui';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { DirectoryCard } from '../../../../components/directory/directory-card/directory-card';
-import { SocialLinks } from '../../../../components/shared/social-links/social-links';
 import { TagsGroup } from '../../tags-group/tags-group';
 
 interface MemberCardProps {
-  isClickable?: boolean;
   isGrid?: boolean;
   member: IMember;
-  showLocation?: boolean;
 }
 
-export function MemberCard({
-  isClickable = false,
-  isGrid = true,
-  member,
-  showLocation = false,
-}: MemberCardProps) {
+export function MemberCard({ isGrid = true, member }: MemberCardProps) {
   const router = useRouter();
   const backLink = encodeURIComponent(router.asPath);
-  const anchorLinkProps = {
-    ...(isClickable
-      ? { href: `/members/${member.id}?backLink=${backLink}` }
-      : {}),
-  };
   const teamsNames = member.teams.map(({ name }) => name);
 
   return (
     <DirectoryCard isGrid={isGrid}>
-      <AnchorLink {...anchorLinkProps}>
+      <AnchorLink href={`/members/${member.id}?backLink=${backLink}`}>
         <div className={`flex ${isGrid ? 'flex-col space-y-4' : 'flex-row'}`}>
           <div className={`${isGrid ? 'w-full' : 'w-[396px]'} flex space-x-4`}>
             <div
@@ -58,38 +45,18 @@ export function MemberCard({
                 {member.name}
               </h3>
               <p className="line-clamp-1">{member.role}</p>
-              {showLocation ? (
-                <div className="mt-2 flex items-center text-sm text-slate-500">
-                  <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0" />
-                  <span className="line-clamp-1">{member.location}</span>
-                </div>
-              ) : null}
+              <div className="mt-2 flex items-center text-sm text-slate-500">
+                <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0" />
+                <span className="line-clamp-1">{member.location}</span>
+              </div>
             </div>
           </div>
         </div>
+        <div className={`${isGrid ? 'mt-4' : 'mx-4 w-[348px] self-center'}`}>
+          <h4 className="mb-2 text-sm font-medium text-slate-500">Teams</h4>
+          <TagsGroup items={teamsNames} isSingleLine={true} />
+        </div>
       </AnchorLink>
-
-      <div className={`${isGrid ? 'my-4' : 'mx-4 w-[348px] self-center'}`}>
-        <h4 className="mb-2 text-sm font-medium text-slate-500">Teams</h4>
-        <TagsGroup items={teamsNames} isSingleLine={true} />
-      </div>
-
-      <div
-        className={`border-slate-200 ${
-          isGrid
-            ? 'border-t pt-4'
-            : 'flex h-20 w-[99px] items-center justify-center self-center border-l pl-5'
-        }`}
-      >
-        <SocialLinks
-          email={{ link: member.email, label: member.email }}
-          twitter={{ link: member.twitter, label: member.twitter }}
-          github={{
-            link: member.githubHandle,
-            label: member.githubHandle ? `@${member.githubHandle}` : '',
-          }}
-        />
-      </div>
     </DirectoryCard>
   );
 }
