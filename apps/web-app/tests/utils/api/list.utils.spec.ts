@@ -13,7 +13,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
         sort: 'Name,desc',
         tags: 'Analytics',
         fundingStage: 'Seed',
-        fundingVehicle: 'IPFS',
+        acceleratorPrograms: 'IPFS',
         searchBy: 'void',
         technology: 'IPFS',
       })
@@ -21,7 +21,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
       fields: TEAM_CARD_FIELDS,
       sort: [{ field: 'Name', direction: 'desc' }],
       filterByFormula:
-        'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())',
+        'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())',
     });
   });
 
@@ -42,7 +42,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
       getTeamsDirectoryRequestOptionsFromQuery({
         tags: 'Analytics',
         fundingStage: 'Seed',
-        fundingVehicle: 'IPFS',
+        acceleratorPrograms: 'IPFS',
         searchBy: 'void',
         technology: 'IPFS|Filecoin',
       })
@@ -50,7 +50,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
       fields: TEAM_CARD_FIELDS,
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula:
-        'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Funding Vehicle}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())',
+        'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())',
     });
   });
 });

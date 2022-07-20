@@ -12,13 +12,13 @@ describe('DirectoryFilters', () => {
         value={createMockRouter({
           query: {
             tags: 'tag_01',
-            fundingVehicle: 'funding_vehicle_01',
+            acceleratorPrograms: 'accelerator_program_01',
             sort: 'Name,desc',
           },
           push,
         })}
       >
-        <DirectoryFilters filterProperties={['tags', 'fundingVehicle']}>
+        <DirectoryFilters filterProperties={['tags', 'acceleratorPrograms']}>
           <div></div>
         </DirectoryFilters>
       </RouterContext.Provider>

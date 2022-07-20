@@ -165,7 +165,7 @@ class AirtableService {
     return {
       filecoinUser: !!team.fields['Filecoin User'],
       fundingStage: team.fields['Funding Stage'] || null,
-      fundingVehicle: team.fields['Funding Vehicle'] || [],
+      acceleratorPrograms: team.fields['Accelerator Programs'] || [],
       id: team.id,
       tags: team.fields['Tags lookup'] || [],
       ipfsUser: !!team.fields['IPFS User'],
@@ -281,8 +281,8 @@ class AirtableService {
       this._teamsTable,
       [
         'Tags lookup',
+        'Accelerator Programs',
         'Funding Stage',
-        'Funding Vehicle',
         'IPFS User',
         'Filecoin User',
       ],
@@ -300,18 +300,18 @@ class AirtableService {
         const tags = [
           ...new Set([...values.tags, ...(team.fields['Tags lookup'] || [])]),
         ];
+        const acceleratorPrograms = [
+          ...new Set([
+            ...values.acceleratorPrograms,
+            ...(team.fields['Accelerator Programs'] || []),
+          ]),
+        ];
         const fundingStage = [
           ...new Set([
             ...values.fundingStage,
             ...(team.fields['Funding Stage']
               ? [team.fields['Funding Stage']]
               : []),
-          ]),
-        ];
-        const fundingVehicle = [
-          ...new Set([
-            ...values.fundingVehicle,
-            ...(team.fields['Funding Vehicle'] || []),
           ]),
         ];
         const technology = [
@@ -322,12 +322,12 @@ class AirtableService {
           ]),
         ];
 
-        return { tags, fundingStage, fundingVehicle, technology };
+        return { tags, acceleratorPrograms, fundingStage, technology };
       },
       {
         tags: [],
+        acceleratorPrograms: [],
         fundingStage: [],
-        fundingVehicle: [],
         technology: [],
       } as IAirtableTeamsFiltersValues
     );

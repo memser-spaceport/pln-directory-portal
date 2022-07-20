@@ -1,7 +1,7 @@
 import { IMember, ITeam } from '@protocol-labs-network/api';
+import TeamProfileAcceleratorPrograms from '../team-profile-accelerator-programs/team-profile-accelerator-programs';
 import TeamProfileDescription from '../team-profile-description/team-profile-description';
 import TeamProfileFundingStage from '../team-profile-funding-stage/team-profile-funding-stage';
-import TeamProfileFundingVehicle from '../team-profile-funding-vehicle/team-profile-funding-vehicle';
 import TeamProfileMembers from '../team-profile-members/team-profile-members';
 
 interface TeamProfileDetailsProps {
@@ -27,7 +27,9 @@ export default function TeamProfileDetails({
         </div>
         <div className="flex gap-x-6">
           <TeamProfileFundingStage fundingStage={team.fundingStage} />
-          <TeamProfileFundingVehicle fundingVehicle={team.fundingVehicle} />
+          <TeamProfileAcceleratorPrograms
+            acceleratorPrograms={team.acceleratorPrograms}
+          />
         </div>
       </div>
       <div className="mt-6">

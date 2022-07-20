@@ -6,7 +6,7 @@ const teamMock: IAirtableTeam = {
     'Long description': 'Long description for Team 01',
     Website: 'http://team01.com/ http://team0X.com/',
     Twitter: '@team01',
-    'Funding Vehicle': ['Seed'],
+    'Accelerator Programs': ['Seed'],
     'Network members': ['member_id_01'],
     Logo: [{ id: 'team_logo_01', url: 'http://team01.com/logo.svg' }],
     'Tags lookup': ['IT'],
@@ -21,7 +21,6 @@ const teamMock: IAirtableTeam = {
     Created: '28/02/1904',
     Video: 'http://team01.com/video.mp4',
     'Funding Stage': 'Seed',
-    'Accelerator Programs': ['Outplay - Pilot'],
     'Friend of PLN': true,
   },
 };
@@ -174,7 +173,7 @@ describe('AirtableService', () => {
       {
         filecoinUser: teamMock.fields['Filecoin User'],
         fundingStage: teamMock.fields['Funding Stage'],
-        fundingVehicle: teamMock.fields['Funding Vehicle'],
+        acceleratorPrograms: teamMock.fields['Accelerator Programs'],
         id: teamMock.id,
         tags: teamMock.fields['Tags lookup'],
         ipfsUser: teamMock.fields['IPFS User'],
@@ -189,7 +188,7 @@ describe('AirtableService', () => {
       {
         filecoinUser: false,
         fundingStage: null,
-        fundingVehicle: [],
+        acceleratorPrograms: [],
         id: emptyTeamMock.id,
         tags: [],
         ipfsUser: false,
@@ -214,7 +213,7 @@ describe('AirtableService', () => {
     expect(team).toEqual({
       filecoinUser: teamMock.fields['Filecoin User'],
       fundingStage: teamMock.fields['Funding Stage'],
-      fundingVehicle: teamMock.fields['Funding Vehicle'],
+      acceleratorPrograms: teamMock.fields['Accelerator Programs'],
       id: teamMock.id,
       tags: teamMock.fields['Tags lookup'],
       ipfsUser: teamMock.fields['IPFS User'],
@@ -239,7 +238,7 @@ describe('AirtableService', () => {
             'Long description': 'Long description for Team 01',
             Website: 'http://team01.com/ http://team0X.com/',
             Twitter: '@team01',
-            'Funding Vehicle': ['Seed'],
+            'Accelerator Programs': ['Seed'],
             'Network members': ['member_id_01'],
             Logo: [{ id: 'team_logo_01', url: 'http://team01.com/logo.svg' }],
             'Tags lookup': ['IT'],
@@ -258,7 +257,7 @@ describe('AirtableService', () => {
             'Long description': 'Long description for Team 02',
             Website: 'http://team02.com/ http://team0X.com/',
             Twitter: '@team02',
-            'Funding Vehicle': ['Seed'],
+            'Accelerator Programs': ['Seed'],
             'Network members': ['member_id_02'],
             Logo: [{ id: 'team_logo_02', url: 'http://team02.com/logo.svg' }],
             'Tags lookup': ['IT'],
@@ -299,7 +298,7 @@ describe('AirtableService', () => {
         website: 'http://team01.com/',
         fundingStage: null,
         filecoinUser: false,
-        fundingVehicle: ['Seed'],
+        acceleratorPrograms: ['Seed'],
         tags: ['IT'],
         ipfsUser: false,
       },
@@ -314,7 +313,7 @@ describe('AirtableService', () => {
         website: 'http://team02.com/',
         fundingStage: null,
         filecoinUser: false,
-        fundingVehicle: ['Seed'],
+        acceleratorPrograms: ['Seed'],
         tags: ['IT'],
         ipfsUser: false,
       },
@@ -330,7 +329,10 @@ describe('AirtableService', () => {
             fields: {
               'Tags lookup': ['Tag 01', 'Tag 02'],
               'Funding Stage': 'Funding Stage 01',
-              'Funding Vehicle': ['Funding Vehicle 01', 'Funding Vehicle 02'],
+              'Accelerator Programs': [
+                'Accelerator Program 01',
+                'Accelerator Program 02',
+              ],
               'IPFS User': true,
               'Filecoin User': true,
             },
@@ -339,14 +341,17 @@ describe('AirtableService', () => {
             fields: {
               'Tags lookup': ['Tag 01', 'Tag 02', 'Tag 03'],
               'Funding Stage': 'Funding Stage 02',
-              'Funding Vehicle': ['Funding Vehicle 02', 'Funding Vehicle 03'],
+              'Accelerator Programs': [
+                'Accelerator Program 02',
+                'Accelerator Program 03',
+              ],
             },
           },
           {
             fields: {
               'Tags lookup': ['Tag 04', 'Tag 05'],
               'Funding Stage': 'Funding Stage 03',
-              'Funding Vehicle': ['Funding Vehicle 04'],
+              'Accelerator Programs': ['Accelerator Program 04'],
             },
           },
           {
@@ -360,7 +365,10 @@ describe('AirtableService', () => {
             fields: {
               'Tags lookup': ['Tag 01', 'Tag 02'],
               'Funding Stage': 'Funding Stage 01',
-              'Funding Vehicle': ['Funding Vehicle 01', 'Funding Vehicle 02'],
+              'Accelerator Programs': [
+                'Accelerator Program 01',
+                'Accelerator Program 02',
+              ],
               'IPFS User': true,
               'Filecoin User': true,
             },
@@ -369,7 +377,10 @@ describe('AirtableService', () => {
             fields: {
               'Tags lookup': ['Tag 01', 'Tag 02', 'Tag 03'],
               'Funding Stage': 'Funding Stage 02',
-              'Funding Vehicle': ['Funding Vehicle 02', 'Funding Vehicle 03'],
+              'Accelerator Programs': [
+                'Accelerator Program 02',
+                'Accelerator Program 03',
+              ],
             },
           },
         ]),
@@ -383,8 +394,8 @@ describe('AirtableService', () => {
     expect(teamsTableMock.select).toHaveBeenNthCalledWith(1, {
       fields: [
         'Tags lookup',
+        'Accelerator Programs',
         'Funding Stage',
-        'Funding Vehicle',
         'IPFS User',
         'Filecoin User',
       ],
@@ -392,8 +403,8 @@ describe('AirtableService', () => {
     expect(teamsTableMock.select).toHaveBeenNthCalledWith(2, {
       fields: [
         'Tags lookup',
+        'Accelerator Programs',
         'Funding Stage',
-        'Funding Vehicle',
         'IPFS User',
         'Filecoin User',
       ],
@@ -408,21 +419,21 @@ describe('AirtableService', () => {
           'Funding Stage 02',
           'Funding Stage 03',
         ],
-        fundingVehicle: [
-          'Funding Vehicle 01',
-          'Funding Vehicle 02',
-          'Funding Vehicle 03',
-          'Funding Vehicle 04',
+        acceleratorPrograms: [
+          'Accelerator Program 01',
+          'Accelerator Program 02',
+          'Accelerator Program 03',
+          'Accelerator Program 04',
         ],
         technology: ['Filecoin', 'IPFS'],
       },
       availableValuesByFilter: {
         tags: ['Tag 01', 'Tag 02', 'Tag 03'],
         fundingStage: ['Funding Stage 01', 'Funding Stage 02'],
-        fundingVehicle: [
-          'Funding Vehicle 01',
-          'Funding Vehicle 02',
-          'Funding Vehicle 03',
+        acceleratorPrograms: [
+          'Accelerator Program 01',
+          'Accelerator Program 02',
+          'Accelerator Program 03',
         ],
         technology: ['Filecoin', 'IPFS'],
       },
