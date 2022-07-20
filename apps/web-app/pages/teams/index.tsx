@@ -39,14 +39,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
 
             <div className="flex flex-wrap gap-4">
               {teams.map((team) => {
-                return (
-                  <TeamCard
-                    key={team.id}
-                    isClickable
-                    team={team}
-                    isGrid={isGrid}
-                  />
-                );
+                return <TeamCard key={team.id} team={team} isGrid={isGrid} />;
               })}
             </div>
 
