@@ -6,6 +6,7 @@ import {
   getMembersDirectoryRequestOptionsFromQuery,
   getTeamsDirectoryListOptions,
   getTeamsDirectoryRequestOptionsFromQuery,
+  getTeamsDirectoryRequestParametersFromQuery,
 } from '../../../utils/api/list.utils';
 
 describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
@@ -126,5 +127,46 @@ describe('#getMembersDirectoryListOptions', () => {
       filterByFormula: 'AND({Name} != "", {Teams} != "")',
       fields: MEMBER_CARD_FIELDS,
     });
+  });
+});
+
+describe('#getTeamsDirectoryRequestParametersFromQuery', () => {
+  it('should return a valid query parameters string when sort is provided and is valid', () => {
+    expect(
+      getTeamsDirectoryRequestParametersFromQuery({
+        sort: 'Name,desc',
+        tags: 'Analytics',
+        acceleratorPrograms: 'IPFS',
+        fundingStage: 'Seed',
+        searchBy: 'void',
+        technology: 'IPFS',
+      })
+    ).toEqual(
+      'fields[]=Name&fields[]=Logo&fields[]=Short description&fields[]=Tags lookup&fields[]=Website&fields[]=Twitter&sort[0][field]=Name&sort[0][direction]=desc&filterByFormula=AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())&pageSize=9'
+    );
+  });
+
+  it('should return a valid query parameters string when sort is provided and is invalid', () => {
+    expect(
+      getTeamsDirectoryRequestParametersFromQuery({
+        sort: 'invalid',
+      })
+    ).toEqual(
+      'fields[]=Name&fields[]=Logo&fields[]=Short description&fields[]=Tags lookup&fields[]=Website&fields[]=Twitter&sort[0][field]=Name&sort[0][direction]=asc&filterByFormula=AND({Name} != "", {Short description} != "")&pageSize=9'
+    );
+  });
+
+  it('should return a valid query parameters string when sort is not provided', () => {
+    expect(
+      getTeamsDirectoryRequestParametersFromQuery({
+        tags: 'Analytics',
+        acceleratorPrograms: 'IPFS',
+        fundingStage: 'Seed',
+        searchBy: 'void',
+        technology: 'IPFS|Filecoin',
+      })
+    ).toEqual(
+      'fields[]=Name&fields[]=Logo&fields[]=Short description&fields[]=Tags lookup&fields[]=Website&fields[]=Twitter&sort[0][field]=Name&sort[0][direction]=asc&filterByFormula=AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())&pageSize=9'
+    );
   });
 });

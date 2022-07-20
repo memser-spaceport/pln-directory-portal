@@ -82,6 +82,42 @@ export function getMembersDirectoryListOptions(
 }
 
 /**
+ * Returns the query parameters string for requesting the teams on
+ * the teams directory, by parsing the provided query parameters.
+ */
+export function getTeamsDirectoryRequestParametersFromQuery(
+  queryParams: ParsedUrlQuery
+): string {
+  const {
+    sort,
+    tags,
+    acceleratorPrograms,
+    fundingStage,
+    searchBy,
+    technology,
+  } = queryParams;
+
+  const fieldsParam = TEAM_CARD_FIELDS.map((field) => `fields[]=${field}`).join(
+    '&'
+  );
+  const sortFromQuery = getSortFromQuery(sort?.toString());
+  const sortFieldParam = `sort[0][field]=${sortFromQuery.field}`;
+  const sortDirectionParam = `sort[0][direction]=${sortFromQuery.direction}`;
+  const sortParam = `${sortFieldParam}&${sortDirectionParam}`;
+  const teamsDirectoryFormula = getTeamsDirectoryFormula({
+    tags,
+    acceleratorPrograms,
+    fundingStage,
+    searchBy,
+    technology,
+  });
+  const filterByFormulaParam = `filterByFormula=${teamsDirectoryFormula}`;
+  const pageSizeParam = `pageSize=${ITEMS_PER_PAGE}`;
+
+  return `${fieldsParam}&${sortParam}&${filterByFormulaParam}&${pageSizeParam}`;
+}
+
+/**
  * Gets sort options by parsing the provided sort query parameter.
  */
 function getSortFromQuery(sortQuery?: string) {
