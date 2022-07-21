@@ -11,16 +11,5 @@ export function HiddenTagsTooltip({ items }: HiddenTagsTooltipProps) {
     </span>
   );
 
-  return (
-    <Tooltip Trigger={hiddenTagsTrigger}>
-      {items.map((item, i) => (
-        <span
-          key={i}
-          className="after:mr-1 after:content-[',']  last:after:content-['']"
-        >
-          {item}
-        </span>
-      ))}
-    </Tooltip>
-  );
+  return <Tooltip Trigger={hiddenTagsTrigger}>{items.join(', ')}</Tooltip>;
 }
