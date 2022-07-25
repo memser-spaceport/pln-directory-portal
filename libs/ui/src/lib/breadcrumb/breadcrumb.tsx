@@ -1,4 +1,4 @@
-import { ChevronRightIcon } from '@heroicons/react/outline';
+import { HomeIcon } from '@heroicons/react/solid';
 import Link from 'next/link';
 
 export interface BreadcrumbProps {
@@ -14,8 +14,14 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
   return (
     <nav
       aria-label="breadcrumb"
-      className="inline-flex rounded-lg border border-slate-200 px-3 py-2 leading-6"
+      className="navbar top-[90px] border-t border-t-slate-200 px-16 py-3.5 text-sm leading-6 shadow-[0_1px_4px_0_#e2e8f0]"
     >
+      <Link href="/">
+        <a>
+          <HomeIcon className="h-4 w-4 fill-slate-600 hover:fill-slate-700" />
+        </a>
+      </Link>
+      <span className="mx-4 text-slate-400">/</span>
       {items.map((item, index, items) => {
         const isLastItem = index === items.length - 1;
         const ariaCurrent: { 'aria-current'?: 'page' } = {
@@ -24,7 +30,9 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
 
         return (
           <div
-            className={`flex items-center ${isLastItem ? 'font-semibold' : ''}`}
+            className={`${
+              isLastItem ? 'font-medium text-slate-900' : 'text-slate-600'
+            }`}
             key={item.label}
             {...ariaCurrent}
           >
@@ -32,7 +40,7 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
               <Link href={item.href} passHref>
                 <a
                   href="replace"
-                  className="text-slate-500 hover:text-slate-700 active:text-slate-900"
+                  className="hover:text-slate-700 active:text-slate-900"
                 >
                   {item.label}
                 </a>
@@ -40,9 +48,7 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
             ) : (
               item.label
             )}
-            {isLastItem ? null : (
-              <ChevronRightIcon className="mx-1 h-4 w-4 text-slate-500" />
-            )}
+            {isLastItem ? null : <span className="mx-4 text-slate-400">/</span>}
           </div>
         );
       })}

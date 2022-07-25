@@ -23,22 +23,24 @@ export default function Member({ member, teams, backLink }: MemberProps) {
   });
 
   return (
-    <section className="mx-10 my-3">
+    <>
       <Head>
         <title>Member {member.name}</title>
       </Head>
-      <div className="flex items-center justify-between">
-        <Breadcrumb items={breadcrumbItems} />
-        <AskToEditLink profileType="member" profileName={member.name} />
-      </div>
-      <div className="mt-6 flex items-start space-x-10">
-        <div className="flex grow flex-col space-y-8">
-          <MemberProfileHeader member={member} />
-          <MemberProfileTeams teams={teams} />
+      <Breadcrumb items={breadcrumbItems} />
+      <section className="px-10 py-3">
+        <div className="flex justify-end">
+          <AskToEditLink profileType="member" profileName={member.name} />
         </div>
-        <MemberProfileOfficeHours url={member.officeHours} />
-      </div>
-    </section>
+        <div className="mt-6 flex items-start space-x-10">
+          <div className="flex grow flex-col space-y-8">
+            <MemberProfileHeader member={member} />
+            <MemberProfileTeams teams={teams} />
+          </div>
+          <MemberProfileOfficeHours url={member.officeHours} />
+        </div>
+      </section>
+    </>
   );
 }
 
