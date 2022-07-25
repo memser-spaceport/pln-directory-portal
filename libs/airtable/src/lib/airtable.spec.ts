@@ -333,7 +333,7 @@ describe('AirtableService', () => {
 
     expect(teamsTableMock.select).toHaveBeenCalledWith({
       filterByFormula:
-        'AND(AND({Name} != "", {Short description} != ""), OR(RECORD_ID()=\'team_id_01\', RECORD_ID()=\'team_id_02\'))',
+        'AND(AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE()), OR(RECORD_ID()=\'team_id_01\', RECORD_ID()=\'team_id_02\'))',
       fields: ['Name'],
       sort: [{ direction: 'asc', field: 'Name' }],
     });
