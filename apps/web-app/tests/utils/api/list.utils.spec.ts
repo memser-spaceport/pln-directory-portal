@@ -23,7 +23,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
     ).toEqual({
       sort: [{ field: 'Name', direction: 'desc' }],
       filterByFormula:
-        'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())',
+        'AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE(), REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())',
     });
   });
 
@@ -34,7 +34,8 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
       })
     ).toEqual({
       sort: [{ field: 'Name', direction: 'asc' }],
-      filterByFormula: 'AND({Name} != "", {Short description} != "")',
+      filterByFormula:
+        'AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE())',
     });
   });
 
@@ -50,7 +51,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
     ).toEqual({
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula:
-        'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())',
+        'AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE(), REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())',
     });
   });
 });
@@ -142,7 +143,7 @@ describe('#getTeamsDirectoryRequestParametersFromQuery', () => {
         technology: 'IPFS',
       })
     ).toEqual(
-      'fields[]=Name&fields[]=Logo&fields[]=Short description&fields[]=Tags lookup&fields[]=Website&fields[]=Twitter&sort[0][field]=Name&sort[0][direction]=desc&filterByFormula=AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())&pageSize=9'
+      'fields[]=Name&fields[]=Logo&fields[]=Short description&fields[]=Tags lookup&fields[]=Website&fields[]=Twitter&sort[0][field]=Name&sort[0][direction]=desc&filterByFormula=AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE(), REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())&pageSize=9'
     );
   });
 
@@ -152,7 +153,7 @@ describe('#getTeamsDirectoryRequestParametersFromQuery', () => {
         sort: 'invalid',
       })
     ).toEqual(
-      'fields[]=Name&fields[]=Logo&fields[]=Short description&fields[]=Tags lookup&fields[]=Website&fields[]=Twitter&sort[0][field]=Name&sort[0][direction]=asc&filterByFormula=AND({Name} != "", {Short description} != "")&pageSize=9'
+      'fields[]=Name&fields[]=Logo&fields[]=Short description&fields[]=Tags lookup&fields[]=Website&fields[]=Twitter&sort[0][field]=Name&sort[0][direction]=asc&filterByFormula=AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE())&pageSize=9'
     );
   });
 
@@ -166,7 +167,7 @@ describe('#getTeamsDirectoryRequestParametersFromQuery', () => {
         technology: 'IPFS|Filecoin',
       })
     ).toEqual(
-      'fields[]=Name&fields[]=Logo&fields[]=Short description&fields[]=Tags lookup&fields[]=Website&fields[]=Twitter&sort[0][field]=Name&sort[0][direction]=asc&filterByFormula=AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())&pageSize=9'
+      'fields[]=Name&fields[]=Logo&fields[]=Short description&fields[]=Tags lookup&fields[]=Website&fields[]=Twitter&sort[0][field]=Name&sort[0][direction]=asc&filterByFormula=AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE(), REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())&pageSize=9'
     );
   });
 });

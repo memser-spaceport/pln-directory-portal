@@ -157,6 +157,7 @@ function getTeamsDirectoryFormula({
     [
       '{Name} != ""',
       '{Short description} != ""',
+      '{Friend of PLN} = FALSE()',
       ...(searchBy ? [getSearchFormulaFromQuery(searchBy)] : []),
       ...(tags ? [getFieldFromQuery('Tags lookup', tags, true)] : []),
       ...(acceleratorPrograms
