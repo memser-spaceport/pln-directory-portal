@@ -9,8 +9,8 @@ function CustomApp({ Component, pageProps }: AppProps) {
       <Head>
         <title>Protocol Labs Network</title>
       </Head>
-      <Navbar />
       <main className="app">
+        <Navbar />
         <Component {...pageProps} />
       </main>
     </>

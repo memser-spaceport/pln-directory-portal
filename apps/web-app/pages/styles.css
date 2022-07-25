@@ -19,4 +19,8 @@ body {
   .tag {
     @apply mr-2 cursor-default whitespace-nowrap rounded-3xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 last:mr-0;
   }
+
+  .navbar {
+    @apply sticky z-50 flex w-full min-w-[1272px] items-center bg-white/95;
+  }
 }

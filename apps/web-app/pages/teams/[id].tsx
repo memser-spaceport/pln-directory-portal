@@ -23,21 +23,22 @@ export default function Team({ team, members, backLink }: TeamProps) {
   });
 
   return (
-    <section className="mx-10 my-3">
+    <>
       <Head>
         <title>Team {team.name}</title>
       </Head>
+      <Breadcrumb items={breadcrumbItems} />
+      <section className="px-10 py-3">
+        <div className="flex justify-end">
+          <AskToEditLink profileType="team" profileName={team.name} />
+        </div>
 
-      <div className="flex items-center justify-between">
-        <Breadcrumb items={breadcrumbItems} />
-        <AskToEditLink profileType="team" profileName={team.name} />
-      </div>
-
-      <div className="mt-6 flex space-x-10">
-        <TeamProfileSidebar team={team} />
-        <TeamProfileDetails team={team} members={members} />
-      </div>
-    </section>
+        <div className="mt-6 flex space-x-10">
+          <TeamProfileSidebar team={team} />
+          <TeamProfileDetails team={team} members={members} />
+        </div>
+      </section>
+    </>
   );
 }
 
