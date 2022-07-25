@@ -85,7 +85,7 @@ describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
     ).toEqual({
       sort: [{ field: 'Name', direction: 'desc' }],
       filterByFormula:
-        'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}))',
+        'AND({Name} != "", {Teams} != "", {Friend of PLN} = FALSE(), REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}))',
     });
   });
 
@@ -96,7 +96,8 @@ describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
       })
     ).toEqual({
       sort: [{ field: 'Name', direction: 'asc' }],
-      filterByFormula: 'AND({Name} != "", {Teams} != "")',
+      filterByFormula:
+        'AND({Name} != "", {Teams} != "", {Friend of PLN} = FALSE())',
     });
   });
 
@@ -111,7 +112,7 @@ describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
     ).toEqual({
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula:
-        'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}))',
+        'AND({Name} != "", {Teams} != "", {Friend of PLN} = FALSE(), REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}))',
     });
   });
 });

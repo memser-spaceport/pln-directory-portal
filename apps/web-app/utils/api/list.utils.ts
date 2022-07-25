@@ -190,6 +190,7 @@ function getMembersDirectoryFormula({
     [
       '{Name} != ""',
       '{Teams} != ""',
+      '{Friend of PLN} = FALSE()',
       ...(searchBy ? [getSearchFormulaFromQuery(searchBy)] : []),
       ...(skills ? [getFieldFromQuery('Skills', skills)] : []),
       ...(country ? [getFieldFromQuery('Country', country)] : []),
