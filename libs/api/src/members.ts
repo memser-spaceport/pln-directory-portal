@@ -7,11 +7,12 @@ export interface IMember {
   image: string | null;
   location: string;
   name: string | null;
+  officeHours: string | null;
   role: string | null;
   skills: string[];
+  teamLead: boolean;
   teams: IMemberTeam[];
   twitter: string | null;
-  officeHours: string | null;
 }
 
 export interface IMemberTeam {
