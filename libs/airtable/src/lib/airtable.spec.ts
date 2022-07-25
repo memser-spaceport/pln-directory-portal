@@ -514,6 +514,7 @@ describe('AirtableService', () => {
         officeHours: memberMock01.fields['Office hours link'],
         role: memberMock01.fields.Role,
         skills: [memberMock01.fields.Skills?.[0]],
+        teamLead: memberMock01.fields['Team lead'],
         teams: [
           {
             id: memberMock01.fields.Teams?.[0],
@@ -534,6 +535,7 @@ describe('AirtableService', () => {
         officeHours: null,
         role: null,
         skills: [],
+        teamLead: false,
         teams: [],
         twitter: null,
       },
@@ -549,6 +551,7 @@ describe('AirtableService', () => {
         officeHours: null,
         role: null,
         skills: [],
+        teamLead: false,
         teams: [],
         twitter: null,
       },
@@ -564,6 +567,7 @@ describe('AirtableService', () => {
         officeHours: null,
         role: null,
         skills: [],
+        teamLead: false,
         teams: [],
         twitter: null,
       },
@@ -579,6 +583,7 @@ describe('AirtableService', () => {
         officeHours: null,
         role: null,
         skills: [],
+        teamLead: false,
         teams: [],
         twitter: null,
       },
@@ -604,6 +609,7 @@ describe('AirtableService', () => {
       officeHours: memberMock01.fields['Office hours link'],
       role: memberMock01.fields.Role,
       skills: [memberMock01.fields.Skills?.[0]],
+      teamLead: memberMock01.fields['Team lead'],
       teams: [
         {
           id: memberMock01.fields.Teams?.[0],
@@ -714,6 +720,7 @@ describe('AirtableService', () => {
             'Discord handle': 'member01#123',
             'Github Handle': 'member01',
             'Office hours link': 'https://calendly.com/protoadin',
+            'Team lead': true,
           },
         },
         {
@@ -797,7 +804,10 @@ describe('AirtableService', () => {
     expect(membersTableMock.select).toHaveBeenCalledWith({
       filterByFormula: 'SEARCH("team_id_01",Teams)',
       fields: ['Name'],
-      sort: [{ field: 'Name', direction: 'asc' }],
+      sort: [
+        { field: 'Team lead', direction: 'desc' },
+        { field: 'Name', direction: 'asc' },
+      ],
     });
 
     expect(members).toStrictEqual([
@@ -814,6 +824,7 @@ describe('AirtableService', () => {
         officeHours: 'https://calendly.com/protoadin',
         role: 'CEO',
         skills: [],
+        teamLead: true,
         teams: [
           { id: 'team_id_01', name: 'team 01' },
           { id: 'team_id_02', name: 'team 02' },
@@ -832,6 +843,7 @@ describe('AirtableService', () => {
         officeHours: null,
         role: 'CEO',
         skills: [],
+        teamLead: false,
         teams: [{ id: 'team_id_03', name: 'team 03' }],
         twitter: '@member01',
       },
@@ -848,6 +860,7 @@ describe('AirtableService', () => {
         officeHours: null,
         role: 'CEO',
         skills: [],
+        teamLead: false,
         teams: [
           { id: 'team_id_02', name: 'team 02' },
           { id: 'team_id_01', name: 'team 01' },

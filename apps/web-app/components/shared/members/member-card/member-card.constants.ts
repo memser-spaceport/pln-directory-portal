@@ -11,4 +11,5 @@ export const MEMBER_CARD_FIELDS = [
   'Email',
   'Twitter',
   'Github Handle',
+  'Team lead',
 ];

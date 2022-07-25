@@ -146,7 +146,10 @@ class AirtableService {
     const membersOptions: IListOptions = {
       filterByFormula: this._getSearchFormula(teamName, 'Teams'),
       fields,
-      sort: [{ field: 'Name', direction: 'asc' }],
+      sort: [
+        { field: 'Team lead', direction: 'desc' },
+        { field: 'Name', direction: 'asc' },
+      ],
     };
 
     return await airtableService.getMembers(membersOptions);
@@ -223,11 +226,12 @@ class AirtableService {
         null,
       location: this._parseMemberLocation(member),
       name: member.fields.Name || null,
+      officeHours: member.fields['Office hours link'] || null,
       role: member.fields.Role || null,
       skills: member.fields.Skills || [],
+      teamLead: !!member.fields['Team lead'],
       teams: this._parseMemberTeams(member),
       twitter: member.fields.Twitter || null,
-      officeHours: member.fields['Office hours link'] || null,
     };
   }
 
