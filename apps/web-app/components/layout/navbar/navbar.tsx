@@ -10,9 +10,9 @@ export function Navbar() {
         <Link href="/teams">
           <a>
             <ProtocolLabsLogo
-              title="Protocol Labs Network Black Logo"
-              width={200}
-              height={66}
+              title="Protocol Labs Network Directory Beta Black Logo"
+              width="212"
+              height="60"
             />
           </a>
         </Link>
