@@ -5,6 +5,7 @@ import { AnchorLink } from '@protocol-labs-network/ui';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { DirectoryCard } from '../../../../components/directory/directory-card/directory-card';
+import { TeamLeadBadge } from '../../../../components/shared/members/team-lead-badge/team-lead-badge';
 import { TagsGroup } from '../../tags-group/tags-group';
 
 interface MemberCardProps {
@@ -22,23 +23,31 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
       <AnchorLink href={`/members/${member.id}?backLink=${backLink}`}>
         <div className={`flex ${isGrid ? 'flex-col space-y-4' : 'flex-row'}`}>
           <div className={`${isGrid ? 'w-full' : 'w-[396px]'} flex space-x-4`}>
-            <div
-              className={`relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full ${
-                member.image ? '' : 'bg-slate-200'
-              }`}
-            >
-              {member.image ? (
-                <Image
-                  className="rounded-full"
-                  alt={`${member.name} Logo`}
-                  src={member.image}
-                  layout="fill"
-                  objectFit="contain"
-                  objectPosition="center"
-                />
-              ) : (
-                <UserIcon className="w-22 h-22 mt-2 fill-white" />
-              )}
+            <div className="relative flex-shrink-0">
+              <div
+                className={`h-20 w-20 overflow-hidden rounded-full ${
+                  member.image ? '' : 'bg-slate-200'
+                }`}
+              >
+                {member.image ? (
+                  <Image
+                    className="rounded-full"
+                    alt={`${member.name} Logo`}
+                    src={member.image}
+                    layout="fill"
+                    objectFit="contain"
+                    objectPosition="center"
+                  />
+                ) : (
+                  <UserIcon className="w-22 h-22 mt-2 fill-white" />
+                )}
+              </div>
+
+              {member.teamLead ? (
+                <div className="absolute top-0 right-1 z-10">
+                  <TeamLeadBadge />
+                </div>
+              ) : null}
             </div>
             <div>
               <h3 className="line-clamp-1 text-base font-semibold text-slate-900">
