@@ -16,14 +16,13 @@ export function TagsGroup({ items, isSingleLine = false }: TagsGroupProps) {
 
   return (
     <div
-      className={`flex w-full items-start ${!isSingleLine ? 'flex-wrap' : ''}`}
+      className={`flex w-full items-start ${
+        isSingleLine ? '' : 'flex-wrap space-y-2'
+      }`}
     >
       {(visibleTags || items).map((item, i) => {
         return (
-          <span
-            key={i}
-            className={`tag ${!isSingleLine ? 'mb-2' : 'truncate'}`}
-          >
+          <span key={i} className={`tag ${isSingleLine ? 'truncate' : ''}`}>
             {item}
           </span>
         );

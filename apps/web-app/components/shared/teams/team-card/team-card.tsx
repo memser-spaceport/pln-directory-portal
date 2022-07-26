@@ -1,10 +1,9 @@
 import { UserGroupIcon } from '@heroicons/react/solid';
 import { ITeam } from '@protocol-labs-network/api';
-import { AnchorLink } from '@protocol-labs-network/ui';
-import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { DirectoryCard } from '../../../directory/directory-card/directory-card';
-import { TagsGroup } from '../../tags-group/tags-group';
+import { DirectoryCardFooter } from '../../../directory/directory-card/directory-card-footer';
+import { DirectoryCardHeader } from '../../../directory/directory-card/directory-card-header';
 
 export interface TeamCardProps {
   team: ITeam;
@@ -16,62 +15,29 @@ export function TeamCard({ team, isGrid = true }: TeamCardProps) {
   const backLink = encodeURIComponent(router.asPath);
 
   return (
-    <DirectoryCard isGrid={isGrid}>
-      <AnchorLink href={`/teams/${team.id}?backLink=${backLink}`}>
-        <div className={`flex ${isGrid ? 'flex-col space-y-4' : 'flex-row'}`}>
-          <div className={`${isGrid ? 'w-full' : 'w-[496px]'} flex space-x-4`}>
-            <div
-              className={`relative h-20 w-20 overflow-hidden rounded ${
-                team.logo ? '' : 'bg-slate-200'
-              }`}
-            >
-              {team.logo ? (
-                <Image
-                  className="rounded"
-                  alt={`${team.name} Logo`}
-                  src={team.logo}
-                  layout="fill"
-                  objectFit="contain"
-                  objectPosition="center"
-                />
-              ) : (
-                <UserGroupIcon className="w-22 h-22 mt-2 fill-white" />
-              )}
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-slate-900">
-                {team.name}
-              </h3>
-              {!isGrid ? (
-                <div className="w-[400px] grow-0">
-                  <p className="line-clamp-2 mt-1 leading-5">
-                    {team.shortDescription}
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          </div>
-          {isGrid ? (
-            <p className="line-clamp-3 h-[60px] leading-5">
-              {team.shortDescription}
-            </p>
-          ) : null}
-        </div>
-
-        <div
-          className={`h-[28px] ${
-            isGrid ? 'mt-4' : 'mx-4 w-[248px] self-center'
-          }`}
+    <DirectoryCard
+      isGrid={isGrid}
+      cardUrl={`/teams/${team.id}?backLink=${backLink}`}
+    >
+      <DirectoryCardHeader
+        isGrid={isGrid}
+        img={team.logo}
+        avatarIcon={UserGroupIcon}
+        name={team.name}
+      />
+      <div className={isGrid ? '' : 'w-[400px] grow-0'}>
+        <h2 className={`${isGrid ? 'my-2' : ''} text-lg font-semibold`}>
+          {team.name}
+        </h2>
+        <p
+          className={`${
+            isGrid ? 'line-clamp-3 h-[60px]' : 'line-clamp-2 mt-1'
+          }  leading-5 text-slate-600`}
         >
-          {team.tags && team.tags.length ? (
-            <TagsGroup isSingleLine items={team.tags} />
-          ) : (
-            <span className="text-xs leading-7 text-slate-400">
-              Tags not provided
-            </span>
-          )}
-        </div>
-      </AnchorLink>
+          {team.shortDescription}
+        </p>
+      </div>
+      <DirectoryCardFooter isGrid={isGrid} tagsArr={team.tags} />
     </DirectoryCard>
   );
 }

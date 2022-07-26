@@ -3,6 +3,12 @@ module.exports = {
     extend: {
       backgroundImage: {
         ask_to_edit_card: "url('../public/assets/images/ask-to-edit-bg.png')",
+        'gradient-to-b--white-to-slate-200': [
+          'linear-gradient(180deg, #FFFFFF 0%, #E2E8F0 205.47%)',
+        ],
+        'gradient-to-r--white-to-slate-200': [
+          'linear-gradient(90deg, #FFFFFF 0%, #E2E8F0 231.25%)',
+        ],
       },
       boxShadow: {
         'card--slate-900': [

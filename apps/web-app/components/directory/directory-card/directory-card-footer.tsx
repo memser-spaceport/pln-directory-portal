@@ -1,0 +1,19 @@
+import { TagsGroup } from '../../shared/tags-group/tags-group';
+
+export interface DirectoryCardFooterProps {
+  isGrid?: boolean;
+  tagsArr: string[];
+}
+export function DirectoryCardFooter({
+  isGrid,
+  tagsArr,
+}: DirectoryCardFooterProps) {
+  return (
+    <>
+      {isGrid ? <div className="my-4 h-px bg-slate-200"></div> : null}
+      <div className={isGrid ? '' : 'self-center'}>
+        {tagsArr?.length ? <TagsGroup isSingleLine items={tagsArr} /> : null}
+      </div>
+    </>
+  );
+}
