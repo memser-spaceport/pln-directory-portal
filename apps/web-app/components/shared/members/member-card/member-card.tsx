@@ -35,7 +35,7 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
                     alt={`${member.name} Logo`}
                     src={member.image}
                     layout="fill"
-                    objectFit="contain"
+                    objectFit="cover"
                     objectPosition="center"
                   />
                 ) : (
