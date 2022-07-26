@@ -144,14 +144,7 @@ class AirtableService {
    */
   public async getTeamMembers(teamName: string, fields: string[]) {
     const membersOptions: IListOptions = {
-      filterByFormula: [
-        'AND(',
-        [
-          '{Friend of PLN} = FALSE()',
-          this._getSearchFormula(teamName, 'Teams'),
-        ].join(', '),
-        ')',
-      ].join(''),
+      filterByFormula: this._getSearchFormula(teamName, 'Teams'),
       fields,
       sort: [
         { field: 'Team lead', direction: 'desc' },
