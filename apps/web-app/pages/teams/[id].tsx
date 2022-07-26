@@ -3,7 +3,7 @@ import { IMember, ITeam } from '@protocol-labs-network/api';
 import { Breadcrumb } from '@protocol-labs-network/ui';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
-import { AskToEditLink } from '../../components/shared/ask-to-edit-link/ask-to-edit-link';
+import { AskToEditCard } from '../../components/shared/ask-to-edit-card/ask-to-edit-card';
 import { MEMBER_CARD_FIELDS } from '../../components/shared/members/member-card/member-card.constants';
 import TeamProfileDetails from '../../components/teams/team-profile/team-profile-details/team-profile-details';
 import TeamProfileSidebar from '../../components/teams/team-profile/team-profile-sidebar/team-profile-sidebar';
@@ -29,13 +29,12 @@ export default function Team({ team, members, backLink }: TeamProps) {
       </Head>
       <Breadcrumb items={breadcrumbItems} />
       <section className="px-10 py-3">
-        <div className="flex justify-end">
-          <AskToEditLink profileType="team" profileName={team.name} />
-        </div>
-
         <div className="mt-6 flex space-x-10">
           <TeamProfileSidebar team={team} />
           <TeamProfileDetails team={team} members={members} />
+          <div className="w-[291px] shrink-0">
+            <AskToEditCard profileType="team" profileName={team.name} />
+          </div>
         </div>
       </section>
     </>

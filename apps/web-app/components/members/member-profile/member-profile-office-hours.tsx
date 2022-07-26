@@ -12,7 +12,7 @@ export function MemberProfileOfficeHours({
   url,
 }: MemberProfileOfficeHoursProps) {
   return (
-    <div className="card w-80 shrink-0 space-y-4">
+    <div className="card space-y-4">
       <div className="flex items-center">
         <CalendarIcon className="h-14 w-14" />
         <div className="ml-2">

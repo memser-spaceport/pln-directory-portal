@@ -5,7 +5,7 @@ import Head from 'next/head';
 import { MemberProfileHeader } from '../../components/members/member-profile/member-profile-header';
 import { MemberProfileOfficeHours } from '../../components/members/member-profile/member-profile-office-hours';
 import { MemberProfileTeams } from '../../components/members/member-profile/member-profile-teams';
-import { AskToEditLink } from '../../components/shared/ask-to-edit-link/ask-to-edit-link';
+import { AskToEditCard } from '../../components/shared/ask-to-edit-card/ask-to-edit-card';
 import { TEAM_CARD_FIELDS } from '../../components/shared/teams/team-card/team-card.constants';
 import { useProfileBreadcrumb } from '../../hooks/profile/use-profile-breadcrumb.hook';
 
@@ -29,15 +29,15 @@ export default function Member({ member, teams, backLink }: MemberProps) {
       </Head>
       <Breadcrumb items={breadcrumbItems} />
       <section className="px-10 py-3">
-        <div className="flex justify-end">
-          <AskToEditLink profileType="member" profileName={member.name} />
-        </div>
         <div className="mt-6 flex items-start space-x-10">
           <div className="flex grow flex-col space-y-8">
             <MemberProfileHeader member={member} />
             <MemberProfileTeams teams={teams} />
           </div>
-          <MemberProfileOfficeHours url={member.officeHours} />
+          <div className="w-[291px] shrink-0 flex-col space-y-4">
+            <AskToEditCard profileType="member" profileName={member.name} />
+            <MemberProfileOfficeHours url={member.officeHours} />
+          </div>
         </div>
       </section>
     </>
