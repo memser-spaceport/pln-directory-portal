@@ -73,11 +73,7 @@ class AirtableService {
       filterByFormula: [
         'AND(',
         'AND(',
-        [
-          '{Name} != ""',
-          '{Short description} != ""',
-          '{Friend of PLN} = FALSE()',
-        ].join(', '),
+        ['{Name} != ""', '{Short description} != ""'].join(', '),
         '), ',
         `OR(${teamsByIdFormula.join(', ')})`,
         ')',
