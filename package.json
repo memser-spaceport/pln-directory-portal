@@ -11,6 +11,7 @@
   },
   "private": true,
   "dependencies": {
+    "@fontsource/inter": "^4.5.11",
     "@headlessui/react": "^1.6.1",
     "@heroicons/react": "^1.0.6",
     "@nrwl/next": "13.9.7",
