@@ -118,6 +118,34 @@ export function getTeamsDirectoryRequestParametersFromQuery(
 }
 
 /**
+ * Returns the query parameters string for requesting the members on
+ * the members directory, by parsing the provided query parameters.
+ */
+export function getMembersDirectoryRequestParametersFromQuery(
+  queryParams: ParsedUrlQuery
+): string {
+  const { sort, searchBy, skills, country, metroArea } = queryParams;
+
+  const fieldsParam = MEMBER_CARD_FIELDS.map(
+    (field) => `fields[]=${field}`
+  ).join('&');
+  const sortFromQuery = getSortFromQuery(sort?.toString());
+  const sortFieldParam = `sort[0][field]=${sortFromQuery.field}`;
+  const sortDirectionParam = `sort[0][direction]=${sortFromQuery.direction}`;
+  const sortParam = `${sortFieldParam}&${sortDirectionParam}`;
+  const membersDirectoryFormula = getMembersDirectoryFormula({
+    searchBy,
+    skills,
+    country,
+    metroArea,
+  });
+  const filterByFormulaParam = `filterByFormula=${membersDirectoryFormula}`;
+  const pageSizeParam = `pageSize=${ITEMS_PER_PAGE}`;
+
+  return `${fieldsParam}&${sortParam}&${filterByFormulaParam}&${pageSizeParam}`;
+}
+
+/**
  * Gets sort options by parsing the provided sort query parameter.
  */
 function getSortFromQuery(sortQuery?: string) {

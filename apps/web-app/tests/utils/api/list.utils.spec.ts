@@ -4,6 +4,7 @@ import { ITEMS_PER_PAGE } from '../../../constants';
 import {
   getMembersDirectoryListOptions,
   getMembersDirectoryRequestOptionsFromQuery,
+  getMembersDirectoryRequestParametersFromQuery,
   getTeamsDirectoryListOptions,
   getTeamsDirectoryRequestOptionsFromQuery,
   getTeamsDirectoryRequestParametersFromQuery,
@@ -169,6 +170,45 @@ describe('#getTeamsDirectoryRequestParametersFromQuery', () => {
       })
     ).toEqual(
       'fields[]=Name&fields[]=Logo&fields[]=Short description&fields[]=Tags lookup&fields[]=Website&fields[]=Twitter&sort[0][field]=Name&sort[0][direction]=asc&filterByFormula=AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE(), REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())&pageSize=9'
+    );
+  });
+});
+
+describe('#getMembersDirectoryRequestParametersFromQuery', () => {
+  it('should return a valid query parameters string when sort is provided and is valid', () => {
+    expect(
+      getMembersDirectoryRequestParametersFromQuery({
+        country: 'Portugal',
+        metroArea: 'Porto',
+        searchBy: 'void',
+        skills: 'Engineering|Leadership',
+        sort: 'Name,desc',
+      })
+    ).toEqual(
+      'fields[]=Name&fields[]=Profile picture&fields[]=Role&fields[]=Teams&fields[]=Team name&fields[]=Country&fields[]=State / Province&fields[]=City&fields[]=Metro Area&fields[]=Email&fields[]=Twitter&fields[]=Github Handle&fields[]=Team lead&sort[0][field]=Name&sort[0][direction]=desc&filterByFormula=AND({Name} != "", {Teams} != "", {Friend of PLN} = FALSE(), REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}))&pageSize=9'
+    );
+  });
+
+  it('should return a valid query parameters string when sort is provided and is invalid', () => {
+    expect(
+      getMembersDirectoryRequestParametersFromQuery({
+        sort: 'invalid',
+      })
+    ).toEqual(
+      'fields[]=Name&fields[]=Profile picture&fields[]=Role&fields[]=Teams&fields[]=Team name&fields[]=Country&fields[]=State / Province&fields[]=City&fields[]=Metro Area&fields[]=Email&fields[]=Twitter&fields[]=Github Handle&fields[]=Team lead&sort[0][field]=Name&sort[0][direction]=asc&filterByFormula=AND({Name} != "", {Teams} != "", {Friend of PLN} = FALSE())&pageSize=9'
+    );
+  });
+
+  it('should return a valid query parameters string when sort is not provided', () => {
+    expect(
+      getMembersDirectoryRequestParametersFromQuery({
+        country: 'Portugal',
+        metroArea: 'Porto',
+        searchBy: 'void',
+        skills: 'Engineering|Leadership',
+      })
+    ).toEqual(
+      'fields[]=Name&fields[]=Profile picture&fields[]=Role&fields[]=Teams&fields[]=Team name&fields[]=Country&fields[]=State / Province&fields[]=City&fields[]=Metro Area&fields[]=Email&fields[]=Twitter&fields[]=Github Handle&fields[]=Team lead&sort[0][field]=Name&sort[0][direction]=asc&filterByFormula=AND({Name} != "", {Teams} != "", {Friend of PLN} = FALSE(), REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}))&pageSize=9'
     );
   });
 });
