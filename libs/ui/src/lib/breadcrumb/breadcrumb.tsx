@@ -14,7 +14,7 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
   return (
     <nav
       aria-label="breadcrumb"
-      className="navbar top-20 border-t border-t-slate-200 px-16 py-3.5 text-sm leading-6 shadow-[0_1px_4px_0_#e2e8f0]"
+      className="navbar top-20 z-40 border-t border-t-slate-200 px-16 py-3.5 text-sm leading-6 shadow-[0_1px_4px_0_#e2e8f0]"
     >
       <Link href="/">
         <a>
