@@ -110,7 +110,7 @@ class AirtableService {
       .select(options)
       .all()) as unknown as IAirtableTeam[];
 
-    return this._parseMembers(members);
+    return this.parseMembers(members);
   }
 
   /**
@@ -163,6 +163,13 @@ class AirtableService {
   }
 
   /**
+   * Parse Airtable's member records into the appropriate format.
+   */
+  public parseMembers(members: IAirtableMember[]): IMember[] {
+    return members.map((member) => this._parseMember(member));
+  }
+
+  /**
    * Service initialization.
    */
   private _init() {
@@ -201,13 +208,6 @@ class AirtableService {
       website:
         (team.fields.Website && team.fields.Website.split(' ')[0]) || null,
     };
-  }
-
-  /**
-   * Parse Airtable's member records into the appropriate format.
-   */
-  private _parseMembers(members: IAirtableMember[]): IMember[] {
-    return members.map((member) => this._parseMember(member));
   }
 
   /**
