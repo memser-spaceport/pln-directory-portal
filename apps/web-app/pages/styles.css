@@ -13,6 +13,10 @@ body {
 }
 
 @layer components {
+  .detail-label {
+    @apply mb-2 text-sm font-medium text-slate-500;
+  }
+
   .card {
     @apply rounded-xl border bg-white p-5 text-sm shadow-md shadow-slate-200;
   }
