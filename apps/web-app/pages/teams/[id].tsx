@@ -5,8 +5,10 @@ import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import { AskToEditCard } from '../../components/shared/ask-to-edit-card/ask-to-edit-card';
 import { MEMBER_CARD_FIELDS } from '../../components/shared/members/member-card/member-card.constants';
-import TeamProfileDetails from '../../components/teams/team-profile/team-profile-details/team-profile-details';
-import TeamProfileSidebar from '../../components/teams/team-profile/team-profile-sidebar/team-profile-sidebar';
+import { TeamProfileDetails } from '../../components/teams/team-profile/team-profile-details/team-profile-details';
+import { TeamProfileFunding } from '../../components/teams/team-profile/team-profile-funding/team-profile-funding';
+import { TeamProfileHeader } from '../../components/teams/team-profile/team-profile-header/team-profile-header';
+import TeamProfileMembers from '../../components/teams/team-profile/team-profile-members/team-profile-members';
 import { useProfileBreadcrumb } from '../../hooks/profile/use-profile-breadcrumb.hook';
 
 interface TeamProps {
@@ -28,13 +30,15 @@ export default function Team({ team, members, backLink }: TeamProps) {
         <title>Team {team.name}</title>
       </Head>
       <Breadcrumb items={breadcrumbItems} />
-      <section className="px-10 pt-24">
-        <div className="mb-10 flex space-x-10">
-          <TeamProfileSidebar team={team} />
-          <TeamProfileDetails team={team} members={members} />
-          <div className="w-[291px] shrink-0">
-            <AskToEditCard profileType="team" profileName={team.name} />
-          </div>
+      <section className="mx-auto mt-24 mb-10 flex max-w-7xl space-x-[30px] px-10">
+        <div className="card w-full space-y-6 p-[30px]">
+          <TeamProfileHeader {...team} />
+          <TeamProfileDetails {...team} />
+          <TeamProfileFunding {...team} />
+          <TeamProfileMembers members={members} />
+        </div>
+        <div className="w-[291px] shrink-0">
+          <AskToEditCard profileType="team" profileName={team.name} />
         </div>
       </section>
     </>

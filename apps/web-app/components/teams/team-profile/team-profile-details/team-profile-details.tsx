@@ -1,40 +1,31 @@
-import { IMember, ITeam } from '@protocol-labs-network/api';
-import TeamProfileAcceleratorPrograms from '../team-profile-accelerator-programs/team-profile-accelerator-programs';
-import TeamProfileDescription from '../team-profile-description/team-profile-description';
-import TeamProfileFundingStage from '../team-profile-funding-stage/team-profile-funding-stage';
-import TeamProfileMembers from '../team-profile-members/team-profile-members';
+import { ITeam } from '@protocol-labs-network/api';
+import { CollapsibleText } from '@protocol-labs-network/ui';
 
-interface TeamProfileDetailsProps {
-  team: ITeam;
-  members: IMember[];
-}
-
-export default function TeamProfileDetails({
-  team,
-  members,
-}: TeamProfileDetailsProps) {
+export function TeamProfileDetails({
+  website,
+  twitter,
+  longDescription,
+  shortDescription,
+}: ITeam) {
   return (
-    <div className="w-full">
-      <div className="flex flex-col gap-y-6">
-        <div className="card">
-          <h1 className="mb-4 text-3xl font-bold">
-            {team.name || 'Not provided'}
-          </h1>
-
-          <TeamProfileDescription
-            description={team.longDescription || 'Not provided'}
-          />
+    <>
+      <div className="flex">
+        <div className="w-1/2">
+          <h2 className="detail-label">Website</h2>
+          <p>{website || '-'}</p>
         </div>
-        <div className="flex gap-x-6">
-          <TeamProfileFundingStage fundingStage={team.fundingStage} />
-          <TeamProfileAcceleratorPrograms
-            acceleratorPrograms={team.acceleratorPrograms}
-          />
+        <div className="w-1/2">
+          <h2 className="detail-label">Twitter</h2>
+          <p>{twitter || '-'}</p>
         </div>
       </div>
-      <div className="mt-6">
-        <TeamProfileMembers members={members} />
+      <div>
+        <h2 className="detail-label">About</h2>
+        <CollapsibleText
+          maxChars={500}
+          txt={longDescription || shortDescription || '-'}
+        />
       </div>
-    </div>
+    </>
   );
 }
