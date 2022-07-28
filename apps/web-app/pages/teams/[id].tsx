@@ -8,7 +8,7 @@ import { MEMBER_CARD_FIELDS } from '../../components/shared/members/member-card/
 import { TeamProfileDetails } from '../../components/teams/team-profile/team-profile-details/team-profile-details';
 import { TeamProfileFunding } from '../../components/teams/team-profile/team-profile-funding/team-profile-funding';
 import { TeamProfileHeader } from '../../components/teams/team-profile/team-profile-header/team-profile-header';
-import TeamProfileMembers from '../../components/teams/team-profile/team-profile-members/team-profile-members';
+import { TeamProfileMembers } from '../../components/teams/team-profile/team-profile-members/team-profile-members';
 import { useProfileBreadcrumb } from '../../hooks/profile/use-profile-breadcrumb.hook';
 
 interface TeamProps {
