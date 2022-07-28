@@ -1,4 +1,4 @@
-const teamMock: IAirtableTeam = {
+const teamMock01: IAirtableTeam = {
   id: 'team_id_01',
   fields: {
     Name: 'Team 01',
@@ -24,14 +24,34 @@ const teamMock: IAirtableTeam = {
     'Friend of PLN': true,
   },
 };
+const teamMock02: IAirtableTeam = {
+  id: 'team_id_02',
+  fields: {
+    Name: 'Team 02',
+    'Short description': 'Short description for Team 02',
+    Logo: [
+      {
+        id: 'team_logo_02',
+        url: 'http://team02.com/logo.svg',
+        thumbnails: {
+          large: {
+            url: 'http://team02.com/logo-large.svg',
+            height: 10,
+            width: 10,
+          },
+        },
+      },
+    ],
+  },
+};
 const emptyTeamMock: IAirtableTeam = { id: 'team_id_02', fields: {} };
-const teamsMock = [teamMock, emptyTeamMock];
+const teamsMock = [teamMock01, teamMock02, emptyTeamMock];
 const teamsTableMock: Airtable.Table<Record<string, string>> = {
   select: jest.fn().mockReturnValue({
     all: jest.fn().mockReturnValue(teamsMock),
     firstPage: jest.fn().mockReturnValue(teamsMock),
   }),
-  find: jest.fn().mockReturnValue(teamMock),
+  find: jest.fn().mockReturnValue(teamMock01),
 } as unknown as Airtable.Table<Record<string, string>>;
 
 const memberMock01: IAirtableMember = {
@@ -81,6 +101,19 @@ const memberMock02: IAirtableMember = {
     Name: 'John Doe',
     Country: 'United Kingdom',
     City: 'London',
+    'Profile picture': [
+      {
+        id: 'att2TxEATPkbk9dta',
+        url: 'https://dl.airtable.com/.attachments/f3ce65a21764f91ed7a907bb330ca60e/4dbc4f0c/adam_photo2.jpg?ts=1650540687&userId=usr6bGImQsm8pYc83&cs=9de9f8e366186ad5',
+        thumbnails: {
+          large: {
+            url: 'https://dl.airtable.com/.attachments/f3ce65a21764f91ed7a907bb330ca60e/4dbc4f0c/adam_photo2_large.jpg?ts=1650540687&userId=usr6bGImQsm8pYc83&cs=9de9f8e366186ad5',
+            height: 10,
+            width: 10,
+          },
+        },
+      },
+    ],
   },
 };
 const memberMock03: IAirtableMember = {
@@ -172,19 +205,34 @@ describe('AirtableService', () => {
     expect(teamsTableMock.select().all).toHaveBeenCalledTimes(1);
     expect(teams).toEqual([
       {
-        filecoinUser: teamMock.fields['Filecoin User'],
-        fundingStage: teamMock.fields['Funding Stage'],
-        acceleratorPrograms: teamMock.fields['Accelerator Programs'],
-        id: teamMock.id,
-        tags: teamMock.fields['Tags lookup'],
-        ipfsUser: teamMock.fields['IPFS User'],
-        members: teamMock.fields['Network members'],
-        logo: teamMock.fields.Logo?.[0].url,
-        longDescription: teamMock.fields['Long description'],
-        name: teamMock.fields.Name,
-        shortDescription: teamMock.fields['Short description'],
-        twitter: teamMock.fields.Twitter,
+        filecoinUser: teamMock01.fields['Filecoin User'],
+        fundingStage: teamMock01.fields['Funding Stage'],
+        acceleratorPrograms: teamMock01.fields['Accelerator Programs'],
+        id: teamMock01.id,
+        tags: teamMock01.fields['Tags lookup'],
+        ipfsUser: teamMock01.fields['IPFS User'],
+        members: teamMock01.fields['Network members'],
+        logo: teamMock01.fields.Logo?.[0].url,
+        longDescription: teamMock01.fields['Long description'],
+        name: teamMock01.fields.Name,
+        shortDescription: teamMock01.fields['Short description'],
+        twitter: teamMock01.fields.Twitter,
         website: 'http://team01.com/',
+      },
+      {
+        filecoinUser: false,
+        fundingStage: null,
+        acceleratorPrograms: [],
+        id: teamMock02.id,
+        tags: [],
+        ipfsUser: false,
+        members: [],
+        logo: teamMock02.fields.Logo?.[0].thumbnails?.large?.url,
+        longDescription: null,
+        name: teamMock02.fields.Name,
+        shortDescription: teamMock02.fields['Short description'],
+        twitter: null,
+        website: null,
       },
       {
         filecoinUser: false,
@@ -223,19 +271,34 @@ describe('AirtableService', () => {
     expect(teamsTableMock.select().firstPage).toHaveBeenCalledTimes(1);
     expect(teams).toEqual([
       {
-        filecoinUser: teamMock.fields['Filecoin User'],
-        fundingStage: teamMock.fields['Funding Stage'],
-        acceleratorPrograms: teamMock.fields['Accelerator Programs'],
-        id: teamMock.id,
-        tags: teamMock.fields['Tags lookup'],
-        ipfsUser: teamMock.fields['IPFS User'],
-        members: teamMock.fields['Network members'],
-        logo: teamMock.fields.Logo?.[0].url,
-        longDescription: teamMock.fields['Long description'],
-        name: teamMock.fields.Name,
-        shortDescription: teamMock.fields['Short description'],
-        twitter: teamMock.fields.Twitter,
+        filecoinUser: teamMock01.fields['Filecoin User'],
+        fundingStage: teamMock01.fields['Funding Stage'],
+        acceleratorPrograms: teamMock01.fields['Accelerator Programs'],
+        id: teamMock01.id,
+        tags: teamMock01.fields['Tags lookup'],
+        ipfsUser: teamMock01.fields['IPFS User'],
+        members: teamMock01.fields['Network members'],
+        logo: teamMock01.fields.Logo?.[0].url,
+        longDescription: teamMock01.fields['Long description'],
+        name: teamMock01.fields.Name,
+        shortDescription: teamMock01.fields['Short description'],
+        twitter: teamMock01.fields.Twitter,
         website: 'http://team01.com/',
+      },
+      {
+        filecoinUser: false,
+        fundingStage: null,
+        acceleratorPrograms: [],
+        id: teamMock02.id,
+        tags: [],
+        ipfsUser: false,
+        members: [],
+        logo: teamMock02.fields.Logo?.[0].thumbnails?.large?.url,
+        longDescription: null,
+        name: teamMock02.fields.Name,
+        shortDescription: teamMock02.fields['Short description'],
+        twitter: null,
+        website: null,
       },
       {
         filecoinUser: false,
@@ -258,23 +321,23 @@ describe('AirtableService', () => {
   it('should be able to find and retrieve the team with the provided id on teams table', async () => {
     (<jest.Mock>teamsTableMock.find).mockClear();
 
-    const team = await airtableService.getTeam(teamMock.id);
+    const team = await airtableService.getTeam(teamMock01.id);
 
     expect(teamsTableMock.find).toHaveBeenCalledTimes(1);
-    expect(teamsTableMock.find).toHaveBeenCalledWith(teamMock.id);
+    expect(teamsTableMock.find).toHaveBeenCalledWith(teamMock01.id);
     expect(team).toEqual({
-      filecoinUser: teamMock.fields['Filecoin User'],
-      fundingStage: teamMock.fields['Funding Stage'],
-      acceleratorPrograms: teamMock.fields['Accelerator Programs'],
-      id: teamMock.id,
-      tags: teamMock.fields['Tags lookup'],
-      ipfsUser: teamMock.fields['IPFS User'],
-      members: teamMock.fields['Network members'],
-      logo: teamMock.fields.Logo?.[0].url,
-      longDescription: teamMock.fields['Long description'],
-      name: teamMock.fields.Name,
-      shortDescription: teamMock.fields['Short description'],
-      twitter: teamMock.fields.Twitter,
+      filecoinUser: teamMock01.fields['Filecoin User'],
+      fundingStage: teamMock01.fields['Funding Stage'],
+      acceleratorPrograms: teamMock01.fields['Accelerator Programs'],
+      id: teamMock01.id,
+      tags: teamMock01.fields['Tags lookup'],
+      ipfsUser: teamMock01.fields['IPFS User'],
+      members: teamMock01.fields['Network members'],
+      logo: teamMock01.fields.Logo?.[0].url,
+      longDescription: teamMock01.fields['Long description'],
+      name: teamMock01.fields.Name,
+      shortDescription: teamMock01.fields['Short description'],
+      twitter: teamMock01.fields.Twitter,
       website: 'http://team01.com/',
     });
   });
@@ -529,7 +592,8 @@ describe('AirtableService', () => {
         email: null,
         githubHandle: null,
         id: memberMock02.id,
-        image: null,
+        image:
+          memberMock02.fields['Profile picture']?.[0].thumbnails?.large?.url,
         location: `${memberMock02.fields.City}, ${memberMock02.fields.Country}`,
         name: memberMock02.fields.Name,
         officeHours: null,
@@ -873,19 +937,34 @@ describe('AirtableService', () => {
   it('should be able to parse the provided teams into the intended format', () => {
     expect(airtableService.parseTeams(teamsMock)).toEqual([
       {
-        filecoinUser: teamMock.fields['Filecoin User'],
-        fundingStage: teamMock.fields['Funding Stage'],
-        acceleratorPrograms: teamMock.fields['Accelerator Programs'],
-        id: teamMock.id,
-        tags: teamMock.fields['Tags lookup'],
-        ipfsUser: teamMock.fields['IPFS User'],
-        members: teamMock.fields['Network members'],
-        logo: teamMock.fields.Logo?.[0].url,
-        longDescription: teamMock.fields['Long description'],
-        name: teamMock.fields.Name,
-        shortDescription: teamMock.fields['Short description'],
-        twitter: teamMock.fields.Twitter,
+        filecoinUser: teamMock01.fields['Filecoin User'],
+        fundingStage: teamMock01.fields['Funding Stage'],
+        acceleratorPrograms: teamMock01.fields['Accelerator Programs'],
+        id: teamMock01.id,
+        tags: teamMock01.fields['Tags lookup'],
+        ipfsUser: teamMock01.fields['IPFS User'],
+        members: teamMock01.fields['Network members'],
+        logo: teamMock01.fields.Logo?.[0].url,
+        longDescription: teamMock01.fields['Long description'],
+        name: teamMock01.fields.Name,
+        shortDescription: teamMock01.fields['Short description'],
+        twitter: teamMock01.fields.Twitter,
         website: 'http://team01.com/',
+      },
+      {
+        filecoinUser: false,
+        fundingStage: null,
+        acceleratorPrograms: [],
+        id: teamMock02.id,
+        tags: [],
+        ipfsUser: false,
+        members: [],
+        logo: teamMock02.fields.Logo?.[0].thumbnails?.large?.url,
+        longDescription: null,
+        name: teamMock02.fields.Name,
+        shortDescription: teamMock02.fields['Short description'],
+        twitter: null,
+        website: null,
       },
       {
         filecoinUser: false,
@@ -934,7 +1013,8 @@ describe('AirtableService', () => {
         email: null,
         githubHandle: null,
         id: memberMock02.id,
-        image: null,
+        image:
+          memberMock02.fields['Profile picture']?.[0].thumbnails?.large?.url,
         location: `${memberMock02.fields.City}, ${memberMock02.fields.Country}`,
         name: memberMock02.fields.Name,
         officeHours: null,
