@@ -193,7 +193,11 @@ class AirtableService {
       tags: team.fields['Tags lookup'] || [],
       ipfsUser: !!team.fields['IPFS User'],
       members: team.fields['Network members'] || [],
-      logo: (team.fields.Logo && team.fields.Logo[0]?.url) || null,
+      logo:
+        (team.fields.Logo &&
+          (team.fields.Logo[0]?.thumbnails?.large?.url ||
+            team.fields.Logo[0]?.url)) ||
+        null,
       longDescription: team.fields['Long description'] || null,
       name: team.fields.Name || null,
       shortDescription: team.fields['Short description'] || null,
@@ -222,7 +226,8 @@ class AirtableService {
       id: member.id,
       image:
         (member.fields['Profile picture'] &&
-          member.fields['Profile picture'][0]?.url) ||
+          (member.fields['Profile picture'][0]?.thumbnails?.large?.url ||
+            member.fields['Profile picture'][0]?.url)) ||
         null,
       location: this._parseMemberLocation(member),
       name: member.fields.Name || null,
