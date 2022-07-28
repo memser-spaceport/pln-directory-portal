@@ -514,7 +514,8 @@ describe('AirtableService', () => {
         'IPFS User',
         'Filecoin User',
       ],
-      filterByFormula: 'AND({Name} != "", {Short description} != "")',
+      filterByFormula:
+        'AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE())',
     });
     expect(teamsTableMock.select).toHaveBeenNthCalledWith(2, {
       fields: [
@@ -741,7 +742,8 @@ describe('AirtableService', () => {
     expect(membersTableMock.select).toHaveBeenCalledTimes(2);
     expect(membersTableMock.select).toHaveBeenNthCalledWith(1, {
       fields: ['Skills', 'Country', 'Metro Area'],
-      filterByFormula: 'AND({Name} != "", {Teams} != "")',
+      filterByFormula:
+        'AND({Name} != "", {Teams} != "", {Friend of PLN} = FALSE())',
     });
     expect(membersTableMock.select).toHaveBeenNthCalledWith(2, {
       fields: ['Skills', 'Country', 'Metro Area'],
