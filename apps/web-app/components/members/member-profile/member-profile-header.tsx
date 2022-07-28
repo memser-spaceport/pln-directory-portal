@@ -24,7 +24,7 @@ export function MemberProfileHeader({ member }: MemberProfileHeaderProps) {
               alt={`${member.name} Logo`}
               src={member.image}
               layout="fill"
-              objectFit="contain"
+              objectFit="cover"
               objectPosition="center"
             />
           ) : (
