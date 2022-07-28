@@ -28,8 +28,8 @@ export default function Member({ member, teams, backLink }: MemberProps) {
         <title>Member {member.name}</title>
       </Head>
       <Breadcrumb items={breadcrumbItems} />
-      <section className="px-10 py-3">
-        <div className="mt-6 flex items-start space-x-10">
+      <section className="px-10 pt-24">
+        <div className="mb-10 flex space-x-10">
           <div className="flex grow flex-col space-y-8">
             <MemberProfileHeader member={member} />
             <MemberProfileTeams teams={teams} />
