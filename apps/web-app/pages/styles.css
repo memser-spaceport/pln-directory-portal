@@ -21,6 +21,6 @@ body {
   }
 
   .navbar {
-    @apply sticky z-50 flex w-full min-w-[1272px] items-center bg-white/95;
+    @apply fixed z-50 flex w-full min-w-[1272px] items-center bg-white/95;
   }
 }

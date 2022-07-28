@@ -28,8 +28,8 @@ export default function Team({ team, members, backLink }: TeamProps) {
         <title>Team {team.name}</title>
       </Head>
       <Breadcrumb items={breadcrumbItems} />
-      <section className="px-10 py-3">
-        <div className="mt-6 flex space-x-10">
+      <section className="px-10 pt-24">
+        <div className="mb-10 flex space-x-10">
           <TeamProfileSidebar team={team} />
           <TeamProfileDetails team={team} members={members} />
           <div className="w-[291px] shrink-0">

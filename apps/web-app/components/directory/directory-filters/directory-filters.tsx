@@ -31,7 +31,7 @@ export function DirectoryFilters({
         </button>
       </div>
 
-      <div className="h-[calc(100vh_-_159px)] overflow-y-auto p-5">
+      <div className="h-[calc(100vh_-_148px)] overflow-y-auto p-5">
         {children}
       </div>
     </>

@@ -13,7 +13,7 @@ function CustomApp({ Component, pageProps }: AppProps) {
       <Head>
         <title>Protocol Labs Network</title>
       </Head>
-      <main className="app">
+      <main className="app pt-20">
         <Navbar />
         <Component {...pageProps} />
       </main>
