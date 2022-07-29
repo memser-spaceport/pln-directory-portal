@@ -211,7 +211,7 @@ describe('/api/members', () => {
       expect(resStatus).toHaveBeenCalledWith(500);
       expect(resJson).toHaveBeenCalledTimes(1);
       expect(resJson).toHaveBeenCalledWith({
-        msg: 'Ups, something went wrong 😕',
+        error: { msg: 'Ups, something went wrong 😕' },
       });
     });
   });

@@ -100,10 +100,12 @@ export function getTeamsDirectoryRequestParametersFromQuery(
   const fieldsParam = TEAM_CARD_FIELDS.map((field) => `fields[]=${field}`).join(
     '&'
   );
+
   const sortFromQuery = getSortFromQuery(sort?.toString());
   const sortFieldParam = `sort[0][field]=${sortFromQuery.field}`;
   const sortDirectionParam = `sort[0][direction]=${sortFromQuery.direction}`;
   const sortParam = `${sortFieldParam}&${sortDirectionParam}`;
+
   const teamsDirectoryFormula = getTeamsDirectoryFormula({
     tags,
     acceleratorPrograms,
@@ -111,7 +113,9 @@ export function getTeamsDirectoryRequestParametersFromQuery(
     searchBy,
     technology,
   });
-  const filterByFormulaParam = `filterByFormula=${teamsDirectoryFormula}`;
+  const encodedFormula = encodeURIComponent(teamsDirectoryFormula);
+  const filterByFormulaParam = `filterByFormula=${encodedFormula}`;
+
   const pageSizeParam = `pageSize=${ITEMS_PER_PAGE}`;
 
   return `${fieldsParam}&${sortParam}&${filterByFormulaParam}&${pageSizeParam}`;
@@ -129,17 +133,21 @@ export function getMembersDirectoryRequestParametersFromQuery(
   const fieldsParam = MEMBER_CARD_FIELDS.map(
     (field) => `fields[]=${field}`
   ).join('&');
+
   const sortFromQuery = getSortFromQuery(sort?.toString());
   const sortFieldParam = `sort[0][field]=${sortFromQuery.field}`;
   const sortDirectionParam = `sort[0][direction]=${sortFromQuery.direction}`;
   const sortParam = `${sortFieldParam}&${sortDirectionParam}`;
+
   const membersDirectoryFormula = getMembersDirectoryFormula({
     searchBy,
     skills,
     country,
     metroArea,
   });
-  const filterByFormulaParam = `filterByFormula=${membersDirectoryFormula}`;
+  const encodedFormula = encodeURIComponent(membersDirectoryFormula);
+  const filterByFormulaParam = `filterByFormula=${encodedFormula}`;
+
   const pageSizeParam = `pageSize=${ITEMS_PER_PAGE}`;
 
   return `${fieldsParam}&${sortParam}&${filterByFormulaParam}&${pageSizeParam}`;
