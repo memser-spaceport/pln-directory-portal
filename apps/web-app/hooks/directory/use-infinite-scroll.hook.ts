@@ -21,6 +21,7 @@ export function useInfiniteScroll({
   const [initialLoad, setInitialLoad] = useState(true);
   const [offset, setOffset] = useState<string>();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
   const router = useRouter();
 
   // Set first page of items based on initial items provided
@@ -106,9 +107,16 @@ export function useInfiniteScroll({
           const response = await fetch(url);
           const data = await response.json();
 
-          // Update internal state with the response data
-          setItems([...items, ...data[dataResultsProp]]);
-          setOffset(data.offset);
+          if (data.error) {
+            setError(true);
+          } else {
+            if (data[dataResultsProp]) {
+              // Update internal state with the response data
+              setItems([...items, ...data[dataResultsProp]]);
+              setOffset(data.offset);
+            }
+          }
+
           setLoading(false);
         }
       }
@@ -124,5 +132,5 @@ export function useInfiniteScroll({
     dataResultsProp,
   ]);
 
-  return [items, loading] as const;
+  return [items, loading, error] as const;
 }

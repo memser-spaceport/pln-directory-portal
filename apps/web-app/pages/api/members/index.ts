@@ -16,9 +16,7 @@ export default async function getMembersHandler(
 
   try {
     const params = getMembersDirectoryRequestParametersFromQuery(req.query);
-    let url = encodeURI(
-      `https://api.airtable.com/v0/${env.AIRTABLE_BASE_ID}/${env.AIRTABLE_MEMBERS_TABLE_ID}?api_key=${env.AIRTABLE_API_KEY}&${params}`
-    );
+    let url = `https://api.airtable.com/v0/${env.AIRTABLE_BASE_ID}/${env.AIRTABLE_MEMBERS_TABLE_ID}?api_key=${env.AIRTABLE_API_KEY}&${params}`;
     let offset = req.query.offset;
 
     // When offset is not provided, it's because we don't have it yet,
@@ -72,6 +70,6 @@ export default async function getMembersHandler(
       members: airtableService.parseMembers(data.records),
     });
   } catch (error) {
-    res.status(500).json({ msg: 'Ups, something went wrong 😕' });
+    res.status(500).json({ error: { msg: 'Ups, something went wrong 😕' } });
   }
 }

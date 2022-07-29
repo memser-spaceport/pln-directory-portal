@@ -1,4 +1,5 @@
 import { ITeam } from '@protocol-labs-network/api';
+import { DirectoryError } from '../../../../components/directory/directory-error/directory-error';
 import { DirectoryLoading } from '../../../../components/directory/directory-loading/directory-loading';
 import { TeamCard } from '../../../../components/shared/teams/team-card/team-card';
 import { useInfiniteScroll } from '../../../../hooks/directory/use-infinite-scroll.hook';
@@ -15,7 +16,7 @@ export function TeamsDirectoryList({
   const cardSelector = '.teams-list > .card:last-child';
   const baseAPIRoute = '/api/teams';
   const dataResultsProp = 'teams';
-  const [teams, loading] = useInfiniteScroll({
+  const [teams, loading, error] = useInfiniteScroll({
     initialItems: teamsData,
     baseAPIRoute,
     cardSelector,
@@ -33,6 +34,12 @@ export function TeamsDirectoryList({
       {loading && (
         <div className="flex justify-center">
           <DirectoryLoading />
+        </div>
+      )}
+
+      {error && (
+        <div className="flex justify-center">
+          <DirectoryError />
         </div>
       )}
     </>
