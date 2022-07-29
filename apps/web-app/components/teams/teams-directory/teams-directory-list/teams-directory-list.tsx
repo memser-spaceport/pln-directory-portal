@@ -1,4 +1,5 @@
 import { ITeam } from '@protocol-labs-network/api';
+import { DirectoryEmpty } from '../../../../components/directory/directory-empty/directory-empty';
 import { DirectoryError } from '../../../../components/directory/directory-error/directory-error';
 import { DirectoryLoading } from '../../../../components/directory/directory-loading/directory-loading';
 import { TeamCard } from '../../../../components/shared/teams/team-card/team-card';
@@ -30,6 +31,20 @@ export function TeamsDirectoryList({
           return <TeamCard key={team.id} team={team} isGrid={isGrid} />;
         })}
       </div>
+
+      {!loading && !error && !teams.length && (
+        <div className="flex justify-center">
+          <DirectoryEmpty
+            filterProperties={[
+              'tags',
+              'acceleratorPrograms',
+              'fundingStage',
+              'technology',
+              'searchBy',
+            ]}
+          />
+        </div>
+      )}
 
       {loading && (
         <div className="flex justify-center">

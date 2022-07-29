@@ -1,5 +1,5 @@
 import { XIcon } from '@heroicons/react/solid';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { composeEventHandlers } from '../../utils/event-handlers.utils';
 
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
@@ -21,6 +21,10 @@ export function InputField({
 }: InputFieldProps) {
   const [inputValue, setInputValue] = useState(defaultValue);
   const InputIcon = icon;
+
+  useEffect(() => {
+    setInputValue(defaultValue);
+  }, [setInputValue, defaultValue]);
 
   function handleUserInput(event: React.ChangeEvent<HTMLInputElement>) {
     setInputValue(event.currentTarget.value);
