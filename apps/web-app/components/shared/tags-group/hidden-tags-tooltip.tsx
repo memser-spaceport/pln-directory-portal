@@ -6,7 +6,7 @@ export interface HiddenTagsTooltipProps {
 
 export function HiddenTagsTooltip({ items }: HiddenTagsTooltipProps) {
   const hiddenTagsTrigger = () => (
-    <span className="tag group flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full p-0 hover:bg-slate-200 hover:text-slate-900">
+    <span className="tag group flex h-[26px] w-[26px] shrink-0 cursor-pointer items-center justify-center rounded-full p-0 leading-[14px] hover:bg-slate-200 hover:text-slate-900">
       +{items.length}
     </span>
   );

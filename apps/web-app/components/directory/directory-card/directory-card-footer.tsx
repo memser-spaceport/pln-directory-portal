@@ -11,8 +11,8 @@ export function DirectoryCardFooter({
   return (
     <>
       {isGrid ? <div className="my-4 h-px bg-slate-200"></div> : null}
-      <div className={isGrid ? '' : 'grow self-center'}>
-        {tagsArr?.length ? <TagsGroup isSingleLine items={tagsArr} /> : null}
+      <div className={isGrid ? 'min-h-[26px]' : 'grow self-center'}>
+        {tagsArr?.length ? <TagsGroup isSingleLine items={tagsArr} /> : '-'}
       </div>
     </>
   );

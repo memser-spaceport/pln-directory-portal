@@ -1,5 +1,4 @@
-import { LocationMarkerIcon } from '@heroicons/react/outline';
-import { UserIcon } from '@heroicons/react/solid';
+import { LocationMarkerIcon, UserIcon } from '@heroicons/react/solid';
 import { IMember } from '@protocol-labs-network/api';
 import { useRouter } from 'next/router';
 import { DirectoryCard } from '../../../../components/directory/directory-card/directory-card';
@@ -14,7 +13,6 @@ interface MemberCardProps {
 export function MemberCard({ isGrid = true, member }: MemberCardProps) {
   const router = useRouter();
   const backLink = encodeURIComponent(router.asPath);
-  const teamsNames = member.teams.map(({ name }) => name);
 
   return (
     <DirectoryCard
@@ -30,24 +28,29 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
         teamLead={member.teamLead}
       />
       <div className={isGrid ? '' : 'w-[400px] grow-0'}>
-        <h2 className={`${isGrid ? 'my-2' : ''} text-lg font-semibold`}>
+        <h2
+          className={`${
+            isGrid ? 'mt-2' : ''
+          } line-clamp-1 text-lg font-semibold`}
+        >
           {member.name}
         </h2>
-        <p className="line-clamp-1">{member.role}</p>
+        <p className={isGrid ? 'line-clamp-2 mt-1 h-10' : 'line-clamp-1'}>
+          {member.role || 'Collaborator'} at {member.teams[0].name}
+        </p>
         {member.location ? (
           <div
-            className={`mt-2 flex items-center text-sm text-slate-500 ${
-              isGrid ? 'justify-center' : ''
-            }`}
+            className={`${isGrid ? 'mt-2 justify-center' : 'mt-1'}
+            } flex items-center text-sm text-slate-600`}
           >
-            <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0" />
+            <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0 fill-slate-400" />
             <span className="line-clamp-1">{member.location}</span>
           </div>
         ) : (
           '-'
         )}
       </div>
-      <DirectoryCardFooter isGrid={isGrid} tagsArr={teamsNames} />
+      <DirectoryCardFooter isGrid={isGrid} tagsArr={member.skills} />
     </DirectoryCard>
   );
 }
