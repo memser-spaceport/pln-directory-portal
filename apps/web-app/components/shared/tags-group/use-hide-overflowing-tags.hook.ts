@@ -1,13 +1,35 @@
-import { MutableRefObject, useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
+import { MutableRefObject, useCallback, useEffect, useState } from 'react';
 
 export function useHideOverflowingTags(
   containerRef: MutableRefObject<HTMLDivElement>,
   tags: string[]
 ) {
-  const [visibleTags, setVisibleTags] = useState(
-    tags.sort((a, b) => a.length - b.length)
-  );
+  const sortedTags = [...tags].sort((a, b) => a.length - b.length);
+  const [visibleTags, setVisibleTags] = useState(sortedTags);
   const [hiddenTags, setHiddenTags] = useState<string[]>([]);
+  const router = useRouter();
+
+  useEffect(() => {
+    // Listen to route changes to re-calculate visible tags
+    router.events.on('routeChangeComplete', handleRouteChange);
+
+    return () => {
+      router.events.off('routeChangeComplete', handleRouteChange);
+    };
+  });
+
+  // When navigation is shallow, reset the visible and hidden tags to force
+  // a re-calculation.
+  const handleRouteChange = useCallback(
+    (_pathname: string, { shallow }: { shallow: boolean }) => {
+      if (shallow) {
+        setVisibleTags(sortedTags);
+        setHiddenTags([]);
+      }
+    },
+    [sortedTags, setVisibleTags, setHiddenTags]
+  );
 
   useEffect(() => {
     if (
