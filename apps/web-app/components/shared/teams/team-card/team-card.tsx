@@ -26,7 +26,11 @@ export function TeamCard({ team, isGrid = true }: TeamCardProps) {
         name={team.name}
       />
       <div className={isGrid ? '' : 'w-[400px] grow-0'}>
-        <h2 className={`${isGrid ? 'my-2' : ''} text-lg font-semibold`}>
+        <h2
+          className={`${
+            isGrid ? 'my-2' : ''
+          } line-clamp-1 text-lg font-semibold`}
+        >
           {team.name}
         </h2>
         <p

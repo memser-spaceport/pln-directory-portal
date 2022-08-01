@@ -42,7 +42,7 @@ export function useHideOverflowingTags(
 
     const { right: containerLimit } =
       containerRef.current.getBoundingClientRect();
-    const containerLimitWithSafetyMargin = containerLimit - 36; // Add 36px safety margin (based on "+X" button size)
+    const containerLimitWithSafetyMargin = containerLimit - 34; // Add 34px safety margin (based on "+X" button size)
     const tagElements = Array.from(containerRef.current.children).filter(
       (el: HTMLElement) => el.classList.contains('tag')
     ) as HTMLElement[];

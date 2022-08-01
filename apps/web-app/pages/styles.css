@@ -18,11 +18,11 @@ body {
   }
 
   .card {
-    @apply shadow-card--slate-900 rounded-xl border bg-white p-5 text-sm;
+    @apply shadow-card--slate-900 rounded-xl bg-white p-5 text-sm;
   }
 
   .tag {
-    @apply block max-w-full cursor-default whitespace-nowrap rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600;
+    @apply block max-w-full cursor-default whitespace-nowrap rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-medium leading-[14px] text-slate-600;
   }
 
   .navbar {

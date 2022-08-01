@@ -201,7 +201,7 @@ describe('#getMembersDirectoryRequestParametersFromQuery', () => {
         sort: 'Name,desc',
       })
     ).toEqual(
-      `fields[]=Name&fields[]=Profile picture&fields[]=Role&fields[]=Teams&fields[]=Team name&fields[]=Country&fields[]=State / Province&fields[]=City&fields[]=Metro Area&fields[]=Email&fields[]=Twitter&fields[]=Github Handle&fields[]=Team lead&sort[0][field]=Name&sort[0][direction]=desc&filterByFormula=${encodedFormula}&pageSize=9`
+      `fields[]=Name&fields[]=Profile picture&fields[]=Role&fields[]=Teams&fields[]=Team name&fields[]=Country&fields[]=State / Province&fields[]=City&fields[]=Metro Area&fields[]=Email&fields[]=Twitter&fields[]=Github Handle&fields[]=Team lead&fields[]=Skills&sort[0][field]=Name&sort[0][direction]=desc&filterByFormula=${encodedFormula}&pageSize=9`
     );
   });
 
@@ -215,7 +215,7 @@ describe('#getMembersDirectoryRequestParametersFromQuery', () => {
         sort: 'invalid',
       })
     ).toEqual(
-      `fields[]=Name&fields[]=Profile picture&fields[]=Role&fields[]=Teams&fields[]=Team name&fields[]=Country&fields[]=State / Province&fields[]=City&fields[]=Metro Area&fields[]=Email&fields[]=Twitter&fields[]=Github Handle&fields[]=Team lead&sort[0][field]=Name&sort[0][direction]=asc&filterByFormula=${encodedFormula}&pageSize=9`
+      `fields[]=Name&fields[]=Profile picture&fields[]=Role&fields[]=Teams&fields[]=Team name&fields[]=Country&fields[]=State / Province&fields[]=City&fields[]=Metro Area&fields[]=Email&fields[]=Twitter&fields[]=Github Handle&fields[]=Team lead&fields[]=Skills&sort[0][field]=Name&sort[0][direction]=asc&filterByFormula=${encodedFormula}&pageSize=9`
     );
   });
 
@@ -232,7 +232,7 @@ describe('#getMembersDirectoryRequestParametersFromQuery', () => {
         skills: 'Engineering|Leadership',
       })
     ).toEqual(
-      `fields[]=Name&fields[]=Profile picture&fields[]=Role&fields[]=Teams&fields[]=Team name&fields[]=Country&fields[]=State / Province&fields[]=City&fields[]=Metro Area&fields[]=Email&fields[]=Twitter&fields[]=Github Handle&fields[]=Team lead&sort[0][field]=Name&sort[0][direction]=asc&filterByFormula=${encodedFormula}&pageSize=9`
+      `fields[]=Name&fields[]=Profile picture&fields[]=Role&fields[]=Teams&fields[]=Team name&fields[]=Country&fields[]=State / Province&fields[]=City&fields[]=Metro Area&fields[]=Email&fields[]=Twitter&fields[]=Github Handle&fields[]=Team lead&fields[]=Skills&sort[0][field]=Name&sort[0][direction]=asc&filterByFormula=${encodedFormula}&pageSize=9`
     );
   });
 });

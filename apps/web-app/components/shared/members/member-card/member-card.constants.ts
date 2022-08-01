@@ -12,4 +12,5 @@ export const MEMBER_CARD_FIELDS = [
   'Twitter',
   'Github Handle',
   'Team lead',
+  'Skills',
 ];
