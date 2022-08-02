@@ -1,5 +1,6 @@
 import { ITeam } from '@protocol-labs-network/api';
-import { CollapsibleText } from '@protocol-labs-network/ui';
+import { CollapsibleText, Tooltip } from '@protocol-labs-network/ui';
+import { TeamProfileSocialLink } from './team-profile-social-link';
 
 export function TeamProfileDetails({
   website,
@@ -12,11 +13,27 @@ export function TeamProfileDetails({
       <div className="flex">
         <div className="w-1/2">
           <h2 className="detail-label">Website</h2>
-          <p>{website || '-'}</p>
+          {website ? (
+            <Tooltip Trigger={() => <TeamProfileSocialLink url={website} />}>
+              {website}
+            </Tooltip>
+          ) : (
+            '-'
+          )}
         </div>
         <div className="w-1/2">
           <h2 className="detail-label">Twitter</h2>
-          <p>{twitter || '-'}</p>
+          {twitter ? (
+            <Tooltip
+              Trigger={() => (
+                <TeamProfileSocialLink url={twitter} type="twitter" />
+              )}
+            >
+              {twitter}
+            </Tooltip>
+          ) : (
+            '-'
+          )}
         </div>
       </div>
       <div>

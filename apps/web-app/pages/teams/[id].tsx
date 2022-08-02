@@ -30,11 +30,13 @@ export default function Team({ team, members, backLink }: TeamProps) {
         <title>Team {team.name}</title>
       </Head>
       <Breadcrumb items={breadcrumbItems} />
-      <section className="mx-auto mt-24 mb-10 flex max-w-7xl space-x-[30px] px-10">
-        <div className="card w-full space-y-6 p-[30px]">
+      <section className="mx-auto mb-10 flex max-w-7xl space-x-[30px] px-10 pt-24">
+        <div className="card w-full space-y-6">
           <TeamProfileHeader {...team} />
           <TeamProfileDetails {...team} />
-          <TeamProfileFunding {...team} />
+          {team.fundingStage || team.acceleratorPrograms.length ? (
+            <TeamProfileFunding {...team} />
+          ) : null}
           <TeamProfileMembers members={members} />
         </div>
         <div className="w-[291px] shrink-0">
