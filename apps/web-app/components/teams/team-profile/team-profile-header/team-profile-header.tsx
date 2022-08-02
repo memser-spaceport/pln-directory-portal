@@ -38,7 +38,7 @@ export function TeamProfileHeader({
         <h1 className="text-2xl font-bold">{name}</h1>
         <div>
           {tags?.length ? (
-            <TagsGroup isSingleLine items={tags} />
+            <TagsGroup items={tags} />
           ) : (
             <span className="text-xs leading-7 text-slate-400">-</span>
           )}
