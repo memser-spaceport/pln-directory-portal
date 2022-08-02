@@ -40,7 +40,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
               searchPlaceholder="Search for a team"
             />
 
-            <TeamsDirectoryList teamsData={teams} isGrid={isGrid} />
+            <TeamsDirectoryList teams={teams} isGrid={isGrid} />
           </div>
         </div>
       </section>
@@ -55,7 +55,7 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
   const optionsFromQuery = getTeamsDirectoryRequestOptionsFromQuery(query);
   const listOptions = getTeamsDirectoryListOptions(optionsFromQuery);
   const [teams, filtersValues] = await Promise.all([
-    airtableService.getFirstTeamsPage(listOptions),
+    airtableService.getTeams(listOptions),
     airtableService.getTeamsFiltersValues(optionsFromQuery),
   ]);
   const parsedFilters = parseTeamsFilters(filtersValues, query);
