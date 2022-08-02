@@ -1,6 +1,5 @@
 import { MEMBER_CARD_FIELDS } from '../../../components/shared/members/member-card/member-card.constants';
 import { TEAM_CARD_FIELDS } from '../../../components/shared/teams/team-card/team-card.constants';
-import { ITEMS_PER_PAGE } from '../../../constants';
 import {
   getMembersDirectoryListOptions,
   getMembersDirectoryRequestOptionsFromQuery,
@@ -68,7 +67,6 @@ describe('#getTeamsDirectoryListOptions', () => {
       sort: [{ field: 'Name', direction: 'desc' }],
       filterByFormula: 'AND({Name} != "", {Short description} != "")',
       fields: TEAM_CARD_FIELDS,
-      pageSize: ITEMS_PER_PAGE,
     });
   });
 });

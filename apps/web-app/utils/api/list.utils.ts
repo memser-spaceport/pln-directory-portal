@@ -45,7 +45,6 @@ export function getTeamsDirectoryListOptions(
   return {
     ...options,
     fields: TEAM_CARD_FIELDS,
-    pageSize: ITEMS_PER_PAGE,
   };
 }
 
