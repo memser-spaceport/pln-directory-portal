@@ -1,4 +1,4 @@
-import { SearchIcon } from '@heroicons/react/solid';
+import { SearchIcon } from '@heroicons/react/outline';
 import { Meta, Story } from '@storybook/react';
 import { InputField, InputFieldProps } from './input-field';
 

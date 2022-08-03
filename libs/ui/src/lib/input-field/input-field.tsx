@@ -39,7 +39,7 @@ export function InputField({
     <label className="relative block">
       <span className="sr-only">{label}</span>
       {InputIcon ? (
-        <InputIcon className="absolute inset-y-0 left-2 my-auto h-4 w-4 fill-slate-600" />
+        <InputIcon className="absolute inset-y-0 left-2 my-auto h-4 w-4 text-slate-600" />
       ) : null}
       <input
         {...props}
