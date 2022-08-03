@@ -1,4 +1,4 @@
-import { SearchIcon } from '@heroicons/react/solid';
+import { SearchIcon } from '@heroicons/react/outline';
 import { InputField } from '@protocol-labs-network/ui';
 import { useRouter } from 'next/router';
 
