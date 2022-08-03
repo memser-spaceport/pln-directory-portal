@@ -32,6 +32,11 @@ module.exports = {
           'inset 0px 1px 0px rgba(255, 255, 255, 0.16)',
         ],
       },
+      colors: {
+        blue: {
+          600: '#156FF7',
+        },
+      },
     },
   },
   plugins: [require('@tailwindcss/line-clamp')],
