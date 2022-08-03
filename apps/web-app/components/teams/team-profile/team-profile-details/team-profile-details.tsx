@@ -14,9 +14,10 @@ export function TeamProfileDetails({
         <div className="w-1/2">
           <h2 className="detail-label">Website</h2>
           {website ? (
-            <Tooltip Trigger={() => <TeamProfileSocialLink url={website} />}>
-              {website}
-            </Tooltip>
+            <Tooltip
+              trigger={<TeamProfileSocialLink url={website} />}
+              content={website}
+            />
           ) : (
             '-'
           )}
@@ -25,12 +26,9 @@ export function TeamProfileDetails({
           <h2 className="detail-label">Twitter</h2>
           {twitter ? (
             <Tooltip
-              Trigger={() => (
-                <TeamProfileSocialLink url={twitter} type="twitter" />
-              )}
-            >
-              {twitter}
-            </Tooltip>
+              trigger={<TeamProfileSocialLink url={twitter} type="twitter" />}
+              content={twitter}
+            />
           ) : (
             '-'
           )}

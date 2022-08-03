@@ -1,24 +1,24 @@
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 
 export interface TooltipProps {
-  Trigger: React.ElementType;
-  children?: React.ReactNode;
+  trigger: React.ReactElement;
+  content: string;
 }
 
-export function Tooltip({ Trigger, children }: TooltipProps) {
+export function Tooltip({ trigger, content }: TooltipProps) {
   return (
     <TooltipPrimitive.Provider delayDuration={0}>
       <TooltipPrimitive.Root>
         <TooltipPrimitive.Trigger className="cursor-pointer">
-          <Trigger />
+          {trigger}
         </TooltipPrimitive.Trigger>
         <TooltipPrimitive.Content
           side="top"
           align="center"
           sideOffset={8}
-          className="flex-shrink-0 rounded bg-slate-900 py-1 px-2 text-xs font-medium text-white"
+          className="z-40 max-w-[260px] flex-shrink-0 rounded bg-slate-900 py-1 px-2 text-xs font-medium text-white"
         >
-          {children}
+          {content}
         </TooltipPrimitive.Content>
       </TooltipPrimitive.Root>
     </TooltipPrimitive.Provider>

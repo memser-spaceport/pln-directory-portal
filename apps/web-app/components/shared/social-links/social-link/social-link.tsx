@@ -18,22 +18,23 @@ export function SocialLink({ linkObj, linkIcon, type }: SocialLinkProps) {
     ...(isActive && { href: url }),
   };
 
-  const SocialIcon = () => {
-    return (
-      <Icon
-        className={`h-5 w-5 ${
-          isActive ? 'text-slate-500 hover:text-slate-600' : 'text-slate-300'
-        }`}
-      />
-    );
-  };
-
   return (
     <AnchorLink {...linkProps}>
       {linkObj.label ? (
-        <Tooltip Trigger={SocialIcon}>{linkObj.label}</Tooltip>
+        <Tooltip
+          trigger={
+            <Icon
+              className={`h-5 w-5 ${
+                isActive
+                  ? 'text-slate-500 hover:text-slate-600'
+                  : 'text-slate-300'
+              }`}
+            />
+          }
+          content={linkObj.label}
+        />
       ) : (
-        <SocialIcon />
+        <Icon className="h-5 w-5 text-slate-300" />
       )}
     </AnchorLink>
   );

@@ -46,14 +46,16 @@ export function TeamProfileHeader({
       </div>
       <div className="flex w-24 items-start justify-end space-x-4">
         {filecoinUser ? (
-          <Tooltip Trigger={() => <ProtocolBtn Icon={FilecoinIcon} />}>
-            Filecoin User
-          </Tooltip>
+          <Tooltip
+            trigger={<ProtocolBtn Icon={FilecoinIcon} />}
+            content="Filecoin User"
+          />
         ) : null}
         {ipfsUser ? (
-          <Tooltip Trigger={() => <ProtocolBtn Icon={IPFSIcon} />}>
-            IPFS User
-          </Tooltip>
+          <Tooltip
+            trigger={<ProtocolBtn Icon={IPFSIcon} />}
+            content="IPFS User"
+          />
         ) : null}
       </div>
     </div>
