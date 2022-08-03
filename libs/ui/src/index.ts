@@ -1,3 +1,4 @@
+export * from './lib/switch/switch';
 export * from './lib/anchor-link/anchor-link';
 export * from './lib/anchor-link/anchor-link.utils';
 export * from './lib/badge/badge';
