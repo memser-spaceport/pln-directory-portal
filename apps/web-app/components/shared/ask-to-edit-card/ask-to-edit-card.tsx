@@ -24,7 +24,7 @@ export function AskToEditCard({
         </span>
         Anything missing?
       </h3>
-      <p className="mt-4 mb-6 text-base text-[15px] ">
+      <p className="mt-4 mb-6 text-base">
         As a community, help Teams and Members stay updated with their
         information.
       </p>

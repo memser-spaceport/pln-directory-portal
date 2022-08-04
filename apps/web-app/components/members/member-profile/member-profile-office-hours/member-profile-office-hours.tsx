@@ -19,7 +19,7 @@ export function MemberProfileOfficeHours({
         </span>
         <h3 className="text-lg font-semibold">Office Hours</h3>
       </div>
-      <p className="mt-4 text-base text-[15px]">
+      <p className="mt-4 text-base">
         A 15 minute time slot for meetings that Members can use to discuss some
         of the most pressing issues their team or organization is currently
         facing.
