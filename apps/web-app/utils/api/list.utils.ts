@@ -55,8 +55,15 @@ export function getTeamsDirectoryListOptions(
 export function getMembersDirectoryRequestOptionsFromQuery(
   queryParams: ParsedUrlQuery
 ): IListOptions {
-  const { sort, searchBy, skills, country, metroArea, officeHoursOnly } =
-    queryParams;
+  const {
+    sort,
+    searchBy,
+    skills,
+    country,
+    metroArea,
+    officeHoursOnly,
+    includeFriends,
+  } = queryParams;
 
   return {
     sort: [getSortFromQuery(sort?.toString())],
@@ -66,6 +73,7 @@ export function getMembersDirectoryRequestOptionsFromQuery(
       country,
       metroArea,
       officeHoursOnly,
+      includeFriends,
     }),
   };
 }
@@ -129,8 +137,15 @@ export function getTeamsDirectoryRequestParametersFromQuery(
 export function getMembersDirectoryRequestParametersFromQuery(
   queryParams: ParsedUrlQuery
 ): string {
-  const { sort, searchBy, skills, country, metroArea, officeHoursOnly } =
-    queryParams;
+  const {
+    sort,
+    searchBy,
+    skills,
+    country,
+    metroArea,
+    officeHoursOnly,
+    includeFriends,
+  } = queryParams;
 
   const fieldsParam = MEMBER_CARD_FIELDS.map(
     (field) => `fields[]=${field}`
@@ -147,6 +162,7 @@ export function getMembersDirectoryRequestParametersFromQuery(
     country,
     metroArea,
     officeHoursOnly,
+    includeFriends,
   });
   const encodedFormula = encodeURIComponent(membersDirectoryFormula);
   const filterByFormulaParam = `filterByFormula=${encodedFormula}`;
@@ -222,6 +238,7 @@ function getMembersDirectoryFormula({
   country,
   metroArea,
   officeHoursOnly,
+  includeFriends,
 }: {
   [key: string]: string | string[] | undefined;
 }) {
@@ -230,12 +247,12 @@ function getMembersDirectoryFormula({
     [
       '{Name} != ""',
       '{Teams} != ""',
-      '{Friend of PLN} = FALSE()',
       ...(searchBy ? [getSearchFormulaFromQuery(searchBy)] : []),
       ...(skills ? [getFieldFromQuery('Skills', skills)] : []),
       ...(country ? [getFieldFromQuery('Country', country)] : []),
       ...(metroArea ? [getFieldFromQuery('Metro Area', metroArea)] : []),
       ...(officeHoursOnly ? ['{Office hours link} != ""'] : []),
+      ...(includeFriends ? [] : ['{Friend of PLN} = FALSE()']),
     ].join(', '),
     ')',
   ].join('');
