@@ -38,6 +38,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
             <DirectoryHeader
               title="Teams"
               searchPlaceholder="Search for a team"
+              count={teams.length}
             />
 
             <TeamsDirectoryList teams={teams} isGrid={isGrid} />
