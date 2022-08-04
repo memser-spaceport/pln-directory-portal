@@ -21,7 +21,7 @@ export function DirectoryFilters({
 
   return (
     <>
-      <div className="relative flex justify-between bg-white p-5 before:absolute before:left-0 before:bottom-[-0.2rem] before:h-1 before:w-full before:border-t after:absolute after:bottom-[-2.25rem] after:left-0 after:h-9 after:w-[calc(100%_-_1.23rem)] after:bg-gradient-to-b after:from-white">
+      <div className="relative flex justify-between bg-white p-5 before:absolute before:left-0 before:bottom-[-0.2rem] before:h-1 before:w-full before:border-t after:absolute after:bottom-0 after:left-0 after:h-7 after:w-[calc(100%_-_1.23rem)] after:translate-y-full after:bg-gradient-to-b after:from-white">
         <span className="text-lg font-semibold leading-7">Filters</span>
         <button
           className="text-xs text-sky-600 transition-colors hover:text-sky-500"

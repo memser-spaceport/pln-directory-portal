@@ -55,7 +55,8 @@ export function getTeamsDirectoryListOptions(
 export function getMembersDirectoryRequestOptionsFromQuery(
   queryParams: ParsedUrlQuery
 ): IListOptions {
-  const { sort, searchBy, skills, country, metroArea } = queryParams;
+  const { sort, searchBy, skills, country, metroArea, officeHoursOnly } =
+    queryParams;
 
   return {
     sort: [getSortFromQuery(sort?.toString())],
@@ -64,6 +65,7 @@ export function getMembersDirectoryRequestOptionsFromQuery(
       skills,
       country,
       metroArea,
+      officeHoursOnly,
     }),
   };
 }
@@ -127,7 +129,8 @@ export function getTeamsDirectoryRequestParametersFromQuery(
 export function getMembersDirectoryRequestParametersFromQuery(
   queryParams: ParsedUrlQuery
 ): string {
-  const { sort, searchBy, skills, country, metroArea } = queryParams;
+  const { sort, searchBy, skills, country, metroArea, officeHoursOnly } =
+    queryParams;
 
   const fieldsParam = MEMBER_CARD_FIELDS.map(
     (field) => `fields[]=${field}`
@@ -143,6 +146,7 @@ export function getMembersDirectoryRequestParametersFromQuery(
     skills,
     country,
     metroArea,
+    officeHoursOnly,
   });
   const encodedFormula = encodeURIComponent(membersDirectoryFormula);
   const filterByFormulaParam = `filterByFormula=${encodedFormula}`;
@@ -217,6 +221,7 @@ function getMembersDirectoryFormula({
   skills,
   country,
   metroArea,
+  officeHoursOnly,
 }: {
   [key: string]: string | string[] | undefined;
 }) {
@@ -230,6 +235,7 @@ function getMembersDirectoryFormula({
       ...(skills ? [getFieldFromQuery('Skills', skills)] : []),
       ...(country ? [getFieldFromQuery('Country', country)] : []),
       ...(metroArea ? [getFieldFromQuery('Metro Area', metroArea)] : []),
+      ...(officeHoursOnly ? ['{Office hours link} != ""'] : []),
     ].join(', '),
     ')',
   ].join('');
