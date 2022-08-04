@@ -5,15 +5,20 @@ import { DirectoryView } from '../../../components/directory/directory-view/dire
 type DirectoryHeaderProps = {
   searchPlaceholder: string;
   title: string;
+  count: number;
 };
 
 export function DirectoryHeader({
   searchPlaceholder,
   title,
+  count,
 }: DirectoryHeaderProps) {
   return (
     <div className="flex items-center justify-between">
-      <h1 className="text-3xl font-bold">{title}</h1>
+      <h1 className="text-3xl font-bold">
+        {title}{' '}
+        <span className="text-sm font-normal text-slate-600">({count})</span>
+      </h1>
       <div className="flex items-center space-x-4">
         <DirectorySearch placeholder={searchPlaceholder} />
         <span className="h-6 w-px bg-slate-300" />

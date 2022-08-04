@@ -38,6 +38,7 @@ export default function Members({ members, filtersValues }: MembersProps) {
             <DirectoryHeader
               title="Members"
               searchPlaceholder="Search for a member"
+              count={members.length}
             />
 
             <div className="flex flex-wrap gap-4">
