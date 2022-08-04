@@ -2,19 +2,16 @@ import Link from 'next/link';
 import { TSocialLinkType } from '../../../shared/social-links/social-link/social-link.types';
 import { getSocialLinkUrl } from '../../../shared/social-links/social-link/social-link.utils';
 
-interface TeamProfileSocialLinkProps {
+interface ProfileSocialLinkProps {
   url: string;
   type?: TSocialLinkType;
 }
 
-export function TeamProfileSocialLink({
-  url,
-  type,
-}: TeamProfileSocialLinkProps) {
+export function ProfileSocialLink({ url, type }: ProfileSocialLinkProps) {
   return (
     <Link href={getSocialLinkUrl(url, type)}>
       <a
-        className="focus:shadow-special-button-hover line-clamp-1 text-left hover:text-slate-600"
+        className="focus:shadow-special-button-hover line-clamp-1 break-all text-left hover:text-slate-600"
         target="_blank"
       >
         {url}

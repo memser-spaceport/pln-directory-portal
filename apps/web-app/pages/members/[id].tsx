@@ -2,8 +2,9 @@ import airtableService from '@protocol-labs-network/airtable';
 import { IMember, ITeam } from '@protocol-labs-network/api';
 import { Breadcrumb } from '@protocol-labs-network/ui';
 import Head from 'next/head';
-import { MemberProfileHeader } from '../../components/members/member-profile/member-profile-header';
-import { MemberProfileOfficeHours } from '../../components/members/member-profile/member-profile-office-hours';
+import { MemberProfileDetails } from '../../components/members/member-profile/member-profile-details/member-profile-details';
+import { MemberProfileHeader } from '../../components/members/member-profile/member-profile-header/member-profile-header';
+import { MemberProfileOfficeHours } from '../../components/members/member-profile/member-profile-office-hours/member-profile-office-hours';
 import { MemberProfileTeams } from '../../components/members/member-profile/member-profile-teams';
 import { AskToEditCard } from '../../components/shared/ask-to-edit-card/ask-to-edit-card';
 import { TEAM_CARD_FIELDS } from '../../components/shared/teams/team-card/team-card.constants';
@@ -28,16 +29,15 @@ export default function Member({ member, teams, backLink }: MemberProps) {
         <title>Member {member.name}</title>
       </Head>
       <Breadcrumb items={breadcrumbItems} />
-      <section className="px-10 pt-24">
-        <div className="mb-10 flex space-x-10">
-          <div className="flex grow flex-col space-y-8">
-            <MemberProfileHeader member={member} />
-            <MemberProfileTeams teams={teams} />
-          </div>
-          <div className="w-[291px] shrink-0 flex-col space-y-4">
-            <AskToEditCard profileType="member" profileName={member.name} />
-            <MemberProfileOfficeHours url={member.officeHours} />
-          </div>
+      <section className="mx-auto mb-10 flex max-w-7xl space-x-[30px] px-10 pt-24">
+        <div className="card w-full space-y-6">
+          <MemberProfileHeader {...member} />
+          <MemberProfileDetails {...member} />
+          <MemberProfileOfficeHours url={member.officeHours} />
+          <MemberProfileTeams teams={teams} />
+        </div>
+        <div className="w-[291px] shrink-0">
+          <AskToEditCard profileType="member" profileName={member.name} />
         </div>
       </section>
     </>
