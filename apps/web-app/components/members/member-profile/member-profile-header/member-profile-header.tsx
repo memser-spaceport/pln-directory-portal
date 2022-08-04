@@ -1,0 +1,63 @@
+import { FlagIcon, LocationMarkerIcon, UserIcon } from '@heroicons/react/solid';
+import { IMember } from '@protocol-labs-network/api';
+import { Tooltip } from '@protocol-labs-network/ui';
+import Image from 'next/image';
+
+export function MemberProfileHeader({
+  image,
+  name,
+  role,
+  teams,
+  location,
+}: IMember) {
+  return (
+    <div className="flex space-x-4">
+      <div
+        className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-full border border-slate-200 ${
+          image ? 'bg-white' : 'bg-slate-200'
+        }`}
+      >
+        {image ? (
+          <Image
+            className="rounded-full"
+            alt={`${name} picture`}
+            src={image}
+            layout="fill"
+            objectFit="cover"
+            objectPosition="center"
+          />
+        ) : (
+          <UserIcon className="w-22 h-22 mt-2 fill-white" />
+        )}
+      </div>
+      <div className="grow">
+        <h1 className="text-2xl font-bold">{name}</h1>
+        <p className="line-clamp-1 text-sm">
+          {role || 'Contributor'} at {teams[0].name}
+        </p>
+        <div className="mt-2 mr-2 flex items-center text-sm text-slate-600">
+          {location ? (
+            <>
+              <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0 fill-slate-400" />
+              <span className="line-clamp-1">{location}</span>
+            </>
+          ) : (
+            '-'
+          )}
+        </div>
+      </div>
+      <div className="flex w-24 items-start justify-end">
+        <Tooltip
+          trigger={
+            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 p-2 shadow-[0_1px_2px_rgba(15,23,42,0.16)]">
+              <i className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] not-italic text-white">
+                <FlagIcon className="h-[9px]" />
+              </i>
+            </span>
+          }
+          content="Team Lead"
+        />
+      </div>
+    </div>
+  );
+}

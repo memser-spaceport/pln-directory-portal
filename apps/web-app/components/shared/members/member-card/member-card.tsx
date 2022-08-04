@@ -36,19 +36,22 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
           {member.name}
         </h2>
         <p className={isGrid ? 'line-clamp-2 mt-1 h-10' : 'line-clamp-1'}>
-          {member.role || 'Collaborator'} at {member.teams[0].name}
+          {member.role || 'Contributor'} at {member.teams[0].name}
         </p>
-        {member.location ? (
-          <div
-            className={`${isGrid ? 'mt-2 justify-center' : 'mt-1'}
+
+        <div
+          className={`${isGrid ? 'mt-2 justify-center' : 'mt-1'}
             } flex items-center text-sm text-slate-600`}
-          >
-            <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0 fill-slate-400" />
-            <span className="line-clamp-1">{member.location}</span>
-          </div>
-        ) : (
-          '-'
-        )}
+        >
+          {member.location ? (
+            <>
+              <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0 fill-slate-400" />
+              <span className="line-clamp-1">{member.location}</span>
+            </>
+          ) : (
+            '-'
+          )}
+        </div>
       </div>
       <DirectoryCardFooter isGrid={isGrid} tagsArr={member.skills} />
     </DirectoryCard>

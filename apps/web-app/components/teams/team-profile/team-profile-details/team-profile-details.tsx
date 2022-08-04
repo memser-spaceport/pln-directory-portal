@@ -1,6 +1,6 @@
 import { ITeam } from '@protocol-labs-network/api';
 import { CollapsibleText, Tooltip } from '@protocol-labs-network/ui';
-import { TeamProfileSocialLink } from './team-profile-social-link';
+import { ProfileSocialLink } from '../../../shared/profile/profile-social-link/profile-social-link';
 
 export function TeamProfileDetails({
   website,
@@ -15,7 +15,7 @@ export function TeamProfileDetails({
           <h2 className="detail-label">Website</h2>
           {website ? (
             <Tooltip
-              trigger={<TeamProfileSocialLink url={website} />}
+              trigger={<ProfileSocialLink url={website} />}
               content={website}
             />
           ) : (
@@ -26,7 +26,7 @@ export function TeamProfileDetails({
           <h2 className="detail-label">Twitter</h2>
           {twitter ? (
             <Tooltip
-              trigger={<TeamProfileSocialLink url={twitter} type="twitter" />}
+              trigger={<ProfileSocialLink url={twitter} type="twitter" />}
               content={twitter}
             />
           ) : (
