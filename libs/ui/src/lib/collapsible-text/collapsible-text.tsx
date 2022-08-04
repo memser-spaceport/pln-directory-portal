@@ -12,7 +12,7 @@ export function CollapsibleText({ maxChars, txt }: CollapsibleTextProps) {
   const isLongerThanMaxChars = removeLineBreak(txt).length > maxChars;
 
   return (
-    <div className="whitespace-pre-wrap text-[15px]">
+    <div className="whitespace-pre-wrap text-base">
       {isCollapsed && isLongerThanMaxChars ? txt.substring(0, maxChars) : txt}{' '}
       {isLongerThanMaxChars ? (
         <button

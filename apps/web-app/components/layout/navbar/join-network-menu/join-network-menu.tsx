@@ -28,7 +28,7 @@ const JOIN_NETWORK_MENU_OPTIONS: IMenuOption[] = [
 export function JoinNetworkMenu() {
   return (
     <Menu as="div" className="relative">
-      <Menu.Button className="shadow-special-button-default hover:shadow-special-button-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-[15px] font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]">
+      <Menu.Button className="shadow-special-button-default hover:shadow-special-button-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]">
         Join the Network
         <div className="my-auto ml-3.5">
           <ArrowIcon />
