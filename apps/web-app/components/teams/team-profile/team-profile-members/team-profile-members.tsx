@@ -1,6 +1,8 @@
+import { UserIcon } from '@heroicons/react/solid';
 import { IMember } from '@protocol-labs-network/api';
 import { useRouter } from 'next/router';
-import { TeamProfileMember } from './team-profile-member';
+import { ProfileCard } from '../../../shared/profile/profile-cards/profile-card';
+import { ProfileCards } from '../../../shared/profile/profile-cards/profile-cards';
 
 interface TeamProfileMembersProps {
   members: IMember[];
@@ -12,15 +14,20 @@ export function TeamProfileMembers({ members }: TeamProfileMembersProps) {
   } = useRouter();
 
   return (
-    <>
-      <h3 className="mb-2 text-xs font-medium leading-[14px] text-slate-600">
-        Members ({members.length})
-      </h3>
-      <div className="max-h-96 overflow-y-auto rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)]">
-        {members.map((member) => (
-          <TeamProfileMember key={`${id}.${member.id}`} {...member} />
-        ))}
-      </div>
-    </>
+    <ProfileCards title="Members" count={members.length}>
+      {members.map((member) => (
+        <ProfileCard
+          key={`${id}.${member.id}`}
+          url={`/members/${member?.id}`}
+          isImageRounded
+          imageUrl={member.image}
+          avatarIcon={UserIcon}
+          name={member.name}
+          showTeamLeadBadge={member.teamLead}
+          description={member.role}
+          tags={member.teams.map(({ name }) => name)}
+        />
+      ))}
+    </ProfileCards>
   );
 }
