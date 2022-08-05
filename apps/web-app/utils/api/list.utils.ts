@@ -22,6 +22,7 @@ export function getTeamsDirectoryRequestOptionsFromQuery(
     fundingStage,
     searchBy,
     technology,
+    includeFriends,
   } = queryParams;
 
   return {
@@ -32,6 +33,7 @@ export function getTeamsDirectoryRequestOptionsFromQuery(
       fundingStage,
       searchBy,
       technology,
+      includeFriends,
     }),
   };
 }
@@ -104,6 +106,7 @@ export function getTeamsDirectoryRequestParametersFromQuery(
     fundingStage,
     searchBy,
     technology,
+    includeFriends,
   } = queryParams;
 
   const fieldsParam = TEAM_CARD_FIELDS.map((field) => `fields[]=${field}`).join(
@@ -121,6 +124,7 @@ export function getTeamsDirectoryRequestParametersFromQuery(
     fundingStage,
     searchBy,
     technology,
+    includeFriends,
   });
   const encodedFormula = encodeURIComponent(teamsDirectoryFormula);
   const filterByFormulaParam = `filterByFormula=${encodedFormula}`;
@@ -204,6 +208,7 @@ function getTeamsDirectoryFormula({
   fundingStage,
   searchBy,
   technology,
+  includeFriends,
 }: {
   [key: string]: string | string[] | undefined;
 }) {
@@ -212,7 +217,6 @@ function getTeamsDirectoryFormula({
     [
       '{Name} != ""',
       '{Short description} != ""',
-      '{Friend of PLN} = FALSE()',
       ...(searchBy ? [getSearchFormulaFromQuery(searchBy)] : []),
       ...(tags ? [getFieldFromQuery('Tags lookup', tags, true)] : []),
       ...(acceleratorPrograms
@@ -222,6 +226,7 @@ function getTeamsDirectoryFormula({
         ? [getFieldFromQuery('Funding Stage', fundingStage)]
         : []),
       ...(technology ? [getTechnologyFormulaFromQuery(technology)] : []),
+      ...(includeFriends ? [] : ['{Friend of PLN} = FALSE()']),
     ].join(', '),
     ')',
   ].join('');

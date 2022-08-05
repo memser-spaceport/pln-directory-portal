@@ -1,3 +1,4 @@
+import { FriendOfPLNFilter } from '../../../../components/directory/directory-filters/friend-of-pln-filter/friend-of-pln-filter';
 import { DirectoryFilters } from '../../../directory/directory-filters/directory-filters';
 import { AcceleratorProgramsFilter } from './accelerator-programs-filter/accelerator-programs-filter';
 import { FundingStageFilter } from './funding-stage-filter/funding-stage-filter';
@@ -19,8 +20,11 @@ export function TeamsDirectoryFilters({
         'acceleratorPrograms',
         'fundingStage',
         'technology',
+        'includeFriends',
       ]}
     >
+      <FriendOfPLNFilter />
+      <div className="my-5 h-px bg-slate-200" />
       <TagsFilter tagsTags={filtersValues.tags} />
       <div className="my-5 h-px bg-slate-200" />
       <AcceleratorProgramsFilter
