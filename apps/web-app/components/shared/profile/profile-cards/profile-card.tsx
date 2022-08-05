@@ -28,9 +28,9 @@ export function ProfileCard({
   const Icon = avatarIcon;
 
   return (
-    <div className="group h-[72px] w-full border-b border-slate-200 bg-white transition-all first:rounded-t-xl last:rounded-b-xl last:border-b-0 hover:bg-slate-50">
+    <div className="group w-full border-b border-slate-200 bg-white transition-all first:rounded-t-xl last:rounded-b-xl last:border-b-0 hover:bg-slate-50">
       <AnchorLink href={url}>
-        <div className="flex items-center p-4">
+        <div className="flex h-[72px] items-center p-4">
           <div className="relative mr-4 h-10 w-10 shrink-0">
             <div
               className={`flex h-10 w-10 overflow-hidden ${
@@ -56,19 +56,13 @@ export function ProfileCard({
               </div>
             ) : null}
           </div>
-          <div className="mr-4 w-60">
+          <div className="mr-4 w-64">
             <h3 className="text-sm font-semibold">{name}</h3>
-            <p className="text-xs leading-[14px] text-slate-600">
-              {description}
+            <p className="line-clamp-2 text-xs leading-[14px] text-slate-600">
+              {description || '-'}
             </p>
           </div>
-          <div>
-            {tags?.length ? (
-              <TagsGroup items={tags} isSingleLine={true} />
-            ) : (
-              '-'
-            )}
-          </div>
+          {tags?.length ? <TagsGroup items={tags} isSingleLine={true} /> : '-'}
           <div className="ml-auto w-12">
             <ChevronRightIcon className="h-4 w-4 fill-slate-500 group-hover:fill-slate-900" />
           </div>

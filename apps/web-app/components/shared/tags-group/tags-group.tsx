@@ -22,10 +22,10 @@ export function TagsGroup({ items, isSingleLine = false }: TagsGroupProps) {
         return (
           <span
             key={i}
-            className={`tag mr-2 last:mr-0 ${
+            className={`tag mr-2 last:mr-0  ${isSingleLine ? '' : 'mb-2'} ${
               isSingleLine && visibleTags.length === 1
                 ? 'overflow-hidden text-ellipsis whitespace-nowrap'
-                : 'mb-2'
+                : ''
             }`}
           >
             {tag}
