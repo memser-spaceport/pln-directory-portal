@@ -19,11 +19,12 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
         acceleratorPrograms: 'IPFS',
         searchBy: 'void',
         technology: 'IPFS',
+        includeFriends: 'true',
       })
     ).toEqual({
       sort: [{ field: 'Name', direction: 'desc' }],
       filterByFormula:
-        'AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE(), REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())',
+        'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())',
     });
   });
 
@@ -47,11 +48,12 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
         acceleratorPrograms: 'IPFS',
         searchBy: 'void',
         technology: 'IPFS|Filecoin',
+        includeFriends: 'true',
       })
     ).toEqual({
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula:
-        'AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE(), REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())',
+        'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())',
     });
   });
 });
@@ -138,7 +140,7 @@ describe('#getMembersDirectoryListOptions', () => {
 describe('#getTeamsDirectoryRequestParametersFromQuery', () => {
   it('should return a valid query parameters string when sort is provided and is valid', () => {
     const encodedFormula = encodeURIComponent(
-      'AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE(), REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())'
+      'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())'
     );
 
     expect(
@@ -149,6 +151,7 @@ describe('#getTeamsDirectoryRequestParametersFromQuery', () => {
         fundingStage: 'Seed',
         searchBy: 'void',
         technology: 'IPFS',
+        includeFriends: 'true',
       })
     ).toEqual(
       `fields[]=Name&fields[]=Logo&fields[]=Short description&fields[]=Tags lookup&fields[]=Website&fields[]=Twitter&sort[0][field]=Name&sort[0][direction]=desc&filterByFormula=${encodedFormula}&pageSize=9`
@@ -171,7 +174,7 @@ describe('#getTeamsDirectoryRequestParametersFromQuery', () => {
 
   it('should return a valid query parameters string when sort is not provided', () => {
     const encodedFormula = encodeURIComponent(
-      'AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE(), REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())'
+      'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())'
     );
 
     expect(
@@ -181,6 +184,7 @@ describe('#getTeamsDirectoryRequestParametersFromQuery', () => {
         fundingStage: 'Seed',
         searchBy: 'void',
         technology: 'IPFS|Filecoin',
+        includeFriends: 'true',
       })
     ).toEqual(
       `fields[]=Name&fields[]=Logo&fields[]=Short description&fields[]=Tags lookup&fields[]=Website&fields[]=Twitter&sort[0][field]=Name&sort[0][direction]=asc&filterByFormula=${encodedFormula}&pageSize=9`
