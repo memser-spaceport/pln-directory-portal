@@ -3,13 +3,14 @@ import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 export interface TooltipProps {
   trigger: React.ReactElement;
   content: string;
+  asChild?: boolean;
 }
 
-export function Tooltip({ trigger, content }: TooltipProps) {
+export function Tooltip({ trigger, content, asChild = false }: TooltipProps) {
   return (
     <TooltipPrimitive.Provider delayDuration={0}>
       <TooltipPrimitive.Root>
-        <TooltipPrimitive.Trigger className="cursor-pointer">
+        <TooltipPrimitive.Trigger asChild={asChild}>
           {trigger}
         </TooltipPrimitive.Trigger>
         <TooltipPrimitive.Content

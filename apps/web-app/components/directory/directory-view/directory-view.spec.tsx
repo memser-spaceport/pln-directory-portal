@@ -15,8 +15,10 @@ describe('DirectoryView', () => {
       name: /change to grid view/i,
     });
 
-    expect(gridBtn.classList.contains('border-blue-100')).toBe(true);
-    expect(gridBtn.classList.contains('bg-blue-100')).toBe(true);
+    expect(gridBtn.parentElement.classList.contains('border-blue-100')).toBe(
+      true
+    );
+    expect(gridBtn.parentElement.classList.contains('bg-blue-100')).toBe(true);
     expect(gridBtn).toHaveAttribute('disabled');
   });
 
