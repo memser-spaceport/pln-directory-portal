@@ -7,7 +7,7 @@ import { useViewType } from '../../components/directory/directory-view/use-direc
 import { MembersDirectoryFilters } from '../../components/members/members-directory/members-directory-filters/members-directory-filters';
 import { IMembersFiltersValues } from '../../components/members/members-directory/members-directory-filters/members-directory-filters.types';
 import { parseMembersFilters } from '../../components/members/members-directory/members-directory-filters/members-directory-filters.utils';
-import { MemberCard } from '../../components/shared/members/member-card/member-card';
+import { MembersDirectoryList } from '../../components/members/members-directory/members-directory-list/members-directory-list';
 import {
   getMembersDirectoryListOptions,
   getMembersDirectoryRequestOptionsFromQuery,
@@ -41,15 +41,7 @@ export default function Members({ members, filtersValues }: MembersProps) {
               count={members.length}
             />
 
-            <div className="flex flex-wrap gap-4">
-              {members.map((member) => (
-                <MemberCard key={member.id} member={member} isGrid={isGrid} />
-              ))}
-            </div>
-
-            <div className="text-sm text-slate-500">
-              Showing <b>{members.length}</b> results
-            </div>
+            <MembersDirectoryList members={members} isGrid={isGrid} />
           </div>
         </div>
       </section>
