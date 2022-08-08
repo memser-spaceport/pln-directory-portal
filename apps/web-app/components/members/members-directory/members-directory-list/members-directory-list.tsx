@@ -15,6 +15,7 @@ export function MembersDirectoryList({
     <DirectoryList
       filterProperties={[
         'skills',
+        'region',
         'country',
         'metroArea',
         'officeHoursOnly',

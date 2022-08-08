@@ -3,6 +3,7 @@ import { FriendOfPLNFilter } from '../../../../components/directory/directory-fi
 import { CountryFilter } from '../../../../components/members/members-directory/members-directory-filters/country-filter/country-filter';
 import { MetroAreaFilter } from '../../../../components/members/members-directory/members-directory-filters/metro-area-filter/metro-area-filter';
 import { OfficeHoursFilter } from '../../../../components/members/members-directory/members-directory-filters/office-hours-filter/office-hours-filter';
+import { RegionFilter } from '../../../../components/members/members-directory/members-directory-filters/region-filter/region-filter';
 import { SkillsFilter } from '../../../../components/members/members-directory/members-directory-filters/skills-filter/skills-filter';
 import { IMembersFiltersValues } from './members-directory-filters.types';
 
@@ -17,6 +18,7 @@ export function MembersDirectoryFilters({
     <DirectoryFilters
       filterProperties={[
         'skills',
+        'region',
         'country',
         'metroArea',
         'officeHoursOnly',
@@ -29,6 +31,8 @@ export function MembersDirectoryFilters({
       </div>
       <div className="my-5 h-px bg-slate-200" />
       <SkillsFilter skillsTags={filtersValues.skills} />
+      <div className="my-5 h-px bg-slate-200" />
+      <RegionFilter regionTags={filtersValues.region} />
       <div className="my-5 h-px bg-slate-200" />
       <CountryFilter countryTags={filtersValues.country} />
       <div className="my-5 h-px bg-slate-200" />

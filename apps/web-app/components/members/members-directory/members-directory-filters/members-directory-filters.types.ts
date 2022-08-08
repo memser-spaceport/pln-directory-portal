@@ -2,6 +2,7 @@ import { IFilterTag } from '../../../../components/directory/directory-filters/d
 
 export interface IMembersFiltersValues {
   skills: IFilterTag[];
+  region: IFilterTag[];
   country: IFilterTag[];
   metroArea: IFilterTag[];
 }

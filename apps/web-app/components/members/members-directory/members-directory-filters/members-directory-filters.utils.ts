@@ -19,6 +19,11 @@ export function parseMembersFilters(
       filtersValues.availableValuesByFilter.skills,
       query.skills
     ),
+    region: getTagsFromValues(
+      filtersValues.valuesByFilter.region,
+      filtersValues.availableValuesByFilter.region,
+      query.region
+    ),
     country: getTagsFromValues(
       filtersValues.valuesByFilter.country,
       filtersValues.availableValuesByFilter.country,

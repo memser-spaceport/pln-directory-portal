@@ -61,6 +61,7 @@ export function getMembersDirectoryRequestOptionsFromQuery(
     sort,
     searchBy,
     skills,
+    region,
     country,
     metroArea,
     officeHoursOnly,
@@ -72,6 +73,7 @@ export function getMembersDirectoryRequestOptionsFromQuery(
     filterByFormula: getMembersDirectoryFormula({
       searchBy,
       skills,
+      region,
       country,
       metroArea,
       officeHoursOnly,
@@ -145,6 +147,7 @@ export function getMembersDirectoryRequestParametersFromQuery(
     sort,
     searchBy,
     skills,
+    region,
     country,
     metroArea,
     officeHoursOnly,
@@ -163,6 +166,7 @@ export function getMembersDirectoryRequestParametersFromQuery(
   const membersDirectoryFormula = getMembersDirectoryFormula({
     searchBy,
     skills,
+    region,
     country,
     metroArea,
     officeHoursOnly,
@@ -240,6 +244,7 @@ function getTeamsDirectoryFormula({
 function getMembersDirectoryFormula({
   searchBy,
   skills,
+  region,
   country,
   metroArea,
   officeHoursOnly,
@@ -254,6 +259,7 @@ function getMembersDirectoryFormula({
       '{Teams} != ""',
       ...(searchBy ? [getSearchFormulaFromQuery(searchBy)] : []),
       ...(skills ? [getFieldFromQuery('Skills', skills)] : []),
+      ...(region ? [getFieldFromQuery('Region', region)] : []),
       ...(country ? [getFieldFromQuery('Country', country)] : []),
       ...(metroArea ? [getFieldFromQuery('Metro Area', metroArea)] : []),
       ...(officeHoursOnly ? ['{Office hours link} != ""'] : []),
