@@ -29,7 +29,7 @@ export function JoinNetworkMenu() {
   return (
     <Menu as="div" className="relative">
       <Menu.Button className="shadow-special-button-default hover:shadow-special-button-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]">
-        Join the Network
+        Join the network
         <div className="my-auto ml-3.5">
           <ArrowIcon />
         </div>
@@ -51,7 +51,7 @@ export function JoinNetworkMenu() {
               <Menu.Item key={option.label}>
                 {({ active }) => (
                   <OptionLink href={option.url} active={active}>
-                    <OptionIcon className="mr-2 h-5 w-5" />
+                    <OptionIcon className="mr-2 h-4 w-4" />
                     {option.label}
                   </OptionLink>
                 )}
@@ -71,9 +71,7 @@ const OptionLink = forwardRef<
   return (
     <Link href={href}>
       <a
-        className={`group flex w-full items-center rounded-lg px-3 py-2 text-sm ${
-          active ? 'bg-slate-100' : ''
-        } `}
+        className="flex items-center rounded-md px-3 py-2 text-sm transition duration-150 ease-in-out hover:bg-slate-100 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-300"
         target="_blank"
         rel="noopener noreferrer"
         ref={ref}
