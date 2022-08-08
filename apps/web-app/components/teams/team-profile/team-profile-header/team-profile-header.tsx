@@ -44,7 +44,7 @@ export function TeamProfileHeader({
           )}
         </div>
       </div>
-      <div className="flex w-24 items-start justify-end space-x-4">
+      <div className="flex w-24 items-start justify-end">
         {filecoinUser ? (
           <Tooltip
             trigger={<ProtocolBtn Icon={FilecoinIcon} />}
@@ -54,6 +54,7 @@ export function TeamProfileHeader({
         {ipfsUser ? (
           <Tooltip
             trigger={<ProtocolBtn Icon={IPFSIcon} />}
+            triggerClassName="ml-4"
             content="IPFS User"
           />
         ) : null}
