@@ -29,7 +29,7 @@ export default function Member({ member, teams, backLink }: MemberProps) {
         <title>Member {member.name}</title>
       </Head>
       <Breadcrumb items={breadcrumbItems} />
-      <section className="mx-auto mb-10 flex max-w-7xl space-x-[30px] px-10 pt-24">
+      <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-24">
         <div className="card w-full space-y-6">
           <MemberProfileHeader {...member} />
           <MemberProfileDetails {...member} />
