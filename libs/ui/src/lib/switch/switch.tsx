@@ -1,5 +1,5 @@
 import { Switch as HeadlessSwitch } from '@headlessui/react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 export interface SwitchProps {
   label?: string;
@@ -9,6 +9,10 @@ export interface SwitchProps {
 
 export function Switch({ label, initialValue = false, onChange }: SwitchProps) {
   const [enabled, setEnabled] = useState(initialValue);
+
+  useEffect(() => {
+    setEnabled(initialValue);
+  }, [setEnabled, initialValue]);
 
   const onSwitchChange = useCallback(
     (enabled: boolean) => {
