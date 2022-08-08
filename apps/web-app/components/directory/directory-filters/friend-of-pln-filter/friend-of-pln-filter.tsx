@@ -6,7 +6,7 @@ export function FriendOfPLNFilter() {
 
   return (
     <Switch
-      label="Include Protocol Labs friends"
+      label="Include Friends of Protocol Labs"
       initialValue={enabled}
       onChange={onSetEnabled}
     />
