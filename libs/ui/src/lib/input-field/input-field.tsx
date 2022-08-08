@@ -44,7 +44,7 @@ export function InputField({
       <input
         {...props}
         className={`block w-full rounded-lg border border-white bg-white text-sm leading-6 text-slate-900 shadow-sm shadow-slate-300 transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-600
-        ${icon ? 'pl-8' : 'pl-3'} ${hasClear ? 'pr-6' : ''} h-10 pr-2
+        ${icon ? 'pl-8' : 'pl-3'} ${hasClear ? 'pr-6' : 'pr-3'} h-10
         leading-10 hover:border-slate-200 hover:ring-2 hover:ring-blue-300 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300 ${
           props.className || ''
         }`}
