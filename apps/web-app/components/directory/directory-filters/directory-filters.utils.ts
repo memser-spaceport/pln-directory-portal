@@ -15,9 +15,11 @@ export function getTagsFromValues(
     ? queryValues
     : queryValues.split(URL_QUERY_VALUE_SEPARATOR);
 
-  return allValues.map((value) => ({
-    value,
-    selected: queryValuesArr.includes(value),
-    disabled: !availableValues.includes(value),
-  }));
+  return allValues.map((value) => {
+    const selected = queryValuesArr.includes(value);
+    const available = availableValues.includes(value);
+    const disabled = !selected && !available;
+
+    return { value, selected, disabled };
+  });
 }
