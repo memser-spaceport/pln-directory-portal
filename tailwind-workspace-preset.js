@@ -40,6 +40,9 @@ module.exports = {
       fontSize: {
         base: '15px',
       },
+      spacing: {
+        7.5: '30px',
+      },
     },
   },
   plugins: [require('@tailwindcss/line-clamp')],
