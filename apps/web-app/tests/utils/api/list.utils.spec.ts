@@ -77,6 +77,7 @@ describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
   it('should return valid options when sort is provided and is valid', () => {
     expect(
       getMembersDirectoryRequestOptionsFromQuery({
+        region: 'Europe',
         country: 'Portugal',
         includeFriends: 'true',
         metroArea: 'Porto',
@@ -88,7 +89,7 @@ describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
     ).toEqual({
       sort: [{ field: 'Name', direction: 'desc' }],
       filterByFormula:
-        'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}), {Office hours link} != "")',
+        'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Europe", {Region}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}), {Office hours link} != "")',
     });
   });
 
@@ -107,6 +108,7 @@ describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
   it('should return valid options when sort is not provided', () => {
     expect(
       getMembersDirectoryRequestOptionsFromQuery({
+        region: 'Europe',
         country: 'Portugal',
         includeFriends: 'true',
         metroArea: 'Porto',
@@ -117,7 +119,7 @@ describe('#getMembersDirectoryRequestOptionsFromQuery', () => {
     ).toEqual({
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula:
-        'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}), {Office hours link} != "")',
+        'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Europe", {Region}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}), {Office hours link} != "")',
     });
   });
 });
@@ -195,11 +197,12 @@ describe('#getTeamsDirectoryRequestParametersFromQuery', () => {
 describe('#getMembersDirectoryRequestParametersFromQuery', () => {
   it('should return a valid query parameters string when sort is provided and is valid', () => {
     const encodedFormula = encodeURIComponent(
-      'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}), {Office hours link} != "")'
+      'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Europe", {Region}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}), {Office hours link} != "")'
     );
 
     expect(
       getMembersDirectoryRequestParametersFromQuery({
+        region: 'Europe',
         country: 'Portugal',
         includeFriends: 'true',
         metroArea: 'Porto',
@@ -229,11 +232,12 @@ describe('#getMembersDirectoryRequestParametersFromQuery', () => {
 
   it('should return a valid query parameters string when sort is not provided', () => {
     const encodedFormula = encodeURIComponent(
-      'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}), {Office hours link} != "")'
+      'AND({Name} != "", {Teams} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Engineering", {Skills}), SEARCH("Leadership", {Skills}), SEARCH("Europe", {Region}), SEARCH("Portugal", {Country}), SEARCH("Porto", {Metro Area}), {Office hours link} != "")'
     );
 
     expect(
       getMembersDirectoryRequestParametersFromQuery({
+        region: 'Europe',
         country: 'Portugal',
         includeFriends: 'true',
         metroArea: 'Porto',

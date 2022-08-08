@@ -693,6 +693,7 @@ describe('AirtableService', () => {
           {
             fields: {
               Skills: ['Skill 01', 'Skill 02'],
+              Region: 'Region 01',
               Country: 'Country 01',
               'Metro Area': 'Metro Area 01',
             },
@@ -700,6 +701,7 @@ describe('AirtableService', () => {
           {
             fields: {
               Skills: ['Skill 01', 'Skill 02', 'Skill 03'],
+              Region: 'Region 02',
               Country: 'Country 02',
               'Metro Area': 'Metro Area 02',
             },
@@ -707,6 +709,7 @@ describe('AirtableService', () => {
           {
             fields: {
               Skills: ['Skill 04', 'Skill 05'],
+              Region: 'Region 03',
               Country: 'Country 03',
               'Metro Area': 'Metro Area 03',
             },
@@ -721,6 +724,7 @@ describe('AirtableService', () => {
           {
             fields: {
               Skills: ['Skill 01', 'Skill 02'],
+              Region: 'Region 01',
               Country: 'Country 01',
               'Metro Area': 'Metro Area 01',
             },
@@ -728,6 +732,7 @@ describe('AirtableService', () => {
           {
             fields: {
               Skills: ['Skill 01', 'Skill 02', 'Skill 03'],
+              Region: 'Region 02',
               Country: 'Country 02',
               'Metro Area': 'Metro Area 02',
             },
@@ -741,23 +746,25 @@ describe('AirtableService', () => {
 
     expect(membersTableMock.select).toHaveBeenCalledTimes(2);
     expect(membersTableMock.select).toHaveBeenNthCalledWith(1, {
-      fields: ['Skills', 'Country', 'Metro Area'],
+      fields: ['Skills', 'Region', 'Country', 'Metro Area'],
       filterByFormula:
         'AND({Name} != "", {Teams} != "", {Friend of PLN} = FALSE())',
     });
     expect(membersTableMock.select).toHaveBeenNthCalledWith(2, {
-      fields: ['Skills', 'Country', 'Metro Area'],
+      fields: ['Skills', 'Region', 'Country', 'Metro Area'],
       filterByFormula: '',
     });
 
     expect(filtersValues).toEqual({
       valuesByFilter: {
         skills: ['Skill 01', 'Skill 02', 'Skill 03', 'Skill 04', 'Skill 05'],
+        region: ['Region 01', 'Region 02', 'Region 03'],
         country: ['Country 01', 'Country 02', 'Country 03'],
         metroArea: ['Metro Area 01', 'Metro Area 02', 'Metro Area 03'],
       },
       availableValuesByFilter: {
         skills: ['Skill 01', 'Skill 02', 'Skill 03'],
+        region: ['Region 01', 'Region 02'],
         country: ['Country 01', 'Country 02'],
         metroArea: ['Metro Area 01', 'Metro Area 02'],
       },

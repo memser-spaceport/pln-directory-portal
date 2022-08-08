@@ -367,7 +367,7 @@ class AirtableService {
   private async _getMembersFiltersValues(options: IListOptions = {}) {
     return (await this._getFiltersValues(
       this._membersTable,
-      ['Skills', 'Country', 'Metro Area'],
+      ['Skills', 'Region', 'Country', 'Metro Area'],
       options,
       this._parseMembersFilters
     )) as IAirtableMembersFiltersValues;
@@ -381,6 +381,12 @@ class AirtableService {
       (values, member) => {
         const skills = [
           ...new Set([...values.skills, ...(member.fields.Skills || [])]),
+        ];
+        const region = [
+          ...new Set([
+            ...values.region,
+            ...(member.fields['Region'] ? [member.fields['Region']] : []),
+          ]),
         ];
         const country = [
           ...new Set([
@@ -397,13 +403,13 @@ class AirtableService {
           ]),
         ];
 
-        return { skills, country, metroArea };
+        return { skills, region, country, metroArea };
       },
       {
         skills: [],
+        region: [],
         country: [],
         metroArea: [],
-        technology: [],
       } as IAirtableMembersFiltersValues
     );
 

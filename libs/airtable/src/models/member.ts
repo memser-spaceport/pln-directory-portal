@@ -37,6 +37,7 @@ export interface IAirtableMemberFields {
   'Location backup'?: string;
   'Friend of PLN'?: boolean;
   'Team name'?: string[];
+  Region?: string;
 }
 
 export interface IAirtableMemberPicture {
@@ -55,6 +56,7 @@ export interface IAirtableMemberPicture {
 
 export interface IAirtableMembersFiltersValues {
   skills: string[];
+  region: string[];
   country: string[];
   metroArea: string[];
 }
