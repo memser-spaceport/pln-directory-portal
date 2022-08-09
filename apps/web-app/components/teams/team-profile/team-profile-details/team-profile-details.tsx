@@ -10,7 +10,7 @@ export function TeamProfileDetails({
 }: ITeam) {
   return (
     <>
-      <div className="flex">
+      <div className="mt-6 flex">
         <div className="w-1/2">
           <h2 className="detail-label">Website</h2>
           {website ? (
@@ -34,7 +34,7 @@ export function TeamProfileDetails({
           )}
         </div>
       </div>
-      <div>
+      <div className="mt-6">
         <h2 className="detail-label">About</h2>
         <CollapsibleText
           maxChars={500}

@@ -38,7 +38,7 @@ module.exports = {
         },
       },
       fontSize: {
-        base: '15px',
+        base: ['15px', '24px'],
       },
       spacing: {
         7.5: '30px',

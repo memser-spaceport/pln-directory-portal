@@ -11,7 +11,7 @@ export function ProfileSocialLink({ url, type }: ProfileSocialLinkProps) {
   return (
     <Link href={getSocialLinkUrl(url, type)}>
       <a
-        className="focus:shadow-special-button-hover line-clamp-1 break-all text-left hover:text-slate-600"
+        className="focus:shadow-special-button-hover line-clamp-1 break-all text-left text-base hover:text-slate-600"
         target="_blank"
       >
         {url}

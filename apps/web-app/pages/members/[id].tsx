@@ -29,8 +29,9 @@ export default function Member({ member, teams, backLink }: MemberProps) {
         <title>Member {member.name}</title>
       </Head>
       <Breadcrumb items={breadcrumbItems} />
+
       <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-24">
-        <div className="card w-full space-y-6">
+        <div className="card p-7.5 w-full">
           <MemberProfileHeader {...member} />
           <MemberProfileDetails {...member} />
           <MemberProfileOfficeHours url={member.officeHours} />
