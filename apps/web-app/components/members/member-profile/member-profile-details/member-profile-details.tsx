@@ -15,7 +15,7 @@ export function MemberProfileDetails({
       <div className="mt-6">
         {skills?.length ? <TagsGroup items={skills} /> : '-'}
       </div>
-      <div className="flex space-x-6">
+      <div className="mt-4 flex space-x-6">
         <div className="w-1/4">
           <h2 className="detail-label">Email</h2>
           {email ? (
