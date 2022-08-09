@@ -25,7 +25,7 @@ export function TeamProfileMembers({ members }: TeamProfileMembersProps) {
           name={member.name}
           showTeamLeadBadge={member.teamLead}
           description={member.role}
-          tags={member.teams.map(({ name }) => name)}
+          tags={member.skills}
         />
       ))}
     </ProfileCards>
