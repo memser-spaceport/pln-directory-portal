@@ -20,6 +20,8 @@ const nextConfig = {
     // SVG images using the default Image Optimization API
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    // Configure the Time to Live (TTL) in seconds for caching optimized images
+    minimumCacheTTL: 300,
   },
   i18n: {
     locales: ['en'],
