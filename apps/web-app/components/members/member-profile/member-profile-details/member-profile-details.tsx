@@ -16,10 +16,11 @@ export function MemberProfileDetails({
         {skills?.length ? <TagsGroup items={skills} /> : '-'}
       </div>
       <div className="mt-4 flex space-x-6">
-        <div className="w-1/4">
+        <div className="flex w-1/4 flex-col items-start">
           <h2 className="detail-label">Email</h2>
           {email ? (
             <Tooltip
+              asChild
               trigger={<ProfileSocialLink url={email} type="email" />}
               content={email}
             />
@@ -27,10 +28,11 @@ export function MemberProfileDetails({
             '-'
           )}
         </div>
-        <div className="w-1/4">
+        <div className="flex w-1/4 flex-col items-start">
           <h2 className="detail-label">Twitter</h2>
           {twitter ? (
             <Tooltip
+              asChild
               trigger={<ProfileSocialLink url={twitter} type="twitter" />}
               content={twitter}
             />
@@ -38,10 +40,11 @@ export function MemberProfileDetails({
             '-'
           )}
         </div>
-        <div className="w-1/4">
+        <div className="flex w-1/4 flex-col items-start">
           <h2 className="detail-label">Discord</h2>
           {discordHandle ? (
             <Tooltip
+              asChild
               trigger={
                 <span className="line-clamp-1 break-all">{discordHandle}</span>
               }
@@ -51,10 +54,11 @@ export function MemberProfileDetails({
             '-'
           )}
         </div>
-        <div className="w-1/4">
+        <div className="flex w-1/4 flex-col items-start">
           <h2 className="detail-label">Github</h2>
           {githubHandle ? (
             <Tooltip
+              asChild
               trigger={<ProfileSocialLink url={githubHandle} type="github" />}
               content={githubHandle}
             />

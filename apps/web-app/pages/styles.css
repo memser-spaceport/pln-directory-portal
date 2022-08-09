@@ -13,6 +13,27 @@
     @apply mb-2 text-sm font-medium text-slate-500;
   }
 
+  .directory-view-type:first-child > button {
+    @apply rounded-r-none rounded-l-lg;
+  }
+  .directory-view-type:last-child > button {
+    @apply rounded-l-none rounded-r-lg;
+  }
+
+  .profile-card > a {
+    @apply w-full border-b border-slate-200 transition-all hover:bg-slate-50;
+  }
+
+  .profile-card:first-child,
+  .profile-card:first-child > a {
+    @apply rounded-t-xl;
+  }
+
+  .profile-card:last-child,
+  .profile-card:last-child > a {
+    @apply rounded-b-xl border-b-0;
+  }
+
   .card {
     @apply shadow-card--slate-900 rounded-xl bg-white p-5 text-sm;
   }
@@ -23,5 +44,13 @@
 
   .navbar {
     @apply fixed z-50 flex w-full min-w-[1272px] items-center bg-white/95;
+  }
+
+  .on-focus {
+    @apply focus-within:rounded-lg focus-within:outline focus-within:outline-1 focus-within:outline-offset-0 focus-within:outline-blue-600 focus-within:ring-2 focus-within:ring-[rgba(21,111,247,0.25)] focus-within:ring-offset-1 focus:rounded-lg focus:outline focus:outline-1 focus:outline-offset-0 focus:outline-blue-600 focus:ring-2 focus:ring-[rgba(21,111,247,0.25)] focus:ring-offset-1 focus-visible:rounded-lg focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-blue-600 focus-visible:ring-2 focus-visible:ring-[rgba(21,111,247,0.25)] focus-visible:ring-offset-1;
+  }
+
+  .on-focus--link {
+    @apply focus-within:shadow-[0_1px_0_#156ff7] focus-within:outline-none focus:shadow-[0_1px_0_#156ff7] focus:outline-none focus-visible:shadow-[0_1px_0_#156ff7] focus-visible:outline-none;
   }
 }

@@ -15,6 +15,8 @@ export function AnchorLink({ href, linkClassName, children }: AnchorLinkProps) {
           className={`cursor-pointer ${linkClassName}`}
           target={isExternal ? '_blank' : '_self'}
           {...(isExternal ? { rel: 'noopener noreferrer' } : {})}
+          aria-label="card anchor"
+          tabIndex={0}
         >
           {children}
         </a>

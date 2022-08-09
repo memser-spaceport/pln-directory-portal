@@ -12,6 +12,7 @@ export function HiddenTagsTooltip({ items }: HiddenTagsTooltipProps) {
           +{items.length}
         </span>
       }
+      triggerClassName="on-focus focus-within:rounded-full focus:rounded-full focus-visible:rounded-full"
       content={items.join(', ')}
     />
   );

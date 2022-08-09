@@ -35,7 +35,7 @@ export function Menu() {
           <li key={item.path}>
             <Link href={item.path}>
               <a
-                className={`focus:shadow-special-button-hover group flex items-center rounded-lg px-3 py-2.5 text-sm hover:text-slate-900 ${
+                className={`on-focus group flex items-center rounded-lg px-3 py-2.5 text-sm hover:text-slate-900 focus:text-slate-900 ${
                   router.pathname == item.path
                     ? 'bg-slate-100 text-slate-900'
                     : 'text-slate-600'

@@ -11,10 +11,11 @@ export function TeamProfileDetails({
   return (
     <>
       <div className="mt-6 flex">
-        <div className="w-1/2">
+        <div className="flex w-1/2 flex-col items-start">
           <h2 className="detail-label">Website</h2>
           {website ? (
             <Tooltip
+              asChild
               trigger={<ProfileSocialLink url={website} />}
               content={website}
             />
@@ -22,10 +23,11 @@ export function TeamProfileDetails({
             '-'
           )}
         </div>
-        <div className="w-1/2">
+        <div className="flex w-1/2 flex-col items-start">
           <h2 className="detail-label">Twitter</h2>
           {twitter ? (
             <Tooltip
+              asChild
               trigger={<ProfileSocialLink url={twitter} type="twitter" />}
               content={twitter}
             />

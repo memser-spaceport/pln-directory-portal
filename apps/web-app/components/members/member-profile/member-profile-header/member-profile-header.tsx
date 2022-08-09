@@ -55,6 +55,7 @@ export function MemberProfileHeader({
               </i>
             </span>
           }
+          triggerClassName="on-focus focus-within:rounded-full focus:rounded-full focus-visible:rounded-full"
           content="Team Lead"
         />
       </div>

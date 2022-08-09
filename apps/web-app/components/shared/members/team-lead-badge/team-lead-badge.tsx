@@ -15,6 +15,7 @@ export function TeamLeadBadge({ size }: TeamLeadBadgeProps) {
           <FlagIcon className="h-2" />
         </i>
       }
+      triggerClassName="on-focus"
       content="Team Lead"
     />
   );
