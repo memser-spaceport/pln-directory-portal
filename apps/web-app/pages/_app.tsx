@@ -5,9 +5,13 @@ import '@fontsource/inter/700.css';
 import { AppProps } from 'next/app';
 import Head from 'next/head';
 import Navbar from '../components/layout/navbar/navbar';
+import { useFathom } from '../hooks/plugins/fathom.hook';
 import './styles.css';
 
 function CustomApp({ Component, pageProps }: AppProps) {
+  // Load Fathom web analytics tracker
+  useFathom();
+
   return (
     <>
       <Head>
