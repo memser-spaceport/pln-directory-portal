@@ -40,7 +40,7 @@ export function DirectoryTagsFilter({
               ))}
             </Collapsible.Content>
             <Collapsible.Trigger className="mt-2 flex items-center space-x-1">
-              <span className="text-xs font-medium leading-[1.17] text-slate-900">
+              <span className="leading-3.5 text-xs font-medium text-slate-900">
                 Show {open ? 'less' : 'more'}
               </span>
               <ChevronDownIcon className={`h-4 ${open ? 'rotate-180' : ''}`} />

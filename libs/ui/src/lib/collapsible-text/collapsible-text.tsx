@@ -16,7 +16,7 @@ export function CollapsibleText({ maxChars, txt }: CollapsibleTextProps) {
       {isCollapsed && isLongerThanMaxChars ? txt.substring(0, maxChars) : txt}{' '}
       {isLongerThanMaxChars ? (
         <button
-          className="text-xs font-semibold leading-[14px] text-[#156FF7]"
+          className="leading-3.5 text-xs font-semibold text-[#156FF7]"
           onClick={() => setIsCollapsed(!isCollapsed)}
         >
           {`Show ${isCollapsed ? 'more' : 'less'}`}

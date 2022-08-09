@@ -37,7 +37,7 @@ export default function Member({ member, teams, backLink }: MemberProps) {
           <MemberProfileOfficeHours url={member.officeHours} />
           <MemberProfileTeams teams={teams} />
         </div>
-        <div className="w-[291px] shrink-0">
+        <div className="w-sidebar shrink-0">
           <AskToEditCard profileType="member" profileName={member.name} />
         </div>
       </section>
