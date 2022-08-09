@@ -1,7 +1,7 @@
 import airtableService from '@protocol-labs-network/airtable';
 import { ITeam } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
-import Head from 'next/head';
+import { NextSeo } from 'next-seo';
 import { DirectoryHeader } from '../../components/directory/directory-header/directory-header';
 import { useViewType } from '../../components/directory/directory-view/use-directory-view-type.hook';
 import { LoadingOverlay } from '../../components/layout/loading-overlay/loading-overlay';
@@ -25,9 +25,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
 
   return (
     <>
-      <Head>
-        <title>Teams</title>
-      </Head>
+      <NextSeo title="Teams" />
 
       <LoadingOverlay excludeUrlFn={(url) => url.startsWith('/teams/')} />
 
