@@ -2,7 +2,7 @@ import airtableService from '@protocol-labs-network/airtable';
 import { IMember, ITeam } from '@protocol-labs-network/api';
 import { Breadcrumb } from '@protocol-labs-network/ui';
 import { GetServerSideProps } from 'next';
-import Head from 'next/head';
+import { NextSeo } from 'next-seo';
 import { AskToEditCard } from '../../components/shared/ask-to-edit-card/ask-to-edit-card';
 import { MEMBER_CARD_FIELDS } from '../../components/shared/members/member-card/member-card.constants';
 import { TeamProfileDetails } from '../../components/teams/team-profile/team-profile-details/team-profile-details';
@@ -26,9 +26,8 @@ export default function Team({ team, members, backLink }: TeamProps) {
 
   return (
     <>
-      <Head>
-        <title>Team {team.name}</title>
-      </Head>
+      <NextSeo title={team.name} description={team.shortDescription} />
+
       <Breadcrumb items={breadcrumbItems} />
       <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-24">
         <div className="card p-7.5 w-full">

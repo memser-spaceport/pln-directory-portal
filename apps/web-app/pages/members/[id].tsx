@@ -1,7 +1,7 @@
 import airtableService from '@protocol-labs-network/airtable';
 import { IMember, ITeam } from '@protocol-labs-network/api';
 import { Breadcrumb } from '@protocol-labs-network/ui';
-import Head from 'next/head';
+import { NextSeo } from 'next-seo';
 import { MemberProfileDetails } from '../../components/members/member-profile/member-profile-details/member-profile-details';
 import { MemberProfileHeader } from '../../components/members/member-profile/member-profile-header/member-profile-header';
 import { MemberProfileOfficeHours } from '../../components/members/member-profile/member-profile-office-hours/member-profile-office-hours';
@@ -25,9 +25,13 @@ export default function Member({ member, teams, backLink }: MemberProps) {
 
   return (
     <>
-      <Head>
-        <title>Member {member.name}</title>
-      </Head>
+      <NextSeo
+        title={member.name}
+        description={`${member.role || 'Contributor'} at ${
+          member.teams[0].name
+        }`}
+      />
+
       <Breadcrumb items={breadcrumbItems} />
 
       <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-24">
