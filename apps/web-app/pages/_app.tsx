@@ -2,10 +2,12 @@ import '@fontsource/inter/400.css';
 import '@fontsource/inter/500.css';
 import '@fontsource/inter/600.css';
 import '@fontsource/inter/700.css';
+import { DefaultSeo } from 'next-seo';
 import { AppProps } from 'next/app';
 import Head from 'next/head';
 import Navbar from '../components/layout/navbar/navbar';
 import { useFathom } from '../hooks/plugins/fathom.hook';
+import { SEO } from '../seo.config';
 import './styles.css';
 
 function CustomApp({ Component, pageProps }: AppProps) {
@@ -17,6 +19,7 @@ function CustomApp({ Component, pageProps }: AppProps) {
       <Head>
         <title>Protocol Labs Network</title>
       </Head>
+      <DefaultSeo {...SEO} />
       <main className="app min-w-[1272px] pt-20">
         <Navbar />
         <Component {...pageProps} />
