@@ -11,6 +11,12 @@ module.exports = {
         ],
       },
       boxShadow: {
+        'on-focus': ['0 0 0 2px rgba(21,111,247,0.25)'],
+        'on-hover': [
+          '0 4px 4px 0 rgba(15,23,42,0.04)',
+          '0 0 1px 0 rgba(15,23,42,0.12)',
+          '0 0 0 2px rgba(21,111,247,0.25)',
+        ],
         'card--slate-900': [
           '0px 0px 1px rgba(15, 23, 42, 0.12)',
           '0px 4px 4px rgba(15, 23, 42, 0.04)',

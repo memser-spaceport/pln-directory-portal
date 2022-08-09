@@ -38,7 +38,7 @@ export function Switch({ label, initialValue = false, onChange }: SwitchProps) {
           onChange={onSwitchChange}
           className={`${
             enabled ? 'bg-blue-600' : 'bg-slate-300'
-          } h-4 w-7 shrink-0 items-center rounded-full transition focus:outline-none focus:ring-1 focus:ring-blue-400`}
+          } on-focus h-4 w-7 shrink-0 items-center rounded-full transition`}
           data-testid="switch__button"
         >
           <div

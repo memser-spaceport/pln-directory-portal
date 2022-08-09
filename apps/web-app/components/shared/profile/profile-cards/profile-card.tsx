@@ -28,8 +28,8 @@ export function ProfileCard({
   const Icon = avatarIcon;
 
   return (
-    <div className="group w-full border-b border-slate-200 bg-white transition-all first:rounded-t-xl last:rounded-b-xl last:border-b-0 hover:bg-slate-50">
-      <AnchorLink href={url}>
+    <div className="profile-card group m-[1px]">
+      <AnchorLink href={url} linkClassName="block on-focus">
         <div className="h-18 flex items-center p-4">
           <div className="relative mr-4 h-10 w-10 shrink-0">
             <div

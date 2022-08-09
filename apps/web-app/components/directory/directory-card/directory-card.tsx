@@ -12,8 +12,12 @@ export function DirectoryCard({
   children,
 }: DirectoryCardProps) {
   return (
-    <div className={`card p-0 ${isGrid ? 'w-[295px]' : 'w-full'} relative`}>
-      <AnchorLink href={cardUrl}>
+    <div
+      className={`card p-0 ${
+        isGrid ? 'w-[295px]' : 'w-full'
+      } hover:shadow-on-hover relative`}
+    >
+      <AnchorLink href={cardUrl} linkClassName="block on-focus">
         <div
           className={`flex ${
             isGrid

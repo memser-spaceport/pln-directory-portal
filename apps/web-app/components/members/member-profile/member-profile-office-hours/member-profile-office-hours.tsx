@@ -28,7 +28,7 @@ export function MemberProfileOfficeHours({
         {url ? (
           <AnchorLink
             href={url}
-            linkClassName="shadow-request-button rounded-lg border border-slate-300 bg-white px-6 py-2.5 text-sm font-medium hover:border-slate-200 hover:text-slate-600 hover:ring-2 hover:ring-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300 active:border-blue-600 active:ring-2"
+            linkClassName="shadow-request-button rounded-lg border border-slate-300 bg-white px-6 py-2.5 text-sm font-medium hover:shadow-on-hover hover:text-slate-600 on-focus active:border-blue-600 active:ring-2"
           >
             Schedule Meeting
           </AnchorLink>
@@ -39,9 +39,11 @@ export function MemberProfileOfficeHours({
         )}
         <AnchorLink
           href={LEARN_MORE_URL}
-          linkClassName="flex items-center text-sm font-semibold"
+          linkClassName="flex items-center text-sm font-semibold group outline-none"
         >
-          Learn more
+          <span className="group-focus-within:shadow-[0_1px_0_#156ff7] group-focus:shadow-[0_1px_0_#156ff7] group-focus-visible:shadow-[0_1px_0_#156ff7]">
+            Learn more
+          </span>
           <ArrowSmRightIcon className="stroke-1.5 ml-1 h-4 w-4 -rotate-45" />
         </AnchorLink>
       </div>
