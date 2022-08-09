@@ -52,12 +52,12 @@ export function ProfileCard({
             </div>
             {showTeamLeadBadge ? (
               <div className="absolute -top-1 -right-1 z-10">
-                <TeamLeadBadge />
+                <TeamLeadBadge size="4" />
               </div>
             ) : null}
           </div>
           <div className="mr-4 w-64">
-            <h3 className="text-sm font-semibold">{name}</h3>
+            <h3 className="line-clamp-1 text-sm font-semibold">{name}</h3>
             <p className="line-clamp-2 leading-3.5 text-xs text-slate-600">
               {description || '-'}
             </p>

@@ -1,11 +1,17 @@
 import { FlagIcon } from '@heroicons/react/solid';
 import { Tooltip } from '@protocol-labs-network/ui';
 
-export function TeamLeadBadge() {
+type TeamLeadBadgeProps = {
+  size: '4' | '5';
+};
+
+export function TeamLeadBadge({ size }: TeamLeadBadgeProps) {
   return (
     <Tooltip
       trigger={
-        <i className="flex h-4 w-4 items-center justify-center rounded-full border border-slate-200 bg-gradient-to-r from-[#427DFF] to-[#44D5BB] not-italic text-white shadow-sm">
+        <i
+          className={`h-${size} flex w-${size} items-center justify-center rounded-full border border-slate-200 bg-gradient-to-r from-[#427DFF] to-[#44D5BB] not-italic text-white`}
+        >
           <FlagIcon className="h-2" />
         </i>
       }

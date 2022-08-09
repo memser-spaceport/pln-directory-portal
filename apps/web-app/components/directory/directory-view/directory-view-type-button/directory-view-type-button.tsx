@@ -38,7 +38,7 @@ export function DirectoryViewTypeButton({
           >
             <span className="sr-only">{label}</span>
             <ViewTypeIcon
-              className={`h-6 w-6 ${
+              className={`stroke-1.5 h-6 w-6 ${
                 isActive
                   ? 'stroke-blue-700'
                   : 'stroke-slate-600 group-focus:stroke-slate-900'

@@ -24,7 +24,7 @@ export function SocialLink({ linkObj, linkIcon, type }: SocialLinkProps) {
         <Tooltip
           trigger={
             <Icon
-              className={`h-5 w-5 ${
+              className={`stroke-1.5 h-5 w-5 ${
                 isActive
                   ? 'text-slate-500 hover:text-slate-600'
                   : 'text-slate-300'
