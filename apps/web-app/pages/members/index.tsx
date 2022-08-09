@@ -4,6 +4,7 @@ import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import { DirectoryHeader } from '../../components/directory/directory-header/directory-header';
 import { useViewType } from '../../components/directory/directory-view/use-directory-view-type.hook';
+import { LoadingOverlay } from '../../components/layout/loading-overlay/loading-overlay';
 import { MembersDirectoryFilters } from '../../components/members/members-directory/members-directory-filters/members-directory-filters';
 import { IMembersFiltersValues } from '../../components/members/members-directory/members-directory-filters/members-directory-filters.types';
 import { parseMembersFilters } from '../../components/members/members-directory/members-directory-filters/members-directory-filters.utils';
@@ -27,6 +28,8 @@ export default function Members({ members, filtersValues }: MembersProps) {
       <Head>
         <title>Members</title>
       </Head>
+
+      <LoadingOverlay excludeUrlFn={(url) => url.startsWith('/members/')} />
 
       <section className="pl-sidebar flex">
         <div className="w-sidebar fixed left-0 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">

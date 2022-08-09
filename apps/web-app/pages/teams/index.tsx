@@ -4,6 +4,7 @@ import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import { DirectoryHeader } from '../../components/directory/directory-header/directory-header';
 import { useViewType } from '../../components/directory/directory-view/use-directory-view-type.hook';
+import { LoadingOverlay } from '../../components/layout/loading-overlay/loading-overlay';
 import { TeamsDirectoryFilters } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters';
 import { ITeamsFiltersValues } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.types';
 import { parseTeamsFilters } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.utils';
@@ -27,6 +28,8 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
       <Head>
         <title>Teams</title>
       </Head>
+
+      <LoadingOverlay excludeUrlFn={(url) => url.startsWith('/teams/')} />
 
       <section className="pl-sidebar flex">
         <div className="w-sidebar fixed left-0 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">
