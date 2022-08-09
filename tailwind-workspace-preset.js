@@ -40,8 +40,14 @@ module.exports = {
       fontSize: {
         base: ['15px', '24px'],
       },
+      lineHeight: {
+        3.5: '14px',
+      },
       spacing: {
+        6.5: '26px',
         7.5: '30px',
+        18: '72px',
+        sidebar: '291px',
       },
     },
   },

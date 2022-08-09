@@ -23,7 +23,7 @@ export function DirectoryCardHeader({
   return (
     <>
       <div
-        className={`relative h-[72px] w-[72px] shrink-0 border border-slate-200 ${
+        className={`h-18 w-18 relative shrink-0 border border-slate-200 ${
           isImageRounded ? 'rounded-full' : 'rounded-lg'
         } ${isGrid ? 'mx-auto' : ''} ${img ? 'bg-white' : 'bg-slate-200'}`}
       >

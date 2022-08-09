@@ -28,8 +28,8 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
         <title>Teams</title>
       </Head>
 
-      <section className="flex pl-[291px]">
-        <div className="fixed left-0 h-full w-[291px] flex-shrink-0 border-r border-r-slate-200 bg-white">
+      <section className="pl-sidebar flex">
+        <div className="w-sidebar fixed left-0 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">
           <TeamsDirectoryFilters filtersValues={filtersValues} />
         </div>
 
