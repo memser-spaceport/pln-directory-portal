@@ -41,7 +41,7 @@ export function DirectoryCardHeader({
         )}
         {teamLead ? (
           <div className="absolute top-0 right-1 z-10">
-            <TeamLeadBadge />
+            <TeamLeadBadge size="5" />
           </div>
         ) : null}
       </div>

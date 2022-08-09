@@ -20,7 +20,7 @@ export function AskToEditCard({
     <div className="card bg-ask_to_edit_card shadow-card--slate-900 p-7.5">
       <h3 className="flex items-center text-lg font-semibold">
         <span className="mr-3 flex h-7 w-7 items-center justify-center rounded border-[0.5px] border-slate-200 bg-slate-100">
-          <PencilAltIcon className="h-4 w-4" />
+          <PencilAltIcon className="stroke-1.5 h-4 w-4" />
         </span>
         Anything missing?
       </h3>

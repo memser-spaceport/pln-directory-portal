@@ -51,7 +51,7 @@ export function JoinNetworkMenu() {
               <Menu.Item key={option.label}>
                 {({ active }) => (
                   <OptionLink href={option.url} active={active}>
-                    <OptionIcon className="mr-2 h-4 w-4" />
+                    <OptionIcon className="stroke-1.5 mr-2 h-4 w-4" />
                     {option.label}
                   </OptionLink>
                 )}

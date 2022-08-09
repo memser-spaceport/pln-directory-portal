@@ -49,6 +49,9 @@ module.exports = {
         18: '72px',
         sidebar: '291px',
       },
+      strokeWidth: {
+        1.5: '1.5px',
+      },
     },
   },
   plugins: [require('@tailwindcss/line-clamp')],

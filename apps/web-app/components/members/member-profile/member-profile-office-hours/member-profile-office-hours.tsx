@@ -15,7 +15,7 @@ export function MemberProfileOfficeHours({
     <div className="mt-6 rounded-xl bg-slate-50 p-4">
       <div className="flex items-center">
         <span className="mr-3 w-7 rounded bg-blue-100 p-1.5">
-          <CalendarIcon className="h-4 w-4 rounded text-blue-700" />
+          <CalendarIcon className="stroke-1.5 h-4 w-4 rounded text-blue-700" />
         </span>
         <h3 className="text-lg font-semibold">Office Hours</h3>
       </div>
@@ -42,7 +42,7 @@ export function MemberProfileOfficeHours({
           linkClassName="flex items-center text-sm font-semibold"
         >
           Learn more
-          <ArrowSmRightIcon className="ml-1 h-4 w-4 -rotate-45" />
+          <ArrowSmRightIcon className="stroke-1.5 ml-1 h-4 w-4 -rotate-45" />
         </AnchorLink>
       </div>
     </div>
