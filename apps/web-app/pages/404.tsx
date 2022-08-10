@@ -1,3 +1,9 @@
+import { ErrorMessage } from '../components/shared/error-message/error-message';
+
 export default function Custom404() {
-  return <h1>404 - Page Not Found</h1>;
+  return (
+    <div className="flex h-[calc(100vh_-_80px)] items-center justify-center">
+      <ErrorMessage />
+    </div>
+  );
 }
