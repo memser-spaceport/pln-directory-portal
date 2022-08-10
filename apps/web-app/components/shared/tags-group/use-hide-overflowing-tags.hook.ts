@@ -1,13 +1,26 @@
 import { useRouter } from 'next/router';
-import { MutableRefObject, useCallback, useEffect, useState } from 'react';
+import { MutableRefObject, useCallback, useEffect, useReducer } from 'react';
+
+interface IReducerState {
+  visibleTags: string[];
+  hiddenTags: string[];
+}
 
 export function useHideOverflowingTags(
   containerRef: MutableRefObject<HTMLDivElement>,
   tags: string[]
 ) {
   const sortedTags = [...tags].sort((a, b) => a.length - b.length);
-  const [visibleTags, setVisibleTags] = useState(sortedTags);
-  const [hiddenTags, setHiddenTags] = useState<string[]>([]);
+  const [state, setState] = useReducer(
+    (state: IReducerState, newState: Partial<IReducerState>) => ({
+      ...state,
+      ...newState,
+    }),
+    {
+      visibleTags: sortedTags,
+      hiddenTags: [] as string[],
+    }
+  );
   const router = useRouter();
 
   useEffect(() => {
@@ -24,18 +37,20 @@ export function useHideOverflowingTags(
   const handleRouteChange = useCallback(
     (_pathname: string, { shallow }: { shallow: boolean }) => {
       if (shallow) {
-        setVisibleTags(sortedTags);
-        setHiddenTags([]);
+        setState({
+          visibleTags: sortedTags,
+          hiddenTags: [],
+        });
       }
     },
-    [sortedTags, setVisibleTags, setHiddenTags]
+    [sortedTags]
   );
 
   useEffect(() => {
     if (
       !containerRef.current ||
       tags.length === 1 ||
-      visibleTags.length === 1
+      state.visibleTags.length === 1
     ) {
       return;
     }
@@ -50,10 +65,12 @@ export function useHideOverflowingTags(
     const { right: lastTagLimit } = lastTagEl.getBoundingClientRect();
 
     if (lastTagLimit > containerLimitWithSafetyMargin) {
-      setHiddenTags([...visibleTags.slice(-1), ...hiddenTags]);
-      setVisibleTags(visibleTags.slice(0, -1));
+      setState({
+        visibleTags: state.visibleTags.slice(0, -1),
+        hiddenTags: [...state.visibleTags.slice(-1), ...state.hiddenTags],
+      });
     }
-  }, [containerRef, tags, hiddenTags, visibleTags]);
+  }, [containerRef, tags, state]);
 
-  return { visibleTags, hiddenTags };
+  return { visibleTags: state.visibleTags, hiddenTags: state.hiddenTags };
 }
