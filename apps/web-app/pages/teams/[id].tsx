@@ -39,7 +39,7 @@ export default function Team({ team, members, backLink }: TeamProps) {
           <TeamProfileMembers members={members} />
         </div>
         <div className="w-sidebar shrink-0">
-          <AskToEditCard profileType="team" profileName={team.name} />
+          <AskToEditCard profileType="team" />
         </div>
       </section>
     </>
