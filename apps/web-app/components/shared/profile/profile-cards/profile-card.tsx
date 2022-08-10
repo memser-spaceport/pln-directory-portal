@@ -56,13 +56,19 @@ export function ProfileCard({
               </div>
             ) : null}
           </div>
-          <div className="mr-4 w-64">
+          <div className="mr-4 w-64 shrink-0">
             <h3 className="line-clamp-1 text-sm font-semibold">{name}</h3>
             <p className="line-clamp-2 leading-3.5 text-xs text-slate-600">
               {description || '-'}
             </p>
           </div>
-          {tags?.length ? <TagsGroup items={tags} isSingleLine={true} /> : '-'}
+          <div className="w-96">
+            {tags?.length ? (
+              <TagsGroup items={tags} isSingleLine={true} />
+            ) : (
+              '-'
+            )}
+          </div>
           <div className="ml-auto w-12">
             <ChevronRightIcon className="h-4 w-4 fill-slate-500 group-hover:fill-slate-900" />
           </div>

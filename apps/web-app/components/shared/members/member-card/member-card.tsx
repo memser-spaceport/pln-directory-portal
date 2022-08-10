@@ -41,7 +41,7 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
 
         <div
           className={`${isGrid ? 'mt-2 justify-center' : 'mt-1'}
-            } flex items-center text-sm text-slate-600`}
+            flex items-center text-sm text-slate-600`}
         >
           {member.location ? (
             <>
