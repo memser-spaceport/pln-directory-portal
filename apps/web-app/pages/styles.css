@@ -2,10 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-slate-100 text-slate-900;
-}
-
 @layer base {
   html {
     font-family: 'Inter', sans-serif;
