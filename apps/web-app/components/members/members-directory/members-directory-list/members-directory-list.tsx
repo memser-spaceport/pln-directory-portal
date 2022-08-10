@@ -5,23 +5,17 @@ import { DirectoryList } from '../../../directory/directory-list/directory-list'
 interface MembersDirectoryListProps {
   members: IMember[];
   isGrid: boolean;
+  filterProperties: string[];
 }
 
 export function MembersDirectoryList({
   members,
   isGrid,
+  filterProperties,
 }: MembersDirectoryListProps) {
   return (
     <DirectoryList
-      filterProperties={[
-        'skills',
-        'region',
-        'country',
-        'metroArea',
-        'officeHoursOnly',
-        'includeFriends',
-        'searchBy',
-      ]}
+      filterProperties={filterProperties}
       itemsCount={members.length}
     >
       {members.map((member) => (

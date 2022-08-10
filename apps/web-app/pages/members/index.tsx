@@ -22,6 +22,14 @@ type MembersProps = {
 export default function Members({ members, filtersValues }: MembersProps) {
   const { selectedViewType } = useViewType();
   const isGrid = selectedViewType === 'grid';
+  const filterProperties = [
+    'skills',
+    'region',
+    'country',
+    'metroArea',
+    'officeHoursOnly',
+    'includeFriends',
+  ];
 
   return (
     <>
@@ -31,7 +39,10 @@ export default function Members({ members, filtersValues }: MembersProps) {
 
       <section className="pl-sidebar flex">
         <div className="w-sidebar fixed left-0 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">
-          <MembersDirectoryFilters filtersValues={filtersValues} />
+          <MembersDirectoryFilters
+            filtersValues={filtersValues}
+            filterProperties={filterProperties}
+          />
         </div>
 
         <div className="mx-auto p-8">
@@ -42,7 +53,11 @@ export default function Members({ members, filtersValues }: MembersProps) {
               count={members.length}
             />
 
-            <MembersDirectoryList members={members} isGrid={isGrid} />
+            <MembersDirectoryList
+              members={members}
+              isGrid={isGrid}
+              filterProperties={filterProperties}
+            />
           </div>
         </div>
       </section>
