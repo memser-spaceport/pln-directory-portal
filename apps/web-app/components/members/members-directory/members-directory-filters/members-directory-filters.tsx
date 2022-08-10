@@ -9,22 +9,15 @@ import { IMembersFiltersValues } from './members-directory-filters.types';
 
 export interface MembersDirectoryFiltersProps {
   filtersValues: IMembersFiltersValues;
+  filterProperties: string[];
 }
 
 export function MembersDirectoryFilters({
   filtersValues,
+  filterProperties,
 }: MembersDirectoryFiltersProps) {
   return (
-    <DirectoryFilters
-      filterProperties={[
-        'skills',
-        'region',
-        'country',
-        'metroArea',
-        'officeHoursOnly',
-        'includeFriends',
-      ]}
-    >
+    <DirectoryFilters filterProperties={filterProperties}>
       <div className="space-y-4">
         <OfficeHoursFilter />
         <FriendOfPLNFilter />
