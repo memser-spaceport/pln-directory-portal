@@ -9,6 +9,7 @@ import { MembersDirectoryFilters } from '../../components/members/members-direct
 import { IMembersFiltersValues } from '../../components/members/members-directory/members-directory-filters/members-directory-filters.types';
 import { parseMembersFilters } from '../../components/members/members-directory/members-directory-filters/members-directory-filters.utils';
 import { MembersDirectoryList } from '../../components/members/members-directory/members-directory-list/members-directory-list';
+import { useDirectoryFiltersFathomLogger } from '../../hooks/plugins/use-directory-filters-fathom-logger.hook';
 import {
   getMembersDirectoryListOptions,
   getMembersDirectoryRequestOptionsFromQuery,
@@ -30,6 +31,8 @@ export default function Members({ members, filtersValues }: MembersProps) {
     'officeHoursOnly',
     'includeFriends',
   ];
+
+  useDirectoryFiltersFathomLogger('members', filterProperties);
 
   return (
     <>

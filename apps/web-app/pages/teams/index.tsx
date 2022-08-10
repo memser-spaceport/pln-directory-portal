@@ -9,6 +9,7 @@ import { TeamsDirectoryFilters } from '../../components/teams/teams-directory/te
 import { ITeamsFiltersValues } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.types';
 import { parseTeamsFilters } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.utils';
 import { TeamsDirectoryList } from '../../components/teams/teams-directory/teams-directory-list/teams-directory-list';
+import { useDirectoryFiltersFathomLogger } from '../../hooks/plugins/use-directory-filters-fathom-logger.hook';
 import {
   getTeamsDirectoryListOptions,
   getTeamsDirectoryRequestOptionsFromQuery,
@@ -29,6 +30,8 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
     'technology',
     'includeFriends',
   ];
+
+  useDirectoryFiltersFathomLogger('teams', filterProperties);
 
   return (
     <>
