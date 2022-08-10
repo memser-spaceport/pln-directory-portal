@@ -1,4 +1,4 @@
-import * as Fathom from 'fathom-client';
+import { load, trackPageview } from 'fathom-client';
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
 
@@ -7,14 +7,14 @@ export function useFathom() {
 
   useEffect(() => {
     function onRouteChangeComplete() {
-      Fathom.trackPageview();
+      trackPageview();
     }
 
     if (
       process.env.NEXT_PUBLIC_FATHOM_TRACKING_CODE &&
       process.env.NEXT_PUBLIC_FATHOM_INCLUDED_DOMAINS
     ) {
-      Fathom.load(process.env.NEXT_PUBLIC_FATHOM_TRACKING_CODE, {
+      load(process.env.NEXT_PUBLIC_FATHOM_TRACKING_CODE, {
         includedDomains: [process.env.NEXT_PUBLIC_FATHOM_INCLUDED_DOMAINS],
       });
 

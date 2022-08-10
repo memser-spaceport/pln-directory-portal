@@ -6,7 +6,7 @@ import { DefaultSeo } from 'next-seo';
 import { AppProps } from 'next/app';
 import Head from 'next/head';
 import Navbar from '../components/layout/navbar/navbar';
-import { useFathom } from '../hooks/plugins/fathom.hook';
+import { useFathom } from '../hooks/plugins/use-fathom.hook';
 import { SEO } from '../seo.config';
 import './styles.css';
 
