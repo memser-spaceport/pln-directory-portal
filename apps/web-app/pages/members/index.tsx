@@ -41,7 +41,7 @@ export default function Members({ members, filtersValues }: MembersProps) {
       <LoadingOverlay excludeUrlFn={(url) => url.startsWith('/members/')} />
 
       <section className="pl-sidebar flex">
-        <div className="w-sidebar fixed left-0 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">
+        <div className="w-sidebar fixed left-0 z-40 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">
           <MembersDirectoryFilters
             filtersValues={filtersValues}
             filterProperties={filterProperties}

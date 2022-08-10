@@ -40,7 +40,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
       <LoadingOverlay excludeUrlFn={(url) => url.startsWith('/teams/')} />
 
       <section className="pl-sidebar flex">
-        <div className="w-sidebar fixed left-0 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">
+        <div className="w-sidebar fixed left-0 z-40 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">
           <TeamsDirectoryFilters
             filtersValues={filtersValues}
             filterProperties={filterProperties}
