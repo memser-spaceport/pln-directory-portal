@@ -17,7 +17,7 @@ function CustomApp({ Component, pageProps }: AppProps) {
   return (
     <>
       <Head>
-        <title>Protocol Labs Network</title>
+        <meta name="viewport" content="width=1272, user-scalable=no" />
       </Head>
       <DefaultSeo {...SEO} />
       <main className="app min-w-[1272px] pt-20">
