@@ -23,10 +23,6 @@ const nextConfig = {
     // Configure the Time to Live (TTL) in seconds for caching optimized images
     minimumCacheTTL: 300,
   },
-  i18n: {
-    locales: ['en'],
-    defaultLocale: 'en',
-  },
   experimental: {
     // this includes files from the monorepo base two directories up
     outputFileTracingRoot: path.join(__dirname, '../../'),
