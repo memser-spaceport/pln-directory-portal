@@ -1,3 +1,4 @@
+import { Transition } from '@headlessui/react';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { LoadingIndicator } from '../../../components/shared/loading-indicator/loading-indicator';
@@ -10,7 +11,6 @@ export function LoadingOverlay({ excludeUrlFn }: LoadingOverlayProps) {
   const router = useRouter();
 
   const [loading, setLoading] = useState(false);
-  const [overlayVisibility, setOverlayVisibility] = useState(false);
 
   useEffect(() => {
     const handleStart = async (
@@ -22,8 +22,6 @@ export function LoadingOverlay({ excludeUrlFn }: LoadingOverlayProps) {
         url !== router.asPath &&
         !shallow
       ) {
-        setOverlayVisibility(true);
-        await new Promise((resolve) => setTimeout(resolve, 0));
         setLoading(true);
       }
     };
@@ -38,8 +36,6 @@ export function LoadingOverlay({ excludeUrlFn }: LoadingOverlayProps) {
         !shallow
       ) {
         setLoading(false);
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        setOverlayVisibility(false);
       }
     };
 
@@ -53,14 +49,17 @@ export function LoadingOverlay({ excludeUrlFn }: LoadingOverlayProps) {
   }, [excludeUrlFn, router]);
 
   return (
-    overlayVisibility && (
-      <div
-        className={`fixed top-20 left-0 z-50 flex h-[calc(100vh_-_80px)] w-full items-center justify-center bg-slate-100 bg-opacity-50 transition-opacity duration-300 ${
-          loading ? 'opacity-100' : 'opacity-0'
-        }`}
-      >
-        <LoadingIndicator />
-      </div>
-    )
+    <Transition
+      show={loading}
+      enter="transition-opacity duration-75"
+      enterFrom="opacity-0"
+      enterTo="opacity-100"
+      leave="transition-opacity duration-150"
+      leaveFrom="opacity-100"
+      leaveTo="opacity-0"
+      className={`fixed top-20 left-0 z-50 flex h-[calc(100%_-_80px)] w-full items-center justify-center bg-slate-100/50`}
+    >
+      <LoadingIndicator />
+    </Transition>
   );
 }
