@@ -5,18 +5,17 @@ import { TeamCard } from '../../../../components/shared/teams/team-card/team-car
 interface TeamsDirectoryListProps {
   teams: ITeam[];
   isGrid: boolean;
+  filterProperties: string[];
 }
 
-export function TeamsDirectoryList({ teams, isGrid }: TeamsDirectoryListProps) {
+export function TeamsDirectoryList({
+  teams,
+  isGrid,
+  filterProperties,
+}: TeamsDirectoryListProps) {
   return (
     <DirectoryList
-      filterProperties={[
-        'tags',
-        'acceleratorPrograms',
-        'fundingStage',
-        'technology',
-        'searchBy',
-      ]}
+      filterProperties={filterProperties}
       itemsCount={teams.length}
     >
       {teams.map((team) => {

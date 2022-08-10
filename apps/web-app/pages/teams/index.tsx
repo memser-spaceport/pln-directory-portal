@@ -22,6 +22,13 @@ type TeamsProps = {
 export default function Teams({ teams, filtersValues }: TeamsProps) {
   const { selectedViewType } = useViewType();
   const isGrid = selectedViewType === 'grid';
+  const filterProperties = [
+    'tags',
+    'acceleratorPrograms',
+    'fundingStage',
+    'technology',
+    'includeFriends',
+  ];
 
   return (
     <>
@@ -31,7 +38,10 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
 
       <section className="pl-sidebar flex">
         <div className="w-sidebar fixed left-0 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">
-          <TeamsDirectoryFilters filtersValues={filtersValues} />
+          <TeamsDirectoryFilters
+            filtersValues={filtersValues}
+            filterProperties={filterProperties}
+          />
         </div>
 
         <div className="mx-auto p-8">
@@ -42,7 +52,11 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
               count={teams.length}
             />
 
-            <TeamsDirectoryList teams={teams} isGrid={isGrid} />
+            <TeamsDirectoryList
+              teams={teams}
+              isGrid={isGrid}
+              filterProperties={filterProperties}
+            />
           </div>
         </div>
       </section>

@@ -8,21 +8,15 @@ import { TechnologyFilter } from './technology-filter/technology-filter';
 
 export interface TeamsDirectoryFiltersProps {
   filtersValues: ITeamsFiltersValues;
+  filterProperties: string[];
 }
 
 export function TeamsDirectoryFilters({
   filtersValues,
+  filterProperties,
 }: TeamsDirectoryFiltersProps) {
   return (
-    <DirectoryFilters
-      filterProperties={[
-        'tags',
-        'acceleratorPrograms',
-        'fundingStage',
-        'technology',
-        'includeFriends',
-      ]}
-    >
+    <DirectoryFilters filterProperties={filterProperties}>
       <FriendOfPLNFilter />
       <div className="my-5 h-px bg-slate-200" />
       <TagsFilter tagsTags={filtersValues.tags} />
