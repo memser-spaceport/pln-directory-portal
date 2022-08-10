@@ -5,6 +5,7 @@ export const SEO = {
   description:
     'The Protocol Labs Network Directory helps network members orient themselves within the network by making it easy to learn about other teams and members, including their roles, capabilities, and experiences.',
   openGraph: {
+    type: 'website',
     url: 'https://plnetwork.io/',
     images: [
       {
