@@ -48,6 +48,7 @@ export function MemberProfileHeader({
       </div>
       <div className="flex w-24 items-start justify-end">
         <Tooltip
+          asChild
           trigger={
             <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 p-2 shadow-[0_1px_2px_rgba(15,23,42,0.16)]">
               <i className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] not-italic text-white">
@@ -55,7 +56,6 @@ export function MemberProfileHeader({
               </i>
             </span>
           }
-          triggerClassName="on-focus focus-within:rounded-full focus:rounded-full focus-visible:rounded-full"
           content="Team Lead"
         />
       </div>

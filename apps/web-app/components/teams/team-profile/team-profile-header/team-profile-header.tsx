@@ -47,15 +47,24 @@ export function TeamProfileHeader({
       <div className="flex w-24 items-start justify-end">
         {filecoinUser ? (
           <Tooltip
-            triggerClassName="on-focus focus-within:rounded-full focus:rounded-full focus-visible:rounded-full"
-            trigger={<ProtocolBtn Icon={FilecoinIcon} />}
+            asChild
+            trigger={
+              <div>
+                <ProtocolBtn Icon={FilecoinIcon} />
+              </div>
+            }
             content="Filecoin User"
           />
         ) : null}
         {ipfsUser ? (
           <Tooltip
-            trigger={<ProtocolBtn Icon={IPFSIcon} />}
-            triggerClassName="ml-4 on-focus focus-within:rounded-full focus:rounded-full focus-visible:rounded-full"
+            asChild
+            trigger={
+              <div>
+                <ProtocolBtn Icon={IPFSIcon} />
+              </div>
+            }
+            triggerClassName="ml-4"
             content="IPFS User"
           />
         ) : null}
