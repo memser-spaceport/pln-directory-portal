@@ -15,6 +15,9 @@ export function useFathom() {
       process.env.NEXT_PUBLIC_FATHOM_INCLUDED_DOMAINS
     ) {
       load(process.env.NEXT_PUBLIC_FATHOM_TRACKING_CODE, {
+        ...(process.env.NEXT_PUBLIC_FATHOM_SCRIPT_URL
+          ? { url: process.env.NEXT_PUBLIC_FATHOM_SCRIPT_URL }
+          : {}),
         includedDomains: [process.env.NEXT_PUBLIC_FATHOM_INCLUDED_DOMAINS],
       });
 
