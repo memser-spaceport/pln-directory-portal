@@ -1,4 +1,3 @@
-import { Transition } from '@headlessui/react';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { LoadingIndicator } from '../../../components/shared/loading-indicator/loading-indicator';
@@ -13,10 +12,7 @@ export function LoadingOverlay({ excludeUrlFn }: LoadingOverlayProps) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const handleStart = async (
-      url: string,
-      { shallow }: { shallow: boolean }
-    ) => {
+    const handleStart = (url: string, { shallow }: { shallow: boolean }) => {
       if (
         (!excludeUrlFn || (excludeUrlFn && !excludeUrlFn(url))) &&
         url !== router.asPath &&
@@ -26,10 +22,7 @@ export function LoadingOverlay({ excludeUrlFn }: LoadingOverlayProps) {
       }
     };
 
-    const handleComplete = async (
-      url: string,
-      { shallow }: { shallow: boolean }
-    ) => {
+    const handleComplete = (url: string, { shallow }: { shallow: boolean }) => {
       if (
         (!excludeUrlFn || (excludeUrlFn && !excludeUrlFn(url))) &&
         url === router.asPath &&
@@ -39,27 +32,34 @@ export function LoadingOverlay({ excludeUrlFn }: LoadingOverlayProps) {
       }
     };
 
+    const handleError = (
+      _err: Error,
+      url: string,
+      { shallow }: { shallow: boolean }
+    ) => {
+      handleComplete(url, { shallow });
+    };
+
     router.events.on('routeChangeStart', handleStart);
     router.events.on('routeChangeComplete', handleComplete);
+    router.events.on('routeChangeError', handleError);
 
     return () => {
       router.events.off('routeChangeStart', handleStart);
       router.events.off('routeChangeComplete', handleComplete);
+      router.events.off('routeChangeError', handleError);
     };
   }, [excludeUrlFn, router]);
 
   return (
-    <Transition
-      show={loading}
-      enter="transition-opacity duration-75"
-      enterFrom="opacity-0"
-      enterTo="opacity-100"
-      leave="transition-opacity duration-150"
-      leaveFrom="opacity-100"
-      leaveTo="opacity-0"
-      className={`fixed top-20 left-0 z-50 flex h-[calc(100%_-_80px)] w-full items-center justify-center bg-slate-100/50`}
+    <div
+      className={`fixed top-20 left-0 z-50 flex h-[calc(100%_-_80px)] w-full items-center justify-center bg-slate-100/50 transition-[visibility,_opacity] duration-[0s,_300ms] ease-[linear,_linear] ${
+        loading
+          ? 'visible opacity-100 delay-[0s,0s]'
+          : 'invisible opacity-0 delay-[300ms,0s]'
+      }`}
     >
       <LoadingIndicator />
-    </Transition>
+    </div>
   );
 }
