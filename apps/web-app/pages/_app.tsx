@@ -18,6 +18,7 @@ function CustomApp({ Component, pageProps }: AppProps) {
     <>
       <Head>
         <meta name="viewport" content="width=1272, user-scalable=no" />
+        <meta content="#f1f5f9" name="theme-color"></meta>
       </Head>
       <DefaultSeo {...SEO} />
       <main className="app min-w-[1272px] pt-20">
