@@ -3,9 +3,7 @@ import { ITeam } from '@protocol-labs-network/api';
 import { Tooltip } from '@protocol-labs-network/ui';
 import Image from 'next/image';
 import { TagsGroup } from '../../../shared/tags-group/tags-group';
-import { ProtocolBtn } from './protocol-btn';
 import { ReactComponent as FilecoinIcon } from '/public/assets/images/icons/filecoin-logo.svg';
-import { ReactComponent as IPFSIcon } from '/public/assets/images/icons/ipfs-logo.svg';
 
 export function TeamProfileHeader({
   logo,
@@ -49,8 +47,8 @@ export function TeamProfileHeader({
           <Tooltip
             asChild
             trigger={
-              <div>
-                <ProtocolBtn Icon={FilecoinIcon} />
+              <div className="inline-flex h-10 w-10 rounded-full border border-slate-200 p-2 shadow-[0_1px_2px_rgba(15,23,42,0.16)]">
+                <FilecoinIcon className="h-6 w-6 self-center" />
               </div>
             }
             content="Filecoin User"
@@ -60,8 +58,13 @@ export function TeamProfileHeader({
           <Tooltip
             asChild
             trigger={
-              <div>
-                <ProtocolBtn Icon={IPFSIcon} />
+              <div className="inline-flex h-10 w-10 rounded-full border border-slate-200 p-2 shadow-[0_1px_2px_rgba(15,23,42,0.16)]">
+                <Image
+                  src="/assets/images/icons/ipfs-logo.png"
+                  alt="IPFS Logo"
+                  width="24px"
+                  height="24px"
+                />
               </div>
             }
             triggerClassName="ml-4"
