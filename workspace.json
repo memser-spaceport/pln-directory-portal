@@ -5,6 +5,7 @@
     "api": "libs/api",
     "ui": "libs/ui",
     "web-app": "apps/web-app",
-    "web-app-e2e": "apps/web-app-e2e"
+    "web-app-e2e": "apps/web-app-e2e",
+    "web-api": "apps/web-api"
   }
 }

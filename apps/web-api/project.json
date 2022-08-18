@@ -1,0 +1,51 @@
+{
+    "root": "apps/web-api",
+    "sourceRoot": "apps/web-api/src",
+    "projectType": "application",
+    "targets": {
+      "build": {
+        "executor": "@nrwl/node:webpack",
+        "outputs": ["{options.outputPath}"],
+        "options": {
+          "outputPath": "dist/apps/web-api",
+          "main": "apps/web-api/src/main.ts",
+          "tsConfig": "apps/web-api/tsconfig.build.json"
+        },
+        "configurations": {
+          "production": {
+            "optimization": true,
+            "extractLicenses": true,
+            "inspect": false,
+            "fileReplacements": [
+              {
+                "replace": "apps/web-api/src/environments/environment.ts",
+                "with": "apps/web-api/src/environments/environment.prod.ts"
+              }
+            ]
+          }
+        }
+      },
+      "serve": {
+        "executor": "@nrwl/node:node",
+        "options": {
+          "buildTarget": "web-api:build"
+        }
+      },
+      "lint": {
+        "executor": "@nrwl/linter:eslint",
+        "outputs": ["{options.outputFile}"],
+        "options": {
+          "lintFilePatterns": ["apps/web-api/**/*.ts"]
+        }
+      },
+      "test": {
+        "executor": "@nrwl/jest:jest",
+        "outputs": ["coverage/apps/web-api"],
+        "options": {
+          "jestConfig": "apps/web-api/jest.config.js",
+          "passWithNoTests": true
+        }
+      }
+    },
+    "tags": []
+  }
