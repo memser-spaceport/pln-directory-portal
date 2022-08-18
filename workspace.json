@@ -3,7 +3,9 @@
   "projects": {
     "airtable": "libs/airtable",
     "api": "libs/api",
+    "contracts": "libs/contracts",
     "ui": "libs/ui",
+    "web-api": "apps/web-api",
     "web-app": "apps/web-app",
     "web-app-e2e": "apps/web-app-e2e"
   }
