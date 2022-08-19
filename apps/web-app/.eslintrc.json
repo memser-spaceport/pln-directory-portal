@@ -22,7 +22,17 @@
       "rules": {}
     }
   ],
+  "rules": {
+    "graphql/template-strings": ["error", {
+      // Import default settings for your GraphQL client. Supported values:
+      // "apollo", "relay", "lokka", "fraql", "literal"
+      "env": "apollo"
+      // no need to specify schema here, it will be automatically determined using .graphqlconfig
+    }]
+  },
   "env": {
     "jest": true
-  }
+  },
+  "plugins": ["graphql"]
 }
+
