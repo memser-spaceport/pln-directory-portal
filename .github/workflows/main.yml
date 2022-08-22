@@ -21,9 +21,6 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable --immutable-cache --check-cache
 
-      - name: Run migrations
-        run: npx nx run web-api:migrate-dev
-
       - name: Run linter for NX-specific workspace files
         run: npx nx workspace-lint
 
