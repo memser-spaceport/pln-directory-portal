@@ -21,6 +21,9 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable --immutable-cache --check-cache
 
+      - name: Prisma Generate
+        run: npx prisma generate --schema=./apps/web-api/prisma/schema.prisma
+
       - name: Run linter for NX-specific workspace files
         run: npx nx workspace-lint
 
