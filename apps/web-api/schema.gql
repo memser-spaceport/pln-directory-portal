@@ -3,59 +3,37 @@
 # ------------------------------------------------------
 
 type Member {
-  """
-  Member ID
-  """
+  """Member ID"""
   id: ID!
 
-  """
-  Member name
-  """
+  """Member name"""
   name: String!
 
-  """
-  Member Email
-  """
+  """Member Email"""
   email: String!
 
-  """
-  Member image
-  """
+  """Member image"""
   image: String!
 
-  """
-  Member github_handler
-  """
+  """Member github_handler"""
   github_handler: String!
 
-  """
-  Member discord_handler
-  """
+  """Member discord_handler"""
   discord_handler: String!
 
-  """
-  Member twitter
-  """
+  """Member twitter"""
   twitter: String!
 
-  """
-  Member office_hours
-  """
+  """Member office_hours"""
   office_hours: String!
 
-  """
-  Is Member pln_friend
-  """
+  """Is Member pln_friend"""
   pln_friend: Boolean!
 
-  """
-  Member createdAt
-  """
+  """Member createdAt"""
   create_at: DateTime!
 
-  """
-  Member updatedAt
-  """
+  """Member updatedAt"""
   updated_at: DateTime!
 }
 
@@ -73,43 +51,27 @@ type Mutation {
 }
 
 input CreateMemberInput {
-  """
-  Member name
-  """
+  """Member name"""
   name: String!
 
-  """
-  Member Email
-  """
+  """Member Email"""
   email: String!
 
-  """
-  Member image
-  """
+  """Member image"""
   image: String!
 
-  """
-  Member github_handler
-  """
+  """Member github_handler"""
   github_handler: String!
 
-  """
-  Member discord_handler
-  """
+  """Member discord_handler"""
   discord_handler: String!
 
-  """
-  Member twitter
-  """
+  """Member twitter"""
   twitter: String!
 
-  """
-  Member office_hours
-  """
+  """Member office_hours"""
   office_hours: String!
 
-  """
-  Is Member pln_friend
-  """
+  """Is Member pln_friend"""
   pln_friend: Boolean!
 }

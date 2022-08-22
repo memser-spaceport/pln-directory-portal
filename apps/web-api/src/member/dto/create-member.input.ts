@@ -1,5 +1,5 @@
-import { InputType, Int, Field } from '@nestjs/graphql';
-import { Member, Prisma } from '@prisma/client';
+import { Field, InputType } from '@nestjs/graphql';
+import { Prisma } from '@prisma/client';
 
 @InputType()
 export class CreateMemberInput implements Prisma.MemberCreateInput {
