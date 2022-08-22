@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Member, Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma.service';
-import { CreateMemberInput } from './dto/create-member.input';
-import { UpdateMemberInput } from './dto/update-member.input';
 import { FetchMembersArgs } from './dto/fetch.members.input';
-import { Member as MemberModel } from '@prisma/client';
 
 @Injectable()
 export class MemberService {
@@ -24,14 +21,7 @@ export class MemberService {
   }
 
   findAll(args: FetchMembersArgs = { skip: 0, take: 5 }): Promise<Member[]> {
-    try {
-      return this.prisma.member.findMany({ skip: args.skip, take: args.take });
-    } catch (error) {
-      console.log(
-        '🚀 ~ file: member.service.ts ~ line 30 ~ MemberService ~ findAll ~ error',
-        error,
-      );
-    }
+    return this.prisma.member.findMany({ skip: args.skip, take: args.take });
   }
 
   create(createMemberInput: Prisma.MemberCreateInput) {
@@ -39,12 +29,4 @@ export class MemberService {
       data: createMemberInput,
     });
   }
-
-  // update(id: number, updateMemberInput: UpdateMemberInput) {
-  //   return `This action updates a #${id} member`;
-  // }
-
-  // remove(id: number) {
-  //   return `This action removes a #${id} member`;
-  // }
 }
