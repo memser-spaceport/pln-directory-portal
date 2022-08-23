@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Member, Prisma } from '@prisma/client';
-import { PrismaService } from 'src/prisma.service';
+import { PrismaService } from '../prisma.service';
 import { FetchMembersArgs } from './dto/fetch.members.input';
 
 @Injectable()
