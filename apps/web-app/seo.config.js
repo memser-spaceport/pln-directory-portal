@@ -59,6 +59,7 @@ export const SEO = {
     },
     { rel: 'shortcut icon', type: 'image/x-icon', href: '/favicon.ico' },
     { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
+    { rel: 'manifest', href: '/manifest.json' },
   ],
   twitter: {
     cardType: 'summary_large_image',
