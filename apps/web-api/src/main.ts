@@ -22,6 +22,6 @@ async function bootstrap() {
     dsn: process.env.SENTRY_DSN,
   });
 
-  await app.listen(3000);
+  await app.listen(process.env.PORT || 3000);
 }
 bootstrap();

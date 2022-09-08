@@ -1,2 +1,0 @@
-schema: '../web-api/schema.gql'
-documents: '../**/*.graphql'
