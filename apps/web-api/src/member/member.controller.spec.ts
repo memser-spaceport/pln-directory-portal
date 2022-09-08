@@ -1,20 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma.service';
-import { MemberResolver } from './member.resolver';
+import { MemberController } from './member.controller';
 import { MemberService } from './member.service';
 
-describe('MemberResolver', () => {
-  let resolver: MemberResolver;
+describe('MemberController', () => {
+  let controller: MemberController;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [MemberResolver, MemberService, PrismaService],
+      providers: [MemberService, PrismaService],
+      controllers: [MemberController],
     }).compile();
 
-    resolver = module.get<MemberResolver>(MemberResolver);
+    controller = module.get<MemberController>(MemberController);
   });
 
   it('should be defined', () => {
-    expect(resolver).toBeDefined();
+    expect(controller).toBeDefined();
   });
 });

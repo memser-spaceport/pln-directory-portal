@@ -10,16 +10,141 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// TODO: User accounts mapped from Clerk
+/// TODO: User permissions/grants
+
+model Team {
+  id                  Int                  @id @default(autoincrement())
+  uid                 String               @unique @default(cuid())
+  name                String               @unique
+  logo                String?
+  blog                String?
+  website             String?
+  twitterHandler      String?
+  shortDescripton     String?
+  longDescripton      String?
+  filecoinUser        Boolean
+  ipfsUser            Boolean
+  plnFriend           Boolean
+  startDate           DateTime?
+  endDate             DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  members             Member[]
+  teamMemberRoles     TeamMemberRole[]
+  industryTags        IndustryTag[]
+  acceleratorPrograms AcceleratorProgram[]
+  fundingStage        FundingStage?        @relation(fields: [fundingStageUid], references: [uid])
+  fundingStageUid     String?
+}
+
 model Member {
-  id              Int      @id @default(autoincrement())
-  name            String?
-  email           String   @unique
-  image           String
-  github_handler  String
-  discord_handler String
-  twitter         String
-  office_hours    String
-  pln_friend      Boolean
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  id              Int              @id @default(autoincrement())
+  uid             String           @unique @default(cuid())
+  name            String
+  email           String           @unique
+  image           String?
+  githubHandler   String?
+  discordHandler  String?
+  twitterHandler  String?
+  officeHours     String?
+  plnFriend       Boolean
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  teams           Team[]
+  skills          Skill[]
+  location        Location         @relation(fields: [locationUid], references: [uid])
+  locationUid     String
+  teamMemberRoles TeamMemberRole[]
+}
+
+model Skill {
+  id          Int      @id @default(autoincrement())
+  uid         String   @unique @default(cuid())
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  members     Member[]
+}
+
+model Location {
+  id                 Int      @id @default(autoincrement())
+  uid                String   @unique @default(cuid())
+  city               String?
+  country            String
+  continent          String
+  region             String?
+  regionAbbreviation String?
+  formattedAddress   String
+  latitude           Float
+  longitude          Float
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  members            Member[]
+}
+
+model Role {
+  id              Int              @id @default(autoincrement())
+  uid             String           @unique @default(cuid())
+  title           String
+  description     String?
+  startDate       DateTime?
+  endDate         DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  teamMemberRoles TeamMemberRole[]
+}
+
+model TeamMemberRole {
+  id       Int     @id @default(autoincrement())
+  mainRole Boolean
+  teamLead Boolean
+  member   Member  @relation(fields: [memberId], references: [id])
+  memberId Int
+  team     Team    @relation(fields: [teamId], references: [id])
+  teamId   Int
+  role     Role    @relation(fields: [roleId], references: [id])
+  roleId   Int
+
+  @@unique([memberId, teamId, roleId])
+}
+
+model IndustryCategory {
+  id           Int           @id @default(autoincrement())
+  uid          String        @unique @default(cuid())
+  title        String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  industryTags IndustryTag[]
+}
+
+model IndustryTag {
+  id                  Int              @id @default(autoincrement())
+  uid                 String           @unique @default(cuid())
+  title               String
+  definition          String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  industryCategory    IndustryCategory @relation(fields: [industryCategoryUid], references: [uid])
+  industryCategoryUid String
+  teams               Team[]
+}
+
+model FundingStage {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  teams     Team[]
+}
+
+model AcceleratorProgram {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  teams     Team[]
 }

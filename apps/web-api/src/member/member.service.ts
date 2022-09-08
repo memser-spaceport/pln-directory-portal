@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Member, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
-import { FetchMembersArgs } from './dto/fetch.members.input';
 
 @Injectable()
 export class MemberService {
@@ -20,13 +19,23 @@ export class MemberService {
     });
   }
 
-  findAll(args: FetchMembersArgs = { skip: 0, take: 5 }): Promise<Member[]> {
-    return this.prisma.member.findMany({ skip: args.skip, take: args.take });
+  findAll(): Promise<Member[]> {
+    return this.prisma.member.findMany();
   }
 
-  create(createMemberInput: Prisma.MemberCreateInput) {
+  create(params: {
+    name: string;
+    email: string;
+    image: string | null;
+    githubHandler: string | null;
+    discordHandler: string | null;
+    twitterHandler: string | null;
+    officeHours: string | null;
+    plnFriend: boolean;
+    locationUid: string;
+  }) {
     return this.prisma.member.create({
-      data: createMemberInput,
+      data: { ...params },
     });
   }
 }

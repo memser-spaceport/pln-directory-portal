@@ -9,7 +9,8 @@
       "options": {
         "outputPath": "dist/apps/web-api",
         "main": "apps/web-api/src/main.ts",
-        "tsConfig": "apps/web-api/tsconfig.build.json"
+        "tsConfig": "apps/web-api/tsconfig.build.json",
+        "tsPlugins": ["@nestjs/swagger/plugin"]
       },
       "configurations": {
         "production": {
