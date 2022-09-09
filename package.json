@@ -7,6 +7,7 @@
     "start": "nx serve",
     "build": "nx build",
     "test": "nx test",
+    "heroku-postbuild": "nx build $PROJECT_NAME --prod",
     "check:local": "npx nx workspace-lint && npx nx format:check && npx nx affected --target=lint && npx nx affected --target=test --ci --code-coverage && npx nx affected --target=build"
   },
   "private": true,
