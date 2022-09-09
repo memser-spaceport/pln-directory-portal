@@ -7,13 +7,15 @@
     "start": "nx serve",
     "build": "nx build",
     "test": "nx test",
-    "check:local": "npx nx workspace-lint && npx nx format:check && npx nx affected --target=lint && npx nx affected --target=test --ci --code-coverage && npx nx affected --target=build"
+    "check:local": "npx nx workspace-lint && npx nx format:check && npx nx affected --target=lint && npx nx affected --target=test --ci --code-coverage && npx nx affected --target=build",
+    "analyze:web": "WITH_BUNDLE_ANALYZER=true nx run web-app:build"
   },
   "private": true,
   "dependencies": {
     "@fontsource/inter": "^4.5.11",
     "@headlessui/react": "^1.6.6",
     "@heroicons/react": "^1.0.6",
+    "@next/bundle-analyzer": "^12.2.5",
     "@nrwl/next": "13.9.7",
     "@radix-ui/react-collapsible": "^0.1.6",
     "@radix-ui/react-tooltip": "^1.0.0",
