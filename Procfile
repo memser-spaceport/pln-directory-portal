@@ -1,1 +1,1 @@
-web: node dist/apps/photo/api/main.js
+web: node dist/apps/web-api/main.js
