@@ -2,11 +2,14 @@
 const withNx = require('@nrwl/next/plugins/with-nx');
 const { withSentryConfig } = require('@sentry/nextjs');
 const path = require('path');
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.WITH_BUNDLE_ANALYZER === 'true',
+});
 
 /**
  * @type {import('@nrwl/next/plugins/with-nx').WithNxOptions}
  **/
-const nextConfig = {
+let nextConfig = {
   nx: {
     // Set this to true if you would like to to use SVGR
     // See: https://github.com/gregberge/svgr
@@ -38,11 +41,20 @@ const nextConfig = {
   },
 };
 
-const sentryWebpackPluginOptions = {
-  silent: true,
-  include: 'dist/apps/web-app/.next',
-};
+// apply bundle analyzer plugin configs
+nextConfig = withBundleAnalyzer(nextConfig);
 
-module.exports = process.env.NEXT_PUBLIC_SENTRY_DSN
-  ? withSentryConfig(withNx(nextConfig), sentryWebpackPluginOptions)
-  : withNx(nextConfig);
+// apply nx plugin configs
+nextConfig = withNx(nextConfig);
+
+if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+  const sentryWebpackPluginOptions = {
+    silent: true,
+    include: 'dist/apps/web-app/.next',
+  };
+
+  // apply sentry plugin configs
+  nextConfig = withSentryConfig(nextConfig, sentryWebpackPluginOptions);
+}
+
+module.exports = nextConfig;
