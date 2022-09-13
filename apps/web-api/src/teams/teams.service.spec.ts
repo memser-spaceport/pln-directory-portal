@@ -5,6 +5,7 @@ import { TeamsService } from './teams.service';
 
 describe('TeamsService', () => {
   let service: TeamsService;
+  let prisma: PrismaService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -13,6 +14,7 @@ describe('TeamsService', () => {
     }).compile();
 
     service = module.get<TeamsService>(TeamsService);
+    prisma = module.get<PrismaService>(PrismaService);
   });
 
   it('should be defined', async () => {
@@ -37,7 +39,7 @@ describe('TeamsService', () => {
         fundingStageUid: 'fundingStageUid',
       },
     ];
-    jest.spyOn(service, 'findAll').mockImplementation(() => result);
+    prisma.team.findMany = jest.fn().mockReturnValueOnce(result);
 
     expect(await service.findAll()).toBe(result);
   });

@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Member, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
+import { CreateMemberDto } from './dto/create-member.dto';
 
 @Injectable()
-export class MemberService {
+export class MembersService {
   constructor(private prisma: PrismaService) {}
 
   async getCount(): Promise<number> {
@@ -23,17 +24,7 @@ export class MemberService {
     return this.prisma.member.findMany();
   }
 
-  create(params: {
-    name: string;
-    email: string;
-    image: string | null;
-    githubHandler: string | null;
-    discordHandler: string | null;
-    twitterHandler: string | null;
-    officeHours: string | null;
-    plnFriend: boolean;
-    locationUid: string;
-  }) {
+  create(params: CreateMemberDto) {
     return this.prisma.member.create({
       data: { ...params },
     });
