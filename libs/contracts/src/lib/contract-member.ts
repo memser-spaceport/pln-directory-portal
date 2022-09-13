@@ -1,15 +1,6 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-export interface Post {
-  id: string;
-  title: string;
-  description: string | null;
-  content: string | null;
-  published: boolean;
-  tags: string[];
-}
-
 const MemberSchema = z.object({
   id: z.number().int(),
   uid: z.string(),
