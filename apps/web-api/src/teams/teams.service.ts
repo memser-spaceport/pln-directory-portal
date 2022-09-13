@@ -19,6 +19,27 @@ export class TeamsService {
   }
 
   async findAll(): Promise<Team[]> {
+    return [
+      {
+        id: 2,
+        uid: '1',
+        name: 'Team 1',
+        logo: 'logo',
+        blog: 'blog',
+        website: 'website',
+        twitterHandler: 'twitterHandler',
+        shortDescripton: 'shortDescripton',
+        longDescripton: 'longDescripton',
+        filecoinUser: true,
+        ipfsUser: true,
+        plnFriend: true,
+        startDate: new Date(),
+        endDate: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        fundingStageUid: 'fundingStageUid',
+      },
+    ];
     return this.prisma.team.findMany({
       include: {
         members: true,

@@ -17,7 +17,7 @@ const apiHealth = c.router({
 
 export const apiNested = c.router({
   /**
-   * Posts API
+   * Members API
    */
   members: apiMember,
   /**

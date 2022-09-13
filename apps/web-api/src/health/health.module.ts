@@ -1,3 +1,4 @@
+import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { TerminusModule } from '@nestjs/terminus';
 import { PrismaService } from '../prisma.service';
@@ -6,7 +7,7 @@ import { PrismaHealthIndicator } from './prisma.health';
 
 @Module({
   controllers: [HealthController],
-  imports: [TerminusModule],
+  imports: [TerminusModule, HttpModule],
   providers: [PrismaHealthIndicator, PrismaService],
 })
 export class HealthModule {}

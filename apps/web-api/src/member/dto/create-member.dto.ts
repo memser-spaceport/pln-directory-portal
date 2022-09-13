@@ -16,5 +16,4 @@ export class CreateMemberDto implements Prisma.MemberCreateInput {
   location: Prisma.LocationCreateNestedOneWithoutMembersInput;
   teamMemberRoles?: Prisma.TeamMemberRoleCreateNestedManyWithoutMemberInput;
   email: string;
-  password: string;
 }
