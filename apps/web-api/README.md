@@ -11,7 +11,7 @@ $ yarn install
 $ docker-compose up -d
 ```
 
-## Generate Prisma Schemas and update db
+## Generate Prisma Schemas and update the database
 
 ```bash
 $ npx prisma generate --schema=./apps/web-api/prisma/schema.prisma

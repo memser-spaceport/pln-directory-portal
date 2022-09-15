@@ -9,6 +9,20 @@ on:
 jobs:
   main:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -21,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable --immutable-cache --check-cache
 
-      - name: Prisma Generate
+      - name: Generate Prisma Client
         run: npx prisma generate --schema=./apps/web-api/prisma/schema.prisma
 
       - name: Run linter for NX-specific workspace files
@@ -35,6 +49,8 @@ jobs:
 
       - name: Run tests for affected apps/libraries
         run: npx nx affected --target=test --parallel=3 --ci --code-coverage
+        env:
+          DATABASE_URL: 'postgresql://root:postgres@localhost:5432/test'
 
       - name: Build affected apps/libraries
         run: npx nx affected --target=build --parallel=3
