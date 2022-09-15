@@ -13,7 +13,7 @@ export class MembersService {
   }
 
   async findOne(
-    memberWhereUniqueInput: Prisma.MemberWhereUniqueInput,
+    memberWhereUniqueInput: Prisma.MemberWhereUniqueInput
   ): Promise<Member | null> {
     return this.prisma.member.findUnique({
       where: memberWhereUniqueInput,
@@ -25,8 +25,12 @@ export class MembersService {
   }
 
   create(params: CreateMemberDto) {
-    return this.prisma.member.create({
-      data: { ...params },
-    });
+    return JSON.parse(
+      JSON.stringify(
+        this.prisma.member.create({
+          data: { ...params },
+        })
+      )
+    );
   }
 }

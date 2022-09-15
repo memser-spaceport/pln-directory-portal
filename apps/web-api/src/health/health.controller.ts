@@ -12,7 +12,7 @@ export class HealthController {
   constructor(
     private health: HealthCheckService,
     private primaHealthIndicator: PrismaHealthIndicator,
-    private http: HttpHealthIndicator,
+    private http: HttpHealthIndicator
   ) {}
 
   @Get()
@@ -22,7 +22,7 @@ export class HealthController {
       () =>
         this.http.pingCheck(
           'heroku-status',
-          'https://status.heroku.com/api/v4/current-status',
+          'https://status.heroku.com/api/v4/current-status'
         ),
       () => this.primaHealthIndicator.isHealthy('prisma'),
     ]);
