@@ -7,9 +7,9 @@ import { CreateMemberDto } from './dto/create-member.dto';
 
 import { MembersService } from './members.service';
 
-const s = initNestServer(apiMember);
-type ControllerShape = typeof s.controllerShape;
-type RouteShape = typeof s.routeShapes;
+const server = initNestServer(apiMember);
+type ControllerShape = typeof server.controllerShape;
+type RouteShape = typeof server.routeShapes;
 
 @Controller('member')
 export class MemberController implements ControllerShape {
@@ -20,7 +20,7 @@ export class MemberController implements ControllerShape {
     return this.membersService.findAll();
   }
 
-  @Api(s.route.createMember)
+  @Api(server.route.createMember)
   @ApiBody({ type: [CreateMemberDto] })
   @Post()
   async createMember(@ApiDecorator() { body }: RouteShape['createMember']) {
@@ -39,6 +39,7 @@ export class MemberController implements ControllerShape {
         },
       },
     });
+
     return { status: 201 as const, body: member };
   }
 }
