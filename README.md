@@ -20,6 +20,10 @@ Run `nx serve web-app` for a dev server. Navigate to [localhost:4200](http://loc
 
 Run `nx build web-app` to build the project. The build artifacts will be stored in the `dist/` directory. Use the `--prod` flag for a production build.
 
+### Generate sitemap & robots.txt
+
+Run `nx run web-app:postbuild` after building the project to generate a sitemap of the app along with a `robots.txt` file. The resulting `sitemap.xml` and `robots.txt` files will be stored in the `dist/apps/web-app/public` directory.
+
 ### Run unit tests
 
 Run `nx test web-app` to execute the unit tests via [Jest](https://jestjs.io).
