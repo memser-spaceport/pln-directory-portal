@@ -1,16 +1,9 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-export interface Post {
-  id: string;
-  title: string;
-  description: string | null;
-  content: string | null;
-  published: boolean;
-  tags: string[];
-}
-
 const MemberSchema = z.object({
+  createdAt: z.date().transform((d) => d.toISOString()),
+  updatedAt: z.date().transform((d) => d.toISOString()),
   id: z.number().int(),
   uid: z.string(),
   name: z.string(),
@@ -21,14 +14,12 @@ const MemberSchema = z.object({
   twitterHandler: z.string().nullish(),
   officeHours: z.string().nullish(),
   plnFriend: z.boolean(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
   locationUid: z.string(),
 });
 
-const c = initContract();
+const contract = initContract();
 
-export const apiMember = c.router({
+export const apiMember = contract.router({
   createMember: {
     method: 'POST',
     path: '/',

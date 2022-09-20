@@ -8,13 +8,16 @@
     "build": "nx build",
     "test": "nx test",
     "heroku-postbuild": "npx prisma generate --schema=./apps/web-api/prisma/schema.prisma && nx build $PROJECT_NAME --prod",
-    "check:local": "npx nx workspace-lint && npx nx format:check && npx nx affected --target=lint && npx nx affected --target=test --ci --code-coverage && npx nx affected --target=build"
+    "check:local": "npx nx workspace-lint && npx nx format:check && npx nx affected --target=lint && npx nx affected --target=test --ci --code-coverage && npx nx affected --target=build",
+    "analyze:web": "WITH_BUNDLE_ANALYZER=true nx run web-app:build"
   },
   "private": true,
   "dependencies": {
+    "@faker-js/faker": "^7.5.0",
     "@fontsource/inter": "^4.5.11",
     "@headlessui/react": "^1.6.6",
     "@heroicons/react": "^1.0.6",
+    "@nestjs/axios": "^0.1.0",
     "@nestjs/common": "^9.0.0",
     "@nestjs/core": "^9.0.0",
     "@nestjs/platform-express": "^9.0.0",
@@ -30,8 +33,6 @@
     "@swc/helpers": "^0.4.11",
     "@ts-rest/core": "^3.2.0",
     "@ts-rest/nest": "^3.2.1",
-    "@ts-rest/next": "^3.2.0",
-    "@ts-rest/react-query": "^3.2.0",
     "airtable": "^0.11.3",
     "autoprefixer": "^10.4.4",
     "class-validator": "^0.13.2",
@@ -43,7 +44,6 @@
     "postcss": "^8.4.12",
     "react": "17.0.2",
     "react-dom": "17.0.2",
-    "react-query": "^3.39.2",
     "reflect-metadata": "^0.1.13",
     "regenerator-runtime": "0.13.7",
     "rimraf": "^3.0.2",
@@ -89,6 +89,7 @@
     "@types/react-dom": "17.0.13",
     "@types/supertest": "^2.0.11",
     "@types/testing-library__jest-dom": "^5.14.3",
+    "@types/uuid": "^8.3.4",
     "@typescript-eslint/eslint-plugin": "~5.10.0",
     "@typescript-eslint/parser": "~5.10.0",
     "babel-jest": "27.2.3",
@@ -103,6 +104,7 @@
     "eslint-plugin-prettier": "^4.0.0",
     "eslint-plugin-react": "7.29.3",
     "eslint-plugin-react-hooks": "4.3.0",
+    "fishery": "^2.2.2",
     "husky": "^8.0.0",
     "jest": "27.2.3",
     "nx": "13.9.7",
@@ -110,7 +112,6 @@
     "prettier-plugin-tailwindcss": "^0.1.11",
     "prisma": "^4.2.1",
     "react-test-renderer": "17.0.2",
-    "run-script-webpack-plugin": "^0.1.1",
     "sass": "1.43.2",
     "semantic-release": "^19.0.3",
     "source-map-support": "^0.5.20",
@@ -120,6 +121,7 @@
     "ts-node": "^10.0.0",
     "tsconfig-paths": "4.0.0",
     "typescript": "^4.3.5",
-    "url-loader": "^3.0.0"
+    "url-loader": "^3.0.0",
+    "uuid": "^9.0.0"
   }
 }

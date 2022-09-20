@@ -1,3 +1,4 @@
+import { VersioningType } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as Sentry from '@sentry/node';
@@ -9,8 +10,8 @@ async function bootstrap() {
   });
 
   const config = new DocumentBuilder()
-    .setTitle('Protocol Labs API')
-    .setDescription('The Protocol Labs API documentation')
+    .setTitle('Protocol Labs Network Directory API')
+    .setDescription('The Protocol Labs Network Directory API documentation')
     .setVersion('1.0')
     .addTag('PL')
     .build();
@@ -18,6 +19,9 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
+  app.enableVersioning({
+    type: VersioningType.URI,
+  });
   app.enableCors();
 
   Sentry.init({

@@ -8,7 +8,7 @@ export class TeamsService {
   constructor(private prisma: PrismaService) {}
 
   async findOne(
-    teamWhereUniqueInput: Prisma.TeamWhereUniqueInput,
+    teamWhereUniqueInput: Prisma.TeamWhereUniqueInput
   ): Promise<Team | null> {
     return this.prisma.team.findUnique({
       where: teamWhereUniqueInput,
@@ -34,7 +34,7 @@ export class TeamsService {
 
   async update(
     updateTeamInput: UpdateTeamDto,
-    where: Prisma.TeamWhereUniqueInput,
+    where: Prisma.TeamWhereUniqueInput
   ): Promise<Team | null> {
     return this.prisma.team.update({
       where,
