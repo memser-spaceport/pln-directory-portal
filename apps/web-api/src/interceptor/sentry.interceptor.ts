@@ -17,7 +17,7 @@ export class SentryInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap(null, (exception) => {
         Sentry.captureException(exception);
-      }),
+      })
     );
   }
 }
