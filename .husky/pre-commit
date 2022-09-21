@@ -1,4 +1,4 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-nx format:write && nx affected:lint
+npx nx format:write && npx nx affected:lint
