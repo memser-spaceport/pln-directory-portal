@@ -7,7 +7,7 @@
     "start": "nx serve",
     "build": "nx build",
     "test": "nx test",
-    "heroku-postbuild": "npx prisma generate --schema=./apps/web-api/prisma/schema.prisma && nx build $PROJECT_NAME --prod",
+    "heroku-postbuild": "npx prisma generate --schema=./apps/web-api/prisma/schema.prisma && nx build $PROJECT_NAME --prod && npx prisma migrate deploy --schema=./apps/web-api/prisma/schema.prisma",
     "check:local": "npx nx workspace-lint && npx nx format:check && npx nx affected --target=lint && npx nx affected --target=test --ci --code-coverage && npx nx affected --target=build",
     "analyze:web": "WITH_BUNDLE_ANALYZER=true nx run web-app:build"
   },
