@@ -18,8 +18,8 @@ export const SEO = {
   },
   additionalMetaTags: [
     { name: 'viewport', content: 'width=1272, user-scalable=no' },
-    { name: 'theme-color', content: '#f1f5f9' },
-    { name: 'msapplication-TileColor', content: '#f1f5f9' },
+    { name: 'theme-color', content: '#ffffff' },
+    { name: 'msapplication-TileColor', content: '#ffffff' },
     { name: 'msapplication-TileImage', content: '/favicon-144x144.png' },
     { name: 'msapplication-config', content: '/browserconfig.xml' },
   ],
@@ -28,31 +28,11 @@ export const SEO = {
     { rel: 'apple-touch-icon', sizes: '60x60', href: '/favicon-60x60.png' },
     { rel: 'apple-touch-icon', sizes: '72x72', href: '/favicon-72x72.png' },
     { rel: 'apple-touch-icon', sizes: '76x76', href: '/favicon-76x76.png' },
-    {
-      rel: 'apple-touch-icon',
-      sizes: '114x114',
-      href: '/favicon-114x114.png',
-    },
-    {
-      rel: 'apple-touch-icon',
-      sizes: '120x120',
-      href: '/favicon-120x120.png',
-    },
-    {
-      rel: 'apple-touch-icon',
-      sizes: '144x144',
-      href: '/favicon-144x144.png',
-    },
-    {
-      rel: 'apple-touch-icon',
-      sizes: '152x152',
-      href: '/favicon-152x152.png',
-    },
-    {
-      rel: 'apple-touch-icon',
-      sizes: '180x180',
-      href: '/favicon-180x180.png',
-    },
+    { rel: 'apple-touch-icon', sizes: '114x114', href: '/favicon-114x114.png' },
+    { rel: 'apple-touch-icon', sizes: '120x120', href: '/favicon-120x120.png' },
+    { rel: 'apple-touch-icon', sizes: '144x144', href: '/favicon-144x144.png' },
+    { rel: 'apple-touch-icon', sizes: '152x152', href: '/favicon-152x152.png' },
+    { rel: 'apple-touch-icon', sizes: '180x180', href: '/favicon-180x180.png' },
     {
       rel: 'icon',
       type: 'image/png',
@@ -79,6 +59,7 @@ export const SEO = {
     },
     { rel: 'shortcut icon', type: 'image/x-icon', href: '/favicon.ico' },
     { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
+    { rel: 'manifest', href: '/manifest.json' },
   ],
   twitter: {
     cardType: 'summary_large_image',
