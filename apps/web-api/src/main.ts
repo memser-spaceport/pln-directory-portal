@@ -22,7 +22,6 @@ async function bootstrap() {
   app.enableVersioning({
     type: VersioningType.URI,
   });
-  app.enableCors();
 
   Sentry.init({
     dsn: process.env.SENTRY_DSN,

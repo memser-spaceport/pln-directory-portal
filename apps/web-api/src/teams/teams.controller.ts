@@ -1,40 +1,30 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Post,
-  Version,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { Prisma, Team } from '@prisma/client';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { TeamsService } from './teams.service';
 
-@Controller('teams')
+@Controller({
+  version: '1',
+})
 export class TeamsController {
   constructor(private readonly teamsService: TeamsService) {}
 
-  @Version('1')
-  @Post()
+  @Post('teams')
   create(@Body() createTeamDto: Prisma.TeamCreateInput): Promise<Team> {
     return this.teamsService.create(createTeamDto);
   }
 
-  @Version('1')
-  @Get(':uid')
+  @Get('teams:uid')
   findOne(@Param('uid') uid: string): Promise<Team> {
     return this.teamsService.findOne({ uid });
   }
 
-  @Version('1')
-  @Get()
+  @Get('teams')
   findAll(): Promise<Team[]> {
     return this.teamsService.findAll();
   }
 
-  @Version('1')
-  @Post(':uid')
+  @Post('teams:uid')
   update(
     @Param('uid') uid: string,
     @Body() updateTeamDto: UpdateTeamDto
@@ -42,8 +32,7 @@ export class TeamsController {
     return this.teamsService.update(updateTeamDto, { uid: uid });
   }
 
-  @Version('1')
-  @Delete(':uid')
+  @Delete('teams:uid')
   delete(@Param('uid') uid: string): Promise<Team> {
     return this.teamsService.delete({ uid: uid });
   }
