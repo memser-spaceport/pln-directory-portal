@@ -22,6 +22,7 @@
     "@nestjs/platform-express": "^9.0.0",
     "@nestjs/swagger": "^6.0.5",
     "@nestjs/terminus": "^9.1.1",
+    "@nestjs/throttler": "^3.0.0",
     "@next/bundle-analyzer": "^12.2.5",
     "@nrwl/next": "13.9.7",
     "@prisma/client": "^4.2.1",
