@@ -3,7 +3,7 @@ import { CollapsibleText, CollapsibleTextProps } from './collapsible-text';
 
 export default {
   component: CollapsibleText,
-  title: 'CollapsibleText',
+  title: 'UI/Collapsible Text',
 } as Meta;
 
 const Template: Story<CollapsibleTextProps> = (args) => (

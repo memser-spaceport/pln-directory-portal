@@ -4,7 +4,7 @@ import { InputField, InputFieldProps } from './input-field';
 
 export default {
   component: InputField,
-  title: 'Input Field',
+  title: 'UI/Input Field',
   argTypes: { onClear: { action: 'onClear' } },
 } as Meta;
 

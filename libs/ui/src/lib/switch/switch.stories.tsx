@@ -3,7 +3,7 @@ import { Switch, SwitchProps } from './switch';
 
 export default {
   component: Switch,
-  title: 'Switch',
+  title: 'UI/Switch',
   argTypes: { onChange: { action: 'onChange' } },
 } as Meta;
 
