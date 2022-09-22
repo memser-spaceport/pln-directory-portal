@@ -4,6 +4,7 @@ import { join } from 'path';
 import { URL } from 'url';
 import { v4 } from 'uuid';
 
+// Retrieves the full database URL with the provided schema name
 const generateDatabaseURL = (schema: string) => {
   if (!process.env.DATABASE_URL) {
     throw new Error('please provide a database url');
@@ -13,6 +14,7 @@ const generateDatabaseURL = (schema: string) => {
   return url.toString();
 };
 
+//  Build a new database URL from a randomly generated schema name:
 const schemaId = `test-${v4()}`;
 const prismaBinary = join(
   __dirname,
@@ -25,13 +27,16 @@ const prismaBinary = join(
   'prisma'
 );
 const schemaPath = join(__dirname, '..', 'schema.prisma');
-
 const url = generateDatabaseURL(schemaId);
+// Reassign the default database URL environment variable from the newly generated URL:
 process.env.DATABASE_URL = url;
+
+// Build a new ORM instance from the newly generated URL:
 export const prisma = new PrismaClient({
   datasources: { db: { url } },
 });
 
+// Create a new & isolated database right before running each test
 beforeEach(() => {
   execSync(`${prismaBinary} db push --schema=${schemaPath}`, {
     env: {
@@ -40,6 +45,8 @@ beforeEach(() => {
     },
   });
 });
+
+// Delete each new testing database right after running a test
 afterEach(async () => {
   await prisma.$executeRawUnsafe(
     `DROP SCHEMA IF EXISTS "${schemaId}" CASCADE;`
