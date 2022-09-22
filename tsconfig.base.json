@@ -17,6 +17,9 @@
     "paths": {
       "@protocol-labs-network/airtable": ["libs/airtable/src/index.ts"],
       "@protocol-labs-network/api": ["libs/api/src/index.ts"],
+      "@protocol-labs-network/storybook-host": [
+        "libs/storybook-host/src/index.ts"
+      ],
       "@protocol-labs-network/ui": ["libs/ui/src/index.ts"]
     }
   },
