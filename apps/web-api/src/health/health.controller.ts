@@ -4,6 +4,7 @@ import {
   HealthCheckService,
   HttpHealthIndicator,
 } from '@nestjs/terminus';
+import { HerokuHealthIndicator } from './heroku.health';
 import { PrismaHealthIndicator } from './prisma.health';
 
 @Injectable()
@@ -11,7 +12,8 @@ import { PrismaHealthIndicator } from './prisma.health';
 export class HealthController {
   constructor(
     private health: HealthCheckService,
-    private primaHealthIndicator: PrismaHealthIndicator,
+    private prismaHealthIndicator: PrismaHealthIndicator,
+    private herokuHealthIndicator: HerokuHealthIndicator,
     private http: HttpHealthIndicator
   ) {}
 
@@ -19,12 +21,8 @@ export class HealthController {
   @HealthCheck()
   healthCheck() {
     return this.health.check([
-      () =>
-        this.http.pingCheck(
-          'heroku-status',
-          'https://status.heroku.com/api/v4/current-status'
-        ),
-      () => this.primaHealthIndicator.isHealthy('prisma'),
+      () => this.herokuHealthIndicator.isHealthy(),
+      () => this.prismaHealthIndicator.isHealthy('prisma'),
     ]);
   }
 }
