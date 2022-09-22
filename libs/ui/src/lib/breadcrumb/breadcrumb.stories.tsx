@@ -3,7 +3,7 @@ import { Breadcrumb, BreadcrumbProps } from './breadcrumb';
 
 export default {
   component: Breadcrumb,
-  title: 'Breadcrumb',
+  title: 'UI/Breadcrumb',
 } as Meta;
 
 const Template: Story<BreadcrumbProps> = (args) => <Breadcrumb {...args} />;

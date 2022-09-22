@@ -3,7 +3,7 @@ import { Tag, TagProps } from './tag';
 
 export default {
   component: Tag,
-  title: 'Tag',
+  title: 'UI/Tag',
   argTypes: { onClick: { action: 'onClick' } },
 } as Meta;
 

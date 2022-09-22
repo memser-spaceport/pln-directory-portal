@@ -3,7 +3,7 @@ import { Dropdown, DropdownProps, IDropdownOption } from './dropdown';
 
 export default {
   component: Dropdown,
-  title: 'Dropdown',
+  title: 'UI/Dropdown',
   argTypes: { onChange: { action: 'onChange' } },
 } as Meta;
 

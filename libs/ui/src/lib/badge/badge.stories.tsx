@@ -3,7 +3,7 @@ import { Badge, BadgeProps } from './badge';
 
 export default {
   component: Badge,
-  title: 'Badge',
+  title: 'UI/Badge',
 } as Meta;
 
 const Template: Story<BadgeProps> = (args) => <Badge {...args} />;

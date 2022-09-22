@@ -4,7 +4,7 @@ import { Tooltip, TooltipProps } from './tooltip';
 
 export default {
   component: Tooltip,
-  title: 'Tooltip',
+  title: 'UI/Tooltip',
   argTypes: {
     Trigger: {
       table: {
