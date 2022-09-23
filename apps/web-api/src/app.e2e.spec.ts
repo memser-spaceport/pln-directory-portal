@@ -1,7 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import supertest from 'supertest';
-import { SentryInterceptor } from './interceptor/sentry.interceptor';
 import { AppController } from './app.controller';
 import { AppModule } from './app.module';
 import { mainConfig } from './main.config';
@@ -13,11 +12,7 @@ describe('App', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
       controllers: [AppController],
-    })
-      // Disable Sentry:
-      .overrideInterceptor(SentryInterceptor)
-      .useValue(() => ({}))
-      .compile();
+    }).compile();
 
     // Init app with main config:
     app = moduleRef.createNestApplication();
@@ -32,6 +27,7 @@ describe('App', () => {
         .expect(200);
       expect(response.body).toHaveProperty('token');
       expect(typeof response.body.token).toBe('string');
+      expect(response.body.token.length).toBeGreaterThan(0);
     });
   });
 });
