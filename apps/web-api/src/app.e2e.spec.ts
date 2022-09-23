@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import supertest from 'supertest';
+import { SentryInterceptor } from './interceptor/sentry.interceptor';
 import { AppController } from './app.controller';
 import { AppModule } from './app.module';
 import { mainConfig } from './main.config';
@@ -12,7 +13,13 @@ describe('App', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
       controllers: [AppController],
-    }).compile();
+    })
+      // Disable Sentry:
+      .overrideInterceptor(SentryInterceptor)
+      .useValue(() => ({}))
+      .compile();
+
+    // Init app with main config:
     app = moduleRef.createNestApplication();
     mainConfig(app);
     await app.init();
