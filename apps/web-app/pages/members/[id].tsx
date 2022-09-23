@@ -55,6 +55,14 @@ export const getServerSideProps = async ({ query, res }) => {
     backLink: string;
   };
   const member = await airtableService.getMember(id);
+
+  // Redirects user to the 404 page if the member has no teams
+  if (!member.teams.length) {
+    return {
+      notFound: true,
+    };
+  }
+
   const teams = await airtableService.getTeamCardsData(
     member.teams,
     TEAM_CARD_FIELDS
