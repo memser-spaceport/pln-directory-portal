@@ -51,6 +51,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
           <div className="w-[917px] space-y-10">
             <DirectoryHeader
               title="Teams"
+              directoryType="teams"
               searchPlaceholder="Search for a team"
               count={teams.length}
             />
