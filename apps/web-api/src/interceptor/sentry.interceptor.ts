@@ -14,13 +14,12 @@ export class SentryInterceptor implements NestInterceptor {
    * to Sentry
    */
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    if (process.env.environment !== 'production') {
-      return;
-    }
     /* Catching the error and sending it to Sentry. */
     return next.handle().pipe(
       catchError((exception) => {
-        Sentry.captureException(exception);
+        if (process.env.ENVIRONMENT === 'production') {
+          Sentry.captureException(exception);
+        }
         throw exception;
       })
     );
