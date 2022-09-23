@@ -1,6 +1,12 @@
 export const URL_QUERY_VALUE_SEPARATOR = '|';
 export const ITEMS_PER_PAGE = 9;
 export const FATHOM_EVENTS = {
+  directory: {
+    controls: {
+      viewTypeListToGrid: 'BFUWBQXV',
+      viewTypeGridToList: 'L5UM9LWA',
+    },
+  },
   members: {
     directory: {
       filters: {
@@ -15,6 +21,8 @@ export const FATHOM_EVENTS = {
         searchBy: '8BWPXHVB',
         sort: 'WOZNMS0E',
         viewType: 'ZZYU8VJV',
+        viewTypeListToGrid: 'PZUNLXST',
+        viewTypeGridToList: 'QUCCIPTW',
       },
     },
   },
@@ -31,6 +39,8 @@ export const FATHOM_EVENTS = {
         searchBy: 'E5KGF8SF',
         sort: 'R0U6VIQR',
         viewType: '9E11MZ5Q',
+        viewTypeListToGrid: 'KHBW7DAV',
+        viewTypeGridToList: 'RPBE1AWN',
       },
     },
   },

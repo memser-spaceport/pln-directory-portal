@@ -52,6 +52,7 @@ export default function Members({ members, filtersValues }: MembersProps) {
           <div className="w-[917px] space-y-10">
             <DirectoryHeader
               title="Members"
+              directoryType="members"
               searchPlaceholder="Search for a member"
               count={members.length}
             />

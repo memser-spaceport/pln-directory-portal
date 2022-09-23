@@ -1,12 +1,14 @@
 import { Tooltip } from '@protocol-labs-network/ui';
+import { TDirectoryType } from '../../directory.types';
 import { TViewType } from '../directory-view.types';
 
 interface DirectoryViewTypeButtonProps {
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   label: string;
-  onClick: (clickedViewType: TViewType) => void;
+  onClick: (clickedViewType: TViewType, directoryType: TDirectoryType) => void;
   selectedViewType: TViewType;
   viewType: TViewType;
+  directoryType: TDirectoryType;
 }
 
 export function DirectoryViewTypeButton({
@@ -15,6 +17,7 @@ export function DirectoryViewTypeButton({
   onClick,
   selectedViewType,
   viewType,
+  directoryType,
 }: DirectoryViewTypeButtonProps) {
   const ViewTypeIcon = icon;
   const isActive = viewType === selectedViewType;
@@ -33,7 +36,7 @@ export function DirectoryViewTypeButton({
         trigger={
           <button
             className="on-focus flex h-10 w-10 items-center justify-center"
-            onClick={() => onClick(viewType)}
+            onClick={() => onClick(viewType, directoryType)}
             disabled={isActive}
           >
             <span className="sr-only">{label}</span>

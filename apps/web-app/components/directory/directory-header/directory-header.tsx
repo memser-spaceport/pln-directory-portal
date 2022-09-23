@@ -1,16 +1,19 @@
 import { DirectorySearch } from '../../../components/directory/directory-search/directory-search';
 import { DirectorySort } from '../../../components/directory/directory-sort/directory-sort';
 import { DirectoryView } from '../../../components/directory/directory-view/directory-view';
+import { TDirectoryType } from '../directory.types';
 
 type DirectoryHeaderProps = {
   searchPlaceholder: string;
   title: string;
+  directoryType: TDirectoryType;
   count: number;
 };
 
 export function DirectoryHeader({
   searchPlaceholder,
   title,
+  directoryType,
   count,
 }: DirectoryHeaderProps) {
   return (
@@ -23,7 +26,7 @@ export function DirectoryHeader({
         <DirectorySearch placeholder={searchPlaceholder} />
         <span className="h-6 w-px bg-slate-300" />
         <DirectorySort />
-        <DirectoryView />
+        <DirectoryView directoryType={directoryType} />
       </div>
     </div>
   );

@@ -7,7 +7,7 @@ describe('DirectoryView', () => {
   it('should show grid button as active and disable at first render', () => {
     render(
       <RouterContext.Provider value={createMockRouter()}>
-        <DirectoryView />
+        <DirectoryView directoryType="teams" />
       </RouterContext.Provider>
     );
 
@@ -27,7 +27,7 @@ describe('DirectoryView', () => {
 
     render(
       <RouterContext.Provider value={createMockRouter({ push })}>
-        <DirectoryView />
+        <DirectoryView directoryType="teams" />
       </RouterContext.Provider>
     );
 
@@ -50,7 +50,7 @@ describe('DirectoryView', () => {
       <RouterContext.Provider
         value={createMockRouter({ query: { viewType: 'list' } })}
       >
-        <DirectoryView />
+        <DirectoryView directoryType="teams" />
       </RouterContext.Provider>
     );
 
@@ -72,7 +72,7 @@ describe('DirectoryView', () => {
       <RouterContext.Provider
         value={createMockRouter({ query: { viewType: 'list' }, push })}
       >
-        <DirectoryView />
+        <DirectoryView directoryType="teams" />
       </RouterContext.Provider>
     );
 

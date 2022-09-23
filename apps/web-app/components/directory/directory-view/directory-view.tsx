@@ -1,8 +1,13 @@
+import { TDirectoryType } from '../directory.types';
 import { DirectoryViewTypeButton } from './directory-view-type-button/directory-view-type-button';
 import { DIRECTORY_VIEW_TYPE_OPTIONS } from './directory-view.constants';
 import { useViewType } from './use-directory-view-type.hook';
 
-export function DirectoryView() {
+type DirectoryViewProps = {
+  directoryType: TDirectoryType;
+};
+
+export function DirectoryView({ directoryType }: DirectoryViewProps) {
   const { selectedViewType, changeView } = useViewType();
 
   return (
@@ -16,6 +21,7 @@ export function DirectoryView() {
             onClick={changeView}
             selectedViewType={selectedViewType}
             viewType={option.viewType}
+            directoryType={directoryType}
           />
         );
       })}
