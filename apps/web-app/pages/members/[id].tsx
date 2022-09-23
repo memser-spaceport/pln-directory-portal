@@ -56,8 +56,9 @@ export const getServerSideProps = async ({ query, res }) => {
   };
   const member = await airtableService.getMember(id);
 
-  // Redirects user to the 404 page if the member has no teams
-  if (!member.teams.length) {
+  // Redirects user to the 404 page if response from
+  // getMember is undefined or the member has no teams
+  if (!member || !member.teams.length) {
     return {
       notFound: true,
     };

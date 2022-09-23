@@ -342,6 +342,16 @@ describe('AirtableService', () => {
     });
   });
 
+  it('should retrieve undefined when Airtable fails to fetch a team', async () => {
+    (<jest.Mock>teamsTableMock.find).mockClear().mockImplementationOnce(() => {
+      throw new Error();
+    });
+
+    const team = await airtableService.getTeam('wrongID');
+    expect(teamsTableMock.find).toHaveBeenCalledTimes(1);
+    expect(team).toEqual(undefined);
+  });
+
   it('should be able to get teams details with the provided id from teams table', async () => {
     (teamsTableMock.select as jest.Mock).mockClear().mockReturnValueOnce({
       all: jest.fn().mockReturnValue([
@@ -683,6 +693,18 @@ describe('AirtableService', () => {
       ],
       twitter: memberMock01.fields.Twitter,
     });
+  });
+
+  it('should retrieve undefined when Airtable fails to fetch a member', async () => {
+    (<jest.Mock>membersTableMock.find)
+      .mockClear()
+      .mockImplementationOnce(() => {
+        throw new Error();
+      });
+
+    const member = await airtableService.getMember('wrongID');
+    expect(membersTableMock.find).toHaveBeenCalledTimes(1);
+    expect(member).toEqual(undefined);
   });
 
   it('should be able to get all members filter values and available members filter values from members table', async () => {

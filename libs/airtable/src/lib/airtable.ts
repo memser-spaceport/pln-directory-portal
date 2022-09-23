@@ -58,9 +58,13 @@ class AirtableService {
    * Get a specific team from Airtable.
    */
   public async getTeam(id: string) {
-    const team: IAirtableTeam = await this._teamsTable.find(id);
+    try {
+      const team: IAirtableTeam = await this._teamsTable.find(id);
 
-    return this._parseTeam(team);
+      return this._parseTeam(team);
+    } catch (error) {
+      return;
+    }
   }
 
   /**
@@ -118,9 +122,13 @@ class AirtableService {
    * Get a specific member from Airtable.
    */
   public async getMember(id: string) {
-    const member: IAirtableMember = await this._membersTable.find(id);
+    try {
+      const member: IAirtableMember = await this._membersTable.find(id);
 
-    return this._parseMember(member);
+      return this._parseMember(member);
+    } catch (error) {
+      return;
+    }
   }
 
   /**
