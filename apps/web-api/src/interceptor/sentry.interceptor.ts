@@ -17,9 +17,7 @@ export class SentryInterceptor implements NestInterceptor {
     /* Catching the error and sending it to Sentry. */
     return next.handle().pipe(
       catchError((exception) => {
-        if (process.env.ENVIRONMENT === 'production') {
-          Sentry.captureException(exception);
-        }
+        Sentry.captureException(exception);
         throw exception;
       })
     );
