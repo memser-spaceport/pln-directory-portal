@@ -25,6 +25,10 @@ async function bootstrap() {
 
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
+    environment: process.env.ENVIRONMENT,
+    enabled:
+      process.env.ENVIRONMENT === 'production' ||
+      process.env.ENVIRONMENT === 'staging',
   });
 
   await app.listen(process.env.PORT || 3000);
