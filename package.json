@@ -8,7 +8,8 @@
     "build": "nx build",
     "test": "nx test",
     "check:local": "npx nx workspace-lint && npx nx format:check && npx nx affected --target=lint && npx nx affected --target=test --ci --code-coverage && npx nx affected --target=build",
-    "analyze:web": "WITH_BUNDLE_ANALYZER=true nx run web-app:build"
+    "analyze:web": "WITH_BUNDLE_ANALYZER=true nx run web-app:build",
+    "heroku-postbuild": "npx prisma generate --schema=./apps/web-api/prisma/schema.prisma && nx build $PROJECT_NAME --prod && npx prisma migrate deploy --schema=./apps/web-api/prisma/schema.prisma"
   },
   "private": true,
   "dependencies": {
@@ -27,6 +28,7 @@
     "@prisma/client": "^4.2.1",
     "@radix-ui/react-collapsible": "^0.1.6",
     "@radix-ui/react-tooltip": "^1.0.0",
+    "@sentry/minimal": "^6.19.7",
     "@sentry/nextjs": "^7.8.1",
     "@swc/helpers": "^0.4.11",
     "@ts-rest/core": "^3.2.0",

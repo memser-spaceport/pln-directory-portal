@@ -1,6 +1,7 @@
 import { VersioningType } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import * as Sentry from '@sentry/node';
 import { AppModule } from './app.module';
 
 const origin = {
@@ -10,7 +11,9 @@ const origin = {
 };
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'log', 'verbose'],
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Protocol Labs Network Directory API')
@@ -30,7 +33,10 @@ async function bootstrap() {
     origin: origin[process.env.ENVIRONMENT],
   });
 
-  await app.listen(3000);
-}
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+  });
 
+  await app.listen(process.env.PORT || 3000);
+}
 bootstrap();
