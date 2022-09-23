@@ -1,5 +1,5 @@
-import { nestCsrf, CsrfFilter } from 'ncsrf';
 import cookieParser from 'cookie-parser';
+import { CsrfFilter, nestCsrf } from 'ncsrf';
 import { CSRFGuard } from './guards/csfr.guard';
 import { mainConfig } from './main.config';
 
@@ -22,6 +22,7 @@ describe('MainConfig', () => {
         useGlobalFilters: jest.fn(),
         useGlobalGuards: jest.fn(),
         enableVersioning: jest.fn(),
+        enableCors: jest.fn(),
       };
     });
 
@@ -43,6 +44,12 @@ describe('MainConfig', () => {
       expect(CsrfFilter).toHaveBeenCalled();
       expect(useGlobalGuardsSpy).toHaveBeenCalled();
       expect(CSRFGuard).toHaveBeenCalled();
+    });
+
+    it('should enable CORS', () => {
+      const enableCorsSpy = jest.spyOn(appMock, 'enableCors');
+      mainConfig(appMock);
+      expect(enableCorsSpy).toHaveBeenCalled();
     });
   });
 });

@@ -1,7 +1,8 @@
-import cookieParser from 'cookie-parser';
-import { nestCsrf, CsrfFilter } from 'ncsrf';
 import { INestApplication, VersioningType } from '@nestjs/common';
+import cookieParser from 'cookie-parser';
+import { CsrfFilter, nestCsrf } from 'ncsrf';
 import { CSRFGuard } from './guards/csfr.guard';
+import { ALLOWED_CORS_ORIGINS } from './utils/constants';
 
 export function mainConfig(app: INestApplication) {
   // API Versioning
@@ -22,4 +23,9 @@ export function mainConfig(app: INestApplication) {
   app.useGlobalFilters(new CsrfFilter());
   // Apply automatic CSRF protection:
   app.useGlobalGuards(new CSRFGuard());
+
+  // Enable CORS for the web-app
+  app.enableCors({
+    origin: ALLOWED_CORS_ORIGINS[process.env.ENVIRONMENT],
+  });
 }
