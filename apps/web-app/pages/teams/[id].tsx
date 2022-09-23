@@ -55,6 +55,15 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
     backLink: string;
   };
   const team = await airtableService.getTeam(id);
+
+  // Redirects user to the 404 page when we're unable to fetch
+  // a valid team with the provided ID
+  if (!team) {
+    return {
+      notFound: true,
+    };
+  }
+
   const members = await airtableService.getTeamMembers(
     team.name,
     MEMBER_CARD_FIELDS
