@@ -3,6 +3,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as Sentry from '@sentry/node';
 import { AppModule } from './app.module';
 import { mainConfig } from './main.config';
+import { APP_ENV } from './utils/constants';
 
 export async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -27,8 +28,8 @@ export async function bootstrap() {
     dsn: process.env.SENTRY_DSN,
     environment: process.env.ENVIRONMENT,
     enabled:
-      process.env.ENVIRONMENT === 'production' ||
-      process.env.ENVIRONMENT === 'staging',
+      process.env.ENVIRONMENT === APP_ENV.PRODUCTION ||
+      process.env.ENVIRONMENT === APP_ENV.STAGING,
   });
 
   await app.listen(process.env.PORT || 3000);
