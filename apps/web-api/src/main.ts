@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/node';
 import { AppModule } from './app.module';
 import { mainConfig } from './main.config';
 
-async function bootstrap() {
+export async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'verbose'],
   });
