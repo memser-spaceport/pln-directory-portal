@@ -1,6 +1,7 @@
 import { VersioningType } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import * as Sentry from '@sentry/node';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -20,6 +21,10 @@ async function bootstrap() {
     type: VersioningType.URI,
   });
 
-  await app.listen(3000);
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+  });
+
+  await app.listen(process.env.PORT || 3000);
 }
 bootstrap();

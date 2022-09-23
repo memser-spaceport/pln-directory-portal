@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AppController } from './app.controller';
 import { HealthModule } from './health/health.module';
 import { MembersModule } from './members/members.module';
 import { PrismaService } from './prisma.service';
 import { TeamsModule } from './teams/teams.module';
 @Module({
+  controllers: [AppController],
   imports: [
     ThrottlerModule.forRoot({
       ttl: 1,
@@ -23,4 +25,5 @@ import { TeamsModule } from './teams/teams.module';
     },
   ],
 })
+
 export class AppModule {}
