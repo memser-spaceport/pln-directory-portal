@@ -1,4 +1,4 @@
-import { Controller, Get, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Req, UseInterceptors } from '@nestjs/common';
 import { SentryInterceptor } from './interceptor/sentry.interceptor';
 
 @UseInterceptors(SentryInterceptor)
@@ -10,5 +10,15 @@ export class AppController {
   @Get()
   getHello(): string {
     return 'Protocol labs API';
+  }
+
+  /**
+   * Retrieve a CSRF token
+   */
+  @Get('/token')
+  getCsrfToken(@Req() req): any {
+    return {
+      token: req.csrfToken(),
+    };
   }
 }
