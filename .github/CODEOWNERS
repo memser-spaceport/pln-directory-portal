@@ -1,0 +1,19 @@
+# Order is important.
+# The last matching pattern takes the most precedence.
+
+# Default owners
+* @miguelleite @miguellteixeira
+
+# Libs owners
+/libs/ @miguelleite @miguellteixeira @AnaFigueiredo26 @PedroFonseca17
+
+# Web App owners
+/apps/web-app/ @miguelleite @AnaFigueiredo26
+/apps/web-app-e2e/ @miguelleite @AnaFigueiredo26
+
+# Frontend libs owners
+/libs/ui/ @miguelleite @AnaFigueiredo26
+/libs/storybook-host/ @miguelleite @AnaFigueiredo26
+
+# Web API owners
+/apps/web-api/ @miguellteixeira @PedroFonseca17
