@@ -23,6 +23,15 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -51,6 +60,8 @@ jobs:
         run: npx nx affected --target=test --parallel=3 --ci --code-coverage
         env:
           DATABASE_URL: 'postgresql://root:postgres@localhost:5432/test'
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
 
       - name: Build affected apps/libraries
         run: npx nx affected --target=build --parallel=3
