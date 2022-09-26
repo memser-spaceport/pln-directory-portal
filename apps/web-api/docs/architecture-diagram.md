@@ -16,7 +16,9 @@ flowchart TB
 
     subgraph HSAPI["Hosting Server (Heroku)"]
         api["REST API\n(Nest.js)"]
+        redis["Caching\n(Redis)"]
         db[("Relational Database\n(PostgreSQL)")]
+        api --- redis
         api --- db
     end
 
