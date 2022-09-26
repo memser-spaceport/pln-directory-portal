@@ -29,5 +29,14 @@ describe('App', () => {
       expect(typeof response.body.token).toBe('string');
       expect(response.body.token.length).toBeGreaterThan(0);
     });
+    it('should retrieve two different CSRF tokens', async () => {
+      const response1 = await supertest(app.getHttpServer())
+        .get('/token')
+        .expect(200);
+      const response2 = await supertest(app.getHttpServer())
+        .get('/token')
+        .expect(200);
+      expect(response1.body.token).not.toEqual(response2.body.token);
+    });
   });
 });

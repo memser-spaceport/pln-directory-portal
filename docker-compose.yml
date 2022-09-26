@@ -11,5 +11,17 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
+  redis:
+    image: redis:7.0.5
+    restart: always
+    ports:
+      - '6379:6379'
+    environment:
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+    volumes:
+      - redis:/data
 volumes:
   db_data:
+  redis:
+    driver: local

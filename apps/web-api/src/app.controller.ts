@@ -1,5 +1,6 @@
 import { Controller, Get, Req, UseInterceptors } from '@nestjs/common';
-import { SentryInterceptor } from './interceptor/sentry.interceptor';
+import { NoCache } from './decorators/no-cache.decorator';
+import { SentryInterceptor } from './interceptors/sentry.interceptor';
 
 @UseInterceptors(SentryInterceptor)
 @Controller()
@@ -16,6 +17,7 @@ export class AppController {
    * Retrieve a CSRF token
    */
   @Get('/token')
+  @NoCache()
   getCsrfToken(@Req() req): any {
     return {
       token: req.csrfToken(),
