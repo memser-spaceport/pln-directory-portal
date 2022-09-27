@@ -8,7 +8,7 @@ export const SEO = {
     url: 'https://plnetwork.io/',
     images: [
       {
-        url: 'https://plnetwork.io/assets/images/protocol-labs-network-open-graph.png',
+        url: 'https://plnetwork.io/assets/images/protocol-labs-network-open-graph.jpg',
         width: 1280,
         height: 640,
         alt: 'Protocol Labs Network Directory',
