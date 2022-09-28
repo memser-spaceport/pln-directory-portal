@@ -1,5 +1,10 @@
 import { getSiteUrl } from './utils/sitemap/sitemap.utils';
 
+const siteUrl = getSiteUrl(
+  process.env.NEXT_PUBLIC_VERCEL_ENV,
+  process.env.NEXT_PUBLIC_VERCEL_URL
+);
+
 export const SEO = {
   titleTemplate: '%s | Protocol Labs Network Directory',
   defaultTitle: 'Protocol Labs Network Directory',
@@ -7,13 +12,10 @@ export const SEO = {
     'The Protocol Labs Network Directory helps network members orient themselves within the network by making it easy to learn about other teams and members, including their roles, capabilities, and experiences.',
   openGraph: {
     type: 'website',
-    url: 'https://plnetwork.io/',
+    url: siteUrl,
     images: [
       {
-        url: `${getSiteUrl(
-          process.env.NEXT_PUBLIC_VERCEL_ENV,
-          process.env.NEXT_PUBLIC_VERCEL_URL
-        )}/assets/images/protocol-labs-network-open-graph.jpg?v1`,
+        url: `${siteUrl}/assets/images/protocol-labs-network-open-graph.jpg?v1`,
         width: 1280,
         height: 640,
         alt: 'Protocol Labs Network Directory',
