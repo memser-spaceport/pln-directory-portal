@@ -12,7 +12,7 @@ export const SEO = {
         width: 1280,
         height: 640,
         alt: 'Protocol Labs Network Directory',
-        type: 'image/jpg',
+        type: 'image/jpeg',
       },
     ],
   },
