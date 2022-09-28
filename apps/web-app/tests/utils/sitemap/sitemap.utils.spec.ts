@@ -4,7 +4,7 @@ describe('#getSiteUrl', () => {
   const PREVIEW_URL = 'preview-url.com';
 
   it('should return the production URL when environment is production', () => {
-    expect(getSiteUrl('production')).toEqual('https://plnetwork.io');
+    expect(getSiteUrl('production')).toEqual('https://www.plnetwork.io');
   });
 
   it('should return the preview URL when environment is not production and the preview URL is defined', () => {

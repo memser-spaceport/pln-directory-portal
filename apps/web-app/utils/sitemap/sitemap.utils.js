@@ -8,7 +8,7 @@ module.exports = {
    */
   getSiteUrl: function (environment, previewURL) {
     return environment === 'production'
-      ? 'https://plnetwork.io'
+      ? 'https://www.plnetwork.io'
       : previewURL
       ? `https://${previewURL}`
       : 'http://localhost:4200';
