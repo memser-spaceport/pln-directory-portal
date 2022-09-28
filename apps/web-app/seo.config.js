@@ -13,7 +13,7 @@ export const SEO = {
         url: `${getSiteUrl(
           process.env.NEXT_PUBLIC_VERCEL_ENV,
           process.env.NEXT_PUBLIC_VERCEL_URL
-        )}/assets/images/protocol-labs-network-open-graph.jpg`,
+        )}/assets/images/protocol-labs-network-open-graph.jpg?v1`,
         width: 1280,
         height: 640,
         alt: 'Protocol Labs Network Directory',
