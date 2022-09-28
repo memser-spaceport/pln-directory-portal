@@ -1,3 +1,4 @@
+import { BullModule } from '@nestjs/bull';
 import {
   CacheModule,
   MiddlewareConsumer,
@@ -31,6 +32,12 @@ import { TeamsModule } from './teams/teams.module';
       isGlobal: true,
       ttl: 86400, // 1 day in seconds
       max: 100, // maximum number of items in cache
+    }),
+    BullModule.forRoot({
+      redis: {
+        host: process.env.REDIS_HOST,
+        port: Number(process.env.REDIS_PORT),
+      },
     }),
     MembersModule,
     HealthModule,

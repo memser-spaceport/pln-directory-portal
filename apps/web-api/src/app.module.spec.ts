@@ -1,3 +1,4 @@
+import { BullModule } from '@nestjs/bull';
 import { CacheModule } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -31,6 +32,13 @@ describe('App Module', () => {
         cacheModule = module.get(CacheModule);
       } catch {}
       expect(cacheModule).toBeInstanceOf(CacheModule);
+    });
+    it('should register the BullModule module', () => {
+      let bullModule: BullModule | undefined = undefined;
+      try {
+        bullModule = module.get(BullModule);
+      } catch {}
+      expect(bullModule).toBeInstanceOf(BullModule);
     });
   });
 });
