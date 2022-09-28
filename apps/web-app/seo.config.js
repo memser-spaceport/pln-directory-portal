@@ -1,3 +1,5 @@
+import { getSiteUrl } from './utils/sitemap/sitemap.utils';
+
 export const SEO = {
   titleTemplate: '%s | Protocol Labs Network Directory',
   defaultTitle: 'Protocol Labs Network Directory',
@@ -8,7 +10,10 @@ export const SEO = {
     url: 'https://plnetwork.io/',
     images: [
       {
-        url: 'https://plnetwork.io/assets/images/protocol-labs-network-open-graph.jpg',
+        url: `${getSiteUrl(
+          process.env.NEXT_PUBLIC_VERCEL_ENV,
+          process.env.NEXT_PUBLIC_VERCEL_URL
+        )}/assets/images/protocol-labs-network-open-graph.jpg`,
         width: 1280,
         height: 640,
         alt: 'Protocol Labs Network Directory',
