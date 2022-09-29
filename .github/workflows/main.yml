@@ -60,10 +60,3 @@ jobs:
         run: npx semantic-release
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-
-      - name: Remove outdated labels
-        if: github.event.pull_request.merged
-        uses: mondeja/remove-labels-gh-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          labels: 'Status: In Review'
