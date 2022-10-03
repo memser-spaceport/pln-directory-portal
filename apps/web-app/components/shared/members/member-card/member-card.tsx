@@ -1,5 +1,6 @@
 import { LocationMarkerIcon, UserIcon } from '@heroicons/react/solid';
 import { IMember } from '@protocol-labs-network/api';
+import { Tooltip } from '@protocol-labs-network/ui';
 import { useRouter } from 'next/router';
 import { DirectoryCard } from '../../../../components/directory/directory-card/directory-card';
 import { DirectoryCardFooter } from '../../../../components/directory/directory-card/directory-card-footer';
@@ -13,6 +14,9 @@ interface MemberCardProps {
 export function MemberCard({ isGrid = true, member }: MemberCardProps) {
   const router = useRouter();
   const backLink = encodeURIComponent(router.asPath);
+  const mainTeam = member.teams[0];
+  const otherTeams = member.teams.slice(1).map((team) => team.name);
+  const role = member.role?.split(',')[0] || 'Contributor';
 
   return (
     <DirectoryCard
@@ -35,9 +39,33 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
         >
           {member.name}
         </h2>
-        <p className={isGrid ? 'line-clamp-2 mt-1 h-10' : 'line-clamp-1'}>
-          {member.role || 'Contributor'} at {member.teams[0].name}
-        </p>
+
+        <div
+          className={`flex ${
+            isGrid ? 'mt-1 flex-col' : 'flex-row items-center'
+          }`}
+        >
+          <div className="flex items-center justify-center">
+            <div className="overflow-hidden text-ellipsis whitespace-nowrap font-medium">
+              {mainTeam?.name}
+            </div>
+            {otherTeams.length ? (
+              <Tooltip
+                trigger={
+                  <div className="ml-1 flex w-4">
+                    <span className="h-4 w-4 rounded-full bg-slate-100 p-0.5 text-[10px] font-medium leading-3 text-slate-600">
+                      +{otherTeams.length}
+                    </span>
+                  </div>
+                }
+                content={otherTeams.join(', ')}
+              />
+            ) : null}
+          </div>
+          <div className={`${isGrid ? 'mt-1' : 'ml-2'} line-clamp-1`}>
+            {role}
+          </div>
+        </div>
 
         <div
           className={`${isGrid ? 'mt-2 justify-center' : 'mt-1'}
