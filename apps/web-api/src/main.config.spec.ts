@@ -1,3 +1,4 @@
+import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
 import { CsrfFilter, nestCsrf } from 'ncsrf';
 import { CSRFGuard } from './guards/csfr.guard';
@@ -6,6 +7,9 @@ import { mainConfig } from './main.config';
 jest.mock('ncsrf');
 jest.mock('cookie-parser');
 jest.mock('./guards/csfr.guard');
+jest.mock('body-parser', () => ({
+  json: jest.fn(),
+}));
 
 describe('MainConfig', () => {
   let appMock;
@@ -37,7 +41,7 @@ describe('MainConfig', () => {
       const useGlobalFiltersSpy = jest.spyOn(appMock, 'useGlobalFilters');
       const useGlobalGuardsSpy = jest.spyOn(appMock, 'useGlobalGuards');
       mainConfig(appMock);
-      expect(useSpy).toHaveBeenCalledTimes(2);
+      expect(useSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
       expect(cookieParser).toHaveBeenCalled();
       expect(nestCsrf).toHaveBeenCalled();
       expect(useGlobalFiltersSpy).toHaveBeenCalled();
@@ -50,6 +54,14 @@ describe('MainConfig', () => {
       const enableCorsSpy = jest.spyOn(appMock, 'enableCors');
       mainConfig(appMock);
       expect(enableCorsSpy).toHaveBeenCalled();
+    });
+
+    it('should enable JSON body parsing limit', () => {
+      const useSpy = jest.spyOn(appMock, 'use');
+      const jsonSpy = jest.spyOn(bodyParser, 'json');
+      mainConfig(appMock);
+      expect(useSpy).toHaveBeenCalled();
+      expect(jsonSpy).toHaveBeenCalledWith({ limit: '100kb' });
     });
   });
 });
