@@ -3,6 +3,7 @@ import { AnchorLink } from '@protocol-labs-network/ui';
 import Image from 'next/image';
 import { TeamLeadBadge } from '../../../shared/members/team-lead-badge/team-lead-badge';
 import { TagsGroup } from '../../../shared/tags-group/tags-group';
+import { MainTeamBadge } from '../../teams/main-team-badge/main-team-badge';
 
 interface ProfileCardProps {
   url: string;
@@ -11,6 +12,7 @@ interface ProfileCardProps {
   avatarIcon: (props: React.ComponentProps<'svg'>) => JSX.Element;
   name: string;
   showTeamLeadBadge?: boolean;
+  showMainTeamBadge?: boolean;
   description?: string;
   tags?: string[];
 }
@@ -22,6 +24,7 @@ export function ProfileCard({
   avatarIcon,
   name,
   showTeamLeadBadge,
+  showMainTeamBadge,
   description,
   tags,
 }: ProfileCardProps) {
@@ -53,6 +56,11 @@ export function ProfileCard({
             {showTeamLeadBadge ? (
               <div className="absolute -top-1 -right-1 z-10">
                 <TeamLeadBadge size="4" />
+              </div>
+            ) : null}
+            {showMainTeamBadge ? (
+              <div className="absolute -top-1 -right-1 z-10">
+                <MainTeamBadge />
               </div>
             ) : null}
           </div>
