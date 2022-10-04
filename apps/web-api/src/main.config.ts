@@ -1,4 +1,5 @@
 import { INestApplication, VersioningType } from '@nestjs/common';
+import { json } from 'body-parser';
 import cookieParser from 'cookie-parser';
 import { CsrfFilter, nestCsrf } from 'ncsrf';
 import { CSRFGuard } from './guards/csfr.guard';
@@ -28,4 +29,7 @@ export function mainConfig(app: INestApplication) {
   app.enableCors({
     origin: ALLOWED_CORS_ORIGINS[process.env.ENVIRONMENT],
   });
+
+  /* Limiting the size of the body of the request to 100kb. */
+  app.use(json({ limit: '100kb' }));
 }
