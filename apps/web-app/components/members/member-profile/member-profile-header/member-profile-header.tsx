@@ -9,6 +9,7 @@ export function MemberProfileHeader({
   role,
   teams,
   location,
+  teamLead,
 }: IMember) {
   return (
     <div className="flex space-x-4">
@@ -46,19 +47,21 @@ export function MemberProfileHeader({
           )}
         </div>
       </div>
-      <div className="flex w-24 items-start justify-end">
-        <Tooltip
-          asChild
-          trigger={
-            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 p-2 shadow-[0_1px_2px_rgba(15,23,42,0.16)]">
-              <i className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] not-italic text-white">
-                <FlagIcon className="h-[9px]" />
-              </i>
-            </span>
-          }
-          content="Team Lead"
-        />
-      </div>
+      {teamLead ? (
+        <div className="flex w-24 items-start justify-end">
+          <Tooltip
+            asChild
+            trigger={
+              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 p-2 shadow-[0_1px_2px_rgba(15,23,42,0.16)]">
+                <i className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] not-italic text-white">
+                  <FlagIcon className="h-[9px]" />
+                </i>
+              </span>
+            }
+            content="Team Lead"
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
