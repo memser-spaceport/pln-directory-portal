@@ -11,6 +11,9 @@ export function MemberProfileHeader({
   location,
   teamLead,
 }: IMember) {
+  const otherTeams = teams.slice(1).map((team) => team.name);
+  const roles = role?.split(',');
+
   return (
     <div className="flex space-x-4">
       <div
@@ -33,10 +36,28 @@ export function MemberProfileHeader({
       </div>
       <div className="grow">
         <h1 className="text-2xl font-bold">{name}</h1>
-        <p className="line-clamp-1 text-sm">
-          {role || 'Contributor'} at {teams[0].name}
+        <div className="flex items-center">
+          <div className="max-w-sm overflow-hidden text-ellipsis whitespace-nowrap font-medium">
+            {teams[0]?.name}
+          </div>
+          {otherTeams.length ? (
+            <Tooltip
+              asChild
+              trigger={
+                <div className="ml-1 flex w-4 cursor-default">
+                  <span className="h-4 w-4 rounded-full bg-slate-100 p-0.5 text-[10px] font-medium leading-3 text-slate-600">
+                    +{otherTeams.length}
+                  </span>
+                </div>
+              }
+              content={otherTeams.join(', ')}
+            />
+          ) : null}
+        </div>
+        <p className="line-clamp-1 mt-0.5 text-sm">
+          {roles[0] || 'Contributor'}
         </p>
-        <div className="mt-2 mr-2 flex items-center text-sm text-slate-600">
+        <div className="mt-1 mr-2 flex items-center text-sm text-slate-600">
           {location ? (
             <>
               <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0 fill-slate-400" />
