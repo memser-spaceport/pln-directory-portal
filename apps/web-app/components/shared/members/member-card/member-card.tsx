@@ -51,8 +51,9 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
             </div>
             {otherTeams.length ? (
               <Tooltip
+                asChild
                 trigger={
-                  <div className="ml-1 flex w-4">
+                  <div className="ml-1 flex w-4 cursor-default">
                     <span className="h-4 w-4 rounded-full bg-slate-100 p-0.5 text-[10px] font-medium leading-3 text-slate-600">
                       +{otherTeams.length}
                     </span>
