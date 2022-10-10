@@ -897,7 +897,7 @@ describe('AirtableService', () => {
     expect(membersTableMock.select).toHaveBeenCalledTimes(1);
 
     expect(membersTableMock.select).toHaveBeenCalledWith({
-      filterByFormula: 'SEARCH("team_id_01",Teams)',
+      filterByFormula: 'FIND(", team_id_01,", ", " & ARRAYJOIN(Teams) & ",")',
       fields: ['Name'],
       sort: [
         { field: 'Team lead', direction: 'desc' },
