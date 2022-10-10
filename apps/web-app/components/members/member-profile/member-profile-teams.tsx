@@ -6,7 +6,7 @@ import { ProfileCards } from '../../shared/profile/profile-cards/profile-cards';
 
 interface MemberProfileTeamsProps {
   teams: ITeam[];
-  roles?: string[];
+  roles: string[];
 }
 
 export function MemberProfileTeams({ teams, roles }: MemberProfileTeamsProps) {
