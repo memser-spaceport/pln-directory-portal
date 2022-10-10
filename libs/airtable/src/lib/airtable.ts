@@ -154,7 +154,7 @@ class AirtableService {
    */
   public async getTeamMembers(teamName: string, fields: string[]) {
     const membersOptions: IListOptions = {
-      filterByFormula: this._getSearchFormula(teamName, 'Teams'),
+      filterByFormula: this._findExactMatchFormula(teamName, 'Teams'),
       fields,
       sort: [
         { field: 'Team lead', direction: 'desc' },
@@ -432,6 +432,14 @@ class AirtableService {
    */
   private _getSearchFormula(queryValue: string, field: string) {
     return `SEARCH("${queryValue}",${field})`;
+  }
+
+  /**
+   * Returns a formula to search results that exactly match provided string
+   * to a given field
+   */
+  private _findExactMatchFormula(queryValue: string, field: string) {
+    return `FIND(", ${queryValue},", ", " & ARRAYJOIN(${field}) & ",")`;
   }
 
   /**
