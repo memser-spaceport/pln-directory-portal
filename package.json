@@ -67,6 +67,7 @@
     "@babel/preset-typescript": "7.12.13",
     "@commitlint/cli": "^17.0.2",
     "@commitlint/config-conventional": "^17.0.2",
+    "@golevelup/ts-jest": "^0.3.3",
     "@nestjs/cli": "^9.0.0",
     "@nestjs/schematics": "^9.0.0",
     "@nestjs/testing": "^9.0.0",
