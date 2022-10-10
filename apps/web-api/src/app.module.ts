@@ -1,4 +1,9 @@
-import { CacheModule, Module } from '@nestjs/common';
+import {
+  CacheModule,
+  MiddlewareConsumer,
+  Module,
+  RequestMethod,
+} from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import * as redisStore from 'cache-manager-redis-store';
@@ -7,6 +12,7 @@ import { AppController } from './app.controller';
 import { HealthModule } from './health/health.module';
 import { MyCacheInterceptor } from './interceptors/cache.interceptor';
 import { MembersModule } from './members/members.module';
+import { ContentTypeMiddleware } from './middlewares/content-type.middleware';
 import { PrismaService } from './prisma.service';
 import { TeamsModule } from './teams/teams.module';
 
@@ -41,4 +47,14 @@ import { TeamsModule } from './teams/teams.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(ContentTypeMiddleware)
+      .forRoutes(
+        { path: '*', method: RequestMethod.POST },
+        { path: '*', method: RequestMethod.PATCH }
+      );
+    // we can use .exclude() to exclude routes from the middleware (e.g. file upload endpoint)
+  }
+}
