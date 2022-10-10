@@ -12,7 +12,7 @@ export function MemberProfileHeader({
   teamLead,
 }: IMember) {
   const otherTeams = teams.slice(1).map((team) => team.name);
-  const roles = role?.split(',');
+  const memberRole = role?.split(',')[0] || 'Contributor';
 
   return (
     <div className="flex space-x-4">
@@ -54,9 +54,7 @@ export function MemberProfileHeader({
             />
           ) : null}
         </div>
-        <p className="line-clamp-1 mt-0.5 text-sm">
-          {roles[0] || 'Contributor'}
-        </p>
+        <p className="line-clamp-1 mt-0.5 text-sm">{memberRole}</p>
         <div className="mt-1 mr-2 flex items-center text-sm text-slate-600">
           {location ? (
             <>
