@@ -2,13 +2,13 @@ import airtableService from '@protocol-labs-network/airtable';
 import { IMember, ITeam } from '@protocol-labs-network/api';
 import { Breadcrumb } from '@protocol-labs-network/ui';
 import { NextSeo } from 'next-seo';
-import { MemberProfileDetails } from '../../components/members/member-profile/member-profile-details/member-profile-details';
-import { MemberProfileHeader } from '../../components/members/member-profile/member-profile-header/member-profile-header';
-import { MemberProfileOfficeHours } from '../../components/members/member-profile/member-profile-office-hours/member-profile-office-hours';
-import { MemberProfileTeams } from '../../components/members/member-profile/member-profile-teams';
-import { AskToEditCard } from '../../components/shared/ask-to-edit-card/ask-to-edit-card';
-import { TEAM_CARD_FIELDS } from '../../components/shared/teams/team-card/team-card.constants';
-import { useProfileBreadcrumb } from '../../hooks/profile/use-profile-breadcrumb.hook';
+import { MemberProfileDetails } from '../../../components/members/member-profile/member-profile-details/member-profile-details';
+import { MemberProfileHeader } from '../../../components/members/member-profile/member-profile-header/member-profile-header';
+import { MemberProfileOfficeHours } from '../../../components/members/member-profile/member-profile-office-hours/member-profile-office-hours';
+import { MemberProfileTeams } from '../../../components/members/member-profile/member-profile-teams';
+import { AskToEditCard } from '../../../components/shared/ask-to-edit-card/ask-to-edit-card';
+import { TEAM_CARD_FIELDS } from '../../../components/shared/teams/team-card/team-card.constants';
+import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcrumb.hook';
 
 interface MemberProps {
   member: IMember;
@@ -53,7 +53,7 @@ export default function Member({ member, teams, backLink }: MemberProps) {
 }
 
 export const getServerSideProps = async ({ query, res }) => {
-  const { id, backLink = '/members' } = query as {
+  const { id, backLink = '/directory/members' } = query as {
     id: string;
     backLink: string;
   };

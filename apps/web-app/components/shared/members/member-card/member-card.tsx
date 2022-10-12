@@ -21,7 +21,7 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
   return (
     <DirectoryCard
       isGrid={isGrid}
-      cardUrl={`/members/${member.id}?backLink=${backLink}`}
+      cardUrl={`/directory/members/${member.id}?backLink=${backLink}`}
     >
       <DirectoryCardHeader
         isGrid={isGrid}

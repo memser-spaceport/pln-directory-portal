@@ -2,18 +2,18 @@ import airtableService from '@protocol-labs-network/airtable';
 import { ITeam } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import { NextSeo } from 'next-seo';
-import { DirectoryHeader } from '../../components/directory/directory-header/directory-header';
-import { useViewType } from '../../components/directory/directory-view/use-directory-view-type.hook';
-import { LoadingOverlay } from '../../components/layout/loading-overlay/loading-overlay';
-import { TeamsDirectoryFilters } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters';
-import { ITeamsFiltersValues } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.types';
-import { parseTeamsFilters } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.utils';
-import { TeamsDirectoryList } from '../../components/teams/teams-directory/teams-directory-list/teams-directory-list';
-import { useDirectoryFiltersFathomLogger } from '../../hooks/plugins/use-directory-filters-fathom-logger.hook';
+import { DirectoryHeader } from '../../../components/directory/directory-header/directory-header';
+import { useViewType } from '../../../components/directory/directory-view/use-directory-view-type.hook';
+import { LoadingOverlay } from '../../../components/layout/loading-overlay/loading-overlay';
+import { TeamsDirectoryFilters } from '../../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters';
+import { ITeamsFiltersValues } from '../../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.types';
+import { parseTeamsFilters } from '../../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.utils';
+import { TeamsDirectoryList } from '../../../components/teams/teams-directory/teams-directory-list/teams-directory-list';
+import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-directory-filters-fathom-logger.hook';
 import {
   getTeamsDirectoryListOptions,
   getTeamsDirectoryRequestOptionsFromQuery,
-} from '../../utils/api/list.utils';
+} from '../../../utils/api/list.utils';
 
 type TeamsProps = {
   teams: ITeam[];
@@ -37,7 +37,9 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
     <>
       <NextSeo title="Teams" />
 
-      <LoadingOverlay excludeUrlFn={(url) => url.startsWith('/teams/')} />
+      <LoadingOverlay
+        excludeUrlFn={(url) => url.startsWith('/directory/teams/')}
+      />
 
       <section className="pl-sidebar flex">
         <div className="w-sidebar fixed left-0 z-40 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">

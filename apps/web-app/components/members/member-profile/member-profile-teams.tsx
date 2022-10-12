@@ -19,7 +19,7 @@ export function MemberProfileTeams({ teams, roles }: MemberProfileTeamsProps) {
       {teams.map((team, i) => (
         <ProfileCard
           key={`${id}.${team.id}`}
-          url={`/teams/${team.id}`}
+          url={`/directory/teams/${team.id}`}
           imageUrl={team.logo}
           avatarIcon={UserGroupIcon}
           name={team.name}

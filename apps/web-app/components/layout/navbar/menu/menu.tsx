@@ -15,12 +15,12 @@ export function Menu() {
     {
       icon: UserGroupIcon,
       name: 'Teams',
-      path: '/teams',
+      path: '/directory/teams',
     },
     {
       icon: UserIcon,
       name: 'Members',
-      path: '/members',
+      path: '/directory/members',
     },
   ];
 

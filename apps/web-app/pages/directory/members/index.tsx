@@ -2,18 +2,18 @@ import airtableService from '@protocol-labs-network/airtable';
 import { IMember } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import { NextSeo } from 'next-seo';
-import { DirectoryHeader } from '../../components/directory/directory-header/directory-header';
-import { useViewType } from '../../components/directory/directory-view/use-directory-view-type.hook';
-import { LoadingOverlay } from '../../components/layout/loading-overlay/loading-overlay';
-import { MembersDirectoryFilters } from '../../components/members/members-directory/members-directory-filters/members-directory-filters';
-import { IMembersFiltersValues } from '../../components/members/members-directory/members-directory-filters/members-directory-filters.types';
-import { parseMembersFilters } from '../../components/members/members-directory/members-directory-filters/members-directory-filters.utils';
-import { MembersDirectoryList } from '../../components/members/members-directory/members-directory-list/members-directory-list';
-import { useDirectoryFiltersFathomLogger } from '../../hooks/plugins/use-directory-filters-fathom-logger.hook';
+import { DirectoryHeader } from '../../../components/directory/directory-header/directory-header';
+import { useViewType } from '../../../components/directory/directory-view/use-directory-view-type.hook';
+import { LoadingOverlay } from '../../../components/layout/loading-overlay/loading-overlay';
+import { MembersDirectoryFilters } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters';
+import { IMembersFiltersValues } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters.types';
+import { parseMembersFilters } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters.utils';
+import { MembersDirectoryList } from '../../../components/members/members-directory/members-directory-list/members-directory-list';
+import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-directory-filters-fathom-logger.hook';
 import {
   getMembersDirectoryListOptions,
   getMembersDirectoryRequestOptionsFromQuery,
-} from '../../utils/api/list.utils';
+} from '../../../utils/api/list.utils';
 
 type MembersProps = {
   members: IMember[];
@@ -38,7 +38,9 @@ export default function Members({ members, filtersValues }: MembersProps) {
     <>
       <NextSeo title="Members" />
 
-      <LoadingOverlay excludeUrlFn={(url) => url.startsWith('/members/')} />
+      <LoadingOverlay
+        excludeUrlFn={(url) => url.startsWith('/directory/members/')}
+      />
 
       <section className="pl-sidebar flex">
         <div className="w-sidebar fixed left-0 z-40 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">
