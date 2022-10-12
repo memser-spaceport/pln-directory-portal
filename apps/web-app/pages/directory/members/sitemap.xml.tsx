@@ -1,8 +1,8 @@
 import airtableService from '@protocol-labs-network/airtable';
 import { GetServerSideProps } from 'next';
 import { getServerSideSitemap, ISitemapField } from 'next-sitemap';
-import { getMembersDirectoryRequestOptionsFromQuery } from '../../utils/api/list.utils';
-import { getSiteUrl } from '../../utils/sitemap/sitemap.utils';
+import { getMembersDirectoryRequestOptionsFromQuery } from '../../../utils/api/list.utils';
+import { getSiteUrl } from '../../../utils/sitemap/sitemap.utils';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 export default function MembersSitemap() {}
@@ -15,7 +15,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   const members = await airtableService.getMembers(membersListOptions);
 
   const membersProfiles: ISitemapField[] = members.map((member) => ({
-    loc: `${siteUrl}/members/${member.id}`,
+    loc: `${siteUrl}/directory/members/${member.id}`,
     lastmod: new Date().toISOString(),
   }));
 

@@ -1,8 +1,8 @@
 import airtableService from '@protocol-labs-network/airtable';
 import { GetServerSideProps } from 'next';
 import { getServerSideSitemap, ISitemapField } from 'next-sitemap';
-import { getTeamsDirectoryRequestOptionsFromQuery } from '../../utils/api/list.utils';
-import { getSiteUrl } from '../../utils/sitemap/sitemap.utils';
+import { getTeamsDirectoryRequestOptionsFromQuery } from '../../../utils/api/list.utils';
+import { getSiteUrl } from '../../../utils/sitemap/sitemap.utils';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 export default function TeamsSitemap() {}
@@ -15,7 +15,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   const teams = await airtableService.getTeams(teamsListOptions);
 
   const teamsProfiles: ISitemapField[] = teams.map((team) => ({
-    loc: `${siteUrl}/teams/${team.id}`,
+    loc: `${siteUrl}/directory/teams/${team.id}`,
     lastmod: new Date().toISOString(),
   }));
 

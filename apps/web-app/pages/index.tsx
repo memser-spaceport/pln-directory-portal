@@ -6,7 +6,7 @@ export const getServerSideProps = async () => {
   return {
     redirect: {
       permanent: false,
-      destination: '/teams',
+      destination: '/directory/teams',
     },
   };
 };

@@ -7,13 +7,13 @@ export function ErrorMessage() {
       <p className="mt-6 w-96 text-base">
         The page you were looking for is not available. <br />
         Please try searching on the {''}
-        <Link href="/teams">
+        <Link href="/directory/teams">
           <a className="text-base text-blue-600 outline-none hover:text-blue-700 focus:text-blue-900 active:text-blue-900">
             teams
           </a>
         </Link>
         {''} or {''}
-        <Link href="/members">
+        <Link href="/directory/members">
           <a className="text-base text-blue-600 outline-none hover:text-blue-700 focus:text-blue-900 active:text-blue-900">
             members
           </a>

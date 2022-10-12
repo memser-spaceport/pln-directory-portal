@@ -17,7 +17,7 @@ export function TeamCard({ team, isGrid = true }: TeamCardProps) {
   return (
     <DirectoryCard
       isGrid={isGrid}
-      cardUrl={`/teams/${team.id}?backLink=${backLink}`}
+      cardUrl={`/directory/teams/${team.id}?backLink=${backLink}`}
     >
       <DirectoryCardHeader
         isGrid={isGrid}
