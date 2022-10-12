@@ -1,4 +1,4 @@
-export * from './lib/switch/switch';
+export * from './lib/accordion/accordion';
 export * from './lib/anchor-link/anchor-link';
 export * from './lib/anchor-link/anchor-link.utils';
 export * from './lib/badge/badge';
@@ -8,5 +8,6 @@ export * from './lib/dropdown/dropdown';
 export * from './lib/icons/arrow/arrow';
 export * from './lib/icons/spinner/spinner';
 export * from './lib/input-field/input-field';
+export * from './lib/switch/switch';
 export * from './lib/tag/tag';
 export * from './lib/tooltip/tooltip';
