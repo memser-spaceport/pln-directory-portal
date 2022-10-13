@@ -25,6 +25,7 @@ describe('MainConfig', () => {
         use: jest.fn(),
         useGlobalFilters: jest.fn(),
         useGlobalGuards: jest.fn(),
+        useGlobalPipes: jest.fn(),
         enableVersioning: jest.fn(),
         enableCors: jest.fn(),
       };

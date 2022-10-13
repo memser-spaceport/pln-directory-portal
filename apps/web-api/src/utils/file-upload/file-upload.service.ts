@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Web3Storage, File } from 'web3.storage';
+import { File, Web3Storage } from 'web3.storage';
 
 // Explicitly import multer to temporarily fix this issue:
 // https://github.com/DefinitelyTyped/DefinitelyTyped/issues/47780
@@ -9,7 +9,7 @@ import 'multer';
 export class FileUploadService {
   private makeStorageClient() {
     return new Web3Storage({
-      token: process.env.WEB3_STORAGE_API_TOKEN,
+      token: process.env.WEB3_STORAGE_API_TOKEN || '',
       endpoint: new URL('https://api.web3.storage'),
     });
   }

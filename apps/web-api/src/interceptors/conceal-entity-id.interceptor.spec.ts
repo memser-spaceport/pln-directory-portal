@@ -1,3 +1,5 @@
+import { createMock } from '@golevelup/ts-jest';
+import { ExecutionContext } from '@nestjs/common';
 import { ConcealEntityIDInterceptor } from './conceal-entity-id.interceptor';
 
 jest.mock('@nestjs/common');
@@ -8,7 +10,7 @@ jest.mock('rxjs/operators', () => ({
 
 describe('ConcealEntityIDInterceptor', () => {
   let concealEntityIDInterceptor: ConcealEntityIDInterceptor;
-  const contextMock = null;
+  const contextMock = createMock<ExecutionContext>();
   const getNextMock = jest.fn(function (data) {
     return {
       handle: jest.fn().mockReturnThis(),

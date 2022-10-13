@@ -4,7 +4,7 @@ import { Test } from '@nestjs/testing';
 import { FundingStage, Team } from '@prisma/client';
 import { Factory } from 'fishery';
 import supertest from 'supertest';
-import { TeamSchema } from '../../../../libs/contracts/src/lib/contract-team';
+import { TeamSchema } from '../../../../libs/contracts/src/schema/team';
 import { prisma } from '../../prisma/index';
 import { TeamsModule } from './teams.module';
 

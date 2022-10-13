@@ -6,6 +6,7 @@
     "allowSyntheticDefaultImports": true,
     "types": ["node", "jest"],
     "strict": false,
+    "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": false,
     "resolveJsonModule": true,
