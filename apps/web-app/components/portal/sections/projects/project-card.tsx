@@ -1,0 +1,32 @@
+import { Card } from '../../card/card';
+import { ProjectButton } from './project-button';
+import { ProjectIcon } from './project-icon';
+
+type TProjectCardProps = {
+  imgUrl: string;
+  title: string;
+  description: string;
+  buttonUrl: string;
+  buttonLabel: string;
+};
+
+export const ProjectCard = ({
+  imgUrl,
+  title,
+  description,
+  buttonUrl,
+  buttonLabel,
+}: TProjectCardProps) => {
+  return (
+    <Card>
+      <div className="mb-4">
+        <ProjectIcon imageFile={imgUrl} />
+      </div>
+      <p className="text-2xl font-semibold">{title}</p>
+      <p className="mt-2 text-lg text-slate-600">{description}</p>
+      <div className="mt-8">
+        <ProjectButton url={buttonUrl} label={buttonLabel} />
+      </div>
+    </Card>
+  );
+};
