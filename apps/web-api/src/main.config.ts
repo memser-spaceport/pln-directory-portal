@@ -3,7 +3,7 @@ import { json } from 'body-parser';
 import cookieParser from 'cookie-parser';
 import { CsrfFilter, nestCsrf } from 'ncsrf';
 import { CSRFGuard } from './guards/csfr.guard';
-import { ALLOWED_CORS_ORIGINS } from './utils/constants';
+import { ALLOWED_CORS_ORIGINS, APP_ENV } from './utils/constants';
 
 export function mainConfig(app: INestApplication) {
   // API Versioning
@@ -27,7 +27,7 @@ export function mainConfig(app: INestApplication) {
 
   // Enable CORS for the web-app
   app.enableCors({
-    origin: ALLOWED_CORS_ORIGINS[process.env.ENVIRONMENT],
+    origin: ALLOWED_CORS_ORIGINS[process.env.ENVIRONMENT || APP_ENV.DEV],
   });
 
   /* Limiting the size of the body of the request to 100kb. */

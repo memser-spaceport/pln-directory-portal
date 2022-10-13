@@ -1,13 +1,12 @@
 import { Controller, Get, Post } from '@nestjs/common';
 import { ApiBody } from '@nestjs/swagger';
-import { Member as MemberModel } from '@prisma/client';
+import { Member as MemberSchema } from '@prisma/client';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
-import { apiMember } from '../../../../libs/contracts/src/lib/contract-member';
-import { CreateMemberDto } from './dto/create-member.dto';
-
+import { CreateMemberSchemaDto } from 'libs/contracts/src/schema';
+import { apiMembers } from '../../../../libs/contracts/src/lib/contract-member';
 import { MembersService } from './members.service';
 
-const server = initNestServer(apiMember);
+const server = initNestServer(apiMembers);
 type ControllerShape = typeof server.controllerShape;
 type RouteShape = typeof server.routeShapes;
 
@@ -16,29 +15,15 @@ export class MemberController implements ControllerShape {
   constructor(private readonly membersService: MembersService) {}
 
   @Get()
-  async getAll(): Promise<MemberModel[]> {
+  async getAll(): Promise<MemberSchema[]> {
     return this.membersService.findAll();
   }
 
   @Api(server.route.createMember)
-  @ApiBody({ type: [CreateMemberDto] })
+  @ApiBody({ type: [CreateMemberSchemaDto] })
   @Post()
   async createMember(@ApiDecorator() { body }: RouteShape['createMember']) {
-    const member = await this.membersService.create({
-      name: body.name,
-      email: body.email,
-      image: body.image,
-      githubHandler: body.githubHandler,
-      discordHandler: body.discordHandler,
-      twitterHandler: body.twitterHandler,
-      officeHours: body.officeHours,
-      plnFriend: body.plnFriend,
-      location: {
-        connect: {
-          uid: body.locationUid,
-        },
-      },
-    });
+    const member = await this.membersService.create(body);
 
     return { status: 201 as const, body: member };
   }

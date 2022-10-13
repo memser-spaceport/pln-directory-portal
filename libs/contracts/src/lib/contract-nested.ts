@@ -1,6 +1,6 @@
 import { initContract } from '@ts-rest/core';
-import { apiMember } from './contract-member';
-import { apiTeam } from './contract-team';
+import { apiMembers } from './contract-member';
+import { apiTeams } from './contract-team';
 
 const contract = initContract();
 
@@ -20,11 +20,11 @@ export const apiNested = contract.router({
   /**
    * Members API
    */
-  members: apiMember,
+  members: apiMembers,
   /**
    * Teams API
    */
-  teams: apiTeam,
+  teams: apiTeams,
   /**
    * Health API
    */

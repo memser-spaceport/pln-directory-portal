@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, Team } from '@prisma/client';
+import { CreateTeamSchemaDto } from 'libs/contracts/src/schema/team';
 import { PrismaService } from '../prisma.service';
-import { UpdateTeamDto } from './dto/update-team.dto';
 
 @Injectable()
 export class TeamsService {
@@ -19,11 +19,7 @@ export class TeamsService {
   }
 
   async findAll(): Promise<Team[]> {
-    return this.prisma.team.findMany({
-      include: {
-        members: true,
-      },
-    });
+    return this.prisma.team.findMany();
   }
 
   create(createTeamInput: Prisma.TeamCreateInput) {
@@ -33,7 +29,7 @@ export class TeamsService {
   }
 
   async update(
-    updateTeamInput: UpdateTeamDto,
+    updateTeamInput: CreateTeamSchemaDto,
     where: Prisma.TeamWhereUniqueInput
   ): Promise<Team | null> {
     return this.prisma.team.update({

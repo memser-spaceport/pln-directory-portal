@@ -40,3 +40,7 @@ $ nx run web-api:test
 ```bash
 $ nx run web-api:lint
 ```
+
+## Full type safety endpoint development
+
+For more information on this access the contracts lib documentation [here](../../libs/contracts/README.md).
