@@ -40,6 +40,11 @@ module.exports = {
           '0px 1px 1px rgba(7, 8, 8, 0.16)',
           'inset 0px 1px 0px rgba(255, 255, 255, 0.16)',
         ],
+        'pln-shadow-01': ['0px 12px 36px -6px rgba(15, 23, 42, 0.16)'],
+        'pln-shadow-01--focus': [
+          '0px 0px 0px 2px rgba(21, 111, 247, 0.25)',
+          '0px 1px 1px rgba(15, 23, 42, 0.08)',
+        ],
       },
       colors: {
         blue: {
