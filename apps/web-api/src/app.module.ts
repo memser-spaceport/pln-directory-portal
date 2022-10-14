@@ -11,6 +11,7 @@ import type { ClientOpts } from 'redis';
 import { AppController } from './app.controller';
 import { HealthModule } from './health/health.module';
 import { MyCacheInterceptor } from './interceptors/cache.interceptor';
+import { ConcealEntityIDInterceptor } from './interceptors/conceal-entity-id.interceptor';
 import { MembersModule } from './members/members.module';
 import { ContentTypeMiddleware } from './middlewares/content-type.middleware';
 import { PrismaService } from './prisma.service';
@@ -44,6 +45,10 @@ import { TeamsModule } from './teams/teams.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: MyCacheInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ConcealEntityIDInterceptor,
     },
   ],
 })
