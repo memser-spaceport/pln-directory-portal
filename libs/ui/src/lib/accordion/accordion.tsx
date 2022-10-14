@@ -34,7 +34,7 @@ export function Accordion({ items }: AccordionProps) {
                   leaveTo="opacity-0"
                 >
                   <Disclosure.Panel className="mt-4 text-lg text-slate-600">
-                    {content}
+                    <div dangerouslySetInnerHTML={{ __html: content }} />
                   </Disclosure.Panel>
                 </Transition>
               </div>
