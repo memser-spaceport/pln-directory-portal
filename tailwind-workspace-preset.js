@@ -9,6 +9,9 @@ module.exports = {
         'gradient-to-r--white-to-slate-200': [
           'linear-gradient(90deg, #FFFFFF 0%, #E2E8F0 231.25%)',
         ],
+        'pln-gradient-02': [
+          'linear-gradient(to right,rgba(66,125,255,0),rgba(66,125,255,1),rgba(68,213,187,1),rgba(68,213,187,0))',
+        ],
       },
       boxShadow: {
         'on-focus': ['0 0 0 2px rgba(21,111,247,0.25)'],
