@@ -70,9 +70,9 @@ class AirtableService {
   /**
    * Get provided fields for provided teams
    */
-  public async getTeamCardsData(teams: IMemberTeam[], fields: string[]) {
-    const teamsId = teams.map(({ id }) => id);
-    const teamsByIdFormula = this._getTeamIdSearchFormula(teamsId);
+  public async getTeamCardsData(memberTeams: IMemberTeam[], fields: string[]) {
+    const teamsIds = memberTeams.map(({ id }) => id);
+    const teamsByIdFormula = this._getTeamIdSearchFormula(teamsIds);
     const listOptions: IListOptions = {
       filterByFormula: [
         'AND(',
@@ -83,10 +83,18 @@ class AirtableService {
         ')',
       ].join(''),
       fields,
-      sort: [{ field: 'Name', direction: 'asc' }],
     };
 
-    return await airtableService.getTeams(listOptions);
+    const teams = await airtableService.getTeams(listOptions);
+    const teamsOnOriginalOrder = teamsIds.reduce((sortedTeams, id) => {
+      const teamWithProvidedId = teams.find((team) => team.id === id);
+
+      !!teamWithProvidedId && sortedTeams.push(teamWithProvidedId as ITeam);
+
+      return sortedTeams;
+    }, <ITeam[]>[]);
+
+    return teamsOnOriginalOrder;
   }
 
   /**

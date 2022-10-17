@@ -356,25 +356,6 @@ describe('AirtableService', () => {
     (teamsTableMock.select as jest.Mock).mockClear().mockReturnValueOnce({
       all: jest.fn().mockReturnValue([
         {
-          id: 'team_id_01',
-          fields: {
-            Name: 'Team 01',
-            'Short description': 'Short description for Team 01',
-            'Long description': 'Long description for Team 01',
-            Website: 'http://team01.com/ http://team0X.com/',
-            Twitter: '@team01',
-            'Accelerator Programs': ['Seed'],
-            'Network members': ['member_id_01'],
-            Logo: [{ id: 'team_logo_01', url: 'http://team01.com/logo.svg' }],
-            'Tags lookup': ['IT'],
-            'Last Audited': new Date('28/02/1904'),
-            Notes: 'Some notes.',
-            'Last Modified': new Date('28/02/1904'),
-            'Eligible for marketplace credits': true,
-            'Grants program': true,
-          },
-        },
-        {
           id: 'team_id_02',
           fields: {
             Name: 'Team 02',
@@ -393,6 +374,25 @@ describe('AirtableService', () => {
             'Grants program': true,
           },
         },
+        {
+          id: 'team_id_01',
+          fields: {
+            Name: 'Team 01',
+            'Short description': 'Short description for Team 01',
+            'Long description': 'Long description for Team 01',
+            Website: 'http://team01.com/ http://team0X.com/',
+            Twitter: '@team01',
+            'Accelerator Programs': ['Seed'],
+            'Network members': ['member_id_01'],
+            Logo: [{ id: 'team_logo_01', url: 'http://team01.com/logo.svg' }],
+            'Tags lookup': ['IT'],
+            'Last Audited': new Date('28/02/1904'),
+            Notes: 'Some notes.',
+            'Last Modified': new Date('28/02/1904'),
+            'Eligible for marketplace credits': true,
+            'Grants program': true,
+          },
+        },
       ]),
     });
 
@@ -400,15 +400,15 @@ describe('AirtableService', () => {
       [
         { id: 'team_id_01', name: 'team 01' },
         { id: 'team_id_02', name: 'team 02' },
+        { id: 'team_id_03', name: 'team 03' },
       ],
       ['Name']
     );
 
     expect(teamsTableMock.select).toHaveBeenCalledWith({
       filterByFormula:
-        'AND(AND({Name} != "", {Short description} != ""), OR(RECORD_ID()=\'team_id_01\', RECORD_ID()=\'team_id_02\'))',
+        "AND(AND({Name} != \"\", {Short description} != \"\"), OR(RECORD_ID()='team_id_01', RECORD_ID()='team_id_02', RECORD_ID()='team_id_03'))",
       fields: ['Name'],
-      sort: [{ direction: 'asc', field: 'Name' }],
     });
 
     expect(teams).toEqual([
