@@ -32,12 +32,16 @@ let nextConfig = {
   },
   async redirects() {
     return [
-      {
-        // Redirect from root to teams directory page
-        source: '/',
-        destination: '/directory/teams',
-        permanent: false,
-      },
+      ...(process.env.NEXT_PUBLIC_HIDE_NETWORK_PORTAL
+        ? [
+            {
+              // Redirect from root to teams directory page
+              source: '/',
+              destination: '/directory/teams',
+              permanent: false,
+            },
+          ]
+        : []),
       {
         // Redirect from directory root to teams directory page
         source: '/directory',
