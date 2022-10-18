@@ -1,12 +1,12 @@
 export interface CardProps {
-  className?: string;
+  styleClassName?: string;
   children: React.ReactNode;
 }
 
-export function Card({ className, children }: CardProps) {
+export function Card({ styleClassName, children }: CardProps) {
   return (
     <div
-      className={`rounded-lg border border-slate-300 p-8 shadow-slate-900/5 ${className}`}
+      className={`rounded-lg border border-slate-300 p-8 shadow-slate-900/5 ${styleClassName}`}
     >
       {children}
     </div>
