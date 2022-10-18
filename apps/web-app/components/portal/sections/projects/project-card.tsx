@@ -1,5 +1,5 @@
 import { Card } from '../../card/card';
-import { ProjectButton } from './project-button';
+import { PortalButton } from '../../portal-button/portal-button';
 import { ProjectIcon } from './project-icon';
 
 type TProjectCardProps = {
@@ -25,7 +25,7 @@ export const ProjectCard = ({
       <p className="text-2xl font-semibold">{title}</p>
       <p className="mt-2 text-lg text-slate-600">{description}</p>
       <div className="mt-8">
-        <ProjectButton url={buttonUrl} label={buttonLabel} />
+        <PortalButton url={buttonUrl} label={buttonLabel} />
       </div>
     </Card>
   );
