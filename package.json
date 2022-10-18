@@ -50,6 +50,7 @@
     "cookie-parser": "^1.4.6",
     "core-js": "^3.6.5",
     "fathom-client": "^3.5.0",
+    "helmet": "^6.0.0",
     "install": "^0.13.0",
     "ncsrf": "^1.0.3",
     "nestjs-zod": "^1.2.1",

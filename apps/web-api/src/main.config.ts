@@ -1,6 +1,7 @@
 import { INestApplication, VersioningType } from '@nestjs/common';
 import { json } from 'body-parser';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { CsrfFilter, nestCsrf } from 'ncsrf';
 import { CSRFGuard } from './guards/csfr.guard';
 import { ALLOWED_CORS_ORIGINS, APP_ENV } from './utils/constants';
@@ -32,4 +33,21 @@ export function mainConfig(app: INestApplication) {
 
   /* Limiting the size of the body of the request to 100kb. */
   app.use(json({ limit: '100kb' }));
+
+  /* Apply helmet to the entire app
+  // Default configuration documented here: https://github.com/helmetjs/helmet
+  */
+  app.use(
+    helmet({
+      frameguard: {
+        action: 'deny',
+      },
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'none'"],
+        },
+      },
+      hidePoweredBy: true,
+    })
+  );
 }

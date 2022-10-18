@@ -1,5 +1,6 @@
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
+import * as helmet from 'helmet';
 import { CsrfFilter, nestCsrf } from 'ncsrf';
 import { CSRFGuard } from './guards/csfr.guard';
 import { mainConfig } from './main.config';
@@ -10,6 +11,7 @@ jest.mock('./guards/csfr.guard');
 jest.mock('body-parser', () => ({
   json: jest.fn(),
 }));
+jest.mock('helmet');
 
 describe('MainConfig', () => {
   let appMock;
@@ -63,6 +65,24 @@ describe('MainConfig', () => {
       mainConfig(appMock);
       expect(useSpy).toHaveBeenCalled();
       expect(jsonSpy).toHaveBeenCalledWith({ limit: '100kb' });
+    });
+    it('should enable helmet', () => {
+      const useSpy = jest.spyOn(appMock, 'use');
+      const helmetSpy = jest.spyOn(helmet, 'default');
+      mainConfig(appMock);
+      expect(useSpy).toHaveBeenCalled();
+      expect(helmetSpy).toHaveBeenCalled();
+      expect(helmetSpy).toHaveBeenCalledWith({
+        frameguard: {
+          action: 'deny',
+        },
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'none'"],
+          },
+        },
+        hidePoweredBy: true,
+      });
     });
   });
 });
