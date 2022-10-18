@@ -1,12 +1,3 @@
 export default function Index() {
-  return <div></div>;
+  return <h1>Network Portal</h1>;
 }
-
-export const getServerSideProps = async () => {
-  return {
-    redirect: {
-      permanent: false,
-      destination: '/directory/teams',
-    },
-  };
-};
