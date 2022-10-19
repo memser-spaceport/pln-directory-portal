@@ -2,6 +2,7 @@ import airtableService from '@protocol-labs-network/airtable';
 import { ITeam } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import { NextSeo } from 'next-seo';
+import { ReactElement } from 'react';
 import { DirectoryHeader } from '../../../components/directory/directory-header/directory-header';
 import { useViewType } from '../../../components/directory/directory-view/use-directory-view-type.hook';
 import { LoadingOverlay } from '../../../components/layout/loading-overlay/loading-overlay';
@@ -10,6 +11,7 @@ import { ITeamsFiltersValues } from '../../../components/teams/teams-directory/t
 import { parseTeamsFilters } from '../../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.utils';
 import { TeamsDirectoryList } from '../../../components/teams/teams-directory/teams-directory-list/teams-directory-list';
 import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-directory-filters-fathom-logger.hook';
+import { DirectoryLayout } from '../../../layouts/directory-layout';
 import {
   getTeamsDirectoryListOptions,
   getTeamsDirectoryRequestOptionsFromQuery,
@@ -69,6 +71,10 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
     </>
   );
 }
+
+Teams.getLayout = function getLayout(page: ReactElement) {
+  return <DirectoryLayout>{page}</DirectoryLayout>;
+};
 
 export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
   query,
