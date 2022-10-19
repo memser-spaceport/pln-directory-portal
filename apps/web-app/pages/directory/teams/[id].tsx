@@ -3,6 +3,7 @@ import { IMember, ITeam } from '@protocol-labs-network/api';
 import { Breadcrumb } from '@protocol-labs-network/ui';
 import { GetServerSideProps } from 'next';
 import { NextSeo } from 'next-seo';
+import { ReactElement } from 'react';
 import { AskToEditCard } from '../../../components/shared/ask-to-edit-card/ask-to-edit-card';
 import { MEMBER_CARD_FIELDS } from '../../../components/shared/members/member-card/member-card.constants';
 import { TeamProfileDetails } from '../../../components/teams/team-profile/team-profile-details/team-profile-details';
@@ -10,6 +11,7 @@ import { TeamProfileFunding } from '../../../components/teams/team-profile/team-
 import { TeamProfileHeader } from '../../../components/teams/team-profile/team-profile-header/team-profile-header';
 import { TeamProfileMembers } from '../../../components/teams/team-profile/team-profile-members/team-profile-members';
 import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcrumb.hook';
+import { DirectoryLayout } from '../../../layouts/directory-layout';
 
 interface TeamProps {
   team: ITeam;
@@ -45,6 +47,10 @@ export default function Team({ team, members, backLink }: TeamProps) {
     </>
   );
 }
+
+Team.getLayout = function getLayout(page: ReactElement) {
+  return <DirectoryLayout>{page}</DirectoryLayout>;
+};
 
 export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
   query,

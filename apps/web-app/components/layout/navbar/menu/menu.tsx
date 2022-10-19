@@ -58,5 +58,3 @@ export function Menu() {
     </ul>
   );
 }
-
-export default Menu;

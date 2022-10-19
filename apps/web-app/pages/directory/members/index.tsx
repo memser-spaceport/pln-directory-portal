@@ -2,6 +2,7 @@ import airtableService from '@protocol-labs-network/airtable';
 import { IMember } from '@protocol-labs-network/api';
 import { GetServerSideProps } from 'next';
 import { NextSeo } from 'next-seo';
+import { ReactElement } from 'react';
 import { DirectoryHeader } from '../../../components/directory/directory-header/directory-header';
 import { useViewType } from '../../../components/directory/directory-view/use-directory-view-type.hook';
 import { LoadingOverlay } from '../../../components/layout/loading-overlay/loading-overlay';
@@ -10,6 +11,7 @@ import { IMembersFiltersValues } from '../../../components/members/members-direc
 import { parseMembersFilters } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters.utils';
 import { MembersDirectoryList } from '../../../components/members/members-directory/members-directory-list/members-directory-list';
 import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-directory-filters-fathom-logger.hook';
+import { DirectoryLayout } from '../../../layouts/directory-layout';
 import {
   getMembersDirectoryListOptions,
   getMembersDirectoryRequestOptionsFromQuery,
@@ -70,6 +72,10 @@ export default function Members({ members, filtersValues }: MembersProps) {
     </>
   );
 }
+
+Members.getLayout = function getLayout(page: ReactElement) {
+  return <DirectoryLayout>{page}</DirectoryLayout>;
+};
 
 export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
   query,
