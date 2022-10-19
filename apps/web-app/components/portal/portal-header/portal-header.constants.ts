@@ -1,6 +1,6 @@
-import { IPortalNavbarItem } from './portal-navbar.types';
+import { IPortalHeaderLink } from './portal-header.types';
 
-export const PORTAL_NAVBAR_ITEMS: IPortalNavbarItem[] = [
+export const PORTAL_HEADER_LINKS: IPortalHeaderLink[] = [
   {
     label: 'Directory',
     url: '/directory',
