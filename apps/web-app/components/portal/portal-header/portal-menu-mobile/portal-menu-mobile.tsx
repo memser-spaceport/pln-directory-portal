@@ -1,0 +1,41 @@
+import { Menu, Transition } from '@headlessui/react';
+import { MenuIcon } from '@protocol-labs-network/ui';
+import { Fragment } from 'react';
+import { PORTAL_HEADER_LINKS } from '../portal-header.constants';
+
+export function PortalMenuMobile() {
+  return (
+    <Menu>
+      <Menu.Button className="flex h-10 w-10 items-center justify-center rounded-lg bg-white shadow-[0_2px_4px_2px_rgba(15,23,42,.04)] outline-none">
+        <MenuIcon />
+      </Menu.Button>
+
+      <Transition
+        as={Fragment}
+        enter="transform transition duration-300"
+        enterFrom="opacity-0 -translate-y-2"
+        enterTo="opacity-100 translate-y-0"
+        leave="transform transition duration-300"
+        leaveFrom="opacity-100 translate-y-0"
+        leaveTo="opacity-0 -translate-y-2"
+      >
+        <Menu.Items className="absolute right-0 mt-2 w-full rounded-lg bg-white p-2 shadow-[0_2px_4px_2px_rgba(15,23,42,.04)] focus:outline-none">
+          {PORTAL_HEADER_LINKS.map((option) => {
+            return (
+              <Menu.Item key={option.label}>
+                <a
+                  href={option.url}
+                  className="block px-3 py-2 text-sm"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {option.label}
+                </a>
+              </Menu.Item>
+            );
+          })}
+        </Menu.Items>
+      </Transition>
+    </Menu>
+  );
+}
