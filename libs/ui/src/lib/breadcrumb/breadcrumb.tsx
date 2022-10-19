@@ -16,7 +16,7 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
       aria-label="breadcrumb"
       className="navbar top-20 z-40 border-t border-t-slate-200 px-16 py-3.5 text-sm leading-6 shadow-[0_1px_4px_0_#e2e8f0]"
     >
-      <Link href="/">
+      <Link href="/directory">
         <a className="on-focus--link">
           <HomeIcon className="h-4 w-4 fill-slate-600 hover:fill-slate-700" />
         </a>
