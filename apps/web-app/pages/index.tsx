@@ -1,9 +1,18 @@
 import { GetServerSideProps } from 'next';
+import { NextSeo } from 'next-seo';
 import { ReactElement } from 'react';
 import { PortalLayout } from '../layouts/portal-layout';
 
 export default function Index() {
-  return <h1>Network Portal</h1>;
+  return (
+    <>
+      <NextSeo
+        additionalMetaTags={[
+          { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        ]}
+      />
+    </>
+  );
 }
 
 Index.getLayout = function getLayout(page: ReactElement) {
