@@ -1,0 +1,33 @@
+import Image from 'next/image';
+import { PortalMenuMobile } from './portal-menu-mobile/portal-menu-mobile';
+import { PortalNavbar } from './portal-navbar/portal-navbar';
+import { useFloatingPortalHeader } from './use-floating-portal-header';
+
+export function PortalHeader() {
+  const isFloating = useFloatingPortalHeader();
+
+  return (
+    <>
+      <div className="relative flex items-center justify-between">
+        <div className="relative h-8 w-8 sm:h-16 sm:w-16">
+          <Image
+            src={`/assets/images/protocol-labs-network-small-logo.svg`}
+            layout="fill"
+            objectFit="cover"
+            alt="Protocol Labs Logo"
+          />
+        </div>
+        <div className="sm:hidden">
+          <PortalMenuMobile />
+        </div>
+      </div>
+      <div
+        className={`fixed ${
+          isFloating ? 'top-4' : 'top-8'
+        } left-1/2 z-50 hidden -translate-x-1/2 transition-all duration-700 ease-in-out sm:block`}
+      >
+        <PortalNavbar floating={isFloating} />
+      </div>
+    </>
+  );
+}
