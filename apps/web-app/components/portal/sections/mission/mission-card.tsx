@@ -19,11 +19,11 @@ const helpAreas = [
 export const MissionCard = () => {
   return (
     <Card styleClassName="bg-white px-9">
-      <h2 className="sm:text-lg">
+      <h2 className="md:text-lg">
         Teams in the Protocol Labs Network (PLN) receive support across the
         entire research and development pipeline. PLN teams get help on:
       </h2>
-      <div className="mt-8 grid gap-y-6 gap-x-10 font-medium sm:mt-7 sm:grid-flow-col sm:grid-cols-3 sm:grid-rows-2 sm:text-lg">
+      <div className="mt-8 grid gap-y-6 gap-x-10 font-medium md:mt-7 md:grid-flow-col md:grid-cols-3 md:grid-rows-2 md:text-lg">
         {helpAreas.map((area, i) => (
           <MissionHelpArea key={i} areaIcon={area.icon} areaName={area.name} />
         ))}
