@@ -1,69 +1,40 @@
-import Link from 'next/link';
+import { FOOTER_MAIN_NAV_LINKS } from './footer.constants';
+import { IFooterMainNavLink } from './footer.types';
+
+/**
+ * Split the links in chunks of two links each
+ */
+function chunkLinks(linksArray: IFooterMainNavLink[]) {
+  const linksChunks = [];
+
+  for (let index = 0; index < linksArray.length; index += 2) {
+    linksChunks.push(linksArray.slice(index, index + 2));
+  }
+
+  return linksChunks;
+}
 
 export const FooterMainNav = () => {
   return (
-    <nav className="flex w-full flex-col justify-center gap-x-8 sm:flex-row">
-      <div className="flex flex-col items-center gap-y-2 text-center sm:items-start sm:text-left">
-        <Link href="mailto:spaceport-admin@protocol.ai">
-          <a
-            className="on-focus--link text-base font-medium hover:rounded hover:bg-slate-200 sm:px-2 sm:py-1"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Contact Us
-          </a>
-        </Link>
-        <Link href="https://protocol.ai/legal/#terms-of-service">
-          <a
-            className="on-focus--link text-base font-medium hover:rounded hover:bg-slate-200 sm:px-2 sm:py-1"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Terms
-          </a>
-        </Link>
-      </div>
-      <div className="flex flex-col items-center gap-y-2 text-center sm:items-start sm:text-left">
-        <Link href="https://protocol.almanac.io/handbook/protocol-labs-spaceport-JzKymu/swag-ilsLIajsqLXbHLXqwM0EKmvEhX2BuuPf">
-          <a
-            className="on-focus--link text-base font-medium hover:rounded hover:bg-slate-200 sm:px-2 sm:py-1"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Swag
-          </a>
-        </Link>
-
-        <Link href="https://protocol.almanac.io/handbook/protocol-labs-spaceport-JzKymu/pln-code-of-conduct-ymBUYyonmhfvizGu6yOpXH1qkuWYce96">
-          <a
-            className="on-focus--link text-base font-medium hover:rounded hover:bg-slate-200 sm:px-2 sm:py-1"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            PLN Code of Conduct
-          </a>
-        </Link>
-      </div>
-      <div className="flex flex-col items-center gap-y-2 text-center sm:items-start sm:text-left">
-        <Link href="https://protocol.almanac.io/handbook/protocol-labs-spaceport-JzKymu/network-funding-YANVDroOLIURUJsfFENd8fJerOtbDaSK">
-          <a
-            className="on-focus--link text-base font-medium hover:rounded hover:bg-slate-200 sm:px-2 sm:py-1"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Network Funding
-          </a>
-        </Link>
-        <Link href="https://protocol.almanac.io/handbook/protocol-labs-spaceport-JzKymu/protocol-labs-spaceport-sFKNLxQKYdQOZfLTL4kL9uVha4TdGlYh">
-          <a
-            className="on-focus--link text-base font-medium hover:rounded hover:bg-slate-200 sm:px-2 sm:py-1"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Spaceport Guide to the PLN Galaxy
-          </a>
-        </Link>
-      </div>
+    <nav className="mt-10 mb-14 flex w-full flex-col justify-center gap-x-8 gap-y-2 sm:my-0 sm:flex-row sm:gap-y-0">
+      {chunkLinks(FOOTER_MAIN_NAV_LINKS).map((linksChunk, linksChunkIndex) => (
+        <div
+          key={`chunk-${linksChunkIndex}`}
+          className="flex flex-col items-center gap-y-2 text-center sm:items-start sm:text-left"
+        >
+          {linksChunk.map((link, linkIndex) => (
+            <a
+              key={`chunk-${linksChunkIndex}-link-${linkIndex}`}
+              href={link.url}
+              className="on-focus--link px-2 py-1 text-base font-medium hover:rounded hover:bg-slate-200"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {link.label}
+            </a>
+          ))}
+        </div>
+      ))}
     </nav>
   );
 };
