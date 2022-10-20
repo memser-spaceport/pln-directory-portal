@@ -21,9 +21,7 @@ export const MissionCard = () => {
     <Card styleClassName="bg-white px-9">
       <h2 className="sm:text-lg">
         Teams in the Protocol Labs Network (PLN) receive support across the
-        entire research and development pipeline.
-        <br />
-        PLN teams get help on:
+        entire research and development pipeline. PLN teams get help on:
       </h2>
       <div className="mt-8 grid gap-y-6 gap-x-10 font-medium sm:mt-7 sm:grid-flow-col sm:grid-cols-3 sm:grid-rows-2 sm:text-lg">
         {helpAreas.map((area, i) => (
