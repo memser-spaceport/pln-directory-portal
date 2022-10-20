@@ -4,7 +4,7 @@ const faqItems = [
   {
     triggerText: 'What is Protocol Labs?',
     content:
-      '<p>Protocol Labs is an open-source R&D lab building protocols, tools, and services to radically improve the internet.</p>',
+      "<p>Protocol Labs is an open-source R&D lab building protocols, tools, and services to radically improve the internet. <a href='https://protocol.ai/' target='_blank' rel='noopener noreferrer'><u>Learn more about Protocol Labs</u></a>.</p>",
   },
   {
     triggerText: 'How is Protocol Labs related to the Protocol Labs Network?',
@@ -14,7 +14,7 @@ const faqItems = [
   {
     triggerText: 'I want to join the network, what can I do?',
     content:
-      "<p>We welcome teams interested in the Protocol Labs mission to collaborate with us on a short or long-term basis. You can read more about membership options <a href='https://protocol.almanac.io/handbook/protocol-labs-spaceport-JzKymu/pln-membership-G4pIdsLCQ6q0BJwwDTOfaVSeoV3NNd8V'><u>here</u></a>, or reach out to <a href='mailto:spaceport-admin@protocol.ai' title='mailto:spaceport-admin@protocol.ai'><u>spaceport-admin@protocol.ai</u></a> and we'll take things from there.</p>",
+      "<p>We welcome teams interested in the Protocol Labs mission to collaborate with us on a short or long-term basis. You can read more about membership options <a href='https://protocol.almanac.io/handbook/protocol-labs-spaceport-JzKymu/pln-membership-G4pIdsLCQ6q0BJwwDTOfaVSeoV3NNd8V' target='_blank' rel='noopener noreferrer'><u>here</u></a>, or reach out to <a href='mailto:spaceport-admin@protocol.ai' title='mailto:spaceport-admin@protocol.ai'><u>spaceport-admin@protocol.ai</u></a> and we'll take things from there.</p>",
   },
   {
     triggerText: 'What is Spaceport?',
