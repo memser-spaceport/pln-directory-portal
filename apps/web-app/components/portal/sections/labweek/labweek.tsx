@@ -44,7 +44,7 @@ export const LabWeek = () => {
 
       <div className="mt-6 mr-3 flex sm:mt-5 sm:justify-end">
         <AnimatedArrowLink
-          url="https://labweek2022.plnetwork.io/"
+          url="https://22.labweek.io/#schedule"
           label="See full event schedule"
         />
       </div>
