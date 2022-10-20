@@ -1,4 +1,4 @@
-import { AnimatedArrowLink } from '../../animated-arrow-link/animated-arrow-link';
+import { ArrowSmRightIcon } from '@heroicons/react/solid';
 import { EventCard } from '../../event-card/event-card';
 
 export const LabWeek = () => {
@@ -43,10 +43,18 @@ export const LabWeek = () => {
       </div>
 
       <div className="mt-6 mr-3 flex sm:mt-5 sm:justify-end">
-        <AnimatedArrowLink
-          url="https://22.labweek.io/#schedule"
-          label="See full event schedule"
-        />
+        <a
+          href="https://22.labweek.io/#schedule"
+          className="group mr-3 flex items-center text-sm font-semibold leading-5"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <span className="relative mr-1 after:absolute after:-bottom-px after:left-0 after:h-px after:w-full after:bg-gradient-to-r after:from-[#4282fc] after:to-[#44d5bb]">
+            See full event schedule
+          </span>
+
+          <ArrowSmRightIcon className="h-4 w-4 stroke-2 transition-all ease-out group-hover:translate-x-1/4 group-hover:duration-[300ms]" />
+        </a>
       </div>
     </section>
   );
