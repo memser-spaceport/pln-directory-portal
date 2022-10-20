@@ -15,19 +15,25 @@ export function TeamProfileMembers({ members }: TeamProfileMembersProps) {
 
   return (
     <ProfileCards title="Members" count={members.length}>
-      {members.map((member) => (
-        <ProfileCard
-          key={`${id}.${member.id}`}
-          url={`/directory/members/${member?.id}`}
-          isImageRounded
-          imageUrl={member.image}
-          avatarIcon={UserIcon}
-          name={member.name}
-          showTeamLeadBadge={member.teamLead}
-          description={member.role}
-          tags={member.skills}
-        />
-      ))}
+      {members.map((member) => {
+        const teamIndex = member.teams.findIndex((team) => team.id === id);
+        const roles = member.role?.split(', ') || [];
+        const role = roles[teamIndex] || 'Contributor';
+
+        return (
+          <ProfileCard
+            key={`${id}.${member.id}`}
+            url={`/directory/members/${member?.id}`}
+            isImageRounded
+            imageUrl={member.image}
+            avatarIcon={UserIcon}
+            name={member.name}
+            showTeamLeadBadge={member.teamLead}
+            description={role}
+            tags={member.skills}
+          />
+        );
+      })}
     </ProfileCards>
   );
 }
