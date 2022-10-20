@@ -4,18 +4,18 @@ import { PortalDivider } from '../../portal-divider/portal-divider';
 
 export const Directory = () => {
   return (
-    <section className="gap-7.5 flex flex-col items-center sm:flex-row">
+    <section className="gap-7.5 flex flex-col items-center md:flex-row">
       <div className="flex-1">
-        <h2 className="text-4xl font-bold leading-[46px] sm:text-5xl sm:leading-[60px]">
+        <h2 className="text-4xl font-bold leading-[46px] md:text-5xl md:leading-[60px]">
           Explore our Network Directory
         </h2>
-        <p className="mb-6 text-[16px] leading-6 text-slate-600 sm:mb-8 sm:mt-2 sm:max-w-md sm:text-lg">
+        <p className="mb-6 text-[16px] leading-6 text-slate-600 md:mb-8 md:mt-2 md:max-w-md md:text-lg">
           Navigate our growing ecosystem, find new partners, and get involved.
         </p>
         <PortalButton url="/directory" label="Network Directory" />
       </div>
       <div className="flex-1">
-        <div className="hidden sm:block">
+        <div className="hidden md:block">
           <Image
             width="540"
             height="564"
@@ -23,7 +23,7 @@ export const Directory = () => {
             alt="Directory Illustration"
           />
         </div>
-        <div className="mt-6 flex flex-col items-center gap-y-6 sm:hidden">
+        <div className="mt-6 flex flex-col items-center gap-y-6 md:hidden">
           <div>
             <Image
               width="255"

@@ -23,21 +23,21 @@ export default function Index() {
       <div>
         <Mission />
         <PortalDivider />
-        <div className="bg-white py-24 px-6 sm:px-16 sm:py-[120px]">
+        <div className="bg-white py-24 px-6 md:px-16 md:py-[120px]">
           <div className="mx-auto max-w-[1110px]">
             <Directory />
           </div>
         </div>
         <div className="bg-gradient-to-b from-slate-50 to-white">
-          <div className="py-24 px-6 sm:px-16 sm:py-[152px]">
+          <div className="py-24 px-6 md:px-16 md:py-[152px]">
             <div className="mx-auto max-w-[1110px]">
-              <div className="mb-[106px] sm:mb-[162px]">
+              <div className="mb-[106px] md:mb-[162px]">
                 <LabWeek />
               </div>
-              <div className="mb-[72px] sm:mb-40">
+              <div className="mb-[72px] md:mb-40">
                 <Projects />
               </div>
-              <div className="mb-32 sm:mb-48">
+              <div className="mb-32 md:mb-48">
                 <Substack />
               </div>
               <div className="mx-auto max-w-[800px]">
