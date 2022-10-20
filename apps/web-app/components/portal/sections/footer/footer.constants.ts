@@ -10,7 +10,7 @@ export const FOOTER_MAIN_NAV_LINKS: IFooterMainNavLink[] = [
     url: 'https://protocol.ai/legal/#terms-of-service',
   },
   {
-    label: 'Swage',
+    label: 'Merch',
     url: 'https://protocol.almanac.io/handbook/protocol-labs-spaceport-JzKymu/swag-ilsLIajsqLXbHLXqwM0EKmvEhX2BuuPf',
   },
   {
