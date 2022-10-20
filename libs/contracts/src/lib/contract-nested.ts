@@ -1,4 +1,5 @@
 import { initContract } from '@ts-rest/core';
+import { apiIndustryTags } from './contract-industry-tags';
 import { apiMembers } from './contract-member';
 import { apiTeams } from './contract-team';
 
@@ -29,4 +30,8 @@ export const apiNested = contract.router({
    * Health API
    */
   health: apiHealth,
+  /**
+   * Tags API
+   */
+  tags: apiIndustryTags,
 });

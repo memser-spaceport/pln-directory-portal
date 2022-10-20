@@ -84,5 +84,10 @@ describe('MainConfig', () => {
         hidePoweredBy: true,
       });
     });
+    it('Should enable the NotFoundInterceptor as a global filter', () => {
+      const useGlobalFiltersSpy = jest.spyOn(appMock, 'useGlobalFilters');
+      mainConfig(appMock);
+      expect(useGlobalFiltersSpy).toHaveBeenCalled();
+    });
   });
 });
