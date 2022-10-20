@@ -7,7 +7,7 @@ export const PORTAL_HEADER_LINKS: IPortalHeaderLink[] = [
   },
   {
     label: 'LabWeek22',
-    url: 'https://labweek2022.plnetwork.io/',
+    url: 'https://22.labweek.io/',
   },
   {
     label: 'Launchpad',
