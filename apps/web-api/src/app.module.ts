@@ -11,6 +11,7 @@ import * as redisStore from 'cache-manager-redis-store';
 import type { ClientOpts } from 'redis';
 import { AppController } from './app.controller';
 import { HealthModule } from './health/health.module';
+import { IndustryTagsModule } from './industry-tags/industry-tags.module';
 import { MyCacheInterceptor } from './interceptors/cache.interceptor';
 import { ConcealEntityIDInterceptor } from './interceptors/conceal-entity-id.interceptor';
 import { MembersModule } from './members/members.module';
@@ -42,6 +43,7 @@ import { TeamsModule } from './teams/teams.module';
     MembersModule,
     HealthModule,
     TeamsModule,
+    IndustryTagsModule,
   ],
   providers: [
     PrismaService,

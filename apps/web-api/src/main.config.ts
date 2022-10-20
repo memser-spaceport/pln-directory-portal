@@ -3,6 +3,7 @@ import { json } from 'body-parser';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { CsrfFilter, nestCsrf } from 'ncsrf';
+import { NotFoundExceptionFilter } from './filters/not-found-exception.filter';
 import { CSRFGuard } from './guards/csfr.guard';
 import { ALLOWED_CORS_ORIGINS, APP_ENV } from './utils/constants';
 
@@ -11,6 +12,8 @@ export function mainConfig(app: INestApplication) {
   app.enableVersioning({
     type: VersioningType.URI,
   });
+
+  app.useGlobalFilters(new NotFoundExceptionFilter());
 
   // Enable CSRF Protection
   // More info: https://github.com/huy97/csrf
