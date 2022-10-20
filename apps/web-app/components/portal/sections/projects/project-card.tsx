@@ -18,7 +18,7 @@ export const ProjectCard = ({
   buttonLabel,
 }: TProjectCardProps) => {
   return (
-    <Card>
+    <Card styleClassName="bg-gradient-to-b to-transparent from-white">
       <div className="mb-4">
         <ProjectIcon imageFile={imgUrl} />
       </div>
