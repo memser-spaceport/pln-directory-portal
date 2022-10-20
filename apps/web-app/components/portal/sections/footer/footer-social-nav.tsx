@@ -26,7 +26,7 @@ const socialLinks = [
 
 export const FooterSocialNav = () => {
   return (
-    <nav className="flex gap-2 sm:gap-4">
+    <nav className="flex flex-shrink-0 gap-2 md:gap-4">
       {socialLinks.map((link, i) => (
         <Link key={i} href={link.url}>
           <a
