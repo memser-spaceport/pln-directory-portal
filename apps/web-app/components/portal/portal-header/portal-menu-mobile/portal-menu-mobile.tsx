@@ -19,7 +19,7 @@ export function PortalMenuMobile() {
         leaveFrom="opacity-100 translate-y-0"
         leaveTo="opacity-0 -translate-y-2"
       >
-        <Menu.Items className="absolute right-0 mt-2 w-full rounded-lg bg-white p-2 shadow-[0_2px_4px_2px_rgba(15,23,42,.04)] focus:outline-none">
+        <Menu.Items className="absolute right-0 z-40 mt-2 w-full rounded-lg bg-white p-2 shadow-[0_2px_4px_2px_rgba(15,23,42,.04)] focus:outline-none">
           {PORTAL_HEADER_LINKS.map((option) => {
             return (
               <Menu.Item key={option.label}>

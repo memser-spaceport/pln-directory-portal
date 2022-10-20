@@ -23,7 +23,9 @@ export const Projects = () => {
   return (
     <div className="sm:gap-7.5 flex flex-col gap-6 sm:flex-row">
       {projects.map((project, i) => (
-        <ProjectCard key={i} {...{ ...project }} />
+        <div key={i} className="sm:flex-grow sm:basis-0">
+          <ProjectCard {...{ ...project }} />
+        </div>
       ))}
     </div>
   );
