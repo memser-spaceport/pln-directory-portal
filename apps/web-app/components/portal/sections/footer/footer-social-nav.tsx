@@ -20,7 +20,7 @@ const socialLinks = [
   {
     name: 'Twitter',
     type: 'twitter',
-    url: 'https://twitter.com/protocollabs/status/1493405440620867587',
+    url: 'https://twitter.com/protocollabs',
   },
 ];
 
