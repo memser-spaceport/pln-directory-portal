@@ -5,7 +5,7 @@ export type TImageCardProps = {
 
 export function ImageCard({ imageURL, children }: TImageCardProps) {
   return (
-    <div className="group relative h-full w-full cursor-default overflow-hidden rounded-lg">
+    <div className="group relative h-full w-full overflow-hidden rounded-lg">
       <div
         className="absolute z-0 h-full w-full bg-cover transition duration-[1200ms] ease-in-out group-hover:rotate-[-5deg] group-hover:scale-110"
         style={{ backgroundImage: `url(${imageURL})` }}
