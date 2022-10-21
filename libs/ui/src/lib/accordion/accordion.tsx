@@ -2,18 +2,25 @@ import { Disclosure, Transition } from '@headlessui/react';
 import { ArrowIcon } from '../icons/arrow/arrow';
 
 interface AccordionProps {
-  items: { triggerText: string; content: string }[];
+  items: {
+    triggerText: string;
+    content: string;
+    handleClick?: (open: boolean) => void;
+  }[];
 }
 
 export function Accordion({ items }: AccordionProps) {
   return (
     <div className="flex flex-col gap-4">
-      {items.map(({ triggerText, content }, i) => {
+      {items.map(({ triggerText, content, handleClick }, i) => {
         return (
           <Disclosure key={i}>
             {({ open }) => (
               <div className="rounded-lg border border-slate-200 bg-white">
-                <Disclosure.Button className="flex w-full items-start p-8 text-left">
+                <Disclosure.Button
+                  className="flex w-full items-start p-8 text-left"
+                  onClick={() => handleClick?.(open)}
+                >
                   <span className="w-full pr-8 text-2xl font-semibold">
                     {triggerText}
                   </span>

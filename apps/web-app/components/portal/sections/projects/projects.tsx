@@ -1,3 +1,4 @@
+import { FATHOM_EVENTS } from '../../../../constants';
 import { ProjectCard } from './project-card';
 
 const projects = [
@@ -8,6 +9,7 @@ const projects = [
       "Use Protocol Lab's industry-learning onboarding program, Launchpad, to train your new talent and hire unmatched recruits.",
     buttonUrl: 'https://pl-launchpad.io/',
     buttonLabel: 'Learn more',
+    eventCode: FATHOM_EVENTS.portal.launchpad.learnMore,
   },
   {
     imgUrl: '/assets/images/icons/mosaia.png',
@@ -16,6 +18,7 @@ const projects = [
       'Mosaia connects you to vetted service providers that can help you, solve problems in areas such as legal, marketing, and event production',
     buttonUrl: 'https://mosaia.io/',
     buttonLabel: 'Learn more',
+    eventCode: FATHOM_EVENTS.portal.mosaia.learnMore,
   },
 ];
 

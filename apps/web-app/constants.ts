@@ -1,6 +1,37 @@
 export const URL_QUERY_VALUE_SEPARATOR = '|';
 export const ITEMS_PER_PAGE = 9;
 export const FATHOM_EVENTS = {
+  portal: {
+    nav: {
+      directory: 'BH9JTCGQ',
+      discord: 'AB3MXZZH',
+      labWeek22: '0KJJ2EUT',
+      launchpad: 'JJPYTSPL',
+      mosaia: 'GU0B5FOF',
+    },
+    networkDirectory: '7M1Q65KH',
+    labWeek22: {
+      filLisbon: 'G15I8LA8',
+      ipfsCamp: 'LRSFUMVF',
+      plSummit: 'JBWFNMIA',
+      fullSchedule: 'SNBZOIDH',
+    },
+    substack: {
+      learnMore: 'GEVI7BWS',
+      subscribe: '1FN6R9HS',
+    },
+    mosaia: {
+      learnMore: '3UPXXTY6',
+    },
+    launchpad: {
+      learnMore: '1MIVOPAO',
+    },
+    faq: {
+      whatIsPl: '32IWWVRI',
+      plAndPln: 'RPTUCVFK',
+      howToJoin: 'DJ8R1BOQ',
+    },
+  },
   directory: {
     controls: {
       viewTypeListToGrid: 'BFUWBQXV',
