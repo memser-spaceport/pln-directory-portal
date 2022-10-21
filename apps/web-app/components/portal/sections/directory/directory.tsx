@@ -1,6 +1,10 @@
+import { trackGoal } from 'fathom-client';
 import Image from 'next/image';
+import { FATHOM_EVENTS } from '../../../../constants';
 import { PortalButton } from '../../portal-button/portal-button';
 import { PortalDivider } from '../../portal-divider/portal-divider';
+
+const eventCode = FATHOM_EVENTS.portal.networkDirectory;
 
 export const Directory = () => {
   return (
@@ -12,7 +16,11 @@ export const Directory = () => {
         <p className="mb-6 text-[16px] leading-6 text-slate-600 md:mb-8 md:mt-2 md:max-w-md md:text-lg">
           Navigate our growing ecosystem, find new partners, and get involved.
         </p>
-        <PortalButton url="/directory" label="Network Directory" />
+        <PortalButton
+          url="/directory"
+          label="Network Directory"
+          handleOnClick={() => eventCode && trackGoal(eventCode, 0)}
+        />
       </div>
       <div className="flex-1">
         <div className="hidden md:block">
