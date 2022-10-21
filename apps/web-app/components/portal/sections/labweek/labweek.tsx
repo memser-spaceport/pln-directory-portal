@@ -16,8 +16,9 @@ export const LabWeek = () => {
       <div className="md:gap-x-7.5 flex flex-col gap-6 md:mt-2 md:flex-row">
         <div className="h-[350px] grow">
           <EventCard
+            cardUrl="https://plsummit.labweek.io/"
             imageURL="/assets/images/portal/pl-summit.png"
-            topic="Topic"
+            topic="Conference"
             eventTitle="PL Summit"
             eventDetails="Lisbon, Oct. 24"
           />
@@ -25,8 +26,9 @@ export const LabWeek = () => {
 
         <div className="h-[350px] grow">
           <EventCard
+            cardUrl="https://2022.ipfs.camp/"
             imageURL="/assets/images/portal/ipfs-camp.png"
-            topic="Topic"
+            topic="Talks & Workshops"
             eventTitle="IPFS Camp"
             eventDetails="Lisbon, Oct. 28"
           />
@@ -34,8 +36,9 @@ export const LabWeek = () => {
 
         <div className="h-[350px] grow">
           <EventCard
+            cardUrl="https://fil-lisbon.io/"
             imageURL="/assets/images/portal/fil-lisbon.png"
-            topic="Topic"
+            topic="Conference"
             eventTitle="FIL Lisbon"
             eventDetails="Lisbon, Oct. 31"
           />
