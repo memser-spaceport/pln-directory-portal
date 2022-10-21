@@ -1,4 +1,5 @@
 import { initContract } from '@ts-rest/core';
+import { apiAcceleratorProgram } from './contract-accelerator-program';
 import { apiIndustryTags } from './contract-industry-tags';
 import { apiMembers } from './contract-member';
 import { apiTeams } from './contract-team';
@@ -34,4 +35,8 @@ export const apiNested = contract.router({
    * Tags API
    */
   tags: apiIndustryTags,
+  /**
+   * Accelerator Programs API
+   */
+  acceleratorPrograms: apiAcceleratorProgram,
 });

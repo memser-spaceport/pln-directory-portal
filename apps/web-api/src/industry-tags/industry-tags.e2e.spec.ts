@@ -16,7 +16,7 @@ describe('Industry Tags', () => {
     app = moduleRef.createNestApplication();
     mainConfig(app);
     await app.init();
-    await createIndustryTags();
+    await createIndustryTags({ amount: 5 });
   });
 
   describe('When getting all industry tags', () => {

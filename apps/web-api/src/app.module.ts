@@ -9,6 +9,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import * as redisStore from 'cache-manager-redis-store';
 import type { ClientOpts } from 'redis';
+import { AcceleratorProgramsModule } from './accelerator-programs/accelerator-programs.module';
 import { AppController } from './app.controller';
 import { HealthModule } from './health/health.module';
 import { IndustryTagsModule } from './industry-tags/industry-tags.module';
@@ -44,6 +45,7 @@ import { TeamsModule } from './teams/teams.module';
     HealthModule,
     TeamsModule,
     IndustryTagsModule,
+    AcceleratorProgramsModule,
   ],
   providers: [
     PrismaService,
