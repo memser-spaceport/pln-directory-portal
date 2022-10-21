@@ -20,7 +20,7 @@ export const ProjectCard = ({
   return (
     <Card styleClassName="bg-gradient-to-b to-transparent from-white">
       <div className="mb-4">
-        <ProjectIcon imageFile={imgUrl} />
+        <ProjectIcon imageFile={imgUrl} alt={`${title} logo`} />
       </div>
       <p className="text-2xl font-semibold">{title}</p>
       <p className="mt-2 text-lg text-slate-600">{description}</p>
