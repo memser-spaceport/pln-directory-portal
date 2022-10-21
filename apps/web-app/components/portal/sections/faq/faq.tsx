@@ -22,7 +22,7 @@ export const Faq = () => {
   return (
     <section>
       <div className="mb-12 text-center">
-        <h2 className="text-5xl font-bold leading-[60px]">
+        <h2 className="text-4xl font-bold leading-[46px] md:text-5xl md:leading-[60px]">
           Got questions?
           <br />
           <span className="text-blue-600">We have answers</span>
