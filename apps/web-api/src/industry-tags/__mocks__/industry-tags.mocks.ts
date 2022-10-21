@@ -1,6 +1,7 @@
 import { IndustryCategory, IndustryTag } from '@prisma/client';
 import { Factory } from 'fishery';
 import { prisma } from '../../../prisma/index';
+import { TestFactorySeederParams } from '../../utils/factory-interfaces';
 
 async function createIndustryCategory() {
   const industryCategoryFactory = Factory.define<IndustryCategory>(
@@ -17,7 +18,7 @@ async function createIndustryCategory() {
   return await prisma.industryCategory.create({ data: industryCategory });
 }
 
-export async function createIndustryTags() {
+export async function createIndustryTags({ amount }: TestFactorySeederParams) {
   const industryCategory = await createIndustryCategory();
 
   const industryTagFactory = Factory.define<IndustryTag>(({ sequence }) => {
@@ -34,7 +35,7 @@ export async function createIndustryTags() {
     return industryTag;
   });
 
-  const industryTags = await industryTagFactory.buildList(5);
+  const industryTags = await industryTagFactory.buildList(amount);
   await prisma.industryTag.createMany({
     data: industryTags,
   });
