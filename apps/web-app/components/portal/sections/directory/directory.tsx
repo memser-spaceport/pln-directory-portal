@@ -21,6 +21,7 @@ export const Directory = () => {
             height="564"
             src="/assets/images/portal/directory-illustration.png"
             alt="Directory Illustration"
+            quality={100}
           />
         </div>
         <div className="mt-6 flex flex-col items-center gap-y-6 md:hidden">
@@ -30,6 +31,7 @@ export const Directory = () => {
               height="243"
               src="/assets/images/portal/filters.png"
               alt="Directory Filters Illustration"
+              quality={100}
             />
           </div>
           <div>
@@ -38,6 +40,7 @@ export const Directory = () => {
               height="243"
               src="/assets/images/portal/teams.png"
               alt="Directory Teams Illustration"
+              quality={100}
             />
           </div>
           <div className="max-w-[255px]">
@@ -49,6 +52,7 @@ export const Directory = () => {
               height="243"
               src="/assets/images/portal/members.png"
               alt="Directory Members Illustration"
+              quality={100}
             />
           </div>
           <div>
@@ -57,6 +61,7 @@ export const Directory = () => {
               height="243"
               src="/assets/images/portal/office-hours.png"
               alt="Directory Office Hours Illustration"
+              quality={100}
             />
           </div>
         </div>
