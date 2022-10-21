@@ -26,21 +26,21 @@ const socialLinks = [
 
 export const FooterSocialNav = () => {
   return (
-    <nav className="flex flex-shrink-0 gap-2 md:gap-4">
+    <nav className="flex flex-shrink-0 gap-4">
       {socialLinks.map((link, i) => (
         <Link key={i} href={link.url}>
           <a
-            className="group relative"
+            className="group relative block h-10 w-10 md:h-6 md:w-6"
             target="_blank"
             rel="noopener noreferrer"
           >
             <Image
               src={`/assets/images/icons/${link.type}-round.svg`}
-              width="24px"
-              height="24px"
               alt={`${link.name} round logo`}
+              layout="fill"
+              objectFit="contain"
             />
-            <div className="absolute top-0 left-0 h-6 w-6 bg-white/25 opacity-0 transition-all duration-150 ease-out group-hover:opacity-100"></div>
+            <div className="absolute top-0 left-0 h-full w-full bg-white/25 opacity-0 transition-all duration-150 ease-out group-hover:opacity-100"></div>
           </a>
         </Link>
       ))}
