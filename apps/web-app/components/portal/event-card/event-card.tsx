@@ -6,6 +6,7 @@ type EventCardProps = {
   topic: string;
   eventTitle: string;
   eventDetails: string;
+  handleClick?: () => void;
 };
 
 export const EventCard = ({
@@ -14,6 +15,7 @@ export const EventCard = ({
   topic,
   eventTitle,
   eventDetails,
+  handleClick,
 }: EventCardProps) => {
   return (
     <a
@@ -21,6 +23,7 @@ export const EventCard = ({
       className="relative block h-full w-full cursor-pointer"
       target="_blank"
       rel="noopener noreferrer"
+      onClick={handleClick}
     >
       <ImageCard imageURL={imageURL}>
         <div className="absolute bottom-0 left-0 w-full p-5 text-left text-white">

@@ -1,3 +1,6 @@
+import { trackGoal } from 'fathom-client';
+import { FATHOM_EVENTS } from '../../../../constants';
+
 import { ArrowSmRightIcon } from '@heroicons/react/solid';
 import { EventCard } from '../../event-card/event-card';
 
@@ -21,6 +24,9 @@ export const LabWeek = () => {
             topic="Conference"
             eventTitle="PL Summit"
             eventDetails="Lisbon, Oct. 24"
+            handleClick={() =>
+              trackGoal(FATHOM_EVENTS.portal.labWeek22.plSummit, 0)
+            }
           />
         </div>
 
@@ -31,6 +37,9 @@ export const LabWeek = () => {
             topic="Talks & Workshops"
             eventTitle="IPFS Camp"
             eventDetails="Lisbon, Oct. 28"
+            handleClick={() =>
+              trackGoal(FATHOM_EVENTS.portal.labWeek22.ipfsCamp, 0)
+            }
           />
         </div>
 
@@ -41,6 +50,9 @@ export const LabWeek = () => {
             topic="Conference"
             eventTitle="FIL Lisbon"
             eventDetails="Lisbon, Oct. 31"
+            handleClick={() =>
+              trackGoal(FATHOM_EVENTS.portal.labWeek22.filLisbon, 0)
+            }
           />
         </div>
       </div>
@@ -51,6 +63,9 @@ export const LabWeek = () => {
           className="group mr-3 flex items-center text-sm font-semibold leading-5"
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() =>
+            trackGoal(FATHOM_EVENTS.portal.labWeek22.fullSchedule, 0)
+          }
         >
           <span className="relative mr-1 after:absolute after:-bottom-px after:left-0 after:h-px after:w-full after:bg-gradient-to-r after:from-[#4282fc] after:to-[#44d5bb]">
             See full event schedule
