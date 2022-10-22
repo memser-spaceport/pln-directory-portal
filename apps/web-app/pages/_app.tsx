@@ -8,7 +8,7 @@ import type { AppProps } from 'next/app';
 import type { ReactElement } from 'react';
 import { ReactNode } from 'react';
 import { useFathom } from '../hooks/plugins/use-fathom.hook';
-import { SEO } from '../seo.config';
+import { DEFAULT_SEO } from '../seo.config';
 import './styles.css';
 
 /* eslint-disable-next-line @typescript-eslint/ban-types */
@@ -32,7 +32,7 @@ export default function CustomApp({
 
   return getLayout(
     <>
-      <DefaultSeo {...SEO} />
+      <DefaultSeo {...DEFAULT_SEO} />
       <Component {...pageProps} />
     </>
   );

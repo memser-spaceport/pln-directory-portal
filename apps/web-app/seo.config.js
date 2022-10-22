@@ -5,26 +5,26 @@ const siteUrl = getSiteUrl(
   process.env.NEXT_PUBLIC_VERCEL_URL
 );
 
-export const SEO = {
-  titleTemplate: '%s | Protocol Labs Network Directory',
-  defaultTitle: 'Protocol Labs Network Directory',
+export const DEFAULT_SEO = {
+  titleTemplate: '%s | Protocol Labs Network',
+  defaultTitle: 'Protocol Labs Network',
   description:
-    'The Protocol Labs Network Directory helps network members orient themselves within the network by making it easy to learn about other teams and members, including their roles, capabilities, and experiences.',
+    'The Protocol Labs Network drives breakthroughs in computing to push humanity forward.',
   openGraph: {
     type: 'website',
     url: siteUrl,
     images: [
       {
-        url: `${siteUrl}/assets/images/protocol-labs-network-open-graph.jpg?v1`,
+        url: `${siteUrl}/assets/images/protocol-labs-network-portal-open-graph.jpg`,
         width: 1280,
         height: 640,
-        alt: 'Protocol Labs Network Directory',
+        alt: 'Protocol Labs Network',
         type: 'image/jpeg',
       },
     ],
   },
   additionalMetaTags: [
-    { name: 'viewport', content: 'width=1272, user-scalable=no' },
+    { name: 'viewport', content: 'width=device-width, initial-scale=1' },
     { name: 'theme-color', content: '#ffffff' },
     { name: 'msapplication-TileColor', content: '#ffffff' },
     { name: 'msapplication-TileImage', content: '/favicon-144x144.png' },
@@ -71,4 +71,25 @@ export const SEO = {
   twitter: {
     cardType: 'summary_large_image',
   },
+};
+
+export const DIRECTORY_SEO = {
+  titleTemplate: '%s | Protocol Labs Network Directory',
+  defaultTitle: 'Protocol Labs Network Directory',
+  description:
+    'The Protocol Labs Network Directory helps network members orient themselves within the network by making it easy to learn about other teams and members, including their roles, capabilities, and experiences.',
+  openGraph: {
+    images: [
+      {
+        url: `${siteUrl}/assets/images/protocol-labs-network-open-graph.jpg?v1`,
+        width: 1280,
+        height: 640,
+        alt: 'Protocol Labs Network Directory',
+        type: 'image/jpeg',
+      },
+    ],
+  },
+  additionalMetaTags: [
+    { name: 'viewport', content: 'width=1272, user-scalable=no' },
+  ],
 };

@@ -11,6 +11,7 @@ import { AskToEditCard } from '../../../components/shared/ask-to-edit-card/ask-t
 import { TEAM_CARD_FIELDS } from '../../../components/shared/teams/team-card/team-card.constants';
 import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcrumb.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
+import { DIRECTORY_SEO } from '../../../seo.config';
 
 interface MemberProps {
   member: IMember;
@@ -28,6 +29,7 @@ export default function Member({ member, teams, backLink }: MemberProps) {
   return (
     <>
       <NextSeo
+        {...DIRECTORY_SEO}
         title={member.name}
         description={`${member.role || 'Contributor'} at ${
           member.teams[0].name
