@@ -12,6 +12,7 @@ import { parseTeamsFilters } from '../../../components/teams/teams-directory/tea
 import { TeamsDirectoryList } from '../../../components/teams/teams-directory/teams-directory-list/teams-directory-list';
 import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-directory-filters-fathom-logger.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
+import { DIRECTORY_SEO } from '../../../seo.config';
 import {
   getTeamsDirectoryListOptions,
   getTeamsDirectoryRequestOptionsFromQuery,
@@ -37,7 +38,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
 
   return (
     <>
-      <NextSeo title="Teams" />
+      <NextSeo {...DIRECTORY_SEO} title="Teams" />
 
       <LoadingOverlay
         excludeUrlFn={(url) => url.startsWith('/directory/teams/')}

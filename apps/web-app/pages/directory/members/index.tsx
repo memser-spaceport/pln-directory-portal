@@ -12,6 +12,7 @@ import { parseMembersFilters } from '../../../components/members/members-directo
 import { MembersDirectoryList } from '../../../components/members/members-directory/members-directory-list/members-directory-list';
 import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-directory-filters-fathom-logger.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
+import { DIRECTORY_SEO } from '../../../seo.config';
 import {
   getMembersDirectoryListOptions,
   getMembersDirectoryRequestOptionsFromQuery,
@@ -38,7 +39,7 @@ export default function Members({ members, filtersValues }: MembersProps) {
 
   return (
     <>
-      <NextSeo title="Members" />
+      <NextSeo {...DIRECTORY_SEO} title="Members" />
 
       <LoadingOverlay
         excludeUrlFn={(url) => url.startsWith('/directory/members/')}
