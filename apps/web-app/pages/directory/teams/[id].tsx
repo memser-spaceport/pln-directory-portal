@@ -12,6 +12,7 @@ import { TeamProfileHeader } from '../../../components/teams/team-profile/team-p
 import { TeamProfileMembers } from '../../../components/teams/team-profile/team-profile-members/team-profile-members';
 import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcrumb.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
+import { DIRECTORY_SEO } from '../../../seo.config';
 
 interface TeamProps {
   team: ITeam;
@@ -28,7 +29,11 @@ export default function Team({ team, members, backLink }: TeamProps) {
 
   return (
     <>
-      <NextSeo title={team.name} description={team.shortDescription} />
+      <NextSeo
+        {...DIRECTORY_SEO}
+        title={team.name}
+        description={team.shortDescription}
+      />
 
       <Breadcrumb items={breadcrumbItems} />
       <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-24">
