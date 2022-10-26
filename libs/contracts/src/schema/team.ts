@@ -35,20 +35,7 @@ export const CreateTeamSchema = TeamSchema.pick({
   fundingStageUid: true,
 });
 
-export const GetTeamSchema = TeamSchema.pick({
-  uid: true,
-  name: true,
-  logo: true,
-  blog: true,
-  website: true,
-  twitterHandler: true,
-  shortDescripton: true,
-  longDescripton: true,
-  filecoinUser: true,
-  ipfsUser: true,
-  plnFriend: true,
-  fundingStageUid: true,
-});
+export const ResponseTeamSchema = TeamSchema.omit({ id: true });
 
 export class TeamDto extends createZodDto(TeamSchema) {}
 

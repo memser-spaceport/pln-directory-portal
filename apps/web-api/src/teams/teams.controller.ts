@@ -1,44 +1,23 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
-import { Team } from '@prisma/client';
-import { Api, initNestServer } from '@ts-rest/nest';
-import { apiTeams } from 'libs/contracts/src/lib/contract-team';
-import { CreateTeamSchemaDto } from 'libs/contracts/src/schema';
+import { Controller } from '@nestjs/common';
+import { ApiParam } from '@nestjs/swagger';
+import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
+import { apiTeam } from 'libs/contracts/src/lib/contract-team';
 import { TeamsService } from './teams.service';
 
-const server = initNestServer(apiTeams);
-
-@Controller({
-  version: '1',
-})
+const server = initNestServer(apiTeam);
+type RouteShape = typeof server.routeShapes;
+@Controller()
 export class TeamsController {
   constructor(private readonly teamsService: TeamsService) {}
 
-  @Post('teams')
-  create(@Body() createTeamDto: CreateTeamSchemaDto): Promise<Team> {
-    return this.teamsService.create(createTeamDto);
-  }
-
-  @Get('teams:uid')
-  findOne(@Param('uid') uid: string): Promise<Team | null> {
-    return this.teamsService.findOne({ uid });
-  }
-
   @Api(server.route.getTeams)
   findAll() {
-    const teams = this.teamsService.findAll();
-    return teams;
+    return this.teamsService.findAll();
   }
 
-  @Post('teams:uid')
-  update(
-    @Param('uid') uid: string,
-    @Body() updateTeamDto: CreateTeamSchemaDto
-  ): Promise<Team | null> {
-    return this.teamsService.update(updateTeamDto, { uid: uid });
-  }
-
-  @Delete('teams:uid')
-  delete(@Param('uid') uid: string): Promise<Team | null> {
-    return this.teamsService.delete({ uid: uid });
+  @Api(server.route.getTeam)
+  @ApiParam({ name: 'uid', type: 'string' })
+  findOne(@ApiDecorator() { params: { uid } }: RouteShape['getTeam']) {
+    return this.teamsService.findOne(uid);
   }
 }
