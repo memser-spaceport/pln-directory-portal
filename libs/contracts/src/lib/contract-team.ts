@@ -1,24 +1,24 @@
 import { initContract } from '@ts-rest/core';
-import { CreateTeamSchema, GetTeamSchema, TeamSchema } from '../schema';
+import { ResponseTeamSchema } from '../schema/team';
+import { getAPIVersionAsPath } from '../utils/versioned-path';
 
 const contract = initContract();
 
-export const apiTeams = contract.router({
+export const apiTeam = contract.router({
   getTeams: {
     method: 'GET',
-    path: '/teams',
+    path: `${getAPIVersionAsPath('1')}/teams`,
     responses: {
-      200: GetTeamSchema.array(),
+      200: ResponseTeamSchema.array(),
+    },
+    summary: 'Get all teams',
+  },
+  getTeam: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/teams/:uid`,
+    responses: {
+      200: ResponseTeamSchema,
     },
     summary: 'Get a team',
-  },
-  createTeam: {
-    method: 'POST',
-    path: '/team',
-    responses: {
-      201: TeamSchema,
-    },
-    body: CreateTeamSchema,
-    summary: 'Create a team',
   },
 });

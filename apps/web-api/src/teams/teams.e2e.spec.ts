@@ -1,12 +1,10 @@
-import { faker } from '@faker-js/faker';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { FundingStage, Team } from '@prisma/client';
-import { Factory } from 'fishery';
+import { TeamSchema } from 'libs/contracts/src/schema/team';
 import supertest from 'supertest';
-import { TeamSchema } from '../../../../libs/contracts/src/schema/team';
-import { prisma } from '../../prisma/index';
+import { mainConfig } from '../main.config';
 import { TeamsModule } from './teams.module';
+import { createTeam } from './__mocks__/teams.mocks';
 
 describe('TeamsService', () => {
   let app: INestApplication;
@@ -16,58 +14,43 @@ describe('TeamsService', () => {
       imports: [TeamsModule],
     }).compile();
     app = moduleRef.createNestApplication();
-
+    mainConfig(app);
     await app.init();
 
-    const fundingStageFactory = Factory.define<FundingStage>(
-      ({ sequence }) => ({
-        id: sequence,
-        uid: `funding-stage-${sequence}`,
-        title: 'Funding Stage Title',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-    );
+    await createTeam({ amount: 5 });
+  });
 
-    const fundingStage = await fundingStageFactory.build();
-    await prisma.fundingStage.create({ data: fundingStage });
-
-    const teamFactory = Factory.define<Team>(({ sequence }) => {
-      const team = {
-        id: sequence,
-        uid: `uid-${sequence}`,
-        name: `Team ${sequence}`,
-        logo: 'logo',
-        blog: faker.internet.url(),
-        website: faker.internet.url(),
-        twitterHandler: faker.name.firstName(),
-        shortDescripton: faker.lorem.sentence(),
-        longDescripton: faker.lorem.paragraph(),
-        filecoinUser: true,
-        ipfsUser: true,
-        plnFriend: true,
-        startDate: new Date(),
-        endDate: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        fundingStageUid: fundingStage.uid,
-      };
-
-      return team;
-    });
-
-    const teams = await teamFactory.buildList(5);
-    await prisma.team.createMany({
-      data: teams,
+  describe('When getting all teams', () => {
+    it('should list all the teams with a valid schema', async () => {
+      const response = await supertest(app.getHttpServer())
+        .get('/v1/teams')
+        .expect(200);
+      const teams = response.body;
+      expect(teams).toHaveLength(5);
+      const hasValidSchema = TeamSchema.array().safeParse(teams).success;
+      expect(hasValidSchema).toBeTruthy();
     });
   });
 
-  it('should list teams with a valid schema', async () => {
-    const response = await supertest(app.getHttpServer())
-      .get('/teams')
-      .expect(200);
-    const teams = response.body;
-    const hasValidSchema = TeamSchema.safeParse(teams[0]).success;
-    expect(hasValidSchema).toBeTruthy();
+  describe('When getting an team by uid', () => {
+    it('should return the team with a valid schema', async () => {
+      const response = await supertest(app.getHttpServer())
+        .get('/v1/teams/uid-1')
+        .expect(200);
+      const team = response.body;
+      const hasValidSchema = TeamSchema.safeParse(team).success;
+      expect(hasValidSchema).toBeTruthy();
+    });
+  });
+
+  describe('When getting a team by uid that does not exist', () => {
+    it('should return a 404', async () => {
+      await supertest(app.getHttpServer()).get('/v1/teams/uid-6').expect(404);
+    });
+  });
+  describe('When getting a team with an uid with only numbers', () => {
+    it('should return a 400', async () => {
+      await supertest(app.getHttpServer()).get('/v1/teams/123').expect(404);
+    });
   });
 });
