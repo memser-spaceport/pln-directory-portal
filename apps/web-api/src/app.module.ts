@@ -11,6 +11,7 @@ import * as redisStore from 'cache-manager-redis-store';
 import type { ClientOpts } from 'redis';
 import { AcceleratorProgramsModule } from './accelerator-programs/accelerator-programs.module';
 import { AppController } from './app.controller';
+import { FundingStagesModule } from './funding-stages/funding-stages.module';
 import { HealthModule } from './health/health.module';
 import { IndustryTagsModule } from './industry-tags/industry-tags.module';
 import { MyCacheInterceptor } from './interceptors/cache.interceptor';
@@ -46,6 +47,7 @@ import { TeamsModule } from './teams/teams.module';
     TeamsModule,
     IndustryTagsModule,
     AcceleratorProgramsModule,
+    FundingStagesModule,
   ],
   providers: [
     PrismaService,
