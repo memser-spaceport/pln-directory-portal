@@ -3,7 +3,8 @@ import { apiAcceleratorProgram } from './contract-accelerator-program';
 import { apiFundingStages } from './contract-funding-stages';
 import { apiIndustryTags } from './contract-industry-tags';
 import { apiMembers } from './contract-member';
-import { apiTeams } from './contract-team';
+import { apiSkills } from './contract-skills';
+import { apiTeam } from './contract-team';
 
 const contract = initContract();
 
@@ -27,7 +28,7 @@ export const apiNested = contract.router({
   /**
    * Teams API
    */
-  teams: apiTeams,
+  teams: apiTeam,
   /**
    * Health API
    */
@@ -44,4 +45,8 @@ export const apiNested = contract.router({
    * Funding stages API
    */
   fundingStages: apiFundingStages,
+  /**
+   * Skills API
+   */
+  skills: apiSkills,
 });
