@@ -19,6 +19,7 @@ import { ConcealEntityIDInterceptor } from './interceptors/conceal-entity-id.int
 import { MembersModule } from './members/members.module';
 import { ContentTypeMiddleware } from './middlewares/content-type.middleware';
 import { PrismaService } from './prisma.service';
+import { SkillsModule } from './skills/skills.module';
 import { TeamsModule } from './teams/teams.module';
 
 @Module({
@@ -48,6 +49,7 @@ import { TeamsModule } from './teams/teams.module';
     IndustryTagsModule,
     AcceleratorProgramsModule,
     FundingStagesModule,
+    SkillsModule,
   ],
   providers: [
     PrismaService,
