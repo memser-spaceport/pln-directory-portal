@@ -23,6 +23,6 @@ export const FOOTER_MAIN_NAV_LINKS: IFooterMainNavLink[] = [
   },
   {
     label: 'Guide to the PLN Galaxy',
-    url: 'https://protocol.almanac.io/handbook/protocol-labs-spaceport-JzKymu/protocol-labs-spaceport-sFKNLxQKYdQOZfLTL4kL9uVha4TdGlYh',
+    url: 'https://protocol.almanac.io/handbook/protocol-labs-spaceport-JzKymu',
   },
 ];
