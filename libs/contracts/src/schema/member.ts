@@ -12,9 +12,13 @@ export const MemberSchema = z.object({
   twitterHandler: z.string().nullish(),
   officeHours: z.string().nullish(),
   plnFriend: z.boolean(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
   locationUid: z.string(),
+});
+
+export const ResponseMemberSchema = MemberSchema.omit({
+  id: true,
 });
 
 export const CreateMemberSchema = MemberSchema.pick({
@@ -32,3 +36,7 @@ export const CreateMemberSchema = MemberSchema.pick({
 export class MemberDto extends createZodDto(MemberSchema) {}
 
 export class CreateMemberSchemaDto extends createZodDto(CreateMemberSchema) {}
+
+export class ResponseMemberSchemaDto extends createZodDto(
+  ResponseMemberSchema
+) {}

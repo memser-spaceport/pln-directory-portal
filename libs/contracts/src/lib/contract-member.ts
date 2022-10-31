@@ -1,16 +1,24 @@
 import { initContract } from '@ts-rest/core';
-import { CreateMemberSchema, MemberSchema } from '../schema';
+import { MemberSchema } from '../schema';
+import { getAPIVersionAsPath } from '../utils/versioned-path';
 
 const contract = initContract();
 
 export const apiMembers = contract.router({
-  createMember: {
-    method: 'POST',
-    path: '/',
+  getMembers: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members`,
     responses: {
-      201: MemberSchema,
+      200: MemberSchema,
     },
-    body: CreateMemberSchema,
-    summary: 'Create a member',
+    summary: 'Get all members',
+  },
+  getMember: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members/:uid`,
+    responses: {
+      200: MemberSchema,
+    },
+    summary: 'Get a member',
   },
 });
