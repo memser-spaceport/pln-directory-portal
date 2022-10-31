@@ -16,6 +16,7 @@
   "dependencies": {
     "@abitia/zod-dto": "^0.4.0",
     "@faker-js/faker": "^7.5.0",
+    "@feedback-fish/react": "^1.2.1",
     "@fontsource/inter": "^4.5.11",
     "@golevelup/ts-jest": "^0.3.3",
     "@headlessui/react": "^1.7.3",

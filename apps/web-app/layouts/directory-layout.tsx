@@ -1,3 +1,4 @@
+import { Feedback } from '../components/layout/feedback/feedback';
 import { Navbar } from '../components/layout/navbar/navbar';
 
 export function DirectoryLayout({ children }) {
@@ -5,6 +6,7 @@ export function DirectoryLayout({ children }) {
     <>
       <Navbar />
       <main className="min-w-[1272px] pt-20">{children}</main>
+      <Feedback />
     </>
   );
 }
