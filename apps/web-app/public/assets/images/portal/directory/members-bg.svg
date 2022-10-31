@@ -1,0 +1,30 @@
+<svg width="255" height="175" viewBox="0 0 255 175" fill="none" xmlns="http://www.w3.org/2000/svg">
+<mask id="mask0_8_140" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="255" height="175">
+<rect width="255" height="175" rx="8" fill="url(#paint0_radial_8_140)"/>
+</mask>
+<g mask="url(#mask0_8_140)">
+<rect x="24" width="118" height="44" rx="8" fill="#F1F5F9"/>
+<rect x="40" y="14" width="86" height="4" rx="2" fill="white"/>
+<rect x="40" y="26" width="66" height="4" rx="2" fill="#F8FAFC"/>
+<rect y="78" width="118" height="44" rx="8" fill="#F8FAFC"/>
+<rect x="16" y="92" width="86" height="4" rx="2" fill="white"/>
+<rect opacity="0.5" x="16" y="104" width="66" height="4" rx="2" fill="white"/>
+<rect x="-25" y="149" width="118" height="44" rx="8" fill="#F1F5F9"/>
+<rect x="-9" y="163" width="86" height="4" rx="2" fill="white"/>
+<path d="M161 12C161 5.37258 166.373 0 173 0H267C273.627 0 279 5.37258 279 12V32C279 38.6274 273.627 44 267 44H173C166.373 44 161 38.6274 161 32V12Z" fill="#F1F5F9"/>
+<rect x="177" y="14" width="86" height="4" rx="2" fill="white"/>
+<rect x="177" y="26" width="66" height="4" rx="2" fill="#F8FAFC"/>
+<rect x="137" y="62" width="118" height="44" rx="8" fill="#F8FAFC"/>
+<rect x="153" y="76" width="86" height="4" rx="2" fill="white"/>
+<rect opacity="0.5" x="153" y="88" width="66" height="4" rx="2" fill="white"/>
+<rect x="144" y="139" width="118" height="44" rx="8" fill="#F8FAFC"/>
+<rect x="160" y="153" width="86" height="4" rx="2" fill="white"/>
+<rect x="160" y="165" width="66" height="4" rx="2" fill="#F8FAFC"/>
+</g>
+<defs>
+<radialGradient id="paint0_radial_8_140" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(127.5 87.5) rotate(90) scale(87.5 127.5)">
+<stop offset="0.732968" stop-color="white"/>
+<stop offset="1" stop-color="white" stop-opacity="0"/>
+</radialGradient>
+</defs>
+</svg>

@@ -15,6 +15,9 @@ module.exports = {
         'pln-gradient-02': [
           'linear-gradient(to right,rgba(66,125,255,0),rgba(66,125,255,1),rgba(68,213,187,1),rgba(68,213,187,0))',
         ],
+        'pln-gradient-03': [
+          'linear-gradient(to top,rgba(66,125,255,0),rgba(66,125,255,1),rgba(68,213,187,1),rgba(68,213,187,0))',
+        ],
       },
       boxShadow: {
         'on-focus': ['0 0 0 2px rgba(21,111,247,0.25)'],
