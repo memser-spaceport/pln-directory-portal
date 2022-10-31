@@ -23,7 +23,7 @@ describe('DirectoryEmpty', () => {
     );
 
     const clearFiltersBtn = screen.getByRole('button', {
-      name: /clear the filters/i,
+      name: /clear all the criteria/i,
     });
     fireEvent.click(clearFiltersBtn);
     expect(push).toHaveBeenCalledTimes(1);

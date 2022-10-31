@@ -24,7 +24,7 @@ export function DirectoryEmpty({ filterProperties }: DirectoryEmptyProps) {
         className="text-blue-600 outline-none hover:text-blue-700 focus:text-blue-900 active:text-blue-900"
         onClick={() => clearFilters()}
       >
-        clear the filters
+        clear all the criteria
       </button>
       .
     </div>

@@ -18,7 +18,9 @@ export function DirectoryList({
 
       {!itemsCount ? (
         <div className="flex justify-center">
-          <DirectoryEmpty filterProperties={filterProperties} />
+          <DirectoryEmpty
+            filterProperties={[...filterProperties, 'searchBy']}
+          />
         </div>
       ) : null}
     </>
