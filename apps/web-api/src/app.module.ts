@@ -32,15 +32,26 @@ import { TeamsModule } from './teams/teams.module';
     CacheModule.register<ClientOpts>({
       store: redisStore,
       host: process.env.REDIS_HOST,
+      url: process.env.REDIS_URL,
       port: Number(process.env.REDIS_PORT),
+      password: process.env.REDIS_PASSWORD,
       isGlobal: true,
       ttl: 86400, // 1 day in seconds
       max: 100, // maximum number of items in cache
+      tls: {
+        rejectUnauthorized: false,
+        requestCert: true,
+      },
     }),
     BullModule.forRoot({
       redis: {
         host: process.env.REDIS_HOST,
         port: Number(process.env.REDIS_PORT),
+        password: process.env.REDIS_PASSWORD,
+        tls: {
+          rejectUnauthorized: false,
+          requestCert: true,
+        },
       },
     }),
     MembersModule,
