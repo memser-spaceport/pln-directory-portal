@@ -74,3 +74,23 @@ export const apiNested = contract.router({
   health: apiHealth,
 });
 ```
+
+When implementing on the client side, the client from '@ts-rest/core' will be able to use the generated types to make the request and handle the response.
+
+```ts
+const client = initClient(apiFundingStages, {
+  baseUrl: 'http://localhost:3000',
+  baseHeaders: {},
+});
+
+const data = await client.getFundingStage({
+  params: { uid: '1' },
+});
+
+// Verify the status code to type the response
+if (data.status === 200) {
+  data.body.uid;
+}
+```
+
+Something to be aware of is that we first need to verify the status code of the response before accessing the body. This is because the body is only gets typed depeding on the status code of the response by the ts-rest library.

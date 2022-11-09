@@ -20,7 +20,8 @@
       "@protocol-labs-network/storybook-host": [
         "libs/storybook-host/src/index.ts"
       ],
-      "@protocol-labs-network/ui": ["libs/ui/src/index.ts"]
+      "@protocol-labs-network/ui": ["libs/ui/src/index.ts"],
+      "@protocol-labs-network/contracts": ["libs/contracts/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
