@@ -1,21 +1,23 @@
-import camelCase from 'camelcase';
 import { Prisma } from '@prisma/client';
+import camelCase from 'camelcase';
 import { prisma } from './index';
 
 import {
-  teams,
+  acceleratorPrograms,
+  fundingStages,
+  imageRelations,
+  industryCategories,
+  industryTags,
+  locations,
+  memberRelations,
+  members,
+  originalImages,
   roles,
   skills,
-  members,
-  locations,
-  technologies,
-  industryTags,
-  teamRelations,
-  fundingStages,
-  memberRelations,
   teamMemberRoles,
-  industryCategories,
-  acceleratorPrograms,
+  teamRelations,
+  teams,
+  technologies,
 } from './fixtures';
 
 /**
@@ -88,6 +90,12 @@ load([
     },
   },
   { [Prisma.ModelName.TeamMemberRole]: teamMemberRoles },
+  {
+    [Prisma.ModelName.Image]: {
+      fixtures: originalImages,
+      relations: imageRelations,
+    },
+  },
 ])
   .then(async () => {
     await prisma.$disconnect();

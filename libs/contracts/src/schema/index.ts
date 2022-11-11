@@ -1,5 +1,6 @@
 export * from './accelerator-program';
 export * from './funding-stage';
+export * from './image';
 export * from './industry-category';
 export * from './industry-tag';
 export * from './location';

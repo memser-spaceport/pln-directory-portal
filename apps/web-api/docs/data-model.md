@@ -15,6 +15,7 @@ classDiagram
     Team --> "0..1" FundingStage
     Team --> "0..n" AcceleratorProgram
     Team --> "0..n" Technology
+    Image --> "1..n" Image
 
 
     class Team {
@@ -126,5 +127,18 @@ classDiagram
       continent : string
       createdAt : datetime
       updatedAt : datetime
+    }
+
+    class Image {
+        id : integer
+        cid : string
+        width : integer
+        height : integer
+        url : string
+        filename : string
+        size : integer
+        type : string
+        version : string
+        thumbnailto : string
     }
 ```
