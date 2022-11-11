@@ -23,3 +23,10 @@ export const NOT_FOUND_GLOBAL_RESPONSE_SCHEMA = {
     example: NOT_FOUND_GLOBAL_ERROR_RESPONSE,
   },
 };
+
+export const THUMBNAIL_SIZES = {
+  LARGE: 1500,
+  MEDIUM: 512,
+  SMALL: 256,
+  TINY: 78,
+};

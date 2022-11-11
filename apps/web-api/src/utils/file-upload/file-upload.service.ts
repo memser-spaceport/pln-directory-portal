@@ -24,4 +24,11 @@ export class FileUploadService {
     const cid = await client.put(fileObjects);
     return cid;
   }
+
+  async getFileUrl(cid: string, filename: string) {
+    // Construct the actual file URL located at a public gateway:
+    // https://web3.storage/docs/how-tos/retrieve/#using-an-ipfs-http-gateway
+    const fileURL = `https://${cid}.ipfs.w3s.link/${filename}`;
+    return fileURL;
+  }
 }
