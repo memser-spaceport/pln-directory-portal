@@ -1,0 +1,27 @@
+import { Factory } from 'fishery';
+import { faker } from '@faker-js/faker';
+import { Location } from '@prisma/client';
+import { prisma } from '../../../prisma/__mocks__/index';
+import { TestFactorySeederParams } from '../../utils/factory-interfaces';
+
+export async function createLocation({ amount }: TestFactorySeederParams) {
+  const locationFactory = Factory.define<Location>(({ sequence }) => ({
+    id: sequence,
+    uid: `location-${sequence}`,
+    city: `city-${sequence}`,
+    country: `country-${sequence}`,
+    continent: `continent-${sequence}`,
+    formattedAddress: `formattedAddress-${sequence}`,
+    latitude: Number(faker.random.numeric(2, { allowLeadingZeros: true })),
+    longitude: Number(faker.random.numeric(2, { allowLeadingZeros: true })),
+    region: `region-${sequence}`,
+    regionAbbreviation: `regionAbbreviation-${sequence}`,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }));
+
+  const locations = await locationFactory.buildList(amount);
+  await prisma.location.createMany({
+    data: locations,
+  });
+}
