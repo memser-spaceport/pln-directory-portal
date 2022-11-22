@@ -1,6 +1,6 @@
 import { FundingStage } from '@prisma/client';
 import { Factory } from 'fishery';
-import { prisma } from '../../../prisma/index';
+import { prisma } from '../../../prisma/__mocks__/index';
 import { TestFactorySeederParams } from '../../utils/factory-interfaces';
 
 export async function createFundingStage({ amount }: TestFactorySeederParams) {

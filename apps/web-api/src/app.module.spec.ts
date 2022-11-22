@@ -2,7 +2,6 @@ import { BullModule } from '@nestjs/bull';
 import { CacheModule } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { prisma } from '../prisma/__mocks__';
 import { AppController } from './app.controller';
 import { AppModule } from './app.module';
 
@@ -14,10 +13,6 @@ describe('App Module', () => {
       imports: [AppModule],
       controllers: [AppController],
     }).compile();
-  });
-
-  afterEach(async () => {
-    await prisma.$disconnect();
   });
 
   describe('when loading the app module', () => {

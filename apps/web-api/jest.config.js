@@ -7,6 +7,8 @@ module.exports = {
     },
   },
   testEnvironment: 'node',
+  // Temporary fix for CI/CD issue: https://d.pr/i/x1Qfk7
+  testTimeout: 30000,
   transform: {
     '^.+\\.[tj]s$': 'ts-jest',
   },
