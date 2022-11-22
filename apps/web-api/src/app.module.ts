@@ -21,6 +21,7 @@ import { ContentTypeMiddleware } from './middlewares/content-type.middleware';
 import { PrismaService } from './prisma.service';
 import { SkillsModule } from './skills/skills.module';
 import { TeamsModule } from './teams/teams.module';
+import { IS_DEV_ENVIRONMENT } from './utils/constants';
 
 @Module({
   controllers: [AppController],
@@ -38,10 +39,12 @@ import { TeamsModule } from './teams/teams.module';
       isGlobal: true,
       ttl: 86400, // 1 day in seconds
       max: 100, // maximum number of items in cache
-      tls: {
-        rejectUnauthorized: false,
-        requestCert: true,
-      },
+      tls: !IS_DEV_ENVIRONMENT
+        ? {
+            rejectUnauthorized: false,
+            requestCert: true,
+          }
+        : null,
     }),
     BullModule.forRoot({
       redis: {
