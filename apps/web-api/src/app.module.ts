@@ -16,12 +16,12 @@ import { HealthModule } from './health/health.module';
 import { IndustryTagsModule } from './industry-tags/industry-tags.module';
 import { MyCacheInterceptor } from './interceptors/cache.interceptor';
 import { ConcealEntityIDInterceptor } from './interceptors/conceal-entity-id.interceptor';
+import { LocationsModule } from './locations/locations.module';
 import { MembersModule } from './members/members.module';
 import { ContentTypeMiddleware } from './middlewares/content-type.middleware';
 import { PrismaService } from './prisma.service';
 import { SkillsModule } from './skills/skills.module';
 import { TeamsModule } from './teams/teams.module';
-import { IS_DEV_ENVIRONMENT } from './utils/constants';
 
 @Module({
   controllers: [AppController],
@@ -39,7 +39,7 @@ import { IS_DEV_ENVIRONMENT } from './utils/constants';
       isGlobal: true,
       ttl: 86400, // 1 day in seconds
       max: 100, // maximum number of items in cache
-      tls: !IS_DEV_ENVIRONMENT
+      tls: process.env.REDIS_WITH_TLS
         ? {
             rejectUnauthorized: false,
             requestCert: true,
@@ -64,6 +64,7 @@ import { IS_DEV_ENVIRONMENT } from './utils/constants';
     AcceleratorProgramsModule,
     FundingStagesModule,
     SkillsModule,
+    LocationsModule,
   ],
   providers: [
     PrismaService,

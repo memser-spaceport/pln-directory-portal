@@ -82,6 +82,8 @@ model Location {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   members            Member[]
+
+  @@unique([continent, country, region, city, formattedAddress, latitude, longitude])
 }
 
 model Role {

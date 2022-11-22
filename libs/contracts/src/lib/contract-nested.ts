@@ -2,6 +2,7 @@ import { initContract } from '@ts-rest/core';
 import { apiAcceleratorProgram } from './contract-accelerator-program';
 import { apiFundingStages } from './contract-funding-stages';
 import { apiIndustryTags } from './contract-industry-tags';
+import { apiLocations } from './contract-locations';
 import { apiMembers } from './contract-member';
 import { apiSkills } from './contract-skills';
 import { apiTeam } from './contract-team';
@@ -49,4 +50,8 @@ export const apiNested = contract.router({
    * Skills API
    */
   skills: apiSkills,
+  /**
+   * Locations API
+   */
+  locations: apiLocations,
 });
