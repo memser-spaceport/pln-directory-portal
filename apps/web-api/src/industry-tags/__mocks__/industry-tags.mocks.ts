@@ -1,6 +1,6 @@
 import { IndustryCategory, IndustryTag } from '@prisma/client';
 import { Factory } from 'fishery';
-import { prisma } from '../../../prisma/index';
+import { prisma } from '../../../prisma/__mocks__/index';
 import { TestFactorySeederParams } from '../../utils/factory-interfaces';
 
 async function createIndustryCategory() {

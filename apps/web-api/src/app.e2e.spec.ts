@@ -8,7 +8,7 @@ import { mainConfig } from './main.config';
 describe('App', () => {
   let app: INestApplication;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
       controllers: [AppController],
@@ -18,6 +18,10 @@ describe('App', () => {
     app = moduleRef.createNestApplication();
     mainConfig(app);
     await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
   });
 
   describe('when requesting the /token endpoint', () => {

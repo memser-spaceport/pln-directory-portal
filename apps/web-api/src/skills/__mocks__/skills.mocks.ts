@@ -1,6 +1,6 @@
 import { Skill } from '@prisma/client';
 import { Factory } from 'fishery';
-import { prisma } from '../../../prisma/index';
+import { prisma } from '../../../prisma/__mocks__/index';
 import { TestFactorySeederParams } from '../../utils/factory-interfaces';
 
 export async function createSkill({ amount }: TestFactorySeederParams) {
