@@ -1,33 +1,62 @@
-import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import { MemberSchema } from 'libs/contracts/src/schema';
 import supertest from 'supertest';
-import { mainConfig } from '../main.config';
-import { MembersModule } from './members.module';
+import { Cache } from 'cache-manager';
+import { INestApplication } from '@nestjs/common';
+import { ResponseMemberWithRelationsSchema } from 'libs/contracts/src/schema';
 import { createMember } from './__mocks__/members.mocks';
+import { bootstrapTestingApp } from '../utils/bootstrap-testing-app';
 
 describe('Members', () => {
   let app: INestApplication;
+  let cacheManager: Cache;
 
   beforeEach(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [MembersModule],
-    }).compile();
-    app = moduleRef.createNestApplication();
-    mainConfig(app);
+    ({ app, cacheManager } = await bootstrapTestingApp());
     await app.init();
+    await cacheManager.reset();
     await createMember({ amount: 5 });
   });
 
+  afterAll(async () => {
+    await app.close();
+    await cacheManager.reset();
+  });
+
   describe('When getting all members', () => {
-    it.only('should list all the members with a valid schema', async () => {
+    it('should list all the members with a valid schema', async () => {
       const response = await supertest(app.getHttpServer())
         .get('/v1/members')
         .expect(200);
       const members = response.body;
       expect(members).toHaveLength(5);
-      const hasValidSchema = MemberSchema.array().safeParse(members).success;
+      const hasValidSchema =
+        ResponseMemberWithRelationsSchema.array().safeParse(members).success;
       expect(hasValidSchema).toBeTruthy();
+    });
+
+    describe('and with an invalid query param', () => {
+      it('should list all the members with a valid schema', async () => {
+        const response = await supertest(app.getHttpServer())
+          .get('/v1/members?invalid=true')
+          .expect(200);
+        const members = response.body;
+        expect(members).toHaveLength(5);
+        const hasValidSchema =
+          ResponseMemberWithRelationsSchema.array().safeParse(members).success;
+        expect(hasValidSchema).toBeTruthy();
+      });
+    });
+
+    describe('and with a valid query param', () => {
+      it('should list filtered members with a valid schema', async () => {
+        const response = await supertest(app.getHttpServer())
+          .get('/v1/members?email__endswith=1@mail.com&with=location')
+          .expect(200);
+        const members = response.body;
+        expect(members).toHaveLength(1);
+        const hasValidSchema =
+          ResponseMemberWithRelationsSchema.array().safeParse(members).success;
+        expect(hasValidSchema).toBeTruthy();
+      });
     });
   });
 
@@ -37,7 +66,8 @@ describe('Members', () => {
         .get('/v1/members/uid-1')
         .expect(200);
       const member = response.body;
-      const hasValidSchema = MemberSchema.safeParse(member).success;
+      const hasValidSchema =
+        ResponseMemberWithRelationsSchema.safeParse(member).success;
       expect(hasValidSchema).toBeTruthy();
     });
   });

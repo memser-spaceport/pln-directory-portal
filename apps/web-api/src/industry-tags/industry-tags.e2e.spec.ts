@@ -1,22 +1,24 @@
-import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import { IndustryTagSchema } from 'libs/contracts/src/schema';
 import supertest from 'supertest';
-import { mainConfig } from '../main.config';
-import { IndustryTagsModule } from './industry-tags.module';
+import { Cache } from 'cache-manager';
+import { INestApplication } from '@nestjs/common';
+import { ResponseIndustryTagSchema } from 'libs/contracts/src/schema';
 import { createIndustryTags } from './__mocks__/industry-tags.mocks';
+import { bootstrapTestingApp } from '../utils/bootstrap-testing-app';
 
 describe('Industry Tags', () => {
   let app: INestApplication;
+  let cacheManager: Cache;
 
   beforeEach(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [IndustryTagsModule],
-    }).compile();
-    app = moduleRef.createNestApplication();
-    mainConfig(app);
+    ({ app, cacheManager } = await bootstrapTestingApp());
     await app.init();
+    await cacheManager.reset();
     await createIndustryTags({ amount: 5 });
+  });
+
+  afterAll(async () => {
+    await app.close();
+    await cacheManager.reset();
   });
 
   describe('When getting all industry tags', () => {
@@ -26,8 +28,35 @@ describe('Industry Tags', () => {
         .expect(200);
       const tags = response.body;
       expect(tags).toHaveLength(5);
-      const hasValidSchema = IndustryTagSchema.array().safeParse(tags).success;
+      const hasValidSchema =
+        ResponseIndustryTagSchema.array().safeParse(tags).success;
       expect(hasValidSchema).toBeTruthy();
+    });
+
+    describe('and with an invalid query param', () => {
+      it('should list all the industry tags with a valid schema', async () => {
+        const response = await supertest(app.getHttpServer())
+          .get('/v1/industry-tags?invalid=true')
+          .expect(200);
+        const tags = response.body;
+        expect(tags).toHaveLength(5);
+        const hasValidSchema =
+          ResponseIndustryTagSchema.array().safeParse(tags).success;
+        expect(hasValidSchema).toBeTruthy();
+      });
+    });
+
+    describe('and with a valid query param', () => {
+      it('should list filtered industry tags with a valid schema', async () => {
+        const response = await supertest(app.getHttpServer())
+          .get('/v1/industry-tags?title=Industry+Tag+2')
+          .expect(200);
+        const tags = response.body;
+        expect(tags).toHaveLength(1);
+        const hasValidSchema =
+          ResponseIndustryTagSchema.array().safeParse(tags).success;
+        expect(hasValidSchema).toBeTruthy();
+      });
     });
   });
   describe('When getting an industry tag by uid', () => {
@@ -36,7 +65,7 @@ describe('Industry Tags', () => {
         .get('/v1/industry-tags/uid-1')
         .expect(200);
       const tag = response.body;
-      const hasValidSchema = IndustryTagSchema.safeParse(tag).success;
+      const hasValidSchema = ResponseIndustryTagSchema.safeParse(tag).success;
       expect(hasValidSchema).toBeTruthy();
     });
   });

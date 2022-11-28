@@ -1,7 +1,17 @@
-import { Controller } from '@nestjs/common';
-import { ApiParam } from '@nestjs/swagger';
+import { Controller, Req } from '@nestjs/common';
+import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
+import { Request } from 'express';
 import { apiAcceleratorProgram } from 'libs/contracts/src/lib/contract-accelerator-program';
+import {
+  AcceleratorProgramQueryParams,
+  ResponseAcceleratorProgramSchema,
+} from 'libs/contracts/src/schema';
+import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
+import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
+import { NOT_FOUND_GLOBAL_RESPONSE_SCHEMA } from '../utils/constants';
+import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
+import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { AcceleratorProgramsService } from './accelerator-programs.service';
 
 const server = initNestServer(apiAcceleratorProgram);
@@ -14,12 +24,21 @@ export class AcceleratorProgramsController {
   ) {}
 
   @Api(server.route.getAcceleratorPrograms)
-  findAll() {
-    return this.acceleratorProgramsService.findAll();
+  @ApiQueryFromZod(AcceleratorProgramQueryParams)
+  @ApiOkResponseFromZod(ResponseAcceleratorProgramSchema.array())
+  findAll(@Req() request: Request) {
+    const queryableFields = prismaQueryableFieldsFromZod(
+      ResponseAcceleratorProgramSchema
+    );
+    const builder = new PrismaQueryBuilder(queryableFields);
+    const builtQuery = builder.build(request.query);
+    return this.acceleratorProgramsService.findAll(builtQuery);
   }
 
   @Api(server.route.getAcceleratorProgram)
   @ApiParam({ name: 'uid', type: 'string' })
+  @ApiOkResponseFromZod(ResponseAcceleratorProgramSchema)
+  @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
   async findOne(
     @ApiDecorator() { params: { uid } }: RouteShape['getAcceleratorProgram']
   ) {

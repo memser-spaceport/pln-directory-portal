@@ -1,5 +1,5 @@
 import { initContract } from '@ts-rest/core';
-import { ResponseIndustryTagSchema } from '../schema';
+import { IndustryTagQueryParams, ResponseIndustryTagSchema } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
 const contract = initContract();
@@ -8,6 +8,7 @@ export const apiIndustryTags = contract.router({
   getIndustryTags: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/industry-tags`,
+    query: IndustryTagQueryParams,
     responses: {
       200: ResponseIndustryTagSchema.array(),
     },

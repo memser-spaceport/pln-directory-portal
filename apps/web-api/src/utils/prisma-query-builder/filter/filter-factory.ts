@@ -15,7 +15,7 @@ interface FilterFactoryQuery {
 
 export class FilterFactory {
   public get(query: FilterFactoryQuery): AbstractFilter | undefined {
-    if (!isString(query.value)) {
+    if (!query.value || !isString(query.value)) {
       return;
     }
     const prop = query.key.split(LookupDelimiter.LOOKUP_DELIMITER)[0];
@@ -31,7 +31,7 @@ export class FilterFactory {
       query: query.query,
       prop,
       lookup,
-      value: query.value,
+      value: String(query.value),
       notOperator,
       fields: query.fields,
     });

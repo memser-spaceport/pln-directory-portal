@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
 export class MembersService {
   constructor(private prisma: PrismaService) {}
 
-  findAll() {
-    return this.prisma.member.findMany();
+  findAll(queryOptions: Prisma.MemberFindManyArgs) {
+    return this.prisma.member.findMany(queryOptions);
   }
 
   findOne(uid: string) {

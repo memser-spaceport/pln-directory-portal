@@ -10,7 +10,7 @@ export const apiLocations = contract.router({
     path: `${getAPIVersionAsPath('1')}/locations`,
     query: LocationQueryParams,
     responses: {
-      200: LocationResponseSchema,
+      200: LocationResponseSchema.array(),
     },
     summary: 'Get all locations',
   },

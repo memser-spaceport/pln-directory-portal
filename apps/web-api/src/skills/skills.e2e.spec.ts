@@ -1,43 +1,71 @@
-import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import { SkillSchema } from 'libs/contracts/src/schema/skill';
 import supertest from 'supertest';
-import { mainConfig } from '../main.config';
-import { SkillsModule } from './skills.module';
+import { Cache } from 'cache-manager';
+import { INestApplication } from '@nestjs/common';
+import { ResponseSkillSchema } from 'libs/contracts/src/schema/skill';
 import { createSkill } from './__mocks__/skills.mocks';
+import { bootstrapTestingApp } from '../utils/bootstrap-testing-app';
 
 describe('Skills', () => {
   let app: INestApplication;
+  let cacheManager: Cache;
 
   beforeEach(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [SkillsModule],
-    }).compile();
-    app = moduleRef.createNestApplication();
-    mainConfig(app);
+    ({ app, cacheManager } = await bootstrapTestingApp());
     await app.init();
-
+    await cacheManager.reset();
     await createSkill({ amount: 5 });
   });
 
-  describe('When getting all industry tags', () => {
-    it('should list all the industry tags with a valid schema', async () => {
+  afterAll(async () => {
+    await app.close();
+    await cacheManager.reset();
+  });
+
+  describe('When getting all skills', () => {
+    it('should list all the skills with a valid schema', async () => {
       const response = await supertest(app.getHttpServer())
         .get('/v1/skills')
         .expect(200);
       const skills = response.body;
       expect(skills).toHaveLength(5);
-      const hasValidSchema = SkillSchema.array().safeParse(skills).success;
+      const hasValidSchema =
+        ResponseSkillSchema.array().safeParse(skills).success;
       expect(hasValidSchema).toBeTruthy();
     });
+
+    describe('and with an invalid query param', () => {
+      it('should list all the skills with a valid schema', async () => {
+        const response = await supertest(app.getHttpServer())
+          .get('/v1/skills?invalid=true')
+          .expect(200);
+        const skills = response.body;
+        expect(skills).toHaveLength(5);
+        const hasValidSchema =
+          ResponseSkillSchema.array().safeParse(skills).success;
+        expect(hasValidSchema).toBeTruthy();
+      });
+    });
+
+    describe('and with a valid query param', () => {
+      it('should list filtered skills with a valid schema', async () => {
+        const response = await supertest(app.getHttpServer())
+          .get('/v1/skills?title=Skill+1')
+          .expect(200);
+        const skills = response.body;
+        expect(skills).toHaveLength(1);
+        const hasValidSchema =
+          ResponseSkillSchema.array().safeParse(skills).success;
+        expect(hasValidSchema).toBeTruthy();
+      });
+    });
   });
-  describe('When getting an industry tag by uid', () => {
-    it('should return the industry tag with a valid schema', async () => {
+  describe('When getting a skill by uid', () => {
+    it('should return the skill with a valid schema', async () => {
       const response = await supertest(app.getHttpServer())
         .get('/v1/skills/uid-1')
         .expect(200);
       const skill = response.body;
-      const hasValidSchema = SkillSchema.safeParse(skill).success;
+      const hasValidSchema = ResponseSkillSchema.safeParse(skill).success;
       expect(hasValidSchema).toBeTruthy();
     });
   });

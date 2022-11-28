@@ -7,3 +7,7 @@ export const IndustryCategorySchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
 });
+
+export const ResponseIndustryCategorySchema = IndustryCategorySchema.omit({
+  id: true,
+}).strict();

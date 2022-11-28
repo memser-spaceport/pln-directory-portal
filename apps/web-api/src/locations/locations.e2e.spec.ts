@@ -33,5 +33,33 @@ describe('Locations', () => {
         LocationResponseSchema.array().safeParse(locations).success;
       expect(hasValidSchema).toBeTruthy();
     });
+
+    describe('and with an invalid query param', () => {
+      it('should list all the locations with a valid schema', async () => {
+        const response = await supertest(app.getHttpServer())
+          .get('/v1/locations?invalid=true')
+          .expect(200);
+        const locations = response.body;
+        expect(locations).toHaveLength(5);
+        LocationResponseSchema.array().parse(locations);
+        const hasValidSchema =
+          LocationResponseSchema.array().safeParse(locations).success;
+        expect(hasValidSchema).toBeTruthy();
+      });
+    });
+
+    describe('and with a valid query param', () => {
+      it('should list filtered locations with a valid schema', async () => {
+        const response = await supertest(app.getHttpServer())
+          .get('/v1/locations?country=country-1')
+          .expect(200);
+        const locations = response.body;
+        expect(locations).toHaveLength(1);
+        LocationResponseSchema.array().parse(locations);
+        const hasValidSchema =
+          LocationResponseSchema.array().safeParse(locations).success;
+        expect(hasValidSchema).toBeTruthy();
+      });
+    });
   });
 });

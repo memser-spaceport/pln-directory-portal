@@ -1,5 +1,5 @@
 import { initContract } from '@ts-rest/core';
-import { ResponseSkillSchema } from '../schema/skill';
+import { ResponseSkillSchema, SkillQueryParams } from '../schema/skill';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
 const contract = initContract();
@@ -8,6 +8,7 @@ export const apiSkills = contract.router({
   getSkills: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/skills`,
+    query: SkillQueryParams,
     responses: {
       200: ResponseSkillSchema.array(),
     },

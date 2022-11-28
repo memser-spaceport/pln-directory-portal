@@ -1,5 +1,11 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
+import { ResponseAcceleratorProgramSchema } from './accelerator-program';
+import { ResponseFundingStageSchema } from './funding-stage';
+import { ResponseIndustryTagSchema } from './industry-tag';
+import { ResponseMemberSchema } from './member';
+import { QueryParams } from './query-params';
+import { ResponseTeamMemberRoleSchema } from './team-member-role';
 
 export const TeamSchema = z.object({
   id: z.number().int(),
@@ -35,7 +41,30 @@ export const CreateTeamSchema = TeamSchema.pick({
   fundingStageUid: true,
 });
 
-export const ResponseTeamSchema = TeamSchema.omit({ id: true });
+export const ResponseTeamSchema = TeamSchema.omit({ id: true }).strict();
+
+export const ResponseTeamWithRelationsSchema = ResponseTeamSchema.extend({
+  acceleratorPrograms: ResponseAcceleratorProgramSchema.array().optional(),
+  industryTags: ResponseIndustryTagSchema.array().optional(),
+  fundingStage: ResponseFundingStageSchema.optional(),
+  members: z.lazy(() => ResponseMemberSchema.array().optional()),
+  teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
+});
+
+export const TeamQueryableFields = ResponseTeamSchema.keyof();
+
+export const TeamRelationalFields = ResponseTeamWithRelationsSchema.pick({
+  acceleratorPrograms: true,
+  industryTags: true,
+  fundingStage: true,
+  members: true,
+  teamMemberRoles: true,
+}).strip();
+
+export const TeamQueryParams = QueryParams({
+  queryableFields: TeamQueryableFields,
+  relationalFields: TeamRelationalFields,
+});
 
 export class TeamDto extends createZodDto(TeamSchema) {}
 

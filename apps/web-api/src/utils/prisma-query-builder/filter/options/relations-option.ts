@@ -23,7 +23,7 @@ export class RelationsOption extends BaseOption implements FilterOption {
       return;
     }
 
-    const relations = query.source['with'].split(',');
+    const relations = String(query.source['with']).split(',');
     const availableQueryKey =
       this.additionalQueryKey in query.target
         ? this.additionalQueryKey

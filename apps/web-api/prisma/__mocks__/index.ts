@@ -105,4 +105,5 @@ afterEach(async () => {
 afterAll(async () => {
   if (!IS_DEV_ENVIRONMENT) return;
   await defaultPrisma.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${baseId}";`);
+  await defaultPrisma.$disconnect();
 });

@@ -1,5 +1,6 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
+import { QueryParams } from './query-params';
 
 export const SkillSchema = z.object({
   id: z.number().int(),
@@ -10,7 +11,13 @@ export const SkillSchema = z.object({
   updatedAt: z.string(),
 });
 
-export const ResponseSkillSchema = SkillSchema.omit({ id: true });
+export const ResponseSkillSchema = SkillSchema.omit({ id: true }).strict();
+
+export const SkillQueryableFields = ResponseSkillSchema.keyof();
+
+export const SkillQueryParams = QueryParams({
+  queryableFields: SkillQueryableFields,
+});
 
 export const CreateSkillSchema = SkillSchema.pick({
   title: true,

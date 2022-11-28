@@ -47,6 +47,19 @@
         "passWithNoTests": true
       }
     },
+    "test-dev": {
+      "executor": "@nrwl/jest:jest",
+      "outputs": ["coverage/apps/web-api"],
+      "options": {
+        "jestConfig": "apps/web-api/jest.config.js",
+        "watch": true,
+        "watchAll": true,
+        "passWithNoTests": true,
+        "detectOpenHandles": true,
+        "detectLeaks": true,
+        "logHeapUsage": true
+      }
+    },
     "migrate-dev": {
       "executor": "@nrwl/workspace:run-commands",
       "outputs": [],

@@ -9,7 +9,11 @@ import { ApiOkResponse } from '@nestjs/swagger';
 export const ApiOkResponseFromZod = (ZodSchema: any) => {
   return applyDecorators(
     ApiOkResponse({
-      schema: zodToJsonSchema(ZodSchema, { target: 'openApi3' }),
+      schema: zodToJsonSchema(ZodSchema, {
+        target: 'openApi3',
+        $refStrategy: 'none',
+      }),
+      description: 'By default, all relational fields will be omitted.',
     })
   );
 };

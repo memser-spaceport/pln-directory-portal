@@ -8,8 +8,8 @@ export async function createSkill({ amount }: TestFactorySeederParams) {
     const skill = {
       id: sequence,
       uid: `uid-${sequence}`,
-      title: `Industry Tag ${sequence}`,
-      description: `Industry Tag ${sequence} description`,
+      title: `Skill ${sequence}`,
+      description: `Skill ${sequence} description`,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
