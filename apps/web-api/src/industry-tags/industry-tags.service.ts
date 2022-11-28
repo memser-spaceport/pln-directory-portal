@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
 export class IndustryTagsService {
   constructor(private prisma: PrismaService) {}
 
-  findAll() {
-    return this.prisma.industryTag.findMany();
+  findAll(queryOptions: Prisma.IndustryTagFindManyArgs) {
+    return this.prisma.industryTag.findMany(queryOptions);
   }
 
   findOne(uid: string) {

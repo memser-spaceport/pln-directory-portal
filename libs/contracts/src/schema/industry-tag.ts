@@ -1,5 +1,7 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
+import { ResponseIndustryCategorySchema } from './industry-category';
+import { QueryParams } from './query-params';
 
 export const IndustryTagSchema = z.object({
   id: z.number().int(),
@@ -11,12 +13,29 @@ export const IndustryTagSchema = z.object({
   industryCategoryUid: z.string(),
 });
 
-export const ResponseIndustryTagSchema = IndustryTagSchema.omit({ id: true });
+export const ResponseIndustryTagSchema = IndustryTagSchema.extend({
+  industryCategory: ResponseIndustryCategorySchema.optional(),
+})
+  .omit({ id: true })
+  .strict();
 
 export const CreateIndustryTagSchema = IndustryTagSchema.pick({
   title: true,
   definition: true,
   industryCategoryUid: true,
+});
+
+export const IndustryTagRelationalFields = ResponseIndustryTagSchema.pick({
+  industryCategory: true,
+}).strip();
+
+export const IndustryTagQueryableFields = ResponseIndustryTagSchema.omit({
+  industryCategory: true,
+}).keyof();
+
+export const IndustryTagQueryParams = QueryParams({
+  queryableFields: IndustryTagQueryableFields,
+  relationalFields: IndustryTagRelationalFields,
 });
 
 export class IndustryTagDto extends createZodDto(IndustryTagSchema) {}

@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
 export class AcceleratorProgramsService {
   constructor(private prisma: PrismaService) {}
 
-  findAll() {
-    return this.prisma.acceleratorProgram.findMany();
+  findAll(queryOptions: Prisma.AcceleratorProgramFindManyArgs) {
+    return this.prisma.acceleratorProgram.findMany(queryOptions);
   }
 
   findOne(uid: string) {

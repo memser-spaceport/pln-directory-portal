@@ -21,11 +21,14 @@ const getQueryableNestedFieldsFromZod = (
   return Object.entries(relationalFields.shape).reduce(
     (allRelationalFields, [relationalField, options]) => {
       const isZodType = (type: string) => options._def.typeName === type;
+      // Extract inner schema in optional zod schemas:
+      options = isZodType(z.ZodOptional.name)
+        ? (options as z.ZodOptional<z.AnyZodObject>).unwrap()
+        : options;
+      // Grab nested fields either from ZodArray or ZodObject:
       const nestedFields = isZodType(z.ZodArray.name)
         ? ((options as z.ZodArray<z.ZodObject<z.ZodRawShape>>).element.keyof()
             .options as string[])
-        : isZodType(z.ZodObject.name)
-        ? ((options as z.ZodObject<z.ZodRawShape>).keyof().options as string[])
         : [];
       return nestedFields
         ? [
@@ -66,11 +69,14 @@ export const QueryParams = ({
           relationalFields.keyof()
         ).optional(),
       }),
-      ...(!!relationalFields && {
-        order: ZodCommaSeparatedQueryValues(
-          // List of nested fields of each relational field:
-          z.enum(getQueryableNestedFieldsFromZod(relationalFields) as [string])
-        ).optional(),
-      }),
+      ...(!!relationalFields &&
+        getQueryableNestedFieldsFromZod(relationalFields).length && {
+          order: ZodCommaSeparatedQueryValues(
+            // List of nested fields of each relational field:
+            z.enum(
+              getQueryableNestedFieldsFromZod(relationalFields) as [string]
+            )
+          ).optional(),
+        }),
     })
     .optional();

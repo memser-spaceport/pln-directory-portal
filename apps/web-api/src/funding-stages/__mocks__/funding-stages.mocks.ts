@@ -8,7 +8,7 @@ export async function createFundingStage({ amount }: TestFactorySeederParams) {
     const industryTag = {
       id: sequence,
       uid: `uid-${sequence}`,
-      title: `Industry Tag ${sequence}`,
+      title: `Funding Stage ${sequence}`,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

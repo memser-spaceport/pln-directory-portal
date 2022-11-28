@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { ResponseRoleSchema } from './role';
+import { ResponseTeamSchema } from './team';
 
 export const TeamMemberRoleSchema = z.object({
   id: z.number().int(),
@@ -8,3 +10,15 @@ export const TeamMemberRoleSchema = z.object({
   teamId: z.number().int(),
   roleId: z.number().int(),
 });
+
+export const ResponseTeamMemberRoleSchema = TeamMemberRoleSchema.extend({
+  team: ResponseTeamSchema,
+  role: ResponseRoleSchema,
+})
+  .omit({
+    id: true,
+    memberId: true,
+    teamId: true,
+    roleId: true,
+  })
+  .strict();

@@ -8,7 +8,7 @@ async function createIndustryCategory() {
     ({ sequence }) => ({
       id: sequence,
       uid: `industry-category-${sequence}`,
-      title: 'Industry Category Title',
+      title: `Industry Category Title ${sequence}`,
       createdAt: new Date(),
       updatedAt: new Date(),
     })

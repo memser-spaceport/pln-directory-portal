@@ -10,3 +10,7 @@ export const RoleSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
 });
+
+export const ResponseRoleSchema = RoleSchema.omit({
+  id: true,
+}).strict();

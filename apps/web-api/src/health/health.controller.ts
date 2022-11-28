@@ -4,6 +4,7 @@ import {
   HealthCheckService,
   HttpHealthIndicator,
 } from '@nestjs/terminus';
+import { NoCache } from '../decorators/no-cache.decorator';
 import { HerokuHealthIndicator } from './heroku.health';
 import { PrismaHealthIndicator } from './prisma.health';
 
@@ -19,6 +20,7 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
+  @NoCache()
   healthCheck() {
     return this.health.check([
       () => this.herokuHealthIndicator.isHealthy(),

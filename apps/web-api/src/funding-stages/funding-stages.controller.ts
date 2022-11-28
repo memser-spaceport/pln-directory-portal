@@ -1,7 +1,17 @@
-import { Controller } from '@nestjs/common';
-import { ApiParam } from '@nestjs/swagger';
+import { Controller, Req } from '@nestjs/common';
+import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
+import { Request } from 'express';
 import { apiFundingStages } from 'libs/contracts/src/lib/contract-funding-stages';
+import {
+  FundingStageQueryParams,
+  ResponseFundingStageSchema,
+} from 'libs/contracts/src/schema';
+import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
+import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
+import { NOT_FOUND_GLOBAL_RESPONSE_SCHEMA } from '../utils/constants';
+import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
+import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { FundingStagesService } from './funding-stages.service';
 
 const server = initNestServer(apiFundingStages);
@@ -12,12 +22,21 @@ export class FundingStagesController {
   constructor(private readonly fundingStagesService: FundingStagesService) {}
 
   @Api(server.route.getFundingStages)
-  findAll() {
-    return this.fundingStagesService.findAll();
+  @ApiQueryFromZod(FundingStageQueryParams)
+  @ApiOkResponseFromZod(ResponseFundingStageSchema.array())
+  findAll(@Req() request: Request) {
+    const queryableFields = prismaQueryableFieldsFromZod(
+      ResponseFundingStageSchema
+    );
+    const builder = new PrismaQueryBuilder(queryableFields);
+    const builtQuery = builder.build(request.query);
+    return this.fundingStagesService.findAll(builtQuery);
   }
 
   @Api(server.route.getFundingStage)
   @ApiParam({ name: 'uid', type: 'string' })
+  @ApiOkResponseFromZod(ResponseFundingStageSchema)
+  @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
   findOne(@ApiDecorator() { params: { uid } }: RouteShape['getFundingStage']) {
     return this.fundingStagesService.findOne(uid);
   }

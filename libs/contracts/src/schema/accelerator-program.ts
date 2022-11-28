@@ -1,5 +1,6 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
+import { QueryParams } from './query-params';
 
 export const AcceleratorProgramSchema = z.object({
   id: z.number().int(),
@@ -11,7 +12,7 @@ export const AcceleratorProgramSchema = z.object({
 
 export const ResponseAcceleratorProgramSchema = AcceleratorProgramSchema.omit({
   id: true,
-});
+}).strict();
 
 export const CreateAcceleratorProgramSchema = AcceleratorProgramSchema.pick({
   title: true,
@@ -19,6 +20,13 @@ export const CreateAcceleratorProgramSchema = AcceleratorProgramSchema.pick({
 
 export const UpdateAcceleratorProgramSchema = AcceleratorProgramSchema.pick({
   title: true,
+});
+
+export const AcceleratorProgramQueryableFields =
+  ResponseAcceleratorProgramSchema.keyof();
+
+export const AcceleratorProgramQueryParams = QueryParams({
+  queryableFields: AcceleratorProgramQueryableFields,
 });
 
 export class CreateAcceleratorProgramDto extends createZodDto(

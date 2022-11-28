@@ -11,3 +11,15 @@ export const ALLOWED_CORS_ORIGINS = {
 };
 
 export const IS_DEV_ENVIRONMENT = process.env.ENVIRONMENT == APP_ENV.DEV;
+
+export const NOT_FOUND_GLOBAL_ERROR_RESPONSE = {
+  statusCode: 404,
+  error: 'Not Found',
+};
+
+export const NOT_FOUND_GLOBAL_RESPONSE_SCHEMA = {
+  schema: {
+    type: 'object',
+    example: NOT_FOUND_GLOBAL_ERROR_RESPONSE,
+  },
+};
