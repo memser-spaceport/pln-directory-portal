@@ -1,0 +1,47 @@
+name: 'Staging Release & Deployment'
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-new-commits-develop:
+    runs-on: ubuntu-20.04
+    outputs:
+      NEW_COMMITS: ${{ steps.check-new-commits.outputs.NEW_COMMITS }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Check if there are new commits on `develop` branch
+        id: check-new-commits
+        run: echo "NEW_COMMITS=$(git rev-list --count origin/develop..origin/staging)" >> $GITHUB_OUTPUT
+
+  rebase:
+    runs-on: ubuntu-20.04
+    needs: check-new-commits-develop
+    if: needs.check-new-commits-develop.outputs.NEW_COMMITS > 1
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set Git config
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "Github Actions"
+
+      - name: Checkout the `staging` branch
+        run: |
+          git checkout staging
+          git pull
+
+      - name: Rebase the `staging` branch onto the `develop` branch
+        run: |
+          git rebase origin/develop
+          git push
+
+      - name: Release a new version
+        run: npx semantic-release
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
