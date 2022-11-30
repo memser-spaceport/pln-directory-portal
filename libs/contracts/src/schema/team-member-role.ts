@@ -12,7 +12,7 @@ export const TeamMemberRoleSchema = z.object({
 });
 
 export const ResponseTeamMemberRoleSchema = TeamMemberRoleSchema.extend({
-  team: ResponseTeamSchema,
+  team: z.lazy(() => ResponseTeamSchema),
   role: ResponseRoleSchema,
 })
   .omit({
