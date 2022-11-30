@@ -1,0 +1,22 @@
+{
+  "root": "libs/industry-tags/data-access",
+  "sourceRoot": "libs/industry-tags/data-access/src",
+  "targets": {
+    "lint": {
+      "executor": "@nrwl/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/industry-tags/data-access/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "@nrwl/jest:jest",
+      "outputs": ["coverage/libs/industry-tags/data-access"],
+      "options": {
+        "jestConfig": "libs/industry-tags/data-access/jest.config.js",
+        "passWithNoTests": true
+      }
+    }
+  },
+  "tags": []
+}

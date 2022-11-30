@@ -5,6 +5,7 @@
     "api": "libs/api",
     "contracts": "libs/contracts",
     "shared-data-access": "libs/shared/data-access",
+    "industry-tags-data-access": "libs/industry-tags/data-access",
     "storybook-host": "libs/storybook-host",
     "ui": "libs/ui",
     "web-api": "apps/web-api",
