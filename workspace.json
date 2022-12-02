@@ -1,6 +1,7 @@
 {
   "version": 2,
   "projects": {
+    "accelerator-programs-data-access": "libs/accelerator-programs/data-access",
     "airtable": "libs/airtable",
     "api": "libs/api",
     "contracts": "libs/contracts",
