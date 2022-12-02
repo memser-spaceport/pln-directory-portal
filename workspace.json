@@ -5,6 +5,7 @@
     "airtable": "libs/airtable",
     "api": "libs/api",
     "contracts": "libs/contracts",
+    "funding-stages-data-access": "libs/funding-stages/data-access",
     "industry-tags-data-access": "libs/industry-tags/data-access",
     "shared-data-access": "libs/shared/data-access",
     "storybook-host": "libs/storybook-host",
