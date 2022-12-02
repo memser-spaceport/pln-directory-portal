@@ -18,14 +18,17 @@
       "@protocol-labs-network/airtable": ["libs/airtable/src/index.ts"],
       "@protocol-labs-network/api": ["libs/api/src/index.ts"],
       "@protocol-labs-network/contracts": ["libs/contracts/src/index.ts"],
-      "@protocol-labs-network/shared/data-access": [
-        "libs/shared/data-access/src/index.ts"
-      ],
       "@protocol-labs-network/industry-tags/data-access": [
         "libs/industry-tags/data-access/src/index.ts"
       ],
+      "@protocol-labs-network/shared/data-access": [
+        "libs/shared/data-access/src/index.ts"
+      ],
       "@protocol-labs-network/storybook-host": [
         "libs/storybook-host/src/index.ts"
+      ],
+      "@protocol-labs-network/technology/data-access": [
+        "libs/technology/data-access/src/index.ts"
       ],
       "@protocol-labs-network/ui": ["libs/ui/src/index.ts"]
     }
