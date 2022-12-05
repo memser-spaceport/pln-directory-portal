@@ -8,6 +8,7 @@
     "funding-stages-data-access": "libs/funding-stages/data-access",
     "industry-tags-data-access": "libs/industry-tags/data-access",
     "shared-data-access": "libs/shared/data-access",
+    "skills-data-access": "libs/skills/data-access",
     "storybook-host": "libs/storybook-host",
     "technology-data-access": "libs/technology/data-access",
     "ui": "libs/ui",

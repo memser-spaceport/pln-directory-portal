@@ -30,6 +30,9 @@
       "@protocol-labs-network/shared/data-access": [
         "libs/shared/data-access/src/index.ts"
       ],
+      "@protocol-labs-network/skills/data-access": [
+        "libs/skills/data-access/src/index.ts"
+      ],
       "@protocol-labs-network/storybook-host": [
         "libs/storybook-host/src/index.ts"
       ],
