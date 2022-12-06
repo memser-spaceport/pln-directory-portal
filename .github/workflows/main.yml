@@ -71,6 +71,3 @@ jobs:
           REDIS_HOST: localhost
           REDIS_PORT: 6379
           FILE_ENCRYPTION_SALT: '${{ secrets.FILE_ENCRYPTION_SALT }}'
-
-      - name: Build affected apps/libraries
-        run: npx nx affected --target=build --parallel=3
