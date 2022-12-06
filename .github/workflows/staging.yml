@@ -11,6 +11,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Check if there are new commits on `develop` branch
         id: check-new-commits
@@ -21,20 +23,16 @@ jobs:
     needs: check-new-commits-develop
     if: needs.check-new-commits-develop.outputs.NEW_COMMITS > 1
     steps:
-      - name: Checkout code
+      - name: Checkout code from the `staging` branch
         uses: actions/checkout@v3
         with:
+          ref: staging
           fetch-depth: 0
 
       - name: Set Git config
         run: |
           git config --local user.email "actions@github.com"
           git config --local user.name "Github Actions"
-
-      - name: Checkout the `staging` branch
-        run: |
-          git checkout staging
-          git pull
 
       - name: Rebase the `staging` branch onto the `develop` branch
         run: |
