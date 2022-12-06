@@ -21,7 +21,7 @@ jobs:
   rebase:
     runs-on: ubuntu-20.04
     needs: check-new-commits-develop
-    if: needs.check-new-commits-develop.outputs.NEW_COMMITS > 1
+    if: needs.check-new-commits-develop.outputs.NEW_COMMITS > 0
     steps:
       - name: Checkout code from the `staging` branch
         uses: actions/checkout@v3
