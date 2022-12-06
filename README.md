@@ -43,6 +43,13 @@ Run `nx affected:e2e` to execute the end-to-end tests affected by a change.
 
 Alternatively, direclty run the "Staging Release & Deployment" workflow on GitHub, under Actions.
 
+### Create a new release & deploy app to production
+
+1. Make sure you have the [GitHub CLI](https://cli.github.com/) installed on your machine (installation instructions [here](https://github.com/cli/cli#installation))
+2. Run `yarn run deploy:production`
+
+Alternatively, direclty run the "Production Release & Deployment" workflow on GitHub, under Actions.
+
 ## Adding capabilities to our workspace
 
 Nx supports many plugins which add capabilities for developing different types of applications and different tools.

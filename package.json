@@ -11,7 +11,8 @@
     "analyze:web": "WITH_BUNDLE_ANALYZER=true nx run web-app:build",
     "heroku-postbuild": "npx prisma generate --schema=./apps/web-api/prisma/schema.prisma && nx build $PROJECT_NAME --prod && npx prisma migrate deploy --schema=./apps/web-api/prisma/schema.prisma",
     "build:storybook": "nx build-storybook storybook-host",
-    "deploy:staging": "gh workflow run staging.yml"
+    "deploy:staging": "gh workflow run staging.yml",
+    "deploy:production": "gh workflow run production.yml"
   },
   "private": true,
   "dependencies": {
