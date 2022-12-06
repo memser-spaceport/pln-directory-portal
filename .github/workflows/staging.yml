@@ -2,6 +2,9 @@ name: 'Staging Deployment'
 
 on:
   workflow_dispatch:
+  schedule:
+    # run every day at 8 AM
+    - cron: '0 8 * * *'
 
 jobs:
   check-new-commits-develop:
