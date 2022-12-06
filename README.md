@@ -36,6 +36,17 @@ Run `nx e2e web-app` to execute the end-to-end tests via [Cypress](https://www.c
 
 Run `nx affected:e2e` to execute the end-to-end tests affected by a change.
 
+### Create a new pre-release & deploy app to staging
+
+1. Make sure you have the [GitHub CLI](https://cli.github.com/) installed on your machine (installation instructions [here](https://github.com/cli/cli#installation))
+2. Run `yarn run deploy:staging`
+
+Alternatively, direclty run the "Staging Release & Deployment" workflow on GitHub, under Actions.
+
+> **Warning**
+>
+> When following the alternative solution, make sure you select the `staging` branch.
+
 ## Adding capabilities to our workspace
 
 Nx supports many plugins which add capabilities for developing different types of applications and different tools.
