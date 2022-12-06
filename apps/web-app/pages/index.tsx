@@ -15,7 +15,7 @@ export default function Index() {
     <div>
       <Mission />
       <PortalDivider />
-      <div className="bg-white py-24 px-6 md:px-16 md:py-[120px]">
+      <div className="bg-blue-600 py-24 px-6 md:px-16 md:py-[120px]">
         <div className="mx-auto max-w-[1110px]">
           <Directory />
         </div>
