@@ -1,4 +1,4 @@
-name: 'Staging Release & Deployment'
+name: 'Staging Deployment'
 
 on:
   workflow_dispatch:
@@ -38,8 +38,3 @@ jobs:
         run: |
           git rebase origin/develop
           git push
-
-      - name: Release a new version
-        run: npx semantic-release
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'

@@ -1,0 +1,19 @@
+name: 'Release'
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+
+jobs:
+  release:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Release a new version
+        run: npx semantic-release
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'

@@ -43,10 +43,6 @@ Run `nx affected:e2e` to execute the end-to-end tests affected by a change.
 
 Alternatively, direclty run the "Staging Release & Deployment" workflow on GitHub, under Actions.
 
-> **Warning**
->
-> When following the alternative solution, make sure you select the `staging` branch.
-
 ## Adding capabilities to our workspace
 
 Nx supports many plugins which add capabilities for developing different types of applications and different tools.

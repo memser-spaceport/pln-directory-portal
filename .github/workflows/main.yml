@@ -74,9 +74,3 @@ jobs:
 
       - name: Build affected apps/libraries
         run: npx nx affected --target=build --parallel=3
-
-      - name: Release a new version
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: npx semantic-release
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
