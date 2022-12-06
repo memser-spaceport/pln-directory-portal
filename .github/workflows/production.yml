@@ -1,0 +1,40 @@
+name: 'Production Deployment'
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-new-commits-staging:
+    runs-on: ubuntu-20.04
+    outputs:
+      NEW_COMMITS: ${{ steps.check-new-commits.outputs.NEW_COMMITS }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Check if there are new commits on `staging` branch
+        id: check-new-commits
+        run: echo "NEW_COMMITS=$(git rev-list --count origin/main..origin/staging)" >> $GITHUB_OUTPUT
+
+  rebase:
+    runs-on: ubuntu-20.04
+    needs: check-new-commits-staging
+    if: needs.check-new-commits-staging.outputs.NEW_COMMITS > 0
+    steps:
+      - name: Checkout code from the `main` branch
+        uses: actions/checkout@v3
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set Git config
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "Github Actions"
+
+      - name: Rebase the `main` branch onto the `staging` branch
+        run: |
+          git rebase origin/staging
+          git push
