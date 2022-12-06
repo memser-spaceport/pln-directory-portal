@@ -36,6 +36,9 @@
       "@protocol-labs-network/storybook-host": [
         "libs/storybook-host/src/index.ts"
       ],
+      "@protocol-labs-network/teams/data-access": [
+        "libs/teams/data-access/src/index.ts"
+      ],
       "@protocol-labs-network/technology/data-access": [
         "libs/technology/data-access/src/index.ts"
       ],
