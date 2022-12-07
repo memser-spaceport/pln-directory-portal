@@ -7,6 +7,7 @@
     "contracts": "libs/contracts",
     "funding-stages-data-access": "libs/funding-stages/data-access",
     "industry-tags-data-access": "libs/industry-tags/data-access",
+    "locations-data-access": "libs/locations/data-access",
     "shared-data-access": "libs/shared/data-access",
     "skills-data-access": "libs/skills/data-access",
     "storybook-host": "libs/storybook-host",
