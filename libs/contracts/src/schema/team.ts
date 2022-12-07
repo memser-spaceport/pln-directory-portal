@@ -72,3 +72,5 @@ export const TeamQueryParams = QueryParams({
 export class TeamDto extends createZodDto(TeamSchema) {}
 
 export class CreateTeamSchemaDto extends createZodDto(CreateTeamSchema) {}
+
+export type TTeamResponse = z.infer<typeof ResponseTeamWithRelationsSchema>;
