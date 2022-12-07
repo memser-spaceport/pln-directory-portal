@@ -1,0 +1,22 @@
+{
+  "root": "libs/locations/data-access",
+  "sourceRoot": "libs/locations/data-access/src",
+  "targets": {
+    "lint": {
+      "executor": "@nrwl/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/locations/data-access/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "@nrwl/jest:jest",
+      "outputs": ["coverage/libs/locations/data-access"],
+      "options": {
+        "jestConfig": "libs/locations/data-access/jest.config.js",
+        "passWithNoTests": true
+      }
+    }
+  },
+  "tags": []
+}
