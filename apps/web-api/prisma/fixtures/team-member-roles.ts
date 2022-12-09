@@ -14,7 +14,7 @@ const getIdsFrom = async (model) => {
 };
 
 export const teamMemberRoles = async () => {
-  const teamMemberRoles: TeamMemberRole[] = [];
+  const teamMemberRoles: Omit<TeamMemberRole, 'id'>[] = [];
   const teamIds = await getIdsFrom(Prisma.ModelName.Team);
   const memberIds = await getIdsFrom(Prisma.ModelName.Member);
   const roleIds = await getIdsFrom(Prisma.ModelName.Role);

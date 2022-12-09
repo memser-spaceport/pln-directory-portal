@@ -18,7 +18,7 @@ const teamsFactory = Factory.define<Team>(({ sequence, onCreate }) => {
     const fundingStageUids = await (
       await getFundingStageUids()
     ).map((result) => result.uid);
-    team.fundingStageUid = sample(fundingStageUids);
+    team.fundingStageUid = sample(fundingStageUids) || '';
     return team;
   });
 
