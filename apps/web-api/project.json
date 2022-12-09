@@ -50,7 +50,8 @@
       "outputs": ["coverage/apps/web-api"],
       "options": {
         "jestConfig": "apps/web-api/jest.config.js",
-        "passWithNoTests": true
+        "passWithNoTests": true,
+        "runInBand": true
       }
     },
     "test-dev": {
