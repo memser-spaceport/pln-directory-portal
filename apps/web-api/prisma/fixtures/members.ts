@@ -18,7 +18,7 @@ const membersFactory = Factory.define<Member>(({ sequence, onCreate }) => {
     const locationUids = await (
       await getLocationUids()
     ).map((result) => result.uid);
-    member.locationUid = sample(locationUids);
+    member.locationUid = sample(locationUids) || '';
     return member;
   });
 

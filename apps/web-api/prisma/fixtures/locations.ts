@@ -37,7 +37,7 @@ const countriesByContinents = [
 ];
 
 const locationsFactory = Factory.define<Location>(({ sequence }) => {
-  const random = sample(countriesByContinents);
+  const random = sample(countriesByContinents) || {};
   const continent = Object.keys(random)[0];
   const country = sample(random[continent]);
   const city = faker.helpers.unique(faker.address.city);
