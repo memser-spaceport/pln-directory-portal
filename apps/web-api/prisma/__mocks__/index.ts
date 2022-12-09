@@ -86,7 +86,15 @@ beforeEach(async () => {
 // Delete each new testing database right after running a test
 afterEach(async () => {
   if (!IS_DEV_ENVIRONMENT) {
+    // Temporary fix for: https://d.pr/i/A052yv
+    await prisma.$executeRawUnsafe(`
+      SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+      WHERE datname in ('${process.env.DB_NAME}', 'test')
+      AND pid <> pg_backend_pid()
+      AND state in ('idle');
+    `);
     await prisma.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${newId}" CASCADE;`);
+    return;
   }
 
   await prisma.$disconnect();
