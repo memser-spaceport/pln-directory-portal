@@ -8,6 +8,7 @@ import {
   skills,
   members,
   locations,
+  technologies,
   industryTags,
   teamRelations,
   fundingStages,
@@ -78,6 +79,7 @@ load([
   { [Prisma.ModelName.IndustryTag]: industryTags },
   { [Prisma.ModelName.Role]: roles },
   { [Prisma.ModelName.Location]: locations },
+  { [Prisma.ModelName.Technology]: technologies },
   { [Prisma.ModelName.Team]: { fixtures: teams, relations: teamRelations } },
   {
     [Prisma.ModelName.Member]: {

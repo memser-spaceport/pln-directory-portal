@@ -22,6 +22,7 @@ import { ContentTypeMiddleware } from './middlewares/content-type.middleware';
 import { PrismaService } from './prisma.service';
 import { SkillsModule } from './skills/skills.module';
 import { TeamsModule } from './teams/teams.module';
+import { TechnologiesModule } from './technologies/technologies.module';
 
 @Module({
   controllers: [AppController],
@@ -65,6 +66,7 @@ import { TeamsModule } from './teams/teams.module';
     FundingStagesModule,
     SkillsModule,
     LocationsModule,
+    TechnologiesModule,
   ],
   providers: [
     PrismaService,
