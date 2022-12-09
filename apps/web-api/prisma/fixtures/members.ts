@@ -1,3 +1,4 @@
+import random from 'lodash/random';
 import sample from 'lodash/sample';
 import sampleSize from 'lodash/sampleSize';
 import { Factory } from 'fishery';
@@ -50,17 +51,34 @@ const getSkillUids = async () => {
   });
 };
 
+const getTechnologyUids = async () => {
+  return await prisma.technology.findMany({
+    select: {
+      uid: true,
+    },
+  });
+};
+
 export const memberRelations = async (members) => {
   const skillUids = await getSkillUids();
+  const randomSkills = sampleSize(skillUids, random(0, skillUids.length));
+  const technologyUids = await getTechnologyUids();
+  const randomTechnologies = sampleSize(
+    technologyUids,
+    random(0, technologyUids.length)
+  );
 
   return members.map((member) => ({
     where: {
       id: member.id,
     },
     data: {
-      skills: {
-        connect: sampleSize(skillUids, 3),
-      },
+      ...(randomSkills.length && {
+        skills: { connect: randomSkills },
+      }),
+      ...(randomTechnologies.length && {
+        technologies: { connect: randomTechnologies },
+      }),
     },
   }));
 };

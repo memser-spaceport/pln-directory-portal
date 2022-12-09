@@ -8,3 +8,4 @@ export * from './role';
 export * from './skill';
 export * from './team';
 export * from './team-member-role';
+export * from './technology';

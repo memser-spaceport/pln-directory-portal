@@ -14,6 +14,7 @@ classDiagram
     Team --> "0..n" IndustryTag
     Team --> "0..1" FundingStage
     Team --> "0..n" AcceleratorProgram
+    Team --> "0..n" Technology
 
 
     class Team {
@@ -27,8 +28,6 @@ classDiagram
       twitterHandler : string
       startDate : datetime
       endDate : datetime
-      filecoinUser : boolean
-      ipfsUser : boolean
       plnFriend : boolean
       createdAt : datetime
       updatedAt : datetime
@@ -67,6 +66,13 @@ classDiagram
 
 
     class IndustryCategory {
+      id : integer
+      title : string
+      createdAt : datetime
+      updatedAt : datetime
+    }
+
+    class Technology {
       id : integer
       title : string
       createdAt : datetime
