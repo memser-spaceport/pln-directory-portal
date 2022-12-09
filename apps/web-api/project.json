@@ -26,6 +26,12 @@
         }
       }
     },
+    "seed": {
+      "executor": "@nrwl/workspace:run-commands",
+      "options": {
+        "command": "ts-node apps/web-api/prisma/seed.ts"
+      }
+    },
     "serve": {
       "executor": "@nrwl/node:node",
       "options": {
