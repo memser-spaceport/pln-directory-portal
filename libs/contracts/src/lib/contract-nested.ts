@@ -6,6 +6,7 @@ import { apiLocations } from './contract-locations';
 import { apiMembers } from './contract-member';
 import { apiSkills } from './contract-skills';
 import { apiTeam } from './contract-team';
+import { apiTechnologies } from './contract-technology';
 
 const contract = initContract();
 
@@ -54,4 +55,8 @@ export const apiNested = contract.router({
    * Locations API
    */
   locations: apiLocations,
+  /**
+   * Technologies API
+   */
+  technologies: apiTechnologies,
 });
