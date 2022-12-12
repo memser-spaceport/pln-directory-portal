@@ -1,5 +1,5 @@
 import { client } from '@protocol-labs-network/shared/data-access';
-import { getCountries, getMetroAreas } from './index';
+import { getCountries, getMetroAreas, getRegions } from './index';
 
 jest.mock('@protocol-labs-network/shared/data-access', () => ({
   client: {
@@ -26,6 +26,17 @@ describe('getCountries', () => {
 
     expect(client.locations.getLocations).toBeCalledWith({
       query: { select: 'country', distinct: 'country' },
+    });
+    expect(result).toEqual({ body: [], status: 200 });
+  });
+});
+
+describe('getRegions', () => {
+  it('should call getLocations appropriately', async () => {
+    const result = await getRegions();
+
+    expect(client.locations.getLocations).toBeCalledWith({
+      query: { select: 'region', distinct: 'region' },
     });
     expect(result).toEqual({ body: [], status: 200 });
   });
