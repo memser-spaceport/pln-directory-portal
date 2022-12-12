@@ -45,8 +45,8 @@
       "@protocol-labs-network/teams/data-access": [
         "libs/teams/data-access/src/index.ts"
       ],
-      "@protocol-labs-network/technology/data-access": [
-        "libs/technology/data-access/src/index.ts"
+      "@protocol-labs-network/technologies/data-access": [
+        "libs/technologies/data-access/src/index.ts"
       ],
       "@protocol-labs-network/ui": ["libs/ui/src/index.ts"]
     }
