@@ -7,3 +7,14 @@ export const getMetroAreas = async () => {
 
   return { body, status };
 };
+
+/**
+ * Get distinct values for existing countries within the locations
+ */
+export const getCountries = async () => {
+  const { body, status } = await client.locations.getLocations({
+    query: { select: 'country', distinct: 'country' },
+  });
+
+  return { body, status };
+};
