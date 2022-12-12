@@ -1,6 +1,24 @@
 import { ITeam } from '@protocol-labs-network/api';
 import { TTeamResponse } from '@protocol-labs-network/contracts';
 import { client } from '@protocol-labs-network/shared/data-access';
+import { TTeamListOptions } from './teams.types';
+
+/**
+ * Get teams list from API
+ */
+export const getTeams = async (options: TTeamListOptions) => {
+  const { body, status } = await client.teams.getTeams({
+    query: {
+      ...options,
+      pagination: false,
+      distinct: 'name', // TODO: remove this when the API is fixed
+    },
+  });
+
+  const teams = status === 200 ? body.map((team) => parseTeam(team)) : [];
+
+  return { teams, status };
+};
 
 /**
  * Get team details from API
