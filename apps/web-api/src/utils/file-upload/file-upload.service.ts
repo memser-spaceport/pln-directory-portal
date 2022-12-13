@@ -4,9 +4,12 @@ import { File, Web3Storage } from 'web3.storage';
 // Explicitly import multer to temporarily fix this issue:
 // https://github.com/DefinitelyTyped/DefinitelyTyped/issues/47780
 import 'multer';
+import { FileEncryptionService } from '../file-encryption/file-encryption.service';
 
 @Injectable()
 export class FileUploadService {
+  constructor(private fileEcryptionService: FileEncryptionService) {}
+
   private makeStorageClient() {
     return new Web3Storage({
       token: process.env.WEB3_STORAGE_API_TOKEN || '',
@@ -18,9 +21,19 @@ export class FileUploadService {
     return files.map((file) => new File([file.buffer], `${file.originalname}`));
   }
 
+  private encryptFiles(
+    files: Array<Express.Multer.File>
+  ): Array<Express.Multer.File> {
+    return files.map((file) => {
+      const eFile = this.fileEcryptionService.getEncryptedFile(file);
+      return eFile;
+    });
+  }
+
   async storeFiles(uploadedFiles: Array<Express.Multer.File>) {
     const client = this.makeStorageClient();
-    const fileObjects = this.makeFileObjects(uploadedFiles);
+    const encryptedFiles = this.encryptFiles(uploadedFiles);
+    const fileObjects = this.makeFileObjects(encryptedFiles);
     const cid = await client.put(fileObjects);
     return cid;
   }

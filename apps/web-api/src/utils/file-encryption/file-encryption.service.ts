@@ -1,5 +1,5 @@
-import * as crypto from 'crypto-browserify';
 import { Injectable } from '@nestjs/common';
+import * as crypto from 'crypto-browserify';
 
 @Injectable()
 export class FileEncryptionService {
