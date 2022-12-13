@@ -31,11 +31,12 @@ jobs:
         with:
           ref: staging
           fetch-depth: 0
+          token: ${{ secrets.PLN_BOT_TOKEN }}
 
       - name: Set Git config
         run: |
-          git config --local user.email "actions@github.com"
-          git config --local user.name "Github Actions"
+          git config --local user.email "pln-dev@pixelmatters.com"
+          git config --local user.name "PLN-Helper"
 
       - name: Rebase the `staging` branch onto the `develop` branch
         run: |
