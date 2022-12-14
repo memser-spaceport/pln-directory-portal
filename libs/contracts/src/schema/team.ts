@@ -6,6 +6,7 @@ import { ResponseIndustryTagSchema } from './industry-tag';
 import { ResponseMemberSchema } from './member';
 import { QueryParams } from './query-params';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
+import { ResponseTechnologySchema } from './technology';
 
 export const TeamSchema = z.object({
   id: z.number().int(),
@@ -49,6 +50,7 @@ export const ResponseTeamWithRelationsSchema = ResponseTeamSchema.extend({
   fundingStage: ResponseFundingStageSchema.optional(),
   members: z.lazy(() => ResponseMemberSchema.array().optional()),
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
+  technologies: ResponseTechnologySchema.array().optional(),
 });
 
 export const TeamQueryableFields = ResponseTeamSchema.keyof();
@@ -59,6 +61,7 @@ export const TeamRelationalFields = ResponseTeamWithRelationsSchema.pick({
   fundingStage: true,
   members: true,
   teamMemberRoles: true,
+  technologies: true,
 }).strip();
 
 export const TeamQueryParams = QueryParams({
