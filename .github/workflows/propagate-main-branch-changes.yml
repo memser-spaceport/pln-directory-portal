@@ -1,10 +1,9 @@
-name: 'Sync branches on push to main'
+name: 'Propagate Main Branch Changes'
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   main-push-sync:
