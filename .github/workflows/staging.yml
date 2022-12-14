@@ -41,4 +41,4 @@ jobs:
       - name: Rebase the `staging` branch onto the `develop` branch
         run: |
           git rebase origin/develop
-          git push
+          git push --force
