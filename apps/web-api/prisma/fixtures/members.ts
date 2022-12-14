@@ -62,11 +62,6 @@ const getTechnologyUids = async () => {
 export const memberRelations = async (members) => {
   const skillUids = await getSkillUids();
   const randomSkills = sampleSize(skillUids, random(0, skillUids.length));
-  const technologyUids = await getTechnologyUids();
-  const randomTechnologies = sampleSize(
-    technologyUids,
-    random(0, technologyUids.length)
-  );
 
   return members.map((member) => ({
     where: {
@@ -75,9 +70,6 @@ export const memberRelations = async (members) => {
     data: {
       ...(randomSkills.length && {
         skills: { connect: randomSkills },
-      }),
-      ...(randomTechnologies.length && {
-        technologies: { connect: randomTechnologies },
       }),
     },
   }));
