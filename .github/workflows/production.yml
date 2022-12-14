@@ -38,4 +38,4 @@ jobs:
       - name: Rebase the `main` branch onto the `staging` branch
         run: |
           git rebase origin/staging
-          git push
+          git push --force

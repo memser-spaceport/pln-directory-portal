@@ -25,10 +25,10 @@ jobs:
       - name: Rebase the `main` branch onto the `staging` branch
         run: |
           git rebase origin/main
-          git push
+          git push --force
 
       - name: Rebase the `staging` branch onto the `develop` branch
         run: |
           git checkout develop
           git rebase origin/staging
-          git push
+          git push --force
