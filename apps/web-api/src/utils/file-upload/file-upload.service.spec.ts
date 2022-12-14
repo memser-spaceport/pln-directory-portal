@@ -1,3 +1,4 @@
+import 'multer';
 import { Readable } from 'stream';
 import { FileEncryptionService } from '../file-encryption/file-encryption.service';
 import { FileUploadService } from './file-upload.service';

@@ -1,4 +1,5 @@
 import fs from 'fs';
+import 'multer';
 import { FileEncryptionService } from './file-encryption.service';
 
 jest.mock('crypto-browserify', () => {
