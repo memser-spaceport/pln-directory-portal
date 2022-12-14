@@ -1,12 +1,13 @@
+import { camelCase, random } from 'lodash';
 import sample from 'lodash/sample';
 import sampleSize from 'lodash/sampleSize';
 import { Factory } from 'fishery';
 import { faker } from '@faker-js/faker';
 import { prisma } from './../index';
-import { Team } from '@prisma/client';
+import { Team, Prisma } from '@prisma/client';
 
-const getFundingStageUids = async () => {
-  return await prisma.fundingStage.findMany({
+const getUidsFrom = async (model) => {
+  return await prisma[camelCase(model)].findMany({
     select: {
       uid: true,
     },
@@ -16,7 +17,7 @@ const getFundingStageUids = async () => {
 const teamsFactory = Factory.define<Team>(({ sequence, onCreate }) => {
   onCreate(async (team) => {
     const fundingStageUids = await (
-      await getFundingStageUids()
+      await getUidsFrom(Prisma.ModelName.FundingStage)
     ).map((result) => result.uid);
     team.fundingStageUid = sample(fundingStageUids) || '';
     return team;
@@ -46,37 +47,34 @@ const teamsFactory = Factory.define<Team>(({ sequence, onCreate }) => {
 
 export const teams = async () => await teamsFactory.createList(300);
 
-const getIndustryTagUids = async () => {
-  return await prisma.industryTag.findMany({
-    select: {
-      uid: true,
-    },
-  });
-};
-
-const getAcceleratorProgramUids = async () => {
-  return await prisma.acceleratorProgram.findMany({
-    select: {
-      uid: true,
-    },
-  });
-};
-
 export const teamRelations = async (teams) => {
-  const industryTagUids = await getIndustryTagUids();
-  const acceleratorProgramUids = await getAcceleratorProgramUids();
+  const industryTagUids = await getUidsFrom(Prisma.ModelName.IndustryTag);
+  const acceleratorProgramUids = await getUidsFrom(
+    Prisma.ModelName.AcceleratorProgram
+  );
+  const technologyUids = await getUidsFrom(Prisma.ModelName.Technology);
 
-  return teams.map((team) => ({
-    where: {
-      id: team.id,
-    },
-    data: {
-      industryTags: {
-        connect: sampleSize(industryTagUids, 3),
+  return teams.map((team) => {
+    const randomTechnologies = sampleSize(
+      technologyUids,
+      random(0, technologyUids.length)
+    );
+
+    return {
+      where: {
+        id: team.id,
       },
-      acceleratorPrograms: {
-        connect: sampleSize(acceleratorProgramUids, 3),
+      data: {
+        industryTags: {
+          connect: sampleSize(industryTagUids, 3),
+        },
+        acceleratorPrograms: {
+          connect: sampleSize(acceleratorProgramUids, 3),
+        },
+        ...(randomTechnologies.length && {
+          technologies: { connect: randomTechnologies },
+        }),
       },
-    },
-  }));
+    };
+  });
 };
