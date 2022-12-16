@@ -6,4 +6,5 @@ export interface ProfileOptions {
   pagination: PaginationOption;
   relations: EnableableOption;
   select: EnableableOption;
+  distinct: EnableableOption;
 }
