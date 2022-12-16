@@ -17,6 +17,9 @@ export const ENABLED_PROFILE: ConfigProfile = {
     select: {
       status: 'enabled',
     },
+    distinct: {
+      status: 'enabled',
+    },
   },
   policy: 'skip',
 };
