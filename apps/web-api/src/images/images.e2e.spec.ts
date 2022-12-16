@@ -10,8 +10,8 @@ import supertest from 'supertest';
 import { AppModule } from '../app.module';
 import { mainConfig } from '../main.config';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
-import { ImagesModule } from './images.module';
 import { createImage } from './__mocks__/images.mocks';
+import { ImagesModule } from './images.module';
 
 jest.mock('web3.storage');
 

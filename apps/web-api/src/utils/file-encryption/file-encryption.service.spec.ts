@@ -1,4 +1,6 @@
 import fs from 'fs';
+// Explicitly import multer to temporarily fix this issue:
+// https://github.com/DefinitelyTyped/DefinitelyTyped/issues/47780
 import 'multer';
 import { FileEncryptionService } from './file-encryption.service';
 
