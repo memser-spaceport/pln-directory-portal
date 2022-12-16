@@ -1,14 +1,18 @@
+// Explicitly import multer to temporarily fix this issue:
+// https://github.com/DefinitelyTyped/DefinitelyTyped/issues/47780
 import 'multer';
 import { Readable } from 'stream';
 import { FileEncryptionService } from '../file-encryption/file-encryption.service';
 import { FileUploadService } from './file-upload.service';
+
+const TEST_FILE_STORED_CID = 'cid';
 
 jest.mock('web3.storage', () => {
   const { Web3Storage } = jest.requireActual('web3.storage');
   return {
     ...Web3Storage,
     Web3Storage: jest.fn().mockImplementation(() => ({
-      put: jest.fn().mockImplementation(() => 'cid'),
+      put: jest.fn().mockImplementation(() => TEST_FILE_STORED_CID),
     })),
     File: jest.fn().mockImplementation((stream, name) => {
       return {
@@ -49,7 +53,7 @@ describe('FileUploadService', () => {
       };
       const cid = await fileUploadService.storeFiles([file]);
       expect(fileEncryptionService.getEncryptedFile).toBeCalledTimes(1);
-      expect(cid).toEqual('cid');
+      expect(cid).toEqual(TEST_FILE_STORED_CID);
     });
   });
 });
