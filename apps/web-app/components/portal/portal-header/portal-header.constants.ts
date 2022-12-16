@@ -8,9 +8,9 @@ export const PORTAL_HEADER_LINKS: IPortalHeaderLink[] = [
     eventCode: FATHOM_EVENTS.portal.nav.directory,
   },
   {
-    label: 'LabWeek22',
-    url: 'https://22.labweek.io/',
-    eventCode: FATHOM_EVENTS.portal.nav.labWeek22,
+    label: 'Events',
+    url: 'https://events.plnetwork.io/',
+    eventCode: FATHOM_EVENTS.portal.nav.events,
   },
   {
     label: 'Launchpad',
