@@ -1,10 +1,10 @@
+import { faker } from '@faker-js/faker';
+import { Prisma, Team } from '@prisma/client';
+import { Factory } from 'fishery';
 import { camelCase, random } from 'lodash';
 import sample from 'lodash/sample';
 import sampleSize from 'lodash/sampleSize';
-import { Factory } from 'fishery';
-import { faker } from '@faker-js/faker';
 import { prisma } from './../index';
-import { Team, Prisma } from '@prisma/client';
 
 const getUidsFrom = async (model) => {
   return await prisma[camelCase(model)].findMany({
@@ -32,8 +32,8 @@ const teamsFactory = Factory.define<Team>(({ sequence, onCreate }) => {
     blog: faker.internet.url(),
     website: faker.internet.url(),
     twitterHandler: faker.name.firstName(),
-    shortDescripton: faker.lorem.sentence(),
-    longDescripton: faker.lorem.paragraph(),
+    shortDescription: faker.lorem.sentence(),
+    longDescription: faker.lorem.paragraph(),
     filecoinUser: faker.datatype.boolean(),
     ipfsUser: faker.datatype.boolean(),
     plnFriend: faker.datatype.boolean(),

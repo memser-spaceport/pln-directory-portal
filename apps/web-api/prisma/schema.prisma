@@ -21,8 +21,8 @@ model Team {
   blog                String?
   website             String?
   twitterHandler      String?
-  shortDescripton     String?
-  longDescripton      String?
+  shortDescription     String?
+  longDescription      String?
   plnFriend           Boolean
   startDate           DateTime?
   endDate             DateTime?
