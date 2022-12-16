@@ -30,6 +30,9 @@
       "@protocol-labs-network/locations/data-access": [
         "libs/locations/data-access/src/index.ts"
       ],
+      "@protocol-labs-network/members/data-access": [
+        "libs/members/data-access/src/index.ts"
+      ],
       "@protocol-labs-network/shared/data-access": [
         "libs/shared/data-access/src/index.ts"
       ],
