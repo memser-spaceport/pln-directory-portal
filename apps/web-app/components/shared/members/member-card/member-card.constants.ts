@@ -8,9 +8,6 @@ export const MEMBER_CARD_FIELDS = [
   'State / Province',
   'City',
   'Metro Area',
-  'Email',
-  'Twitter',
-  'Github Handle',
   'Team lead',
   'Skills',
 ];
