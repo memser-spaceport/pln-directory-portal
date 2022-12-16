@@ -1,151 +1,250 @@
+import { TTeamResponse } from '@protocol-labs-network/contracts';
 import { client } from '@protocol-labs-network/shared/data-access';
-import { getTeam } from './index';
+import { getTeam, getTeams, getTeamsFilters, parseTeam } from './index';
 
 jest.mock('@protocol-labs-network/shared/data-access', () => ({
   client: {
     teams: {
-      getTeam: jest.fn().mockResolvedValue({
-        body: {
-          uid: 'uid-crooks-and-sons',
-          name: 'Crooks and Sons',
-          logo: {
-            uid: 'uid-image-1',
-            cid: 'cid',
-            width: 33,
-            height: 33,
-            url: 'https://loremflickr.com/640/480/animals',
-            filename: 'image-1',
-            size: 33,
-            type: 'WEBP',
-            version: 'ORIGINAL',
-            thumbnailToUid: null,
-            createdAt: '2022-03-10T01:47:16.101Z',
-            updatedAt: '2022-12-09T03:45:03.694Z',
-          },
-          logoUid: 'uid-image-1',
-          blog: 'http://gruesome-reinscription.net',
-          website: 'http://curvy-harpsichord.org',
-          twitterHandler: 'Brenna',
-          shortDescription:
-            'Ullam error nulla beatae amet quia enim molestias.',
-          longDescription:
-            'Voluptatum iure voluptate quibusdam tempora. Natus repudiandae adipisci est sed. Aspernatur est eaque. Iure accusamus velit ut soluta.',
-          plnFriend: false,
-          startDate: '2022-02-05T06:50:34.559Z',
-          endDate: '2022-12-09T08:55:14.516Z',
-          createdAt: '2022-03-10T01:47:16.101Z',
-          updatedAt: '2022-12-09T03:45:03.694Z',
-          fundingStageUid: 'uid-series-a',
-          technologies: [
-            {
-              uid: 'ipfs',
-              title: 'IPFS',
-              definition: null,
-              createdAt: '2022-07-10T15:14:35.893Z',
-              updatedAt: '2022-12-09T15:14:45.290Z',
-              industryCategoryUid: 'uid-ipfs',
-            },
-            {
-              uid: 'filecoin',
-              title: 'Filecoin',
-              definition: null,
-              createdAt: '2022-05-03T15:48:01.691Z',
-              updatedAt: '2022-12-09T14:29:32.247Z',
-              industryCategoryUid: 'uid-filecoin',
-            },
-          ],
-          industryTags: [
-            {
-              uid: 'uid-video-app--storage',
-              title: 'Video app & storage',
-              definition: null,
-              createdAt: '2022-07-10T15:14:35.893Z',
-              updatedAt: '2022-12-09T15:14:45.290Z',
-              industryCategoryUid: 'uid-other',
-            },
-            {
-              uid: 'uid-decentralized-identity',
-              title: 'Decentralized Identity',
-              definition: null,
-              createdAt: '2022-05-03T15:48:01.691Z',
-              updatedAt: '2022-12-09T14:29:32.247Z',
-              industryCategoryUid: 'uid-use-case-applications',
-            },
-            {
-              uid: 'uid-vrar',
-              title: 'VR/AR',
-              definition: null,
-              createdAt: '2022-05-15T03:03:36.987Z',
-              updatedAt: '2022-12-09T08:25:49.759Z',
-              industryCategoryUid: 'uid-ecosystem',
-            },
-          ],
-          acceleratorPrograms: [
-            {
-              uid: 'uid-cypher',
-              title: 'Cypher',
-              createdAt: '2021-12-17T14:35:20.515Z',
-              updatedAt: '2022-12-09T02:03:22.910Z',
-            },
-            {
-              uid: 'uid-faber',
-              title: 'Faber',
-              createdAt: '2022-05-05T06:25:42.548Z',
-              updatedAt: '2022-12-08T22:28:07.558Z',
-            },
-            {
-              uid: 'uid-tachyon',
-              title: 'Tachyon',
-              createdAt: '2022-11-19T13:51:01.541Z',
-              updatedAt: '2022-12-08T21:28:21.424Z',
-            },
-          ],
-          fundingStage: {
-            uid: 'uid-series-a',
-            title: 'Series A',
-            createdAt: '2022-06-03T13:50:22.472Z',
-            updatedAt: '2022-12-09T00:14:46.849Z',
-          },
-          teamMemberRoles: [
-            { member: { uid: 'uid-01' } },
-            { member: { uid: 'uid-02' } },
-            { member: { uid: 'uid-01' } },
-            { member: { uid: 'uid-03' } },
-            { member: { uid: 'uid-02' } },
-          ],
-        },
-
-        status: 200,
-      }),
+      getTeam: jest.fn(),
+      getTeams: jest.fn(),
     },
   },
 }));
 
+const teamResponseMock: TTeamResponse = {
+  uid: 'team-01',
+  name: 'Team 01',
+  plnFriend: false,
+  createdAt: '2022-09-30T23:20:06.960Z',
+  updatedAt: '2022-12-22T20:36:25.081Z',
+  filecoinUser: false,
+  ipfsUser: false,
+};
+
+describe('getTeams', () => {
+  it('should call getTeams appropriately', async () => {
+    (<jest.Mock>client.teams.getTeams).mockReturnValueOnce({
+      body: [teamResponseMock],
+      status: 200,
+    });
+
+    const options = {
+      'technologies.title__with': 'IPFS',
+    };
+    const response = await getTeams(options);
+
+    expect(client.teams.getTeams).toHaveBeenCalledWith({
+      query: options,
+    });
+    expect(response).toEqual({
+      body: [teamResponseMock],
+      status: 200,
+    });
+  });
+});
+
 describe('getTeam', () => {
   it('should call getTeam appropriately', async () => {
-    const id = 'uid-crooks-and-sons';
-    const { team, status } = await getTeam(id);
+    (<jest.Mock>client.teams.getTeam).mockReturnValueOnce({
+      body: teamResponseMock,
+      status: 200,
+    });
+
+    const id = teamResponseMock.uid;
+    const response = await getTeam(id);
 
     expect(client.teams.getTeam).toBeCalledWith({
       params: { uid: id },
     });
-    expect(team).toEqual({
-      id: 'uid-crooks-and-sons',
-      name: 'Crooks and Sons',
-      logo: 'https://loremflickr.com/640/480/animals',
-      website: 'http://curvy-harpsichord.org',
-      twitter: 'Brenna',
-      shortDescription: 'Ullam error nulla beatae amet quia enim molestias.',
+    expect(response).toEqual({
+      body: teamResponseMock,
+      status: 200,
+    });
+  });
+});
+
+describe('parseTeam', () => {
+  it('should correctly parse a TTeamResponse object into an ITeam object', () => {
+    const teamResponse = {
+      ...teamResponseMock,
+      logo: { url: 'https://myteam.com/logo.png' },
+      website: 'https://myteam.com',
+      twitterHandler: '@myteam',
+      shortDescription: 'We build cool stuff',
       longDescription:
-        'Voluptatum iure voluptate quibusdam tempora. Natus repudiandae adipisci est sed. Aspernatur est eaque. Iure accusamus velit ut soluta.',
+        'We are a team of skilled engineers who build innovative products',
+      technologies: [{ title: 'Filecoin' }, { title: 'IPFS' }],
+      acceleratorPrograms: [
+        { title: 'Accelerator A' },
+        { title: 'Accelerator B' },
+      ],
+      industryTags: [
+        { title: 'Software Development' },
+        { title: 'Blockchain' },
+      ],
+      fundingStage: { title: 'Seed' },
+      teamMemberRoles: [{ member: { uid: '456' } }, { member: { uid: '789' } }],
+    } as TTeamResponse;
+
+    const expectedResult = {
+      id: 'team-01',
+      name: 'Team 01',
+      logo: 'https://myteam.com/logo.png',
+      website: 'https://myteam.com',
+      twitter: '@myteam',
+      shortDescription: 'We build cool stuff',
+      longDescription:
+        'We are a team of skilled engineers who build innovative products',
       filecoinUser: true,
       ipfsUser: true,
-      fundingStage: 'Series A',
-      tags: ['Video app & storage', 'Decentralized Identity', 'VR/AR'],
-      acceleratorPrograms: ['Cypher', 'Faber', 'Tachyon'],
-      members: ['uid-01', 'uid-02', 'uid-03'],
+      fundingStage: 'Seed',
+      acceleratorPrograms: ['Accelerator A', 'Accelerator B'],
+      tags: ['Software Development', 'Blockchain'],
+      members: ['456', '789'],
       contactMethod: null,
+    };
+
+    expect(parseTeam(teamResponse)).toEqual(expectedResult);
+  });
+
+  it('should correctly parse a TTeamResponse object into an ITeam object', () => {
+    const teamResponse = {
+      ...teamResponseMock,
+    } as TTeamResponse;
+
+    const expectedResult = {
+      id: 'team-01',
+      name: 'Team 01',
+      logo: null,
+      website: null,
+      twitter: null,
+      shortDescription: null,
+      longDescription: null,
+      filecoinUser: false,
+      ipfsUser: false,
+      fundingStage: null,
+      acceleratorPrograms: [],
+      tags: [],
+      members: [],
+      contactMethod: null,
+    };
+
+    expect(parseTeam(teamResponse)).toEqual(expectedResult);
+  });
+});
+
+describe('getTeamsFilterValues', () => {
+  it('should be able to get all teams filter values and available teams filter values', async () => {
+    (client.teams.getTeams as jest.Mock)
+      .mockClear()
+      .mockReturnValueOnce({
+        body: [
+          {
+            industryTags: [{ title: 'Tag 01' }, { title: 'Tag 02' }],
+            fundingStage: { title: 'Funding Stage 01' },
+            acceleratorPrograms: [
+              { title: 'Accelerator Program 01' },
+              { title: 'Accelerator Program 02' },
+            ],
+            technologies: [{ title: 'IPFS' }, { title: 'Filecoin' }],
+          },
+          {
+            industryTags: [
+              { title: 'Tag 01' },
+              { title: 'Tag 02' },
+              { title: 'Tag 03' },
+            ],
+            fundingStage: { title: 'Funding Stage 02' },
+            acceleratorPrograms: [
+              { title: 'Accelerator Program 02' },
+              { title: 'Accelerator Program 03' },
+            ],
+          },
+          {
+            industryTags: [{ title: 'Tag 04' }, { title: 'Tag 05' }],
+            fundingStage: { title: 'Funding Stage 03' },
+            acceleratorPrograms: [{ title: 'Accelerator Program 04' }],
+          },
+          {},
+        ],
+        status: 200,
+      })
+      .mockReturnValueOnce({
+        body: [
+          {
+            industryTags: [{ title: 'Tag 01' }, { title: 'Tag 02' }],
+            fundingStage: { title: 'Funding Stage 01' },
+            acceleratorPrograms: [
+              { title: 'Accelerator Program 01' },
+              { title: 'Accelerator Program 02' },
+            ],
+            technologies: [{ title: 'IPFS' }, { title: 'Filecoin' }],
+          },
+          {
+            industryTags: [
+              { title: 'Tag 01' },
+              { title: 'Tag 02' },
+              { title: 'Tag 03' },
+            ],
+            fundingStage: { title: 'Funding Stage 02' },
+            acceleratorPrograms: [
+              { title: 'Accelerator Program 02' },
+              { title: 'Accelerator Program 03' },
+            ],
+          },
+        ],
+        status: 200,
+      });
+
+    const result = await getTeamsFilters({
+      'technologies.title__with': 'Tag 01',
     });
-    expect(status).toEqual(200);
+
+    expect(client.teams.getTeams).toHaveBeenCalledTimes(2);
+    expect(client.teams.getTeams).toHaveBeenNthCalledWith(1, {
+      query: {
+        pagination: false,
+        select:
+          'industryTags.title,acceleratorPrograms.title,fundingStage.title,technologies.title',
+      },
+    });
+    expect(client.teams.getTeams).toHaveBeenNthCalledWith(2, {
+      query: {
+        'technologies.title__with': 'Tag 01',
+        pagination: false,
+        select:
+          'industryTags.title,acceleratorPrograms.title,fundingStage.title,technologies.title',
+      },
+    });
+
+    const expectedResult = {
+      valuesByFilter: {
+        tags: ['Tag 01', 'Tag 02', 'Tag 03', 'Tag 04', 'Tag 05'],
+        fundingStage: [
+          'Funding Stage 01',
+          'Funding Stage 02',
+          'Funding Stage 03',
+        ],
+        acceleratorPrograms: [
+          'Accelerator Program 01',
+          'Accelerator Program 02',
+          'Accelerator Program 03',
+          'Accelerator Program 04',
+        ],
+        technology: ['Filecoin', 'IPFS'],
+      },
+      availableValuesByFilter: {
+        tags: ['Tag 01', 'Tag 02', 'Tag 03'],
+        fundingStage: ['Funding Stage 01', 'Funding Stage 02'],
+        acceleratorPrograms: [
+          'Accelerator Program 01',
+          'Accelerator Program 02',
+          'Accelerator Program 03',
+        ],
+        technology: ['Filecoin', 'IPFS'],
+      },
+    };
+
+    expect(result).toEqual(expectedResult);
   });
 });
