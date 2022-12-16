@@ -72,6 +72,12 @@ let nextConfig = {
         destination: '/directory/members/:id*',
         permanent: false,
       },
+      {
+        // Redirect the events path to the appropriate Events page
+        source: '/events',
+        destination: 'https://events.plnetwork.io',
+        permanent: false,
+      },
     ];
   },
 };
