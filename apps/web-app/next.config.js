@@ -75,7 +75,7 @@ let nextConfig = {
       {
         // Redirect the events path to the appropriate Events page
         source: '/events',
-        destination: 'https://events.plnetwork.io',
+        destination: 'https://pl-network-events.vercel.app',
         permanent: false,
       },
     ];
