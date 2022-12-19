@@ -1,6 +1,18 @@
 import { IMember } from '@protocol-labs-network/api';
 import { TMemberResponse } from '@protocol-labs-network/contracts';
 import { client } from '@protocol-labs-network/shared/data-access';
+import { TMemberListOptions } from './members.types';
+
+/**
+ * Get members list from API
+ */
+export const getMembers = async (options: TMemberListOptions) => {
+  return await client.members.getMembers({
+    query: {
+      ...options,
+    },
+  });
+};
 
 /**
  * Get member details from API
@@ -59,7 +71,7 @@ export const parseMember = (member: TMemberResponse): IMember => {
     skills: memberSkills,
     role: memberRole || null,
     teamLead,
-    teams: memberTeams || [],
+    teams: memberTeams,
   };
 };
 
