@@ -66,3 +66,5 @@ export class CreateMemberSchemaDto extends createZodDto(CreateMemberSchema) {}
 export class ResponseMemberSchemaDto extends createZodDto(
   ResponseMemberSchema
 ) {}
+
+export type TMemberResponse = z.infer<typeof ResponseMemberWithRelationsSchema>;
