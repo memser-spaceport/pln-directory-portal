@@ -46,7 +46,7 @@ export abstract class BaseOption {
         .filter((field) => !field.includes('.'))
         .join(',');
 
-    optionValues().forEach((valueField) => {
+    for (const valueField of optionValues()) {
       let fieldName = getFieldWithoutPrefix(valueField);
       if (
         excludeOptions.allowNested !== true &&
@@ -63,19 +63,22 @@ export abstract class BaseOption {
       if (
         has(query.fields, fieldName) &&
         (excludeOptions.onlyPrimitiveFields !== true ||
-          typeof get(query.fields, fieldName) === 'boolean') &&
+          typeof get(query.fields, fieldName) === 'boolean' ||
+          has(query.fields, `${fieldName}._type`)) &&
         (excludeOptions.onlyRelatedFields !== true ||
-          typeof query.fields[fieldName.split('.')[0]] !== 'boolean')
+          (typeof get(query.fields, fieldName) !== 'boolean' &&
+            !has(query.fields, `${fieldName}._type`)))
       ) {
-        return;
+        continue;
       }
       if (hasJustOneField()) {
-        return unset(query.source, optionKey);
+        unset(query.source, optionKey);
+        break;
       }
       query.source[optionKey] = String(query.source[optionKey])
         .split(',')
         .filter((field) => field !== valueField)
         .join(',');
-    });
+    }
   }
 }

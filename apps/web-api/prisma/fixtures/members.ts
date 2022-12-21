@@ -4,22 +4,28 @@ import sampleSize from 'lodash/sampleSize';
 import { Factory } from 'fishery';
 import { faker } from '@faker-js/faker';
 import { prisma } from './../index';
-import { Member } from '@prisma/client';
+import { Member, Prisma } from '@prisma/client';
+import { camelCase } from 'lodash';
 
-const getLocationUids = async () => {
-  return await prisma.location.findMany({
+const getUidsFrom = async (model, where = {}) => {
+  return await prisma[camelCase(model)].findMany({
     select: {
       uid: true,
     },
+    where,
   });
 };
 
 const membersFactory = Factory.define<Member>(({ sequence, onCreate }) => {
   onCreate(async (member) => {
     const locationUids = await (
-      await getLocationUids()
+      await getUidsFrom(Prisma.ModelName.Location)
     ).map((result) => result.uid);
     member.locationUid = sample(locationUids) || '';
+    const imageUids = await (
+      await getUidsFrom(Prisma.ModelName.Image, { thumbnailToUid: null })
+    ).map((result) => result.uid);
+    member.imageUid = sample(imageUids) || '';
     return member;
   });
 
@@ -29,7 +35,7 @@ const membersFactory = Factory.define<Member>(({ sequence, onCreate }) => {
     uid: faker.helpers.slugify(`uid-${name.toLowerCase()}`),
     name,
     email: faker.internet.email(),
-    image: faker.image.animals(),
+    imageUid: '',
     githubHandler: faker.internet.userName(name),
     discordHandler: faker.internet.userName(name),
     twitterHandler: faker.internet.userName(name),
@@ -43,24 +49,8 @@ const membersFactory = Factory.define<Member>(({ sequence, onCreate }) => {
 
 export const members = async () => await membersFactory.createList(800);
 
-const getSkillUids = async () => {
-  return await prisma.skill.findMany({
-    select: {
-      uid: true,
-    },
-  });
-};
-
-const getTechnologyUids = async () => {
-  return await prisma.technology.findMany({
-    select: {
-      uid: true,
-    },
-  });
-};
-
 export const memberRelations = async (members) => {
-  const skillUids = await getSkillUids();
+  const skillUids = await getUidsFrom(Prisma.ModelName.Skill);
   const randomSkills = sampleSize(skillUids, random(0, skillUids.length));
 
   return members.map((member) => ({

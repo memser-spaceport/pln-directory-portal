@@ -32,7 +32,7 @@ export async function createMember({ amount }: TestFactorySeederParams) {
       uid: `uid-${sequence}`,
       name: 'name',
       email: `email-${sequence}@mail.com`,
-      image: 'image',
+      imageUid: null,
       githubHandler: 'githubHandler',
       discordHandler: 'discordHandler',
       twitterHandler: 'twitterHandler',

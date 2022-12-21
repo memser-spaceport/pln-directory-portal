@@ -35,7 +35,7 @@ export class RelationsOption extends BaseOption implements FilterOption {
         (fields, currentField) => ({
           ...fields,
           ...(currentField.includes('.')
-            ? set({}, currentField.replace(/\./g, '.select.'), true)
+            ? set({}, currentField.replace(/\./g, '.include.'), true)
             : {
                 [currentField]: true,
               }),

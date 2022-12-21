@@ -25,6 +25,11 @@ export const CreateImageSchema = z.object({
 
 export const ResponseImageSchema = ImageSchema.omit({ id: true }).strict();
 
+export const ResponseImageWithRelationsSchema = ResponseImageSchema.extend({
+  thumbnailTo: ResponseImageSchema.optional(),
+  thumbnails: ResponseImageSchema.array().optional(),
+});
+
 export const ResponseCreateImageSchema = z.object({
   image: ResponseImageSchema.extend({
     thumbnails: ResponseImageSchema.array(),

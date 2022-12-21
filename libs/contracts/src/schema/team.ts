@@ -2,6 +2,7 @@ import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
 import { ResponseAcceleratorProgramSchema } from './accelerator-program';
 import { ResponseFundingStageSchema } from './funding-stage';
+import { ResponseImageWithRelationsSchema } from './image';
 import { ResponseIndustryTagSchema } from './industry-tag';
 import { ResponseMemberSchema } from './member';
 import { QueryParams } from './query-params';
@@ -12,7 +13,7 @@ export const TeamSchema = z.object({
   id: z.number().int(),
   uid: z.string(),
   name: z.string(),
-  logo: z.string().nullish(),
+  logoUid: z.string().nullish(),
   blog: z.string().nullish(),
   website: z.string().nullish(),
   twitterHandler: z.string().nullish(),
@@ -30,7 +31,7 @@ export const TeamSchema = z.object({
 
 export const CreateTeamSchema = TeamSchema.pick({
   name: true,
-  logo: true,
+  logoUid: true,
   blog: true,
   website: true,
   twitterHandler: true,
@@ -45,6 +46,7 @@ export const CreateTeamSchema = TeamSchema.pick({
 export const ResponseTeamSchema = TeamSchema.omit({ id: true }).strict();
 
 export const ResponseTeamWithRelationsSchema = ResponseTeamSchema.extend({
+  logo: ResponseImageWithRelationsSchema.optional(),
   acceleratorPrograms: ResponseAcceleratorProgramSchema.array().optional(),
   industryTags: ResponseIndustryTagSchema.array().optional(),
   fundingStage: ResponseFundingStageSchema.optional(),
@@ -56,6 +58,7 @@ export const ResponseTeamWithRelationsSchema = ResponseTeamSchema.extend({
 export const TeamQueryableFields = ResponseTeamSchema.keyof();
 
 export const TeamRelationalFields = ResponseTeamWithRelationsSchema.pick({
+  logo: true,
   acceleratorPrograms: true,
   industryTags: true,
   fundingStage: true,
