@@ -62,7 +62,7 @@ const parseTeam = (team: TTeamResponse): ITeam => {
   return {
     id,
     name,
-    logo: logo || null,
+    logo: logo?.url || null,
     website: website || null,
     twitter: twitter || null,
     shortDescription: shortDescription || null,

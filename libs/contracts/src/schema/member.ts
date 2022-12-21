@@ -1,5 +1,6 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
+import { ResponseImageWithRelationsSchema } from './image';
 import { LocationResponseSchema } from './location';
 import { QueryParams } from './query-params';
 import { ResponseSkillSchema } from './skill';
@@ -11,7 +12,7 @@ export const MemberSchema = z.object({
   uid: z.string(),
   name: z.string(),
   email: z.string(),
-  image: z.string().nullish(),
+  imageUid: z.string().nullish(),
   githubHandler: z.string().nullish(),
   discordHandler: z.string().nullish(),
   twitterHandler: z.string().nullish(),
@@ -25,6 +26,7 @@ export const MemberSchema = z.object({
 export const ResponseMemberSchema = MemberSchema.omit({ id: true }).strict();
 
 export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
+  image: ResponseImageWithRelationsSchema.optional(),
   location: LocationResponseSchema.optional(),
   skills: ResponseSkillSchema.array().optional(),
   teams: z.lazy(() => ResponseTeamSchema.array().optional()),
@@ -34,7 +36,7 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
 export const CreateMemberSchema = MemberSchema.pick({
   name: true,
   email: true,
-  image: true,
+  imageUid: true,
   githubHandler: true,
   discordHandler: true,
   twitterHandler: true,
@@ -44,6 +46,7 @@ export const CreateMemberSchema = MemberSchema.pick({
 });
 
 export const MemberRelationalFields = ResponseMemberWithRelationsSchema.pick({
+  image: true,
   location: true,
   skills: true,
   teams: true,

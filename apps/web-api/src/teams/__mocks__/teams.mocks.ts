@@ -27,7 +27,7 @@ export async function createTeam({ amount }: TestFactorySeederParams) {
       id: sequence,
       uid: `uid-${sequence}`,
       name: `Team ${sequence}`,
-      logo: 'logo',
+      logoUid: null,
       blog: faker.internet.url(),
       website: faker.internet.url(),
       twitterHandler: faker.name.firstName(),

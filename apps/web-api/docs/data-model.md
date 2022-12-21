@@ -7,12 +7,14 @@ classDiagram
     Team "0..n" <--> "0..n" Member
     Member --> "0..n" Skill
     Member --> "0..1" Location
+    Member --> "0..1" Image
     Role "1..n" <-- TeamMemberRole
     Member "1" <-- TeamMemberRole
     Team "1" <-- TeamMemberRole
     IndustryTag --> "1" IndustryCategory
     Team --> "0..n" IndustryTag
     Team --> "0..1" FundingStage
+    Team --> "0..1" Image
     Team --> "0..n" AcceleratorProgram
     Team --> "0..n" Technology
     Image --> "1..n" Image
@@ -23,7 +25,6 @@ classDiagram
       name : string
       shortDescription : string
       longDescription : string
-      logo : string
       website : string
       blog : string
       twitterHandler : string
@@ -84,7 +85,6 @@ classDiagram
       id : integer
       name : string
       email : string
-      image : string
       githubHandler : string
       discordHandler : string
       twitterHandler : string

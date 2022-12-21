@@ -6,11 +6,12 @@ import sample from 'lodash/sample';
 import sampleSize from 'lodash/sampleSize';
 import { prisma } from './../index';
 
-const getUidsFrom = async (model) => {
+const getUidsFrom = async (model, where = {}) => {
   return await prisma[camelCase(model)].findMany({
     select: {
       uid: true,
     },
+    where,
   });
 };
 
@@ -20,6 +21,10 @@ const teamsFactory = Factory.define<Team>(({ sequence, onCreate }) => {
       await getUidsFrom(Prisma.ModelName.FundingStage)
     ).map((result) => result.uid);
     team.fundingStageUid = sample(fundingStageUids) || '';
+    const imageUids = await (
+      await getUidsFrom(Prisma.ModelName.Image, { thumbnailToUid: null })
+    ).map((result) => result.uid);
+    team.logoUid = sample(imageUids) || '';
     return team;
   });
 
@@ -28,7 +33,7 @@ const teamsFactory = Factory.define<Team>(({ sequence, onCreate }) => {
     id: sequence,
     uid: faker.helpers.slugify(`uid-${companyName.toLowerCase()}`),
     name: companyName,
-    logo: faker.image.animals(),
+    logoUid: null,
     blog: faker.internet.url(),
     website: faker.internet.url(),
     twitterHandler: faker.name.firstName(),

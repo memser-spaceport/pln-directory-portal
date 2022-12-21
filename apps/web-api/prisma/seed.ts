@@ -82,6 +82,12 @@ load([
   { [Prisma.ModelName.Role]: roles },
   { [Prisma.ModelName.Location]: locations },
   { [Prisma.ModelName.Technology]: technologies },
+  {
+    [Prisma.ModelName.Image]: {
+      fixtures: originalImages,
+      relations: imageRelations,
+    },
+  },
   { [Prisma.ModelName.Team]: { fixtures: teams, relations: teamRelations } },
   {
     [Prisma.ModelName.Member]: {
@@ -90,12 +96,6 @@ load([
     },
   },
   { [Prisma.ModelName.TeamMemberRole]: teamMemberRoles },
-  {
-    [Prisma.ModelName.Image]: {
-      fixtures: originalImages,
-      relations: imageRelations,
-    },
-  },
 ])
   .then(async () => {
     await prisma.$disconnect();

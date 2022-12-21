@@ -101,15 +101,12 @@ describe('Relations Option', () => {
     });
 
     describe('and with relations specified with a nested primitive field', () => {
-      it('should be included in the Prisma query', () => {
+      it('should be excluded from the Prisma query', () => {
         const prismaQuery = prismaQueryBuilder.build({
           with: 'nested.address',
         });
         const hasRelationsInQuery = TEST_DEFAULT_QUERY_KEY in prismaQuery;
-        expect(hasRelationsInQuery).toBeTruthy();
-        expect(prismaQuery[TEST_DEFAULT_QUERY_KEY]).toStrictEqual({
-          nested: { select: { address: true } },
-        });
+        expect(hasRelationsInQuery).toBeFalsy();
       });
     });
 
@@ -138,7 +135,7 @@ describe('Relations Option', () => {
     describe('and with the different relations and select specified on existing fields', () => {
       it('should account for both on the Prisma query', () => {
         const prismaQuery = prismaQueryBuilder.build({
-          with: 'nested.address',
+          with: 'nested',
           select: 'nestedList.title',
         });
         const hasInvalidRelationsInQuery =
@@ -148,11 +145,7 @@ describe('Relations Option', () => {
           TEST_ADDITIONAL_QUERY_KEY in prismaQuery;
         expect(hasValidRelationsInQuery).toBeTruthy();
         expect(prismaQuery[TEST_ADDITIONAL_QUERY_KEY]).toStrictEqual({
-          nested: {
-            select: {
-              address: true,
-            },
-          },
+          nested: true,
           nestedList: {
             select: {
               title: true,

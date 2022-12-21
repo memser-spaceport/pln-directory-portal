@@ -17,12 +17,13 @@ model Team {
   id                  Int                  @id @default(autoincrement())
   uid                 String               @unique @default(cuid())
   name                String               @unique
-  logo                String?
+  logo                Image?               @relation(fields: [logoUid], references: [uid])
+  logoUid             String?
   blog                String?
   website             String?
   twitterHandler      String?
-  shortDescription     String?
-  longDescription      String?
+  shortDescription    String?
+  longDescription     String?
   plnFriend           Boolean
   startDate           DateTime?
   endDate             DateTime?
@@ -46,7 +47,8 @@ model Member {
   uid             String           @unique @default(cuid())
   name            String
   email           String           @unique
-  image           String?
+  image           Image?           @relation(fields: [imageUid], references: [uid])
+  imageUid        String?
   githubHandler   String?
   discordHandler  String?
   twitterHandler  String?
@@ -162,26 +164,30 @@ model Technology {
   updatedAt DateTime @updatedAt
   teams     Team[]
 }
+
 model Image {
-  id        Int      @id @default(autoincrement())
-  uid       String   @unique @default(cuid())
+  id             Int       @id @default(autoincrement())
+  uid            String    @unique @default(cuid())
   // The cid is not unique because this id represents an array of multiple images
   // with different sizes that can be accessed trough the cid and filename
-  cid       String
-  width     Int
-  height    Int
-  url       String
-  filename  String
-  size      Int
-  type      String
-  version   ImageSize
+  cid            String
+  width          Int
+  height         Int
+  url            String
+  filename       String
+  size           Int
+  type           String
+  version        ImageSize
   // This image can be a thumbnail to other image
   thumbnailToUid String?
-  thumbnailTo Image?   @relation("ImageThumbnails", fields: [thumbnailToUid], references: [uid])
+  thumbnailTo    Image?    @relation("ImageThumbnails", fields: [thumbnailToUid], references: [uid])
   // This image can have multiple thumbnails
-  thumbnails    Image[] @relation("ImageThumbnails")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  thumbnails     Image[]   @relation("ImageThumbnails")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  // Reverse Relations:
+  Team           Team[]
+  Member         Member[]
 }
 
 enum ImageSize {
