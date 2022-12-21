@@ -9,15 +9,19 @@ import { ApiQuery } from '@nestjs/swagger';
  * pass a schema because it does not work well with complex json schemas. 🤷‍♂️
  */
 export const ApiQueryFromZod = (
-  ZodQueryParams: z.ZodOptional<z.ZodObject<any>>
+  ZodQueryParams: z.ZodOptional<z.ZodObject<any>>,
+  filterWithKeys?: string[]
 ) => {
   const zodSchema = zodToJsonSchema(ZodQueryParams.unwrap(), {
     $refStrategy: 'none',
   }) as any;
 
   return applyDecorators(
-    ...Object.entries(zodSchema.properties).map(
-      ([queryKey, queryOptions]: [string, any]) => {
+    ...Object.entries(zodSchema.properties)
+      .filter(
+        ([queryKey]) => !!filterWithKeys && filterWithKeys.includes(queryKey)
+      )
+      .map(([queryKey, queryOptions]: [string, any]) => {
         // Treat arrays as a multiple valued string
         const queryValueType =
           queryOptions.type == 'array' ? 'string' : queryOptions.type;
@@ -28,7 +32,6 @@ export const ApiQueryFromZod = (
           required: false,
           allowEmptyValue: false,
         });
-      }
-    )
+      })
   );
 };

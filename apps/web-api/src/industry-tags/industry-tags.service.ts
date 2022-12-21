@@ -10,8 +10,14 @@ export class IndustryTagsService {
     return this.prisma.industryTag.findMany(queryOptions);
   }
 
-  findOne(uid: string) {
-    return this.prisma.industryTag.findUniqueOrThrow({ where: { uid } });
+  findOne(
+    uid: string,
+    queryOptions: Omit<Prisma.IndustryTagFindUniqueArgsBase, 'where'> = {}
+  ) {
+    return this.prisma.industryTag.findUniqueOrThrow({
+      where: { uid },
+      ...queryOptions,
+    });
   }
 
   // create(

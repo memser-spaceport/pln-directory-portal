@@ -10,7 +10,13 @@ export class SkillsService {
     return this.prisma.skill.findMany(queryOptions);
   }
 
-  findOne(uid: string) {
-    return this.prisma.skill.findUniqueOrThrow({ where: { uid } });
+  findOne(
+    uid: string,
+    queryOptions: Omit<Prisma.SkillFindUniqueArgsBase, 'where'> = {}
+  ) {
+    return this.prisma.skill.findUniqueOrThrow({
+      where: { uid },
+      ...queryOptions,
+    });
   }
 }

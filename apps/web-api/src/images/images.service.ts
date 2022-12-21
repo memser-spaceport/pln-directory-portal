@@ -10,8 +10,14 @@ export class ImagesService {
     return this.prisma.image.findMany();
   }
 
-  findOne(uid: string) {
-    return this.prisma.image.findUniqueOrThrow({ where: { uid } });
+  findOne(
+    uid: string,
+    queryOptions: Omit<Prisma.ImageFindUniqueArgsBase, 'where'> = {}
+  ) {
+    return this.prisma.image.findUniqueOrThrow({
+      where: { uid },
+      ...queryOptions,
+    });
   }
 
   async bulkCreate(

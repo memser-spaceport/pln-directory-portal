@@ -10,7 +10,13 @@ export class TeamsService {
     return this.prisma.team.findMany(queryOptions);
   }
 
-  findOne(uid: string) {
-    return this.prisma.team.findUniqueOrThrow({ where: { uid } });
+  findOne(
+    uid: string,
+    queryOptions: Omit<Prisma.TeamFindUniqueArgsBase, 'where'> = {}
+  ) {
+    return this.prisma.team.findUniqueOrThrow({
+      where: { uid },
+      ...queryOptions,
+    });
   }
 }

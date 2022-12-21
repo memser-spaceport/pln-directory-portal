@@ -10,7 +10,16 @@ export class AcceleratorProgramsService {
     return this.prisma.acceleratorProgram.findMany(queryOptions);
   }
 
-  findOne(uid: string) {
-    return this.prisma.acceleratorProgram.findUniqueOrThrow({ where: { uid } });
+  findOne(
+    uid: string,
+    queryOptions: Omit<
+      Prisma.AcceleratorProgramFindUniqueArgsBase,
+      'where'
+    > = {}
+  ) {
+    return this.prisma.acceleratorProgram.findUniqueOrThrow({
+      where: { uid },
+      ...queryOptions,
+    });
   }
 }

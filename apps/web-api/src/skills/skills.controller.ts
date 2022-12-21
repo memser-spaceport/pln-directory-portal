@@ -9,8 +9,12 @@ import {
 } from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
-import { NOT_FOUND_GLOBAL_RESPONSE_SCHEMA } from '../utils/constants';
+import {
+  NOT_FOUND_GLOBAL_RESPONSE_SCHEMA,
+  RETRIEVAL_QUERY_FILTERS,
+} from '../utils/constants';
 import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
+import { ENABLED_RETRIEVAL_PROFILE } from '../utils/prisma-query-builder/profile/defaults';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { SkillsService } from './skills.service';
 
@@ -35,7 +39,17 @@ export class SkillsController {
   @ApiParam({ name: 'uid', type: 'string' })
   @ApiOkResponseFromZod(ResponseSkillSchema)
   @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
-  findOne(@ApiDecorator() { params: { uid } }: RouteShape['getSkill']) {
-    return this.skillsService.findOne(uid);
+  @ApiQueryFromZod(SkillQueryParams, RETRIEVAL_QUERY_FILTERS)
+  findOne(
+    @Req() request: Request,
+    @ApiDecorator() { params: { uid } }: RouteShape['getSkill']
+  ) {
+    const queryableFields = prismaQueryableFieldsFromZod(ResponseSkillSchema);
+    const builder = new PrismaQueryBuilder(
+      queryableFields,
+      ENABLED_RETRIEVAL_PROFILE
+    );
+    const builtQuery = builder.build(request.query);
+    return this.skillsService.findOne(uid, builtQuery);
   }
 }

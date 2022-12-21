@@ -11,6 +11,9 @@ export const DISABLED_PROFILE: ConfigProfile = {
     ordering: {
       status: 'disabled',
     },
+    orderingChildren: {
+      status: 'disabled',
+    },
     relations: {
       status: 'disabled',
     },
