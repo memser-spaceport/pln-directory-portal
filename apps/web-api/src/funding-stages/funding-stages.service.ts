@@ -10,7 +10,13 @@ export class FundingStagesService {
     return this.prisma.fundingStage.findMany(queryOptions);
   }
 
-  findOne(uid: string) {
-    return this.prisma.fundingStage.findUniqueOrThrow({ where: { uid } });
+  findOne(
+    uid: string,
+    queryOptions: Omit<Prisma.FundingStageFindUniqueArgsBase, 'where'> = {}
+  ) {
+    return this.prisma.fundingStage.findUniqueOrThrow({
+      where: { uid },
+      ...queryOptions,
+    });
   }
 }

@@ -10,7 +10,13 @@ export class MembersService {
     return this.prisma.member.findMany(queryOptions);
   }
 
-  findOne(uid: string) {
-    return this.prisma.member.findUniqueOrThrow({ where: { uid } });
+  findOne(
+    uid: string,
+    queryOptions: Omit<Prisma.MemberFindUniqueArgsBase, 'where'> = {}
+  ) {
+    return this.prisma.member.findUniqueOrThrow({
+      where: { uid },
+      ...queryOptions,
+    });
   }
 }

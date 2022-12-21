@@ -89,6 +89,6 @@ export class OrderChildrenOption extends BaseOption implements FilterOption {
   }
 
   public isAuthorized(profile: ConfigProfile): boolean {
-    return profile.options.ordering.status !== 'disabled';
+    return profile.options.orderingChildren.status !== 'disabled';
   }
 }

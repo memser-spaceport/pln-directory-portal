@@ -10,7 +10,13 @@ export class TechnologiesService {
     return this.prisma.technology.findMany(queryOptions);
   }
 
-  findOne(uid: string) {
-    return this.prisma.technology.findUniqueOrThrow({ where: { uid } });
+  findOne(
+    uid: string,
+    queryOptions: Omit<Prisma.TechnologyFindUniqueArgsBase, 'where'> = {}
+  ) {
+    return this.prisma.technology.findUniqueOrThrow({
+      where: { uid },
+      ...queryOptions,
+    });
   }
 }
