@@ -2,9 +2,8 @@
 
 ```mermaid
 classDiagram
-    direction LR
+    direction TB
 
-    Team "0..n" <--> "0..n" Member
     Member --> "0..n" Skill
     Member --> "0..1" Location
     Member --> "0..1" Image

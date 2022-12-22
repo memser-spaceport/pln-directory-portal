@@ -4,7 +4,6 @@ import { ResponseAcceleratorProgramSchema } from './accelerator-program';
 import { ResponseFundingStageSchema } from './funding-stage';
 import { ResponseImageWithRelationsSchema } from './image';
 import { ResponseIndustryTagSchema } from './industry-tag';
-import { ResponseMemberSchema } from './member';
 import { QueryParams } from './query-params';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
 import { ResponseTechnologySchema } from './technology';
@@ -50,8 +49,9 @@ export const ResponseTeamWithRelationsSchema = ResponseTeamSchema.extend({
   acceleratorPrograms: ResponseAcceleratorProgramSchema.array().optional(),
   industryTags: ResponseIndustryTagSchema.array().optional(),
   fundingStage: ResponseFundingStageSchema.optional(),
-  members: z.lazy(() => ResponseMemberSchema.array().optional()),
-  teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
+  teamMemberRoles: z.lazy(() =>
+    ResponseTeamMemberRoleSchema.array().optional()
+  ),
   technologies: ResponseTechnologySchema.array().optional(),
 });
 
@@ -62,7 +62,6 @@ export const TeamRelationalFields = ResponseTeamWithRelationsSchema.pick({
   acceleratorPrograms: true,
   industryTags: true,
   fundingStage: true,
-  members: true,
   teamMemberRoles: true,
   technologies: true,
 }).strip();

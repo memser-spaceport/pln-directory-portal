@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMemberSchema } from './member';
 import { ResponseRoleSchema } from './role';
 import { ResponseTeamSchema } from './team';
 
@@ -12,7 +13,8 @@ export const TeamMemberRoleSchema = z.object({
 });
 
 export const ResponseTeamMemberRoleSchema = TeamMemberRoleSchema.extend({
-  team: z.lazy(() => ResponseTeamSchema),
+  member: z.lazy(() => ResponseTeamSchema),
+  team: z.lazy(() => ResponseMemberSchema),
   role: ResponseRoleSchema,
 })
   .omit({
