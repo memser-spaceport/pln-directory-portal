@@ -34,7 +34,12 @@ export const LOOKUP_FILTER_MAP: Map<LookupFilter, BuildQueryFunction> = new Map(
               ? prop
               : value === 'null' && nullable
               ? prop.replace(/\./g, '.none.')
-              : prop.replace(/\./g, '.some.');
+              : prop
+                  .replace(/\./g, '.some.')
+                  .replace(
+                    /(?<last>\.some\..*)(\.some\.)(?<field>\w+)$/,
+                    '$1.is.$3'
+                  );
           const prismaQueryValue = [
             {
               is: +value,

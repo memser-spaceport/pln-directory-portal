@@ -2,6 +2,7 @@ import isString from 'lodash/isString';
 import { ConfigProfile } from '../../profile/config-profile';
 import { BaseOption, FilterOption, FilterOptionQuery } from './filter-option';
 import set from 'lodash/set';
+import { has } from 'lodash';
 
 export class RelationsOption extends BaseOption implements FilterOption {
   private paramKey = 'with';
@@ -35,7 +36,7 @@ export class RelationsOption extends BaseOption implements FilterOption {
         (fields, currentField) => ({
           ...fields,
           ...(currentField.includes('.')
-            ? set({}, currentField.replace(/\./g, '.include.'), true)
+            ? set(fields, currentField.replace(/\./g, '.include.'), true)
             : {
                 [currentField]: true,
               }),

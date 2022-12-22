@@ -19,6 +19,12 @@ describe('Relations Option', () => {
         email: true,
         nested: {
           address: true,
+          roles: {
+            _many: true,
+          },
+          skills: {
+            _many: true,
+          },
         },
         nestedList: {
           _many: true,
@@ -149,6 +155,24 @@ describe('Relations Option', () => {
           nestedList: {
             select: {
               title: true,
+            },
+          },
+        });
+      });
+    });
+
+    describe('and with nested relations specified on existing fields', () => {
+      it('should account for both on the Prisma query', () => {
+        const prismaQuery = prismaQueryBuilder.build({
+          with: 'nested.roles,nested.skills',
+        });
+        const hasRelationsInQuery = TEST_DEFAULT_QUERY_KEY in prismaQuery;
+        expect(hasRelationsInQuery).toBeTruthy();
+        expect(prismaQuery[TEST_DEFAULT_QUERY_KEY]).toStrictEqual({
+          nested: {
+            include: {
+              roles: true,
+              skills: true,
             },
           },
         });

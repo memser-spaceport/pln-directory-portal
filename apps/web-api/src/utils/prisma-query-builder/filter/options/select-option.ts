@@ -27,7 +27,7 @@ export class SelectOption extends BaseOption implements FilterOption {
       (fields, currentField) => ({
         ...fields,
         ...(currentField.includes('.')
-          ? set({}, currentField.replace(/\./g, '.select.'), true)
+          ? set(fields, currentField.replace(/\./g, '.select.'), true)
           : {
               [currentField]: true,
             }),

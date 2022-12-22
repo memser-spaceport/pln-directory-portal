@@ -4,7 +4,6 @@ import { ResponseImageWithRelationsSchema } from './image';
 import { LocationResponseSchema } from './location';
 import { QueryParams } from './query-params';
 import { ResponseSkillSchema } from './skill';
-import { ResponseTeamSchema } from './team';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
 
 export const MemberSchema = z.object({
@@ -29,8 +28,9 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   image: ResponseImageWithRelationsSchema.optional(),
   location: LocationResponseSchema.optional(),
   skills: ResponseSkillSchema.array().optional(),
-  teams: z.lazy(() => ResponseTeamSchema.array().optional()),
-  teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
+  teamMemberRoles: z.lazy(() =>
+    ResponseTeamMemberRoleSchema.array().optional()
+  ),
 });
 
 export const CreateMemberSchema = MemberSchema.pick({
@@ -49,7 +49,6 @@ export const MemberRelationalFields = ResponseMemberWithRelationsSchema.pick({
   image: true,
   location: true,
   skills: true,
-  teams: true,
   teamMemberRoles: true,
 }).strip();
 
