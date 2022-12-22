@@ -106,7 +106,13 @@ jest.mock('@protocol-labs-network/shared/data-access', () => ({
             createdAt: '2022-06-03T13:50:22.472Z',
             updatedAt: '2022-12-09T00:14:46.849Z',
           },
-          members: [],
+          teamMemberRoles: [
+            { member: { uid: 'uid-01' } },
+            { member: { uid: 'uid-02' } },
+            { member: { uid: 'uid-01' } },
+            { member: { uid: 'uid-03' } },
+            { member: { uid: 'uid-02' } },
+          ],
         },
 
         status: 200,
@@ -137,7 +143,7 @@ describe('getTeam', () => {
       fundingStage: 'Series A',
       tags: ['Video app & storage', 'Decentralized Identity', 'VR/AR'],
       acceleratorPrograms: ['Cypher', 'Faber', 'Tachyon'],
-      members: [],
+      members: ['uid-01', 'uid-02', 'uid-03'],
     });
     expect(status).toEqual(200);
   });
