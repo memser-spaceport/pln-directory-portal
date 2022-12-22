@@ -40,7 +40,7 @@ export async function handleRequest(request) {
 
   // Construct the actual file URL located at a public gateway:
   // https://web3.storage/docs/how-tos/retrieve/#using-an-ipfs-http-gateway
-  const fileURL = `https://${cid}.ipfs.dweb.link/${filename}`;
+  const fileURL = `https://w3s.link/ipfs/${cid}/${filename}`;
 
   // Store expected response data according to the file fetching result:
   let headers;
