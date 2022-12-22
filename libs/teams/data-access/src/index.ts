@@ -49,7 +49,7 @@ const parseTeam = (team: TTeamResponse): ITeam => {
     acceleratorPrograms,
     industryTags: tags,
     fundingStage,
-    members,
+    teamMemberRoles,
   } = team;
 
   const filecoinUser = technologies
@@ -74,6 +74,12 @@ const parseTeam = (team: TTeamResponse): ITeam => {
       ? acceleratorPrograms.map((program) => program.title)
       : [],
     tags: tags?.length ? tags.map((tag) => tag.title) : [],
-    members: members?.length ? members.map((member) => member.uid) : [],
+    members: teamMemberRoles?.length
+      ? [
+          ...new Set(
+            teamMemberRoles.map((teamMemberRole) => teamMemberRole.member.uid)
+          ),
+        ]
+      : [],
   };
 };
