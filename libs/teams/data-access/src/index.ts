@@ -77,7 +77,9 @@ const parseTeam = (team: TTeamResponse): ITeam => {
     members: teamMemberRoles?.length
       ? [
           ...new Set(
-            teamMemberRoles.map((teamMemberRole) => teamMemberRole.member.uid)
+            teamMemberRoles.map(
+              (teamMemberRole) => teamMemberRole.member?.uid || ''
+            )
           ),
         ]
       : [],
