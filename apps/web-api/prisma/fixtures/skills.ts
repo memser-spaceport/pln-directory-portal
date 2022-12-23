@@ -1,15 +1,16 @@
-import { Factory } from 'fishery';
 import { faker } from '@faker-js/faker';
 import { Skill } from '@prisma/client';
+import { Factory } from 'fishery';
 
-export const skillFactory = Factory.define<Skill>(({ sequence }) => ({
-  id: sequence,
-  uid: `uid-${sequence}`,
-  title: `Skill ${sequence}`,
-  description: `Skill ${sequence} description`,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-}));
+export const skillFactory = Factory.define<Omit<Skill, 'id'>>(
+  ({ sequence }) => ({
+    uid: `uid-${sequence}`,
+    title: `Skill ${sequence}`,
+    description: `Skill ${sequence} description`,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  })
+);
 
 export const skills = [
   'AI',

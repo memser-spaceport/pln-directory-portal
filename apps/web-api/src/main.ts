@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/node';
 import { AppModule } from './app.module';
 import { mainConfig } from './main.config';
 import { APP_ENV } from './utils/constants';
+import agent from './utils/forest-admin/agent';
 
 export async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -32,6 +33,8 @@ export async function bootstrap() {
       process.env.ENVIRONMENT === APP_ENV.STAGING,
   });
 
+  await agent.mountOnNestJs(app).start();
   await app.listen(process.env.PORT || 3000);
 }
+
 bootstrap();

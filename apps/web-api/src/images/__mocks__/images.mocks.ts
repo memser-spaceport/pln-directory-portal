@@ -4,9 +4,8 @@ import { prisma } from '../../../prisma/__mocks__/index';
 import { TestFactorySeederParams } from '../../utils/factory-interfaces';
 
 export async function createImage({ amount }: TestFactorySeederParams) {
-  const imageFactory = Factory.define<Image>(({ sequence }) => {
+  const imageFactory = Factory.define<Omit<Image, 'id'>>(({ sequence }) => {
     const image = {
-      id: sequence + 100,
       uid: `uid-${sequence}`,
       cid: 'cid',
       width: 33,

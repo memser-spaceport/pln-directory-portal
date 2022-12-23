@@ -64,7 +64,10 @@ describe('MainConfig', () => {
       const jsonSpy = jest.spyOn(bodyParser, 'json');
       mainConfig(appMock);
       expect(useSpy).toHaveBeenCalled();
-      expect(jsonSpy).toHaveBeenCalledWith({ limit: '100kb' });
+      expect(jsonSpy).toHaveBeenCalledWith({
+        limit: '100kb',
+        type: 'text/plain',
+      });
     });
     it('should enable helmet', () => {
       const useSpy = jest.spyOn(appMock, 'use');

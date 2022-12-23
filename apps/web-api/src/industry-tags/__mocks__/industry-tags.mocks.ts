@@ -4,9 +4,8 @@ import { prisma } from '../../../prisma/__mocks__/index';
 import { TestFactorySeederParams } from '../../utils/factory-interfaces';
 
 async function createIndustryCategory() {
-  const industryCategoryFactory = Factory.define<IndustryCategory>(
+  const industryCategoryFactory = Factory.define<Omit<IndustryCategory, 'id'>>(
     ({ sequence }) => ({
-      id: sequence,
       uid: `industry-category-${sequence}`,
       title: `Industry Category Title ${sequence}`,
       createdAt: new Date(),
@@ -21,19 +20,20 @@ async function createIndustryCategory() {
 export async function createIndustryTags({ amount }: TestFactorySeederParams) {
   const industryCategory = await createIndustryCategory();
 
-  const industryTagFactory = Factory.define<IndustryTag>(({ sequence }) => {
-    const industryTag = {
-      id: sequence,
-      uid: `uid-${sequence}`,
-      title: `Industry Tag ${sequence}`,
-      definition: 'Industry Tag Definition',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      industryCategoryUid: industryCategory.uid,
-    };
+  const industryTagFactory = Factory.define<Omit<IndustryTag, 'id'>>(
+    ({ sequence }) => {
+      const industryTag = {
+        uid: `uid-${sequence}`,
+        title: `Industry Tag ${sequence}`,
+        definition: 'Industry Tag Definition',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        industryCategoryUid: industryCategory.uid,
+      };
 
-    return industryTag;
-  });
+      return industryTag;
+    }
+  );
 
   const industryTags = await industryTagFactory.buildList(amount);
   await prisma.industryTag.createMany({

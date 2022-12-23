@@ -6,19 +6,18 @@ import { TestFactorySeederParams } from '../../utils/factory-interfaces';
 export async function createAcceleratorProgram({
   amount,
 }: TestFactorySeederParams) {
-  const acceleratorProgramFactory = Factory.define<AcceleratorProgram>(
-    ({ sequence }) => {
-      const acceleratorProgram = {
-        id: sequence,
-        uid: `uid-${sequence}`,
-        title: `Accelerator Program ${sequence}`,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+  const acceleratorProgramFactory = Factory.define<
+    Omit<AcceleratorProgram, 'id'>
+  >(({ sequence }) => {
+    const acceleratorProgram = {
+      uid: `uid-${sequence}`,
+      title: `Accelerator Program ${sequence}`,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
 
-      return acceleratorProgram;
-    }
-  );
+    return acceleratorProgram;
+  });
 
   const acceleratorPrograms = await acceleratorProgramFactory.buildList(amount);
   await prisma.acceleratorProgram.createMany({
