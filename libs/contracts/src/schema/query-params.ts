@@ -80,3 +80,9 @@ export const QueryParams = ({
         }),
     })
     .optional();
+
+export const RETRIEVAL_QUERY_FILTERS: { [prop: string]: true } = {
+  order: true,
+  with: true,
+  select: true,
+};

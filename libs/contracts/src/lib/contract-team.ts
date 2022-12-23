@@ -1,6 +1,7 @@
 import { initContract } from '@ts-rest/core';
 import {
   ResponseTeamWithRelationsSchema,
+  TeamDetailQueryParams,
   TeamQueryParams,
 } from '../schema/team';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
@@ -20,6 +21,7 @@ export const apiTeam = contract.router({
   getTeam: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/teams/:uid`,
+    query: TeamDetailQueryParams,
     responses: {
       200: ResponseTeamWithRelationsSchema,
     },

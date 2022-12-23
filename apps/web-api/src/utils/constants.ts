@@ -30,5 +30,3 @@ export const THUMBNAIL_SIZES = {
   SMALL: 256,
   TINY: 78,
 };
-
-export const RETRIEVAL_QUERY_FILTERS = ['order', 'with', 'select'];
