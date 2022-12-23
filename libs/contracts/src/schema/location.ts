@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { QueryParams } from './query-params';
+import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 
 export const LocationSchema = z.object({
   id: z.number().int(),
@@ -25,3 +25,7 @@ export const LocationQueryableFields = LocationResponseSchema.keyof();
 export const LocationQueryParams = QueryParams({
   queryableFields: LocationQueryableFields,
 });
+
+export const LocationDetailQueryParams = LocationQueryParams.unwrap()
+  .pick(RETRIEVAL_QUERY_FILTERS)
+  .optional();

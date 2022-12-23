@@ -19,7 +19,7 @@ export const ApiQueryFromZod = (
   return applyDecorators(
     ...Object.entries(zodSchema.properties)
       .filter(
-        ([queryKey]) => !!filterWithKeys && filterWithKeys.includes(queryKey)
+        ([queryKey]) => !filterWithKeys || filterWithKeys.includes(queryKey)
       )
       .map(([queryKey, queryOptions]: [string, any]) => {
         // Treat arrays as a multiple valued string

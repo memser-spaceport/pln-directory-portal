@@ -1,6 +1,6 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
-import { QueryParams } from './query-params';
+import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 
 export const FundingStageSchema = z.object({
   id: z.number().int(),
@@ -24,6 +24,10 @@ export const FundingStageQueryableFields = ResponseFundingStageSchema.keyof();
 export const FundingStageQueryParams = QueryParams({
   queryableFields: FundingStageQueryableFields,
 });
+
+export const FundingStageDetailQueryParams = FundingStageQueryParams.unwrap()
+  .pick(RETRIEVAL_QUERY_FILTERS)
+  .optional();
 
 export class CreateFundingStageDto extends createZodDto(
   CreateFundingStageSchema

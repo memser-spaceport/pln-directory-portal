@@ -1,7 +1,7 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
 import { ResponseIndustryCategorySchema } from './industry-category';
-import { QueryParams } from './query-params';
+import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 
 export const IndustryTagSchema = z.object({
   id: z.number().int(),
@@ -37,6 +37,10 @@ export const IndustryTagQueryParams = QueryParams({
   queryableFields: IndustryTagQueryableFields,
   relationalFields: IndustryTagRelationalFields,
 });
+
+export const IndustryTagDetailQueryParams = IndustryTagQueryParams.unwrap()
+  .pick(RETRIEVAL_QUERY_FILTERS)
+  .optional();
 
 export class IndustryTagDto extends createZodDto(IndustryTagSchema) {}
 

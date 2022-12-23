@@ -2,7 +2,7 @@ import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
 import { ResponseImageWithRelationsSchema } from './image';
 import { LocationResponseSchema } from './location';
-import { QueryParams } from './query-params';
+import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseSkillSchema } from './skill';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
 
@@ -58,6 +58,10 @@ export const MemberQueryParams = QueryParams({
   queryableFields: MemberQueryableFields,
   relationalFields: MemberRelationalFields,
 });
+
+export const MemberDetailQueryParams = MemberQueryParams.unwrap()
+  .pick(RETRIEVAL_QUERY_FILTERS)
+  .optional();
 
 export class MemberDto extends createZodDto(MemberSchema) {}
 

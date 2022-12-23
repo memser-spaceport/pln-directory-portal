@@ -1,6 +1,10 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
-import { FundingStageQueryParams, ResponseFundingStageSchema } from '../schema';
+import {
+  FundingStageDetailQueryParams,
+  FundingStageQueryParams,
+  ResponseFundingStageSchema,
+} from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
 const contract = initContract();
@@ -18,6 +22,7 @@ export const apiFundingStages = contract.router({
   getFundingStage: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/funding-stages/:uid`,
+    query: FundingStageDetailQueryParams,
     responses: {
       200: ResponseFundingStageSchema,
     },

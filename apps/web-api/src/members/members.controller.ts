@@ -3,16 +3,14 @@ import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
 import {
+  MemberDetailQueryParams,
   MemberQueryParams,
   ResponseMemberWithRelationsSchema,
 } from 'libs/contracts/src/schema';
 import { apiMembers } from '../../../../libs/contracts/src/lib/contract-member';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
-import {
-  NOT_FOUND_GLOBAL_RESPONSE_SCHEMA,
-  RETRIEVAL_QUERY_FILTERS,
-} from '../utils/constants';
+import { NOT_FOUND_GLOBAL_RESPONSE_SCHEMA } from '../utils/constants';
 import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { ENABLED_RETRIEVAL_PROFILE } from '../utils/prisma-query-builder/profile/defaults';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
@@ -41,7 +39,7 @@ export class MemberController {
   @ApiParam({ name: 'uid', type: 'string' })
   @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
   @ApiOkResponseFromZod(ResponseMemberWithRelationsSchema)
-  @ApiQueryFromZod(MemberQueryParams, RETRIEVAL_QUERY_FILTERS)
+  @ApiQueryFromZod(MemberDetailQueryParams)
   findOne(
     @Req() request: Request,
     @ApiDecorator() { params: { uid } }: RouteShape['getMember']
