@@ -27,6 +27,7 @@ export interface IAirtableTeamFields {
   'Funding Stage'?: string;
   'Accelerator Programs'?: string[];
   'Friend of PLN'?: boolean;
+  'Preferred Method of Contact'?: string;
 }
 
 export interface IAirtableTeamLogo {

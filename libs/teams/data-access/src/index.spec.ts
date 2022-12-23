@@ -144,6 +144,7 @@ describe('getTeam', () => {
       tags: ['Video app & storage', 'Decentralized Identity', 'VR/AR'],
       acceleratorPrograms: ['Cypher', 'Faber', 'Tachyon'],
       members: ['uid-01', 'uid-02', 'uid-03'],
+      contactMethod: null,
     });
     expect(status).toEqual(200);
   });

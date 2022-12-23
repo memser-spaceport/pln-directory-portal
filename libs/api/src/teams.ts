@@ -11,5 +11,6 @@ export interface ITeam {
   name: string | null;
   shortDescription: string | null;
   twitter: string | null;
+  contactMethod: string | null;
   website: string | null;
 }

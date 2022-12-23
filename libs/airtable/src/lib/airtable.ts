@@ -220,6 +220,7 @@ class AirtableService {
       name: team.fields.Name || null,
       shortDescription: team.fields['Short description'] || null,
       twitter: team.fields.Twitter || null,
+      contactMethod: team.fields['Preferred Method of Contact'] || null,
       /**
        * TODO: Remove the website split when Airtable data gets fixed.
        *

@@ -83,5 +83,6 @@ const parseTeam = (team: TTeamResponse): ITeam => {
           ),
         ]
       : [],
+    contactMethod: null, // TODO: Update this when the API adds this field
   };
 };

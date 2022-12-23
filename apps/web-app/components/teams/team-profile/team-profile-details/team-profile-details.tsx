@@ -1,34 +1,48 @@
 import { ITeam } from '@protocol-labs-network/api';
 import { CollapsibleText, Tooltip } from '@protocol-labs-network/ui';
 import { ProfileSocialLink } from '../../../shared/profile/profile-social-link/profile-social-link';
+import { ContactMethod } from './contact-method/contact-method';
 
 export function TeamProfileDetails({
   website,
   twitter,
+  contactMethod,
   longDescription,
   shortDescription,
 }: ITeam) {
   return (
     <>
-      <div className="mt-6 flex">
-        <div className="flex w-1/2 flex-col items-start">
+      <div className="mt-6 flex space-x-6">
+        <div className="flex flex-1 flex-col items-start">
           <h2 className="detail-label">Website</h2>
           {website ? (
             <Tooltip
               asChild
-              trigger={<ProfileSocialLink url={website} />}
+              trigger={
+                <div>
+                  <ProfileSocialLink url={website} />
+                </div>
+              }
               content={website}
             />
           ) : (
             '-'
           )}
         </div>
-        <div className="flex w-1/2 flex-col items-start">
+        <div className="flex flex-1 flex-col items-start">
+          <h2 className="detail-label">Message us</h2>
+          <ContactMethod contactMethod={contactMethod} />
+        </div>
+        <div className="flex flex-1 flex-col items-start">
           <h2 className="detail-label">Twitter</h2>
           {twitter ? (
             <Tooltip
               asChild
-              trigger={<ProfileSocialLink url={twitter} type="twitter" />}
+              trigger={
+                <div>
+                  <ProfileSocialLink url={twitter} type="twitter" />
+                </div>
+              }
               content={twitter}
             />
           ) : (
