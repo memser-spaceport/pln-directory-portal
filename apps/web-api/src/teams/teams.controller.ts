@@ -5,14 +5,12 @@ import { Request } from 'express';
 import { apiTeam } from 'libs/contracts/src/lib/contract-team';
 import {
   ResponseTeamWithRelationsSchema,
+  TeamDetailQueryParams,
   TeamQueryParams,
 } from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
-import {
-  NOT_FOUND_GLOBAL_RESPONSE_SCHEMA,
-  RETRIEVAL_QUERY_FILTERS,
-} from '../utils/constants';
+import { NOT_FOUND_GLOBAL_RESPONSE_SCHEMA } from '../utils/constants';
 import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { ENABLED_RETRIEVAL_PROFILE } from '../utils/prisma-query-builder/profile/defaults';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
@@ -40,7 +38,7 @@ export class TeamsController {
   @ApiParam({ name: 'uid', type: 'string' })
   @ApiOkResponseFromZod(ResponseTeamWithRelationsSchema)
   @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
-  @ApiQueryFromZod(TeamQueryParams, RETRIEVAL_QUERY_FILTERS)
+  @ApiQueryFromZod(TeamDetailQueryParams)
   findOne(
     @Req() request: Request,
     @ApiDecorator() { params: { uid } }: RouteShape['getTeam']

@@ -4,7 +4,7 @@ import { ResponseAcceleratorProgramSchema } from './accelerator-program';
 import { ResponseFundingStageSchema } from './funding-stage';
 import { ResponseImageWithRelationsSchema } from './image';
 import { ResponseIndustryTagSchema } from './industry-tag';
-import { QueryParams } from './query-params';
+import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
 import { ResponseTechnologySchema } from './technology';
 
@@ -70,6 +70,10 @@ export const TeamQueryParams = QueryParams({
   queryableFields: TeamQueryableFields,
   relationalFields: TeamRelationalFields,
 });
+
+export const TeamDetailQueryParams = TeamQueryParams.unwrap()
+  .pick(RETRIEVAL_QUERY_FILTERS)
+  .optional();
 
 export class TeamDto extends createZodDto(TeamSchema) {}
 
