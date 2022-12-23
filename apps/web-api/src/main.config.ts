@@ -12,9 +12,7 @@ export function mainConfig(app: INestApplication) {
   app.enableVersioning({
     type: VersioningType.URI,
   });
-
   app.useGlobalFilters(new NotFoundExceptionFilter());
-
   // Enable CSRF Protection
   // More info: https://github.com/huy97/csrf
   app.use(cookieParser());
@@ -28,15 +26,13 @@ export function mainConfig(app: INestApplication) {
   app.useGlobalFilters(new CsrfFilter());
   // Apply automatic CSRF protection:
   app.useGlobalGuards(new CSRFGuard());
-
   // Enable CORS for the web-app
   app.enableCors({
     origin: ALLOWED_CORS_ORIGINS[process.env.ENVIRONMENT || APP_ENV.DEV],
+    credentials: true,
   });
-
   /* Limiting the size of the body of the request to 100kb. */
-  app.use(json({ limit: '100kb' }));
-
+  app.use(json({ limit: '100kb', type: 'text/plain' }));
   /* Apply helmet to the entire app
   // Default configuration documented here: https://github.com/helmetjs/helmet
   */

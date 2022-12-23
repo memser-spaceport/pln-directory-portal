@@ -5,9 +5,12 @@ export enum APP_ENV {
 }
 
 export const ALLOWED_CORS_ORIGINS = {
-  [APP_ENV.DEV]: /localhost/,
-  [APP_ENV.STAGING]: /.-protocol-labs-spaceport.vercel.app/,
-  [APP_ENV.PRODUCTION]: 'https://www.plnetwork.io',
+  [APP_ENV.DEV]: [/localhost/, /app.forestadmin.com/],
+  [APP_ENV.STAGING]: [
+    /.-protocol-labs-spaceport.vercel.app/,
+    /app.forestadmin.com/,
+  ],
+  [APP_ENV.PRODUCTION]: ['https://www.plnetwork.io', /app.forestadmin.com/],
 };
 
 export const IS_DEV_ENVIRONMENT = process.env.ENVIRONMENT == APP_ENV.DEV;

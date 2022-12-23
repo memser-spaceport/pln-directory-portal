@@ -174,7 +174,7 @@ export class ImagesController {
     // Update thumbnails with the cid and url of the image
     thumbnails.map(async (thumbnail) => {
       thumbnail.cid = cid;
-      thumbnail.url = await this.fileUploadService.getFileUrl(
+      thumbnail.url = await this.fileUploadService.getDecryptedFileUrl(
         cid,
         thumbnail.filename
       );
@@ -187,7 +187,10 @@ export class ImagesController {
         filename: originalName,
         size: originalImage.size,
         height: originalImage.height,
-        url: await this.fileUploadService.getFileUrl(cid, originalName),
+        url: await this.fileUploadService.getDecryptedFileUrl(
+          cid,
+          originalName
+        ),
         width: originalImage.width,
         version: 'ORIGINAL',
         type: originalImage.format,

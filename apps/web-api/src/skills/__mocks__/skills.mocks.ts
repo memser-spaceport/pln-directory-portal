@@ -4,9 +4,8 @@ import { prisma } from '../../../prisma/__mocks__/index';
 import { TestFactorySeederParams } from '../../utils/factory-interfaces';
 
 export async function createSkill({ amount }: TestFactorySeederParams) {
-  const skillFactory = Factory.define<Skill>(({ sequence }) => {
+  const skillFactory = Factory.define<Omit<Skill, 'id'>>(({ sequence }) => {
     const skill = {
-      id: sequence,
       uid: `uid-${sequence}`,
       title: `Skill ${sequence}`,
       description: `Skill ${sequence} description`,
