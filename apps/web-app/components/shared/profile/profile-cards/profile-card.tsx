@@ -36,7 +36,7 @@ export function ProfileCard({
         <div className="h-18 flex items-center p-4">
           <div className="relative mr-4 h-10 w-10 shrink-0">
             <div
-              className={`flex h-10 w-10 overflow-hidden ${
+              className={`relative flex h-10 w-10 overflow-hidden ${
                 isImageRounded ? 'rounded-full' : 'rounded-lg'
               }  ${imageUrl ? '' : 'bg-slate-200'}`}
             >

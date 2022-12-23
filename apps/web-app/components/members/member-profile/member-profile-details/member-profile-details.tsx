@@ -21,7 +21,11 @@ export function MemberProfileDetails({
           {email ? (
             <Tooltip
               asChild
-              trigger={<ProfileSocialLink url={email} type="email" />}
+              trigger={
+                <div>
+                  <ProfileSocialLink url={email} type="email" />
+                </div>
+              }
               content={email}
             />
           ) : (
@@ -33,7 +37,11 @@ export function MemberProfileDetails({
           {twitter ? (
             <Tooltip
               asChild
-              trigger={<ProfileSocialLink url={twitter} type="twitter" />}
+              trigger={
+                <div>
+                  <ProfileSocialLink url={twitter} type="twitter" />
+                </div>
+              }
               content={twitter}
             />
           ) : (
@@ -59,7 +67,11 @@ export function MemberProfileDetails({
           {githubHandle ? (
             <Tooltip
               asChild
-              trigger={<ProfileSocialLink url={githubHandle} type="github" />}
+              trigger={
+                <div>
+                  <ProfileSocialLink url={githubHandle} type="github" />
+                </div>
+              }
               content={githubHandle}
             />
           ) : (
