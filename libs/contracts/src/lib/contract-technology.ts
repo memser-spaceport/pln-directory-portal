@@ -1,6 +1,7 @@
 import { initContract } from '@ts-rest/core';
 import {
   ResponseTechnologySchema,
+  TechnologyDetailQueryParams,
   TechnologyQueryParams,
 } from '../schema/technology';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
@@ -20,6 +21,7 @@ export const apiTechnologies = contract.router({
   getTechnology: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/technologies/:uid`,
+    query: TechnologyDetailQueryParams,
     responses: {
       200: ResponseTechnologySchema,
     },

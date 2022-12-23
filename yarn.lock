@@ -5894,20 +5894,20 @@
   resolved "https://registry.yarnpkg.com/@trysound/sax/-/sax-0.2.0.tgz#cccaab758af56761eb7bf37af6f03f326dd798ad"
   integrity sha512-L7z9BgrNEcYyUYtF+HaEfiS5ebkh9jXqbszz7pC0hRBPaatV0XjSD3+eHrpqFemQfgwiFF0QPIarnIihIDn7OA==
 
-"@ts-rest/core@3.6.0":
-  version "3.6.0"
-  resolved "https://registry.yarnpkg.com/@ts-rest/core/-/core-3.6.0.tgz#da56bedf57ee753dc3df0fd7777efa7e4ff1845e"
-  integrity sha512-h7YC0v7c+/mOL6xwBJPEefXBjPJk7+oW1nnv1hqlTYunOqZnVNlfG1niwnc75f7iVVcFWFRRgIKa26oewY85PQ==
+"@ts-rest/core@3.11.2":
+  version "3.11.2"
+  resolved "https://registry.yarnpkg.com/@ts-rest/core/-/core-3.11.2.tgz#c15f5518965b57dba591ae85e84bb07984806bf1"
+  integrity sha512-XEAHiEW0xN9oFW3XWYSlmkECosEbAe6M4HmCc5raBMPaJAS3t7HVZSjrn2q8mnM70T42GweURWt7nV/A7itUZw==
 
-"@ts-rest/nest@3.6.0":
-  version "3.6.0"
-  resolved "https://registry.yarnpkg.com/@ts-rest/nest/-/nest-3.6.0.tgz#47929d77e650294c2fc89f2490a7a31e1079c28d"
-  integrity sha512-5D+IswD2n92eGuhtNgVB8U485emV6FaOgMRNSSCsM3rtIlcb454U+OTAVM4MGrmeam4/mCQTScdQ+iRLuUx6Xg==
+"@ts-rest/nest@3.11.2":
+  version "3.11.2"
+  resolved "https://registry.yarnpkg.com/@ts-rest/nest/-/nest-3.11.2.tgz#0d2bfe38057a4387ad57fdb400e94e2bbf8ef148"
+  integrity sha512-5UrWY0ADF6OISIzVFZo7QTcXUzJsKM1CQMFS35ed7rhtel/qImn7dLM//wJOlMK6Sk1Hg00JGKe0vTBnDeO58A==
 
-"@ts-rest/open-api@^3.6.0":
-  version "3.6.0"
-  resolved "https://registry.yarnpkg.com/@ts-rest/open-api/-/open-api-3.6.0.tgz#204f6f6db3d4651fbc96fe3cbe160eb6d74412ff"
-  integrity sha512-tVbu9mxObUnuecedUJ70QOwPi/pty2O20Qr26WjlMmazZPgukg80QssRNZojo0y49cgbeOHh74NvAWyZ1sh7Mg==
+"@ts-rest/open-api@3.11.2":
+  version "3.11.2"
+  resolved "https://registry.yarnpkg.com/@ts-rest/open-api/-/open-api-3.11.2.tgz#b96b64ae3c775342993d9e46a5a865156b4e02b5"
+  integrity sha512-M4WVRUAE87hIJJRZyn/LaUtFVnJMUYUpfLiEZlHi2SDY6ENttZtZTC+d/hAqwZiGGqnBYaCsy9jjmchPdiiDfw==
 
 "@tsconfig/node10@^1.0.7":
   version "1.0.8"

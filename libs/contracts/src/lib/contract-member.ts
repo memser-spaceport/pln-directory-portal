@@ -1,5 +1,6 @@
 import { initContract } from '@ts-rest/core';
 import {
+  MemberDetailQueryParams,
   MemberQueryParams,
   ResponseMemberWithRelationsSchema,
 } from '../schema';
@@ -20,6 +21,7 @@ export const apiMembers = contract.router({
   getMember: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/members/:uid`,
+    query: MemberDetailQueryParams,
     responses: {
       200: ResponseMemberWithRelationsSchema,
     },

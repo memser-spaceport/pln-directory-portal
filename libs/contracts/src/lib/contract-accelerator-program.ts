@@ -1,5 +1,6 @@
 import { initContract } from '@ts-rest/core';
 import {
+  AcceleratorProgramDetailQueryParams,
   AcceleratorProgramQueryParams,
   ResponseAcceleratorProgramSchema,
 } from '../schema/accelerator-program';
@@ -18,6 +19,7 @@ export const apiAcceleratorProgram = contract.router({
   getAcceleratorProgram: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/accelerator-programs/:uid`,
+    query: AcceleratorProgramDetailQueryParams,
     responses: {
       200: ResponseAcceleratorProgramSchema,
     },
