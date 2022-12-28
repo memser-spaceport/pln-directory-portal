@@ -7,14 +7,15 @@ async function createLocation() {
   const locationFactory = Factory.define<Omit<Location, 'id'>>(
     ({ sequence }) => ({
       uid: `industry-category-${sequence}`,
-      city: 'city',
+      placeId: `placeId-${sequence}`,
+      city: `city-${sequence}`,
       country: 'country',
       continent: 'continent',
-      formattedAddress: 'formattedAddress',
       latitude: 0,
       longitude: 0,
       region: 'region',
       regionAbbreviation: 'regionAbbreviation',
+      metroArea: 'metroArea',
       createdAt: new Date(),
       updatedAt: new Date(),
     })

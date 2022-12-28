@@ -3,10 +3,14 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { PrismaService } from '../prisma.service';
 import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
+import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 
 @Injectable()
 export class MembersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private locationTransferService: LocationTransferService
+  ) {}
 
   findAll(queryOptions: Prisma.MemberFindManyArgs) {
     return this.prisma.member.findMany(queryOptions);
@@ -62,6 +66,10 @@ export class MembersService {
 
       // TODO: Create or connect location
 
+      const { location } = await this.locationTransferService.transferLocation(
+        member
+      );
+
       await this.prisma.member.upsert({
         where: {
           name: member.fields.Name,
@@ -73,6 +81,7 @@ export class MembersService {
         create: {
           name: member.fields.Name,
           plnFriend: member.fields['Friend of PLN'] || false,
+          locationUid: location ? location?.uid : null,
           ...manyToManyRelations,
         },
       });

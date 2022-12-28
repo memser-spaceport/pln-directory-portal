@@ -1,27 +1,27 @@
-import fs from 'fs';
-import { z } from 'zod';
-import uniq from 'lodash/uniq';
-import map from 'lodash/map';
-import { Command, CommandRunner } from 'nest-commander';
-import { IndustryCategoriesService } from '../industry-categories/industry-categories.service';
-import { IndustryTagsService } from '../industry-tags/industry-tags.service';
-import { AirtableService } from '../utils/airtable/airtable.service';
-import { AirtableIndustryTagSchema } from '../utils/airtable/schema/airtable-industry-tag.schema';
-import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schema';
-import { FundingStagesService } from '../funding-stages/funding-stages.service';
-import { AcceleratorProgramsService } from '../accelerator-programs/accelerator-programs.service';
-import { TechnologiesService } from '../technologies/technologies.service';
-import { TeamsService } from '../teams/teams.service';
-import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
-import { SkillsService } from '../skills/skills.service';
-import { RolesService } from '../roles/roles.service';
-import { MembersService } from '../members/members.service';
-import { TeamMemberRolesService } from '../team-member-roles/team-member-roles.service';
 import {
   IAirtableIndustryTag,
   IAirtableMember,
   IAirtableTeam,
 } from '@protocol-labs-network/airtable';
+import fs from 'fs';
+import map from 'lodash/map';
+import uniq from 'lodash/uniq';
+import { Command, CommandRunner } from 'nest-commander';
+import { z } from 'zod';
+import { AcceleratorProgramsService } from '../accelerator-programs/accelerator-programs.service';
+import { FundingStagesService } from '../funding-stages/funding-stages.service';
+import { IndustryCategoriesService } from '../industry-categories/industry-categories.service';
+import { IndustryTagsService } from '../industry-tags/industry-tags.service';
+import { MembersService } from '../members/members.service';
+import { RolesService } from '../roles/roles.service';
+import { SkillsService } from '../skills/skills.service';
+import { TeamMemberRolesService } from '../team-member-roles/team-member-roles.service';
+import { TeamsService } from '../teams/teams.service';
+import { TechnologiesService } from '../technologies/technologies.service';
+import { AirtableService } from '../utils/airtable/airtable.service';
+import { AirtableIndustryTagSchema } from '../utils/airtable/schema/airtable-industry-tag.schema';
+import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
+import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schema';
 
 @Command({
   name: 'migrate-airtable-data',
