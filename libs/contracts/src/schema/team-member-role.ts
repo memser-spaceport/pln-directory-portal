@@ -1,7 +1,9 @@
 import { z } from 'zod';
-import { ResponseMemberSchema } from './member';
-import { ResponseRoleSchema } from './role';
-import { ResponseTeamSchema } from './team';
+import {
+  ResponseMemberSchema,
+  ResponseTeamSchema,
+  ResponseRoleSchema,
+} from './index';
 
 export const TeamMemberRoleSchema = z.object({
   id: z.number().int(),
@@ -15,7 +17,7 @@ export const TeamMemberRoleSchema = z.object({
 export const ResponseTeamMemberRoleSchema = TeamMemberRoleSchema.extend({
   member: z.lazy(() => ResponseMemberSchema).optional(),
   team: z.lazy(() => ResponseTeamSchema).optional(),
-  role: ResponseRoleSchema.optional(),
+  role: z.lazy(() => ResponseRoleSchema).optional(),
 })
   .omit({
     id: true,

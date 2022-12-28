@@ -1,13 +1,20 @@
 import supertest from 'supertest';
 import { Cache } from 'cache-manager';
 import { INestApplication } from '@nestjs/common';
-import { ResponseTeamWithRelationsSchema } from 'libs/contracts/src/schema/team';
 import { createTeam } from './__mocks__/teams.mocks';
 import { bootstrapTestingApp } from '../utils/bootstrap-testing-app';
 
 describe('TeamsService', () => {
   let app: INestApplication;
   let cacheManager: Cache;
+  let ResponseTeamWithRelationsSchema;
+
+  beforeAll(() => {
+    // Fix to avoid circular dependency issue:
+    ({ ResponseTeamWithRelationsSchema } = jest.requireActual(
+      'libs/contracts/src/schema/team'
+    ));
+  });
 
   beforeEach(async () => {
     ({ app, cacheManager } = await bootstrapTestingApp());

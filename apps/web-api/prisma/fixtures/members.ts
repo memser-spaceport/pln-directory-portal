@@ -51,16 +51,18 @@ export const members = async () => await membersFactory.createList(800);
 
 export const memberRelations = async (members) => {
   const skillUids = await getUidsFrom(Prisma.ModelName.Skill);
-  const randomSkills = sampleSize(skillUids, random(0, skillUids.length));
 
-  return members.map((member) => ({
-    where: {
-      id: member.id,
-    },
-    data: {
-      ...(randomSkills.length && {
-        skills: { connect: randomSkills },
-      }),
-    },
-  }));
+  return members.map((member) => {
+    const randomSkills = sampleSize(skillUids, random(0, 5));
+    return {
+      where: {
+        id: member.id,
+      },
+      data: {
+        ...(randomSkills.length && {
+          skills: { connect: randomSkills },
+        }),
+      },
+    };
+  });
 };

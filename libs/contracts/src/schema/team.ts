@@ -49,9 +49,7 @@ export const ResponseTeamWithRelationsSchema = ResponseTeamSchema.extend({
   acceleratorPrograms: ResponseAcceleratorProgramSchema.array().optional(),
   industryTags: ResponseIndustryTagSchema.array().optional(),
   fundingStage: ResponseFundingStageSchema.optional(),
-  teamMemberRoles: z.lazy(() =>
-    ResponseTeamMemberRoleSchema.array().optional()
-  ),
+  teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
   technologies: ResponseTechnologySchema.array().optional(),
 });
 

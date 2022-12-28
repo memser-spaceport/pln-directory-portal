@@ -28,9 +28,7 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   image: ResponseImageWithRelationsSchema.optional(),
   location: LocationResponseSchema.optional(),
   skills: ResponseSkillSchema.array().optional(),
-  teamMemberRoles: z.lazy(() =>
-    ResponseTeamMemberRoleSchema.array().optional()
-  ),
+  teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
 });
 
 export const CreateMemberSchema = MemberSchema.pick({
