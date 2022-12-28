@@ -172,6 +172,22 @@ export const LOOKUP_FILTER_MAP: Map<LookupFilter, BuildQueryFunction> = new Map(
       },
     ],
     [
+      LookupFilter.WITH,
+      {
+        build: ({ prop, value, numeric, fromMany }) => ({
+          AND: value
+            .split(',')
+            .map((val) =>
+              set(
+                {},
+                !fromMany ? prop : prop.replace(/\./g, '.some.'),
+                numeric ? +val : val
+              )
+            ),
+        }),
+      },
+    ],
+    [
       LookupFilter.BETWEEN,
       {
         build: ({ prop, value, fromMany }) => {

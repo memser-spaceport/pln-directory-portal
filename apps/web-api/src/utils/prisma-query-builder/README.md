@@ -81,21 +81,22 @@ It will be transformed into:
 
 ### Available Lookups
 
-| Lookup          | Behaviour                                                   | Example                |
-| --------------- | ----------------------------------------------------------- | ---------------------- |
-| _(none)_        | Return entries that match with value                        | `foo=raul`             |
-| **contains**    | Return entries that contains value                          | `foo__contains=lopez`  |
-| **startswith**  | Return entries that starts with value                       | `foo__startswith=r`    |
-| **endswith**    | Return entries that ends with value                         | `foo__endswith=dev`    |
-| **icontains**   | Return entries that contains value and ignoring case        | `foo__icontains=Lopez` |
-| **istartswith** | Return entries that starts with value and ignoring case     | `foo__istartswith=R`   |
-| **iendswith**   | Return entries that ends with value and ignoring case       | `foo__iendswith=Dev`   |
-| **lt**          | Return entries with value less than or equal to provided    | `foo__lt=18`           |
-| **lte**         | Return entries with value less than provided                | `foo__lte=18`          |
-| **gt**          | Returns entries with value greater than provided            | `foo__gt=18`           |
-| **gte**         | Return entries with value greater than or equal to provided | `foo__gte=18`          |
-| **in**          | Return entries that match with values in list               | `foo__in=admin,common` |
-| **between**     | Return entries in range (numeric, dates)                    | `foo__between=1,27`    |
+| Lookup          | Behaviour                                                   | Example                  |
+| --------------- | ----------------------------------------------------------- | ------------------------ |
+| _(none)_        | Return entries that match with value                        | `foo=raul`               |
+| **contains**    | Return entries that contains value                          | `foo__contains=lopez`    |
+| **startswith**  | Return entries that starts with value                       | `foo__startswith=r`      |
+| **endswith**    | Return entries that ends with value                         | `foo__endswith=dev`      |
+| **icontains**   | Return entries that contains value and ignoring case        | `foo__icontains=Lopez`   |
+| **istartswith** | Return entries that starts with value and ignoring case     | `foo__istartswith=R`     |
+| **iendswith**   | Return entries that ends with value and ignoring case       | `foo__iendswith=Dev`     |
+| **lt**          | Return entries with value less than or equal to provided    | `foo__lt=18`             |
+| **lte**         | Return entries with value less than provided                | `foo__lte=18`            |
+| **gt**          | Returns entries with value greater than provided            | `foo__gt=18`             |
+| **gte**         | Return entries with value greater than or equal to provided | `foo__gte=18`            |
+| **in**          | Return entries that match at least one value on the list    | `foo__in=admin,common`   |
+| **with**        | Return entries that match all values on the list            | `foo__with=admin,common` |
+| **between**     | Return entries in range (numeric, dates)                    | `foo__between=1,27`      |
 
 **Notice**: you can use negative logic prefixing lookup with `__not`.
 

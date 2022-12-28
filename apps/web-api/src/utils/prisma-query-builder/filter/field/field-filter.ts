@@ -88,8 +88,18 @@ export class FieldFilter extends AbstractFilter {
         !this.fieldToBeQueriedComesFromMany && !this.fieldToBeQueriedHasMany
           ? this.prop
           : this.value === 'null' && this.fieldToBeQueriedIsNullable
-          ? this.prop.replace(/\./g, '.none.')
-          : this.prop.replace(/\./g, '.some.');
+          ? this.prop
+              .replace(/\./g, '.none.')
+              .replace(
+                /(?<last>\.none\..*)(\.none\.)(?<field>\w+)$/,
+                '$1.is.$3'
+              )
+          : this.prop
+              .replace(/\./g, '.some.')
+              .replace(
+                /(?<last>\.some\..*)(\.some\.)(?<field>\w+)$/,
+                '$1.is.$3'
+              );
 
       const prismaQueryValue = [
         {
@@ -117,10 +127,31 @@ export class FieldFilter extends AbstractFilter {
           when: this.value !== 'null' || !this.fieldToBeQueriedIsNullable,
         },
       ].find((condition) => !!condition.when)?.is;
+      const hasInclusiveLookup = 'AND' in queryToAdd;
+      const hasMultiValueLookup =
+        prismaQueryPath.includes('some') &&
+        typeof prismaQueryValue === 'string' &&
+        prismaQueryValue.includes(',');
 
-      queryToAdd = {
-        NOT: set({}, prismaQueryPath, prismaQueryValue),
-      };
+      queryToAdd = hasMultiValueLookup
+        ? hasInclusiveLookup
+          ? set(
+              {},
+              `${prismaQueryPath.replace(/\.some\./g, '.none.')}.in`,
+              prismaQueryValue
+                .split(',')
+                .map((val) => (this.fieldToBeQueriedIsNumeric ? +val : val))
+            )
+          : {
+              NOT: {
+                AND: prismaQueryValue
+                  .split(',')
+                  .map((val) => set({}, prismaQueryPath, val)),
+              },
+            }
+        : {
+            NOT: set({}, prismaQueryPath, prismaQueryValue),
+          };
     }
 
     if (Object.keys(queryToAdd).length) {
