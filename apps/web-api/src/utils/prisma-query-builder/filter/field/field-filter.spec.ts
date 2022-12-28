@@ -32,6 +32,9 @@ describe('Field Filter', () => {
       skills: {
         _many: true,
         title: true,
+        level: {
+          _type: 'number',
+        },
         description: {
           _nullable: true,
         },
@@ -288,6 +291,37 @@ describe('Field Filter', () => {
         });
       });
     });
+
+    describe('and with an with lookup', () => {
+      it('should include it in the Prisma query', () => {
+        const prismaQuery = prismaQueryBuilder.build({
+          'skills.title__with': 'joe,carl',
+        });
+        expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
+          AND: [
+            { skills: { some: { title: 'joe' } } },
+            { skills: { some: { title: 'carl' } } },
+          ],
+        });
+      });
+
+      describe('and with an negation operator', () => {
+        it('should include it in the Prisma query', () => {
+          const prismaQuery = prismaQueryBuilder.build({
+            'skills.title__not__with': 'joe,carl',
+          });
+          expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
+            skills: {
+              none: {
+                title: {
+                  in: ['joe', 'carl'],
+                },
+              },
+            },
+          });
+        });
+      });
+    });
   });
 
   // * 4 - Existing nullable field
@@ -509,6 +543,37 @@ describe('Field Filter', () => {
           });
           expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
             NOT: { age: { in: [20, 30] } },
+          });
+        });
+      });
+    });
+
+    describe('and with an with lookup', () => {
+      it('should include it in the Prisma query', () => {
+        const prismaQuery = prismaQueryBuilder.build({
+          'skills.level__with': '10,20',
+        });
+        expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
+          AND: [
+            { skills: { some: { level: 10 } } },
+            { skills: { some: { level: 20 } } },
+          ],
+        });
+      });
+
+      describe('and with an negation operator', () => {
+        it('should include it in the Prisma query', () => {
+          const prismaQuery = prismaQueryBuilder.build({
+            'skills.level__not__with': '10,20',
+          });
+          expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
+            skills: {
+              none: {
+                level: {
+                  in: [10, 20],
+                },
+              },
+            },
           });
         });
       });

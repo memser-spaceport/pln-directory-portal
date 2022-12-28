@@ -11,6 +11,7 @@ export enum LookupFilter {
   ISTARTS_WITH = 'istartswith',
   IENDS_WITH = 'iendswith',
   IN = 'in',
+  WITH = 'with',
   BETWEEN = 'between',
   NOT = 'not',
 }
