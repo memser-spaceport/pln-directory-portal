@@ -10,7 +10,7 @@ classDiagram
     Role "1..n" <-- TeamMemberRole
     Member "1" <-- TeamMemberRole
     Team "1" <-- TeamMemberRole
-    IndustryTag --> "1" IndustryCategory
+    IndustryTag --> "0..1" IndustryCategory
     Team --> "0..n" IndustryTag
     Team --> "0..1" FundingStage
     Team --> "0..1" Image

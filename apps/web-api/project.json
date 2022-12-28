@@ -26,6 +26,17 @@
         }
       }
     },
+    "build:cli": {
+      "executor": "@nrwl/node:webpack",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/apps/web-api",
+        "main": "apps/web-api/src/cli.ts",
+        "outputFileName": "cli.js",
+        "tsConfig": "apps/web-api/tsconfig.build.json",
+        "tsPlugins": ["@nestjs/swagger/plugin"]
+      }
+    },
     "seed": {
       "executor": "@nrwl/workspace:run-commands",
       "options": {

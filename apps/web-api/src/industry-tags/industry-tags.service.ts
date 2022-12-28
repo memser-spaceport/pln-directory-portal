@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { IAirtableIndustryTag } from '@protocol-labs-network/airtable';
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
@@ -18,6 +19,35 @@ export class IndustryTagsService {
       where: { uid },
       ...queryOptions,
     });
+  }
+
+  async insertManyFromAirtable(airtableIndustryTags: IAirtableIndustryTag[]) {
+    const industryCategories = await this.prisma.industryCategory.findMany();
+    return this.prisma.$transaction(
+      airtableIndustryTags.map((industryTag) => {
+        const airtableCategory = !!industryTag.fields.Categories
+          ? industryTag.fields.Categories[0]
+          : '';
+        const relatedCategory = !!industryTag.fields.Categories?.length
+          ? industryCategories.find(
+              (category) => category.title === airtableCategory
+            )
+          : null;
+
+        return this.prisma.industryTag.upsert({
+          where: { title: industryTag.fields.Tags },
+          update: {
+            definition: industryTag.fields.Definition,
+            industryCategoryUid: relatedCategory?.uid,
+          },
+          create: {
+            title: industryTag.fields.Tags,
+            definition: industryTag.fields.Definition,
+            industryCategoryUid: relatedCategory?.uid,
+          },
+        });
+      })
+    );
   }
 
   // create(

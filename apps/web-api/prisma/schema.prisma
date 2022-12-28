@@ -118,21 +118,21 @@ model TeamMemberRole {
 model IndustryCategory {
   id           Int           @id @default(autoincrement())
   uid          String        @unique @default(cuid())
-  title        String
+  title        String        @unique
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   industryTags IndustryTag[]
 }
 
 model IndustryTag {
-  id                  Int              @id @default(autoincrement())
-  uid                 String           @unique @default(cuid())
-  title               String
+  id                  Int               @id @default(autoincrement())
+  uid                 String            @unique @default(cuid())
+  title               String            @unique
   definition          String?
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
-  industryCategory    IndustryCategory @relation(fields: [industryCategoryUid], references: [uid])
-  industryCategoryUid String
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  industryCategory    IndustryCategory? @relation(fields: [industryCategoryUid], references: [uid])
+  industryCategoryUid String?
   teams               Team[]
 }
 
