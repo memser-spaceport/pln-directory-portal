@@ -12,6 +12,7 @@ import { TeamMemberRolesService } from './team-member-roles/team-member-roles.se
 import { TeamsService } from './teams/teams.service';
 import { TechnologiesService } from './technologies/technologies.service';
 import { AirtableService } from './utils/airtable/airtable.service';
+import { LocationTransferService } from './utils/location-transfer/location-transfer.service';
 
 @Module({
   providers: [
@@ -27,6 +28,7 @@ import { AirtableService } from './utils/airtable/airtable.service';
     TeamMemberRolesService,
     IndustryCategoriesService,
     AcceleratorProgramsService,
+    LocationTransferService,
     MigrateAirtableDataCommand,
   ],
 })

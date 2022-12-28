@@ -116,7 +116,7 @@ classDiagram
 
     class Location {
       id : integer
-      formattedAddress : string
+      placeId : string
       latitude : float
       longitude : float
       city : string
@@ -124,6 +124,7 @@ classDiagram
       regionAbbreviation : string
       country : string
       continent : string
+      metroArea : string
       createdAt : datetime
       updatedAt : datetime
     }

@@ -72,19 +72,20 @@ model Skill {
 model Location {
   id                 Int      @id @default(autoincrement())
   uid                String   @unique @default(cuid())
+  placeId            String   @unique
   city               String?
   country            String
   continent          String
   region             String?
   regionAbbreviation String?
-  formattedAddress   String
+  metroArea          String?
   latitude           Float
   longitude          Float
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   members            Member[]
 
-  @@unique([continent, country, region, city, formattedAddress, latitude, longitude])
+  @@unique([continent, country, region, city, metroArea, latitude, longitude])
 }
 
 model Role {

@@ -45,14 +45,15 @@ const locationsFactory = Factory.define<Omit<Location, 'id'>>(
 
     return {
       uid: faker.helpers.slugify(`uid-${city.toLowerCase()}`),
+      placeId: faker.helpers.slugify(`placeId-${city.toLowerCase()}`),
       city,
       country,
       continent,
       region: faker.address.state(),
       regionAbbreviation: faker.address.stateAbbr(),
-      formattedAddress: faker.address.streetAddress(),
       latitude: Number(faker.address.latitude()),
       longitude: Number(faker.address.longitude()),
+      metroArea: faker.address.city(),
       createdAt: faker.date.past(),
       updatedAt: faker.date.recent(),
     };
