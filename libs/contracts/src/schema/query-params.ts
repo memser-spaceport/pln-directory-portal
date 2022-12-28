@@ -16,7 +16,9 @@ const ZodCommaSeparatedQueryValues = (
  * fields of each relational field from any zod object
  */
 const getQueryableNestedFieldsFromZod = (
-  relationalFields: z.ZodObject<z.ZodRawShape>
+  relationalFields: z.ZodObject<z.ZodRawShape>,
+  onlyRelationalNestedFields = false,
+  onlyManyRelationalFields = true
 ) => {
   return Object.entries(relationalFields.shape).reduce(
     (allRelationalFields, [relationalField, options]) => {
@@ -27,15 +29,22 @@ const getQueryableNestedFieldsFromZod = (
         : options;
       // Grab nested fields either from ZodArray or ZodObject:
       const nestedFields = isZodType(z.ZodArray.name)
-        ? ((options as z.ZodArray<z.ZodObject<z.ZodRawShape>>).element.keyof()
-            .options as string[])
-        : [];
+        ? (options as z.ZodArray<z.ZodObject<z.ZodRawShape>>).element.shape
+        : isZodType(z.ZodObject.name) && !onlyManyRelationalFields
+        ? (options as z.ZodObject<z.ZodRawShape>).shape
+        : null;
       return nestedFields
         ? [
             ...allRelationalFields,
-            ...nestedFields.map(
-              (nestedField) => `${relationalField}.${nestedField}`
-            ),
+            ...Object.entries(nestedFields)
+              .filter(
+                (nestedField) =>
+                  (!onlyRelationalNestedFields &&
+                    nestedField[1]._def.typeName !== z.ZodOptional.name) ||
+                  (onlyRelationalNestedFields &&
+                    nestedField[1]._def.typeName === z.ZodOptional.name)
+              )
+              .map((nestedField) => `${relationalField}.${nestedField[0]}`),
           ]
         : allRelationalFields;
     },
@@ -65,8 +74,15 @@ export const QueryParams = ({
       // Relational Query Params:
       ...(!!relationalFields && {
         with: ZodCommaSeparatedQueryValues(
-          // List of relational fields:
-          relationalFields.keyof()
+          // List of nested fields of each relational field:
+          z.enum([
+            ...(relationalFields.keyof().options as [string]),
+            ...(getQueryableNestedFieldsFromZod(
+              relationalFields,
+              true,
+              false
+            ) as [string]),
+          ])
         ).optional(),
       }),
       ...(!!relationalFields &&
