@@ -1,7 +1,9 @@
 import has from 'lodash/has';
 import set from 'lodash/set';
 import get from 'lodash/get';
+import mergeWith from 'lodash/mergeWith';
 import isString from 'lodash/isString';
+import isArray from 'lodash/isArray';
 
 import { LOOKUP_FILTER_MAP } from './field-filter-map';
 import { AbstractFilter } from '../filter';
@@ -129,36 +131,60 @@ export class FieldFilter extends AbstractFilter {
       ].find((condition) => !!condition.when)?.is;
       const hasInclusiveLookup = 'AND' in queryToAdd;
       const hasMultiValueLookup =
-        prismaQueryPath.includes('some') &&
-        typeof prismaQueryValue === 'string' &&
-        prismaQueryValue.includes(',');
+        typeof prismaQueryValue === 'string' && prismaQueryValue.includes(',');
 
+      // Build either a "multi-value-NOT-condition"
+      // (with an inclusive/exclusive nature)
+      // or a "single-value-NOT-condition"
       queryToAdd = hasMultiValueLookup
-        ? hasInclusiveLookup
-          ? set(
-              {},
-              `${prismaQueryPath.replace(/\.some\./g, '.none.')}.in`,
-              prismaQueryValue
-                .split(',')
-                .map((val) => (this.fieldToBeQueriedIsNumeric ? +val : val))
-            )
-          : {
-              NOT: {
-                AND: prismaQueryValue
-                  .split(',')
-                  .map((val) => set({}, prismaQueryPath, val)),
-              },
-            }
+        ? {
+            [hasInclusiveLookup ? 'AND' : 'OR']: prismaQueryValue
+              .split(',')
+              .map((val) => ({
+                NOT: set(
+                  {},
+                  prismaQueryPath,
+                  this.fieldToBeQueriedIsNumeric ? +val : val
+                ),
+              })),
+          }
         : {
             NOT: set({}, prismaQueryPath, prismaQueryValue),
           };
     }
 
+    // Merge all conditions to be added:
     if (Object.keys(queryToAdd).length) {
-      this.query['where'] = {
-        ...this.query['where'],
-        ...queryToAdd,
-      };
+      this.query['where'] = mergeWith(
+        this.query['where'],
+        queryToAdd,
+        (objValue, srcValue) => {
+          if (isArray(objValue) && isArray(srcValue)) {
+            return [...objValue, ...srcValue];
+          }
+        }
+      );
+
+      // Group multiple independent NOT conditions
+      // with single values inside an AND operator:
+      if (
+        'NOT' in this.query['where'] &&
+        Object.keys(this.query['where'].NOT).length > 1
+      ) {
+        this.query['where'].AND = [
+          ...(this.query['where']?.AND || []),
+          ...Object.entries(this.query['where'].NOT).reduce(
+            (conditions, condition: any) => {
+              return [
+                ...conditions,
+                { NOT: Object.fromEntries(new Map([condition])) },
+              ];
+            },
+            []
+          ),
+        ];
+        delete this.query['where']['NOT'];
+      }
     }
   }
 
