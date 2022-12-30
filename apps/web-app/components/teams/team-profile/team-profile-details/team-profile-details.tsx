@@ -23,7 +23,7 @@ export function TeamProfileDetails({
                   <ProfileSocialLink url={website} />
                 </div>
               }
-              content={website}
+              content={<span className="break-all">{website}</span>}
             />
           ) : (
             '-'
