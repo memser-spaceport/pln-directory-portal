@@ -43,7 +43,7 @@ model Member {
   id              Int              @id @default(autoincrement())
   uid             String           @unique @default(cuid())
   name            String           @unique
-  email           String           @unique
+  email           String?          @unique
   image           Image?           @relation(fields: [imageUid], references: [uid])
   imageUid        String?
   githubHandler   String?

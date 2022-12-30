@@ -21,7 +21,7 @@ export const AirtableMemberSchema: z.ZodType<IAirtableMember> = z.lazy(() =>
       Teams: z.string().array().optional(),
       Role: z.string().optional(),
       Location: z.string().optional(),
-      Email: z.string(),
+      Email: z.string().optional(),
       Twitter: z.string().optional(),
       'Discord handle': z.string().optional(),
       Notes: z.string().optional(),

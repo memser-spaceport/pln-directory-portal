@@ -16,12 +16,22 @@ import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.s
 import { SkillsService } from '../skills/skills.service';
 import { RolesService } from '../roles/roles.service';
 import { MembersService } from '../members/members.service';
+import { TeamMemberRolesService } from '../team-member-roles/team-member-roles.service';
+import {
+  IAirtableIndustryTag,
+  IAirtableMember,
+  IAirtableTeam,
+} from '@protocol-labs-network/airtable';
 
 @Command({
   name: 'migrate-airtable-data',
   description: 'A command to migrate data from Airtable into the PL database.',
 })
 export class MigrateAirtableDataCommand extends CommandRunner {
+  private industryTags: IAirtableIndustryTag[];
+  private teams: IAirtableTeam[];
+  private members: IAirtableMember[];
+
   constructor(
     private readonly teamsService: TeamsService,
     private readonly rolesService: RolesService,
@@ -31,6 +41,7 @@ export class MigrateAirtableDataCommand extends CommandRunner {
     private readonly technologiesService: TechnologiesService,
     private readonly industryTagsService: IndustryTagsService,
     private readonly fundingStagesService: FundingStagesService,
+    private readonly teamMemberRolesService: TeamMemberRolesService,
     private readonly industryCategoriesService: IndustryCategoriesService,
     private readonly acceleratorProgramsService: AcceleratorProgramsService
   ) {
@@ -42,7 +53,7 @@ export class MigrateAirtableDataCommand extends CommandRunner {
     await this.insertIndustryTagsWithCategories();
     await this.insertTeamsWithRelationalData();
     await this.insertMembersWithRelationalData();
-    // TODO: Insert Team Member Roles
+    await this.insertTeamMemberRoles();
   }
 
   private validateDataOrFail(
@@ -80,14 +91,14 @@ export class MigrateAirtableDataCommand extends CommandRunner {
 
   private async insertIndustryTagsWithCategories() {
     // Fetch and validate data:
-    const industryTags = await this.airtableService.getAllIndustryTags();
+    this.industryTags = await this.airtableService.getAllIndustryTags();
     this.validateDataOrFail(AirtableIndustryTagSchema.array(), {
-      industryTags,
+      industryTags: this.industryTags,
     });
 
     // Extract categories from tags:
     const industryCategoriesToCreate = uniq([
-      ...map(industryTags, 'fields.Categories')
+      ...map(this.industryTags, 'fields.Categories')
         .filter((val) => !!val)
         .reduce((values, value) => [...values, ...value]),
     ]);
@@ -96,25 +107,25 @@ export class MigrateAirtableDataCommand extends CommandRunner {
     await this.industryCategoriesService.insertManyFromList(
       industryCategoriesToCreate
     );
-    await this.industryTagsService.insertManyFromAirtable(industryTags);
+    await this.industryTagsService.insertManyFromAirtable(this.industryTags);
     this.outputSuccessMessage('Added Industry Tags & Categories');
   }
 
   private async insertTeamsWithRelationalData() {
     // Fetch and validate data:
-    const teams = await this.airtableService.getAllTeams();
+    this.teams = await this.airtableService.getAllTeams();
     this.validateDataOrFail(AirtableTeamSchema.array(), {
-      teams,
+      teams: this.teams,
     });
 
     // Extract funding stages from teams:
     const fundingStagesToCreate = uniq<string>(
-      map(teams, 'fields.Funding Stage').filter((val) => !!val)
+      map(this.teams, 'fields.Funding Stage').filter((val) => !!val)
     );
 
     // Extract accelerator programs from teams:
     const acceleratorProgramsToCreate = uniq<string>(
-      map(teams, 'fields.Accelerator Programs')
+      map(this.teams, 'fields.Accelerator Programs')
         .filter((val) => !!val)
         .reduce((values, value) => [...values, ...value])
     );
@@ -129,28 +140,28 @@ export class MigrateAirtableDataCommand extends CommandRunner {
     await this.acceleratorProgramsService.insertManyFromList(
       acceleratorProgramsToCreate
     );
-    await this.teamsService.insertManyFromAirtable(teams);
+    await this.teamsService.insertManyFromAirtable(this.teams);
 
     this.outputSuccessMessage('Added Teams and their relational data');
   }
 
   private async insertMembersWithRelationalData() {
     // Fetch and validate data:
-    const members = await this.airtableService.getAllMembers();
+    this.members = await this.airtableService.getAllMembers();
     this.validateDataOrFail(AirtableMemberSchema.array(), {
-      members,
+      members: this.members,
     });
 
     // Extract skills from members:
     const skillsToCreate = uniq<string>(
-      map(members, 'fields.Skills')
+      map(this.members, 'fields.Skills')
         .filter((val) => !!val)
         .reduce((values, value) => [...values, ...value])
     );
 
     // Extract roles from members:
     const rolesToCreate = uniq<string>(
-      map(members, 'fields.Role').filter((val) => !!val)
+      map(this.members, 'fields.Role').filter((val) => !!val)
     );
 
     // Extract images from members:
@@ -161,8 +172,17 @@ export class MigrateAirtableDataCommand extends CommandRunner {
     // Insert data on database:
     await this.rolesService.insertManyFromList(rolesToCreate);
     await this.skillsService.insertManyFromList(skillsToCreate);
-    await this.membersService.insertManyWithLocationsFromAirtable(members);
+    await this.membersService.insertManyWithLocationsFromAirtable(this.members);
 
     this.outputSuccessMessage('Added Members and their relational data');
+  }
+
+  private async insertTeamMemberRoles() {
+    await this.teamMemberRolesService.insertManyFromAirtable(
+      this.members,
+      this.teams
+    );
+
+    this.outputSuccessMessage('Added Team Member Roles');
   }
 }

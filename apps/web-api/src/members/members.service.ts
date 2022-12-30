@@ -28,7 +28,12 @@ export class MembersService {
     const skills = await this.prisma.skill.findMany();
 
     for (const member of airtableMembers) {
+      if (!member.fields?.Name) {
+        continue;
+      }
+
       const optionalFieldsToAdd = Object.entries({
+        email: 'Email',
         githubHandler: 'Github Handle',
         discordHandler: 'Discord handle',
         twitterHandler: 'Twitter',
@@ -57,15 +62,16 @@ export class MembersService {
 
       // TODO: Create or connect location
 
-      this.prisma.member.upsert({
-        where: { name: member.fields.Name, email: member.fields.Email },
+      await this.prisma.member.upsert({
+        where: {
+          name: member.fields.Name,
+        },
         update: {
           ...optionalFieldsToAdd,
           ...manyToManyRelations,
         },
         create: {
-          name: member.fields?.Name || '',
-          email: member.fields?.Email || '',
+          name: member.fields.Name,
           plnFriend: member.fields['Friend of PLN'] || false,
           ...manyToManyRelations,
         },
