@@ -16,23 +16,34 @@ export class AirtableService {
   };
 
   private async getFromAirtable(tableId: string | undefined): Promise<any> {
+    const results = [] as any[];
+
     if (!tableId) {
       console.table(this.apiTables);
       throw Error('Missing table id(s)');
     }
 
-    return await axios
-      .get(`${this.apiUrl}/${tableId}`, {
-        headers: {
-          Authorization: `Bearer ${process.env.AIRTABLE_API_KEY}`,
-        },
-      })
-      .then((response) => {
-        return response?.data?.records;
-      })
-      .catch((error) => {
-        throw Error(error);
-      });
+    const fetchResults = async (offset?) => {
+      return await axios
+        .get(`${this.apiUrl}/${tableId}${offset ? `?offset=${offset}` : ''}`, {
+          headers: {
+            Authorization: `Bearer ${process.env.AIRTABLE_API_KEY}`,
+          },
+        })
+        .then(async (response) => {
+          results.push(...response?.data?.records);
+          if (response?.data?.offset) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            await fetchResults(response.data.offset);
+          }
+        })
+        .catch((error) => {
+          throw Error(error);
+        });
+    };
+
+    await fetchResults();
+    return results;
   }
 
   public async getAllTeams(): Promise<IAirtableTeam[]> {

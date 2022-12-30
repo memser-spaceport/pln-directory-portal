@@ -19,4 +19,19 @@ export class SkillsService {
       ...queryOptions,
     });
   }
+
+  async insertManyFromList(skills: string[]) {
+    const uniqueSkills = Array.from(new Set(skills));
+    return await this.prisma.$transaction(
+      uniqueSkills.map((skill) =>
+        this.prisma.skill.upsert({
+          where: { title: skill },
+          update: {},
+          create: {
+            title: skill,
+          },
+        })
+      )
+    );
+  }
 }

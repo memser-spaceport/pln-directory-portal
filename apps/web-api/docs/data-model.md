@@ -27,17 +27,17 @@ classDiagram
       website : string
       blog : string
       twitterHandler : string
-      startDate : datetime
-      endDate : datetime
       plnFriend : boolean
       createdAt : datetime
       updatedAt : datetime
     }
 
     class TeamMemberRole {
-       id : integer
-       mainRole : boolean
-       teamLead : boolean
+      id : integer
+      mainRole : boolean
+      teamLead : boolean
+      startDate : datetime
+      endDate : datetime
     }
 
 

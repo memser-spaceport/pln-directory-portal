@@ -25,8 +25,6 @@ model Team {
   shortDescription    String?
   longDescription     String?
   plnFriend           Boolean
-  startDate           DateTime?
-  endDate             DateTime?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   teamMemberRoles     TeamMemberRole[]
@@ -44,7 +42,7 @@ model Team {
 model Member {
   id              Int              @id @default(autoincrement())
   uid             String           @unique @default(cuid())
-  name            String
+  name            String           @unique
   email           String           @unique
   image           Image?           @relation(fields: [imageUid], references: [uid])
   imageUid        String?
@@ -56,15 +54,15 @@ model Member {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   skills          Skill[]
-  location        Location         @relation(fields: [locationUid], references: [uid])
-  locationUid     String
+  location        Location?        @relation(fields: [locationUid], references: [uid])
+  locationUid     String?
   teamMemberRoles TeamMemberRole[]
 }
 
 model Skill {
   id          Int      @id @default(autoincrement())
   uid         String   @unique @default(cuid())
-  title       String
+  title       String   @unique
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -92,25 +90,25 @@ model Location {
 model Role {
   id              Int              @id @default(autoincrement())
   uid             String           @unique @default(cuid())
-  title           String
+  title           String           @unique
   description     String?
-  startDate       DateTime?
-  endDate         DateTime?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   teamMemberRoles TeamMemberRole[]
 }
 
 model TeamMemberRole {
-  id       Int     @id @default(autoincrement())
-  mainRole Boolean
-  teamLead Boolean
-  member   Member  @relation(fields: [memberId], references: [id])
-  memberId Int
-  team     Team    @relation(fields: [teamId], references: [id])
-  teamId   Int
-  role     Role    @relation(fields: [roleId], references: [id])
-  roleId   Int
+  id        Int       @id @default(autoincrement())
+  mainRole  Boolean
+  teamLead  Boolean
+  startDate DateTime?
+  endDate   DateTime?
+  member    Member    @relation(fields: [memberId], references: [id])
+  memberId  Int
+  team      Team      @relation(fields: [teamId], references: [id])
+  teamId    Int
+  role      Role      @relation(fields: [roleId], references: [id])
+  roleId    Int
 
   @@unique([memberId, teamId, roleId])
 }
@@ -139,7 +137,7 @@ model IndustryTag {
 model FundingStage {
   id        Int      @id @default(autoincrement())
   uid       String   @unique @default(cuid())
-  title     String
+  title     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   teams     Team[]
@@ -148,7 +146,7 @@ model FundingStage {
 model AcceleratorProgram {
   id        Int      @id @default(autoincrement())
   uid       String   @unique @default(cuid())
-  title     String
+  title     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   teams     Team[]
@@ -157,7 +155,7 @@ model AcceleratorProgram {
 model Technology {
   id        Int      @id @default(autoincrement())
   uid       String   @unique @default(cuid())
-  title     String
+  title     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   teams     Team[]

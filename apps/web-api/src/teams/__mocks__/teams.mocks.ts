@@ -36,8 +36,6 @@ export async function createTeam({ amount }: TestFactorySeederParams) {
       filecoinUser: true,
       ipfsUser: true,
       plnFriend: true,
-      startDate: new Date(),
-      endDate: new Date(),
       createdAt: new Date(),
       updatedAt: new Date(),
       fundingStageUid: fundingStage.uid,

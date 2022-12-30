@@ -19,4 +19,19 @@ export class FundingStagesService {
       ...queryOptions,
     });
   }
+
+  async insertManyFromList(fundingStages: string[]) {
+    const uniqueFundingStages = Array.from(new Set(fundingStages));
+    return await this.prisma.$transaction(
+      uniqueFundingStages.map((fundingStage) =>
+        this.prisma.fundingStage.upsert({
+          where: { title: fundingStage },
+          update: {},
+          create: {
+            title: fundingStage,
+          },
+        })
+      )
+    );
+  }
 }
