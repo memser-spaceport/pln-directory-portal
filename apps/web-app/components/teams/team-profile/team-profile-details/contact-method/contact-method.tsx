@@ -23,7 +23,7 @@ export function ContactMethod({ contactMethod }: TContactMethodProps) {
               />
             </div>
           }
-          content={contactMethod}
+          content={<span className="break-all">{contactMethod}</span>}
         />
       ) : (
         '-'
