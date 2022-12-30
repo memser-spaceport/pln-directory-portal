@@ -30,7 +30,7 @@ export async function createMember({ amount }: TestFactorySeederParams) {
     const industryTag = {
       id: sequence,
       uid: `uid-${sequence}`,
-      name: 'name',
+      name: `name-${sequence}`,
       email: `email-${sequence}@mail.com`,
       imageUid: null,
       githubHandler: 'githubHandler',

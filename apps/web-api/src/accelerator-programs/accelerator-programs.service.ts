@@ -22,4 +22,19 @@ export class AcceleratorProgramsService {
       ...queryOptions,
     });
   }
+
+  async insertManyFromList(acceleratorPrograms: string[]) {
+    const uniqueAcceleratorPrograms = Array.from(new Set(acceleratorPrograms));
+    return await this.prisma.$transaction(
+      uniqueAcceleratorPrograms.map((acceleratorProgram) =>
+        this.prisma.acceleratorProgram.upsert({
+          where: { title: acceleratorProgram },
+          update: {},
+          create: {
+            title: acceleratorProgram,
+          },
+        })
+      )
+    );
+  }
 }

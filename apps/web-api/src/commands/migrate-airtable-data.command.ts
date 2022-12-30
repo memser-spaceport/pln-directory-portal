@@ -1,10 +1,21 @@
 import fs from 'fs';
-import { Command, CommandRunner } from 'nest-commander';
 import { z } from 'zod';
+import uniq from 'lodash/uniq';
+import map from 'lodash/map';
+import { Command, CommandRunner } from 'nest-commander';
 import { IndustryCategoriesService } from '../industry-categories/industry-categories.service';
 import { IndustryTagsService } from '../industry-tags/industry-tags.service';
 import { AirtableService } from '../utils/airtable/airtable.service';
 import { AirtableIndustryTagSchema } from '../utils/airtable/schema/airtable-industry-tag.schema';
+import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schema';
+import { FundingStagesService } from '../funding-stages/funding-stages.service';
+import { AcceleratorProgramsService } from '../accelerator-programs/accelerator-programs.service';
+import { TechnologiesService } from '../technologies/technologies.service';
+import { TeamsService } from '../teams/teams.service';
+import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
+import { SkillsService } from '../skills/skills.service';
+import { RolesService } from '../roles/roles.service';
+import { MembersService } from '../members/members.service';
 
 @Command({
   name: 'migrate-airtable-data',
@@ -12,15 +23,26 @@ import { AirtableIndustryTagSchema } from '../utils/airtable/schema/airtable-ind
 })
 export class MigrateAirtableDataCommand extends CommandRunner {
   constructor(
+    private readonly teamsService: TeamsService,
+    private readonly rolesService: RolesService,
+    private readonly skillsService: SkillsService,
+    private readonly membersService: MembersService,
     private readonly airtableService: AirtableService,
+    private readonly technologiesService: TechnologiesService,
     private readonly industryTagsService: IndustryTagsService,
-    private readonly industryCategoriesService: IndustryCategoriesService
+    private readonly fundingStagesService: FundingStagesService,
+    private readonly industryCategoriesService: IndustryCategoriesService,
+    private readonly acceleratorProgramsService: AcceleratorProgramsService
   ) {
     super();
   }
 
   async run(): Promise<void> {
-    this.insertIndustryTagsWithCategories();
+    await this.insertTechnologies();
+    await this.insertIndustryTagsWithCategories();
+    await this.insertTeamsWithRelationalData();
+    await this.insertMembersWithRelationalData();
+    // TODO: Insert Team Member Roles
   }
 
   private validateDataOrFail(
@@ -46,7 +68,14 @@ export class MigrateAirtableDataCommand extends CommandRunner {
   }
 
   private outputSuccessMessage(message: string) {
-    console.log(`\n✅ ${message}\n`);
+    console.log(`\n✅ ${message}\r`);
+  }
+
+  private async insertTechnologies() {
+    // Technologies need to be created independently
+    // and later on will be mapped from Airtable boolean fields:
+    await this.technologiesService.insertManyFromList(['Filecoin', 'IPFS']);
+    this.outputSuccessMessage('Added Technologies');
   }
 
   private async insertIndustryTagsWithCategories() {
@@ -57,19 +86,83 @@ export class MigrateAirtableDataCommand extends CommandRunner {
     });
 
     // Extract categories from tags:
-    const industryCategoriesToCreate = industryTags.reduce(
-      (categories, entry) =>
-        !!entry.fields.Categories
-          ? [...categories, ...entry.fields.Categories]
-          : categories,
-      []
-    );
+    const industryCategoriesToCreate = uniq([
+      ...map(industryTags, 'fields.Categories')
+        .filter((val) => !!val)
+        .reduce((values, value) => [...values, ...value]),
+    ]);
 
     // Insert data on database:
     await this.industryCategoriesService.insertManyFromList(
       industryCategoriesToCreate
     );
     await this.industryTagsService.insertManyFromAirtable(industryTags);
-    this.outputSuccessMessage('Added Industry Tags data');
+    this.outputSuccessMessage('Added Industry Tags & Categories');
+  }
+
+  private async insertTeamsWithRelationalData() {
+    // Fetch and validate data:
+    const teams = await this.airtableService.getAllTeams();
+    this.validateDataOrFail(AirtableTeamSchema.array(), {
+      teams,
+    });
+
+    // Extract funding stages from teams:
+    const fundingStagesToCreate = uniq<string>(
+      map(teams, 'fields.Funding Stage').filter((val) => !!val)
+    );
+
+    // Extract accelerator programs from teams:
+    const acceleratorProgramsToCreate = uniq<string>(
+      map(teams, 'fields.Accelerator Programs')
+        .filter((val) => !!val)
+        .reduce((values, value) => [...values, ...value])
+    );
+
+    // Extract images from teams:
+    // const imagesToCreate = map(teams, 'fields.Logo')
+    //   .filter((val) => !!val)
+    //   .reduce((values, value) => [...values, ...value]);
+
+    // Insert data on database:
+    await this.fundingStagesService.insertManyFromList(fundingStagesToCreate);
+    await this.acceleratorProgramsService.insertManyFromList(
+      acceleratorProgramsToCreate
+    );
+    await this.teamsService.insertManyFromAirtable(teams);
+
+    this.outputSuccessMessage('Added Teams and their relational data');
+  }
+
+  private async insertMembersWithRelationalData() {
+    // Fetch and validate data:
+    const members = await this.airtableService.getAllMembers();
+    this.validateDataOrFail(AirtableMemberSchema.array(), {
+      members,
+    });
+
+    // Extract skills from members:
+    const skillsToCreate = uniq<string>(
+      map(members, 'fields.Skills')
+        .filter((val) => !!val)
+        .reduce((values, value) => [...values, ...value])
+    );
+
+    // Extract roles from members:
+    const rolesToCreate = uniq<string>(
+      map(members, 'fields.Role').filter((val) => !!val)
+    );
+
+    // Extract images from members:
+    // const imagesToCreate = map(members, 'fields.Profile picture')
+    //   .filter((val) => !!val)
+    //   .reduce((values, value) => [...values, ...value]);
+
+    // Insert data on database:
+    await this.rolesService.insertManyFromList(rolesToCreate);
+    await this.skillsService.insertManyFromList(skillsToCreate);
+    await this.membersService.insertManyWithLocationsFromAirtable(members);
+
+    this.outputSuccessMessage('Added Members and their relational data');
   }
 }

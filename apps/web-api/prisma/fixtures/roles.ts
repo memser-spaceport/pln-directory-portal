@@ -85,7 +85,6 @@ export const roles = [
 ].map((role) => ({
   uid: faker.helpers.slugify(`uid-${role.toLowerCase()}`),
   title: role,
-  startDate: faker.date.past(),
   createdAt: faker.date.past(),
   updatedAt: faker.date.recent(),
 }));

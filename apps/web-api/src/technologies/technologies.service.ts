@@ -19,4 +19,19 @@ export class TechnologiesService {
       ...queryOptions,
     });
   }
+
+  async insertManyFromList(technologies: string[]) {
+    const uniqueTechnologies = Array.from(new Set(technologies));
+    return await this.prisma.$transaction(
+      uniqueTechnologies.map((technology) =>
+        this.prisma.technology.upsert({
+          where: { title: technology },
+          update: {},
+          create: {
+            title: technology,
+          },
+        })
+      )
+    );
+  }
 }

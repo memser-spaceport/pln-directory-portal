@@ -36,6 +36,7 @@ async function load(fixtures) {
             FROM   pg_class
             WHERE  relkind = 'r'  -- only tables
             AND    relnamespace = 'public'::regnamespace
+            AND    relname != '_prisma_migrations'
         );
     END
     $func$;
