@@ -8,6 +8,7 @@ import { MembersService } from './members/members.service';
 import { PrismaService } from './prisma.service';
 import { RolesService } from './roles/roles.service';
 import { SkillsService } from './skills/skills.service';
+import { TeamMemberRolesService } from './team-member-roles/team-member-roles.service';
 import { TeamsService } from './teams/teams.service';
 import { TechnologiesService } from './technologies/technologies.service';
 import { AirtableService } from './utils/airtable/airtable.service';
@@ -23,6 +24,7 @@ import { AirtableService } from './utils/airtable/airtable.service';
     TechnologiesService,
     IndustryTagsService,
     FundingStagesService,
+    TeamMemberRolesService,
     IndustryCategoriesService,
     AcceleratorProgramsService,
     MigrateAirtableDataCommand,
