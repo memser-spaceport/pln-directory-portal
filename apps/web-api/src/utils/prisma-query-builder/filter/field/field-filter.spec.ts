@@ -311,13 +311,98 @@ describe('Field Filter', () => {
             'skills.title__not__with': 'joe,carl',
           });
           expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
-            skills: {
-              none: {
-                title: {
-                  in: ['joe', 'carl'],
+            AND: [
+              {
+                NOT: {
+                  skills: { some: { title: 'joe' } },
                 },
               },
-            },
+              {
+                NOT: {
+                  skills: { some: { title: 'carl' } },
+                },
+              },
+            ],
+          });
+        });
+      });
+    });
+
+    describe('and with multiple with lookups', () => {
+      it('should include it in the Prisma query', () => {
+        const prismaQuery = prismaQueryBuilder.build({
+          'skills.title__with': 'joe,carl',
+          'location.city__with': 'porto,lisbon',
+        });
+        expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
+          AND: [
+            { skills: { some: { title: 'joe' } } },
+            { skills: { some: { title: 'carl' } } },
+            { location: { city: 'porto' } },
+            { location: { city: 'lisbon' } },
+          ],
+        });
+      });
+
+      describe('and with a single value', () => {
+        it('should include it in the Prisma query', () => {
+          const prismaQuery = prismaQueryBuilder.build({
+            'skills.title__with': 'joe',
+            'location.city__with': 'porto',
+          });
+          expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
+            AND: [
+              { skills: { some: { title: 'joe' } } },
+              { location: { city: 'porto' } },
+            ],
+          });
+        });
+      });
+
+      describe('and with an negation operator', () => {
+        it('should include it in the Prisma query', () => {
+          const prismaQuery = prismaQueryBuilder.build({
+            'skills.title__not__with': 'joe,carl',
+            'location.city__not__with': 'porto,lisbon',
+          });
+          expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
+            AND: [
+              {
+                NOT: {
+                  skills: { some: { title: 'joe' } },
+                },
+              },
+              {
+                NOT: {
+                  skills: { some: { title: 'carl' } },
+                },
+              },
+              {
+                NOT: {
+                  location: { city: 'porto' },
+                },
+              },
+              {
+                NOT: {
+                  location: { city: 'lisbon' },
+                },
+              },
+            ],
+          });
+        });
+
+        describe('and with a single value', () => {
+          it('should include it in the Prisma query', () => {
+            const prismaQuery = prismaQueryBuilder.build({
+              'skills.title__not__with': 'joe',
+              'location.city__not__with': 'porto',
+            });
+            expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
+              AND: [
+                { NOT: { skills: { some: { title: 'joe' } } } },
+                { NOT: { location: { city: 'porto' } } },
+              ],
+            });
           });
         });
       });
@@ -567,13 +652,18 @@ describe('Field Filter', () => {
             'skills.level__not__with': '10,20',
           });
           expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
-            skills: {
-              none: {
-                level: {
-                  in: [10, 20],
+            AND: [
+              {
+                NOT: {
+                  skills: { some: { level: 10 } },
                 },
               },
-            },
+              {
+                NOT: {
+                  skills: { some: { level: 20 } },
+                },
+              },
+            ],
           });
         });
       });
