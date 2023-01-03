@@ -3,13 +3,15 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { PrismaService } from '../prisma.service';
 import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
+import { FileMigrationService } from '../utils/file-migration/file-migration.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 
 @Injectable()
 export class MembersService {
   constructor(
     private prisma: PrismaService,
-    private locationTransferService: LocationTransferService
+    private locationTransferService: LocationTransferService,
+    private fileMigrationService: FileMigrationService
   ) {}
 
   findAll(queryOptions: Prisma.MemberFindManyArgs) {
@@ -30,10 +32,24 @@ export class MembersService {
     airtableMembers: z.infer<typeof AirtableMemberSchema>[]
   ) {
     const skills = await this.prisma.skill.findMany();
-
     for (const member of airtableMembers) {
       if (!member.fields?.Name) {
         continue;
+      }
+
+      let image;
+
+      if (member.fields['Profile picture']) {
+        const ppf = member.fields['Profile picture'][0];
+        image = await this.fileMigrationService.migrateFile({
+          id: ppf.id || '',
+          url: ppf.url || '',
+          filename: ppf.filename || '',
+          size: ppf.size || 0,
+          type: ppf.type || '',
+          height: ppf.height || 0,
+          width: ppf.width || 0,
+        });
       }
 
       const optionalFieldsToAdd = Object.entries({
@@ -82,6 +98,7 @@ export class MembersService {
           name: member.fields.Name,
           plnFriend: member.fields['Friend of PLN'] || false,
           locationUid: location ? location?.uid : null,
+          imageUid: image?.uid,
           ...manyToManyRelations,
         },
       });
