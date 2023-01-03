@@ -33,3 +33,5 @@ export class SkillDto extends createZodDto(SkillSchema) {}
 export class CreateSkillDto extends createZodDto(CreateSkillSchema) {}
 
 export class ResponseSkillDto extends createZodDto(ResponseSkillSchema) {}
+
+export type TSkillResponse = z.infer<typeof ResponseSkillSchema>;
