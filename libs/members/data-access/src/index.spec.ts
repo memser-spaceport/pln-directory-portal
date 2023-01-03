@@ -1,7 +1,7 @@
 import { IMember } from '@protocol-labs-network/api';
 import { TMemberResponse } from '@protocol-labs-network/contracts';
 import { client } from '@protocol-labs-network/shared/data-access';
-import { getMember, getMembers, parseMember } from './index';
+import { getMember, getMembers, getMembersFilters, parseMember } from './index';
 
 jest.mock('@protocol-labs-network/shared/data-access', () => ({
   client: {
@@ -24,7 +24,7 @@ const memberResponseMock: TMemberResponse = {
 
 describe('getMembers', () => {
   it('should call getMembers appropriately', async () => {
-    (<jest.Mock>client.members.getMembers).mockReturnValueOnce({
+    (<jest.Mock>client.members.getMembers).mockClear().mockReturnValueOnce({
       body: [memberResponseMock],
       status: 200,
     });
@@ -46,7 +46,7 @@ describe('getMembers', () => {
 
 describe('getMember', () => {
   it('should call getMember appropriately', async () => {
-    (<jest.Mock>client.members.getMember).mockReturnValueOnce({
+    (<jest.Mock>client.members.getMember).mockClear().mockReturnValueOnce({
       body: memberResponseMock,
       status: 200,
     });
@@ -71,7 +71,7 @@ describe('parseMember', () => {
       discordHandler: 'jsmith#1234',
       githubHandler: 'jsmith',
       image: { url: 'https://example.com/image.jpg' },
-      location: { city: 'New York', country: 'USA' },
+      location: { country: 'USA', region: 'New York Region', city: 'New York' },
       officeHours: 'https://example.com/office-hours',
       skills: [{ title: 'JavaScript' }, { title: 'TypeScript' }],
       teamMemberRoles: [
@@ -133,32 +133,6 @@ describe('parseMember', () => {
     expect(parseMember(memberResponseMock)).toEqual(expectedOutput);
   });
 
-  it('should return correct location string when only city is provided', () => {
-    const memberResponse = {
-      ...memberResponseMock,
-      location: { city: 'New York' },
-    } as TMemberResponse;
-
-    const expectedOutput: IMember = {
-      id: 'uid-john-smith',
-      name: 'John Smith',
-      displayName: 'John Smith',
-      email: 'john.smith@example.com',
-      image: null,
-      githubHandle: null,
-      discordHandle: null,
-      twitter: null,
-      officeHours: null,
-      location: 'New York',
-      skills: [],
-      role: null,
-      teamLead: false,
-      teams: [],
-    };
-
-    expect(parseMember(memberResponse)).toEqual(expectedOutput);
-  });
-
   it('should return correct location string when only country is provided', () => {
     const memberResponse = {
       ...memberResponseMock,
@@ -183,5 +157,125 @@ describe('parseMember', () => {
     };
 
     expect(parseMember(memberResponse)).toEqual(expectedOutput);
+  });
+
+  it('should return correct location string when country and region are provided', () => {
+    const memberResponse = {
+      ...memberResponseMock,
+      location: { country: 'USA', region: 'New York Region' },
+    } as TMemberResponse;
+
+    const expectedOutput: IMember = {
+      id: 'uid-john-smith',
+      name: 'John Smith',
+      displayName: 'John Smith',
+      email: 'john.smith@example.com',
+      image: null,
+      githubHandle: null,
+      discordHandle: null,
+      twitter: null,
+      officeHours: null,
+      location: 'New York Region, USA',
+      skills: [],
+      role: null,
+      teamLead: false,
+      teams: [],
+    };
+
+    expect(parseMember(memberResponse)).toEqual(expectedOutput);
+  });
+});
+
+describe('getMembersFilters', () => {
+  const options = {
+    'skills.title__with': 'Skill 01',
+  };
+
+  const member01 = {
+    skills: [{ title: 'Skill 1' }, { title: 'Skill 2' }],
+    location: {
+      continent: 'Continent 1',
+      country: 'Country 1',
+      city: 'City 1',
+    },
+  } as TMemberResponse;
+  const member02 = {
+    skills: [{ title: 'Skill 2' }, { title: 'Skill 3' }],
+    location: {
+      continent: 'Continent 2',
+      country: 'Country 2',
+      city: 'City 2',
+    },
+  } as TMemberResponse;
+
+  it('should return the correct values and available values for members filters when the API returns a successful response', async () => {
+    (<jest.Mock>client.members.getMembers)
+      .mockClear()
+      .mockReturnValueOnce({
+        body: [member01, member02, {}],
+        status: 200,
+      })
+      .mockReturnValueOnce({
+        body: [member01],
+        status: 200,
+      });
+
+    const result = await getMembersFilters(options);
+
+    expect(client.members.getMembers).toHaveBeenCalledTimes(2);
+    expect(client.members.getMembers).toHaveBeenNthCalledWith(1, {
+      query: {
+        pagination: false,
+        select:
+          'skills.title,location.continent,location.country,location.city',
+      },
+    });
+    expect(client.members.getMembers).toHaveBeenNthCalledWith(2, {
+      query: {
+        'skills.title__with': 'Skill 01',
+        pagination: false,
+        select:
+          'skills.title,location.continent,location.country,location.city',
+      },
+    });
+
+    const expectedResult = {
+      valuesByFilter: {
+        skills: ['Skill 1', 'Skill 2', 'Skill 3'],
+        region: ['Continent 1', 'Continent 2'],
+        country: ['Country 1', 'Country 2'],
+        metroArea: ['City 1', 'City 2'],
+      },
+      availableValuesByFilter: {
+        skills: ['Skill 1', 'Skill 2'],
+        region: ['Continent 1'],
+        country: ['Country 1'],
+        metroArea: ['City 1'],
+      },
+    };
+
+    expect(result).toEqual(expectedResult);
+  });
+
+  it('should return empty filters if the API returns a non-200 status code', async () => {
+    (<jest.Mock>client.members.getMembers)
+      .mockClear()
+      .mockReturnValueOnce({
+        body: [],
+        status: 404,
+      })
+      .mockReturnValueOnce({
+        body: [{}],
+        status: 200,
+      });
+
+    const result = await getMembersFilters(options);
+
+    const expectedResult = {
+      valuesByFilter: [],
+      availableValuesByFilter: [],
+    };
+
+    expect(result).toEqual(expectedResult);
   });
 });
