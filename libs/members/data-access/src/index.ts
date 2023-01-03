@@ -1,3 +1,4 @@
+import { IAirtableMembersFiltersValues } from '@protocol-labs-network/airtable';
 import { IMember } from '@protocol-labs-network/api';
 import { TMemberResponse } from '@protocol-labs-network/contracts';
 import { client } from '@protocol-labs-network/shared/data-access';
@@ -45,8 +46,9 @@ export const parseMember = (member: TMemberResponse): IMember => {
   const memberLocation = parseMemberLocation(location);
   const memberSkills = skills?.map((skill) => skill.title) || [];
 
-  // TODO: Change memberRole, teamLead & memberTeams lines during code cleanup and removal of the Airtable layer
-  // to fully take advantage of the new relationships between teams and members.
+  // TODO: Change memberRole, teamLead & memberTeams lines during code cleanup
+  // and removal of the Airtable layer to fully take advantage
+  // of the new relationships between teams and members.
   const memberRole = teamMemberRoles
     ?.map((member) => member.role?.title)
     .join(',');
@@ -81,15 +83,110 @@ export const parseMember = (member: TMemberResponse): IMember => {
 const parseMemberLocation = (
   location: TMemberResponse['location']
 ): IMember['location'] => {
-  const { city, country } = location ?? {};
+  const { country, region, city } = location ?? {};
 
-  if (city && country) {
-    return `${city}, ${country}`;
-  } else if (city) {
-    return city;
-  } else if (country) {
+  // TODO: Use metroArea when available
+  // if (metroArea) {
+  //   return metroArea;
+  // }
+
+  if (country) {
+    if (city) {
+      return `${city}, ${country}`;
+    }
+
+    if (region) {
+      return `${region}, ${country}`;
+    }
+
     return country;
-  } else {
-    return 'Not provided';
   }
+
+  return 'Not provided';
+};
+
+/**
+ * Get values and available values for members filters
+ */
+export const getMembersFilters = async (options: TMemberListOptions) => {
+  const [valuesByFilter, availableValuesByFilter] = await Promise.all([
+    getMembersFiltersValues(),
+    getMembersFiltersValues(options),
+  ]);
+
+  if (valuesByFilter.status !== 200 || availableValuesByFilter.status !== 200) {
+    return {
+      valuesByFilter: [],
+      availableValuesByFilter: [],
+    };
+  }
+
+  return {
+    valuesByFilter: parseMembersFilters(valuesByFilter.body),
+    availableValuesByFilter: parseMembersFilters(availableValuesByFilter.body),
+  };
+};
+
+/**
+ * Get values for teams filters
+ */
+const getMembersFiltersValues = async (options: TMemberListOptions = {}) => {
+  return await getMembers({
+    ...options,
+    pagination: false,
+    // TODO: Replace with `location.metroArea` when available
+    select: 'skills.title,location.continent,location.country,location.city',
+  });
+};
+
+/**
+ * Parse members fields values into lists of unique values per field.
+ */
+const parseMembersFilters = (members: TMemberResponse[]) => {
+  const filtersValues = members.reduce(
+    (values, member) => {
+      const skills = getUniqueFilterValues(
+        values.skills,
+        member.skills?.map((skill) => skill.title)
+      );
+
+      const region = getUniqueFilterValues(
+        values.region,
+        member.location?.continent ? [member.location.continent] : []
+      );
+
+      const country = getUniqueFilterValues(
+        values.country,
+        member.location?.country ? [member.location.country] : []
+      );
+
+      const metroArea = getUniqueFilterValues(
+        values.metroArea,
+        // TODO: Replace with `member.location.metroArea` when available
+        member.location?.city ? [member.location.city] : []
+      );
+
+      return { skills, region, country, metroArea };
+    },
+    {
+      skills: [],
+      region: [],
+      country: [],
+      metroArea: [],
+    } as IAirtableMembersFiltersValues
+  );
+
+  Object.values(filtersValues).forEach((value) => value.sort());
+
+  return filtersValues;
+};
+
+/**
+ * Get unique values from two arrays
+ */
+const getUniqueFilterValues = (
+  uniqueValues: string[],
+  newValues?: string[]
+): string[] => {
+  return [...new Set([...uniqueValues, ...(newValues || [])])];
 };
