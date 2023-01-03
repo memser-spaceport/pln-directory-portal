@@ -108,10 +108,6 @@ describe('parseTeam', () => {
   });
 
   it('should correctly parse a TTeamResponse object into an ITeam object', () => {
-    const teamResponse = {
-      ...teamResponseMock,
-    } as TTeamResponse;
-
     const expectedResult = {
       id: 'team-01',
       name: 'Team 01',
@@ -129,7 +125,7 @@ describe('parseTeam', () => {
       contactMethod: null,
     };
 
-    expect(parseTeam(teamResponse)).toEqual(expectedResult);
+    expect(parseTeam(teamResponseMock)).toEqual(expectedResult);
   });
 });
 
