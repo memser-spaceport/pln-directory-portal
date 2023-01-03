@@ -29,3 +29,5 @@ export const LocationQueryParams = QueryParams({
 export const LocationDetailQueryParams = LocationQueryParams.unwrap()
   .pick(RETRIEVAL_QUERY_FILTERS)
   .optional();
+
+export type TLocationResponse = z.infer<typeof LocationResponseSchema>;
