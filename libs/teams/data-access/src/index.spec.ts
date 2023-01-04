@@ -23,7 +23,7 @@ const teamResponseMock: TTeamResponse = {
 
 describe('getTeams', () => {
   it('should call getTeams appropriately', async () => {
-    (<jest.Mock>client.teams.getTeams).mockReturnValueOnce({
+    (<jest.Mock>client.teams.getTeams).mockClear().mockReturnValueOnce({
       body: [teamResponseMock],
       status: 200,
     });
@@ -45,7 +45,7 @@ describe('getTeams', () => {
 
 describe('getTeam', () => {
   it('should call getTeam appropriately', async () => {
-    (<jest.Mock>client.teams.getTeam).mockReturnValueOnce({
+    (<jest.Mock>client.teams.getTeam).mockClear().mockReturnValueOnce({
       body: teamResponseMock,
       status: 200,
     });
@@ -130,6 +130,10 @@ describe('parseTeam', () => {
 });
 
 describe('getTeamsFilterValues', () => {
+  const options = {
+    'technologies.title__with': 'Tag 01',
+  };
+
   it('should be able to get all teams filter values and available teams filter values', async () => {
     (client.teams.getTeams as jest.Mock)
       .mockClear()
@@ -192,9 +196,7 @@ describe('getTeamsFilterValues', () => {
         status: 200,
       });
 
-    const result = await getTeamsFilters({
-      'technologies.title__with': 'Tag 01',
-    });
+    const result = await getTeamsFilters(options);
 
     expect(client.teams.getTeams).toHaveBeenCalledTimes(2);
     expect(client.teams.getTeams).toHaveBeenNthCalledWith(1, {
@@ -242,5 +244,25 @@ describe('getTeamsFilterValues', () => {
     };
 
     expect(result).toEqual(expectedResult);
+  });
+
+  it('should return empty filters if the API returns a non-200 status code', async () => {
+    (<jest.Mock>client.teams.getTeams)
+      .mockClear()
+      .mockReturnValueOnce({
+        body: [],
+        status: 404,
+      })
+      .mockReturnValueOnce({
+        body: [{}],
+        status: 200,
+      });
+
+    const filters = await getTeamsFilters(options);
+
+    expect(filters).toEqual({
+      valuesByFilter: [],
+      availableValuesByFilter: [],
+    });
   });
 });

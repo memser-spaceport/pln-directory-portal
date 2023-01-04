@@ -87,9 +87,16 @@ export const getTeamsFilters = async (options: TTeamListOptions) => {
     getTeamsFiltersValues(options),
   ]);
 
+  if (valuesByFilter.status !== 200 || availableValuesByFilter.status !== 200) {
+    return {
+      valuesByFilter: [],
+      availableValuesByFilter: [],
+    };
+  }
+
   return {
-    valuesByFilter,
-    availableValuesByFilter,
+    valuesByFilter: parseTeamsFilters(valuesByFilter.body),
+    availableValuesByFilter: parseTeamsFilters(availableValuesByFilter.body),
   };
 };
 
@@ -97,14 +104,12 @@ export const getTeamsFilters = async (options: TTeamListOptions) => {
  * Get values for teams filters
  */
 const getTeamsFiltersValues = async (options: TTeamListOptions = {}) => {
-  const { body, status } = await getTeams({
+  return await getTeams({
     ...options,
     pagination: false,
     select:
       'industryTags.title,acceleratorPrograms.title,fundingStage.title,technologies.title',
   });
-
-  return status === 200 ? parseTeamsFilters(body) : [];
 };
 
 /**
