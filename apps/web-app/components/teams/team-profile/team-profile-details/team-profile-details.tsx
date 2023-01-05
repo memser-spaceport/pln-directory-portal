@@ -30,7 +30,7 @@ export function TeamProfileDetails({
           )}
         </div>
         <div className="flex flex-1 flex-col items-start">
-          <h2 className="detail-label">Message us</h2>
+          <h2 className="detail-label">Contact us</h2>
           <ContactMethod contactMethod={contactMethod} />
         </div>
         <div className="flex flex-1 flex-col items-start">
