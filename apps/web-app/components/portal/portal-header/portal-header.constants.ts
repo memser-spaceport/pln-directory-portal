@@ -9,7 +9,7 @@ export const PORTAL_HEADER_LINKS: IPortalHeaderLink[] = [
   },
   {
     label: 'Events',
-    url: 'https://pl-network-events.vercel.app/',
+    url: 'https://events.plnetwork.io/',
     eventCode: FATHOM_EVENTS.portal.nav.events,
   },
   {
