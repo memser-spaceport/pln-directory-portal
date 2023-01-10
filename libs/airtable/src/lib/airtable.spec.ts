@@ -63,7 +63,6 @@ const memberMock01: IAirtableMember = {
   id: 'member_id_01',
   fields: {
     Name: 'Aarsh Dan Shah',
-    'Display Name': 'Aarsh Shah',
     'PLN Start Date': new Date('28/02/1904'),
     'PLN End Date': new Date('28/02/1904'),
     'Profile picture': [
@@ -596,7 +595,6 @@ describe('AirtableService', () => {
     expect(members).toEqual([
       {
         discordHandle: memberMock01.fields['Discord handle'],
-        displayName: memberMock01.fields['Display Name'],
         email: memberMock01.fields.Email,
         githubHandle: memberMock01.fields['Github Handle'],
         id: memberMock01.id,
@@ -617,7 +615,6 @@ describe('AirtableService', () => {
       },
       {
         discordHandle: null,
-        displayName: null,
         email: null,
         githubHandle: null,
         id: memberMock02.id,
@@ -634,7 +631,6 @@ describe('AirtableService', () => {
       },
       {
         discordHandle: null,
-        displayName: null,
         email: null,
         githubHandle: null,
         id: memberMock03.id,
@@ -650,7 +646,6 @@ describe('AirtableService', () => {
       },
       {
         discordHandle: null,
-        displayName: null,
         email: null,
         githubHandle: null,
         id: memberMock04.id,
@@ -666,7 +661,6 @@ describe('AirtableService', () => {
       },
       {
         discordHandle: null,
-        displayName: null,
         email: null,
         githubHandle: null,
         id: emptyMemberMock.id,
@@ -692,7 +686,6 @@ describe('AirtableService', () => {
     expect(membersTableMock.find).toHaveBeenCalledWith(memberMock01.id);
     expect(member).toEqual({
       discordHandle: memberMock01.fields['Discord handle'],
-      displayName: memberMock01.fields['Display Name'],
       email: memberMock01.fields.Email,
       githubHandle: memberMock01.fields['Github Handle'],
       id: memberMock01.id,
@@ -818,7 +811,6 @@ describe('AirtableService', () => {
           id: 'member_id_01',
           fields: {
             Name: 'Aarsh Dan Shah',
-            'Display Name': 'Aarsh Shah',
             'Profile picture': [
               {
                 id: 'att2TxEATPkbk9dta',
@@ -840,7 +832,6 @@ describe('AirtableService', () => {
           id: 'member_id_02',
           fields: {
             Name: 'Dan Shah',
-            'Display Name': 'Dan Shah',
             'Profile picture': [
               {
                 id: 'att2TxEATPkbk9dta',
@@ -860,7 +851,6 @@ describe('AirtableService', () => {
           id: 'member_id_03',
           fields: {
             Name: 'Shah',
-            'Display Name': 'Shah',
             'Profile picture': [
               {
                 id: 'att2TxEATPkbk9dta',
@@ -926,7 +916,6 @@ describe('AirtableService', () => {
     expect(members).toStrictEqual([
       {
         discordHandle: 'member01#123',
-        displayName: 'Aarsh Shah',
         email: 'aarsh.shah@protocol.ai',
         githubHandle: 'member01',
         id: 'member_id_01',
@@ -946,7 +935,6 @@ describe('AirtableService', () => {
       },
       {
         discordHandle: 'member02#123',
-        displayName: 'Dan Shah',
         email: 'dan.shah@protocol.ai',
         githubHandle: 'member02',
         id: 'member_id_02',
@@ -962,7 +950,6 @@ describe('AirtableService', () => {
       },
       {
         discordHandle: 'member03#123',
-        displayName: 'Shah',
         email: 'shah@protocol.ai',
         githubHandle: 'member03',
         id: 'member_id_03',
@@ -1040,7 +1027,6 @@ describe('AirtableService', () => {
     expect(airtableService.parseMembers(membersMock)).toEqual([
       {
         discordHandle: memberMock01.fields['Discord handle'],
-        displayName: memberMock01.fields['Display Name'],
         email: memberMock01.fields.Email,
         githubHandle: memberMock01.fields['Github Handle'],
         id: memberMock01.id,
@@ -1061,7 +1047,6 @@ describe('AirtableService', () => {
       },
       {
         discordHandle: null,
-        displayName: null,
         email: null,
         githubHandle: null,
         id: memberMock02.id,
@@ -1078,7 +1063,6 @@ describe('AirtableService', () => {
       },
       {
         discordHandle: null,
-        displayName: null,
         email: null,
         githubHandle: null,
         id: memberMock03.id,
@@ -1094,7 +1078,6 @@ describe('AirtableService', () => {
       },
       {
         discordHandle: null,
-        displayName: null,
         email: null,
         githubHandle: null,
         id: memberMock04.id,
@@ -1110,7 +1093,6 @@ describe('AirtableService', () => {
       },
       {
         discordHandle: null,
-        displayName: null,
         email: null,
         githubHandle: null,
         id: emptyMemberMock.id,

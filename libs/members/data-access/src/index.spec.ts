@@ -254,7 +254,6 @@ describe('parseMember', () => {
     const expectedResult: IMember = {
       id: 'uid-john-smith',
       name: 'John Smith',
-      displayName: 'John Smith',
       email: 'john.smith@example.com',
       image: 'https://example.com/image.jpg',
       githubHandle: 'jsmith',
@@ -278,7 +277,6 @@ describe('parseMember', () => {
     const expectedOutput: IMember = {
       id: 'uid-john-smith',
       name: 'John Smith',
-      displayName: 'John Smith',
       email: 'john.smith@example.com',
       image: null,
       githubHandle: null,
@@ -304,7 +302,6 @@ describe('parseMember', () => {
     const expectedOutput: IMember = {
       id: 'uid-john-smith',
       name: 'John Smith',
-      displayName: 'John Smith',
       email: 'john.smith@example.com',
       image: null,
       githubHandle: null,
@@ -330,7 +327,6 @@ describe('parseMember', () => {
     const expectedOutput: IMember = {
       id: 'uid-john-smith',
       name: 'John Smith',
-      displayName: 'John Smith',
       email: 'john.smith@example.com',
       image: null,
       githubHandle: null,
