@@ -7,4 +7,5 @@ export type TMemberListOptions = TListOptions & {
   'location.continent__with'?: string;
   'location.country__with'?: string;
   'location.city__with'?: string;
+  'teamMemberRoles.team.uid'?: string;
 };
