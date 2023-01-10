@@ -239,7 +239,6 @@ class AirtableService {
   private _parseMember(member: IAirtableMember): IMember {
     return {
       discordHandle: member.fields['Discord handle'] || null,
-      displayName: member.fields['Display Name'] || null,
       email: member.fields.Email || null,
       githubHandle: member.fields['Github Handle'] || null,
       id: member.id,

@@ -42,7 +42,6 @@ export const parseMember = (member: TMemberResponse): IMember => {
     teamMemberRoles,
   } = member;
 
-  const displayName = name;
   const memberLocation = parseMemberLocation(location);
   const memberSkills = skills?.map((skill) => skill.title) || [];
 
@@ -60,7 +59,6 @@ export const parseMember = (member: TMemberResponse): IMember => {
   return {
     id,
     name,
-    displayName,
     email,
     image: image?.url || null,
     githubHandle: githubHandle || null,

@@ -1,6 +1,5 @@
 export interface IMember {
   discordHandle: string | null;
-  displayName: string | null;
   email: string | null;
   githubHandle: string | null;
   id: string | null;
