@@ -100,7 +100,7 @@ export class MigrateAirtableDataCommand extends CommandRunner {
     const industryCategoriesToCreate = uniq([
       ...map(this.industryTags, 'fields.Categories')
         .filter((val) => !!val)
-        .reduce((values, value) => [...values, ...value]),
+        .reduce((values, value) => [...values, ...value], []),
     ]);
 
     // Insert data on database:
@@ -127,7 +127,7 @@ export class MigrateAirtableDataCommand extends CommandRunner {
     const acceleratorProgramsToCreate = uniq<string>(
       map(this.teams, 'fields.Accelerator Programs')
         .filter((val) => !!val)
-        .reduce((values, value) => [...values, ...value])
+        .reduce((values, value) => [...values, ...value], [])
     );
 
     // Extract images from teams:
@@ -156,7 +156,7 @@ export class MigrateAirtableDataCommand extends CommandRunner {
     const skillsToCreate = uniq<string>(
       map(this.members, 'fields.Skills')
         .filter((val) => !!val)
-        .reduce((values, value) => [...values, ...value])
+        .reduce((values, value) => [...values, ...value], [])
     );
 
     // Extract roles from members:
