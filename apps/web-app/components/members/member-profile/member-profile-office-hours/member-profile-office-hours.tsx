@@ -1,5 +1,7 @@
 import { ArrowSmRightIcon, CalendarIcon } from '@heroicons/react/outline';
 import { AnchorLink } from '@protocol-labs-network/ui';
+import { trackGoal } from 'fathom-client';
+import { FATHOM_EVENTS } from '../../../../constants';
 
 type MemberProfileOfficeHoursProps = {
   url?: string;
@@ -29,6 +31,12 @@ export function MemberProfileOfficeHours({
           <AnchorLink
             href={url}
             linkClassName="shadow-request-button rounded-lg border border-slate-300 bg-white px-6 py-2.5 text-sm font-medium hover:shadow-on-hover hover:text-slate-600 on-focus active:border-blue-600 active:ring-2"
+            handleOnClick={() =>
+              trackGoal(
+                FATHOM_EVENTS.members.profile.officeHours.scheduleMeeting,
+                0
+              )
+            }
           >
             Schedule Meeting
           </AnchorLink>
@@ -40,6 +48,9 @@ export function MemberProfileOfficeHours({
         <AnchorLink
           href={LEARN_MORE_URL}
           linkClassName="flex items-center text-sm font-semibold group outline-none"
+          handleOnClick={() =>
+            trackGoal(FATHOM_EVENTS.members.profile.officeHours.learnMore, 0)
+          }
         >
           <span className="group-focus-within:shadow-[0_1px_0_#156ff7] group-focus:shadow-[0_1px_0_#156ff7] group-focus-visible:shadow-[0_1px_0_#156ff7]">
             Learn more

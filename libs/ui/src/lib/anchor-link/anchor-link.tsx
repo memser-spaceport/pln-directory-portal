@@ -3,9 +3,15 @@ import { parseLink } from './anchor-link.utils';
 
 export type AnchorLinkProps = {
   linkClassName?: string;
+  handleOnClick?: () => void;
 } & React.PropsWithChildren<Partial<LinkProps>>;
 
-export function AnchorLink({ href, linkClassName, children }: AnchorLinkProps) {
+export function AnchorLink({
+  href,
+  handleOnClick,
+  linkClassName,
+  children,
+}: AnchorLinkProps) {
   if (href) {
     const { link, isExternal } = parseLink(href);
 
@@ -17,6 +23,7 @@ export function AnchorLink({ href, linkClassName, children }: AnchorLinkProps) {
           {...(isExternal ? { rel: 'noopener noreferrer' } : {})}
           aria-label="card anchor"
           tabIndex={0}
+          onClick={handleOnClick && handleOnClick}
         >
           {children}
         </a>
