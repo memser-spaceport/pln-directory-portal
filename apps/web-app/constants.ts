@@ -38,6 +38,9 @@ export const FATHOM_EVENTS = {
       viewTypeListToGrid: 'BFUWBQXV',
       viewTypeGridToList: 'L5UM9LWA',
     },
+    joinNetwork: 'HUGDIQDP',
+    joinNetworkAsMember: 'KJLW2EYZ',
+    joinNetworkAsTeam: 'GWGBBAHB',
   },
   members: {
     directory: {
@@ -57,6 +60,13 @@ export const FATHOM_EVENTS = {
         viewTypeGridToList: 'QUCCIPTW',
       },
     },
+    profile: {
+      requestToEdit: 'RI7BOPLV',
+      officeHours: {
+        scheduleMeeting: 'EKX8QTJD',
+        learnMore: 'QWTLEVVB',
+      },
+    },
   },
   teams: {
     directory: {
@@ -74,6 +84,9 @@ export const FATHOM_EVENTS = {
         viewTypeListToGrid: 'KHBW7DAV',
         viewTypeGridToList: 'RPBE1AWN',
       },
+    },
+    profile: {
+      requestToEdit: 'GHBT5VFH',
     },
   },
 };
