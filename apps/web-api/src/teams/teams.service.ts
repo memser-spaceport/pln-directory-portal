@@ -40,6 +40,7 @@ export class TeamsService {
         website: 'Website',
         twitterHandler: 'Twitter',
         shortDescription: 'Short description',
+        contactMethod: 'Preferred Method of Contact',
         longDescription: 'Long description',
         plnFriend: 'Friend of PLN',
         filecoinUser: 'Filecoin User',

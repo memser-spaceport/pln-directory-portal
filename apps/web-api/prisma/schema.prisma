@@ -21,6 +21,7 @@ model Team {
   logoUid             String?
   blog                String?
   website             String?
+  contactMethod       String?
   twitterHandler      String?
   shortDescription    String?
   longDescription     String?

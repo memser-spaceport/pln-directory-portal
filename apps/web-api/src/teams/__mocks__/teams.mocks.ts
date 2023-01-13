@@ -30,6 +30,7 @@ export async function createTeam({ amount }: TestFactorySeederParams) {
       logoUid: null,
       blog: faker.internet.url(),
       website: faker.internet.url(),
+      contactMethod: faker.internet.url(),
       twitterHandler: faker.name.firstName(),
       shortDescription: faker.lorem.sentence(),
       longDescription: faker.lorem.paragraph(),
