@@ -23,6 +23,7 @@ classDiagram
       name : string
       shortDescription : string
       longDescription : string
+      contactMethod : string
       website : string
       blog : string
       twitterHandler : string

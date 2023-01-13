@@ -37,6 +37,11 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(
       logoUid: null,
       blog: faker.internet.url(),
       website: faker.internet.url(),
+      contactMethod: faker.helpers.arrayElement([
+        null,
+        faker.internet.url(),
+        faker.internet.email(),
+      ]),
       twitterHandler: faker.name.firstName(),
       shortDescription: faker.lorem.sentence(),
       longDescription: faker.lorem.paragraph(),
