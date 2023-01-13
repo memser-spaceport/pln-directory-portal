@@ -43,7 +43,7 @@ const memberMock: TMemberResponse = {
   },
   teamMemberRoles: [
     {
-      mainRole: true,
+      mainTeam: true,
       teamLead: false,
       member: {
         uid: 'uid-lucy',
@@ -59,15 +59,7 @@ const memberMock: TMemberResponse = {
         updatedAt: '2022-12-23T01:41:29.628Z',
         locationUid: 'uid-halmouth',
       },
-      role: {
-        uid: 'uid-film-executive-producer',
-        title: 'Film Executive Producer',
-        description: null,
-        startDate: new Date('2022-02-27T07:26:59.029Z'),
-        endDate: null,
-        createdAt: new Date('2022-09-18T01:30:43.969Z'),
-        updatedAt: new Date('2022-12-22T21:19:49.085Z'),
-      },
+      role: 'Film Executive Producer',
       team: {
         uid: 'uid-dubuque---pfeffer',
         name: 'DuBuque - Pfeffer',
@@ -90,7 +82,7 @@ const memberMock: TMemberResponse = {
       },
     },
     {
-      mainRole: true,
+      mainTeam: false,
       teamLead: false,
       member: {
         uid: 'uid-lucy',
@@ -106,15 +98,7 @@ const memberMock: TMemberResponse = {
         updatedAt: '2022-12-23T01:41:29.628Z',
         locationUid: 'uid-halmouth',
       },
-      role: {
-        uid: 'uid-dj',
-        title: 'DJ',
-        description: null,
-        startDate: new Date('2022-04-08T13:47:31.755Z'),
-        endDate: null,
-        createdAt: new Date('2022-05-27T15:03:30.750Z'),
-        updatedAt: new Date('2022-12-23T08:26:36.438Z'),
-      },
+      role: 'DJ',
       team: {
         uid: 'uid-ebert-tremblay-and-kling',
         name: 'Ebert, Tremblay and Kling',

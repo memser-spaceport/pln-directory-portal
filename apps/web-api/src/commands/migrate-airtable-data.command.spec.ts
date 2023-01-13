@@ -1,5 +1,5 @@
 import { MigrateAirtableDataCommand } from './migrate-airtable-data.command';
-import { TEST_SERVICES_MOCK } from './__mocks__';
+import { TEST_SERVICES_MOCK } from './__mocks__/migrate-airtable-data.mocks';
 
 jest.mock('fs');
 
@@ -20,7 +20,7 @@ describe('MigrateAirtableDataCommand', () => {
       mockedServices = TEST_SERVICES_MOCK();
       migrateCommand = new MigrateAirtableDataCommand(...mockedServices);
       await migrateCommand.run();
-      expect(mockedServices[5].insertManyFromList).toHaveBeenCalled();
+      expect(mockedServices[4].insertManyFromList).toHaveBeenCalled();
     });
 
     describe('and with invalid industry tags', () => {
@@ -72,9 +72,9 @@ describe('MigrateAirtableDataCommand', () => {
         migrateCommand = new MigrateAirtableDataCommand(...mockedServices);
         await migrateCommand.run();
         // Assert that it called the Industry Category Service with an empty list of categories:
-        expect(mockedServices[9].insertManyFromList).toHaveBeenCalledWith([]);
+        expect(mockedServices[8].insertManyFromList).toHaveBeenCalledWith([]);
         // Assert that it called the Industry Tag Service with the incoming data:
-        expect(mockedServices[6].insertManyFromAirtable).toHaveBeenCalledWith(
+        expect(mockedServices[5].insertManyFromAirtable).toHaveBeenCalledWith(
           industryTagsWithoutCategories
         );
       });
@@ -129,11 +129,11 @@ describe('MigrateAirtableDataCommand', () => {
         migrateCommand = new MigrateAirtableDataCommand(...mockedServices);
         await migrateCommand.run();
         // Assert that it called the Funding Stages Service:
-        expect(mockedServices[7].insertManyFromList).toHaveBeenCalledWith([
+        expect(mockedServices[6].insertManyFromList).toHaveBeenCalledWith([
           'Series A',
         ]);
         // Assert that it called the Accelerator Programs Service:
-        expect(mockedServices[10].insertManyFromList).toHaveBeenCalledWith([
+        expect(mockedServices[9].insertManyFromList).toHaveBeenCalledWith([
           'Alliance',
         ]);
         // Assert that it called the Teams Service with the incoming data:
@@ -192,17 +192,13 @@ describe('MigrateAirtableDataCommand', () => {
         });
         migrateCommand = new MigrateAirtableDataCommand(...mockedServices);
         await migrateCommand.run();
-        // Assert that it called the Roles Service:
-        expect(mockedServices[1].insertManyFromList).toHaveBeenCalledWith([
-          'CEO',
-        ]);
         // Assert that it called the Skills Service:
-        expect(mockedServices[2].insertManyFromList).toHaveBeenCalledWith([
+        expect(mockedServices[1].insertManyFromList).toHaveBeenCalledWith([
           'AI',
         ]);
         // Assert that it called the Members Service with the incoming data:
         expect(
-          mockedServices[3].insertManyWithLocationsFromAirtable
+          mockedServices[2].insertManyWithLocationsFromAirtable
         ).toHaveBeenCalledWith(members);
       });
     });
@@ -211,7 +207,7 @@ describe('MigrateAirtableDataCommand', () => {
       mockedServices = TEST_SERVICES_MOCK();
       migrateCommand = new MigrateAirtableDataCommand(...mockedServices);
       await migrateCommand.run();
-      expect(mockedServices[8].insertManyFromAirtable).toHaveBeenCalled();
+      expect(mockedServices[7].insertManyFromAirtable).toHaveBeenCalled();
     });
   });
 });

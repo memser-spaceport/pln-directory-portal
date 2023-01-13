@@ -49,9 +49,7 @@ export const parseMember = (member: TMemberResponse): IMember => {
   // TODO: Change memberRole, teamLead & memberTeams lines during code cleanup
   // and removal of the Airtable layer to fully take advantage
   // of the new relationships between teams and members.
-  const memberRole = teamMemberRoles
-    ?.map((member) => member.role?.title)
-    .join(',');
+  const memberRole = teamMemberRoles?.map((member) => member.role).join(',');
   const teamLead = teamMemberRoles?.some((member) => member.teamLead) || false;
   const memberTeams =
     teamMemberRoles?.map((member) => ({
