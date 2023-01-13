@@ -1,31 +1,29 @@
 import camelCase from 'camelcase';
-import sample from 'lodash/sample';
 import sampleSize from 'lodash/sampleSize';
 import { prisma } from './../index';
 import { faker } from '@faker-js/faker';
 import { TeamMemberRole, Prisma } from '@prisma/client';
 
-const getIdsFrom = async (model) => {
+const getUidsFrom = async (model) => {
   return await prisma[camelCase(model)].findMany({
     select: {
-      id: true,
+      uid: true,
     },
   });
 };
 
 export const teamMemberRoles = async () => {
   const teamMemberRoles: Omit<TeamMemberRole, 'id'>[] = [];
-  const teamIds = await getIdsFrom(Prisma.ModelName.Team);
-  const memberIds = await getIdsFrom(Prisma.ModelName.Member);
-  const roleIds = await getIdsFrom(Prisma.ModelName.Role);
+  const teamUids = await getUidsFrom(Prisma.ModelName.Team);
+  const memberUids = await getUidsFrom(Prisma.ModelName.Member);
 
-  teamIds.forEach((teamId) =>
+  teamUids.forEach((teamUid) =>
     teamMemberRoles.push(
-      ...sampleSize(memberIds, 6).map(({ id }) => ({
-        teamId: teamId.id,
-        memberId: id,
-        roleId: sample(roleIds).id,
-        mainRole: faker.datatype.boolean(),
+      ...sampleSize(memberUids, 6).map(({ uid }) => ({
+        teamUid: teamUid.uid,
+        memberUid: uid,
+        role: faker.name.jobTitle(),
+        mainTeam: false,
         teamLead: faker.datatype.boolean(),
         startDate: faker.date.past(),
         endDate: faker.date.recent(),

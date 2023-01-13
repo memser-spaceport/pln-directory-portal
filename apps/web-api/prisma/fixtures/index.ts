@@ -6,7 +6,6 @@ export * from './industry-tags';
 export * from './locations';
 export * from './technologies';
 export * from './members';
-export * from './roles';
 export * from './skills';
 export * from './team-member-roles';
 export * from './teams';
