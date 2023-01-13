@@ -36,7 +36,7 @@ async function executeImageUpload(context) {
 const agent = createAgent({
   authSecret: process.env.FOREST_AUTH_SECRET || '',
   envSecret: process.env.FOREST_ENV_SECRET || '',
-  isProduction: process.env.NODE_ENV === 'production',
+  isProduction: process.env.ENVIRONMENT === 'production',
 }).addDataSource(createSqlDataSource(process.env.DATABASE_URL || ''));
 
 agent.customizeCollection('Member', (collection) =>
