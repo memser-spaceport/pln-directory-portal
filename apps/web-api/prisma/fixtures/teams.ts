@@ -43,8 +43,6 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(
       filecoinUser: faker.datatype.boolean(),
       ipfsUser: faker.datatype.boolean(),
       plnFriend: faker.datatype.boolean(),
-      startDate: faker.date.past(),
-      endDate: faker.date.recent(),
       createdAt: faker.date.past(),
       updatedAt: faker.date.recent(),
       fundingStageUid: null,

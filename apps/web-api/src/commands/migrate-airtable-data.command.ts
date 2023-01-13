@@ -13,7 +13,6 @@ import { FundingStagesService } from '../funding-stages/funding-stages.service';
 import { IndustryCategoriesService } from '../industry-categories/industry-categories.service';
 import { IndustryTagsService } from '../industry-tags/industry-tags.service';
 import { MembersService } from '../members/members.service';
-import { RolesService } from '../roles/roles.service';
 import { SkillsService } from '../skills/skills.service';
 import { TeamMemberRolesService } from '../team-member-roles/team-member-roles.service';
 import { TeamsService } from '../teams/teams.service';
@@ -34,7 +33,6 @@ export class MigrateAirtableDataCommand extends CommandRunner {
 
   constructor(
     private readonly teamsService: TeamsService,
-    private readonly rolesService: RolesService,
     private readonly skillsService: SkillsService,
     private readonly membersService: MembersService,
     private readonly airtableService: AirtableService,
@@ -159,18 +157,12 @@ export class MigrateAirtableDataCommand extends CommandRunner {
         .reduce((values, value) => [...values, ...value], [])
     );
 
-    // Extract roles from members:
-    const rolesToCreate = uniq<string>(
-      map(this.members, 'fields.Role').filter((val) => !!val)
-    );
-
     // Extract images from members:
     // const imagesToCreate = map(members, 'fields.Profile picture')
     //   .filter((val) => !!val)
     //   .reduce((values, value) => [...values, ...value]);
 
     // Insert data on database:
-    await this.rolesService.insertManyFromList(rolesToCreate);
     await this.skillsService.insertManyFromList(skillsToCreate);
     await this.membersService.insertManyWithLocationsFromAirtable(this.members);
 

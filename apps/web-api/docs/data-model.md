@@ -7,7 +7,6 @@ classDiagram
     Member --> "0..n" Skill
     Member --> "0..1" Location
     Member --> "0..1" Image
-    Role "1..n" <-- TeamMemberRole
     Member "1" <-- TeamMemberRole
     Team "1" <-- TeamMemberRole
     IndustryTag --> "0..1" IndustryCategory
@@ -34,7 +33,8 @@ classDiagram
 
     class TeamMemberRole {
       id : integer
-      mainRole : boolean
+      role : string
+      mainTeam : boolean
       teamLead : boolean
       startDate : datetime
       endDate : datetime
@@ -92,18 +92,6 @@ classDiagram
       createdAt : datetime
       updatedAt : datetime
     }
-
-
-    class Role {
-      id : integer
-      title : string
-      description : string
-      startDate : datetime
-      endDate : datetime
-      createdAt : datetime
-      updatedAt : datetime
-    }
-
 
     class Skill {
       id : integer

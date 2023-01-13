@@ -8,7 +8,6 @@ import { IndustryCategoriesService } from './industry-categories/industry-catego
 import { IndustryTagsService } from './industry-tags/industry-tags.service';
 import { MembersService } from './members/members.service';
 import { PrismaService } from './prisma.service';
-import { RolesService } from './roles/roles.service';
 import { SkillsService } from './skills/skills.service';
 import { TeamMemberRolesService } from './team-member-roles/team-member-roles.service';
 import { TeamsService } from './teams/teams.service';
@@ -22,7 +21,6 @@ import { LocationTransferService } from './utils/location-transfer/location-tran
 @Module({
   providers: [
     TeamsService,
-    RolesService,
     PrismaService,
     SkillsService,
     MembersService,

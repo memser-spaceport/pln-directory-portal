@@ -88,30 +88,20 @@ model Location {
   @@unique([continent, country, region, city, metroArea, latitude, longitude])
 }
 
-model Role {
-  id              Int              @id @default(autoincrement())
-  uid             String           @unique @default(cuid())
-  title           String           @unique
-  description     String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  teamMemberRoles TeamMemberRole[]
-}
-
 model TeamMemberRole {
   id        Int       @id @default(autoincrement())
-  mainRole  Boolean
+  mainTeam  Boolean
   teamLead  Boolean
   startDate DateTime?
   endDate   DateTime?
-  member    Member    @relation(fields: [memberId], references: [id])
-  memberId  Int
-  team      Team      @relation(fields: [teamId], references: [id])
-  teamId    Int
-  role      Role      @relation(fields: [roleId], references: [id])
-  roleId    Int
+  role      String?
+  member    Member    @relation(fields: [memberUid], references: [uid])
+  memberUid String
+  team      Team      @relation(fields: [teamUid], references: [uid])
+  teamUid   String
 
-  @@unique([memberId, teamId, roleId])
+  // One member can only have one role per team
+  @@unique([memberUid, teamUid])
 }
 
 model IndustryCategory {

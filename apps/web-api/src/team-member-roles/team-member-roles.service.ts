@@ -14,72 +14,74 @@ export class TeamMemberRolesService {
   ) {
     const teams = await this.prisma.team.findMany();
     const members = await this.prisma.member.findMany();
-    const roles = await this.prisma.role.findMany();
 
     return this.prisma.$transaction(
       airtableMembers
-        .filter(
-          (airtableMember) =>
-            !!airtableMember.fields?.Teams && !!airtableMember.fields?.Role
-        )
+        .filter((airtableMember) => !!airtableMember.fields?.Teams)
         .map((airtableMember) => {
-          const memberId = members.find(
+          const memberUid = members.find(
             (member) => member.name === airtableMember.fields.Name
-          )?.id;
-          const teamId = teams.find(
-            (team) =>
-              airtableTeams.find((team) =>
-                airtableMember.fields.Teams?.includes(team.id)
-              )?.fields.Name === team.name
-          )?.id;
-          const roleId = roles.find(
-            (role) => role.title === airtableMember.fields.Role
-          )?.id;
+          )?.uid;
+          const teamUids = teams
+            .filter((team) =>
+              airtableTeams
+                .filter((airtableTeam) =>
+                  airtableMember.fields.Teams?.includes(airtableTeam.id)
+                )
+                .map((airtableTeam) => airtableTeam?.fields.Name)
+                .includes(team.name)
+            )
+            .map((team) => team.uid);
 
-          return this.prisma.teamMemberRole.upsert({
-            where: {
-              ...(memberId &&
-                teamId &&
-                roleId && {
-                  memberId_teamId_roleId: { memberId, teamId, roleId },
+          return teamUids.map((teamUid, index) =>
+            this.prisma.teamMemberRole.upsert({
+              where: {
+                ...(memberUid &&
+                  teamUid && {
+                    memberUid_teamUid: { memberUid, teamUid },
+                  }),
+              },
+              update: {
+                ...(airtableMember.fields?.['Role'] &&
+                  index === 0 && {
+                    role: airtableMember.fields['Role'],
+                  }),
+                teamLead: airtableMember.fields['Team lead'] || false,
+                ...(airtableMember.fields?.['PLN Start Date'] && {
+                  startDate: new Date(airtableMember.fields['PLN Start Date']),
                 }),
-            },
-            update: {
-              teamLead: airtableMember.fields['Team lead'] || false,
-              ...(airtableMember.fields?.['PLN Start Date'] && {
-                startDate: new Date(airtableMember.fields['PLN Start Date']),
-              }),
-              ...(airtableMember.fields?.['PLN End Date'] && {
-                endDate: new Date(airtableMember.fields['PLN End Date']),
-              }),
-            },
-            create: {
-              mainRole: false, // there's no corresponding field on Airtable
-              teamLead: airtableMember.fields['Team lead'] || false,
-              ...(airtableMember.fields?.['PLN Start Date'] && {
-                startDate: new Date(airtableMember.fields['PLN Start Date']),
-              }),
-              ...(airtableMember.fields?.['PLN End Date'] && {
-                endDate: new Date(airtableMember.fields['PLN End Date']),
-              }),
-              member: {
-                connect: {
-                  id: memberId,
+                ...(airtableMember.fields?.['PLN End Date'] && {
+                  endDate: new Date(airtableMember.fields['PLN End Date']),
+                }),
+              },
+              create: {
+                ...(airtableMember.fields?.['Role'] &&
+                  index === 0 && {
+                    role: airtableMember.fields['Role'],
+                  }),
+                mainTeam: false,
+                teamLead: airtableMember.fields['Team lead'] || false,
+                ...(airtableMember.fields?.['PLN Start Date'] && {
+                  startDate: new Date(airtableMember.fields['PLN Start Date']),
+                }),
+                ...(airtableMember.fields?.['PLN End Date'] && {
+                  endDate: new Date(airtableMember.fields['PLN End Date']),
+                }),
+                member: {
+                  connect: {
+                    uid: memberUid,
+                  },
+                },
+                team: {
+                  connect: {
+                    uid: teamUid,
+                  },
                 },
               },
-              team: {
-                connect: {
-                  id: teamId,
-                },
-              },
-              role: {
-                connect: {
-                  id: roleId,
-                },
-              },
-            },
-          });
+            })
+          );
         })
+        .reduce((upserts, listOfUpserts) => [...upserts, ...listOfUpserts])
     );
   }
 }

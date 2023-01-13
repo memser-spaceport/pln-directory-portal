@@ -12,7 +12,6 @@ import {
   memberRelations,
   members,
   originalImages,
-  roles,
   skills,
   teamMemberRoles,
   teamRelations,
@@ -80,7 +79,6 @@ load([
   { [Prisma.ModelName.AcceleratorProgram]: acceleratorPrograms },
   { [Prisma.ModelName.IndustryCategory]: industryCategories },
   { [Prisma.ModelName.IndustryTag]: industryTags },
-  { [Prisma.ModelName.Role]: roles },
   { [Prisma.ModelName.Location]: locations },
   { [Prisma.ModelName.Technology]: technologies },
   {

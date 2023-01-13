@@ -99,6 +99,7 @@ export class MembersService {
           plnFriend: member.fields['Friend of PLN'] || false,
           locationUid: location ? location?.uid : null,
           imageUid: image?.uid,
+          ...optionalFieldsToAdd,
           ...manyToManyRelations,
         },
       });
