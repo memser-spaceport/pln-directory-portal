@@ -254,12 +254,12 @@ describe('parseMember', () => {
       skills: [{ title: 'JavaScript' }, { title: 'TypeScript' }],
       teamMemberRoles: [
         {
-          role: { title: 'Developer' },
+          role: 'Developer',
           team: { uid: 'team-1', name: 'Team 1' },
           teamLead: true,
         },
         {
-          role: { title: 'Manager' },
+          role: 'Manager',
           team: { uid: 'team-2', name: 'Team 2' },
           teamLead: false,
         },
