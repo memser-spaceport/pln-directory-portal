@@ -1,7 +1,6 @@
 {
   "version": 2,
   "projects": {
-    "accelerator-programs-data-access": "libs/accelerator-programs/data-access",
     "airtable": "libs/airtable",
     "api": "libs/api",
     "contracts": "libs/contracts",
@@ -9,6 +8,7 @@
     "industry-tags-data-access": "libs/industry-tags/data-access",
     "locations-data-access": "libs/locations/data-access",
     "members-data-access": "libs/members/data-access",
+    "membership-sources-data-access": "libs/membership-sources/data-access",
     "shared-data-access": "libs/shared/data-access",
     "skills-data-access": "libs/skills/data-access",
     "storybook-host": "libs/storybook-host",

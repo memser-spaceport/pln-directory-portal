@@ -1,6 +1,6 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
-import { ResponseAcceleratorProgramSchema } from './accelerator-program';
+import { ResponseMembershipSourceSchema } from './membership-source';
 import { ResponseFundingStageSchema } from './funding-stage';
 import { ResponseImageWithRelationsSchema } from './image';
 import { ResponseIndustryTagSchema } from './industry-tag';
@@ -48,7 +48,7 @@ export const ResponseTeamSchema = TeamSchema.omit({ id: true }).strict();
 
 export const ResponseTeamWithRelationsSchema = ResponseTeamSchema.extend({
   logo: ResponseImageWithRelationsSchema.optional(),
-  acceleratorPrograms: ResponseAcceleratorProgramSchema.array().optional(),
+  membershipSources: ResponseMembershipSourceSchema.array().optional(),
   industryTags: ResponseIndustryTagSchema.array().optional(),
   fundingStage: ResponseFundingStageSchema.optional(),
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
@@ -59,7 +59,7 @@ export const TeamQueryableFields = ResponseTeamSchema.keyof();
 
 export const TeamRelationalFields = ResponseTeamWithRelationsSchema.pick({
   logo: true,
-  acceleratorPrograms: true,
+  membershipSources: true,
   industryTags: true,
   fundingStage: true,
   teamMemberRoles: true,

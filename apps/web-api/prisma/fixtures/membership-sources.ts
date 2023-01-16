@@ -1,15 +1,15 @@
 import { faker } from '@faker-js/faker';
 
-export const acceleratorPrograms = [
+export const membershipSources = [
   'Cypher',
   'Faber',
   'Longhash',
   'Outlier Ventures',
   'Tachyon',
   'Y Combinator',
-].map((acceleratorProgram) => ({
-  uid: faker.helpers.slugify(`uid-${acceleratorProgram.toLowerCase()}`),
-  title: acceleratorProgram,
+].map((membershipSource) => ({
+  uid: faker.helpers.slugify(`uid-${membershipSource.toLowerCase()}`),
+  title: membershipSource,
   createdAt: faker.date.past(),
   updatedAt: faker.date.recent(),
 }));

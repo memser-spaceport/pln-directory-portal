@@ -1,10 +1,7 @@
 import { ITeam } from '@protocol-labs-network/api';
 import { TagsGroup } from '../../../shared/tags-group/tags-group';
 
-export function TeamProfileFunding({
-  fundingStage,
-  acceleratorPrograms,
-}: ITeam) {
+export function TeamProfileFunding({ fundingStage, membershipSources }: ITeam) {
   return (
     <div className="mt-6 flex rounded-lg border border-slate-200">
       {fundingStage ? (
@@ -15,11 +12,11 @@ export function TeamProfileFunding({
           </div>
         </div>
       ) : null}
-      {acceleratorPrograms?.length ? (
+      {membershipSources?.length ? (
         <div className="grow basis-1/2 p-5 pb-3 even:border-l even:border-l-slate-200">
-          <h2 className="detail-label">Accelerator Programs</h2>
+          <h2 className="detail-label">Membership Sources</h2>
           <div>
-            <TagsGroup items={acceleratorPrograms} />
+            <TagsGroup items={membershipSources} />
           </div>
         </div>
       ) : null}

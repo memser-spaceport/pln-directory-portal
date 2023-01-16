@@ -74,9 +74,9 @@ describe('parseTeam', () => {
       longDescription:
         'We are a team of skilled engineers who build innovative products',
       technologies: [{ title: 'Filecoin' }, { title: 'IPFS' }],
-      acceleratorPrograms: [
-        { title: 'Accelerator A' },
-        { title: 'Accelerator B' },
+      membershipSources: [
+        { title: 'Membership Source A' },
+        { title: 'Membership Source B' },
       ],
       industryTags: [
         { title: 'Software Development' },
@@ -98,7 +98,7 @@ describe('parseTeam', () => {
       filecoinUser: true,
       ipfsUser: true,
       fundingStage: 'Seed',
-      acceleratorPrograms: ['Accelerator A', 'Accelerator B'],
+      membershipSources: ['Membership Source A', 'Membership Source B'],
       tags: ['Software Development', 'Blockchain'],
       members: ['456', '789'],
       contactMethod: null,
@@ -119,7 +119,7 @@ describe('parseTeam', () => {
       filecoinUser: false,
       ipfsUser: false,
       fundingStage: null,
-      acceleratorPrograms: [],
+      membershipSources: [],
       tags: [],
       members: [],
       contactMethod: null,
@@ -142,9 +142,9 @@ describe('getTeamsFilterValues', () => {
           {
             industryTags: [{ title: 'Tag 01' }, { title: 'Tag 02' }],
             fundingStage: { title: 'Funding Stage 01' },
-            acceleratorPrograms: [
-              { title: 'Accelerator Program 01' },
-              { title: 'Accelerator Program 02' },
+            membershipSources: [
+              { title: 'Membership Source 01' },
+              { title: 'Membership Source 02' },
             ],
             technologies: [{ title: 'IPFS' }, { title: 'Filecoin' }],
           },
@@ -155,15 +155,15 @@ describe('getTeamsFilterValues', () => {
               { title: 'Tag 03' },
             ],
             fundingStage: { title: 'Funding Stage 02' },
-            acceleratorPrograms: [
-              { title: 'Accelerator Program 02' },
-              { title: 'Accelerator Program 03' },
+            membershipSources: [
+              { title: 'Membership Source 02' },
+              { title: 'Membership Source 03' },
             ],
           },
           {
             industryTags: [{ title: 'Tag 04' }, { title: 'Tag 05' }],
             fundingStage: { title: 'Funding Stage 03' },
-            acceleratorPrograms: [{ title: 'Accelerator Program 04' }],
+            membershipSources: [{ title: 'Membership Source 04' }],
           },
           {},
         ],
@@ -174,9 +174,9 @@ describe('getTeamsFilterValues', () => {
           {
             industryTags: [{ title: 'Tag 01' }, { title: 'Tag 02' }],
             fundingStage: { title: 'Funding Stage 01' },
-            acceleratorPrograms: [
-              { title: 'Accelerator Program 01' },
-              { title: 'Accelerator Program 02' },
+            membershipSources: [
+              { title: 'Membership Source 01' },
+              { title: 'Membership Source 02' },
             ],
             technologies: [{ title: 'IPFS' }, { title: 'Filecoin' }],
           },
@@ -187,9 +187,9 @@ describe('getTeamsFilterValues', () => {
               { title: 'Tag 03' },
             ],
             fundingStage: { title: 'Funding Stage 02' },
-            acceleratorPrograms: [
-              { title: 'Accelerator Program 02' },
-              { title: 'Accelerator Program 03' },
+            membershipSources: [
+              { title: 'Membership Source 02' },
+              { title: 'Membership Source 03' },
             ],
           },
         ],
@@ -203,7 +203,7 @@ describe('getTeamsFilterValues', () => {
       query: {
         pagination: false,
         select:
-          'industryTags.title,acceleratorPrograms.title,fundingStage.title,technologies.title',
+          'industryTags.title,membershipSources.title,fundingStage.title,technologies.title',
       },
     });
     expect(client.teams.getTeams).toHaveBeenNthCalledWith(2, {
@@ -211,7 +211,7 @@ describe('getTeamsFilterValues', () => {
         'technologies.title__with': 'Tag 01',
         pagination: false,
         select:
-          'industryTags.title,acceleratorPrograms.title,fundingStage.title,technologies.title',
+          'industryTags.title,membershipSources.title,fundingStage.title,technologies.title',
       },
     });
 
@@ -223,21 +223,21 @@ describe('getTeamsFilterValues', () => {
           'Funding Stage 02',
           'Funding Stage 03',
         ],
-        acceleratorPrograms: [
-          'Accelerator Program 01',
-          'Accelerator Program 02',
-          'Accelerator Program 03',
-          'Accelerator Program 04',
+        membershipSources: [
+          'Membership Source 01',
+          'Membership Source 02',
+          'Membership Source 03',
+          'Membership Source 04',
         ],
         technology: ['Filecoin', 'IPFS'],
       },
       availableValuesByFilter: {
         tags: ['Tag 01', 'Tag 02', 'Tag 03'],
         fundingStage: ['Funding Stage 01', 'Funding Stage 02'],
-        acceleratorPrograms: [
-          'Accelerator Program 01',
-          'Accelerator Program 02',
-          'Accelerator Program 03',
+        membershipSources: [
+          'Membership Source 01',
+          'Membership Source 02',
+          'Membership Source 03',
         ],
         technology: ['Filecoin', 'IPFS'],
       },
@@ -262,13 +262,13 @@ describe('getTeamsFilterValues', () => {
 
     expect(filters).toEqual({
       availableValuesByFilter: {
-        acceleratorPrograms: [],
+        membershipSources: [],
         fundingStage: [],
         tags: [],
         technology: [],
       },
       valuesByFilter: {
-        acceleratorPrograms: [],
+        membershipSources: [],
         fundingStage: [],
         tags: [],
         technology: [],

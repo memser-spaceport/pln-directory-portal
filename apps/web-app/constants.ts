@@ -73,7 +73,7 @@ export const FATHOM_EVENTS = {
       filters: {
         includeFriends: '2SQSL0FQ',
         tags: 'BSOPLO3Z',
-        acceleratorPrograms: 'LWE6VIGX',
+        membershipSources: 'LWE6VIGX',
         fundingStage: 'L4SN5SWW',
         technology: 'QSLCUGEX',
       },

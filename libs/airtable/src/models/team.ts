@@ -47,7 +47,7 @@ export interface IAirtableTeamLogo {
 
 export interface IAirtableTeamsFiltersValues {
   tags: string[];
-  acceleratorPrograms: string[];
+  membershipSources: string[];
   fundingStage: string[];
   technology: string[];
 }

@@ -112,7 +112,7 @@ describe('MigrateAirtableDataCommand', () => {
     });
 
     describe('and with valid teams', () => {
-      it('should call the funding stages, accelerator programs & teams service', async () => {
+      it('should call the funding stages, membership sources & teams service', async () => {
         const teams = [
           {
             id: 'id',
@@ -132,7 +132,7 @@ describe('MigrateAirtableDataCommand', () => {
         expect(mockedServices[6].insertManyFromList).toHaveBeenCalledWith([
           'Series A',
         ]);
-        // Assert that it called the Accelerator Programs Service:
+        // Assert that it called the Membership Sources Service:
         expect(mockedServices[9].insertManyFromList).toHaveBeenCalledWith([
           'Alliance',
         ]);

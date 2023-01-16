@@ -3,7 +3,7 @@ import camelCase from 'camelcase';
 import { prisma } from './index';
 
 import {
-  acceleratorPrograms,
+  membershipSources,
   fundingStages,
   imageRelations,
   industryCategories,
@@ -76,7 +76,7 @@ async function load(fixtures) {
 load([
   { [Prisma.ModelName.Skill]: skills },
   { [Prisma.ModelName.FundingStage]: fundingStages },
-  { [Prisma.ModelName.AcceleratorProgram]: acceleratorPrograms },
+  { [Prisma.ModelName.MembershipSource]: membershipSources },
   { [Prisma.ModelName.IndustryCategory]: industryCategories },
   { [Prisma.ModelName.IndustryTag]: industryTags },
   { [Prisma.ModelName.Location]: locations },

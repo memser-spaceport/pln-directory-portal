@@ -40,7 +40,7 @@ export default function Team({ team, members, backLink }: TeamProps) {
         <div className="card p-7.5 w-full">
           <TeamProfileHeader {...team} />
           <TeamProfileDetails {...team} />
-          {team.fundingStage || team.acceleratorPrograms.length ? (
+          {team.fundingStage || team.membershipSources.length ? (
             <TeamProfileFunding {...team} />
           ) : null}
           <TeamProfileMembers members={members} />

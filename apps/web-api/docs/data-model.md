@@ -13,7 +13,7 @@ classDiagram
     Team --> "0..n" IndustryTag
     Team --> "0..1" FundingStage
     Team --> "0..1" Image
-    Team --> "0..n" AcceleratorProgram
+    Team --> "0..n" MembershipSource
     Team --> "0..n" Technology
     Image --> "1..n" Image
 
@@ -50,7 +50,7 @@ classDiagram
     }
 
 
-    class AcceleratorProgram {
+    class MembershipSource {
       id : integer
       title : string
       createdAt : datetime
