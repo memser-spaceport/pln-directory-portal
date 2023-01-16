@@ -1,8 +1,7 @@
-import { IAirtableTeamsFiltersValues } from '@protocol-labs-network/airtable';
 import { ITeam } from '@protocol-labs-network/api';
 import { TTeamResponse } from '@protocol-labs-network/contracts';
 import { client } from '@protocol-labs-network/shared/data-access';
-import { TTeamListOptions } from './teams.types';
+import { TTeamListOptions, TTeamsFiltersValues } from './teams.types';
 
 /**
  * Get teams list from API
@@ -88,9 +87,16 @@ export const getTeamsFilters = async (options: TTeamListOptions) => {
   ]);
 
   if (valuesByFilter.status !== 200 || availableValuesByFilter.status !== 200) {
+    const emptyFilters = {
+      tags: [],
+      acceleratorPrograms: [],
+      fundingStage: [],
+      technology: [],
+    };
+
     return {
-      valuesByFilter: [],
-      availableValuesByFilter: [],
+      valuesByFilter: emptyFilters,
+      availableValuesByFilter: emptyFilters,
     };
   }
 
@@ -145,7 +151,7 @@ const parseTeamsFilters = (teams: TTeamResponse[]) => {
       acceleratorPrograms: [],
       fundingStage: [],
       technology: [],
-    } as IAirtableTeamsFiltersValues
+    } as TTeamsFiltersValues
   );
 
   Object.values(filtersValues).forEach((value) => value.sort());
@@ -162,3 +168,5 @@ const getUniqueFilterValues = (
 ): string[] => {
   return [...new Set([...uniqueValues, ...(newValues || [])])];
 };
+
+export * from './teams.types';

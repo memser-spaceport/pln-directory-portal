@@ -1,5 +1,10 @@
 import airtableService from '@protocol-labs-network/airtable';
 import { ITeam } from '@protocol-labs-network/api';
+import {
+  getTeams,
+  getTeamsFilters,
+  parseTeam,
+} from '@protocol-labs-network/teams/data-access';
 import { GetServerSideProps } from 'next';
 import { NextSeo } from 'next-seo';
 import { ReactElement } from 'react';
@@ -16,7 +21,11 @@ import { DIRECTORY_SEO } from '../../../seo.config';
 import {
   getTeamsDirectoryListOptions,
   getTeamsDirectoryRequestOptionsFromQuery,
-} from '../../../utils/api/list.utils';
+} from '../../../utils/list.utils';
+import {
+  getTeamsListOptions,
+  getTeamsOptionsFromQuery,
+} from '../../../utils/teams.utils';
 
 type TeamsProps = {
   teams: ITeam[];
@@ -81,13 +90,33 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
   query,
   res,
 }) => {
-  const optionsFromQuery = getTeamsDirectoryRequestOptionsFromQuery(query);
-  const listOptions = getTeamsDirectoryListOptions(optionsFromQuery);
-  const [teams, filtersValues] = await Promise.all([
-    airtableService.getTeams(listOptions),
-    airtableService.getTeamsFiltersValues(optionsFromQuery),
-  ]);
-  const parsedFilters = parseTeamsFilters(filtersValues, query);
+  let teams;
+  let parsedFilters;
+
+  if (process.env.USE_CUSTOM_PLNETWORK_API) {
+    const optionsFromQuery = getTeamsOptionsFromQuery(query);
+    const listOptions = getTeamsListOptions(optionsFromQuery);
+    const [teamsResponse, filtersValues] = await Promise.all([
+      getTeams(listOptions),
+      getTeamsFilters(optionsFromQuery),
+    ]);
+
+    teams =
+      teamsResponse.status === 200
+        ? teamsResponse.body.map((team) => parseTeam(team))
+        : [];
+    parsedFilters = parseTeamsFilters(filtersValues, query);
+  } else {
+    const optionsFromQuery = getTeamsDirectoryRequestOptionsFromQuery(query);
+    const listOptions = getTeamsDirectoryListOptions(optionsFromQuery);
+    const [teamsResponse, filtersValues] = await Promise.all([
+      airtableService.getTeams(listOptions),
+      airtableService.getTeamsFiltersValues(optionsFromQuery),
+    ]);
+
+    teams = teamsResponse;
+    parsedFilters = parseTeamsFilters(filtersValues, query);
+  }
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days

@@ -2,7 +2,7 @@ import airtableService from '@protocol-labs-network/airtable';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { env } from 'process';
 import getMembersHandler from '../../../../pages/api/members';
-import { getMembersDirectoryRequestParametersFromQuery } from '../../../../utils/api/list.utils';
+import { getMembersDirectoryRequestParametersFromQuery } from '../../../../utils/list.utils';
 
 const mockMembers = {
   records: [{ Name: 'member_01' }, { Name: 'member_02' }],
@@ -27,7 +27,7 @@ jest.mock('@protocol-labs-network/airtable', () => ({
 }));
 
 const mockQueryParamsString = 'mockQueryParamsString';
-jest.mock('../../../utils/api/list.utils', () => ({
+jest.mock('../../../../utils/list.utils', () => ({
   getMembersDirectoryRequestParametersFromQuery: jest.fn(
     () => mockQueryParamsString
   ),

@@ -7,3 +7,10 @@ export type TTeamListOptions = TListOptions & {
   'fundingStage.title__with'?: string;
   plnFriend?: boolean;
 };
+
+export type TTeamsFiltersValues = {
+  tags: string[];
+  acceleratorPrograms: string[];
+  fundingStage: string[];
+  technology: string[];
+};

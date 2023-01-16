@@ -3,10 +3,10 @@ import { ParsedUrlQuery } from 'querystring';
 import {
   directorySortOptions,
   TDirectorySortOption,
-} from '../../components/directory/directory-sort/directory-sort.types';
-import { MEMBER_CARD_FIELDS } from '../../components/shared/members/member-card/member-card.constants';
-import { TEAM_CARD_FIELDS } from '../../components/shared/teams/team-card/team-card.constants';
-import { ITEMS_PER_PAGE, URL_QUERY_VALUE_SEPARATOR } from '../../constants';
+} from '../components/directory/directory-sort/directory-sort.types';
+import { MEMBER_CARD_FIELDS } from '../components/shared/members/member-card/member-card.constants';
+import { TEAM_CARD_FIELDS } from '../components/shared/teams/team-card/team-card.constants';
+import { ITEMS_PER_PAGE, URL_QUERY_VALUE_SEPARATOR } from '../constants';
 
 /**
  * Returns the options for requesting the teams on the teams directory,
@@ -183,7 +183,7 @@ export function getMembersDirectoryRequestParametersFromQuery(
 /**
  * Gets sort options by parsing the provided sort query parameter.
  */
-function getSortFromQuery(sortQuery?: string) {
+export function getSortFromQuery(sortQuery?: string) {
   const sort = isSortValid(sortQuery) ? sortQuery : 'Name,asc';
   const sortSettings = sort.split(',');
 
@@ -311,4 +311,12 @@ function getTechnologyFormulaFromQuery(
     : technologyQuery.split(URL_QUERY_VALUE_SEPARATOR);
 
   return values.map((value) => `{${value} User} = TRUE()`).join(', ');
+}
+
+/**
+ * Takes in a single argument values, which can be either a string or an array of strings,
+ * and returns a string with the values separated by a comma.
+ */
+export function stringifyQueryValues(values: string | string[]) {
+  return Array.isArray(values) ? values.toString() : values.replace('|', ',');
 }
