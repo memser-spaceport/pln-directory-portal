@@ -16,7 +16,7 @@ import { DIRECTORY_SEO } from '../../../seo.config';
 import {
   getMembersDirectoryListOptions,
   getMembersDirectoryRequestOptionsFromQuery,
-} from '../../../utils/api/list.utils';
+} from '../../../utils/list.utils';
 
 type MembersProps = {
   members: IMember[];

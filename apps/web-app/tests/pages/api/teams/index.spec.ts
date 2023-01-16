@@ -2,7 +2,7 @@ import airtableService from '@protocol-labs-network/airtable';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { env } from 'process';
 import getTeamsHandler from '../../../../pages/api/teams';
-import { getTeamsDirectoryRequestParametersFromQuery } from '../../../../utils/api/list.utils';
+import { getTeamsDirectoryRequestParametersFromQuery } from '../../../../utils/list.utils';
 
 const mockTeams = {
   records: [{ Name: 'team_01' }, { Name: 'team_02' }],
@@ -27,7 +27,7 @@ jest.mock('@protocol-labs-network/airtable', () => ({
 }));
 
 const mockQueryParamsString = 'mockQueryParamsString';
-jest.mock('../../../utils/api/list.utils', () => ({
+jest.mock('../../../../utils/list.utils', () => ({
   getTeamsDirectoryRequestParametersFromQuery: jest.fn(
     () => mockQueryParamsString
   ),

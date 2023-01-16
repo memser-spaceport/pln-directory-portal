@@ -1,7 +1,7 @@
 import airtableService from '@protocol-labs-network/airtable';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { env } from 'process';
-import { getTeamsDirectoryRequestParametersFromQuery } from '../../../utils/api/list.utils';
+import { getTeamsDirectoryRequestParametersFromQuery } from '../../../utils/list.utils';
 
 export default async function getTeamsHandler(
   req: NextApiRequest,

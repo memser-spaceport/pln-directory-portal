@@ -1,5 +1,5 @@
-import { MEMBER_CARD_FIELDS } from '../../../components/shared/members/member-card/member-card.constants';
-import { TEAM_CARD_FIELDS } from '../../../components/shared/teams/team-card/team-card.constants';
+import { MEMBER_CARD_FIELDS } from '../components/shared/members/member-card/member-card.constants';
+import { TEAM_CARD_FIELDS } from '../components/shared/teams/team-card/team-card.constants';
 import {
   getMembersDirectoryListOptions,
   getMembersDirectoryRequestOptionsFromQuery,
@@ -7,7 +7,8 @@ import {
   getTeamsDirectoryListOptions,
   getTeamsDirectoryRequestOptionsFromQuery,
   getTeamsDirectoryRequestParametersFromQuery,
-} from '../../../utils/api/list.utils';
+  stringifyQueryValues,
+} from './list.utils';
 
 describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
   it('should return valid options when sort is provided and is valid', () => {
@@ -248,5 +249,15 @@ describe('#getMembersDirectoryRequestParametersFromQuery', () => {
     ).toEqual(
       `fields[]=Name&fields[]=Profile picture&fields[]=Role&fields[]=Teams&fields[]=Team name&fields[]=Country&fields[]=State / Province&fields[]=City&fields[]=Metro Area&fields[]=Team lead&fields[]=Skills&sort[0][field]=Name&sort[0][direction]=asc&filterByFormula=${encodedFormula}&pageSize=9`
     );
+  });
+});
+
+describe('#stringifyQueryValues', () => {
+  it('should return a valid string with the values separated by a comma when provided strings with values separated by vertical bar', () => {
+    expect(stringifyQueryValues('IPFS|Filecoin')).toEqual('IPFS,Filecoin');
+  });
+
+  it('should return a valid string with the values separated by a comma when provided an array of strings', () => {
+    expect(stringifyQueryValues(['IPFS', 'Filecoin'])).toEqual('IPFS,Filecoin');
   });
 });

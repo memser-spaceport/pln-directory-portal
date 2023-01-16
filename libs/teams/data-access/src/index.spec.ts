@@ -261,8 +261,18 @@ describe('getTeamsFilterValues', () => {
     const filters = await getTeamsFilters(options);
 
     expect(filters).toEqual({
-      valuesByFilter: [],
-      availableValuesByFilter: [],
+      availableValuesByFilter: {
+        acceleratorPrograms: [],
+        fundingStage: [],
+        tags: [],
+        technology: [],
+      },
+      valuesByFilter: {
+        acceleratorPrograms: [],
+        fundingStage: [],
+        tags: [],
+        technology: [],
+      },
     });
   });
 });

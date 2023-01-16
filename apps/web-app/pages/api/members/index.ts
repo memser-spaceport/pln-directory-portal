@@ -1,7 +1,7 @@
 import airtableService from '@protocol-labs-network/airtable';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { env } from 'process';
-import { getMembersDirectoryRequestParametersFromQuery } from '../../../utils/api/list.utils';
+import { getMembersDirectoryRequestParametersFromQuery } from '../../../utils/list.utils';
 
 export default async function getMembersHandler(
   req: NextApiRequest,

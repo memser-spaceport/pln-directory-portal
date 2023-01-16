@@ -1,4 +1,4 @@
-import { getSiteUrl } from '../../../utils/sitemap/sitemap.utils';
+import { getSiteUrl } from './sitemap.utils';
 
 describe('#getSiteUrl', () => {
   const PREVIEW_URL = 'preview-url.com';

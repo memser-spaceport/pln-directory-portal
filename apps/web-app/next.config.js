@@ -18,7 +18,12 @@ let nextConfig = {
   images: {
     // List remote domains that have access to Next.js Image Optimization API,
     // to protect the app from malicious users
-    domains: ['dl.airtable.com', 'v5.airtableusercontent.com'],
+    // TODO: remove these domains during code cleanup and removal of the Airtable layer
+    domains: [
+      'dl.airtable.com',
+      'v5.airtableusercontent.com',
+      'loremflickr.com',
+    ],
     // Enable `dangerouslyAllowSVG` and `contentSecurityPolicy` to serve
     // SVG images using the default Image Optimization API
     dangerouslyAllowSVG: true,
