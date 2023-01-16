@@ -16,7 +16,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
         sort: 'Name,desc',
         tags: 'Analytics',
         fundingStage: 'Seed',
-        acceleratorPrograms: 'IPFS',
+        membershipSources: 'IPFS',
         searchBy: 'void',
         technology: 'IPFS',
         includeFriends: 'true',
@@ -45,7 +45,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
       getTeamsDirectoryRequestOptionsFromQuery({
         tags: 'Analytics',
         fundingStage: 'Seed',
-        acceleratorPrograms: 'IPFS',
+        membershipSources: 'IPFS',
         searchBy: 'void',
         technology: 'IPFS|Filecoin',
         includeFriends: 'true',
@@ -149,7 +149,7 @@ describe('#getTeamsDirectoryRequestParametersFromQuery', () => {
       getTeamsDirectoryRequestParametersFromQuery({
         sort: 'Name,desc',
         tags: 'Analytics',
-        acceleratorPrograms: 'IPFS',
+        membershipSources: 'IPFS',
         fundingStage: 'Seed',
         searchBy: 'void',
         technology: 'IPFS',
@@ -182,7 +182,7 @@ describe('#getTeamsDirectoryRequestParametersFromQuery', () => {
     expect(
       getTeamsDirectoryRequestParametersFromQuery({
         tags: 'Analytics',
-        acceleratorPrograms: 'IPFS',
+        membershipSources: 'IPFS',
         fundingStage: 'Seed',
         searchBy: 'void',
         technology: 'IPFS|Filecoin',

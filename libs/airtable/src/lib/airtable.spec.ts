@@ -216,7 +216,7 @@ describe('AirtableService', () => {
       {
         filecoinUser: teamMock01.fields['Filecoin User'],
         fundingStage: teamMock01.fields['Funding Stage'],
-        acceleratorPrograms: teamMock01.fields['Accelerator Programs'],
+        membershipSources: teamMock01.fields['Accelerator Programs'],
         id: teamMock01.id,
         tags: teamMock01.fields['Tags lookup'],
         ipfsUser: teamMock01.fields['IPFS User'],
@@ -232,7 +232,7 @@ describe('AirtableService', () => {
       {
         filecoinUser: false,
         fundingStage: null,
-        acceleratorPrograms: [],
+        membershipSources: [],
         id: teamMock02.id,
         tags: [],
         ipfsUser: false,
@@ -248,7 +248,7 @@ describe('AirtableService', () => {
       {
         filecoinUser: false,
         fundingStage: null,
-        acceleratorPrograms: [],
+        membershipSources: [],
         id: emptyTeamMock.id,
         tags: [],
         ipfsUser: false,
@@ -285,7 +285,7 @@ describe('AirtableService', () => {
       {
         filecoinUser: teamMock01.fields['Filecoin User'],
         fundingStage: teamMock01.fields['Funding Stage'],
-        acceleratorPrograms: teamMock01.fields['Accelerator Programs'],
+        membershipSources: teamMock01.fields['Accelerator Programs'],
         id: teamMock01.id,
         tags: teamMock01.fields['Tags lookup'],
         ipfsUser: teamMock01.fields['IPFS User'],
@@ -301,7 +301,7 @@ describe('AirtableService', () => {
       {
         filecoinUser: false,
         fundingStage: null,
-        acceleratorPrograms: [],
+        membershipSources: [],
         id: teamMock02.id,
         tags: [],
         ipfsUser: false,
@@ -317,7 +317,7 @@ describe('AirtableService', () => {
       {
         filecoinUser: false,
         fundingStage: null,
-        acceleratorPrograms: [],
+        membershipSources: [],
         id: emptyTeamMock.id,
         tags: [],
         ipfsUser: false,
@@ -343,7 +343,7 @@ describe('AirtableService', () => {
     expect(team).toEqual({
       filecoinUser: teamMock01.fields['Filecoin User'],
       fundingStage: teamMock01.fields['Funding Stage'],
-      acceleratorPrograms: teamMock01.fields['Accelerator Programs'],
+      membershipSources: teamMock01.fields['Accelerator Programs'],
       id: teamMock01.id,
       tags: teamMock01.fields['Tags lookup'],
       ipfsUser: teamMock01.fields['IPFS User'],
@@ -439,7 +439,7 @@ describe('AirtableService', () => {
         website: 'http://team01.com/',
         fundingStage: null,
         filecoinUser: false,
-        acceleratorPrograms: ['Seed'],
+        membershipSources: ['Seed'],
         tags: ['IT'],
         ipfsUser: false,
         contactMethod: null,
@@ -455,7 +455,7 @@ describe('AirtableService', () => {
         website: 'http://team02.com/',
         fundingStage: null,
         filecoinUser: false,
-        acceleratorPrograms: ['Seed'],
+        membershipSources: ['Seed'],
         tags: ['IT'],
         ipfsUser: false,
         contactMethod: null,
@@ -564,7 +564,7 @@ describe('AirtableService', () => {
           'Funding Stage 02',
           'Funding Stage 03',
         ],
-        acceleratorPrograms: [
+        membershipSources: [
           'Accelerator Program 01',
           'Accelerator Program 02',
           'Accelerator Program 03',
@@ -575,7 +575,7 @@ describe('AirtableService', () => {
       availableValuesByFilter: {
         tags: ['Tag 01', 'Tag 02', 'Tag 03'],
         fundingStage: ['Funding Stage 01', 'Funding Stage 02'],
-        acceleratorPrograms: [
+        membershipSources: [
           'Accelerator Program 01',
           'Accelerator Program 02',
           'Accelerator Program 03',
@@ -988,7 +988,7 @@ describe('AirtableService', () => {
       {
         filecoinUser: teamMock01.fields['Filecoin User'],
         fundingStage: teamMock01.fields['Funding Stage'],
-        acceleratorPrograms: teamMock01.fields['Accelerator Programs'],
+        membershipSources: teamMock01.fields['Accelerator Programs'],
         id: teamMock01.id,
         tags: teamMock01.fields['Tags lookup'],
         ipfsUser: teamMock01.fields['IPFS User'],
@@ -1004,7 +1004,7 @@ describe('AirtableService', () => {
       {
         filecoinUser: false,
         fundingStage: null,
-        acceleratorPrograms: [],
+        membershipSources: [],
         id: teamMock02.id,
         tags: [],
         ipfsUser: false,
@@ -1020,7 +1020,7 @@ describe('AirtableService', () => {
       {
         filecoinUser: false,
         fundingStage: null,
-        acceleratorPrograms: [],
+        membershipSources: [],
         id: emptyTeamMock.id,
         tags: [],
         ipfsUser: false,

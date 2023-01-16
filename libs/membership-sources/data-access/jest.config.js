@@ -1,5 +1,5 @@
 module.exports = {
-  displayName: 'accelerator-programs-data-access',
+  displayName: 'membership-sources-data-access',
   preset: '../../../jest.preset.js',
   globals: {
     'ts-jest': {
@@ -10,5 +10,5 @@ module.exports = {
     '^.+\\.[tj]s$': 'ts-jest',
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageDirectory: '../../../coverage/libs/accelerator-programs/data-access',
+  coverageDirectory: '../../../coverage/libs/membership-sources/data-access',
 };

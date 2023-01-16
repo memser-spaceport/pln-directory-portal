@@ -1,0 +1,22 @@
+{
+  "root": "libs/membership-sources/data-access",
+  "sourceRoot": "libs/membership-sources/data-access/src",
+  "targets": {
+    "lint": {
+      "executor": "@nrwl/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/membership-sources/data-access/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "@nrwl/jest:jest",
+      "outputs": ["coverage/libs/membership-sources/data-access"],
+      "options": {
+        "jestConfig": "libs/membership-sources/data-access/jest.config.js",
+        "passWithNoTests": true
+      }
+    }
+  },
+  "tags": []
+}

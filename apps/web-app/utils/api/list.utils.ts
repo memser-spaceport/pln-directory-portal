@@ -18,7 +18,7 @@ export function getTeamsDirectoryRequestOptionsFromQuery(
   const {
     sort,
     tags,
-    acceleratorPrograms,
+    membershipSources,
     fundingStage,
     searchBy,
     technology,
@@ -29,7 +29,7 @@ export function getTeamsDirectoryRequestOptionsFromQuery(
     sort: [getSortFromQuery(sort?.toString())],
     filterByFormula: getTeamsDirectoryFormula({
       tags,
-      acceleratorPrograms,
+      membershipSources,
       fundingStage,
       searchBy,
       technology,
@@ -104,7 +104,7 @@ export function getTeamsDirectoryRequestParametersFromQuery(
   const {
     sort,
     tags,
-    acceleratorPrograms,
+    membershipSources,
     fundingStage,
     searchBy,
     technology,
@@ -122,7 +122,7 @@ export function getTeamsDirectoryRequestParametersFromQuery(
 
   const teamsDirectoryFormula = getTeamsDirectoryFormula({
     tags,
-    acceleratorPrograms,
+    membershipSources,
     fundingStage,
     searchBy,
     technology,
@@ -208,7 +208,7 @@ function isSortValid(sortQuery?: string) {
  */
 function getTeamsDirectoryFormula({
   tags,
-  acceleratorPrograms,
+  membershipSources,
   fundingStage,
   searchBy,
   technology,
@@ -223,8 +223,8 @@ function getTeamsDirectoryFormula({
       '{Short description} != ""',
       ...(searchBy ? [getSearchFormulaFromQuery(searchBy)] : []),
       ...(tags ? [getFieldFromQuery('Tags lookup', tags, true)] : []),
-      ...(acceleratorPrograms
-        ? [getFieldFromQuery('Accelerator Programs', acceleratorPrograms)]
+      ...(membershipSources
+        ? [getFieldFromQuery('Accelerator Programs', membershipSources)]
         : []),
       ...(fundingStage
         ? [getFieldFromQuery('Funding Stage', fundingStage)]

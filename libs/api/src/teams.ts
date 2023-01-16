@@ -1,7 +1,7 @@
 export interface ITeam {
   filecoinUser: boolean;
   fundingStage: string | null;
-  acceleratorPrograms: string[];
+  membershipSources: string[];
   id: string;
   tags: string[];
   ipfsUser: boolean;

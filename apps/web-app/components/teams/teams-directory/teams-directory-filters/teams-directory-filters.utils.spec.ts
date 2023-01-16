@@ -7,10 +7,10 @@ describe('#parseTeamsFilters', () => {
         {
           valuesByFilter: {
             tags: ['Tag 01', 'Tag 02', 'Tag 03'],
-            acceleratorPrograms: [
-              'Accelerator Program 01',
-              'Accelerator Program 02',
-              'Accelerator Program 03',
+            membershipSources: [
+              'Membership Source 01',
+              'Membership Source 02',
+              'Membership Source 03',
             ],
             fundingStage: [
               'Funding Stage 01',
@@ -21,10 +21,7 @@ describe('#parseTeamsFilters', () => {
           },
           availableValuesByFilter: {
             tags: ['Tag 01', 'Tag 03'],
-            acceleratorPrograms: [
-              'Accelerator Program 01',
-              'Accelerator Program 03',
-            ],
+            membershipSources: ['Membership Source 01', 'Membership Source 03'],
             fundingStage: ['Funding Stage 01', 'Funding Stage 02'],
             technology: ['Filecoin'],
           },
@@ -40,10 +37,10 @@ describe('#parseTeamsFilters', () => {
         { value: 'Tag 02', selected: false, disabled: true },
         { value: 'Tag 03', selected: false, disabled: false },
       ],
-      acceleratorPrograms: [
-        { value: 'Accelerator Program 01', selected: false, disabled: false },
-        { value: 'Accelerator Program 02', selected: false, disabled: true },
-        { value: 'Accelerator Program 03', selected: false, disabled: false },
+      membershipSources: [
+        { value: 'Membership Source 01', selected: false, disabled: false },
+        { value: 'Membership Source 02', selected: false, disabled: true },
+        { value: 'Membership Source 03', selected: false, disabled: false },
       ],
       fundingStage: [
         { value: 'Funding Stage 01', selected: false, disabled: false },
