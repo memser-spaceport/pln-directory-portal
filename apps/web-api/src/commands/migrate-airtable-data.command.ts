@@ -8,7 +8,7 @@ import map from 'lodash/map';
 import uniq from 'lodash/uniq';
 import { Command, CommandRunner } from 'nest-commander';
 import { z } from 'zod';
-import { AcceleratorProgramsService } from '../accelerator-programs/accelerator-programs.service';
+import { MembershipSourcesService } from '../membership-sources/membership-sources.service';
 import { FundingStagesService } from '../funding-stages/funding-stages.service';
 import { IndustryCategoriesService } from '../industry-categories/industry-categories.service';
 import { IndustryTagsService } from '../industry-tags/industry-tags.service';
@@ -43,7 +43,7 @@ export class MigrateAirtableDataCommand extends CommandRunner {
     private readonly fundingStagesService: FundingStagesService,
     private readonly teamMemberRolesService: TeamMemberRolesService,
     private readonly industryCategoriesService: IndustryCategoriesService,
-    private readonly acceleratorProgramsService: AcceleratorProgramsService
+    private readonly membershipSourcesService: MembershipSourcesService
   ) {
     super();
   }
@@ -123,8 +123,8 @@ export class MigrateAirtableDataCommand extends CommandRunner {
       map(this.teams, 'fields.Funding Stage').filter((val) => !!val)
     );
 
-    // Extract accelerator programs from teams:
-    const acceleratorProgramsToCreate = uniq<string>(
+    // Extract accelerator programs (a.k.a membership sources) from teams:
+    const membershipSourcesToCreate = uniq<string>(
       map(this.teams, 'fields.Accelerator Programs')
         .filter((val) => !!val)
         .reduce((values, value) => [...values, ...value], [])
@@ -137,8 +137,8 @@ export class MigrateAirtableDataCommand extends CommandRunner {
 
     // Insert data on database:
     await this.fundingStagesService.insertManyFromList(fundingStagesToCreate);
-    await this.acceleratorProgramsService.insertManyFromList(
-      acceleratorProgramsToCreate
+    await this.membershipSourcesService.insertManyFromList(
+      membershipSourcesToCreate
     );
     await this.teamsService.insertManyFromAirtable(this.teams);
 
