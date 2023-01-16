@@ -56,8 +56,8 @@ export const teams = async () => await teamsFactory.createList(300);
 
 export const teamRelations = async (teams) => {
   const industryTagUids = await getUidsFrom(Prisma.ModelName.IndustryTag);
-  const acceleratorProgramUids = await getUidsFrom(
-    Prisma.ModelName.AcceleratorProgram
+  const membershipSourceUids = await getUidsFrom(
+    Prisma.ModelName.MembershipSource
   );
   const technologyUids = await getUidsFrom(Prisma.ModelName.Technology);
 
@@ -75,8 +75,8 @@ export const teamRelations = async (teams) => {
         industryTags: {
           connect: sampleSize(industryTagUids, 3),
         },
-        acceleratorPrograms: {
-          connect: sampleSize(acceleratorProgramUids, 3),
+        membershipSources: {
+          connect: sampleSize(membershipSourceUids, 3),
         },
         ...(randomTechnologies.length && {
           technologies: { connect: randomTechnologies },

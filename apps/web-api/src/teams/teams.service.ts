@@ -32,7 +32,7 @@ export class TeamsService {
     const fundingStages = await this.prisma.fundingStage.findMany();
     const industryTags = await this.prisma.industryTag.findMany();
     const technologies = await this.prisma.technology.findMany();
-    const acceleratorPrograms = await this.prisma.acceleratorProgram.findMany();
+    const membershipSources = await this.prisma.membershipSource.findMany();
 
     for (const team of airtableTeams) {
       const optionalFieldsToAdd = Object.entries({
@@ -72,8 +72,8 @@ export class TeamsService {
             )
             .map((tag) => ({ id: tag.id })),
         },
-        acceleratorPrograms: {
-          connect: acceleratorPrograms
+        membershipSources: {
+          connect: membershipSources
             .filter(
               (program) =>
                 !!team.fields?.['Accelerator Programs'] &&

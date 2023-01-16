@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { AcceleratorProgramsService } from './accelerator-programs/accelerator-programs.service';
+import { MembershipSourcesService } from './membership-sources/membership-sources.service';
 import { MigrateAirtableDataCommand } from './commands/migrate-airtable-data.command';
 import { FundingStagesService } from './funding-stages/funding-stages.service';
 import { ImagesController } from './images/images.controller';
@@ -32,7 +32,7 @@ import { LocationTransferService } from './utils/location-transfer/location-tran
     FundingStagesService,
     TeamMemberRolesService,
     IndustryCategoriesService,
-    AcceleratorProgramsService,
+    MembershipSourcesService,
     LocationTransferService,
     MigrateAirtableDataCommand,
     FileMigrationService,

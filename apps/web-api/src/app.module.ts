@@ -9,7 +9,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import * as redisStore from 'cache-manager-redis-store';
 import type { ClientOpts } from 'redis';
-import { AcceleratorProgramsModule } from './accelerator-programs/accelerator-programs.module';
+import { MembershipSourcesModule } from './membership-sources/membership-sources.module';
 import { AppController } from './app.controller';
 import { FundingStagesModule } from './funding-stages/funding-stages.module';
 import { HealthModule } from './health/health.module';
@@ -62,7 +62,7 @@ import { TechnologiesModule } from './technologies/technologies.module';
     HealthModule,
     TeamsModule,
     IndustryTagsModule,
-    AcceleratorProgramsModule,
+    MembershipSourcesModule,
     FundingStagesModule,
     SkillsModule,
     LocationsModule,
