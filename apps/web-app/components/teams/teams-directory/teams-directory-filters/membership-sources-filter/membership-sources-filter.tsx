@@ -2,21 +2,21 @@ import { DirectoryTagsFilter } from '../../../../directory/directory-filters/dir
 import { IFilterTag } from '../../../../directory/directory-filters/directory-tags-filter/directory-tags-filter.types';
 import { useTagsFilter } from '../../../../directory/directory-filters/directory-tags-filter/use-tags-filter.hook';
 
-export interface AcceleratorProgramsFilterProps {
-  acceleratorProgramsTags: IFilterTag[];
+export interface MembershipSourcesFilterProps {
+  membershipSourcesTags: IFilterTag[];
 }
 
-export function AcceleratorProgramsFilter({
-  acceleratorProgramsTags,
-}: AcceleratorProgramsFilterProps) {
+export function MembershipSourcesFilter({
+  membershipSourcesTags,
+}: MembershipSourcesFilterProps) {
   const [tags, toggleTag] = useTagsFilter(
-    'acceleratorPrograms',
-    acceleratorProgramsTags
+    'membershipSources',
+    membershipSourcesTags
   );
 
   return (
     <DirectoryTagsFilter
-      title="Accelerator Programs"
+      title="Membership Sources"
       tags={tags}
       onTagToggle={toggleTag}
     />

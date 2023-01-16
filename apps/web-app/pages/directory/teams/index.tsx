@@ -37,7 +37,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
   const isGrid = selectedViewType === 'grid';
   const filterProperties = [
     'tags',
-    'acceleratorPrograms',
+    'membershipSources',
     'fundingStage',
     'technology',
     'includeFriends',

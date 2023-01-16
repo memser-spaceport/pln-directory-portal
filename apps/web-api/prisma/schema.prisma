@@ -14,30 +14,30 @@ datasource db {
 /// TODO: User permissions/grants
 
 model Team {
-  id                  Int                  @id @default(autoincrement())
-  uid                 String               @unique @default(cuid())
-  name                String               @unique
-  logo                Image?               @relation(fields: [logoUid], references: [uid])
-  logoUid             String?
-  blog                String?
-  website             String?
-  contactMethod       String?
-  twitterHandler      String?
-  shortDescription    String?
-  longDescription     String?
-  plnFriend           Boolean
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  teamMemberRoles     TeamMemberRole[]
-  industryTags        IndustryTag[]
-  acceleratorPrograms AcceleratorProgram[]
-  fundingStage        FundingStage?        @relation(fields: [fundingStageUid], references: [uid])
-  fundingStageUid     String?
-  technologies        Technology[]
+  id                Int                @id @default(autoincrement())
+  uid               String             @unique @default(cuid())
+  name              String             @unique
+  logo              Image?             @relation(fields: [logoUid], references: [uid])
+  logoUid           String?
+  blog              String?
+  website           String?
+  contactMethod     String?
+  twitterHandler    String?
+  shortDescription  String?
+  longDescription   String?
+  plnFriend         Boolean
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  teamMemberRoles   TeamMemberRole[]
+  industryTags      IndustryTag[]
+  membershipSources MembershipSource[]
+  fundingStage      FundingStage?      @relation(fields: [fundingStageUid], references: [uid])
+  fundingStageUid   String?
+  technologies      Technology[]
   // To be deprecated in favor of Technology model
   // Remove after Airtable data migration:
-  filecoinUser        Boolean
-  ipfsUser            Boolean
+  filecoinUser      Boolean
+  ipfsUser          Boolean
 }
 
 model Member {
@@ -135,7 +135,7 @@ model FundingStage {
   teams     Team[]
 }
 
-model AcceleratorProgram {
+model MembershipSource {
   id        Int      @id @default(autoincrement())
   uid       String   @unique @default(cuid())
   title     String   @unique

@@ -15,9 +15,6 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@protocol-labs-network/accelerator-programs/data-access": [
-        "libs/accelerator-programs/data-access/src/index.ts"
-      ],
       "@protocol-labs-network/airtable": ["libs/airtable/src/index.ts"],
       "@protocol-labs-network/api": ["libs/api/src/index.ts"],
       "@protocol-labs-network/contracts": ["libs/contracts/src/index.ts"],
@@ -32,6 +29,9 @@
       ],
       "@protocol-labs-network/members/data-access": [
         "libs/members/data-access/src/index.ts"
+      ],
+      "@protocol-labs-network/membership-sources/data-access": [
+        "libs/membership-sources/data-access/src/index.ts"
       ],
       "@protocol-labs-network/shared/data-access": [
         "libs/shared/data-access/src/index.ts"

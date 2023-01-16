@@ -19,10 +19,10 @@ export function parseTeamsFilters(
       filtersValues.availableValuesByFilter.tags,
       query.tags
     ),
-    acceleratorPrograms: getTagsFromValues(
-      filtersValues.valuesByFilter.acceleratorPrograms,
-      filtersValues.availableValuesByFilter.acceleratorPrograms,
-      query.acceleratorPrograms
+    membershipSources: getTagsFromValues(
+      filtersValues.valuesByFilter.membershipSources,
+      filtersValues.availableValuesByFilter.membershipSources,
+      query.membershipSources
     ),
     fundingStage: getTagsFromValues(
       filtersValues.valuesByFilter.fundingStage,

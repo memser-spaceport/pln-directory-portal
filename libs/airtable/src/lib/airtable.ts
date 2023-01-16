@@ -206,7 +206,7 @@ class AirtableService {
     return {
       filecoinUser: !!team.fields['Filecoin User'],
       fundingStage: team.fields['Funding Stage'] || null,
-      acceleratorPrograms: team.fields['Accelerator Programs'] || [],
+      membershipSources: team.fields['Accelerator Programs'] || [],
       id: team.id,
       tags: team.fields['Tags lookup'] || [],
       ipfsUser: !!team.fields['IPFS User'],
@@ -341,9 +341,9 @@ class AirtableService {
         const tags = [
           ...new Set([...values.tags, ...(team.fields['Tags lookup'] || [])]),
         ];
-        const acceleratorPrograms = [
+        const membershipSources = [
           ...new Set([
-            ...values.acceleratorPrograms,
+            ...values.membershipSources,
             ...(team.fields['Accelerator Programs'] || []),
           ]),
         ];
@@ -363,11 +363,11 @@ class AirtableService {
           ]),
         ];
 
-        return { tags, acceleratorPrograms, fundingStage, technology };
+        return { tags, membershipSources, fundingStage, technology };
       },
       {
         tags: [],
-        acceleratorPrograms: [],
+        membershipSources: [],
         fundingStage: [],
         technology: [],
       } as IAirtableTeamsFiltersValues

@@ -36,7 +36,7 @@ export const parseTeam = (team: TTeamResponse): ITeam => {
     shortDescription,
     longDescription,
     technologies,
-    acceleratorPrograms,
+    membershipSources,
     industryTags: tags,
     fundingStage,
     teamMemberRoles,
@@ -46,8 +46,8 @@ export const parseTeam = (team: TTeamResponse): ITeam => {
   const filecoinUser = technologyTitles.includes('Filecoin');
   const ipfsUser = technologyTitles.includes('IPFS');
 
-  const acceleratorProgramTitles =
-    acceleratorPrograms?.map((program) => program.title) || [];
+  const membershipSourceTitles =
+    membershipSources?.map((source) => source.title) || [];
   const tagTitles = tags?.map((tag) => tag.title) || [];
   const memberIds = teamMemberRoles?.length
     ? [
@@ -70,7 +70,7 @@ export const parseTeam = (team: TTeamResponse): ITeam => {
     filecoinUser,
     ipfsUser,
     fundingStage: fundingStage?.title || null,
-    acceleratorPrograms: acceleratorProgramTitles,
+    membershipSources: membershipSourceTitles,
     tags: tagTitles,
     members: memberIds,
     contactMethod: null,
@@ -89,7 +89,7 @@ export const getTeamsFilters = async (options: TTeamListOptions) => {
   if (valuesByFilter.status !== 200 || availableValuesByFilter.status !== 200) {
     const emptyFilters = {
       tags: [],
-      acceleratorPrograms: [],
+      membershipSources: [],
       fundingStage: [],
       technology: [],
     };
@@ -114,7 +114,7 @@ const getTeamsFiltersValues = async (options: TTeamListOptions = {}) => {
     ...options,
     pagination: false,
     select:
-      'industryTags.title,acceleratorPrograms.title,fundingStage.title,technologies.title',
+      'industryTags.title,membershipSources.title,fundingStage.title,technologies.title',
   });
 };
 
@@ -129,9 +129,9 @@ const parseTeamsFilters = (teams: TTeamResponse[]) => {
         team.industryTags?.map((tag) => tag.title)
       );
 
-      const acceleratorPrograms = getUniqueFilterValues(
-        values.acceleratorPrograms,
-        team.acceleratorPrograms?.map((program) => program.title)
+      const membershipSources = getUniqueFilterValues(
+        values.membershipSources,
+        team.membershipSources?.map((source) => source.title)
       );
 
       const fundingStage = getUniqueFilterValues(
@@ -144,11 +144,11 @@ const parseTeamsFilters = (teams: TTeamResponse[]) => {
         team.technologies?.map((technology) => technology.title)
       );
 
-      return { tags, acceleratorPrograms, fundingStage, technology };
+      return { tags, membershipSources, fundingStage, technology };
     },
     {
       tags: [],
-      acceleratorPrograms: [],
+      membershipSources: [],
       fundingStage: [],
       technology: [],
     } as TTeamsFiltersValues

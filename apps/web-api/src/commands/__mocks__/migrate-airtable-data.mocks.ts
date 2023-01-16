@@ -1,4 +1,4 @@
-import { AcceleratorProgramsService } from '../../accelerator-programs/accelerator-programs.service';
+import { MembershipSourcesService } from '../../membership-sources/membership-sources.service';
 import { FundingStagesService } from '../../funding-stages/funding-stages.service';
 import { IndustryCategoriesService } from '../../industry-categories/industry-categories.service';
 import { IndustryTagsService } from '../../industry-tags/industry-tags.service';
@@ -38,5 +38,5 @@ export const TEST_SERVICES_MOCK = (customMethods = {}) =>
     FundingStagesService,
     TeamMemberRolesService,
     IndustryCategoriesService,
-    AcceleratorProgramsService
+    MembershipSourcesService
   ];

@@ -2,7 +2,7 @@ import { IFilterTag } from '../../../directory/directory-filters/directory-tags-
 
 export interface ITeamsFiltersValues {
   tags: IFilterTag[];
-  acceleratorPrograms: IFilterTag[];
+  membershipSources: IFilterTag[];
   fundingStage: IFilterTag[];
   technology: IFilterTag[];
 }

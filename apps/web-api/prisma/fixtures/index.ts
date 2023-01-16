@@ -1,4 +1,4 @@
-export * from './accelerator-programs';
+export * from './membership-sources';
 export * from './funding-stages';
 export * from './images';
 export * from './industry-categories';
