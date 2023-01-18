@@ -236,6 +236,7 @@ describe('getMembersFilters', () => {
       continent: 'Continent 1',
       country: 'Country 1',
       city: 'City 1',
+      metroArea: 'Metro Area 1',
     },
   } as TMemberResponse;
   const member02 = {
@@ -266,7 +267,7 @@ describe('getMembersFilters', () => {
       query: {
         pagination: false,
         select:
-          'skills.title,location.continent,location.country,location.city',
+          'skills.title,location.metroArea,location.city,location.continent,location.country',
       },
     });
     expect(client.members.getMembers).toHaveBeenNthCalledWith(2, {
@@ -274,7 +275,7 @@ describe('getMembersFilters', () => {
         'skills.title__with': 'Skill 01',
         pagination: false,
         select:
-          'skills.title,location.continent,location.country,location.city',
+          'skills.title,location.metroArea,location.city,location.continent,location.country',
       },
     });
 
@@ -283,13 +284,13 @@ describe('getMembersFilters', () => {
         skills: ['Skill 1', 'Skill 2', 'Skill 3'],
         region: ['Continent 1', 'Continent 2'],
         country: ['Country 1', 'Country 2'],
-        metroArea: ['City 1', 'City 2'],
+        metroArea: ['Metro Area 1'],
       },
       availableValuesByFilter: {
         skills: ['Skill 1', 'Skill 2'],
         region: ['Continent 1'],
         country: ['Country 1'],
-        metroArea: ['City 1'],
+        metroArea: ['Metro Area 1'],
       },
     };
 
@@ -311,8 +312,18 @@ describe('getMembersFilters', () => {
     const result = await getMembersFilters(options);
 
     const expectedResult = {
-      valuesByFilter: [],
-      availableValuesByFilter: [],
+      valuesByFilter: {
+        country: [],
+        metroArea: [],
+        region: [],
+        skills: [],
+      },
+      availableValuesByFilter: {
+        country: [],
+        metroArea: [],
+        region: [],
+        skills: [],
+      },
     };
 
     expect(result).toEqual(expectedResult);
