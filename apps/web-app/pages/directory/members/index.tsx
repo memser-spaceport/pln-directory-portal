@@ -1,5 +1,10 @@
 import airtableService from '@protocol-labs-network/airtable';
 import { IMember } from '@protocol-labs-network/api';
+import {
+  getMembers,
+  getMembersFilters,
+  parseMember,
+} from '@protocol-labs-network/members/data-access';
 import { GetServerSideProps } from 'next';
 import { NextSeo } from 'next-seo';
 import { ReactElement } from 'react';
@@ -17,6 +22,10 @@ import {
   getMembersDirectoryListOptions,
   getMembersDirectoryRequestOptionsFromQuery,
 } from '../../../utils/list.utils';
+import {
+  getMembersListOptions,
+  getMembersOptionsFromQuery,
+} from '../../../utils/members.utils';
 
 type MembersProps = {
   members: IMember[];
@@ -82,13 +91,33 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
   query,
   res,
 }) => {
-  const optionsFromQuery = getMembersDirectoryRequestOptionsFromQuery(query);
-  const listOptions = getMembersDirectoryListOptions(optionsFromQuery);
-  const [members, filtersValues] = await Promise.all([
-    airtableService.getMembers(listOptions),
-    airtableService.getMembersFiltersValues(optionsFromQuery),
-  ]);
-  const parsedFilters = parseMembersFilters(filtersValues, query);
+  let members: IMember[];
+  let parsedFilters: IMembersFiltersValues;
+
+  if (process.env.USE_CUSTOM_PLNETWORK_API) {
+    const optionsFromQuery = getMembersOptionsFromQuery(query);
+    const listOptions = getMembersListOptions(optionsFromQuery);
+    const [membersResponse, filtersValues] = await Promise.all([
+      getMembers(listOptions),
+      getMembersFilters(optionsFromQuery),
+    ]);
+
+    members =
+      membersResponse.status === 200
+        ? membersResponse.body.map((member) => parseMember(member))
+        : [];
+    parsedFilters = parseMembersFilters(filtersValues, query);
+  } else {
+    const optionsFromQuery = getMembersDirectoryRequestOptionsFromQuery(query);
+    const listOptions = getMembersDirectoryListOptions(optionsFromQuery);
+    const [membersResponse, filtersValues] = await Promise.all([
+      airtableService.getMembers(listOptions),
+      airtableService.getMembersFiltersValues(optionsFromQuery),
+    ]);
+
+    members = membersResponse;
+    parsedFilters = parseMembersFilters(filtersValues, query);
+  }
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days

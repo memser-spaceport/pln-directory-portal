@@ -5,7 +5,16 @@ import { client } from '@protocol-labs-network/shared/data-access';
  */
 export const getLocations = async () => {
   return await client.locations.getLocations({
-    query: { select: 'city,region,country' },
+    query: { select: 'metroArea,city,region,country' },
+  });
+};
+
+/**
+ * Get distinct values for existing metro areas within the locations
+ */
+export const getMetroAreas = async () => {
+  return await client.locations.getLocations({
+    query: { select: 'metroArea', distinct: 'metroArea' },
   });
 };
 

@@ -43,8 +43,8 @@ export const parseMember = (member: TMemberResponse): IMember => {
       id: teamMemberRole.team?.uid || '',
       name: teamMemberRole.team?.name || '',
       role: teamMemberRole.role || 'Contributor',
-      teamLead: teamMemberRole.teamLead,
-      mainTeam: teamMemberRole.mainTeam,
+      teamLead: !!teamMemberRole.teamLead,
+      mainTeam: !!teamMemberRole.mainTeam,
     })) || [];
   const mainTeam = teams.find((team) => team.mainTeam) || null;
   const teamLead = teams.some((team) => team.teamLead);
@@ -72,12 +72,11 @@ export const parseMember = (member: TMemberResponse): IMember => {
 const parseMemberLocation = (
   location: TMemberResponse['location']
 ): IMember['location'] => {
-  const { country, region, city } = location ?? {};
+  const { metroArea, city, country, region } = location ?? {};
 
-  // TODO: Use metroArea when available
-  // if (metroArea) {
-  //   return metroArea;
-  // }
+  if (metroArea) {
+    return metroArea;
+  }
 
   if (country) {
     if (city) {
@@ -104,9 +103,16 @@ export const getMembersFilters = async (options: TMemberListOptions) => {
   ]);
 
   if (valuesByFilter.status !== 200 || availableValuesByFilter.status !== 200) {
+    const emptyFilters = {
+      skills: [],
+      region: [],
+      country: [],
+      metroArea: [],
+    };
+
     return {
-      valuesByFilter: [],
-      availableValuesByFilter: [],
+      valuesByFilter: emptyFilters,
+      availableValuesByFilter: emptyFilters,
     };
   }
 
@@ -123,8 +129,8 @@ const getMembersFiltersValues = async (options: TMemberListOptions = {}) => {
   return await getMembers({
     ...options,
     pagination: false,
-    // TODO: Replace with `location.metroArea` when available
-    select: 'skills.title,location.continent,location.country,location.city',
+    select:
+      'skills.title,location.metroArea,location.city,location.continent,location.country',
   });
 };
 
@@ -151,8 +157,7 @@ const parseMembersFilters = (members: TMemberResponse[]) => {
 
       const metroArea = getUniqueFilterValues(
         values.metroArea,
-        // TODO: Replace with `member.location.metroArea` when available
-        member.location?.city ? [member.location.city] : []
+        member.location?.metroArea ? [member.location.metroArea] : []
       );
 
       return { skills, region, country, metroArea };

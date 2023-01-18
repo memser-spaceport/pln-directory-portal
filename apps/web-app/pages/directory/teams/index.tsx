@@ -90,8 +90,8 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
   query,
   res,
 }) => {
-  let teams;
-  let parsedFilters;
+  let teams: ITeam[];
+  let parsedFilters: ITeamsFiltersValues;
 
   if (process.env.USE_CUSTOM_PLNETWORK_API) {
     const optionsFromQuery = getTeamsOptionsFromQuery(query);
