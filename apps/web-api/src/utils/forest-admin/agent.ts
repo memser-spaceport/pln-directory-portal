@@ -1,5 +1,6 @@
 import { createAgent } from '@forestadmin/agent';
 import { createSqlDataSource } from '@forestadmin/datasource-sql';
+import axios from 'axios';
 import { Readable } from 'stream';
 import { ImagesController } from '../../images/images.controller';
 import { ImagesService } from '../../images/images.service';
@@ -39,7 +40,7 @@ const agent = createAgent({
   isProduction: process.env.ENVIRONMENT === 'production',
 }).addDataSource(createSqlDataSource(process.env.DATABASE_URL || ''));
 
-agent.customizeCollection('Member', (collection) =>
+agent.customizeCollection('Member', (collection) => {
   // TODO: Check if we can do all of this on the member creation
   collection.addAction('Upload image', {
     scope: 'Single',
@@ -63,10 +64,22 @@ agent.customizeCollection('Member', (collection) =>
         { imageUid: image.uid }
       );
     },
-  })
-);
+  });
 
-agent.customizeCollection('Team', (collection) =>
+  collection.addHook('After', 'Create', async () => {
+    await triggerSync('member-to-pln-airtable');
+  });
+
+  collection.addHook('After', 'Update', async () => {
+    await triggerSync('member-to-pln-airtable');
+  });
+
+  collection.addHook('After', 'Delete', async () => {
+    await triggerSync('member-to-pln-airtable');
+  });
+});
+
+agent.customizeCollection('Team', (collection) => {
   collection.addAction('Upload image', {
     scope: 'Single',
     form: [
@@ -89,8 +102,52 @@ agent.customizeCollection('Team', (collection) =>
         { logoUid: image.uid }
       );
     },
-  })
-);
+  });
+
+  collection.addHook('After', 'Create', async () => {
+    await triggerSync('team-to-pln-airtable');
+  });
+
+  collection.addHook('After', 'Update', async () => {
+    await triggerSync('team-to-pln-airtable');
+  });
+
+  collection.addHook('After', 'Delete', async () => {
+    await triggerSync('team-to-pln-airtable');
+  });
+});
+
+agent.customizeCollection('IndustryTag', (collection) => {
+  collection.addHook('After', 'Create', async () => {
+    await triggerSync('industry-tag-to-pln-airtable');
+  });
+
+  collection.addHook('After', 'Update', async () => {
+    await triggerSync('industry-tag-to-pln-airtable');
+  });
+
+  collection.addHook('After', 'Delete', async () => {
+    await triggerSync('industry-tag-to-pln-airtable');
+  });
+});
+
+async function triggerSync(slug) {
+  try {
+    await axios.post(
+      'https://api.hightouch.com/api/v1/syncs/trigger',
+      {
+        syncSlug: slug,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.HIGHTOUCH_API_KEY}`,
+        },
+      }
+    );
+  } catch (error) {
+    throw new error(error);
+  }
+}
 
 agent.use(generateUid);
 
