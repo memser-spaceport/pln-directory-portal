@@ -16,9 +16,7 @@ export function TeamProfileMembers({ members }: TeamProfileMembersProps) {
   return (
     <ProfileCards title="Members" count={members.length}>
       {members.map((member) => {
-        const teamIndex = member.teams.findIndex((team) => team.id === id);
-        const roles = member.role?.split(', ') || [];
-        const role = roles[teamIndex] || 'Contributor';
+        const team = member.teams.find((team) => team.id === id);
 
         return (
           <ProfileCard
@@ -29,7 +27,7 @@ export function TeamProfileMembers({ members }: TeamProfileMembersProps) {
             avatarIcon={UserIcon}
             name={member.name}
             showTeamLeadBadge={member.teamLead}
-            description={role}
+            description={team.role}
             tags={member.skills}
           />
         );

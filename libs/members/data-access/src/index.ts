@@ -28,48 +28,33 @@ export const getMember = async (id: string) => {
  * Parse member fields values into a member object.
  **/
 export const parseMember = (member: TMemberResponse): IMember => {
-  const {
-    uid: id,
-    name,
-    email,
-    image,
-    githubHandler: githubHandle,
-    discordHandler: discordHandle,
-    twitterHandler: twitter,
-    officeHours,
-    location,
-    skills,
-    teamMemberRoles,
-  } = member;
-
-  const memberLocation = parseMemberLocation(location);
-  const memberSkills = skills?.map((skill) => skill.title) || [];
-
-  // TODO: Change memberRole, teamLead & memberTeams lines during code cleanup
-  // and removal of the Airtable layer to fully take advantage
-  // of the new relationships between teams and members.
-  const memberRole = teamMemberRoles?.map((member) => member.role).join(',');
-  const teamLead = teamMemberRoles?.some((member) => member.teamLead) || false;
-  const memberTeams =
-    teamMemberRoles?.map((member) => ({
-      id: member.team?.uid || '',
-      name: member.team?.name || '',
+  const location = parseMemberLocation(member.location);
+  const skills = member.skills?.map((skill) => skill.title) || [];
+  const teams =
+    member.teamMemberRoles?.map((teamMemberRole) => ({
+      id: teamMemberRole.team?.uid || '',
+      name: teamMemberRole.team?.name || '',
+      role: teamMemberRole.role || 'Contributor',
+      teamLead: teamMemberRole.teamLead,
+      mainTeam: teamMemberRole.mainTeam,
     })) || [];
+  const mainTeam = teams.find((team) => team.mainTeam) || null;
+  const teamLead = teams.some((team) => team.teamLead);
 
   return {
-    id,
-    name,
-    email,
-    image: image?.url || null,
-    githubHandle: githubHandle || null,
-    discordHandle: discordHandle || null,
-    twitter: twitter || null,
-    officeHours: officeHours || null,
-    location: memberLocation,
-    skills: memberSkills,
-    role: memberRole || null,
+    id: member.uid,
+    name: member.name,
+    email: member.email || null,
+    image: member.image?.url || null,
+    githubHandle: member.githubHandler || null,
+    discordHandle: member.discordHandler || null,
+    twitter: member.twitterHandler || null,
+    officeHours: member.officeHours || null,
+    location,
+    skills,
     teamLead,
-    teams: memberTeams,
+    teams,
+    mainTeam,
   };
 };
 

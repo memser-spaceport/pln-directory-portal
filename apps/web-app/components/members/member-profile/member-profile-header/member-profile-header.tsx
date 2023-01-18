@@ -6,13 +6,13 @@ import Image from 'next/image';
 export function MemberProfileHeader({
   image,
   name,
-  role,
   teams,
   location,
   teamLead,
+  mainTeam,
 }: IMember) {
   const otherTeams = teams.slice(1).map((team) => team.name);
-  const memberRole = role?.split(',')[0] || 'Contributor';
+  const memberRole = mainTeam?.role || 'Contributor';
 
   return (
     <div className="flex space-x-4">

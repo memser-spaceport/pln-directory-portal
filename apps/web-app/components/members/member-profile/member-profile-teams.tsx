@@ -1,15 +1,15 @@
 import { UserGroupIcon } from '@heroicons/react/solid';
-import { ITeam } from '@protocol-labs-network/api';
+import { IMember, ITeam } from '@protocol-labs-network/api';
 import { useRouter } from 'next/router';
 import { ProfileCard } from '../../shared/profile/profile-cards/profile-card';
 import { ProfileCards } from '../../shared/profile/profile-cards/profile-cards';
 
 interface MemberProfileTeamsProps {
   teams: ITeam[];
-  roles: string[];
+  member: IMember;
 }
 
-export function MemberProfileTeams({ teams, roles }: MemberProfileTeamsProps) {
+export function MemberProfileTeams({ teams, member }: MemberProfileTeamsProps) {
   const {
     query: { id },
   } = useRouter();
@@ -23,7 +23,10 @@ export function MemberProfileTeams({ teams, roles }: MemberProfileTeamsProps) {
           imageUrl={team.logo}
           avatarIcon={UserGroupIcon}
           name={team.name}
-          description={roles[i] || 'Contributor'}
+          description={
+            member.teams.find((memberTeam) => memberTeam.id === team.id)
+              ?.role || 'Contributor'
+          }
           tags={team.tags}
           showMainTeamBadge={teams.length > 1 && i === 0}
         />

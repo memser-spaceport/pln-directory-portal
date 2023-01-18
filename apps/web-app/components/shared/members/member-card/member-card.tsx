@@ -16,7 +16,7 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
   const backLink = encodeURIComponent(router.asPath);
   const mainTeam = member.teams[0];
   const otherTeams = member.teams.slice(1).map((team) => team.name);
-  const role = member.role?.split(',')[0] || 'Contributor';
+  const role = member.mainTeam?.role || 'Contributor';
 
   return (
     <DirectoryCard
