@@ -1,6 +1,9 @@
 import { ITeam } from '@protocol-labs-network/api';
 import { TTeamResponse } from '@protocol-labs-network/contracts';
-import { client } from '@protocol-labs-network/shared/data-access';
+import {
+  client,
+  TGetRequestOptions,
+} from '@protocol-labs-network/shared/data-access';
 import { TTeamListOptions, TTeamsFiltersValues } from './teams.types';
 
 /**
@@ -17,10 +20,12 @@ export const getTeams = async (options: TTeamListOptions) => {
 /**
  * Get team details from API
  */
-export const getTeam = async (id: string) => {
+export const getTeam = async (id: string, options: TGetRequestOptions = {}) => {
   return await client.teams.getTeam({
     params: { uid: id },
-  });
+    query: options,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
 };
 
 /**

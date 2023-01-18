@@ -55,6 +55,27 @@ describe('getTeam', () => {
 
     expect(client.teams.getTeam).toBeCalledWith({
       params: { uid: id },
+      query: {},
+    });
+    expect(response).toEqual({
+      body: teamResponseMock,
+      status: 200,
+    });
+  });
+
+  it('should call getTeam appropriately', async () => {
+    (<jest.Mock>client.teams.getTeam).mockClear().mockReturnValueOnce({
+      body: teamResponseMock,
+      status: 200,
+    });
+
+    const options = { select: 'name' };
+    const id = teamResponseMock.uid;
+    const response = await getTeam(id, options);
+
+    expect(client.teams.getTeam).toBeCalledWith({
+      params: { uid: id },
+      query: options,
     });
     expect(response).toEqual({
       body: teamResponseMock,
