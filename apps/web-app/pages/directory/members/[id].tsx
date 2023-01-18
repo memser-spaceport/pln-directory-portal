@@ -31,8 +31,8 @@ export default function Member({ member, teams, backLink }: MemberProps) {
       <NextSeo
         {...DIRECTORY_SEO}
         title={member.name}
-        description={`${member.role || 'Contributor'} at ${
-          member.teams[0].name
+        description={`${member.mainTeam?.role || 'Contributor'} at ${
+          member.mainTeam?.name
         }`}
       />
 
@@ -43,10 +43,7 @@ export default function Member({ member, teams, backLink }: MemberProps) {
           <MemberProfileHeader {...member} />
           <MemberProfileDetails {...member} />
           <MemberProfileOfficeHours url={member.officeHours} />
-          <MemberProfileTeams
-            teams={teams}
-            roles={member.role?.split(', ') || []}
-          />
+          <MemberProfileTeams teams={teams} member={member} />
         </div>
         <div className="w-sidebar shrink-0">
           <AskToEditCard profileType="member" />

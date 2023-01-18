@@ -237,6 +237,9 @@ class AirtableService {
    * Parse Airtable's member record into the appropriate format.
    */
   private _parseMember(member: IAirtableMember): IMember {
+    const teams = this._parseMemberTeams(member);
+    const mainTeam = teams[0] || null;
+
     return {
       discordHandle: member.fields['Discord handle'] || null,
       email: member.fields.Email || null,
@@ -248,12 +251,12 @@ class AirtableService {
             member.fields['Profile picture'][0]?.url)) ||
         null,
       location: this._parseMemberLocation(member),
+      mainTeam,
       name: member.fields.Name || null,
       officeHours: member.fields['Office hours link'] || null,
-      role: member.fields.Role || null,
       skills: member.fields.Skills || [],
       teamLead: !!member.fields['Team lead'],
-      teams: this._parseMemberTeams(member),
+      teams,
       twitter: member.fields.Twitter || null,
     };
   }
@@ -263,9 +266,14 @@ class AirtableService {
       return [];
     }
 
+    const roles = member.fields.Role?.split(', ') || [];
+
     return member.fields.Teams.map((id, i) => ({
       id,
       name: member.fields['Team name']?.[i] || '',
+      role: roles[i] || 'Contributor',
+      teamLead: !!member.fields['Team lead'],
+      mainTeam: i === 0,
     }));
   }
 

@@ -241,11 +241,13 @@ describe('parseMember', () => {
           role: 'Developer',
           team: { uid: 'team-1', name: 'Team 1' },
           teamLead: true,
+          mainTeam: false,
         },
         {
           role: 'Manager',
           team: { uid: 'team-2', name: 'Team 2' },
           teamLead: false,
+          mainTeam: true,
         },
       ],
       twitterHandler: 'jsmith',
@@ -261,13 +263,32 @@ describe('parseMember', () => {
       twitter: 'jsmith',
       officeHours: 'https://example.com/office-hours',
       location: 'New York, USA',
+
       skills: ['JavaScript', 'TypeScript'],
-      role: 'Developer,Manager',
       teamLead: true,
       teams: [
-        { id: 'team-1', name: 'Team 1' },
-        { id: 'team-2', name: 'Team 2' },
+        {
+          id: 'team-1',
+          name: 'Team 1',
+          role: 'Developer',
+          teamLead: true,
+          mainTeam: false,
+        },
+        {
+          id: 'team-2',
+          name: 'Team 2',
+          role: 'Manager',
+          teamLead: false,
+          mainTeam: true,
+        },
       ],
+      mainTeam: {
+        id: 'team-2',
+        name: 'Team 2',
+        role: 'Manager',
+        teamLead: false,
+        mainTeam: true,
+      },
     };
 
     expect(parseMember(memberResponse)).toEqual(expectedResult);
@@ -285,9 +306,9 @@ describe('parseMember', () => {
       officeHours: null,
       location: 'Not provided',
       skills: [],
-      role: null,
       teamLead: false,
       teams: [],
+      mainTeam: null,
     };
 
     expect(parseMember(memberResponseMock)).toEqual(expectedOutput);
@@ -310,9 +331,9 @@ describe('parseMember', () => {
       officeHours: null,
       location: 'USA',
       skills: [],
-      role: null,
       teamLead: false,
       teams: [],
+      mainTeam: null,
     };
 
     expect(parseMember(memberResponse)).toEqual(expectedOutput);
@@ -335,9 +356,9 @@ describe('parseMember', () => {
       officeHours: null,
       location: 'New York Region, USA',
       skills: [],
-      role: null,
       teamLead: false,
       teams: [],
+      mainTeam: null,
     };
 
     expect(parseMember(memberResponse)).toEqual(expectedOutput);
