@@ -1,6 +1,12 @@
 import airtableService from '@protocol-labs-network/airtable';
 import { IMember, ITeam } from '@protocol-labs-network/api';
+import {
+  getMember,
+  parseMember,
+} from '@protocol-labs-network/members/data-access';
+import { getTeams, parseTeam } from '@protocol-labs-network/teams/data-access';
 import { Breadcrumb } from '@protocol-labs-network/ui';
+import orderBy from 'lodash/orderBy';
 import { NextSeo } from 'next-seo';
 import { ReactElement } from 'react';
 import { MemberProfileDetails } from '../../../components/members/member-profile/member-profile-details/member-profile-details';
@@ -63,7 +69,35 @@ export const getServerSideProps = async ({ query, res }) => {
     id: string;
     backLink: string;
   };
-  const member = await airtableService.getMember(id);
+  let member: IMember;
+  let teams: ITeam[];
+
+  // Fetches member data from the custom API when the USE_CUSTOM_PLNETWORK_API environment variable is set
+  // TODO: Refactor when cleaning up Airtable-related code
+  if (process.env.USE_CUSTOM_PLNETWORK_API) {
+    const [memberResponse, memberTeamsResponse] = await Promise.all([
+      getMember(id, {
+        with: 'image,skills,location,teamMemberRoles.team',
+      }),
+      getTeams({
+        'teamMemberRoles.member.uid': id,
+        select:
+          'uid,name,logo.url,industryTags.title,teamMemberRoles.role,teamMemberRoles.mainTeam',
+        pagination: false,
+      }),
+    ]);
+
+    if (memberResponse.status === 200 && memberTeamsResponse.status === 200) {
+      member = parseMember(memberResponse.body);
+      teams = orderBy(
+        memberTeamsResponse.body.map(parseTeam),
+        ['mainTeam', 'name'],
+        ['desc', 'asc']
+      );
+    }
+  } else {
+    member = await airtableService.getMember(id);
+  }
 
   // Redirects user to the 404 page if response from
   // getMember is undefined or the member has no teams
@@ -73,10 +107,14 @@ export const getServerSideProps = async ({ query, res }) => {
     };
   }
 
-  const teams = await airtableService.getTeamCardsData(
-    member.teams,
-    TEAM_CARD_FIELDS
-  );
+  // Fetches member teams information if datasource is Airtable
+  // TODO: Remove when cleaning up Airtable-related code
+  if (!process.env.USE_CUSTOM_PLNETWORK_API) {
+    teams = await airtableService.getTeamCardsData(
+      member.teams,
+      TEAM_CARD_FIELDS
+    );
+  }
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days

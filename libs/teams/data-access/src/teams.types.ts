@@ -5,6 +5,7 @@ export type TTeamListOptions = TListOptions & {
   'membershipSources.title__with'?: string;
   'industryTags.title__with'?: string;
   'fundingStage.title__with'?: string;
+  'teamMemberRoles.member.uid'?: string;
   plnFriend?: boolean;
 };
 
