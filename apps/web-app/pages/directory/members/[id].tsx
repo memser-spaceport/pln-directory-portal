@@ -25,15 +25,16 @@ export default function Member({ member, teams, backLink }: MemberProps) {
     directoryName: 'Members',
     pageName: member.name,
   });
+  const description = member.mainTeam
+    ? `${member.mainTeam.role} at ${member.mainTeam.name}`
+    : 'Contributor';
 
   return (
     <>
       <NextSeo
         {...DIRECTORY_SEO}
         title={member.name}
-        description={`${member.mainTeam?.role || 'Contributor'} at ${
-          member.mainTeam?.name
-        }`}
+        description={description}
       />
 
       <Breadcrumb items={breadcrumbItems} />
