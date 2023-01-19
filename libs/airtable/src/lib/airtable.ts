@@ -4,6 +4,7 @@ import {
   IMemberTeam,
   ITeam,
 } from '@protocol-labs-network/api';
+import * as Sentry from '@sentry/node';
 import Airtable from 'airtable';
 import {
   IAirtableMember,
@@ -36,11 +37,16 @@ class AirtableService {
    * Get teams from Airtable.
    */
   public async getTeams(options: IListOptions) {
-    const teams: IAirtableTeam[] = (await this._teamsTable
-      .select(options)
-      .all()) as unknown as IAirtableTeam[];
+    try {
+      const teams: IAirtableTeam[] = (await this._teamsTable
+        .select(options)
+        .all()) as unknown as IAirtableTeam[];
 
-    return this.parseTeams(teams);
+      return this.parseTeams(teams);
+    } catch (error) {
+      this._logErrorsOnSentry(error, options, 'getTeams');
+      throw error;
+    }
   }
 
   /**
@@ -465,6 +471,25 @@ class AirtableService {
     return teams.map((id) => {
       return `RECORD_ID()='${id}'`;
     });
+  }
+
+  /**
+   * Logs error details to Sentry
+   */
+  private _logErrorsOnSentry(
+    error: unknown,
+    options: object,
+    method: string,
+    addAditionalScope?: (scope: Sentry.Scope) => void
+  ) {
+    Sentry.withScope((scope) => {
+      scope.setTag('module', 'AirtableService');
+      scope.setTag('method', method);
+      scope.setContext('requestOptions', { options });
+      addAditionalScope && addAditionalScope(scope);
+      Sentry.captureException(error);
+    });
+    Sentry.flush(2000);
   }
 }
 
