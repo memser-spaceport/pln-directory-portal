@@ -9,7 +9,7 @@ export function getTeamsOptionsFromQuery(queryParams: ParsedUrlQuery) {
   const {
     sort,
     tags,
-    acceleratorPrograms,
+    membershipSources,
     fundingStage,
     searchBy,
     technology,
@@ -23,10 +23,10 @@ export function getTeamsOptionsFromQuery(queryParams: ParsedUrlQuery) {
     ...(technology
       ? { 'technologies.title__with': stringifyQueryValues(technology) }
       : {}),
-    ...(acceleratorPrograms
+    ...(membershipSources
       ? {
-          'acceleratorPrograms.title__with':
-            stringifyQueryValues(acceleratorPrograms),
+          'membershipSources.title__with':
+            stringifyQueryValues(membershipSources),
         }
       : {}),
     ...(fundingStage
