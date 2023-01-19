@@ -318,5 +318,5 @@ function getTechnologyFormulaFromQuery(
  * and returns a string with the values separated by a comma.
  */
 export function stringifyQueryValues(values: string | string[]) {
-  return Array.isArray(values) ? values.toString() : values.replace('|', ',');
+  return Array.isArray(values) ? values.toString() : values.replace(/\|/g, ',');
 }
