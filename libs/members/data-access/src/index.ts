@@ -1,7 +1,10 @@
 import { IAirtableMembersFiltersValues } from '@protocol-labs-network/airtable';
 import { IMember } from '@protocol-labs-network/api';
 import { TMemberResponse } from '@protocol-labs-network/contracts';
-import { client } from '@protocol-labs-network/shared/data-access';
+import {
+  client,
+  TGetRequestOptions,
+} from '@protocol-labs-network/shared/data-access';
 import { TMemberListOptions } from './members.types';
 
 /**
@@ -18,10 +21,15 @@ export const getMembers = async (options: TMemberListOptions) => {
 /**
  * Get member details from API
  */
-export const getMember = async (id: string) => {
+export const getMember = async (
+  id: string,
+  options: TGetRequestOptions = {}
+) => {
   return await client.members.getMember({
     params: { uid: id },
-  });
+    query: options,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
 };
 
 /**
