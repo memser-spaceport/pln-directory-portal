@@ -7,13 +7,13 @@ describe('#getTeamsOptionsFromQuery', () => {
         sort: 'Name,desc',
         tags: 'Analytics',
         fundingStage: 'Seed',
-        acceleratorPrograms: 'IPFS',
+        membershipSources: 'IPFS',
         searchBy: 'void',
         technology: 'IPFS',
         includeFriends: 'true',
       })
     ).toEqual({
-      'acceleratorPrograms.title__with': 'IPFS',
+      'membershipSources.title__with': 'IPFS',
       'fundingStage.title__with': 'Seed',
       'industryTags.title__with': 'Analytics',
       name__istartswith: 'void',
@@ -38,13 +38,13 @@ describe('#getTeamsOptionsFromQuery', () => {
       getTeamsOptionsFromQuery({
         tags: 'Analytics',
         fundingStage: 'Seed',
-        acceleratorPrograms: 'IPFS',
+        membershipSources: 'IPFS',
         searchBy: 'void',
         technology: 'IPFS|Filecoin',
         includeFriends: 'true',
       })
     ).toEqual({
-      'acceleratorPrograms.title__with': 'IPFS',
+      'membershipSources.title__with': 'IPFS',
       'fundingStage.title__with': 'Seed',
       'industryTags.title__with': 'Analytics',
       name__istartswith: 'void',
@@ -58,11 +58,11 @@ describe('#getTeamsListOptions', () => {
   it('should append teams cards list properties to the provided options', () => {
     expect(
       getTeamsListOptions({
-        'acceleratorPrograms.title__with': 'IPFS',
+        'membershipSources.title__with': 'IPFS',
         orderBy: '-name',
       })
     ).toEqual({
-      'acceleratorPrograms.title__with': 'IPFS',
+      'membershipSources.title__with': 'IPFS',
       orderBy: '-name',
       pagination: false,
       select: 'uid,name,shortDescription,logo.url,industryTags.title',
