@@ -17,6 +17,9 @@
     "deploy:production": "gh workflow run production.yml"
   },
   "private": true,
+  "prisma": {
+    "schema": "apps/web-api/prisma/schema.prisma"
+  },
   "dependencies": {
     "@abitia/zod-dto": "^0.4.0",
     "@faker-js/faker": "^7.5.0",

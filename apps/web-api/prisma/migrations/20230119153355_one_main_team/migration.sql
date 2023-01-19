@@ -1,5 +1,3 @@
--- TODO: Only apply this migration after generating the initial migration. 
-
 -- Add unique index to make sure there's only main team per member:
 CREATE UNIQUE INDEX only_one_main_team ON "TeamMemberRole" ("memberUid") WHERE "mainTeam" = TRUE;
 
