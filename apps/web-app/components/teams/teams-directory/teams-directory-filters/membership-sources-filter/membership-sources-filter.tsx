@@ -16,7 +16,7 @@ export function MembershipSourcesFilter({
 
   return (
     <DirectoryTagsFilter
-      title="Membership Sources"
+      title="Membership Source"
       tags={tags}
       onTagToggle={toggleTag}
     />
