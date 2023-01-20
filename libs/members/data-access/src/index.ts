@@ -179,3 +179,5 @@ const getUniqueFilterValues = (
 ): string[] => {
   return [...new Set([...uniqueValues, ...(newValues || [])])];
 };
+
+export * from './members.types';
