@@ -7,7 +7,10 @@ import { ImagesService } from '../../images/images.service';
 import { PrismaService } from '../../prisma.service';
 import { FileEncryptionService } from '../file-encryption/file-encryption.service';
 import { FileUploadService } from '../file-upload/file-upload.service';
+import { LocationTransferService } from '../location-transfer/location-transfer.service';
 import { generateUid } from './generated-uid';
+
+const prismaService = new PrismaService();
 
 async function executeImageUpload(context) {
   const file = context.formValues.Image;
@@ -130,6 +133,83 @@ agent.customizeCollection('IndustryTag', (collection) => {
     await triggerSync('industry-tag-to-pln-airtable');
   });
 });
+
+agent.customizeCollection('Location', (collection) => {
+  collection.addHook('Before', 'Create', async (context) => {
+    const { city, country, continent, metroArea } = context.data[0];
+    await generateGoogleApiData(city, country, continent, metroArea, context);
+  });
+
+  collection.addHook('Before', 'Update', async (context) => {
+    let { city, country, continent, metroArea } = context.patch;
+
+    if (!city || !country) {
+      const location = await prismaService.location.findUnique({
+        where: {
+          id: context.patch['id'],
+        },
+      });
+
+      if (!location) {
+        context.throwForbiddenError('Location not found');
+        return;
+      }
+
+      city = city || location.city;
+      country = country || location.country;
+      continent = continent || location.continent;
+      metroArea = metroArea || location.metroArea;
+    }
+
+    await generateGoogleApiData(city, country, continent, metroArea, context);
+  });
+});
+
+async function generateGoogleApiData(
+  city,
+  country,
+  continent,
+  metroArea,
+  context
+) {
+  const locationTransferService = new LocationTransferService(prismaService);
+  const { location } = await locationTransferService.fetchLocation(
+    city,
+    country,
+    continent,
+    metroArea
+  );
+
+  if (!location) {
+    context.throwForbiddenError('Provided location not valid');
+    return;
+  }
+
+  if (!context.data && !context.patch) {
+    context.throwForbiddenError('Provided information not valid');
+    return;
+  }
+
+  const existingLocation = await prismaService.location.findUnique({
+    where: {
+      placeId: location.placeId,
+    },
+  });
+
+  // Check if location already exists when creating a new location or when updating a location
+  if (
+    (existingLocation && context.data) ||
+    (existingLocation &&
+      context.patch &&
+      existingLocation.id !== context.patch['id'])
+  ) {
+    context.throwForbiddenError('Provided location already exists');
+    return;
+  }
+
+  const target = context.data ? context.data[0] : context.patch;
+  Object.assign(target, location);
+}
 
 async function triggerSync(slug) {
   try {
