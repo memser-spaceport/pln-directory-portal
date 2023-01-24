@@ -48,7 +48,7 @@ describe('LocationTransferService', () => {
       expect(location?.continent).toEqual('North America');
       expect(location?.region).toEqual('Texas');
       expect(location?.regionAbbreviation).toEqual('TX');
-      expect(location?.metroArea).toEqual('Texas');
+      expect(location?.metroArea).toEqual('Austin');
       expect(location?.latitude).toEqual(30.267153);
       expect(location?.longitude).toEqual(-97.7430608);
     });

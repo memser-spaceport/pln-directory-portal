@@ -7,28 +7,51 @@ import { PrismaService } from '../../prisma.service';
 export class LocationTransferService {
   constructor(private prismaService: PrismaService) {}
 
-  // TODO: Refactor this function to improve readability and maintainability
   async transferLocation(member: IAirtableMember) {
-    const hasCityCountryFields =
-      member.fields['City'] || member.fields['Country'];
+    const { status, location } = await this.fetchLocation(
+      member.fields['City'],
+      member.fields['Country'],
+      member.fields.Region,
+      member.fields['Metro Area']
+    );
+
+    if (!location || status !== 'OK') {
+      return { status };
+    }
+
+    const finalLocation = await this.prismaService.location.upsert({
+      where: {
+        placeId: location.placeId,
+      },
+      update: {},
+      create: location,
+    });
+
+    return { status: 'OK', location: finalLocation };
+  }
+
+  // TODO: Refactor this function to improve readability and maintainability
+  async fetchLocation(
+    providedCity,
+    providedCountry,
+    providedContinet,
+    providedMetroArea
+  ) {
+    const hasCityCountryFields = providedCity || providedCountry;
     const hasProvidedLocation =
-      (member.fields['City'] &&
-        member.fields['City'].toLowerCase() !== 'not provided') ||
-      (member.fields['Country'] &&
-        member.fields['Country'].toLowerCase() !== 'not provided');
+      (providedCity && providedCity.toLowerCase() !== 'not provided') ||
+      (providedCountry && providedCountry.toLowerCase() !== 'not provided');
 
     if (!hasCityCountryFields || !hasProvidedLocation) {
       return { status: 'NOT_PROVIDED' };
     }
     const city =
-      member.fields['City'] &&
-      member.fields['City'].toLowerCase() !== 'not provided'
-        ? member.fields['City']
+      providedCity && providedCity.toLowerCase() !== 'not provided'
+        ? providedCity
         : '';
     const country =
-      member.fields['Country'] &&
-      member.fields['Country'].toLowerCase() !== 'not provided'
-        ? member.fields['Country']
+      providedCountry && providedCountry.toLowerCase() !== 'not provided'
+        ? providedCountry
         : '';
     /**
      * Looking for the same city and country in the same string is not working
@@ -121,22 +144,14 @@ export class LocationTransferService {
       placeId: placeDetails.data.results[0].place_id,
       city: apiCity ? apiCity.long_name : null,
       country: apiCountry ? apiCountry.long_name : null,
-      continent: member.fields.Region ? member.fields.Region : 'Not Defined',
+      continent: providedContinet ? providedContinet : 'Not Defined',
       region: apiState ? apiState.long_name : null,
       regionAbbreviation: apiState ? apiState.short_name : null,
-      metroArea: apiState ? apiState.long_name : null,
+      metroArea: providedMetroArea ? providedMetroArea : 'Not Defined',
       latitude: lat,
       longitude: lng,
     };
 
-    const location = await this.prismaService.location.upsert({
-      where: {
-        placeId: finalResult.placeId,
-      },
-      update: {},
-      create: finalResult,
-    });
-
-    return { status: 'OK', location };
+    return { status: 'OK', location: finalResult };
   }
 }

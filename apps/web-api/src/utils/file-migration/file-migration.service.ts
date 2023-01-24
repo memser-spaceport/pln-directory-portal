@@ -63,9 +63,11 @@ export class FileMigrationService {
       fs.unlink(filePath, function (err) {
         if (err) throw err;
       });
-      fs.unlink(originalFilePath, function (err) {
-        if (err) throw err;
-      });
+      if (originalFilePath !== filePath) {
+        fs.unlink(originalFilePath, function (err) {
+          if (err) throw err;
+        });
+      }
     }
 
     return image;
