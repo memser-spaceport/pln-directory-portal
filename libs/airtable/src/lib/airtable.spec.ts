@@ -731,9 +731,8 @@ describe('AirtableService', () => {
         throw new Error();
       });
 
-    const member = await airtableService.getMember('wrongID');
+    await expect(airtableService.getMember('wrongID')).rejects.toThrow();
     expect(membersTableMock.find).toHaveBeenCalledTimes(1);
-    expect(member).toEqual(undefined);
   });
 
   it('should be able to get all members filter values and available members filter values from members table', async () => {

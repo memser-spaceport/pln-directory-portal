@@ -131,11 +131,16 @@ class AirtableService {
    * Get members from Airtable.
    */
   public async getMembers(options: IListOptions = {}) {
-    const members: IAirtableMember[] = (await this._membersTable
-      .select(options)
-      .all()) as unknown as IAirtableTeam[];
+    try {
+      const members: IAirtableMember[] = (await this._membersTable
+        .select(options)
+        .all()) as unknown as IAirtableTeam[];
 
-    return this.parseMembers(members);
+      return this.parseMembers(members);
+    } catch (error) {
+      this._logErrorsOnSentry(error, options, 'getMembers');
+      throw error;
+    }
   }
 
   /**
@@ -147,7 +152,8 @@ class AirtableService {
 
       return this._parseMember(member);
     } catch (error) {
-      return;
+      this._logErrorsOnSentry(error, { id }, 'getMember');
+      throw error;
     }
   }
 
