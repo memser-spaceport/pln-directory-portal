@@ -5,6 +5,7 @@ import fs from 'fs';
 import { ImagesController } from '../../images/images.controller';
 import { ImagesService } from '../../images/images.service';
 import { PrismaService } from '../../prisma.service';
+import { FILE_UPLOAD_SIZE_LIMIT } from '../constants';
 import { FileEncryptionService } from '../file-encryption/file-encryption.service';
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { FileMigrationService } from './file-migration.service';
@@ -109,7 +110,7 @@ describe('FileMigrationService', () => {
         id: 'rec1',
         url: 'https://dl.airtable.com/.attachments/test.png',
         filename: '1',
-        size: 100000000,
+        size: FILE_UPLOAD_SIZE_LIMIT,
         type: 'image/png',
         width: 1,
         height: 1,
