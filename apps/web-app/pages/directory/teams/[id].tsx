@@ -100,7 +100,13 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
       );
     }
   } else {
-    team = await airtableService.getTeam(id);
+    try {
+      team = await airtableService.getTeam(id);
+    } catch (error) {
+      return {
+        notFound: true,
+      };
+    }
   }
 
   // Redirects user to the 404 page when we're unable to fetch

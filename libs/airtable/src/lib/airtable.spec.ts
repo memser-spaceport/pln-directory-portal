@@ -363,9 +363,8 @@ describe('AirtableService', () => {
       throw new Error();
     });
 
-    const team = await airtableService.getTeam('wrongID');
+    await expect(airtableService.getTeam('wrongID')).rejects.toThrow();
     expect(teamsTableMock.find).toHaveBeenCalledTimes(1);
-    expect(team).toEqual(undefined);
   });
 
   it('should be able to get teams details with the provided id from teams table', async () => {

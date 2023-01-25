@@ -53,11 +53,16 @@ class AirtableService {
    * Get first page of teams from Airtable.
    */
   public async getFirstTeamsPage(options: IListOptions) {
-    const teams: IAirtableTeam[] = (await this._teamsTable
-      .select(options)
-      .firstPage()) as unknown as IAirtableTeam[];
+    try {
+      const teams: IAirtableTeam[] = (await this._teamsTable
+        .select(options)
+        .firstPage()) as unknown as IAirtableTeam[];
 
-    return this.parseTeams(teams);
+      return this.parseTeams(teams);
+    } catch (error) {
+      this._logErrorsOnSentry(error, options, 'getFirstTeamsPage');
+      throw error;
+    }
   }
 
   /**
@@ -69,7 +74,8 @@ class AirtableService {
 
       return this._parseTeam(team);
     } catch (error) {
-      return;
+      this._logErrorsOnSentry(error, { id }, 'getTeam');
+      throw error;
     }
   }
 
@@ -317,14 +323,21 @@ class AirtableService {
       | ((members: IAirtableMember[]) => IAirtableMembersFiltersValues)
       | ((teams: IAirtableTeam[]) => IAirtableTeamsFiltersValues)
   ) {
-    const results: IAirtableMember[] | IAirtableTeam[] = (await table
-      .select({
-        fields,
-        ...options,
-      })
-      .all()) as unknown as IAirtableMember[] | IAirtableTeam[];
+    try {
+      const results: IAirtableMember[] | IAirtableTeam[] = (await table
+        .select({
+          fields,
+          ...options,
+        })
+        .all()) as unknown as IAirtableMember[] | IAirtableTeam[];
 
-    return parser(results);
+      return parser(results);
+    } catch (error) {
+      this._logErrorsOnSentry(error, options, 'getFiltersValues', (scope) =>
+        scope.setContext('fields', { fields })
+      );
+      throw error;
+    }
   }
 
   /**
