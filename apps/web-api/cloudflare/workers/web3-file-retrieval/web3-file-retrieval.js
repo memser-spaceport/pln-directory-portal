@@ -8,7 +8,7 @@ function hasValidCid(value) {
 }
 
 function hasValidFilename(value) {
-  return /^[a-z0-9_.@()-]+\.(jpg|jpeg|png|webp|pdf|csv)$/i.test(value);
+  return /^[a-z0-9_.@()%-]+\.(jpg|jpeg|png|webp|pdf|csv)$/i.test(value);
 }
 
 function getScryptKey() {
