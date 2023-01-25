@@ -33,3 +33,5 @@ export const THUMBNAIL_SIZES = {
   SMALL: 256,
   TINY: 78,
 };
+
+export const FILE_UPLOAD_SIZE_LIMIT = 1000000; // 1MB in bytes

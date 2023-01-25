@@ -3,6 +3,7 @@ import { IAirtableImage } from '@protocol-labs-network/airtable';
 import * as fs from 'fs';
 import * as client from 'https';
 import { ImagesController } from '../../images/images.controller';
+import { FILE_UPLOAD_SIZE_LIMIT } from '../constants';
 
 @Injectable()
 export class FileMigrationService {
@@ -18,7 +19,8 @@ export class FileMigrationService {
       return { status: 'File type not supported' };
     }
 
-    if (size > 10000000) {
+    // TODO: Remove this condition after applying compression
+    if (size > FILE_UPLOAD_SIZE_LIMIT) {
       return { status: 'File size too large' };
     }
 
@@ -47,6 +49,7 @@ export class FileMigrationService {
     };
     let image;
     try {
+      // TODO: Apply image compression
       const data = await this.imagesController.uploadImage(newFile);
       image = data.image;
     } catch (error) {
