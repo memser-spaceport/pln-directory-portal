@@ -128,11 +128,6 @@ export class MigrateAirtableDataCommand extends CommandRunner {
         .reduce((values, value) => [...values, ...value], [])
     );
 
-    // Extract images from teams:
-    // const imagesToCreate = map(teams, 'fields.Logo')
-    //   .filter((val) => !!val)
-    //   .reduce((values, value) => [...values, ...value]);
-
     // Insert data on database:
     await this.fundingStagesService.insertManyFromList(fundingStagesToCreate);
     await this.membershipSourcesService.insertManyFromList(
@@ -156,11 +151,6 @@ export class MigrateAirtableDataCommand extends CommandRunner {
         .filter((val) => !!val)
         .reduce((values, value) => [...values, ...value], [])
     );
-
-    // Extract images from members:
-    // const imagesToCreate = map(members, 'fields.Profile picture')
-    //   .filter((val) => !!val)
-    //   .reduce((values, value) => [...values, ...value]);
 
     // Insert data on database:
     await this.skillsService.insertManyFromList(skillsToCreate);

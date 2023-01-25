@@ -32,6 +32,8 @@ export class MembersService {
     airtableMembers: z.infer<typeof AirtableMemberSchema>[]
   ) {
     const skills = await this.prisma.skill.findMany();
+    const images = await this.prisma.image.findMany();
+
     for (const member of airtableMembers) {
       if (!member.fields?.Name) {
         continue;
@@ -41,15 +43,17 @@ export class MembersService {
 
       if (member.fields['Profile picture']) {
         const ppf = member.fields['Profile picture'][0];
-        image = await this.fileMigrationService.migrateFile({
-          id: ppf.id || '',
-          url: ppf.url || '',
-          filename: ppf.filename || '',
-          size: ppf.size || 0,
-          type: ppf.type || '',
-          height: ppf.height || 0,
-          width: ppf.width || 0,
-        });
+        image =
+          images.find((image) => image.filename === ppf.filename) ||
+          (await this.fileMigrationService.migrateFile({
+            id: ppf.id || '',
+            url: ppf.url || '',
+            filename: ppf.filename || '',
+            size: ppf.size || 0,
+            type: ppf.type || '',
+            height: ppf.height || 0,
+            width: ppf.width || 0,
+          }));
       }
 
       const optionalFieldsToAdd = Object.entries({

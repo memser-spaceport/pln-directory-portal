@@ -33,6 +33,7 @@ export class TeamsService {
     const industryTags = await this.prisma.industryTag.findMany();
     const technologies = await this.prisma.technology.findMany();
     const membershipSources = await this.prisma.membershipSource.findMany();
+    const images = await this.prisma.image.findMany();
 
     for (const team of airtableTeams) {
       const optionalFieldsToAdd = Object.entries({
@@ -97,15 +98,17 @@ export class TeamsService {
 
       if (team.fields.Logo) {
         const logo = team.fields.Logo[0];
-        image = await this.fileMigrationService.migrateFile({
-          id: logo.id ? logo.id : '',
-          url: logo.url ? logo.url : '',
-          filename: logo.filename ? logo.filename : '',
-          size: logo.size ? logo.size : 0,
-          type: logo.type ? logo.type : '',
-          height: logo.height ? logo.height : 0,
-          width: logo.width ? logo.width : 0,
-        });
+        image =
+          images.find((image) => image.filename === logo.filename) ||
+          (await this.fileMigrationService.migrateFile({
+            id: logo.id ? logo.id : '',
+            url: logo.url ? logo.url : '',
+            filename: logo.filename ? logo.filename : '',
+            size: logo.size ? logo.size : 0,
+            type: logo.type ? logo.type : '',
+            height: logo.height ? logo.height : 0,
+            width: logo.width ? logo.width : 0,
+          }));
       }
 
       await this.prisma.team.upsert({
