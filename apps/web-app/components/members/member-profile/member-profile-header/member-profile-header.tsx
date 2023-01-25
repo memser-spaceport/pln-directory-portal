@@ -11,7 +11,10 @@ export function MemberProfileHeader({
   teamLead,
   mainTeam,
 }: IMember) {
-  const otherTeams = teams.slice(1).map((team) => team.name);
+  const otherTeams = teams
+    .filter((team) => team.id !== mainTeam?.id)
+    .map((team) => team.name)
+    .sort();
   const memberRole = mainTeam?.role || 'Contributor';
 
   return (
@@ -38,7 +41,7 @@ export function MemberProfileHeader({
         <h1 className="text-2xl font-bold">{name}</h1>
         <div className="flex items-center">
           <div className="max-w-sm overflow-hidden text-ellipsis whitespace-nowrap font-medium">
-            {teams[0]?.name}
+            {mainTeam?.name}
           </div>
           {otherTeams.length ? (
             <Tooltip
