@@ -75,7 +75,7 @@ describe('#getMembersListOptions', () => {
       orderBy: '-name',
       pagination: false,
       select:
-        'uid,name,image.url,location.metroArea, location.country,location.region,skills.title,teamMemberRoles.teamLead,teamMemberRoles.role,teamMemberRoles.team.name',
+        'uid,name,image.url,location.metroArea,location.country,location.region,skills.title,teamMemberRoles.teamLead,teamMemberRoles.mainTeam,teamMemberRoles.role,teamMemberRoles.team.name,teamMemberRoles.team.uid',
     });
   });
 });

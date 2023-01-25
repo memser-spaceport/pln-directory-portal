@@ -14,8 +14,11 @@ interface MemberCardProps {
 export function MemberCard({ isGrid = true, member }: MemberCardProps) {
   const router = useRouter();
   const backLink = encodeURIComponent(router.asPath);
-  const mainTeam = member.teams[0];
-  const otherTeams = member.teams.slice(1).map((team) => team.name);
+  const mainTeam = member.mainTeam;
+  const otherTeams = member.teams
+    .filter((team) => team.id !== mainTeam?.id)
+    .map((team) => team.name)
+    .sort();
   const role = member.mainTeam?.role || 'Contributor';
 
   return (
