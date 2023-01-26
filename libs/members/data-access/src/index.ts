@@ -67,6 +67,24 @@ export const parseMember = (member: TMemberResponse): IMember => {
 };
 
 /**
+ * Parse team members by excluding relationships to teams other than
+ * the provided.
+ **/
+export const parseTeamMember = (
+  member: TMemberResponse,
+  teamId: string
+): IMember => {
+  const memberWithoutOtherTeams = {
+    ...member,
+    teamMemberRoles: member.teamMemberRoles?.filter(
+      (teamMemberRole) => teamMemberRole.team?.uid === teamId
+    ),
+  };
+
+  return parseMember(memberWithoutOtherTeams);
+};
+
+/**
  * Parse member location fields values into a location string.
  */
 const parseMemberLocation = (
