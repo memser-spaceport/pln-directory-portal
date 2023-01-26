@@ -8,10 +8,11 @@
     "build": "nx build",
     "test": "nx test",
     "api:prisma-sync": "npx prisma generate --schema=./apps/web-api/prisma/schema.prisma && npx prisma db push --schema=./apps/web-api/prisma/schema.prisma",
+    "api:prod-migrate-airtable-data": "node ./dist/apps/web-api/cli/cli.js migrate-airtable-data",
     "api:migrate-airtable-data": "ts-node apps/web-api/src/cli.ts migrate-airtable-data",
     "check:local": "npx nx workspace-lint && npx nx format:check && npx nx affected --target=lint && npx nx affected --target=test --ci --code-coverage && npx nx affected --target=build",
     "analyze:web": "WITH_BUNDLE_ANALYZER=true nx run web-app:build",
-    "heroku-postbuild": "npx prisma generate --schema=./apps/web-api/prisma/schema.prisma && nx build $PROJECT_NAME --prod && npx prisma migrate deploy --schema=./apps/web-api/prisma/schema.prisma",
+    "heroku-postbuild": "npx prisma generate --schema=./apps/web-api/prisma/schema.prisma && nx build $PROJECT_NAME --prod && npx prisma migrate deploy --schema=./apps/web-api/prisma/schema.prisma && nx run web-api:build-cli",
     "build:storybook": "nx build-storybook storybook-host",
     "deploy:staging": "gh workflow run staging.yml",
     "deploy:production": "gh workflow run production.yml"
