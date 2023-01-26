@@ -30,7 +30,7 @@
       "executor": "@nrwl/node:webpack",
       "outputs": ["{options.outputPath}"],
       "options": {
-        "outputPath": "dist/apps/web-api",
+        "outputPath": "dist/apps/web-api/cli",
         "main": "apps/web-api/src/cli.ts",
         "outputFileName": "cli.js",
         "tsConfig": "apps/web-api/tsconfig.build.json",
