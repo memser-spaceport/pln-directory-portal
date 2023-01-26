@@ -2,7 +2,7 @@ import airtableService from '@protocol-labs-network/airtable';
 import { IMember, ITeam } from '@protocol-labs-network/api';
 import {
   getMembers,
-  parseMember,
+  parseTeamMember,
 } from '@protocol-labs-network/members/data-access';
 import { getTeam, parseTeam } from '@protocol-labs-network/teams/data-access';
 import { Breadcrumb } from '@protocol-labs-network/ui';
@@ -92,7 +92,9 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
     if (teamResponse.status === 200 && teamMembersResponse.status === 200) {
       team = parseTeam(teamResponse.body);
       members = orderBy(
-        teamMembersResponse.body.map(parseMember),
+        teamMembersResponse.body.map((member) =>
+          parseTeamMember(member, team.id)
+        ),
         ['teamLead', 'name'],
         ['desc', 'asc']
       );

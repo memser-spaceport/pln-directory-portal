@@ -2,7 +2,13 @@ import { IMember } from '@protocol-labs-network/api';
 
 import { TMemberResponse } from '@protocol-labs-network/contracts';
 import { client } from '@protocol-labs-network/shared/data-access';
-import { getMember, getMembers, getMembersFilters, parseMember } from './index';
+import {
+  getMember,
+  getMembers,
+  getMembersFilters,
+  parseMember,
+  parseTeamMember,
+} from './index';
 
 jest.mock('@protocol-labs-network/shared/data-access', () => ({
   client: {
@@ -222,6 +228,97 @@ describe('parseMember', () => {
     };
 
     expect(parseMember(memberResponse)).toEqual(expectedOutput);
+  });
+});
+
+describe('parseTeamMember', () => {
+  const memberResponse = {
+    ...memberResponseMock,
+    discordHandler: 'jsmith#1234',
+    githubHandler: 'jsmith',
+    image: { url: 'https://example.com/image.jpg' },
+    location: { country: 'USA', region: 'New York Region', city: 'New York' },
+    officeHours: 'https://example.com/office-hours',
+    skills: [{ title: 'JavaScript' }, { title: 'TypeScript' }],
+    teamMemberRoles: [
+      {
+        role: 'Developer',
+        team: { uid: 'team-1', name: 'Team 1' },
+        teamLead: true,
+        mainTeam: false,
+      },
+      {
+        role: 'Manager',
+        team: { uid: 'team-2', name: 'Team 2' },
+        teamLead: false,
+        mainTeam: true,
+      },
+    ],
+    twitterHandler: 'jsmith',
+  } as TMemberResponse;
+
+  it('should correctly parse a TMemberResponse into an IMember object, excluding non-matching teams', () => {
+    const expectedResult: IMember = {
+      id: 'uid-john-smith',
+      name: 'John Smith',
+      email: 'john.smith@example.com',
+      image: 'https://example.com/image.jpg',
+      githubHandle: 'jsmith',
+      discordHandle: 'jsmith#1234',
+      twitter: 'jsmith',
+      officeHours: 'https://example.com/office-hours',
+      location: 'New York, USA',
+
+      skills: ['JavaScript', 'TypeScript'],
+      teamLead: true,
+      teams: [
+        {
+          id: 'team-1',
+          name: 'Team 1',
+          role: 'Developer',
+          teamLead: true,
+          mainTeam: false,
+        },
+      ],
+      mainTeam: null,
+    };
+
+    expect(parseTeamMember(memberResponse, 'team-1')).toEqual(expectedResult);
+  });
+
+  it('should correctly parse a TMemberResponse into an IMember object, excluding non-matching teams', () => {
+    const expectedResult: IMember = {
+      id: 'uid-john-smith',
+      name: 'John Smith',
+      email: 'john.smith@example.com',
+      image: 'https://example.com/image.jpg',
+      githubHandle: 'jsmith',
+      discordHandle: 'jsmith#1234',
+      twitter: 'jsmith',
+      officeHours: 'https://example.com/office-hours',
+      location: 'New York, USA',
+
+      skills: ['JavaScript', 'TypeScript'],
+      teamLead: false,
+      teams: [
+        {
+          id: 'team-2',
+          name: 'Team 2',
+          role: 'Manager',
+          teamLead: false,
+          mainTeam: true,
+        },
+      ],
+      mainTeam: {
+        id: 'team-2',
+        name: 'Team 2',
+        role: 'Manager',
+        teamLead: false,
+        mainTeam: true,
+      },
+    };
+
+    expect(parseTeamMember(memberResponse, 'team-2')).toEqual(expectedResult);
   });
 });
 
