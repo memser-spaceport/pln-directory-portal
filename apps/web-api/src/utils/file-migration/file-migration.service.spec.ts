@@ -2,10 +2,10 @@ import { createMock } from '@golevelup/ts-jest';
 import { Test, TestingModule } from '@nestjs/testing';
 import { prisma } from 'apps/web-api/prisma/__mocks__';
 import fs from 'fs';
+import path from 'path';
 import { ImagesController } from '../../images/images.controller';
 import { ImagesService } from '../../images/images.service';
 import { PrismaService } from '../../prisma.service';
-import { FILE_UPLOAD_SIZE_LIMIT } from '../constants';
 import { FileEncryptionService } from '../file-encryption/file-encryption.service';
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { FileMigrationService } from './file-migration.service';
@@ -14,6 +14,30 @@ jest.spyOn(fs, 'readFileSync').mockImplementation(() => 'readFileSync');
 jest.spyOn(fs, 'createWriteStream').mockImplementation();
 jest.spyOn(fs, 'unlink').mockImplementation();
 jest.spyOn(fs, 'createReadStream').mockImplementation();
+jest.spyOn(path, 'parse').mockImplementation(() => {
+  return {
+    dir: 'dir',
+    name: 'test',
+    ext: 'png',
+    root: 'root',
+    base: 'base',
+  };
+});
+jest.mock('sharp', () => {
+  return jest.fn(() => {
+    return {
+      toFormat: jest.fn().mockImplementation(() => {
+        return {
+          toFile: jest.fn().mockImplementation(() => {
+            return {
+              format: 'webp',
+            };
+          }),
+        };
+      }),
+    };
+  });
+});
 
 describe('FileMigrationService', () => {
   let fileMigrationService: FileMigrationService;
@@ -72,7 +96,7 @@ describe('FileMigrationService', () => {
       const airtableImage = {
         id: 'rec1',
         url: 'https://dl.airtable.com/.attachments/test.png',
-        filename: '1',
+        filename: 'test.png',
         size: 1,
         type: 'image/png',
         width: 1,
@@ -80,14 +104,14 @@ describe('FileMigrationService', () => {
       };
       await fileMigrationService.migrateFile(airtableImage);
       expect(imagesController.uploadImage).toHaveBeenCalledWith({
-        filename: '1',
-        mimetype: 'image/png',
+        filename: 'test.webp',
+        mimetype: 'image/webp',
         encoding: '7bit',
         buffer: 'readFileSync',
         destination: '',
         fieldname: 'file',
-        originalname: '1',
-        path: './1',
+        originalname: 'test.webp',
+        path: './test.webp',
         size: 1,
         stream: undefined,
       });
@@ -104,19 +128,6 @@ describe('FileMigrationService', () => {
       };
       const result = await fileMigrationService.migrateFile(airtableImage);
       expect(result).toEqual({ status: 'File type not supported' });
-    });
-    it('Should return status if the size is bigger than 1mb', async () => {
-      const airtableImage = {
-        id: 'rec1',
-        url: 'https://dl.airtable.com/.attachments/test.png',
-        filename: '1',
-        size: FILE_UPLOAD_SIZE_LIMIT,
-        type: 'image/png',
-        width: 1,
-        height: 1,
-      };
-      const result = await fileMigrationService.migrateFile(airtableImage);
-      expect(result).toEqual({ status: 'File size too large' });
     });
     it('Should throw error if the download fails', async () => {
       const airtableImage = {
