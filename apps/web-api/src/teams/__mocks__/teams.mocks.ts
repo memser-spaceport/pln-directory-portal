@@ -37,6 +37,7 @@ export async function createTeam({ amount }: TestFactorySeederParams) {
       filecoinUser: true,
       ipfsUser: true,
       plnFriend: true,
+      airtableRecId: `airtable-rec-id-${sequence}`,
       createdAt: new Date(),
       updatedAt: new Date(),
       fundingStageUid: fundingStage.uid,

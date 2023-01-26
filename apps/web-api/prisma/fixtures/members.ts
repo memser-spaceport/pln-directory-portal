@@ -41,6 +41,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
       twitterHandler: faker.internet.userName(name),
       officeHours: faker.helpers.arrayElement([null, faker.internet.url()]),
       plnFriend: faker.datatype.boolean(),
+      airtableRecId: `airtable-rec-id-${sequence}`,
       createdAt: faker.date.past(),
       updatedAt: faker.date.recent(),
       locationUid: '',

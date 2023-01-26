@@ -26,6 +26,7 @@ model Team {
   shortDescription  String?
   longDescription   String?
   plnFriend         Boolean
+  airtableRecId   String?             @unique
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   teamMemberRoles   TeamMemberRole[]
@@ -52,6 +53,7 @@ model Member {
   twitterHandler  String?
   officeHours     String?
   plnFriend       Boolean
+  airtableRecId   String?             @unique
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   skills          Skill[]
@@ -119,6 +121,7 @@ model IndustryTag {
   uid                 String            @unique @default(cuid())
   title               String            @unique
   definition          String?
+  airtableRecId   String?             @unique
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
   industryCategory    IndustryCategory? @relation(fields: [industryCategoryUid], references: [uid])

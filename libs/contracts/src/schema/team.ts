@@ -1,9 +1,9 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
-import { ResponseMembershipSourceSchema } from './membership-source';
 import { ResponseFundingStageSchema } from './funding-stage';
 import { ResponseImageWithRelationsSchema } from './image';
 import { ResponseIndustryTagSchema } from './industry-tag';
+import { ResponseMembershipSourceSchema } from './membership-source';
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
 import { ResponseTechnologySchema } from './technology';
@@ -24,6 +24,7 @@ export const TeamSchema = z.object({
   plnFriend: z.boolean(),
   startDate: z.date().or(z.string()).nullish(),
   endDate: z.date().or(z.string()).nullish(),
+  airtableRecId: z.string().nullish(),
   createdAt: z.date().or(z.string()),
   updatedAt: z.date().or(z.string()),
   fundingStageUid: z.string().nullish(),

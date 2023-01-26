@@ -112,13 +112,14 @@ export class TeamsService {
       }
 
       await this.prisma.team.upsert({
-        where: { name: team.fields.Name },
+        where: { airtableRecId: team.id },
         update: {
           ...optionalFieldsToAdd,
           ...oneToManyRelations,
           ...manyToManyRelations,
         },
         create: {
+          airtableRecId: team.id,
           name: team.fields.Name,
           plnFriend: team.fields['Friend of PLN'] || false,
           filecoinUser: team.fields['Filecoin User'] || false,

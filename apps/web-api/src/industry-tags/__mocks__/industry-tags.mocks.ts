@@ -26,6 +26,7 @@ export async function createIndustryTags({ amount }: TestFactorySeederParams) {
         uid: `uid-${sequence}`,
         title: `Industry Tag ${sequence}`,
         definition: 'Industry Tag Definition',
+        airtableRecId: `airtable-rec-id-${sequence}`,
         createdAt: new Date(),
         updatedAt: new Date(),
         industryCategoryUid: industryCategory.uid,

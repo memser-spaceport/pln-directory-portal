@@ -92,13 +92,14 @@ export class MembersService {
 
       await this.prisma.member.upsert({
         where: {
-          name: member.fields.Name,
+          airtableRecId: member.id,
         },
         update: {
           ...optionalFieldsToAdd,
           ...manyToManyRelations,
         },
         create: {
+          airtableRecId: member.id,
           name: member.fields.Name,
           plnFriend: member.fields['Friend of PLN'] || false,
           locationUid: location ? location?.uid : null,
