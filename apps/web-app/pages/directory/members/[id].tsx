@@ -6,7 +6,6 @@ import {
 } from '@protocol-labs-network/members/data-access';
 import { getTeams, parseTeam } from '@protocol-labs-network/teams/data-access';
 import { Breadcrumb } from '@protocol-labs-network/ui';
-import orderBy from 'lodash/orderBy';
 import { NextSeo } from 'next-seo';
 import { ReactElement } from 'react';
 import { MemberProfileDetails } from '../../../components/members/member-profile/member-profile-details/member-profile-details';
@@ -89,11 +88,7 @@ export const getServerSideProps = async ({ query, res }) => {
 
     if (memberResponse.status === 200 && memberTeamsResponse.status === 200) {
       member = parseMember(memberResponse.body);
-      teams = orderBy(
-        memberTeamsResponse.body.map(parseTeam),
-        ['mainTeam', 'name'],
-        ['desc', 'asc']
-      );
+      teams = memberTeamsResponse.body.map(parseTeam);
     }
   } else {
     member = await airtableService.getMember(id);
