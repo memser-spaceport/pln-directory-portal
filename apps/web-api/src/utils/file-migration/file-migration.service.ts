@@ -2,8 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { IAirtableImage } from '@protocol-labs-network/airtable';
 import * as fs from 'fs';
 import * as client from 'https';
+import * as path from 'path';
+import sharp from 'sharp';
 import { ImagesController } from '../../images/images.controller';
-import { FILE_UPLOAD_SIZE_LIMIT } from '../constants';
 
 @Injectable()
 export class FileMigrationService {
@@ -19,11 +20,6 @@ export class FileMigrationService {
       return { status: 'File type not supported' };
     }
 
-    // TODO: Remove this condition after applying compression
-    if (size > FILE_UPLOAD_SIZE_LIMIT) {
-      return { status: 'File size too large' };
-    }
-
     if (width < 1 && height < 1) {
       return { status: 'File is not an image' };
     }
@@ -34,22 +30,29 @@ export class FileMigrationService {
       throw new Error(`Failed downloading the image - ${error}`);
     }
 
-    const filePath = `./${filename}`;
+    const originalFilePath = `./${filename}`;
+    const buffer = fs.readFileSync(originalFilePath);
+
+    const compressedFileName = `${path.parse(filename).name}.webp`;
+    const compressedFile = await sharp(buffer)
+      .toFormat('webp')
+      .toFile(path.join('./', compressedFileName));
+    const filePath = `./${compressedFileName}`;
+
     const newFile: Express.Multer.File = {
       path: filePath,
       size: size,
-      filename: filename,
+      filename: compressedFileName,
       buffer: fs.readFileSync(filePath),
       destination: '',
       fieldname: 'file',
-      mimetype: type,
-      originalname: filename,
+      mimetype: `image/${compressedFile.format}`,
+      originalname: compressedFileName,
       stream: fs.createReadStream(filePath),
       encoding: '7bit',
     };
     let image;
     try {
-      // TODO: Apply image compression
       const data = await this.imagesController.uploadImage(newFile);
       image = data.image;
     } catch (error) {
@@ -58,6 +61,9 @@ export class FileMigrationService {
 
     if (image) {
       fs.unlink(filePath, function (err) {
+        if (err) throw err;
+      });
+      fs.unlink(originalFilePath, function (err) {
         if (err) throw err;
       });
     }
