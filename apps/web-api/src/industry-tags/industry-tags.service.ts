@@ -35,12 +35,13 @@ export class IndustryTagsService {
           : null;
 
         return this.prisma.industryTag.upsert({
-          where: { title: industryTag.fields.Tags },
+          where: { airtableRecId: industryTag.id },
           update: {
             definition: industryTag.fields.Definition,
             industryCategoryUid: relatedCategory?.uid,
           },
           create: {
+            airtableRecId: industryTag.id,
             title: industryTag.fields.Tags,
             definition: industryTag.fields.Definition,
             industryCategoryUid: relatedCategory?.uid,

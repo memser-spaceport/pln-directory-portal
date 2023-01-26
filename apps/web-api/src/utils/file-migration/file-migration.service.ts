@@ -5,6 +5,10 @@ import * as client from 'https';
 import * as path from 'path';
 import sharp from 'sharp';
 import { ImagesController } from '../../images/images.controller';
+import {
+  FILE_UPLOAD_SIZE_LIMIT,
+  IMAGE_UPLOAD_MAX_DIMENSION,
+} from '../constants';
 
 @Injectable()
 export class FileMigrationService {
@@ -12,6 +16,7 @@ export class FileMigrationService {
 
   async migrateFile(airtableImage: IAirtableImage) {
     const { url, size, type, filename, width, height } = airtableImage;
+
     if (
       type !== 'image/jpeg' &&
       type !== 'image/png' &&
@@ -34,9 +39,30 @@ export class FileMigrationService {
     const buffer = fs.readFileSync(originalFilePath);
 
     const compressedFileName = `${path.parse(filename).name}.webp`;
-    const compressedFile = await sharp(buffer)
-      .toFormat('webp')
-      .toFile(path.join('./', compressedFileName));
+    let compressedFile;
+
+    if (
+      width > IMAGE_UPLOAD_MAX_DIMENSION ||
+      height > IMAGE_UPLOAD_MAX_DIMENSION
+    ) {
+      compressedFile = await sharp(buffer)
+        .toFormat('webp')
+        .resize(IMAGE_UPLOAD_MAX_DIMENSION, IMAGE_UPLOAD_MAX_DIMENSION, {
+          fit: 'inside',
+        })
+        .toFile(path.join('./', compressedFileName));
+    } else {
+      compressedFile = await sharp(buffer)
+        .toFormat('webp')
+        .toFile(path.join('./', compressedFileName));
+    }
+
+    if (compressedFile.size > FILE_UPLOAD_SIZE_LIMIT) {
+      compressedFile = await sharp(fs.readFileSync(`./${compressedFileName}`))
+        .webp({ quality: 50 })
+        .toFile(path.join('./', compressedFileName));
+    }
+
     const filePath = `./${compressedFileName}`;
 
     const newFile: Express.Multer.File = {

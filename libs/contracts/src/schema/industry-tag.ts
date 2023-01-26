@@ -8,6 +8,7 @@ export const IndustryTagSchema = z.object({
   uid: z.string(),
   title: z.string(),
   definition: z.string().nullish(),
+  airtableRecId: z.string().nullish(),
   createdAt: z.string(),
   updatedAt: z.string(),
   industryCategoryUid: z.string(),

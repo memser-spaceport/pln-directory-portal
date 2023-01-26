@@ -23,21 +23,15 @@ jest.spyOn(path, 'parse').mockImplementation(() => {
     base: 'base',
   };
 });
-jest.mock('sharp', () => {
-  return jest.fn(() => {
-    return {
-      toFormat: jest.fn().mockImplementation(() => {
-        return {
-          toFile: jest.fn().mockImplementation(() => {
-            return {
-              format: 'webp',
-            };
-          }),
-        };
-      }),
-    };
-  });
-});
+jest.mock('sharp', () =>
+  jest.fn(() => ({
+    toFormat: jest.fn().mockImplementation(() => ({
+      toFile: jest.fn().mockImplementation(() => ({
+        format: 'webp',
+      })),
+    })),
+  }))
+);
 
 describe('FileMigrationService', () => {
   let fileMigrationService: FileMigrationService;
