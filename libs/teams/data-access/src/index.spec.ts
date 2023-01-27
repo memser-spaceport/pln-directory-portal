@@ -100,8 +100,20 @@ describe('parseTeam', () => {
         { title: 'Membership Source B' },
       ],
       industryTags: [
-        { title: 'Software Development' },
-        { title: 'Blockchain' },
+        {
+          uid: '',
+          createdAt: '',
+          updatedAt: '',
+          title: 'Software Development',
+          industryCategoryUid: '',
+        },
+        {
+          uid: '',
+          createdAt: '',
+          updatedAt: '',
+          title: 'Blockchain',
+          industryCategoryUid: '',
+        },
       ],
       fundingStage: { title: 'Seed' },
       teamMemberRoles: [{ member: { uid: '456' } }, { member: { uid: '789' } }],
@@ -121,7 +133,22 @@ describe('parseTeam', () => {
       ipfsUser: true,
       fundingStage: 'Seed',
       membershipSources: ['Membership Source A', 'Membership Source B'],
-      tags: ['Software Development', 'Blockchain'],
+      industryTags: [
+        {
+          createdAt: '',
+          industryCategoryUid: '',
+          title: 'Software Development',
+          uid: '',
+          updatedAt: '',
+        },
+        {
+          createdAt: '',
+          industryCategoryUid: '',
+          title: 'Blockchain',
+          uid: '',
+          updatedAt: '',
+        },
+      ],
       members: ['456', '789'],
       contactMethod: 'https://myteam.com/contact',
     };
@@ -142,7 +169,7 @@ describe('parseTeam', () => {
       ipfsUser: false,
       fundingStage: null,
       membershipSources: [],
-      tags: [],
+      industryTags: [],
       members: [],
       contactMethod: null,
     };

@@ -42,7 +42,7 @@ export const parseTeam = (team: TTeamResponse): ITeam => {
     longDescription,
     technologies,
     membershipSources,
-    industryTags: tags,
+    industryTags,
     fundingStage,
     teamMemberRoles,
     contactMethod,
@@ -54,7 +54,6 @@ export const parseTeam = (team: TTeamResponse): ITeam => {
 
   const membershipSourceTitles =
     membershipSources?.map((source) => source.title) || [];
-  const tagTitles = tags?.map((tag) => tag.title) || [];
   const memberIds = teamMemberRoles?.length
     ? [
         ...new Set(
@@ -77,7 +76,7 @@ export const parseTeam = (team: TTeamResponse): ITeam => {
     ipfsUser,
     fundingStage: fundingStage?.title || null,
     membershipSources: membershipSourceTitles,
-    tags: tagTitles,
+    industryTags: industryTags || [],
     members: memberIds,
     contactMethod: contactMethod || null,
   };

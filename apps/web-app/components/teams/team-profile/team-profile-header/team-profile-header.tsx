@@ -8,7 +8,7 @@ import { ReactComponent as FilecoinIcon } from '/public/assets/images/icons/file
 export function TeamProfileHeader({
   logo,
   name,
-  tags,
+  industryTags,
   filecoinUser,
   ipfsUser,
 }: ITeam) {
@@ -35,8 +35,8 @@ export function TeamProfileHeader({
       <div className="grow space-y-4">
         <h1 className="text-2xl font-bold">{name}</h1>
         <div>
-          {tags?.length ? (
-            <TagsGroup items={tags} />
+          {industryTags?.length ? (
+            <TagsGroup items={industryTags.map((tag) => tag.title)} />
           ) : (
             <span className="text-xs leading-7 text-slate-400">-</span>
           )}

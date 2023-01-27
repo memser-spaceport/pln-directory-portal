@@ -41,7 +41,10 @@ export function TeamCard({ team, isGrid = true }: TeamCardProps) {
           {team.shortDescription}
         </p>
       </div>
-      <DirectoryCardFooter isGrid={isGrid} tagsArr={team.tags} />
+      <DirectoryCardFooter
+        isGrid={isGrid}
+        tagsArr={team.industryTags.map((tag) => tag.title)}
+      />
     </DirectoryCard>
   );
 }

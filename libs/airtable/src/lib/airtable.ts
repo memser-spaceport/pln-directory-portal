@@ -218,12 +218,21 @@ class AirtableService {
    * Parse Airtable's team record into the appropriate format.
    */
   private _parseTeam(team: IAirtableTeam): ITeam {
+    const industryTags =
+      team.fields['Tags lookup']?.map((tag: string) => ({
+        uid: '',
+        createdAt: '',
+        updatedAt: '',
+        title: tag,
+        industryCategoryUid: '',
+      })) || [];
+
     return {
       filecoinUser: !!team.fields['Filecoin User'],
       fundingStage: team.fields['Funding Stage'] || null,
       membershipSources: team.fields['Accelerator Programs'] || [],
       id: team.id,
-      tags: team.fields['Tags lookup'] || [],
+      industryTags,
       ipfsUser: !!team.fields['IPFS User'],
       members: team.fields['Network members'] || [],
       logo:
