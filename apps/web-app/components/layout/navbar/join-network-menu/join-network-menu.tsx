@@ -26,7 +26,7 @@ const JOIN_NETWORK_MENU_OPTIONS: IMenuOption[] = [
     icon: UserGroupIcon,
     label: 'As a Team',
     url: 'https://airtable.com/shrCUt3HKrxd7EDEw',
-    eventCode: FATHOM_EVENTS.directory.joinNetworkAsMember,
+    eventCode: FATHOM_EVENTS.directory.joinNetworkAsTeam,
   },
 ];
 
