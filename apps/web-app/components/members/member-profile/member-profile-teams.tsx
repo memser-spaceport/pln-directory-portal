@@ -36,7 +36,7 @@ export function MemberProfileTeams({ teams, member }: MemberProfileTeamsProps) {
             avatarIcon={UserGroupIcon}
             name={team.name}
             description={team.role || 'Contributor'}
-            tags={teamDetails?.tags}
+            tags={teamDetails?.industryTags.map((tag) => tag.title)}
             showMainTeamBadge={team.mainTeam && sortedTeams.length > 1}
           />
         );
