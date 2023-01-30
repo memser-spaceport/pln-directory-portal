@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
-import { MembershipSourcesService } from './membership-sources/membership-sources.service';
 import { MigrateAirtableDataCommand } from './commands/migrate-airtable-data.command';
+import { SaveAirtableDataCommand } from './commands/save-airtable-data.commands';
 import { FundingStagesService } from './funding-stages/funding-stages.service';
 import { ImagesController } from './images/images.controller';
 import { ImagesService } from './images/images.service';
 import { IndustryCategoriesService } from './industry-categories/industry-categories.service';
 import { IndustryTagsService } from './industry-tags/industry-tags.service';
 import { MembersService } from './members/members.service';
+import { MembershipSourcesService } from './membership-sources/membership-sources.service';
 import { PrismaService } from './prisma.service';
 import { SkillsService } from './skills/skills.service';
 import { TeamMemberRolesService } from './team-member-roles/team-member-roles.service';
@@ -38,6 +39,7 @@ import { LocationTransferService } from './utils/location-transfer/location-tran
     FileEncryptionService,
     ImagesService,
     ImagesController,
+    SaveAirtableDataCommand,
   ],
 })
 export class CommandModule {}
