@@ -1,9 +1,11 @@
 # Staging Deployment
 
+This document outlines the process for deploying code to the staging environment, including the actions that initiate the deployment, and the workflow of the deployment process.
+
 ## Process
 
 - The _Staging Deployment_ workflow:
-  - runs every day at 8 AM
+  - runs every day at 8 AM (WET)
   - can be triggered ad-hoc by either running the workflow:
     - directly from the repository's _Actions_ panel
     - using the _npm_ script `yarn run deploy:staging`

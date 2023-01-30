@@ -1,8 +1,10 @@
 # Production Deployment
 
+This document outlines the process for deploying code to the production environment, including the actions that initiate the deployment, and the workflow of the deployment process.
+
 ## Process
 
-- The Production Deployment\_ workflow can be triggered ad-hoc by either running the workflow:
+- The Production Deployment workflow can be triggered ad-hoc by either running the workflow:
   - directly from the repository's _Actions_ panel
   - using the _npm_ script `yarn run deploy:production`
 - After running the workflow, the web application will be deployed to [Vercel's Production Environment](https://plnetwork.io/) and the API to [Heroku's Production Environment](https://api.plnetwork.io/)
