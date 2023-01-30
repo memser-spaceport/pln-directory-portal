@@ -1,15 +1,15 @@
-import get from 'lodash/get';
 import has from 'lodash/has';
-import isArray from 'lodash/isArray';
-import isString from 'lodash/isString';
-import mergeWith from 'lodash/mergeWith';
 import set from 'lodash/set';
+import get from 'lodash/get';
+import mergeWith from 'lodash/mergeWith';
+import isString from 'lodash/isString';
+import isArray from 'lodash/isArray';
 
-import { PrismaQueryableFields } from '../../prisma-fields';
-import { PrismaQuery } from '../../prisma-query';
-import { AbstractFilter } from '../filter';
 import { LOOKUP_FILTER_MAP } from './field-filter-map';
+import { AbstractFilter } from '../filter';
+import { PrismaQueryableFields } from '../../prisma-fields';
 import { LookupFilter } from './lookup.enum';
+import { PrismaQuery } from '../../prisma-query';
 
 interface FilterConfig {
   query: PrismaQuery;
@@ -89,6 +89,13 @@ export class FieldFilter extends AbstractFilter {
       const prismaQueryPath =
         !this.fieldToBeQueriedComesFromMany && !this.fieldToBeQueriedHasMany
           ? this.prop
+          : this.value === 'null' && this.fieldToBeQueriedIsNullable
+          ? this.prop
+              .replace(/\./g, '.none.')
+              .replace(
+                /(?<last>\.none\..*)(\.none\.)(?<field>\w+)$/,
+                '$1.is.$3'
+              )
           : this.prop
               .replace(/\./g, '.some.')
               .replace(

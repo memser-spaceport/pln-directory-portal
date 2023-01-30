@@ -922,7 +922,7 @@ describe('Field Filter', () => {
             'skills.description': 'null',
           });
           expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
-            skills: { some: { description: null } },
+            skills: { none: { description: null } },
           });
         });
 
@@ -932,7 +932,7 @@ describe('Field Filter', () => {
               'skills.description__not': 'null',
             });
             expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
-              NOT: { skills: { some: { description: null } } },
+              NOT: { skills: { none: { description: null } } },
             });
           });
         });
