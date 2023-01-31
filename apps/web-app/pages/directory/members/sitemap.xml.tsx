@@ -19,6 +19,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     const membersListOptions: TMemberListOptions = {
       select: 'uid',
       pagination: false,
+      teamMemberRoles__not: 'null',
     };
     const membersResponse = await getMembers(membersListOptions);
 

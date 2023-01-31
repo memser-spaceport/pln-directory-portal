@@ -149,6 +149,7 @@ const getMembersFiltersValues = async (options: TMemberListOptions = {}) => {
     pagination: false,
     select:
       'skills.title,location.metroArea,location.city,location.continent,location.country',
+    teamMemberRoles__not: 'null',
   });
 };
 
