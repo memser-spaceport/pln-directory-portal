@@ -1,7 +1,8 @@
 import { faker } from '@faker-js/faker';
 import { Prisma, Team } from '@prisma/client';
 import { Factory } from 'fishery';
-import { camelCase, random } from 'lodash';
+import camelCase from 'lodash/camelCase';
+import random from 'lodash/random';
 import sample from 'lodash/sample';
 import sampleSize from 'lodash/sampleSize';
 import { prisma } from './../index';
