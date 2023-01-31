@@ -66,6 +66,7 @@ describe('#getTeamsListOptions', () => {
       orderBy: '-name',
       pagination: false,
       select: 'uid,name,shortDescription,logo.url,industryTags.title',
+      shortDescription__not: 'null',
     });
   });
 });

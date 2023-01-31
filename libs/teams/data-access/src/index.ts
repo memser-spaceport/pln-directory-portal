@@ -120,6 +120,7 @@ const getTeamsFiltersValues = async (options: TTeamListOptions = {}) => {
     pagination: false,
     select:
       'industryTags.title,membershipSources.title,fundingStage.title,technologies.title',
+    shortDescription__not: 'null',
   });
 };
 

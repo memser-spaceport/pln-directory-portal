@@ -7,6 +7,7 @@ export type TTeamListOptions = TListOptions & {
   'fundingStage.title__with'?: string;
   'teamMemberRoles.member.uid'?: string;
   plnFriend?: boolean;
+  shortDescription__not?: 'null';
 };
 
 export type TTeamsFiltersValues = {
