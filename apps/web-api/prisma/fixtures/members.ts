@@ -1,7 +1,7 @@
 import { faker } from '@faker-js/faker';
 import { Member, Prisma } from '@prisma/client';
 import { Factory } from 'fishery';
-import { camelCase } from 'lodash';
+import camelCase from 'lodash/camelCase';
 import random from 'lodash/random';
 import sample from 'lodash/sample';
 import sampleSize from 'lodash/sampleSize';
@@ -39,7 +39,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
       githubHandler: faker.internet.userName(name),
       discordHandler: faker.internet.userName(name),
       twitterHandler: faker.internet.userName(name),
-      officeHours: faker.internet.url(),
+      officeHours: faker.helpers.arrayElement([null, faker.internet.url()]),
       plnFriend: faker.datatype.boolean(),
       createdAt: faker.date.past(),
       updatedAt: faker.date.recent(),
