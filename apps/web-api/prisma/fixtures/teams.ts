@@ -43,10 +43,13 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(
         faker.internet.email(),
       ]),
       twitterHandler: faker.name.firstName(),
-      longDescription: faker.lorem.paragraph(),
       shortDescription: faker.helpers.arrayElement([
         null,
         faker.lorem.sentence(),
+      ]),
+      longDescription: faker.helpers.arrayElement([
+        null,
+        faker.lorem.paragraph(),
       ]),
       filecoinUser: faker.datatype.boolean(),
       ipfsUser: faker.datatype.boolean(),
