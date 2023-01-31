@@ -19,13 +19,13 @@ const JOIN_NETWORK_MENU_OPTIONS: IMenuOption[] = [
   {
     icon: UserIcon,
     label: 'As a Member',
-    url: 'https://airtable.com/shridgH41yhbvCYXW',
+    url: 'https://airtable.com/shr7xzCLmEiatgcNK',
     eventCode: FATHOM_EVENTS.directory.joinNetworkAsMember,
   },
   {
     icon: UserGroupIcon,
     label: 'As a Team',
-    url: 'https://airtable.com/shrCUt3HKrxd7EDEw',
+    url: 'https://airtable.com/shr5o6bOrdx9gWBY0',
     eventCode: FATHOM_EVENTS.directory.joinNetworkAsTeam,
   },
 ];
