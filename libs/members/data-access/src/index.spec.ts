@@ -365,6 +365,7 @@ describe('getMembersFilters', () => {
         pagination: false,
         select:
           'skills.title,location.metroArea,location.city,location.continent,location.country',
+        teamMemberRoles__not: 'null',
       },
     });
     expect(client.members.getMembers).toHaveBeenNthCalledWith(2, {
@@ -373,6 +374,7 @@ describe('getMembersFilters', () => {
         pagination: false,
         select:
           'skills.title,location.metroArea,location.city,location.continent,location.country',
+        teamMemberRoles__not: 'null',
       },
     });
 
