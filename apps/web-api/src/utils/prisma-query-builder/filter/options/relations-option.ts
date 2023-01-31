@@ -1,8 +1,7 @@
 import isString from 'lodash/isString';
+import set from 'lodash/set';
 import { ConfigProfile } from '../../profile/config-profile';
 import { BaseOption, FilterOption, FilterOptionQuery } from './filter-option';
-import set from 'lodash/set';
-import { has } from 'lodash';
 
 export class RelationsOption extends BaseOption implements FilterOption {
   private paramKey = 'with';

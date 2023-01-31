@@ -1,10 +1,10 @@
-import { LookupDelimiter, LookupFilter } from './field/lookup.enum';
-import { FieldFilter } from './field/field-filter';
-import { AbstractFilter } from './filter';
-import { PrismaQuery } from '../prisma-query';
-import { isString } from 'lodash';
-import { QueryString } from '../query-string';
+import isString from 'lodash/isString';
 import { PrismaQueryableFields } from '../prisma-fields';
+import { PrismaQuery } from '../prisma-query';
+import { QueryString } from '../query-string';
+import { FieldFilter } from './field/field-filter';
+import { LookupDelimiter, LookupFilter } from './field/lookup.enum';
+import { AbstractFilter } from './filter';
 
 interface FilterFactoryQuery {
   query: PrismaQuery;
