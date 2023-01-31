@@ -225,6 +225,7 @@ describe('getTeamsFilterValues', () => {
         pagination: false,
         select:
           'industryTags.title,membershipSources.title,fundingStage.title,technologies.title',
+        shortDescription__not: 'null',
       },
     });
     expect(client.teams.getTeams).toHaveBeenNthCalledWith(2, {
@@ -233,6 +234,7 @@ describe('getTeamsFilterValues', () => {
         pagination: false,
         select:
           'industryTags.title,membershipSources.title,fundingStage.title,technologies.title',
+        shortDescription__not: 'null',
       },
     });
 

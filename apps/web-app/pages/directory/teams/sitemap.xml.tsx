@@ -19,6 +19,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     const teamsListOptions: TTeamListOptions = {
       select: 'uid',
       pagination: false,
+      shortDescription__not: 'null',
     };
     const teamsResponse = await getTeams(teamsListOptions);
 
