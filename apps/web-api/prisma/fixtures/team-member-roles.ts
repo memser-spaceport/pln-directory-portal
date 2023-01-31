@@ -1,8 +1,9 @@
+import { faker } from '@faker-js/faker';
+import { Prisma, TeamMemberRole } from '@prisma/client';
 import camelCase from 'camelcase';
+import random from 'lodash/random';
 import sampleSize from 'lodash/sampleSize';
 import { prisma } from './../index';
-import { faker } from '@faker-js/faker';
-import { TeamMemberRole, Prisma } from '@prisma/client';
 
 const getUidsFrom = async (model) => {
   return await prisma[camelCase(model)].findMany({
@@ -19,7 +20,7 @@ export const teamMemberRoles = async () => {
 
   teamUids.forEach((teamUid) =>
     teamMemberRoles.push(
-      ...sampleSize(memberUids, 6).map(({ uid }) => ({
+      ...sampleSize(memberUids, random(0, 6)).map(({ uid }) => ({
         teamUid: teamUid.uid,
         memberUid: uid,
         role: faker.name.jobTitle(),
