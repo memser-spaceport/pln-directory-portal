@@ -4,6 +4,7 @@ import {
   IMemberTeam,
   ITeam,
 } from '@protocol-labs-network/api';
+import { TTeamResponse } from '@protocol-labs-network/contracts';
 import * as Sentry from '@sentry/node';
 import Airtable from 'airtable';
 import {
@@ -226,14 +227,32 @@ class AirtableService {
         title: tag,
         industryCategoryUid: '',
       })) || [];
+    const technologies: TTeamResponse['technologies'] = [];
+
+    if (team.fields['Filecoin User']) {
+      technologies.push({
+        uid: '',
+        title: 'Filecoin',
+        createdAt: '',
+        updatedAt: '',
+      });
+    }
+
+    if (team.fields['IPFS User']) {
+      technologies.push({
+        uid: '',
+        title: 'IPFS',
+        createdAt: '',
+        updatedAt: '',
+      });
+    }
 
     return {
-      filecoinUser: !!team.fields['Filecoin User'],
       fundingStage: team.fields['Funding Stage'] || null,
       membershipSources: team.fields['Accelerator Programs'] || [],
       id: team.id,
       industryTags,
-      ipfsUser: !!team.fields['IPFS User'],
+      technologies,
       members: team.fields['Network members'] || [],
       logo:
         (team.fields.Logo &&

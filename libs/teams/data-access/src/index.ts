@@ -48,10 +48,6 @@ export const parseTeam = (team: TTeamResponse): ITeam => {
     contactMethod,
   } = team;
 
-  const technologyTitles = technologies?.map((tech) => tech.title) || [];
-  const filecoinUser = technologyTitles.includes('Filecoin');
-  const ipfsUser = technologyTitles.includes('IPFS');
-
   const membershipSourceTitles =
     membershipSources?.map((source) => source.title) || [];
   const memberIds = teamMemberRoles?.length
@@ -72,8 +68,7 @@ export const parseTeam = (team: TTeamResponse): ITeam => {
     twitter: twitter || null,
     shortDescription: shortDescription || null,
     longDescription: longDescription || null,
-    filecoinUser,
-    ipfsUser,
+    technologies: technologies || [],
     fundingStage: fundingStage?.title || null,
     membershipSources: membershipSourceTitles,
     industryTags: industryTags || [],
