@@ -129,8 +129,14 @@ describe('parseTeam', () => {
       shortDescription: 'We build cool stuff',
       longDescription:
         'We are a team of skilled engineers who build innovative products',
-      filecoinUser: true,
-      ipfsUser: true,
+      technologies: [
+        {
+          title: 'Filecoin',
+        },
+        {
+          title: 'IPFS',
+        },
+      ],
       fundingStage: 'Seed',
       membershipSources: ['Membership Source A', 'Membership Source B'],
       industryTags: [
@@ -165,8 +171,7 @@ describe('parseTeam', () => {
       twitter: null,
       shortDescription: null,
       longDescription: null,
-      filecoinUser: false,
-      ipfsUser: false,
+      technologies: [],
       fundingStage: null,
       membershipSources: [],
       industryTags: [],

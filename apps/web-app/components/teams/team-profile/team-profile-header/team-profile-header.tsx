@@ -9,8 +9,7 @@ export function TeamProfileHeader({
   logo,
   name,
   industryTags,
-  filecoinUser,
-  ipfsUser,
+  technologies,
 }: ITeam) {
   return (
     <div className="flex space-x-4">
@@ -43,7 +42,7 @@ export function TeamProfileHeader({
         </div>
       </div>
       <div className="flex w-24 items-start justify-end">
-        {filecoinUser ? (
+        {technologies.some((technology) => technology.title === 'Filecoin') ? (
           <Tooltip
             asChild
             trigger={
@@ -54,7 +53,7 @@ export function TeamProfileHeader({
             content="Filecoin User"
           />
         ) : null}
-        {ipfsUser ? (
+        {technologies.some((technology) => technology.title === 'IPFS') ? (
           <Tooltip
             asChild
             trigger={
