@@ -48,8 +48,6 @@ export const parseTeam = (team: TTeamResponse): ITeam => {
     contactMethod,
   } = team;
 
-  const membershipSourceTitles =
-    membershipSources?.map((source) => source.title) || [];
   const memberIds = teamMemberRoles?.length
     ? [
         ...new Set(
@@ -70,8 +68,8 @@ export const parseTeam = (team: TTeamResponse): ITeam => {
     longDescription: longDescription || null,
     technologies: technologies || [],
     fundingStage: fundingStage?.title || null,
-    membershipSources: membershipSourceTitles,
     industryTags: industryTags || [],
+    membershipSources: membershipSources || [],
     members: memberIds,
     contactMethod: contactMethod || null,
   };

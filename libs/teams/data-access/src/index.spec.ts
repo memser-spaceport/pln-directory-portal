@@ -138,7 +138,6 @@ describe('parseTeam', () => {
         },
       ],
       fundingStage: 'Seed',
-      membershipSources: ['Membership Source A', 'Membership Source B'],
       industryTags: [
         {
           createdAt: '',
@@ -153,6 +152,14 @@ describe('parseTeam', () => {
           title: 'Blockchain',
           uid: '',
           updatedAt: '',
+        },
+      ],
+      membershipSources: [
+        {
+          title: 'Membership Source A',
+        },
+        {
+          title: 'Membership Source B',
         },
       ],
       members: ['456', '789'],

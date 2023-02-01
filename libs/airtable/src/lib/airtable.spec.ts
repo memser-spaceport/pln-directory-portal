@@ -215,7 +215,14 @@ describe('AirtableService', () => {
     expect(teams).toEqual([
       {
         fundingStage: teamMock01.fields['Funding Stage'],
-        membershipSources: teamMock01.fields['Accelerator Programs'],
+        membershipSources: [
+          {
+            createdAt: '',
+            title: 'Seed',
+            uid: '',
+            updatedAt: '',
+          },
+        ],
         id: teamMock01.id,
         industryTags: [
           {
@@ -302,7 +309,14 @@ describe('AirtableService', () => {
     expect(teams).toEqual([
       {
         fundingStage: teamMock01.fields['Funding Stage'],
-        membershipSources: teamMock01.fields['Accelerator Programs'],
+        membershipSources: [
+          {
+            createdAt: '',
+            title: 'Seed',
+            uid: '',
+            updatedAt: '',
+          },
+        ],
         id: teamMock01.id,
         industryTags: [
           {
@@ -378,7 +392,9 @@ describe('AirtableService', () => {
     expect(teamsTableMock.find).toHaveBeenCalledWith(teamMock01.id);
     expect(team).toEqual({
       fundingStage: teamMock01.fields['Funding Stage'],
-      membershipSources: teamMock01.fields['Accelerator Programs'],
+      membershipSources: [
+        { createdAt: '', title: 'Seed', uid: '', updatedAt: '' },
+      ],
       id: teamMock01.id,
       industryTags: [
         {
@@ -494,7 +510,6 @@ describe('AirtableService', () => {
         twitter: '@team01',
         website: 'http://team01.com/',
         fundingStage: null,
-        membershipSources: ['Seed'],
         industryTags: [
           {
             uid: '',
@@ -503,6 +518,9 @@ describe('AirtableService', () => {
             title: 'IT',
             industryCategoryUid: '',
           },
+        ],
+        membershipSources: [
+          { createdAt: '', title: 'Seed', uid: '', updatedAt: '' },
         ],
         contactMethod: null,
       },
@@ -517,7 +535,6 @@ describe('AirtableService', () => {
         twitter: '@team02',
         website: 'http://team02.com/',
         fundingStage: null,
-        membershipSources: ['Seed'],
         industryTags: [
           {
             uid: '',
@@ -526,6 +543,9 @@ describe('AirtableService', () => {
             title: 'IT',
             industryCategoryUid: '',
           },
+        ],
+        membershipSources: [
+          { createdAt: '', title: 'Seed', uid: '', updatedAt: '' },
         ],
         contactMethod: null,
       },
@@ -1124,7 +1144,9 @@ describe('AirtableService', () => {
     expect(airtableService.parseTeams(teamsMock)).toEqual([
       {
         fundingStage: teamMock01.fields['Funding Stage'],
-        membershipSources: teamMock01.fields['Accelerator Programs'],
+        membershipSources: [
+          { createdAt: '', title: 'Seed', uid: '', updatedAt: '' },
+        ],
         id: teamMock01.id,
         industryTags: [
           {

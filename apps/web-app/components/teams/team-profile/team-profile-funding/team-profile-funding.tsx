@@ -16,7 +16,9 @@ export function TeamProfileFunding({ fundingStage, membershipSources }: ITeam) {
         <div className="grow basis-1/2 p-5 pb-3 even:border-l even:border-l-slate-200">
           <h2 className="detail-label">Membership Source</h2>
           <div>
-            <TagsGroup items={membershipSources} />
+            <TagsGroup
+              items={membershipSources.map((source) => source.title)}
+            />
           </div>
         </div>
       ) : null}
