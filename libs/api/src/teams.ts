@@ -10,7 +10,7 @@ export interface ITeam {
   twitter: string | null;
   contactMethod: string | null;
   fundingStage: string | null;
-  membershipSources: string[];
+  membershipSources: TTeamResponse['membershipSources'];
   industryTags: TTeamResponse['industryTags'];
   technologies: TTeamResponse['technologies'];
   members: string[];

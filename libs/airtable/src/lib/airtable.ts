@@ -247,9 +247,17 @@ class AirtableService {
       });
     }
 
+    const membershipSources =
+      team.fields['Accelerator Programs']?.map((program: string) => ({
+        uid: '',
+        createdAt: '',
+        updatedAt: '',
+        title: program,
+      })) || [];
+
     return {
       fundingStage: team.fields['Funding Stage'] || null,
-      membershipSources: team.fields['Accelerator Programs'] || [],
+      membershipSources,
       id: team.id,
       industryTags,
       technologies,
