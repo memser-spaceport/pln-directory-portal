@@ -678,7 +678,14 @@ describe('AirtableService', () => {
         },
         name: memberMock01.fields.Name,
         officeHours: memberMock01.fields['Office hours link'],
-        skills: [memberMock01.fields.Skills?.[0]],
+        skills: [
+          {
+            createdAt: '',
+            title: 'Product',
+            uid: '',
+            updatedAt: '',
+          },
+        ],
         teamLead: memberMock01.fields['Team lead'],
         teams: [
           {
@@ -778,7 +785,14 @@ describe('AirtableService', () => {
       },
       name: memberMock01.fields.Name,
       officeHours: memberMock01.fields['Office hours link'],
-      skills: [memberMock01.fields.Skills?.[0]],
+      skills: [
+        {
+          createdAt: '',
+          title: 'Product',
+          uid: '',
+          updatedAt: '',
+        },
+      ],
       teamLead: memberMock01.fields['Team lead'],
       teams: [
         {
@@ -1195,7 +1209,14 @@ describe('AirtableService', () => {
         },
         name: memberMock01.fields.Name,
         officeHours: memberMock01.fields['Office hours link'],
-        skills: [memberMock01.fields.Skills?.[0]],
+        skills: [
+          {
+            createdAt: '',
+            title: 'Product',
+            uid: '',
+            updatedAt: '',
+          },
+        ],
         teamLead: memberMock01.fields['Team lead'],
         teams: [
           {

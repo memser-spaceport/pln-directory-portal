@@ -101,7 +101,10 @@ describe('parseMember', () => {
       image: { url: 'https://example.com/image.jpg' },
       location: { country: 'USA', region: 'New York Region', city: 'New York' },
       officeHours: 'https://example.com/office-hours',
-      skills: [{ title: 'JavaScript' }, { title: 'TypeScript' }],
+      skills: [
+        { uid: '', createdAt: '', updatedAt: '', title: 'JavaScript' },
+        { uid: '', createdAt: '', updatedAt: '', title: 'TypeScript' },
+      ],
       teamMemberRoles: [
         {
           role: 'Developer',
@@ -129,8 +132,20 @@ describe('parseMember', () => {
       twitter: 'jsmith',
       officeHours: 'https://example.com/office-hours',
       location: 'New York, USA',
-
-      skills: ['JavaScript', 'TypeScript'],
+      skills: [
+        {
+          uid: '',
+          createdAt: '',
+          updatedAt: '',
+          title: 'JavaScript',
+        },
+        {
+          uid: '',
+          createdAt: '',
+          updatedAt: '',
+          title: 'TypeScript',
+        },
+      ],
       teamLead: true,
       teams: [
         {
@@ -239,7 +254,10 @@ describe('parseTeamMember', () => {
     image: { url: 'https://example.com/image.jpg' },
     location: { country: 'USA', region: 'New York Region', city: 'New York' },
     officeHours: 'https://example.com/office-hours',
-    skills: [{ title: 'JavaScript' }, { title: 'TypeScript' }],
+    skills: [
+      { uid: '', createdAt: '', updatedAt: '', title: 'JavaScript' },
+      { uid: '', createdAt: '', updatedAt: '', title: 'TypeScript' },
+    ],
     teamMemberRoles: [
       {
         role: 'Developer',
@@ -269,7 +287,10 @@ describe('parseTeamMember', () => {
       officeHours: 'https://example.com/office-hours',
       location: 'New York, USA',
 
-      skills: ['JavaScript', 'TypeScript'],
+      skills: [
+        { uid: '', createdAt: '', updatedAt: '', title: 'JavaScript' },
+        { uid: '', createdAt: '', updatedAt: '', title: 'TypeScript' },
+      ],
       teamLead: true,
       teams: [
         {
@@ -298,7 +319,10 @@ describe('parseTeamMember', () => {
       officeHours: 'https://example.com/office-hours',
       location: 'New York, USA',
 
-      skills: ['JavaScript', 'TypeScript'],
+      skills: [
+        { uid: '', createdAt: '', updatedAt: '', title: 'JavaScript' },
+        { uid: '', createdAt: '', updatedAt: '', title: 'TypeScript' },
+      ],
       teamLead: false,
       teams: [
         {
@@ -328,7 +352,10 @@ describe('getMembersFilters', () => {
   };
 
   const member01 = {
-    skills: [{ title: 'Skill 1' }, { title: 'Skill 2' }],
+    skills: [
+      { uid: '', createdAt: '', updatedAt: '', title: 'Skill 1' },
+      { uid: '', createdAt: '', updatedAt: '', title: 'Skill 2' },
+    ],
     location: {
       continent: 'Continent 1',
       country: 'Country 1',
@@ -337,7 +364,10 @@ describe('getMembersFilters', () => {
     },
   } as TMemberResponse;
   const member02 = {
-    skills: [{ title: 'Skill 2' }, { title: 'Skill 3' }],
+    skills: [
+      { uid: '', createdAt: '', updatedAt: '', title: 'Skill 2' },
+      { uid: '', createdAt: '', updatedAt: '', title: 'Skill 3' },
+    ],
     location: {
       continent: 'Continent 2',
       country: 'Country 2',

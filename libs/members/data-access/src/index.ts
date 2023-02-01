@@ -37,7 +37,6 @@ export const getMember = async (
  **/
 export const parseMember = (member: TMemberResponse): IMember => {
   const location = parseMemberLocation(member.location);
-  const skills = member.skills?.map((skill) => skill.title) || [];
   const teams =
     member.teamMemberRoles?.map((teamMemberRole) => ({
       id: teamMemberRole.team?.uid || '',
@@ -59,7 +58,7 @@ export const parseMember = (member: TMemberResponse): IMember => {
     twitter: member.twitterHandler || null,
     officeHours: member.officeHours || null,
     location,
-    skills,
+    skills: member.skills || [],
     teamLead,
     teams,
     mainTeam,

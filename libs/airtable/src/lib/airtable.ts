@@ -282,6 +282,13 @@ class AirtableService {
   private _parseMember(member: IAirtableMember): IMember {
     const teams = this._parseMemberTeams(member);
     const mainTeam = teams[0] || null;
+    const skills =
+      member.fields.Skills?.map((skill: string) => ({
+        uid: '',
+        createdAt: '',
+        updatedAt: '',
+        title: skill,
+      })) || [];
 
     return {
       discordHandle: member.fields['Discord handle'] || null,
@@ -297,7 +304,7 @@ class AirtableService {
       mainTeam,
       name: member.fields.Name || null,
       officeHours: member.fields['Office hours link'] || null,
-      skills: member.fields.Skills || [],
+      skills,
       teamLead: !!member.fields['Team lead'],
       teams,
       twitter: member.fields.Twitter || null,

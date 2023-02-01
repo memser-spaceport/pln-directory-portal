@@ -28,7 +28,7 @@ export function TeamProfileMembers({ members }: TeamProfileMembersProps) {
             name={member.name}
             showTeamLeadBadge={member.teamLead}
             description={team.role}
-            tags={member.skills}
+            tags={member.skills.map((skill) => skill.title)}
           />
         );
       })}

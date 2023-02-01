@@ -13,7 +13,11 @@ export function MemberProfileDetails({
   return (
     <>
       <div className="mt-6">
-        {skills?.length ? <TagsGroup items={skills} /> : '-'}
+        {skills.length ? (
+          <TagsGroup items={skills.map((skill) => skill.title)} />
+        ) : (
+          '-'
+        )}
       </div>
       <div className="mt-4 flex space-x-6">
         <div className="flex w-1/4 flex-col items-start">

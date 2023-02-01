@@ -1,3 +1,5 @@
+import { TMemberResponse } from '@protocol-labs-network/contracts';
+
 export interface IMember {
   discordHandle: string | null;
   email: string | null;
@@ -7,7 +9,7 @@ export interface IMember {
   location: string;
   name: string | null;
   officeHours: string | null;
-  skills: string[];
+  skills: TMemberResponse['skills'];
   teamLead: boolean;
   teams: IMemberTeam[];
   mainTeam: IMemberTeam | null;
