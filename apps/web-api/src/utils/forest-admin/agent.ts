@@ -1,5 +1,6 @@
 import { createAgent } from '@forestadmin/agent';
 import { createSqlDataSource } from '@forestadmin/datasource-sql';
+import * as Sentry from '@sentry/minimal';
 import axios from 'axios';
 import { Readable } from 'stream';
 import { ImagesController } from '../../images/images.controller';
@@ -9,6 +10,7 @@ import { FileEncryptionService } from '../file-encryption/file-encryption.servic
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { LocationTransferService } from '../location-transfer/location-transfer.service';
 import { generateUid } from './generated-uid';
+import { APP_ENV } from '../../utils/constants';
 
 const prismaService = new PrismaService();
 
@@ -225,7 +227,10 @@ async function triggerSync(slug) {
       }
     );
   } catch (error) {
-    throw new error(error);
+    if (process.env.ENVIRONMENT === APP_ENV.PRODUCTION) {
+      Sentry.captureException(`${error} - Sync trigger failed`);
+    }
+    return;
   }
 }
 
