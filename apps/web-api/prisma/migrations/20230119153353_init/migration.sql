@@ -200,9 +200,6 @@ CREATE UNIQUE INDEX "Team_name_key" ON "Team"("name");
 CREATE UNIQUE INDEX "Member_uid_key" ON "Member"("uid");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Member_name_key" ON "Member"("name");
-
--- CreateIndex
 CREATE UNIQUE INDEX "Member_email_key" ON "Member"("email");
 
 -- CreateIndex
