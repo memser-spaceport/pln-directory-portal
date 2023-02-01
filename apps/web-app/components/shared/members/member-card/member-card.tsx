@@ -85,7 +85,10 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
           )}
         </div>
       </div>
-      <DirectoryCardFooter isGrid={isGrid} tagsArr={member.skills} />
+      <DirectoryCardFooter
+        isGrid={isGrid}
+        tagsArr={member.skills.map((skill) => skill.title)}
+      />
     </DirectoryCard>
   );
 }
