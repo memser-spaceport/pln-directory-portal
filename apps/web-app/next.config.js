@@ -23,6 +23,7 @@ let nextConfig = {
       'dl.airtable.com',
       'v5.airtableusercontent.com',
       'loremflickr.com',
+      'files.plnetwork.io',
     ],
     // Enable `dangerouslyAllowSVG` and `contentSecurityPolicy` to serve
     // SVG images using the default Image Optimization API
