@@ -59,6 +59,18 @@ describe('#getMembersOptionsFromQuery', () => {
       'skills.title__with': 'Engineering,Leadership',
     });
   });
+
+  it('should return searchBy with no whitespace at the beginning or end', () => {
+    expect(
+      getMembersOptionsFromQuery({
+        searchBy: '  lorem ipsum  ',
+      })
+    ).toEqual({
+      orderBy: 'name',
+      plnFriend: false,
+      name__istartswith: 'lorem ipsum',
+    });
+  });
 });
 
 describe('#getMembersListOptions', () => {

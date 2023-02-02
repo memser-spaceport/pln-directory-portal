@@ -4,6 +4,7 @@ import {
   getMembersDirectoryListOptions,
   getMembersDirectoryRequestOptionsFromQuery,
   getMembersDirectoryRequestParametersFromQuery,
+  getSearchFormulaFromQuery,
   getTeamsDirectoryListOptions,
   getTeamsDirectoryRequestOptionsFromQuery,
   getTeamsDirectoryRequestParametersFromQuery,
@@ -247,6 +248,14 @@ describe('#getMembersDirectoryRequestParametersFromQuery', () => {
       })
     ).toEqual(
       `fields[]=Name&fields[]=Profile picture&fields[]=Role&fields[]=Teams&fields[]=Team name&fields[]=Country&fields[]=State / Province&fields[]=City&fields[]=Metro Area&fields[]=Team lead&fields[]=Skills&sort[0][field]=Name&sort[0][direction]=asc&filterByFormula=${encodedFormula}&pageSize=9`
+    );
+  });
+});
+
+describe('#getSearchFormulaFromQuery', () => {
+  it('should return a formula to find results whose names start with the trimmed input value', () => {
+    expect(getSearchFormulaFromQuery('   Lorem  Ipsum     ')).toEqual(
+      'REGEX_MATCH({Name}, "(?i)^(Lorem  Ipsum)")'
     );
   });
 });

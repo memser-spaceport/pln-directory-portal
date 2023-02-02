@@ -34,7 +34,9 @@ export function getTeamsOptionsFromQuery(queryParams: ParsedUrlQuery) {
       : {}),
     ...(tags ? { 'industryTags.title__with': stringifyQueryValues(tags) } : {}),
     ...(includeFriends ? {} : { plnFriend: false }),
-    ...(searchBy ? { name__istartswith: stringifyQueryValues(searchBy) } : {}),
+    ...(searchBy
+      ? { name__istartswith: stringifyQueryValues(searchBy).trim() }
+      : {}),
     orderBy: `${sortFromQuery.direction === 'desc' ? '-' : ''}${sortField}`,
   };
 }
