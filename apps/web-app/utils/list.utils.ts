@@ -274,8 +274,8 @@ function getMembersDirectoryFormula({
  * Returns formula to find matching results with names starting with the
  * provided search query parameter.
  */
-function getSearchFormulaFromQuery(searchQuery: string | string[] = '') {
-  return `REGEX_MATCH({Name}, "(?i)^(${searchQuery.toString()})")`;
+export function getSearchFormulaFromQuery(searchQuery: string | string[] = '') {
+  return `REGEX_MATCH({Name}, "(?i)^(${searchQuery.toString().trim()})")`;
 }
 
 /**

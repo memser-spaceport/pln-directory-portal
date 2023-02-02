@@ -38,7 +38,9 @@ export function getMembersOptionsFromQuery(
       ? { 'location.metroArea__with': stringifyQueryValues(metroArea) }
       : {}),
     ...(includeFriends ? {} : { plnFriend: false }),
-    ...(searchBy ? { name__istartswith: stringifyQueryValues(searchBy) } : {}),
+    ...(searchBy
+      ? { name__istartswith: stringifyQueryValues(searchBy).trim() }
+      : {}),
     orderBy: `${sortFromQuery.direction === 'desc' ? '-' : ''}${sortField}`,
   };
 }
