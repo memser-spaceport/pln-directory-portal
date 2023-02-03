@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { PrismaService } from '../prisma.service';
 import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
+import { hashFileName } from '../utils/hashing';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 
 @Injectable()
@@ -43,8 +44,9 @@ export class MembersService {
 
       if (member.fields['Profile picture']) {
         const ppf = member.fields['Profile picture'][0];
+        const hashedPpf = hashFileName(ppf.filename || '');
         image =
-          images.find((image) => image.filename === ppf.filename) ||
+          images.find((image) => image.filename === hashedPpf) ||
           (await this.fileMigrationService.migrateFile({
             id: ppf.id || '',
             url: ppf.url || '',

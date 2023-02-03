@@ -9,6 +9,7 @@ import sharp from 'sharp';
 import { apiImages } from '../../../../libs/contracts/src/lib/contract-images';
 import { THUMBNAIL_SIZES } from '../utils/constants';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
+import { hashFileName } from '../utils/hashing';
 import { ImagesService } from './images.service';
 
 const server = initNestServer(apiImages);
@@ -51,7 +52,7 @@ export class ImagesController {
   })
   @UseInterceptors(FileInterceptor('file'))
   async uploadImage(@UploadedFile() file: Express.Multer.File) {
-    const originalName = `${path.parse(file.originalname).name}${
+    file.originalname = `${hashFileName(path.parse(file.originalname).name)}${
       path.parse(file.originalname).ext
     }`;
 
@@ -67,14 +68,14 @@ export class ImagesController {
     // Generate original image to obtain width and height
     const originalImage = await sharp(file.buffer)
       .webp({ effort: 3 })
-      .toFile(path.join('./img-tmp', originalName));
+      .toFile(path.join('./img-tmp', file.originalname));
 
     /*
         The following conditions are meant to prevent generating thumbnails
         that are larger than the original image
     */
     if (originalImage.width > THUMBNAIL_SIZES.TINY) {
-      const filename = `${THUMBNAIL_SIZES.TINY}-${originalName}`;
+      const filename = `${THUMBNAIL_SIZES.TINY}-${file.originalname}`;
 
       const tinyImage = await generateThumbnail(file, THUMBNAIL_SIZES.TINY);
 
@@ -99,7 +100,7 @@ export class ImagesController {
     }
 
     if (originalImage.width > THUMBNAIL_SIZES.SMALL) {
-      const filename = `${THUMBNAIL_SIZES.SMALL}-${originalName}`;
+      const filename = `${THUMBNAIL_SIZES.SMALL}-${file.originalname}`;
       const smallImage = await generateThumbnail(file, THUMBNAIL_SIZES.SMALL);
 
       const smallFormData = createFormDataFromSharp(
@@ -122,7 +123,7 @@ export class ImagesController {
     }
 
     if (originalImage.width > THUMBNAIL_SIZES.MEDIUM) {
-      const filename = `${THUMBNAIL_SIZES.MEDIUM}-${originalName}`;
+      const filename = `${THUMBNAIL_SIZES.MEDIUM}-${file.originalname}`;
       const mediumImage = await generateThumbnail(file, THUMBNAIL_SIZES.MEDIUM);
 
       const mediumFormData = createFormDataFromSharp(
@@ -145,7 +146,7 @@ export class ImagesController {
     }
 
     if (originalImage.width > THUMBNAIL_SIZES.LARGE) {
-      const filename = `${THUMBNAIL_SIZES.LARGE}-${originalName}`;
+      const filename = `${THUMBNAIL_SIZES.LARGE}-${file.originalname}`;
       const largeImage = await generateThumbnail(file, THUMBNAIL_SIZES.LARGE);
 
       const largeFormData = createFormDataFromSharp(
@@ -184,12 +185,12 @@ export class ImagesController {
     const createdImages = await this.imagesService.bulkCreate(
       {
         cid: cid,
-        filename: originalName,
+        filename: file.originalname,
         size: originalImage.size,
         height: originalImage.height,
         url: await this.fileUploadService.getDecryptedFileUrl(
           cid,
-          originalName
+          file.originalname
         ),
         width: originalImage.width,
         version: 'ORIGINAL',

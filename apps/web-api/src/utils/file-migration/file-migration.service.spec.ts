@@ -9,7 +9,6 @@ import { PrismaService } from '../../prisma.service';
 import { FileEncryptionService } from '../file-encryption/file-encryption.service';
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { FileMigrationService } from './file-migration.service';
-
 jest.spyOn(fs, 'readFileSync').mockImplementation(() => 'readFileSync');
 jest.spyOn(fs, 'createWriteStream').mockImplementation();
 jest.spyOn(fs, 'unlink').mockImplementation();
@@ -32,7 +31,6 @@ jest.mock('sharp', () =>
     })),
   }))
 );
-
 describe('FileMigrationService', () => {
   let fileMigrationService: FileMigrationService;
   let imagesController: ImagesController;
@@ -56,7 +54,6 @@ describe('FileMigrationService', () => {
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .compile();
-
     fileMigrationService = app.get<FileMigrationService>(FileMigrationService);
     imagesController = app.get<ImagesController>(ImagesController);
     jest.spyOn(imagesController, 'uploadImage').mockImplementation(() => {
@@ -79,12 +76,10 @@ describe('FileMigrationService', () => {
         },
       });
     });
-
     jest.spyOn(fileMigrationService, 'download').mockImplementation(() => {
       return Promise.resolve();
     });
   });
-
   describe('When receiving a file', () => {
     it('Should call uploadImage with a valid image', async () => {
       const airtableImage = {
