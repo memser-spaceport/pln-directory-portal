@@ -220,7 +220,6 @@ function getTeamsDirectoryFormula({
     'AND(',
     [
       '{Name} != ""',
-      '{Short description} != ""',
       ...(searchBy ? [getSearchFormulaFromQuery(searchBy)] : []),
       ...(tags ? [getFieldFromQuery('Tags lookup', tags, true)] : []),
       ...(membershipSources

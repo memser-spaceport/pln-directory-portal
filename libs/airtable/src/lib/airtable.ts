@@ -88,9 +88,7 @@ class AirtableService {
     const listOptions: IListOptions = {
       filterByFormula: [
         'AND(',
-        'AND(',
-        ['{Name} != ""', '{Short description} != ""'].join(', '),
-        '), ',
+        '{Name} != "", ',
         `OR(${teamsByIdFormula.join(', ')})`,
         ')',
       ].join(''),
@@ -115,8 +113,7 @@ class AirtableService {
   public async getTeamsFiltersValues(options: IListOptions) {
     const [valuesByFilter, availableValuesByFilter] = await Promise.all([
       this._getTeamsFiltersValues({
-        filterByFormula:
-          'AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE())',
+        filterByFormula: 'AND({Name} != "", {Friend of PLN} = FALSE())',
       }),
       this._getTeamsFiltersValues(options),
     ]);
