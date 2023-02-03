@@ -80,20 +80,13 @@ export class LocationTransferService {
     /**
      * This catches the islands like Kauai, Maui, etc
      */
+
     let requiredPlace =
       placeResponse.data.predictions &&
       placeResponse.data.predictions.find(
         (place) =>
-          place.types && place.types.find((type) => type === 'natural_feature')
+          place.types && place.types.find((type) => type === 'locality')
       );
-
-    if (!requiredPlace)
-      requiredPlace =
-        placeResponse.data.predictions &&
-        placeResponse.data.predictions.find(
-          (place) =>
-            place.types && place.types.find((type) => type === 'locality')
-        );
 
     if (!requiredPlace)
       requiredPlace =
@@ -103,12 +96,22 @@ export class LocationTransferService {
             place.types &&
             place.types.find((type) => type === 'administrative_area_level_1')
         );
+
     if (!requiredPlace)
       requiredPlace =
         placeResponse.data.predictions &&
         placeResponse.data.predictions.find(
           (place) =>
             place.types && place.types.find((type) => type === 'country')
+        );
+
+    if (!requiredPlace)
+      requiredPlace =
+        placeResponse.data.predictions &&
+        placeResponse.data.predictions.find(
+          (place) =>
+            place.types &&
+            place.types.find((type) => type === 'natural_feature')
         );
 
     if (!requiredPlace) {
