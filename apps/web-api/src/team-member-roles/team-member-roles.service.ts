@@ -31,6 +31,29 @@ export class TeamMemberRolesService {
                 .map((airtableTeam) => airtableTeam?.fields.Name)
                 .includes(team.name)
             )
+            /* Sorting the teams fetched from Prisma in the order that they appear in Airtable. */
+            .sort((teamA, teamB) => {
+              const memberAirtableTeams = airtableTeams
+                .filter((airtableTeam) =>
+                  airtableMember.fields.Teams?.includes(airtableTeam.id)
+                )
+                /* Sorting the teams in the order they appear in the airtable member associated teams. */
+                .sort((airtableTeamA, airtableTeamB) =>
+                  airtableMember.fields.Teams
+                    ? airtableMember.fields.Teams.indexOf(
+                        airtableTeamA.id || ''
+                      ) -
+                      airtableMember.fields.Teams.indexOf(
+                        airtableTeamB.id || ''
+                      )
+                    : 0
+                )
+                .map((airtableTeam) => airtableTeam?.fields.Name);
+              return (
+                memberAirtableTeams.indexOf(teamA.name) -
+                memberAirtableTeams.indexOf(teamB.name)
+              );
+            })
             .map((team) => team.uid);
 
           return teamUids.map((teamUid, index) =>

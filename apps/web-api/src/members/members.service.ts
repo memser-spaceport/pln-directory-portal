@@ -84,8 +84,6 @@ export class MembersService {
         },
       };
 
-      // TODO: Create or connect location
-
       const { location } = await this.locationTransferService.transferLocation(
         member
       );
