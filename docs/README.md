@@ -1,5 +1,29 @@
 # Table of Contents
 
+- Technical Specification
+  - [Overview](../README.md)
+  - [Architecture Diagram](ARCHITECTURE_DIAGRAM.md)
+  - [Technology Stack](TECHNOLOGY_STACK.md)
+  - [Web API](../apps/web-api/README.md)
+    - [Data Model](../apps/web-api/docs/DATA_MODEL.md)
+    - [Prisma Query Builder](../apps/web-api/src/utils/prisma-query-builder/README.md)
+    - [Web3 File Retrieval using Cloudflare workers](../apps/web-api/cloudflare/workers/web3-file-retrieval/web3-file-retrieval.md)
+  - [Web App](../apps/web-app/README.md)
+  - Libs
+    - [Airtable](../libs/airtable/README.md)
+    - [API](../libs/api/README.md)
+    - [Contracts](../libs/contracts/README.md)
+    - [Funding Stages — Data Access](../libs/funding-stages/data-access/README.md)
+    - [Industry Tags — Data Access](../libs/industry-tags/data-access/README)
+    - [Locations — Data Access](../libs/locations/data-access/README)
+    - [Members — Data Access](../libs/members/data-access/README)
+    - [Membership Sources — Data Access](../libs/membership-sources/data-access/README)
+    - [Shared — Data Access](../libs/shared/data-access/README)
+    - [Skills — Data Access](../libs/skills/data-access/README)
+    - [Teams — Data Access](../libs/teams/data-access/README)
+    - [Technologies — Data Access](../libs/technologies/data-access/README)
+    - [Storybook Host](../libs/storybook-host/README.md)
+    - [UI](../libs/ui/README.md)
 - Guidelines
   - [Branching Guidelines](GUIDELINES_BRANCHING.md)
   - [Commit Guidelines](GUIDELINES_COMMIT.md)
