@@ -25,7 +25,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
     ).toEqual({
       sort: [{ field: 'Name', direction: 'desc' }],
       filterByFormula:
-        'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())',
+        'AND({Name} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())',
     });
   });
 
@@ -36,8 +36,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
       })
     ).toEqual({
       sort: [{ field: 'Name', direction: 'asc' }],
-      filterByFormula:
-        'AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE())',
+      filterByFormula: 'AND({Name} != "", {Friend of PLN} = FALSE())',
     });
   });
 
@@ -54,7 +53,7 @@ describe('#getTeamsDirectoryRequestOptionsFromQuery', () => {
     ).toEqual({
       sort: [{ field: 'Name', direction: 'asc' }],
       filterByFormula:
-        'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())',
+        'AND({Name} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())',
     });
   });
 });
@@ -64,11 +63,11 @@ describe('#getTeamsDirectoryListOptions', () => {
     expect(
       getTeamsDirectoryListOptions({
         sort: [{ field: 'Name', direction: 'desc' }],
-        filterByFormula: 'AND({Name} != "", {Short description} != "")',
+        filterByFormula: 'AND({Name} != "")',
       })
     ).toEqual({
       sort: [{ field: 'Name', direction: 'desc' }],
-      filterByFormula: 'AND({Name} != "", {Short description} != "")',
+      filterByFormula: 'AND({Name} != "")',
       fields: TEAM_CARD_FIELDS,
     });
   });
@@ -143,7 +142,7 @@ describe('#getMembersDirectoryListOptions', () => {
 describe('#getTeamsDirectoryRequestParametersFromQuery', () => {
   it('should return a valid query parameters string when sort is provided and is valid', () => {
     const encodedFormula = encodeURIComponent(
-      'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())'
+      'AND({Name} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE())'
     );
 
     expect(
@@ -163,7 +162,7 @@ describe('#getTeamsDirectoryRequestParametersFromQuery', () => {
 
   it('should return a valid query parameters string when sort is provided and is invalid', () => {
     const encodedFormula = encodeURIComponent(
-      'AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE())'
+      'AND({Name} != "", {Friend of PLN} = FALSE())'
     );
 
     expect(
@@ -177,7 +176,7 @@ describe('#getTeamsDirectoryRequestParametersFromQuery', () => {
 
   it('should return a valid query parameters string when sort is not provided', () => {
     const encodedFormula = encodeURIComponent(
-      'AND({Name} != "", {Short description} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())'
+      'AND({Name} != "", REGEX_MATCH({Name}, "(?i)^(void)"), SEARCH("Analytics", ARRAYJOIN({Tags lookup})), SEARCH("IPFS", {Accelerator Programs}), SEARCH("Seed", {Funding Stage}), {IPFS User} = TRUE(), {Filecoin User} = TRUE())'
     );
 
     expect(

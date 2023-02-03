@@ -422,7 +422,7 @@ describe('AirtableService', () => {
 
     expect(teamsTableMock.select).toHaveBeenCalledWith({
       filterByFormula:
-        "AND(AND({Name} != \"\", {Short description} != \"\"), OR(RECORD_ID()='team_id_01', RECORD_ID()='team_id_02', RECORD_ID()='team_id_03'))",
+        "AND({Name} != \"\", OR(RECORD_ID()='team_id_01', RECORD_ID()='team_id_02', RECORD_ID()='team_id_03'))",
       fields: ['Name'],
     });
 
@@ -541,8 +541,7 @@ describe('AirtableService', () => {
         'IPFS User',
         'Filecoin User',
       ],
-      filterByFormula:
-        'AND({Name} != "", {Short description} != "", {Friend of PLN} = FALSE())',
+      filterByFormula: 'AND({Name} != "", {Friend of PLN} = FALSE())',
     });
     expect(teamsTableMock.select).toHaveBeenNthCalledWith(2, {
       fields: [
