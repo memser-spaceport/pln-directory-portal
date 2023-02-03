@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { PrismaService } from '../prisma.service';
 import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schema';
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
+import { hashFileName } from '../utils/hashing';
 
 @Injectable()
 export class TeamsService {
@@ -98,8 +99,9 @@ export class TeamsService {
 
       if (team.fields.Logo) {
         const logo = team.fields.Logo[0];
+        const hashedLogo = hashFileName(logo.filename || '');
         image =
-          images.find((image) => image.filename === logo.filename) ||
+          images.find((image) => image.filename === hashedLogo) ||
           (await this.fileMigrationService.migrateFile({
             id: logo.id ? logo.id : '',
             url: logo.url ? logo.url : '',

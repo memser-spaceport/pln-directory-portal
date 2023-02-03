@@ -9,14 +9,11 @@ import {
   FILE_UPLOAD_SIZE_LIMIT,
   IMAGE_UPLOAD_MAX_DIMENSION,
 } from '../constants';
-
 @Injectable()
 export class FileMigrationService {
   constructor(private readonly imagesController: ImagesController) {}
-
   async migrateFile(airtableImage: IAirtableImage) {
     const { url, size, type, filename, width, height } = airtableImage;
-
     if (
       type !== 'image/jpeg' &&
       type !== 'image/png' &&
@@ -24,17 +21,14 @@ export class FileMigrationService {
     ) {
       return { status: 'File type not supported' };
     }
-
     if (width < 1 && height < 1) {
       return { status: 'File is not an image' };
     }
-
     try {
       await this.download(url, filename);
     } catch (error) {
       throw new Error(`Failed downloading the image - ${error}`);
     }
-
     const originalFilePath = `./${filename}`;
     const buffer = fs.readFileSync(originalFilePath);
 
@@ -84,7 +78,6 @@ export class FileMigrationService {
     } catch (error) {
       throw new Error(`Failed uploading the image - ${error}`);
     }
-
     if (image) {
       fs.unlink(filePath, function (err) {
         if (err) throw err;
@@ -95,10 +88,8 @@ export class FileMigrationService {
         });
       }
     }
-
     return image;
   }
-
   download(url, filepath) {
     return new Promise((resolve, reject) => {
       client.get(
