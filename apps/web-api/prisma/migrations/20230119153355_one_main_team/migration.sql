@@ -1,5 +1,5 @@
 -- Add unique index to make sure there's only main team per member:
-CREATE UNIQUE INDEX only_one_main_team ON "TeamMemberRole" ("memberUid") WHERE "mainTeam" = TRUE;
+CREATE UNIQUE INDEX only_one_main_team ON "TeamMemberRole" ("memberUid", "mainTeam") WHERE "mainTeam" = TRUE;
 
 -- Add function to verify if there's at least one main team of a member: 
 CREATE OR REPLACE FUNCTION check_for_at_least_one_main_team ( IN uid TEXT ) RETURNS bool AS $$
