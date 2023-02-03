@@ -105,6 +105,7 @@ describe('parseTeam', () => {
       ],
       fundingStage: { title: 'Seed' },
       teamMemberRoles: [{ member: { uid: '456' } }, { member: { uid: '789' } }],
+      contactMethod: 'https://myteam.com/contact',
     } as TTeamResponse;
 
     const expectedResult = {
@@ -122,7 +123,7 @@ describe('parseTeam', () => {
       membershipSources: ['Membership Source A', 'Membership Source B'],
       tags: ['Software Development', 'Blockchain'],
       members: ['456', '789'],
-      contactMethod: null,
+      contactMethod: 'https://myteam.com/contact',
     };
 
     expect(parseTeam(teamResponse)).toEqual(expectedResult);

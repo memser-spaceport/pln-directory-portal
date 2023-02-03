@@ -45,6 +45,7 @@ export const parseTeam = (team: TTeamResponse): ITeam => {
     industryTags: tags,
     fundingStage,
     teamMemberRoles,
+    contactMethod,
   } = team;
 
   const technologyTitles = technologies?.map((tech) => tech.title) || [];
@@ -78,7 +79,7 @@ export const parseTeam = (team: TTeamResponse): ITeam => {
     membershipSources: membershipSourceTitles,
     tags: tagTitles,
     members: memberIds,
-    contactMethod: null,
+    contactMethod: contactMethod || null,
   };
 };
 
