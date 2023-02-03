@@ -47,6 +47,5 @@ export function getTeamsListOptions(options) {
     ...options,
     select: 'uid,name,shortDescription,logo.url,industryTags.title',
     pagination: false,
-    shortDescription__not: 'null',
   };
 }
