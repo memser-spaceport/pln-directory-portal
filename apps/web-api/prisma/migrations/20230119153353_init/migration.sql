@@ -266,6 +266,15 @@ CREATE UNIQUE INDEX "_MemberToSkill_AB_unique" ON "_MemberToSkill"("A", "B");
 CREATE INDEX "_MemberToSkill_B_index" ON "_MemberToSkill"("B");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "IndustryTag_airtableRecId_key" ON "IndustryTag"("airtableRecId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Member_airtableRecId_key" ON "Member"("airtableRecId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Team_airtableRecId_key" ON "Team"("airtableRecId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "_IndustryTagToTeam_AB_unique" ON "_IndustryTagToTeam"("A", "B");
 
 -- CreateIndex
