@@ -34,6 +34,10 @@
     @apply rounded-b-xl border-b-0;
   }
 
+  .profile-description a {
+    @apply text-blue-600 hover:text-blue-700;
+  }
+
   .card {
     @apply shadow-card--slate-900 rounded-xl bg-white p-5 text-sm;
   }
