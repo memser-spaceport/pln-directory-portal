@@ -1,3 +1,4 @@
+import sortBy from 'lodash/sortBy';
 import { useRouter } from 'next/router';
 import { MutableRefObject, useCallback, useEffect, useReducer } from 'react';
 
@@ -10,7 +11,10 @@ export function useHideOverflowingTags(
   containerRef: MutableRefObject<HTMLDivElement>,
   tags: string[]
 ) {
-  const sortedTags = [...tags].sort((a, b) => a.length - b.length);
+  const sortedTags = sortBy(tags, [
+    (tag) => tag.length,
+    (tag) => tag.toLowerCase(),
+  ]);
   const [state, setState] = useReducer(
     (state: IReducerState, newState: Partial<IReducerState>) => ({
       ...state,
