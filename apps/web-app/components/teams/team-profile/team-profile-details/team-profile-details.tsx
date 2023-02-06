@@ -53,7 +53,8 @@ export function TeamProfileDetails({
       <div className="mt-6">
         <h2 className="detail-label">About</h2>
         <CollapsibleText
-          maxChars={500}
+          classname="profile-description"
+          maxHeight={120}
           txt={longDescription || shortDescription || '-'}
         />
       </div>
