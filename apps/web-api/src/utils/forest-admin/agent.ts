@@ -11,6 +11,7 @@ import { FileEncryptionService } from '../file-encryption/file-encryption.servic
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { LocationTransferService } from '../location-transfer/location-transfer.service';
 import { generateUid } from './generated-uid';
+import { resetCacheAfterCreateOrUpdateOrDelete } from './reset-cache-after-cud';
 
 const prismaService = new PrismaService();
 
@@ -167,6 +168,8 @@ agent.customizeCollection('Location', (collection) => {
     await generateGoogleApiData(city, country, continent, metroArea, context);
   });
 });
+
+agent.use(resetCacheAfterCreateOrUpdateOrDelete);
 
 async function generateGoogleApiData(
   city,
