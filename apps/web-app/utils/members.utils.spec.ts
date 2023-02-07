@@ -21,7 +21,7 @@ describe('#getMembersOptionsFromQuery', () => {
       'location.country__with': 'Portugal',
       'location.metroArea__with': 'Porto',
       name__istartswith: 'void',
-      officeHours__not: null,
+      officeHours__not: 'null',
       orderBy: '-name',
       'skills.title__with': 'Engineering,Leadership',
     });
@@ -54,7 +54,7 @@ describe('#getMembersOptionsFromQuery', () => {
       'location.country__with': 'Portugal',
       'location.metroArea__with': 'Porto',
       name__istartswith: 'void',
-      officeHours__not: null,
+      officeHours__not: 'null',
       orderBy: 'name',
       'skills.title__with': 'Engineering,Leadership',
     });
@@ -78,12 +78,12 @@ describe('#getMembersListOptions', () => {
     expect(
       getMembersListOptions({
         orderBy: '-name',
-        officeHours__not: null,
+        officeHours__not: 'null',
         'location.metroarea__with': 'Porto',
       })
     ).toEqual({
       'location.metroarea__with': 'Porto',
-      officeHours__not: null,
+      officeHours__not: 'null',
       orderBy: '-name',
       pagination: false,
       select:
