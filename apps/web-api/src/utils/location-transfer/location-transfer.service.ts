@@ -77,25 +77,25 @@ export class LocationTransferService {
       return { status: 'NO_PREDICTIONS' };
     }
 
-    /**
-     * This catches the islands like Kauai, Maui, etc
-     */
+    let requiredPlace;
 
-    let requiredPlace =
-      placeResponse.data.predictions &&
-      placeResponse.data.predictions.find(
-        (place) =>
-          place.types && place.types.find((type) => type === 'locality')
-      );
-
-    if (!requiredPlace)
+    if (city) {
       requiredPlace =
         placeResponse.data.predictions &&
         placeResponse.data.predictions.find(
           (place) =>
-            place.types &&
-            place.types.find((type) => type === 'administrative_area_level_1')
+            place.types && place.types.find((type) => type === 'locality')
         );
+
+      if (!requiredPlace)
+        requiredPlace =
+          placeResponse.data.predictions &&
+          placeResponse.data.predictions.find(
+            (place) =>
+              place.types &&
+              place.types.find((type) => type === 'administrative_area_level_1')
+          );
+    }
 
     if (!requiredPlace)
       requiredPlace =
@@ -105,6 +105,9 @@ export class LocationTransferService {
             place.types && place.types.find((type) => type === 'country')
         );
 
+    /**
+     * This catches the islands like Kauai, Maui, etc
+     */
     if (!requiredPlace)
       requiredPlace =
         placeResponse.data.predictions &&

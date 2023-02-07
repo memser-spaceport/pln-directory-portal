@@ -6,7 +6,6 @@ import { LocationTransferService } from './location-transfer.service';
 
 describe('LocationTransferService', () => {
   let locationTransferService: LocationTransferService;
-  let prismaService: PrismaService;
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
       providers: [LocationTransferService, PrismaService],
