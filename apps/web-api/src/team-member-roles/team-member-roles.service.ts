@@ -65,10 +65,9 @@ export class TeamMemberRolesService {
                   }),
               },
               update: {
-                ...(airtableMember.fields?.['Role'] &&
-                  index === 0 && {
-                    role: airtableMember.fields['Role'],
-                  }),
+                ...(airtableMember.fields?.['Role']?.split(', ')[index] && {
+                  role: airtableMember.fields['Role'].split(', ')[index],
+                }),
                 teamLead: airtableMember.fields['Team lead'] || false,
                 ...(airtableMember.fields?.['PLN Start Date'] && {
                   startDate: new Date(airtableMember.fields['PLN Start Date']),
@@ -78,10 +77,9 @@ export class TeamMemberRolesService {
                 }),
               },
               create: {
-                ...(airtableMember.fields?.['Role'] &&
-                  index === 0 && {
-                    role: airtableMember.fields['Role'],
-                  }),
+                ...(airtableMember.fields?.['Role']?.split(', ')?.[index] && {
+                  role: airtableMember.fields['Role'].split(', ')[index],
+                }),
                 mainTeam: false,
                 teamLead: airtableMember.fields['Team lead'] || false,
                 ...(airtableMember.fields?.['PLN Start Date'] && {
