@@ -52,8 +52,6 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(
         null,
         faker.lorem.paragraph(),
       ]),
-      filecoinUser: faker.datatype.boolean(),
-      ipfsUser: faker.datatype.boolean(),
       plnFriend: faker.datatype.boolean(),
       airtableRecId: `airtable-rec-id-${sequence}`,
       createdAt: faker.date.past(),

@@ -23,8 +23,6 @@ const teamResponseMock: TTeamResponse = {
   plnFriend: false,
   createdAt: '2022-09-30T23:20:06.960Z',
   updatedAt: '2022-12-22T20:36:25.081Z',
-  filecoinUser: false,
-  ipfsUser: false,
 };
 
 describe('getTeams', () => {

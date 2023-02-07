@@ -19,8 +19,6 @@ export const TeamSchema = z.object({
   twitterHandler: z.string().nullish(),
   shortDescription: z.string().nullish(),
   longDescription: z.string().nullish(),
-  filecoinUser: z.boolean(),
-  ipfsUser: z.boolean(),
   plnFriend: z.boolean(),
   startDate: z.date().or(z.string()).nullish(),
   endDate: z.date().or(z.string()).nullish(),
@@ -39,8 +37,6 @@ export const CreateTeamSchema = TeamSchema.pick({
   twitterHandler: true,
   shortDescription: true,
   longDescription: true,
-  filecoinUser: true,
-  ipfsUser: true,
   plnFriend: true,
   fundingStageUid: true,
 });
