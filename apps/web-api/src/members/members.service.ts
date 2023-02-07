@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import * as path from 'path';
 import { z } from 'zod';
 import { PrismaService } from '../prisma.service';
 import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
@@ -44,9 +45,15 @@ export class MembersService {
 
       if (member.fields['Profile picture']) {
         const ppf = member.fields['Profile picture'][0];
-        const hashedPpf = hashFileName(ppf.filename || '');
+
+        const hashedPpf = ppf.filename
+          ? hashFileName(path.parse(ppf.filename).name)
+          : '';
+
         image =
-          images.find((image) => image.filename === hashedPpf) ||
+          images.find(
+            (image) => path.parse(image.filename).name === hashedPpf
+          ) ||
           (await this.fileMigrationService.migrateFile({
             id: ppf.id || '',
             url: ppf.url || '',

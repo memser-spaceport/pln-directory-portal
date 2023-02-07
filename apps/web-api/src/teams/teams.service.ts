@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import * as path from 'path';
 import { z } from 'zod';
 import { PrismaService } from '../prisma.service';
 import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schema';
@@ -99,9 +100,14 @@ export class TeamsService {
 
       if (team.fields.Logo) {
         const logo = team.fields.Logo[0];
-        const hashedLogo = hashFileName(logo.filename || '');
+
+        const hashedLogo = logo.filename
+          ? hashFileName(path.parse(logo.filename).name)
+          : '';
         image =
-          images.find((image) => image.filename === hashedLogo) ||
+          images.find(
+            (image) => path.parse(image.filename).name === hashedLogo
+          ) ||
           (await this.fileMigrationService.migrateFile({
             id: logo.id ? logo.id : '',
             url: logo.url ? logo.url : '',
