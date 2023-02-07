@@ -34,8 +34,6 @@ export async function createTeam({ amount }: TestFactorySeederParams) {
       twitterHandler: faker.name.firstName(),
       shortDescription: faker.lorem.sentence(),
       longDescription: faker.lorem.paragraph(),
-      filecoinUser: true,
-      ipfsUser: true,
       plnFriend: true,
       airtableRecId: `airtable-rec-id-${sequence}`,
       createdAt: new Date(),

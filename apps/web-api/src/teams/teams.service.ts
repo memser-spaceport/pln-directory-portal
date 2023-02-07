@@ -46,8 +46,6 @@ export class TeamsService {
         contactMethod: 'Preferred Method of Contact',
         longDescription: 'Long description',
         plnFriend: 'Friend of PLN',
-        filecoinUser: 'Filecoin User',
-        ipfsUser: 'IPFS User',
       }).reduce(
         (optionalFields, [prismaField, airtableField]) => ({
           ...optionalFields,
@@ -130,8 +128,6 @@ export class TeamsService {
           airtableRecId: team.id,
           name: team.fields.Name,
           plnFriend: team.fields['Friend of PLN'] || false,
-          filecoinUser: team.fields['Filecoin User'] || false,
-          ipfsUser: team.fields['IPFS User'] || false,
           logoUid: image && image.uid ? image.uid : undefined,
           ...optionalFieldsToAdd,
           ...oneToManyRelations,
