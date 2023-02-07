@@ -24,7 +24,7 @@ export function getMembersOptionsFromQuery(
   const sortField = sortFromQuery.field.toLowerCase();
 
   return {
-    ...(officeHoursOnly ? { officeHours__not: null } : {}),
+    ...(officeHoursOnly ? { officeHours__not: 'null' } : {}),
     ...(skills ? { 'skills.title__with': stringifyQueryValues(skills) } : {}),
     ...(region
       ? {
