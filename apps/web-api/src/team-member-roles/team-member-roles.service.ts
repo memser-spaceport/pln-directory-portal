@@ -20,7 +20,7 @@ export class TeamMemberRolesService {
         .filter((airtableMember) => !!airtableMember.fields?.Teams)
         .map((airtableMember) => {
           const memberUid = members.find(
-            (member) => member.name === airtableMember.fields.Name
+            (member) => member.airtableRecId === airtableMember.id
           )?.uid;
           const teamUids = teams
             .filter((team) =>
