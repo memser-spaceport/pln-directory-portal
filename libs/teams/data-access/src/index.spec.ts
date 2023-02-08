@@ -265,6 +265,7 @@ describe('getTeamsFilterValues', () => {
         pagination: false,
         select:
           'industryTags.title,membershipSources.title,fundingStage.title,technologies.title',
+        plnFriend: false,
       },
     });
     expect(client.teams.getTeams).toHaveBeenNthCalledWith(2, {
