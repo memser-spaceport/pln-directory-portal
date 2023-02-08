@@ -1,5 +1,5 @@
-import { MigrateAirtableDataCommand } from './migrate-airtable-data.command';
 import { TEST_SERVICES_MOCK } from './__mocks__/migrate-airtable-data.mocks';
+import { MigrateAirtableDataCommand } from './migrate-airtable-data.command';
 
 jest.mock('fs');
 
@@ -120,6 +120,7 @@ describe('MigrateAirtableDataCommand', () => {
               Name: 'Name',
               'Funding Stage': 'Series A',
               'Accelerator Programs': ['Alliance'],
+              'Date created': new Date('2023-01-31'),
             },
           },
         ];
@@ -162,6 +163,7 @@ describe('MigrateAirtableDataCommand', () => {
               },
             ]),
         });
+
         migrateCommand = new MigrateAirtableDataCommand(...mockedServices);
         let schemaValidationErrors;
         try {
@@ -169,6 +171,7 @@ describe('MigrateAirtableDataCommand', () => {
         } catch (errors) {
           schemaValidationErrors = errors;
         }
+
         expect(schemaValidationErrors).toBeDefined();
         // Verify that the amount of schema errors matches the issues present on the promise resolved above:
         expect(JSON.parse(schemaValidationErrors.message).length).toBe(5);
@@ -184,6 +187,7 @@ describe('MigrateAirtableDataCommand', () => {
               Name: 'Name',
               Skills: ['AI'],
               Role: 'CEO',
+              'Date created': new Date('2023-01-31'),
             },
           },
         ];
