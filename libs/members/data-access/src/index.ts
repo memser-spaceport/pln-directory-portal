@@ -115,7 +115,9 @@ const parseMemberLocation = (
  */
 export const getMembersFilters = async (options: TMemberListOptions) => {
   const [valuesByFilter, availableValuesByFilter] = await Promise.all([
-    getMembersFiltersValues(),
+    getMembersFiltersValues({
+      plnFriend: false,
+    }),
     getMembersFiltersValues(options),
   ]);
 

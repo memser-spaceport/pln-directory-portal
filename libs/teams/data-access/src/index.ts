@@ -80,7 +80,9 @@ export const parseTeam = (team: TTeamResponse): ITeam => {
  */
 export const getTeamsFilters = async (options: TTeamListOptions) => {
   const [valuesByFilter, availableValuesByFilter] = await Promise.all([
-    getTeamsFiltersValues(),
+    getTeamsFiltersValues({
+      plnFriend: false,
+    }),
     getTeamsFiltersValues(options),
   ]);
 

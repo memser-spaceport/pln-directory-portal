@@ -396,6 +396,7 @@ describe('getMembersFilters', () => {
         select:
           'skills.title,location.metroArea,location.city,location.continent,location.country',
         teamMemberRoles__not: 'null',
+        plnFriend: false,
       },
     });
     expect(client.members.getMembers).toHaveBeenNthCalledWith(2, {
