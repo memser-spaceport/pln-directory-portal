@@ -148,10 +148,13 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
   }
 
   // Cache response data in the browser for 1 minute,
-  // and in the CDN for 5 minutes, while keeping it stale for 7 days
+  // and in the CDN for 5 minutes, while keeping it stale for 7 days.
+  // Disable cache when using Airtable as datasource.
   res.setHeader(
     'Cache-Control',
-    'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
+    process.env.USE_CUSTOM_PLNETWORK_API
+      ? 'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
+      : 'no-cache, no-store, max-age=0, must-revalidate'
   );
 
   return {
