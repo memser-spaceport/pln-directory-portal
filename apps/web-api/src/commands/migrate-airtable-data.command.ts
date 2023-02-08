@@ -111,7 +111,13 @@ export class MigrateAirtableDataCommand extends CommandRunner {
 
   private async insertTeamsWithRelationalData() {
     // Fetch and validate data:
-    this.teams = await this.airtableService.getAllTeams();
+    this.teams = await (
+      await this.airtableService.getAllTeams()
+    ).filter(
+      (team) =>
+        !team?.fields?.['Date created'] ||
+        new Date(team.fields['Date created']) <= new Date('2023/01/31')
+    );
     this.validateDataOrFail(AirtableTeamSchema.array(), {
       teams: this.teams,
     });
@@ -140,7 +146,11 @@ export class MigrateAirtableDataCommand extends CommandRunner {
 
   private async insertMembersWithRelationalData() {
     // Fetch and validate data:
-    this.members = await this.airtableService.getAllMembers();
+    this.members = (await this.airtableService.getAllMembers()).filter(
+      (member) =>
+        !member?.fields?.['Date created'] ||
+        new Date(member.fields['Date created']) <= new Date('2023/01/31')
+    );
     this.validateDataOrFail(AirtableMemberSchema.array(), {
       members: this.members,
     });
