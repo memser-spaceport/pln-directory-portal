@@ -6,16 +6,17 @@ import { Readable } from 'stream';
 import { ImagesController } from '../../images/images.controller';
 import { ImagesService } from '../../images/images.service';
 import { PrismaService } from '../../prisma.service';
+import { APP_ENV } from '../../utils/constants';
 import { FileEncryptionService } from '../file-encryption/file-encryption.service';
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { LocationTransferService } from '../location-transfer/location-transfer.service';
 import { generateUid } from './generated-uid';
-import { APP_ENV } from '../../utils/constants';
 
 const prismaService = new PrismaService();
 
 async function executeImageUpload(context) {
   const file = context.formValues.Image;
+
   const builtFile: Express.Multer.File = {
     fieldname: 'field name',
     originalname: file.name,

@@ -51,10 +51,16 @@ export class ImagesController {
     },
   })
   @UseInterceptors(FileInterceptor('file'))
-  async uploadImage(@UploadedFile() file: Express.Multer.File) {
-    file.originalname = `${hashFileName(path.parse(file.originalname).name)}${
-      path.parse(file.originalname).ext
-    }`;
+  async uploadImage(
+    @UploadedFile() file: Express.Multer.File,
+    { needsToHashFilename } = { needsToHashFilename: true }
+  ) {
+    // Hash filename if needed
+    file.originalname = needsToHashFilename
+      ? `${hashFileName(
+          `${path.parse(file.originalname).name}-${Date.now()}`
+        )}${path.parse(file.originalname).ext}`
+      : file.originalname;
 
     const dir = './img-tmp';
     // Check if directory exists and create it if it doesn't

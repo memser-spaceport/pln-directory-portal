@@ -9,11 +9,12 @@ import {
   FILE_UPLOAD_SIZE_LIMIT,
   IMAGE_UPLOAD_MAX_DIMENSION,
 } from '../constants';
+import { hashFileName } from '../hashing';
 @Injectable()
 export class FileMigrationService {
   constructor(private readonly imagesController: ImagesController) {}
   async migrateFile(airtableImage: IAirtableImage) {
-    const { url, size, type, filename, width, height } = airtableImage;
+    const { id, url, size, type, filename, width, height } = airtableImage;
     if (
       type !== 'image/jpeg' &&
       type !== 'image/png' &&
@@ -32,7 +33,9 @@ export class FileMigrationService {
     const originalFilePath = `./${filename}`;
     const buffer = fs.readFileSync(originalFilePath);
 
-    const compressedFileName = `${path.parse(filename).name}.webp`;
+    const compressedFileName = `${hashFileName(
+      `${path.parse(filename).name}-${id}`
+    )}.webp`;
     let compressedFile;
 
     if (
@@ -73,7 +76,9 @@ export class FileMigrationService {
     };
     let image;
     try {
-      const data = await this.imagesController.uploadImage(newFile);
+      const data = await this.imagesController.uploadImage(newFile, {
+        needsToHashFilename: false,
+      });
       image = data.image;
     } catch (error) {
       throw new Error(`Failed uploading the image - ${error}`);
