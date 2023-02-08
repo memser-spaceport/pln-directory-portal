@@ -47,7 +47,7 @@ export class MembersService {
         const ppf = member.fields['Profile picture'][0];
 
         const hashedPpf = ppf.filename
-          ? hashFileName(path.parse(ppf.filename).name)
+          ? hashFileName(`${path.parse(ppf.filename).name}-${ppf.id}`)
           : '';
 
         image =

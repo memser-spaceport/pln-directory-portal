@@ -8,6 +8,7 @@ import { ImagesService } from '../../images/images.service';
 import { PrismaService } from '../../prisma.service';
 import { FileEncryptionService } from '../file-encryption/file-encryption.service';
 import { FileUploadService } from '../file-upload/file-upload.service';
+import { hashFileName } from '../hashing';
 import { FileMigrationService } from './file-migration.service';
 jest.spyOn(fs, 'readFileSync').mockImplementation(() => 'readFileSync');
 jest.spyOn(fs, 'createWriteStream').mockImplementation();
@@ -91,19 +92,25 @@ describe('FileMigrationService', () => {
         width: 1,
         height: 1,
       };
+      const hashedFileName = `${hashFileName(
+        `${path.parse('test.png').name}-rec1`
+      )}.webp`;
       await fileMigrationService.migrateFile(airtableImage);
-      expect(imagesController.uploadImage).toHaveBeenCalledWith({
-        filename: 'test.webp',
-        mimetype: 'image/webp',
-        encoding: '7bit',
-        buffer: 'readFileSync',
-        destination: '',
-        fieldname: 'file',
-        originalname: 'test.webp',
-        path: './test.webp',
-        size: 1,
-        stream: undefined,
-      });
+      expect(imagesController.uploadImage).toHaveBeenCalledWith(
+        {
+          filename: hashedFileName,
+          mimetype: 'image/webp',
+          encoding: '7bit',
+          buffer: 'readFileSync',
+          destination: '',
+          fieldname: 'file',
+          originalname: hashedFileName,
+          path: `./${hashedFileName}`,
+          size: 1,
+          stream: undefined,
+        },
+        { needsToHashFilename: false }
+      );
     });
     it('Should return status if file type is not suported', async () => {
       const airtableImage = {

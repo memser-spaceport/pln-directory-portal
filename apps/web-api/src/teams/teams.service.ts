@@ -102,7 +102,7 @@ export class TeamsService {
         const logo = team.fields.Logo[0];
 
         const hashedLogo = logo.filename
-          ? hashFileName(path.parse(logo.filename).name)
+          ? hashFileName(`${path.parse(logo.filename).name}-${logo.id}`)
           : '';
         image =
           images.find(
