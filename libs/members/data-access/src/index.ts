@@ -33,6 +33,17 @@ export const getMember = async (
 };
 
 /**
+ * Get member unique id based on provided airtable id
+ */
+export const getMemberUIDByAirtableId = async (id: string) => {
+  const res = await client.members.getMembers({
+    query: { airtableRecId: id, select: 'uid' },
+  });
+
+  return res.status === 200 && res.body[0] ? res.body[0].uid : null;
+};
+
+/**
  * Parse member fields values into a member object.
  **/
 export const parseMember = (member: TMemberResponse): IMember => {

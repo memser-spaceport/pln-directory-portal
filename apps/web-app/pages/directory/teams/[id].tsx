@@ -4,7 +4,11 @@ import {
   getMembers,
   parseTeamMember,
 } from '@protocol-labs-network/members/data-access';
-import { getTeam, parseTeam } from '@protocol-labs-network/teams/data-access';
+import {
+  getTeam,
+  getTeamUIDByAirtableId,
+  parseTeam,
+} from '@protocol-labs-network/teams/data-access';
 import { Breadcrumb } from '@protocol-labs-network/ui';
 import orderBy from 'lodash/orderBy';
 import { GetServerSideProps } from 'next';
@@ -16,6 +20,7 @@ import { TeamProfileDetails } from '../../../components/teams/team-profile/team-
 import { TeamProfileFunding } from '../../../components/teams/team-profile/team-profile-funding/team-profile-funding';
 import { TeamProfileHeader } from '../../../components/teams/team-profile/team-profile-header/team-profile-header';
 import { TeamProfileMembers } from '../../../components/teams/team-profile/team-profile-members/team-profile-members';
+import { AIRTABLE_REGEX } from '../../../constants';
 import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcrumb.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
@@ -77,6 +82,22 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
   // Fetches team data from the custom API when the USE_CUSTOM_PLNETWORK_API environment variable is set
   // TODO: Refactor when cleaning up Airtable-related code
   if (process.env.USE_CUSTOM_PLNETWORK_API) {
+    // Check if provided ID is an Airtable ID, and if so, get the corresponding backend UID
+    if (AIRTABLE_REGEX.test(id)) {
+      const teamUID = await getTeamUIDByAirtableId(id);
+
+      return teamUID
+        ? {
+            redirect: {
+              permanent: true,
+              destination: `/directory/teams/${teamUID}`,
+            },
+          }
+        : {
+            notFound: true,
+          };
+    }
+
     const [teamResponse, teamMembersResponse] = await Promise.all([
       getTeam(id, {
         with: 'logo,technologies,membershipSources,industryTags,fundingStage,teamMemberRoles.member',

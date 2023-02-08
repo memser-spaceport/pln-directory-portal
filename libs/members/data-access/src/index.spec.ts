@@ -6,6 +6,7 @@ import {
   getMember,
   getMembers,
   getMembersFilters,
+  getMemberUIDByAirtableId,
   parseMember,
   parseTeamMember,
 } from './index';
@@ -89,6 +90,51 @@ describe('getMember', () => {
       body: memberResponseMock,
       status: 200,
     });
+  });
+});
+
+describe('getMemberUIDByAirtableId', () => {
+  const airtableUID = 'airtableUID';
+
+  it('should call getMembers appropriately', async () => {
+    (<jest.Mock>client.members.getMembers).mockClear().mockReturnValueOnce({
+      body: [memberResponseMock],
+      status: 200,
+    });
+
+    const response = await getMemberUIDByAirtableId(airtableUID);
+
+    expect(client.members.getMembers).toHaveBeenCalledWith({
+      query: { airtableRecId: airtableUID, select: 'uid' },
+    });
+    expect(response).toEqual(memberResponseMock.uid);
+  });
+
+  it('should call getMembers appropriately', async () => {
+    (<jest.Mock>client.members.getMembers).mockClear().mockReturnValueOnce({
+      body: [],
+      status: 200,
+    });
+
+    const response = await getMemberUIDByAirtableId(airtableUID);
+
+    expect(client.members.getMembers).toHaveBeenCalledWith({
+      query: { airtableRecId: airtableUID, select: 'uid' },
+    });
+    expect(response).toEqual(null);
+  });
+
+  it('should call getMembers appropriately', async () => {
+    (<jest.Mock>client.members.getMembers).mockClear().mockReturnValueOnce({
+      status: 404,
+    });
+
+    const response = await getMemberUIDByAirtableId(airtableUID);
+
+    expect(client.members.getMembers).toHaveBeenCalledWith({
+      query: { airtableRecId: airtableUID, select: 'uid' },
+    });
+    expect(response).toEqual(null);
   });
 });
 

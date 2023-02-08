@@ -90,3 +90,4 @@ export const FATHOM_EVENTS = {
     },
   },
 };
+export const AIRTABLE_REGEX = /^rec[A-Za-z0-9]{14}$/;
