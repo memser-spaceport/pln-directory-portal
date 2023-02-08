@@ -1,6 +1,12 @@
 import { TTeamResponse } from '@protocol-labs-network/contracts';
 import { client } from '@protocol-labs-network/shared/data-access';
-import { getTeam, getTeams, getTeamsFilters, parseTeam } from './index';
+import {
+  getTeam,
+  getTeams,
+  getTeamsFilters,
+  getTeamUIDByAirtableId,
+  parseTeam,
+} from './index';
 
 jest.mock('@protocol-labs-network/shared/data-access', () => ({
   client: {
@@ -81,6 +87,51 @@ describe('getTeam', () => {
       body: teamResponseMock,
       status: 200,
     });
+  });
+});
+
+describe('getTeamUIDByAirtableId', () => {
+  const airtableUID = 'airtableUID';
+
+  it('should call getTeams appropriately', async () => {
+    (<jest.Mock>client.teams.getTeams).mockClear().mockReturnValueOnce({
+      body: [teamResponseMock],
+      status: 200,
+    });
+
+    const response = await getTeamUIDByAirtableId(airtableUID);
+
+    expect(client.teams.getTeams).toHaveBeenCalledWith({
+      query: { airtableRecId: airtableUID, select: 'uid' },
+    });
+    expect(response).toEqual(teamResponseMock.uid);
+  });
+
+  it('should call getTeams appropriately', async () => {
+    (<jest.Mock>client.teams.getTeams).mockClear().mockReturnValueOnce({
+      body: [],
+      status: 200,
+    });
+
+    const response = await getTeamUIDByAirtableId(airtableUID);
+
+    expect(client.teams.getTeams).toHaveBeenCalledWith({
+      query: { airtableRecId: airtableUID, select: 'uid' },
+    });
+    expect(response).toEqual(null);
+  });
+
+  it('should call getTeams appropriately', async () => {
+    (<jest.Mock>client.teams.getTeams).mockClear().mockReturnValueOnce({
+      status: 404,
+    });
+
+    const response = await getTeamUIDByAirtableId(airtableUID);
+
+    expect(client.teams.getTeams).toHaveBeenCalledWith({
+      query: { airtableRecId: airtableUID, select: 'uid' },
+    });
+    expect(response).toEqual(null);
   });
 });
 

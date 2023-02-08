@@ -29,6 +29,17 @@ export const getTeam = async (id: string, options: TGetRequestOptions = {}) => {
 };
 
 /**
+ * Get team unique id based on provided airtable id
+ */
+export const getTeamUIDByAirtableId = async (id: string) => {
+  const res = await client.teams.getTeams({
+    query: { airtableRecId: id, select: 'uid' },
+  });
+
+  return res.status === 200 && res.body[0] ? res.body[0].uid : null;
+};
+
+/**
  * Parse team fields values into a team object.
  **/
 export const parseTeam = (team: TTeamResponse): ITeam => {

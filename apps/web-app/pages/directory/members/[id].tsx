@@ -2,6 +2,7 @@ import airtableService from '@protocol-labs-network/airtable';
 import { IMember, ITeam } from '@protocol-labs-network/api';
 import {
   getMember,
+  getMemberUIDByAirtableId,
   parseMember,
 } from '@protocol-labs-network/members/data-access';
 import { getTeams, parseTeam } from '@protocol-labs-network/teams/data-access';
@@ -14,6 +15,7 @@ import { MemberProfileOfficeHours } from '../../../components/members/member-pro
 import { MemberProfileTeams } from '../../../components/members/member-profile/member-profile-teams';
 import { AskToEditCard } from '../../../components/shared/ask-to-edit-card/ask-to-edit-card';
 import { TEAM_CARD_FIELDS } from '../../../components/shared/teams/team-card/team-card.constants';
+import { AIRTABLE_REGEX } from '../../../constants';
 import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcrumb.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
@@ -74,6 +76,22 @@ export const getServerSideProps = async ({ query, res }) => {
   // Fetches member data from the custom API when the USE_CUSTOM_PLNETWORK_API environment variable is set
   // TODO: Refactor when cleaning up Airtable-related code
   if (process.env.USE_CUSTOM_PLNETWORK_API) {
+    // Check if provided ID is an Airtable ID, and if so, get the corresponding backend UID
+    if (AIRTABLE_REGEX.test(id)) {
+      const memberUID = await getMemberUIDByAirtableId(id);
+
+      return memberUID
+        ? {
+            redirect: {
+              permanent: true,
+              destination: `/directory/members/${memberUID}`,
+            },
+          }
+        : {
+            notFound: true,
+          };
+    }
+
     const [memberResponse, memberTeamsResponse] = await Promise.all([
       getMember(id, {
         with: 'image,skills,location,teamMemberRoles.team',
