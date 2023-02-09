@@ -27,7 +27,7 @@ export function DirectoryFilters({
           className="on-focus--link leading-3.5 text-xs text-blue-600 transition-colors hover:text-blue-700"
           onClick={clearFilters}
         >
-          Clear all
+          Clear filters
         </button>
       </div>
 

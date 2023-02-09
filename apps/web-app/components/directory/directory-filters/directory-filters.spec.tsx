@@ -25,7 +25,7 @@ describe('DirectoryFilters', () => {
     );
 
     const clearFiltersBtn = screen.getByRole('button', {
-      name: /clear all/i,
+      name: /clear filters/i,
     });
     fireEvent.click(clearFiltersBtn);
     expect(push).toHaveBeenCalledTimes(1);
