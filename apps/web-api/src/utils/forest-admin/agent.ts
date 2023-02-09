@@ -218,11 +218,15 @@ async function generateGoogleApiData(
 }
 
 async function triggerSync(slug) {
+  if (process.env.ENVIRONMENT !== APP_ENV.PRODUCTION) {
+    return;
+  }
   try {
     await axios.post(
       'https://api.hightouch.com/api/v1/syncs/trigger',
       {
         syncSlug: slug,
+        fullResync: 'true',
       },
       {
         headers: {
@@ -231,9 +235,7 @@ async function triggerSync(slug) {
       }
     );
   } catch (error) {
-    if (process.env.ENVIRONMENT === APP_ENV.PRODUCTION) {
-      Sentry.captureException(`${error} - Sync trigger failed`);
-    }
+    Sentry.captureException(`${error} - Sync trigger failed`);
     return;
   }
 }
