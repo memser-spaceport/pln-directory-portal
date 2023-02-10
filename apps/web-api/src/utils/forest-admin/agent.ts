@@ -21,8 +21,8 @@ async function executeImageUpload(context) {
   const builtFile: Express.Multer.File = {
     fieldname: 'field name',
     originalname: file.name,
-    encoding: file.mimetype,
-    mimetype: file.mimetype,
+    encoding: file.mimeType,
+    mimetype: file.mimeType,
     buffer: file.buffer,
     size: Buffer.byteLength(file.buffer),
     destination: '.',

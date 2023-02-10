@@ -1,4 +1,10 @@
-import { Controller, UploadedFile, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  HttpException,
+  HttpStatus,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiParam } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
@@ -7,6 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import sharp from 'sharp';
 import { apiImages } from '../../../../libs/contracts/src/lib/contract-images';
+import { compressImage } from '../utils/compress-image';
 import { THUMBNAIL_SIZES } from '../utils/constants';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { hashFileName } from '../utils/hashing';
@@ -55,6 +62,16 @@ export class ImagesController {
     @UploadedFile() file: Express.Multer.File,
     { needsToHashFilename } = { needsToHashFilename: true }
   ) {
+    const { mimetype, buffer } = file;
+
+    if (
+      mimetype !== 'image/jpeg' &&
+      mimetype !== 'image/png' &&
+      mimetype !== 'image/webp'
+    ) {
+      throw new HttpException('Invalid file type', HttpStatus.BAD_REQUEST);
+    }
+
     // Hash filename if needed
     file.originalname = needsToHashFilename
       ? `${hashFileName(
@@ -74,20 +91,35 @@ export class ImagesController {
     // Generate original image to obtain width and height
     const originalImage = await sharp(file.buffer)
       .webp({ effort: 3 })
-      .toFile(path.join('./img-tmp', file.originalname));
+      .toFile(path.join(dir, file.originalname));
 
+    /**
+     * Compress original image
+     */
+    const compressedFileName = `${path.parse(file.originalname).name}.webp`;
+    const compressedOriginalFile = await compressImage({
+      buffer,
+      sharpImage: originalImage,
+      fileName: compressedFileName,
+      dir,
+    });
+    const compressedOriginalFilePath = `${dir}/${compressedFileName}`;
     /*
         The following conditions are meant to prevent generating thumbnails
         that are larger than the original image
     */
     if (originalImage.width > THUMBNAIL_SIZES.TINY) {
-      const filename = `${THUMBNAIL_SIZES.TINY}-${file.originalname}`;
+      const filename = `${THUMBNAIL_SIZES.TINY}-${compressedFileName}`;
 
-      const tinyImage = await generateThumbnail(file, THUMBNAIL_SIZES.TINY);
+      const tinyImage = await generateThumbnail(
+        file,
+        THUMBNAIL_SIZES.TINY,
+        filename
+      );
 
       const tinyFormData = createFormDataFromSharp(
         filename,
-        path.join('./img-tmp', filename),
+        path.join(dir, filename),
         tinyImage
       );
       filesToStore.push(tinyFormData);
@@ -106,8 +138,12 @@ export class ImagesController {
     }
 
     if (originalImage.width > THUMBNAIL_SIZES.SMALL) {
-      const filename = `${THUMBNAIL_SIZES.SMALL}-${file.originalname}`;
-      const smallImage = await generateThumbnail(file, THUMBNAIL_SIZES.SMALL);
+      const filename = `${THUMBNAIL_SIZES.SMALL}-${compressedFileName}`;
+      const smallImage = await generateThumbnail(
+        file,
+        THUMBNAIL_SIZES.SMALL,
+        filename
+      );
 
       const smallFormData = createFormDataFromSharp(
         filename,
@@ -129,8 +165,12 @@ export class ImagesController {
     }
 
     if (originalImage.width > THUMBNAIL_SIZES.MEDIUM) {
-      const filename = `${THUMBNAIL_SIZES.MEDIUM}-${file.originalname}`;
-      const mediumImage = await generateThumbnail(file, THUMBNAIL_SIZES.MEDIUM);
+      const filename = `${THUMBNAIL_SIZES.MEDIUM}-${compressedFileName}`;
+      const mediumImage = await generateThumbnail(
+        file,
+        THUMBNAIL_SIZES.MEDIUM,
+        filename
+      );
 
       const mediumFormData = createFormDataFromSharp(
         filename,
@@ -152,8 +192,12 @@ export class ImagesController {
     }
 
     if (originalImage.width > THUMBNAIL_SIZES.LARGE) {
-      const filename = `${THUMBNAIL_SIZES.LARGE}-${file.originalname}`;
-      const largeImage = await generateThumbnail(file, THUMBNAIL_SIZES.LARGE);
+      const filename = `${THUMBNAIL_SIZES.LARGE}-${compressedFileName}`;
+      const largeImage = await generateThumbnail(
+        file,
+        THUMBNAIL_SIZES.LARGE,
+        filename
+      );
 
       const largeFormData = createFormDataFromSharp(
         filename,
@@ -173,9 +217,23 @@ export class ImagesController {
       });
     }
 
+    // Create a new file to store the compressed original image
+    const expressCompressedOriginalFile: Express.Multer.File = {
+      path: compressedOriginalFilePath,
+      size: compressedOriginalFile.size,
+      filename: compressedFileName,
+      buffer: fs.readFileSync(compressedOriginalFilePath),
+      destination: '',
+      fieldname: 'file',
+      mimetype: `image/${compressedOriginalFile.format}`,
+      originalname: compressedFileName,
+      stream: fs.createReadStream(compressedOriginalFilePath),
+      encoding: '7bit',
+    };
+
     // Store all files in web3.storage
     const cid = await this.fileUploadService.storeFiles([
-      file,
+      expressCompressedOriginalFile,
       ...filesToStore,
     ]);
     // Update thumbnails with the cid and url of the image
@@ -191,12 +249,12 @@ export class ImagesController {
     const createdImages = await this.imagesService.bulkCreate(
       {
         cid: cid,
-        filename: file.originalname,
+        filename: compressedFileName,
         size: originalImage.size,
         height: originalImage.height,
         url: await this.fileUploadService.getDecryptedFileUrl(
           cid,
-          file.originalname
+          compressedFileName
         ),
         width: originalImage.width,
         version: 'ORIGINAL',
@@ -234,11 +292,12 @@ function createFormDataFromSharp(
 
 function generateThumbnail(
   file: Express.Multer.File,
-  size: number
+  size: number,
+  fileName: string
 ): Promise<sharp.OutputInfo> {
   return sharp(file.buffer)
     .resize(size)
     .webp({ effort: 3, force: true })
     .toFormat('webp')
-    .toFile(path.join('./img-tmp', `${size}-${file.originalname}`));
+    .toFile(path.join('./img-tmp', fileName));
 }
