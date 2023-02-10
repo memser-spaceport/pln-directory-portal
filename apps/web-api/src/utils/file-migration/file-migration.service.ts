@@ -3,12 +3,7 @@ import { IAirtableImage } from '@protocol-labs-network/airtable';
 import * as fs from 'fs';
 import * as client from 'https';
 import * as path from 'path';
-import sharp from 'sharp';
 import { ImagesController } from '../../images/images.controller';
-import {
-  FILE_UPLOAD_SIZE_LIMIT,
-  IMAGE_UPLOAD_MAX_DIMENSION,
-} from '../constants';
 import { hashFileName } from '../hashing';
 @Injectable()
 export class FileMigrationService {
@@ -31,46 +26,23 @@ export class FileMigrationService {
       throw new Error(`Failed downloading the image - ${error}`);
     }
     const originalFilePath = `./${filename}`;
-    const buffer = fs.readFileSync(originalFilePath);
 
-    const compressedFileName = `${hashFileName(
+    const hashedFileName = `${hashFileName(
       `${path.parse(filename).name}-${id}`
     )}.webp`;
     let compressedFile;
 
-    if (
-      width > IMAGE_UPLOAD_MAX_DIMENSION ||
-      height > IMAGE_UPLOAD_MAX_DIMENSION
-    ) {
-      compressedFile = await sharp(buffer)
-        .toFormat('webp')
-        .resize(IMAGE_UPLOAD_MAX_DIMENSION, IMAGE_UPLOAD_MAX_DIMENSION, {
-          fit: 'inside',
-        })
-        .toFile(path.join('./', compressedFileName));
-    } else {
-      compressedFile = await sharp(buffer)
-        .toFormat('webp')
-        .toFile(path.join('./', compressedFileName));
-    }
-
-    if (compressedFile.size > FILE_UPLOAD_SIZE_LIMIT) {
-      compressedFile = await sharp(fs.readFileSync(`./${compressedFileName}`))
-        .webp({ quality: 50 })
-        .toFile(path.join('./', compressedFileName));
-    }
-
-    const filePath = `./${compressedFileName}`;
+    const filePath = `./${hashedFileName}`;
 
     const newFile: Express.Multer.File = {
       path: filePath,
       size: size,
-      filename: compressedFileName,
+      filename: hashedFileName,
       buffer: fs.readFileSync(filePath),
       destination: '',
       fieldname: 'file',
-      mimetype: `image/${compressedFile.format}`,
-      originalname: compressedFileName,
+      mimetype: type,
+      originalname: hashedFileName,
       stream: fs.createReadStream(filePath),
       encoding: '7bit',
     };
@@ -95,6 +67,7 @@ export class FileMigrationService {
     }
     return image;
   }
+
   download(url, filepath) {
     return new Promise((resolve, reject) => {
       client.get(

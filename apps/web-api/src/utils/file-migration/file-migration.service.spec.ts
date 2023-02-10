@@ -99,7 +99,7 @@ describe('FileMigrationService', () => {
       expect(imagesController.uploadImage).toHaveBeenCalledWith(
         {
           filename: hashedFileName,
-          mimetype: 'image/webp',
+          mimetype: 'image/png',
           encoding: '7bit',
           buffer: 'readFileSync',
           destination: '',
