@@ -73,17 +73,7 @@ agent.customizeCollection('Member', (collection) => {
     },
   });
 
-  collection.addHook('After', 'Create', async () => {
-    await triggerSync('member-to-pln-airtable');
-  });
-
-  collection.addHook('After', 'Update', async () => {
-    await triggerSync('member-to-pln-airtable');
-  });
-
-  collection.addHook('After', 'Delete', async () => {
-    await triggerSync('member-to-pln-airtable');
-  });
+  configureCUDSyncs(collection, 'member-to-pln-airtable');
 });
 
 agent.customizeCollection('Team', (collection) => {
@@ -111,31 +101,31 @@ agent.customizeCollection('Team', (collection) => {
     },
   });
 
-  collection.addHook('After', 'Create', async () => {
-    await triggerSync('team-to-pln-airtable');
-  });
-
-  collection.addHook('After', 'Update', async () => {
-    await triggerSync('team-to-pln-airtable');
-  });
-
-  collection.addHook('After', 'Delete', async () => {
-    await triggerSync('team-to-pln-airtable');
-  });
+  configureCUDSyncs(collection, 'team-to-pln-airtable');
 });
 
 agent.customizeCollection('IndustryTag', (collection) => {
-  collection.addHook('After', 'Create', async () => {
-    await triggerSync('industry-tag-to-pln-airtable');
-  });
+  configureCUDSyncs(collection, 'industry-tag-to-pln-airtable');
+});
 
-  collection.addHook('After', 'Update', async () => {
-    await triggerSync('industry-tag-to-pln-airtable');
-  });
+agent.customizeCollection('TeamMemberRole', (collection) => {
+  configureCUDSyncs(collection, 'member-to-pln-airtable');
+});
 
-  collection.addHook('After', 'Delete', async () => {
-    await triggerSync('industry-tag-to-pln-airtable');
-  });
+agent.customizeCollection('_MemberToSkill', (collection) => {
+  configureCUDSyncs(collection, 'member-to-pln-airtable');
+});
+
+agent.customizeCollection('_IndustryTagToTeam', (collection) => {
+  configureCUDSyncs(collection, 'team-to-pln-airtable');
+});
+
+agent.customizeCollection('_MembershipSourceToTeam', (collection) => {
+  configureCUDSyncs(collection, 'team-to-pln-airtable');
+});
+
+agent.customizeCollection('_TeamToTechnology', (collection) => {
+  configureCUDSyncs(collection, 'team-to-pln-airtable');
 });
 
 agent.customizeCollection('Location', (collection) => {
@@ -215,6 +205,20 @@ async function generateGoogleApiData(
 
   const target = context.data ? context.data[0] : context.patch;
   Object.assign(target, location);
+}
+
+async function configureCUDSyncs(collection, slug) {
+  collection.addHook('After', 'Create', async () => {
+    await triggerSync(slug);
+  });
+
+  collection.addHook('After', 'Update', async () => {
+    await triggerSync(slug);
+  });
+
+  collection.addHook('After', 'Delete', async () => {
+    await triggerSync(slug);
+  });
 }
 
 async function triggerSync(slug) {
