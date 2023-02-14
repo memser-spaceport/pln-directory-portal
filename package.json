@@ -134,7 +134,6 @@
     "babel-loader": "8.1.0",
     "browserify-aes": "^1.2.0",
     "buffer": "^6.0.3",
-    "chromatic": "^6.9.0",
     "create-hash": "^1.2.0",
     "cypress": "^9.1.0",
     "eslint": "~8.7.0",
