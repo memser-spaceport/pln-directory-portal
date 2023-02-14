@@ -114,7 +114,7 @@ export const getServerSideProps = async ({ query, res }) => {
 
   // Redirects user to the 404 page if response from
   // getMember is undefined or the member has no teams
-  if (!member || !member.teams.length) {
+  if (!member) {
     return {
       notFound: true,
     };

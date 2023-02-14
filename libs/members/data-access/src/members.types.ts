@@ -8,5 +8,4 @@ export type TMemberListOptions = TListOptions & {
   'location.metroarea__with'?: string;
   'teamMemberRoles.team.uid'?: string;
   plnFriend?: boolean;
-  teamMemberRoles__not?: 'null';
 };
