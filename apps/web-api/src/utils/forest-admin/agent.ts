@@ -129,6 +129,18 @@ agent.customizeCollection('_TeamToTechnology', (collection) => {
 });
 
 agent.customizeCollection('Location', (collection) => {
+  collection.addField('formattedLocation', {
+    columnType: 'String',
+    dependencies: ['city', 'country', 'region', 'continent'],
+    getValues: (records) =>
+      records.map(
+        (r) =>
+          `${r.city ? r.city + ' - ' : ''}${r.region ? r.region + ' : ' : ''}${
+            r.country
+          } (${r.continent})`
+      ),
+  });
+
   collection.addHook('Before', 'Create', async (context) => {
     const { city, country, continent, metroArea } = context.data[0];
     await generateGoogleApiData(city, country, continent, metroArea, context);
