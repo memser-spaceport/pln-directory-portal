@@ -56,6 +56,5 @@ export function getMembersListOptions(
     select:
       'uid,name,image.url,location.metroArea,location.country,location.region,skills.title,teamMemberRoles.teamLead,teamMemberRoles.mainTeam,teamMemberRoles.role,teamMemberRoles.team.name,teamMemberRoles.team.uid',
     pagination: false,
-    teamMemberRoles__not: 'null',
   };
 }

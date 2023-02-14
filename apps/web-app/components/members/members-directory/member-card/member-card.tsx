@@ -50,7 +50,7 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
         >
           <div className="flex items-center justify-center">
             <div className="overflow-hidden text-ellipsis whitespace-nowrap font-medium">
-              {mainTeam?.name}
+              {(member.teams.length && mainTeam?.name) || '-'}
             </div>
             {otherTeams.length ? (
               <Tooltip
