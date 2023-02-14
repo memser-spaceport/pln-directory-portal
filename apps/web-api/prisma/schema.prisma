@@ -98,9 +98,9 @@ model TeamMemberRole {
   startDate DateTime?
   endDate   DateTime?
   role      String?
-  member    Member    @relation(fields: [memberUid], references: [uid])
+  member    Member    @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
   memberUid String
-  team      Team      @relation(fields: [teamUid], references: [uid])
+  team      Team      @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
   teamUid   String
 
   // One member can only have one role per team
