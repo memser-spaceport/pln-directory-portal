@@ -25,7 +25,7 @@
       - [Teams](../libs/teams/data-access/README)
       - [Technologies](../libs/technologies/data-access/README)
     - [Storybook Host](../libs/storybook-host/README.md)
-    - [UI](../libs/ui/README.md)
+    - [UI Library](../libs/ui/README.md)
 - Guidelines
   - [Branching Guidelines](GUIDELINES_BRANCHING.md)
   - [Commit Guidelines](GUIDELINES_COMMIT.md)
