@@ -1,6 +1,6 @@
 import { IAirtableMembersFiltersValues } from '@protocol-labs-network/airtable';
 import { ParsedUrlQuery } from 'querystring';
-import { getTagsFromValues } from '../../../../components/directory/directory-filters/directory-filters.utils';
+import { getTagsFromValues } from '../../../shared/directory/directory-filters/directory-filters.utils';
 import { IMembersFiltersValues } from './members-directory-filters.types';
 
 /**

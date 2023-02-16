@@ -13,8 +13,8 @@ import { MemberProfileDetails } from '../../../components/members/member-profile
 import { MemberProfileHeader } from '../../../components/members/member-profile/member-profile-header/member-profile-header';
 import { MemberProfileOfficeHours } from '../../../components/members/member-profile/member-profile-office-hours/member-profile-office-hours';
 import { MemberProfileTeams } from '../../../components/members/member-profile/member-profile-teams';
-import { AskToEditCard } from '../../../components/shared/ask-to-edit-card/ask-to-edit-card';
-import { TEAM_CARD_FIELDS } from '../../../components/shared/teams/team-card/team-card.constants';
+import { AskToEditCard } from '../../../components/shared/profile/ask-to-edit-card/ask-to-edit-card';
+import { TEAM_CARD_FIELDS } from '../../../components/teams/teams-directory/team-card/team-card.constants';
 import { AIRTABLE_REGEX } from '../../../constants';
 import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcrumb.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';

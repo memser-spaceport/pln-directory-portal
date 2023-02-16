@@ -1,10 +1,10 @@
-import { DirectoryFilters } from '../../../../components/directory/directory-filters/directory-filters';
-import { FriendOfPLNFilter } from '../../../../components/directory/directory-filters/friend-of-pln-filter/friend-of-pln-filter';
 import { CountryFilter } from '../../../../components/members/members-directory/members-directory-filters/country-filter/country-filter';
 import { MetroAreaFilter } from '../../../../components/members/members-directory/members-directory-filters/metro-area-filter/metro-area-filter';
 import { OfficeHoursFilter } from '../../../../components/members/members-directory/members-directory-filters/office-hours-filter/office-hours-filter';
 import { RegionFilter } from '../../../../components/members/members-directory/members-directory-filters/region-filter/region-filter';
 import { SkillsFilter } from '../../../../components/members/members-directory/members-directory-filters/skills-filter/skills-filter';
+import { DirectoryFilters } from '../../../shared/directory/directory-filters/directory-filters';
+import { FriendOfPLNFilter } from '../../../shared/directory/directory-filters/friend-of-pln-filter/friend-of-pln-filter';
 import { IMembersFiltersValues } from './members-directory-filters.types';
 
 export interface MembersDirectoryFiltersProps {

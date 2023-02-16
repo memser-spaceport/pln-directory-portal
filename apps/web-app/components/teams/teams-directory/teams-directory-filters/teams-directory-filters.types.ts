@@ -1,4 +1,4 @@
-import { IFilterTag } from '../../../directory/directory-filters/directory-tags-filter/directory-tags-filter.types';
+import { IFilterTag } from '../../../shared/directory/directory-filters/directory-tags-filter/directory-tags-filter.types';
 
 export interface ITeamsFiltersValues {
   tags: IFilterTag[];

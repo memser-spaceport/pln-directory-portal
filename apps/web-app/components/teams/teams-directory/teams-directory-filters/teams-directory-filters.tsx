@@ -1,5 +1,5 @@
-import { FriendOfPLNFilter } from '../../../../components/directory/directory-filters/friend-of-pln-filter/friend-of-pln-filter';
-import { DirectoryFilters } from '../../../directory/directory-filters/directory-filters';
+import { DirectoryFilters } from '../../../shared/directory/directory-filters/directory-filters';
+import { FriendOfPLNFilter } from '../../../shared/directory/directory-filters/friend-of-pln-filter/friend-of-pln-filter';
 import { FundingStageFilter } from './funding-stage-filter/funding-stage-filter';
 import { MembershipSourcesFilter } from './membership-sources-filter/membership-sources-filter';
 import { TagsFilter } from './tags-filter/tags-filter';

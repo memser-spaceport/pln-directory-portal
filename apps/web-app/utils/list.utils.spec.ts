@@ -1,5 +1,5 @@
-import { MEMBER_CARD_FIELDS } from '../components/shared/members/member-card/member-card.constants';
-import { TEAM_CARD_FIELDS } from '../components/shared/teams/team-card/team-card.constants';
+import { MEMBER_CARD_FIELDS } from '../components/members/members-directory/member-card/member-card.constants';
+import { TEAM_CARD_FIELDS } from '../components/teams/teams-directory/team-card/team-card.constants';
 import {
   getMembersDirectoryListOptions,
   getMembersDirectoryRequestOptionsFromQuery,
