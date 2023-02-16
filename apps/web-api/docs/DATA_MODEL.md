@@ -28,6 +28,7 @@ classDiagram
       blog : string
       twitterHandler : string
       plnFriend : boolean
+      airtableRecId : string
       createdAt : datetime
       updatedAt : datetime
     }
@@ -62,6 +63,7 @@ classDiagram
       id : integer
       title : string
       definition : string
+      airtableRecId : string
       createdAt : datetime
       updatedAt : datetime
     }
@@ -90,6 +92,7 @@ classDiagram
       twitterHandler : string
       officeHours : string
       plnFriend : boolean
+      airtableRecId : string
       createdAt : datetime
       updatedAt : datetime
     }
