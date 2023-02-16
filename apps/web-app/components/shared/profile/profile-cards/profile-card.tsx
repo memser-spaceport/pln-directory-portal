@@ -1,9 +1,9 @@
 import { ChevronRightIcon } from '@heroicons/react/solid';
 import { AnchorLink } from '@protocol-labs-network/ui';
 import Image from 'next/image';
-import { TeamLeadBadge } from '../../../shared/members/team-lead-badge/team-lead-badge';
-import { TagsGroup } from '../../../shared/tags-group/tags-group';
-import { MainTeamBadge } from '../../teams/main-team-badge/main-team-badge';
+import { MainTeamBadge } from '../../main-team-badge/main-team-badge';
+import { TagsGroup } from '../../tags-group/tags-group';
+import { TeamLeadBadge } from '../../team-lead-badge/team-lead-badge';
 
 interface ProfileCardProps {
   url: string;

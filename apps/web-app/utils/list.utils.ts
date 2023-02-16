@@ -1,11 +1,11 @@
 import { IListOptions, TListSortDirection } from '@protocol-labs-network/api';
 import { ParsedUrlQuery } from 'querystring';
+import { MEMBER_CARD_FIELDS } from '../components/members/members-directory/member-card/member-card.constants';
 import {
   directorySortOptions,
   TDirectorySortOption,
-} from '../components/directory/directory-sort/directory-sort.types';
-import { MEMBER_CARD_FIELDS } from '../components/shared/members/member-card/member-card.constants';
-import { TEAM_CARD_FIELDS } from '../components/shared/teams/team-card/team-card.constants';
+} from '../components/shared/directory/directory-sort/directory-sort.types';
+import { TEAM_CARD_FIELDS } from '../components/teams/teams-directory/team-card/team-card.constants';
 import { ITEMS_PER_PAGE, URL_QUERY_VALUE_SEPARATOR } from '../constants';
 
 /**

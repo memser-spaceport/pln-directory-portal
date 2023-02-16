@@ -1,6 +1,6 @@
 import { IMember } from '@protocol-labs-network/api';
-import { MemberCard } from '../../../../components/shared/members/member-card/member-card';
-import { DirectoryList } from '../../../directory/directory-list/directory-list';
+import { DirectoryList } from '../../../shared/directory/directory-list/directory-list';
+import { MemberCard } from '../member-card/member-card';
 
 interface MembersDirectoryListProps {
   members: IMember[];
