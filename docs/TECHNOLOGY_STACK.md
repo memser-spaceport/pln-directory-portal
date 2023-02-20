@@ -1,4 +1,4 @@
-# 👨‍💻 Technology stack
+# 👨‍💻 Technology Stack
 
 ## 🛠️ Repository Tooling
 
@@ -10,21 +10,27 @@ Git is a free and open-source distributed version control system designed to han
 
 The largest and most advanced development platform in the world.
 
-**[NX](https://www.nx.dev/)**
+**[NX](https://nx.dev/)**
 
-We’re going to use a monorepo approach for the repository, which is a software development approach where we develop multiple projects in the same repository (e.g., a frontend web application and a REST API). The major benefit of doing so is the fact that these projects can depend on each other and even share code between them, e.g., the model/interfaces to be used by both the web application and the backend.
+Powerful and extensible development tool that provides a set of opinionated CLI commands, plugins, and libraries to manage monorepos, improve the development experience, and enforce best practices for building scalable and maintainable applications.
 
-This means that, whenever we make a change on any interface shared by both apps, we’ll get a warning and will be prompted to fix the issue.
+**[Commitlint](https://commitlint.js.org/#/)**
 
-NX calls itself a next-generation build system with first-class monorepo support and powerful integrations. When we make a change, we don’t want to rebuild or retest every project in the monorepo, but rather rebuild and retest the projects that can be affected by our change – and that’s where it excels.
+Popular and flexible linter for enforcing consistent and conventional commit messages, based on the Conventional Commits specification, that provides a set of rules and presets for validating the structure, format, and content of commit messages, as well as integration with Git workflows and popular CI/CD tools, improving code readability and changelog generation.
+
+**[Semantic Release](https://github.com/semantic-release/semantic-release)**
+
+Tool that automates the package release workflow by determining the next version number and generating release notes based on commit messages and semantic versioning principles.
+
+**[Husky](https://typicode.github.io/husky/)**
+
+Modern and fast Git hook manager for Node.js that allows developers to automate and enforce Git workflows and best practices, such as linting, testing, formatting, committing, and pushing code, by defining custom scripts that run before or after specific Git events, such as commit, push, and merge, improving code quality and collaboration.
 
 ## 📈 Error Monitoring
 
 **[Sentry](https://www.sentry.io/)**
 
-Sentry is an Error Monitoring service that supports different technologies and is being used at Pixelmatters for some time now, for different projects.
-
-We’re going to be taking advantage of Sentry’s Slack integration in order to track and triage errors in real-time.
+Cloud-based error monitoring and application performance monitoring (APM) platform that helps developers diagnose, fix, and optimize errors and performance issues in web and mobile applications, by providing real-time error tracking, alerting, debugging, and performance insights.
 
 ## 📝 Code Quality
 
@@ -39,17 +45,12 @@ The ESLint equivalent for styling – a modern linter that helps us avoid errors
 **[Prettier](https://www.prettier.io/)**
 
 Prettier is an opinionated code formatter that enforces a consistent code style (i.e. code formatting) across our entire codebase by parsing our code away and re-printing it with its own rules, taking stuff as maximum line length into account, wrapping code when necessary.
-​
-
-**[Codecov](http://www.codecov.io)**
-
-Codecov makes it easy to see absolute test coverage and coverage changes overlayed with our source code, making it easier to identify needed test areas.
 
 ## 🎨 Frontend
 
 **[React](https://www.reactjs.org/)**
 
-React is the most used frontend web framework, with a big community that produces countless libraries and already built components for us to use. Pixelmatters’ team also has extensive knowledge of it, and currently, it is far easier to hire someone for React than any other frontend framework.
+Popular and widely used JavaScript library for building user interfaces that provides a declarative and efficient approach to composing UI components, managing state and props, and handling events, based on a unidirectional data flow and a virtual DOM, enabling developers to create reusable and scalable UIs for web and mobile applications.
 
 **[Next.js](https://www.nextjs.org/)**
 
@@ -58,6 +59,18 @@ Next.js is a React Framework, meaning that it uses React as the view layer and b
 **[TypeScript](https://www.typescriptlang.org/)**
 
 Nowadays, typed JavaScript is a must-have for any robust and maintainable web application, the reason why we’ll be using the above stack along with TypeScript.
+
+**[Fathom](https://usefathom.com/)**
+
+Simple and privacy-focused website analytics platform that provides essential insights into website traffic and user behavior without collecting or storing personal data, serving ads, or using third-party tracking scripts.
+
+**[Next SEO](https://github.com/garmeeh/next-seo)**
+
+Plugin for the Next.js framework that provides a simple and configurable way to manage and update SEO metadata, such as title, description, canonical URLs, and social media sharing images, for individual pages or the entire site, improving search engine visibility and social media engagement.
+
+**[Next Sitemap](https://github.com/iamvishnusankar/next-sitemap)**
+
+Plugin for the Next.js framework that generates a `sitemap.xml` file for search engines, based on the pages and dynamic routes defined in the application, and allows customization of the `priority`, `changefreq`, and `lastmod` attributes for each URL, improving SEO and indexing.
 
 ## 🎨 UI Development
 
@@ -73,13 +86,17 @@ Completely unstyled, fully accessible UI components, designed to integrate beaut
 
 Unstyled, accessible components for building high‑quality design systems and web apps in React. We’ll be using this as our secondary component library, whenever Headless UI does not fit our needs.
 
+**[Heroicons](https://heroicons.com/)**
+
+Set of free and open-source SVG icons for the web, designed to be easily customizable and accessible, and available in two styles (outline and solid) and various sizes.
+
+**[Fontsource](https://fontsource.org/)**
+
+Collection of self-hosted, open-source fonts for the web, optimized for performance and accessibility, and available as NPM packages, that can be easily integrated into modern front-end frameworks and tools.
+
 **[Storybook](https://storybook.js.org/)**
 
 Storybook is an open-source tool for building UI components and pages in isolation, promoting a component-based approach to our development process.
-
-**[Chromatic](https://www.chromatic.com/)**
-
-Chromatic will help us review UI implementation among the team by publishing our Storybook instance to a secure CDN. Like code review, but for UI.
 
 ## 🧪 Unit Testing
 
@@ -91,17 +108,15 @@ JavaScript unit/component testing framework with a focus on simplicity.
 
 Simple utilities for testing DOM-based React user interfaces. It’s built on top of the DOM Testing Library, adding APIs for working with React components.
 
-## 🛠️ Other Tooling
-
-**[Mock Service Worker](https://www.mswjs.io/)**
-
-Mock Service Worker is an API mocking library that uses Service Worker API to intercept actual network-level requests. The major benefit is helping to prevent having the frontend team blocked from working on features that depend on backend development, by providing the means to mock those dependencies.
-
 ## 🛠️ Backend
 
 **[NestJS](https://www.nestjs.com/)**
 
 A progressive Node.js framework for building efficient, reliable and scalable server-side applications.​
+
+**[Prisma Client](https://www.prisma.io/client)**
+
+Type-safe and auto-generated database client for Node.js and TypeScript that provides a modern and efficient way to interact with databases, by offering a declarative and composable API for querying, writing, and updating data, as well as support for migrations, data modeling, and database introspection, improving developer productivity and reducing boilerplate code.
 
 **[TS-Rest](https://ts-rest.com/)**
 
@@ -137,6 +152,10 @@ The open source, in-memory data store used by millions of developers as a databa
 
 Heroku is a platform as a service (PaaS) that enables developers to build, run, and operate applications entirely in the cloud.
 
+**[Vercel](https://vercel.com/)**
+
+Cloud-based platform for hosting, deploying, and scaling web applications, including Next.js web apps, that provides a seamless and fast development experience, with features such as automatic deployments, preview URLs, custom domains, CDN caching, edge network optimization, and serverless functions, as well as integration with Git workflows and popular development tools, improving developer productivity and user experience.
+
 ## 🎯 Serverless Functions
 
 **[Cloudflare](https://www.cloudflare.com/)**
@@ -158,3 +177,7 @@ Google Cloud Platform, is a suite of cloud computing services that runs on the s
 **[Docker](https://www.docker.com/)**
 
 Docker takes away repetitive, mundane configuration tasks and is used throughout the development lifecycle for fast, easy and portable application development – desktop and cloud. Docker’s comprehensive end to end platform includes UIs, CLIs, APIs and security that are engineered to work together across the entire application delivery lifecycle.
+
+**[Lodash](https://lodash.com/)**
+
+Popular and comprehensive JavaScript utility library that provides a wide range of modular and performant functions for array, object, string, number, collection, and function manipulation, as well as utilities for working with async and functional programming patterns, improving code readability, and reducing development time.
