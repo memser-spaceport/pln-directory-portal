@@ -6,6 +6,7 @@
   - [Technology Stack](TECHNOLOGY_STACK.md)
   - [Web API](../apps/web-api/README.md)
     - [Data Model](../apps/web-api/docs/DATA_MODEL.md)
+    - [Admin Panel](ADMIN_PANEL.md)
     - [Prisma Query Builder](../apps/web-api/src/utils/prisma-query-builder/README.md)
     - [Web3 File Retrieval using Cloudflare workers](../apps/web-api/cloudflare/workers/web3-file-retrieval/web3-file-retrieval.md)
   - [Web App](../apps/web-app/README.md)
