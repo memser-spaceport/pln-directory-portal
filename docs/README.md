@@ -13,6 +13,7 @@
   - [Web App](../apps/web-app/README.md)
     - [Components](WEB_APP_COMPONENTS.md)
     - [Fathom Guidelines](GUIDELINES_FATHOM.md)
+    - [Sitemap](SITEMAPS.md)
   - Libs
     - [Airtable](../libs/airtable/README.md)
     - [API](../libs/api/README.md)
