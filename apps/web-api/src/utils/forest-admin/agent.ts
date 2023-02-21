@@ -142,12 +142,19 @@ agent.customizeCollection('Location', (collection) => {
   });
 
   collection.addHook('Before', 'Create', async (context) => {
-    const { city, country, continent, metroArea } = context.data[0];
-    await generateGoogleApiData(city, country, continent, metroArea, context);
+    const { city, country, continent, region, metroArea } = context.data[0];
+    await generateGoogleApiData(
+      city,
+      country,
+      continent,
+      region,
+      metroArea,
+      context
+    );
   });
 
   collection.addHook('Before', 'Update', async (context) => {
-    let { city, country, continent, metroArea } = context.patch;
+    let { city, country, continent, region, metroArea } = context.patch;
 
     if (!city || !country) {
       const location = await prismaService.location.findUnique({
@@ -161,13 +168,21 @@ agent.customizeCollection('Location', (collection) => {
         return;
       }
 
-      city = city || location.city;
+      city = city === null ? '' : city || location.city;
+      metroArea = metroArea === null ? '' : metroArea || location.metroArea;
       country = country || location.country;
       continent = continent || location.continent;
-      metroArea = metroArea || location.metroArea;
+      region = region === null ? '' : region || location.region;
     }
 
-    await generateGoogleApiData(city, country, continent, metroArea, context);
+    await generateGoogleApiData(
+      city,
+      country,
+      continent,
+      region,
+      metroArea,
+      context
+    );
   });
 });
 
@@ -177,6 +192,7 @@ async function generateGoogleApiData(
   city,
   country,
   continent,
+  region,
   metroArea,
   context
 ) {
@@ -185,6 +201,7 @@ async function generateGoogleApiData(
     city,
     country,
     continent,
+    region,
     metroArea
   );
 

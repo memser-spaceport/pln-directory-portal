@@ -72,9 +72,12 @@ model Skill {
   members     Member[]
 }
 
+
 model Location {
   id                 Int      @id @default(autoincrement())
   uid                String   @unique @default(cuid())
+  // On the location-transfer.service.ts we are adding the metroArea to the placeId to avoid duplicates because
+  // since the metroArea is not valid on the Google Places API we need to append this field to avoid rewriting the same location
   placeId            String   @unique
   city               String?
   country            String
