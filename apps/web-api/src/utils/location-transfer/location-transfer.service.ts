@@ -12,6 +12,7 @@ export class LocationTransferService {
       member.fields['City'],
       member.fields['Country'],
       member.fields.Region,
+      member.fields['State / Province'],
       member.fields['Metro Area']
     );
 
@@ -34,7 +35,8 @@ export class LocationTransferService {
   async fetchLocation(
     providedCity,
     providedCountry,
-    providedContinet,
+    providedContinent,
+    providedRegion,
     providedMetroArea
   ) {
     const hasCityCountryFields = providedCity || providedCountry;
@@ -53,11 +55,15 @@ export class LocationTransferService {
       providedCountry && providedCountry.toLowerCase() !== 'not provided'
         ? providedCountry
         : '';
+    const region =
+      providedRegion && providedCountry.toLowerCase() !== 'not provided'
+        ? providedRegion
+        : '';
     /**
      * Looking for the same city and country in the same string is not working
      * we should strip one if they are the same
      */
-    const searchString = city === country ? country : `${city} ${country}`;
+    const searchString = `${city} ${region} ${country}`;
 
     let placeResponse;
     try {
@@ -86,15 +92,16 @@ export class LocationTransferService {
           (place) =>
             place.types && place.types.find((type) => type === 'locality')
         );
+    }
 
-      if (!requiredPlace)
-        requiredPlace =
-          placeResponse.data.predictions &&
-          placeResponse.data.predictions.find(
-            (place) =>
-              place.types &&
-              place.types.find((type) => type === 'administrative_area_level_1')
-          );
+    if (!requiredPlace && (city || region)) {
+      requiredPlace =
+        placeResponse.data.predictions &&
+        placeResponse.data.predictions.find(
+          (place) =>
+            place.types &&
+            place.types.find((type) => type === 'administrative_area_level_1')
+        );
     }
 
     if (!requiredPlace)
@@ -146,14 +153,21 @@ export class LocationTransferService {
     const lat = placeDetails.data.results[0].geometry.location.lat;
     const lng = placeDetails.data.results[0].geometry.location.lng;
 
+    /**
+     * We are adding the metroArea to the placeId to avoid duplicates because
+     * since the metroArea is not valid on the Google Places API we need to append this field to avoid rewriting the same location
+     */
     const finalResult = {
-      placeId: placeDetails.data.results[0].place_id,
-      city: apiCity ? apiCity.long_name : null,
+      placeId: `${placeDetails.data.results[0].place_id}${
+        !providedCity && providedMetroArea ? `-${providedMetroArea}` : ''
+      }`,
+      city: providedCity && apiCity ? apiCity.long_name : null,
       country: apiCountry ? apiCountry.long_name : null,
-      continent: providedContinet ? providedContinet : 'Not Defined',
-      region: apiState ? apiState.long_name : null,
-      regionAbbreviation: apiState ? apiState.short_name : null,
-      metroArea: providedMetroArea ? providedMetroArea : 'Not Defined',
+      continent: providedContinent ? providedContinent : 'Not Defined',
+      region: providedRegion && apiState ? apiState.long_name : null,
+      metroArea: providedMetroArea ? providedMetroArea : null,
+      regionAbbreviation:
+        providedRegion && apiState ? apiState.short_name : null,
       latitude: lat,
       longitude: lng,
     };
