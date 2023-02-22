@@ -11,6 +11,7 @@
     - [Web3 File Retrieval using Cloudflare workers](../apps/web-api/cloudflare/workers/web3-file-retrieval/web3-file-retrieval.md)
     - [Location Mapping](./LOCATION_MAPPING.md)
     - [Data Sync Tool](./DATA_SYNC_TOOL.md)
+    - [Rollback Plan](./ROLLBACK_PLAN.md)
   - [Web App](../apps/web-app/README.md)
     - [Components](WEB_APP_COMPONENTS.md)
     - [Fathom Guidelines](GUIDELINES_FATHOM.md)
