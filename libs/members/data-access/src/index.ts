@@ -1,11 +1,10 @@
-import { IAirtableMembersFiltersValues } from '@protocol-labs-network/airtable';
 import { IMember } from '@protocol-labs-network/api';
 import { TMemberResponse } from '@protocol-labs-network/contracts';
 import {
   client,
   TGetRequestOptions,
 } from '@protocol-labs-network/shared/data-access';
-import { TMemberListOptions } from './members.types';
+import { TMemberListOptions, TMembersFiltersValues } from './members.types';
 
 /**
  * Get members list from API
@@ -126,10 +125,10 @@ const parseMemberLocation = (
  */
 export const getMembersFilters = async (options: TMemberListOptions) => {
   const [valuesByFilter, availableValuesByFilter] = await Promise.all([
-    getMembersFiltersValues({
+    geTMembersFiltersValuess({
       plnFriend: false,
     }),
-    getMembersFiltersValues(options),
+    geTMembersFiltersValuess(options),
   ]);
 
   if (valuesByFilter.status !== 200 || availableValuesByFilter.status !== 200) {
@@ -155,7 +154,7 @@ export const getMembersFilters = async (options: TMemberListOptions) => {
 /**
  * Get values for teams filters
  */
-const getMembersFiltersValues = async (options: TMemberListOptions = {}) => {
+const geTMembersFiltersValuess = async (options: TMemberListOptions = {}) => {
   return await getMembers({
     ...options,
     pagination: false,
@@ -197,7 +196,7 @@ const parseMembersFilters = (members: TMemberResponse[]) => {
       region: [],
       country: [],
       metroArea: [],
-    } as IAirtableMembersFiltersValues
+    } as TMembersFiltersValues
   );
 
   Object.values(filtersValues).forEach((value) => value.sort());
