@@ -44,10 +44,3 @@ export interface IAirtableTeamLogo {
     full?: IAirtableImage;
   };
 }
-
-export interface IAirtableTeamsFiltersValues {
-  tags: string[];
-  membershipSources: string[];
-  fundingStage: string[];
-  technology: string[];
-}

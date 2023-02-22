@@ -9,3 +9,10 @@ export type TMemberListOptions = TListOptions & {
   'teamMemberRoles.team.uid'?: string;
   plnFriend?: boolean;
 };
+
+export type TMembersFiltersValues = {
+  skills: string[];
+  region: string[];
+  country: string[];
+  metroArea: string[];
+};

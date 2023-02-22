@@ -1,4 +1,4 @@
-import { IAirtableMembersFiltersValues } from '@protocol-labs-network/airtable';
+import { TMembersFiltersValues } from '@protocol-labs-network/members/data-access';
 import { ParsedUrlQuery } from 'querystring';
 import { getTagsFromValues } from '../../../shared/directory/directory-filters/directory-filters.utils';
 import { IMembersFiltersValues } from './members-directory-filters.types';
@@ -8,8 +8,8 @@ import { IMembersFiltersValues } from './members-directory-filters.types';
  */
 export function parseMembersFilters(
   filtersValues: {
-    valuesByFilter: IAirtableMembersFiltersValues;
-    availableValuesByFilter: IAirtableMembersFiltersValues;
+    valuesByFilter: TMembersFiltersValues;
+    availableValuesByFilter: TMembersFiltersValues;
   },
   query: ParsedUrlQuery
 ): IMembersFiltersValues {

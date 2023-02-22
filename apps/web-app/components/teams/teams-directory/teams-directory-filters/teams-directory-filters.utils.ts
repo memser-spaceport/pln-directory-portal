@@ -1,4 +1,4 @@
-import { IAirtableTeamsFiltersValues } from '@protocol-labs-network/airtable';
+import { TTeamsFiltersValues } from '@protocol-labs-network/teams/data-access';
 import { ParsedUrlQuery } from 'querystring';
 import { getTagsFromValues } from '../../../shared/directory/directory-filters/directory-filters.utils';
 import { ITeamsFiltersValues } from './teams-directory-filters.types';
@@ -8,8 +8,8 @@ import { ITeamsFiltersValues } from './teams-directory-filters.types';
  */
 export function parseTeamsFilters(
   filtersValues: {
-    valuesByFilter: IAirtableTeamsFiltersValues;
-    availableValuesByFilter: IAirtableTeamsFiltersValues;
+    valuesByFilter: TTeamsFiltersValues;
+    availableValuesByFilter: TTeamsFiltersValues;
   },
   query: ParsedUrlQuery
 ): ITeamsFiltersValues {
