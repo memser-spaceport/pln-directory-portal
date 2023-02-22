@@ -1,4 +1,3 @@
-import airtableService from '@protocol-labs-network/airtable';
 import { ITeam } from '@protocol-labs-network/api';
 import {
   getTeams,
@@ -18,10 +17,6 @@ import { TeamsDirectoryList } from '../../../components/teams/teams-directory/te
 import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-directory-filters-fathom-logger.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
-import {
-  getTeamsDirectoryListOptions,
-  getTeamsDirectoryRequestOptionsFromQuery,
-} from '../../../utils/list.utils';
 import {
   getTeamsListOptions,
   getTeamsOptionsFromQuery,
@@ -90,42 +85,27 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
   query,
   res,
 }) => {
-  let teams: ITeam[];
-  let parsedFilters: ITeamsFiltersValues;
+  const optionsFromQuery = getTeamsOptionsFromQuery(query);
+  const listOptions = getTeamsListOptions(optionsFromQuery);
+  const [teamsResponse, filtersValues] = await Promise.all([
+    getTeams(listOptions),
+    getTeamsFilters(optionsFromQuery),
+  ]);
 
-  if (process.env.USE_CUSTOM_PLNETWORK_API) {
-    const optionsFromQuery = getTeamsOptionsFromQuery(query);
-    const listOptions = getTeamsListOptions(optionsFromQuery);
-    const [teamsResponse, filtersValues] = await Promise.all([
-      getTeams(listOptions),
-      getTeamsFilters(optionsFromQuery),
-    ]);
-
-    teams =
-      teamsResponse.status === 200
-        ? teamsResponse.body.map((team) => parseTeam(team))
-        : [];
-    parsedFilters = parseTeamsFilters(filtersValues, query);
-  } else {
-    const optionsFromQuery = getTeamsDirectoryRequestOptionsFromQuery(query);
-    const listOptions = getTeamsDirectoryListOptions(optionsFromQuery);
-    const [teamsResponse, filtersValues] = await Promise.all([
-      airtableService.getTeams(listOptions),
-      airtableService.getTeamsFiltersValues(optionsFromQuery),
-    ]);
-
-    teams = teamsResponse;
-    parsedFilters = parseTeamsFilters(filtersValues, query);
-  }
+  const teams: ITeam[] =
+    teamsResponse.status === 200
+      ? teamsResponse.body.map((team) => parseTeam(team))
+      : [];
+  const parsedFilters: ITeamsFiltersValues = parseTeamsFilters(
+    filtersValues,
+    query
+  );
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
-  // Disable cache when using Airtable as datasource.
   res.setHeader(
     'Cache-Control',
-    process.env.USE_CUSTOM_PLNETWORK_API
-      ? 'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
-      : 'no-cache, no-store, max-age=0, must-revalidate'
+    'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
   );
 
   return {

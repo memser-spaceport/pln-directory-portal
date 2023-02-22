@@ -1,4 +1,3 @@
-import airtableService from '@protocol-labs-network/airtable';
 import { IMember } from '@protocol-labs-network/api';
 import {
   getMembers,
@@ -18,10 +17,6 @@ import { useViewType } from '../../../components/shared/directory/directory-view
 import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-directory-filters-fathom-logger.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
-import {
-  getMembersDirectoryListOptions,
-  getMembersDirectoryRequestOptionsFromQuery,
-} from '../../../utils/list.utils';
 import {
   getMembersListOptions,
   getMembersOptionsFromQuery,
@@ -91,42 +86,27 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
   query,
   res,
 }) => {
-  let members: IMember[];
-  let parsedFilters: IMembersFiltersValues;
+  const optionsFromQuery = getMembersOptionsFromQuery(query);
+  const listOptions = getMembersListOptions(optionsFromQuery);
+  const [membersResponse, filtersValues] = await Promise.all([
+    getMembers(listOptions),
+    getMembersFilters(optionsFromQuery),
+  ]);
 
-  if (process.env.USE_CUSTOM_PLNETWORK_API) {
-    const optionsFromQuery = getMembersOptionsFromQuery(query);
-    const listOptions = getMembersListOptions(optionsFromQuery);
-    const [membersResponse, filtersValues] = await Promise.all([
-      getMembers(listOptions),
-      getMembersFilters(optionsFromQuery),
-    ]);
-
-    members =
-      membersResponse.status === 200
-        ? membersResponse.body.map((member) => parseMember(member))
-        : [];
-    parsedFilters = parseMembersFilters(filtersValues, query);
-  } else {
-    const optionsFromQuery = getMembersDirectoryRequestOptionsFromQuery(query);
-    const listOptions = getMembersDirectoryListOptions(optionsFromQuery);
-    const [membersResponse, filtersValues] = await Promise.all([
-      airtableService.getMembers(listOptions),
-      airtableService.getMembersFiltersValues(optionsFromQuery),
-    ]);
-
-    members = membersResponse;
-    parsedFilters = parseMembersFilters(filtersValues, query);
-  }
+  const members: IMember[] =
+    membersResponse.status === 200
+      ? membersResponse.body.map((member) => parseMember(member))
+      : [];
+  const parsedFilters: IMembersFiltersValues = parseMembersFilters(
+    filtersValues,
+    query
+  );
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
-  // Disable cache when using Airtable as datasource.
   res.setHeader(
     'Cache-Control',
-    process.env.USE_CUSTOM_PLNETWORK_API
-      ? 'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
-      : 'no-cache, no-store, max-age=0, must-revalidate'
+    'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
   );
 
   return {

@@ -1,4 +1,3 @@
-import airtableService from '@protocol-labs-network/airtable';
 import { IMember, ITeam } from '@protocol-labs-network/api';
 import {
   getMember,
@@ -14,7 +13,6 @@ import { MemberProfileHeader } from '../../../components/members/member-profile/
 import { MemberProfileOfficeHours } from '../../../components/members/member-profile/member-profile-office-hours/member-profile-office-hours';
 import { MemberProfileTeams } from '../../../components/members/member-profile/member-profile-teams';
 import { AskToEditCard } from '../../../components/shared/profile/ask-to-edit-card/ask-to-edit-card';
-import { TEAM_CARD_FIELDS } from '../../../components/teams/teams-directory/team-card/team-card.constants';
 import { AIRTABLE_REGEX } from '../../../constants';
 import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcrumb.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
@@ -73,43 +71,37 @@ export const getServerSideProps = async ({ query, res }) => {
   let member: IMember;
   let teams: ITeam[];
 
-  // Fetches member data from the custom API when the USE_CUSTOM_PLNETWORK_API environment variable is set
-  // TODO: Refactor when cleaning up Airtable-related code
-  if (process.env.USE_CUSTOM_PLNETWORK_API) {
-    // Check if provided ID is an Airtable ID, and if so, get the corresponding backend UID
-    if (AIRTABLE_REGEX.test(id)) {
-      const memberUID = await getMemberUIDByAirtableId(id);
+  // Check if provided ID is an Airtable ID, and if so, get the corresponding backend UID
+  if (AIRTABLE_REGEX.test(id)) {
+    const memberUID = await getMemberUIDByAirtableId(id);
 
-      return memberUID
-        ? {
-            redirect: {
-              permanent: true,
-              destination: `/directory/members/${memberUID}`,
-            },
-          }
-        : {
-            notFound: true,
-          };
-    }
+    return memberUID
+      ? {
+          redirect: {
+            permanent: true,
+            destination: `/directory/members/${memberUID}`,
+          },
+        }
+      : {
+          notFound: true,
+        };
+  }
 
-    const [memberResponse, memberTeamsResponse] = await Promise.all([
-      getMember(id, {
-        with: 'image,skills,location,teamMemberRoles.team',
-      }),
-      getTeams({
-        'teamMemberRoles.member.uid': id,
-        select:
-          'uid,name,logo.url,industryTags.title,teamMemberRoles.role,teamMemberRoles.mainTeam',
-        pagination: false,
-      }),
-    ]);
+  const [memberResponse, memberTeamsResponse] = await Promise.all([
+    getMember(id, {
+      with: 'image,skills,location,teamMemberRoles.team',
+    }),
+    getTeams({
+      'teamMemberRoles.member.uid': id,
+      select:
+        'uid,name,logo.url,industryTags.title,teamMemberRoles.role,teamMemberRoles.mainTeam',
+      pagination: false,
+    }),
+  ]);
 
-    if (memberResponse.status === 200 && memberTeamsResponse.status === 200) {
-      member = parseMember(memberResponse.body);
-      teams = memberTeamsResponse.body.map(parseTeam);
-    }
-  } else {
-    member = await airtableService.getMember(id);
+  if (memberResponse.status === 200 && memberTeamsResponse.status === 200) {
+    member = parseMember(memberResponse.body);
+    teams = memberTeamsResponse.body.map(parseTeam);
   }
 
   // Redirects user to the 404 page if response from
@@ -120,23 +112,11 @@ export const getServerSideProps = async ({ query, res }) => {
     };
   }
 
-  // Fetches member teams information if datasource is Airtable
-  // TODO: Remove when cleaning up Airtable-related code
-  if (!process.env.USE_CUSTOM_PLNETWORK_API) {
-    teams = await airtableService.getTeamCardsData(
-      member.teams,
-      TEAM_CARD_FIELDS
-    );
-  }
-
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
-  // Disable cache when using Airtable as datasource.
   res.setHeader(
     'Cache-Control',
-    process.env.USE_CUSTOM_PLNETWORK_API
-      ? 'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
-      : 'no-cache, no-store, max-age=0, must-revalidate'
+    'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
   );
 
   return {

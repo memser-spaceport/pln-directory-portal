@@ -1,4 +1,3 @@
-import airtableService from '@protocol-labs-network/airtable';
 import { IMember, ITeam } from '@protocol-labs-network/api';
 import {
   getMembers,
@@ -14,7 +13,6 @@ import orderBy from 'lodash/orderBy';
 import { GetServerSideProps } from 'next';
 import { NextSeo } from 'next-seo';
 import { ReactElement } from 'react';
-import { MEMBER_CARD_FIELDS } from '../../../components/members/members-directory/member-card/member-card.constants';
 import { AskToEditCard } from '../../../components/shared/profile/ask-to-edit-card/ask-to-edit-card';
 import { TeamProfileDetails } from '../../../components/teams/team-profile/team-profile-details/team-profile-details';
 import { TeamProfileFunding } from '../../../components/teams/team-profile/team-profile-funding/team-profile-funding';
@@ -79,55 +77,43 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
   let team: ITeam;
   let members: IMember[];
 
-  // Fetches team data from the custom API when the USE_CUSTOM_PLNETWORK_API environment variable is set
-  // TODO: Refactor when cleaning up Airtable-related code
-  if (process.env.USE_CUSTOM_PLNETWORK_API) {
-    // Check if provided ID is an Airtable ID, and if so, get the corresponding backend UID
-    if (AIRTABLE_REGEX.test(id)) {
-      const teamUID = await getTeamUIDByAirtableId(id);
+  // Check if provided ID follows the Airtable ID format (reqXXXXXXXXXXXXXX), and if so, get the corresponding UID for the team from the web api
+  if (AIRTABLE_REGEX.test(id)) {
+    const teamUID = await getTeamUIDByAirtableId(id);
 
-      return teamUID
-        ? {
-            redirect: {
-              permanent: true,
-              destination: `/directory/teams/${teamUID}`,
-            },
-          }
-        : {
-            notFound: true,
-          };
-    }
+    return teamUID
+      ? {
+          redirect: {
+            permanent: true,
+            destination: `/directory/teams/${teamUID}`,
+          },
+        }
+      : {
+          notFound: true,
+        };
+  }
 
-    const [teamResponse, teamMembersResponse] = await Promise.all([
-      getTeam(id, {
-        with: 'logo,technologies,membershipSources,industryTags,fundingStage,teamMemberRoles.member',
-      }),
-      getMembers({
-        'teamMemberRoles.team.uid': id,
-        select:
-          'uid,name,image.url,skills.title,teamMemberRoles.team.uid,teamMemberRoles.team.name,teamMemberRoles.role,teamMemberRoles.teamLead,teamMemberRoles.mainTeam',
-        pagination: false,
-      }),
-    ]);
+  const [teamResponse, teamMembersResponse] = await Promise.all([
+    getTeam(id, {
+      with: 'logo,technologies,membershipSources,industryTags,fundingStage,teamMemberRoles.member',
+    }),
+    getMembers({
+      'teamMemberRoles.team.uid': id,
+      select:
+        'uid,name,image.url,skills.title,teamMemberRoles.team.uid,teamMemberRoles.team.name,teamMemberRoles.role,teamMemberRoles.teamLead,teamMemberRoles.mainTeam',
+      pagination: false,
+    }),
+  ]);
 
-    if (teamResponse.status === 200 && teamMembersResponse.status === 200) {
-      team = parseTeam(teamResponse.body);
-      members = orderBy(
-        teamMembersResponse.body.map((member) =>
-          parseTeamMember(member, team.id)
-        ),
-        ['teamLead', 'name'],
-        ['desc', 'asc']
-      );
-    }
-  } else {
-    try {
-      team = await airtableService.getTeam(id);
-    } catch (error) {
-      return {
-        notFound: true,
-      };
-    }
+  if (teamResponse.status === 200 && teamMembersResponse.status === 200) {
+    team = parseTeam(teamResponse.body);
+    members = orderBy(
+      teamMembersResponse.body.map((member) =>
+        parseTeamMember(member, team.id)
+      ),
+      ['teamLead', 'name'],
+      ['desc', 'asc']
+    );
   }
 
   // Redirects user to the 404 page when we're unable to fetch
@@ -138,23 +124,11 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
     };
   }
 
-  // Fetches team members information if datasource is Airtable
-  // TODO: Remove when cleaning up Airtable-related code
-  if (!process.env.USE_CUSTOM_PLNETWORK_API) {
-    members = await airtableService.getTeamMembers(
-      team.name,
-      MEMBER_CARD_FIELDS
-    );
-  }
-
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days.
-  // Disable cache when using Airtable as datasource.
   res.setHeader(
     'Cache-Control',
-    process.env.USE_CUSTOM_PLNETWORK_API
-      ? 'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
-      : 'no-cache, no-store, max-age=0, must-revalidate'
+    'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
   );
 
   return {
