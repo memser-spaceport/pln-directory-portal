@@ -35,7 +35,7 @@ jobs:
 
       - name: Set Git config
         run: |
-          git config --local user.email "pln-dev@pixelmatters.com"
+          git config --local user.email "bot@plnetwork.io"
           git config --local user.name "PLN-Helper"
 
       - name: Rebase the `staging` branch onto the `develop` branch
