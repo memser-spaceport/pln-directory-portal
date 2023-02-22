@@ -131,13 +131,13 @@ agent.customizeCollection('_TeamToTechnology', (collection) => {
 agent.customizeCollection('Location', (collection) => {
   collection.addField('formattedLocation', {
     columnType: 'String',
-    dependencies: ['city', 'country', 'region', 'continent'],
+    dependencies: ['city', 'country', 'region', 'continent', 'metroArea'],
     getValues: (records) =>
       records.map(
         (r) =>
-          `${r.city ? r.city + ' - ' : ''}${r.region ? r.region + ' : ' : ''}${
-            r.country
-          } (${r.continent})`
+          `${r.city ? r.city + ' - ' : ''}${
+            r.metroArea ? r.metroArea + ' - ' : ''
+          }${r.region ? r.region + ' : ' : ''}${r.country} (${r.continent})`
       ),
   });
 
