@@ -1,13 +1,13 @@
 jest.mock('axios', () => {
   const axios = jest.requireActual('axios');
-  const regexPlace = /maps.googleapis.com\/maps\/api\/place\/queryautocomplete/;
+  const regexPlace = /maps.googleapis.com\/maps\/api\/place\/autocomplete/;
   const regexGeocode = /maps.googleapis.com\/maps\/api\/geocode/;
   const regexZeroResults =
-    /maps.googleapis.com\/maps\/api\/place\/queryautocomplete\/json\?input\=not/;
+    /maps.googleapis.com\/maps\/api\/place\/autocomplete\/json\?types=\(regions\)&input\=not/;
   const regexNoPredictions =
-    /maps.googleapis.com\/maps\/api\/place\/queryautocomplete\/json\?input\=noPrediction/;
+    /maps.googleapis.com\/maps\/api\/place\/autocomplete\/json\?types=\(regions\)&input\=noPrediction/;
   const regexNoRequiredPlace =
-    /maps.googleapis.com\/maps\/api\/place\/queryautocomplete\/json\?input\=noRequiredPlace/;
+    /maps.googleapis.com\/maps\/api\/place\/autocomplete\/json\?types=\(regions\)&input\=noRequiredPlace/;
   return {
     ...axios,
     get: jest.fn().mockImplementation((url) => {

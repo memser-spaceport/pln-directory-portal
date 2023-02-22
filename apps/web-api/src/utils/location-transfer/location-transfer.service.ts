@@ -68,7 +68,7 @@ export class LocationTransferService {
     let placeResponse;
     try {
       placeResponse = await axios.get(
-        `https://maps.googleapis.com/maps/api/place/queryautocomplete/json?input=${encodeURIComponent(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?types=(regions)&input=${encodeURIComponent(
           searchString
         )}&key=${process.env.GOOGLE_PLACES_API_KEY}`
       );
