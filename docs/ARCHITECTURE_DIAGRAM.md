@@ -42,6 +42,10 @@ flowchart TB
         CW["Cloudflare Workers"]
     end
 
+    subgraph GCP["Google Cloud Platform"]
+        GCPAPI["Google Places API"]
+        GCPBucket["Google Cloud Storage Bucket"]
+    end
 
     HC(("HTTP Client"))
     CW -- retrieves files --> W3S
@@ -53,6 +57,8 @@ flowchart TB
     HSWA --> A1
     HSWA --> ER
     HSWA -- auth requests --> AS
+    HSAPI -- Search Locations --> GCPAPI
+    HSAPI -- Storing Backups --> GCPBucket
     HC --> HSWA
     HSAPI --> ER
     AS -- auth webhooks --> HSAPI
