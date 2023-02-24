@@ -13,6 +13,7 @@
     - [Location Mapping](./LOCATION_MAPPING.md)
     - [Data Sync Tool](./DATA_SYNC_TOOL.md)
     - [Rollback Plan](./ROLLBACK_PLAN.md)
+    - [Testing Guidelines](../apps/web-api/docs/GUIDELINES_TESTING.md)
   - [Web App](../apps/web-app/README.md)
     - [Components](WEB_APP_COMPONENTS.md)
     - [Fathom Guidelines](GUIDELINES_FATHOM.md)
