@@ -1,10 +1,8 @@
-import { IMember, ITeam } from '@protocol-labs-network/api';
 import {
   getMember,
   getMemberUIDByAirtableId,
-  parseMember,
 } from '@protocol-labs-network/members/data-access';
-import { getTeams, parseTeam } from '@protocol-labs-network/teams/data-access';
+import { getTeams } from '@protocol-labs-network/teams/data-access';
 import { Breadcrumb } from '@protocol-labs-network/ui';
 import { NextSeo } from 'next-seo';
 import { ReactElement } from 'react';
@@ -17,6 +15,10 @@ import { AIRTABLE_REGEX } from '../../../constants';
 import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcrumb.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
+import { IMember } from '../../../utils/members.types';
+import { parseMember } from '../../../utils/members.utils';
+import { ITeam } from '../../../utils/teams.types';
+import { parseTeam } from '../../../utils/teams.utils';
 
 interface MemberProps {
   member: IMember;

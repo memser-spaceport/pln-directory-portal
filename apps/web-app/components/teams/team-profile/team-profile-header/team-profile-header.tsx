@@ -1,7 +1,7 @@
 import { UserGroupIcon } from '@heroicons/react/solid';
-import { ITeam } from '@protocol-labs-network/api';
 import { Tooltip } from '@protocol-labs-network/ui';
 import Image from 'next/image';
+import { ITeam } from '../../../../utils/teams.types';
 import { TagsGroup } from '../../../shared/tags-group/tags-group';
 import { ReactComponent as FilecoinIcon } from '/public/assets/images/icons/filecoin-logo.svg';
 

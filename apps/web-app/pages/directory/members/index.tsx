@@ -1,8 +1,6 @@
-import { IMember } from '@protocol-labs-network/api';
 import {
   getMembers,
   getMembersFilters,
-  parseMember,
 } from '@protocol-labs-network/members/data-access';
 import { GetServerSideProps } from 'next';
 import { NextSeo } from 'next-seo';
@@ -17,6 +15,9 @@ import { useViewType } from '../../../components/shared/directory/directory-view
 import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-directory-filters-fathom-logger.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
+import { IMember } from '../../../utils/members.types';
+import { parseMember } from '../../../utils/members.utils';
+
 import {
   getMembersListOptions,
   getMembersOptionsFromQuery,

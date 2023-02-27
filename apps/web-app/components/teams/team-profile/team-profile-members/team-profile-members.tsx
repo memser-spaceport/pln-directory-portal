@@ -1,6 +1,6 @@
 import { UserIcon } from '@heroicons/react/solid';
-import { IMember } from '@protocol-labs-network/api';
 import { useRouter } from 'next/router';
+import { IMember } from '../../../../utils/members.types';
 import { ProfileCard } from '../../../shared/profile/profile-cards/profile-card';
 import { ProfileCards } from '../../../shared/profile/profile-cards/profile-cards';
 

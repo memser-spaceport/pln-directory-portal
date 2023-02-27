@@ -1,7 +1,8 @@
 import { UserGroupIcon } from '@heroicons/react/solid';
-import { IMember, ITeam } from '@protocol-labs-network/api';
 import orderBy from 'lodash/orderBy';
 import { useRouter } from 'next/router';
+import { IMember } from '../../../utils/members.types';
+import { ITeam } from '../../../utils/teams.types';
 import { ProfileCard } from '../../shared/profile/profile-cards/profile-card';
 import { ProfileCards } from '../../shared/profile/profile-cards/profile-cards';
 

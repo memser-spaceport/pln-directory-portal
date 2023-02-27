@@ -1,7 +1,7 @@
-import { TListSortDirection } from '@protocol-labs-network/api';
 import {
   directorySortOptions,
   TDirectorySortOption,
+  TListSortDirection,
 } from '../components/shared/directory/directory-sort/directory-sort.types';
 
 /**

@@ -1,7 +1,7 @@
 import { FlagIcon, LocationMarkerIcon, UserIcon } from '@heroicons/react/solid';
-import { IMember } from '@protocol-labs-network/api';
 import { Tooltip } from '@protocol-labs-network/ui';
 import Image from 'next/image';
+import { IMember } from '../../../../utils/members.types';
 
 export function MemberProfileHeader({
   image,

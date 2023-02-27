@@ -1,5 +1,5 @@
-import { ITeam } from '@protocol-labs-network/api';
 import { CollapsibleText, Tooltip } from '@protocol-labs-network/ui';
+import { ITeam } from '../../../../utils/teams.types';
 import { ProfileSocialLink } from '../../../shared/profile/profile-social-link/profile-social-link';
 import { ContactMethod } from './contact-method/contact-method';
 

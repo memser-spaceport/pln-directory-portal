@@ -1,8 +1,9 @@
-import { IMember, ITeam } from '@protocol-labs-network/api';
 import { useRouter } from 'next/router';
 import { stringify } from 'querystring';
 import { useCallback, useEffect, useState } from 'react';
 import { ITEMS_PER_PAGE } from '../../constants';
+import { IMember } from '../../utils/members.types';
+import { ITeam } from '../../utils/teams.types';
 
 type UseInfiniteScrollProps = {
   initialItems: ITeam[] | IMember[];
