@@ -1,8 +1,6 @@
-import { ITeam } from '@protocol-labs-network/api';
 import {
   getTeams,
   getTeamsFilters,
-  parseTeam,
 } from '@protocol-labs-network/teams/data-access';
 import { GetServerSideProps } from 'next';
 import { NextSeo } from 'next-seo';
@@ -17,9 +15,11 @@ import { TeamsDirectoryList } from '../../../components/teams/teams-directory/te
 import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-directory-filters-fathom-logger.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
+import { ITeam } from '../../../utils/teams.types';
 import {
   getTeamsListOptions,
   getTeamsOptionsFromQuery,
+  parseTeam,
 } from '../../../utils/teams.utils';
 
 type TeamsProps = {

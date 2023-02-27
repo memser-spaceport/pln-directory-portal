@@ -1,12 +1,7 @@
-import { IMember, ITeam } from '@protocol-labs-network/api';
-import {
-  getMembers,
-  parseTeamMember,
-} from '@protocol-labs-network/members/data-access';
+import { getMembers } from '@protocol-labs-network/members/data-access';
 import {
   getTeam,
   getTeamUIDByAirtableId,
-  parseTeam,
 } from '@protocol-labs-network/teams/data-access';
 import { Breadcrumb } from '@protocol-labs-network/ui';
 import orderBy from 'lodash/orderBy';
@@ -22,6 +17,10 @@ import { AIRTABLE_REGEX } from '../../../constants';
 import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcrumb.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
+import { IMember } from '../../../utils/members.types';
+import { parseTeamMember } from '../../../utils/members.utils';
+import { ITeam } from '../../../utils/teams.types';
+import { parseTeam } from '../../../utils/teams.utils';
 
 interface TeamProps {
   team: ITeam;

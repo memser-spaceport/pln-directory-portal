@@ -2,7 +2,6 @@
   "version": 2,
   "projects": {
     "airtable": "libs/airtable",
-    "api": "libs/api",
     "contracts": "libs/contracts",
     "funding-stages-data-access": "libs/funding-stages/data-access",
     "industry-tags-data-access": "libs/industry-tags/data-access",

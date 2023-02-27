@@ -1,6 +1,6 @@
 import { UserGroupIcon } from '@heroicons/react/solid';
-import { ITeam } from '@protocol-labs-network/api';
 import { useRouter } from 'next/router';
+import { ITeam } from '../../../../utils/teams.types';
 import { DirectoryCard } from '../../../shared/directory/directory-card/directory-card';
 import { DirectoryCardFooter } from '../../../shared/directory/directory-card/directory-card-footer';
 import { DirectoryCardHeader } from '../../../shared/directory/directory-card/directory-card-header';

@@ -1,5 +1,7 @@
+import { TTeamResponse } from '@protocol-labs-network/contracts';
 import { ParsedUrlQuery } from 'querystring';
 import { getSortFromQuery, stringifyQueryValues } from './list.utils';
+import { ITeam } from './teams.types';
 
 /**
  * Returns the options for requesting the teams on the teams directory,
@@ -51,3 +53,50 @@ export function getTeamsListOptions(options) {
     pagination: false,
   };
 }
+
+/**
+ * Parse team fields values into a team object.
+ **/
+export const parseTeam = (team: TTeamResponse): ITeam => {
+  const {
+    uid: id,
+    name,
+    logo,
+    website,
+    twitterHandler: twitter,
+    shortDescription,
+    longDescription,
+    technologies,
+    membershipSources,
+    industryTags,
+    fundingStage,
+    teamMemberRoles,
+    contactMethod,
+  } = team;
+
+  const memberIds = teamMemberRoles?.length
+    ? [
+        ...new Set(
+          teamMemberRoles.map(
+            (teamMemberRole) => teamMemberRole.member?.uid || ''
+          )
+        ),
+      ]
+    : [];
+
+  return {
+    id,
+    name,
+    logo: logo?.url || null,
+    website: website || null,
+    twitter: twitter || null,
+    shortDescription: shortDescription || null,
+    longDescription: longDescription || null,
+    technologies: technologies || [],
+    fundingStage: fundingStage?.title || null,
+    industryTags: industryTags || [],
+    membershipSources: membershipSources || [],
+    members: memberIds,
+    contactMethod: contactMethod || null,
+  };
+};

@@ -1,5 +1,5 @@
-import { IMember } from '@protocol-labs-network/api';
 import { Tooltip } from '@protocol-labs-network/ui';
+import { IMember } from '../../../../utils/members.types';
 import { ProfileSocialLink } from '../../../shared/profile/profile-social-link/profile-social-link';
 import { TagsGroup } from '../../../shared/tags-group/tags-group';
 

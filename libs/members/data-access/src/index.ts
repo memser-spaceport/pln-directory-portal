@@ -1,4 +1,3 @@
-import { IMember } from '@protocol-labs-network/api';
 import { TMemberResponse } from '@protocol-labs-network/contracts';
 import {
   client,
@@ -43,92 +42,14 @@ export const getMemberUIDByAirtableId = async (id: string) => {
 };
 
 /**
- * Parse member fields values into a member object.
- **/
-export const parseMember = (member: TMemberResponse): IMember => {
-  const location = parseMemberLocation(member.location);
-  const teams =
-    member.teamMemberRoles?.map((teamMemberRole) => ({
-      id: teamMemberRole.team?.uid || '',
-      name: teamMemberRole.team?.name || '',
-      role: teamMemberRole.role || 'Contributor',
-      teamLead: !!teamMemberRole.teamLead,
-      mainTeam: !!teamMemberRole.mainTeam,
-    })) || [];
-  const mainTeam = teams.find((team) => team.mainTeam) || null;
-  const teamLead = teams.some((team) => team.teamLead);
-
-  return {
-    id: member.uid,
-    name: member.name,
-    email: member.email || null,
-    image: member.image?.url || null,
-    githubHandle: member.githubHandler || null,
-    discordHandle: member.discordHandler || null,
-    twitter: member.twitterHandler || null,
-    officeHours: member.officeHours || null,
-    location,
-    skills: member.skills || [],
-    teamLead,
-    teams,
-    mainTeam,
-  };
-};
-
-/**
- * Parse team members by excluding relationships to teams other than
- * the provided.
- **/
-export const parseTeamMember = (
-  member: TMemberResponse,
-  teamId: string
-): IMember => {
-  const memberWithoutOtherTeams = {
-    ...member,
-    teamMemberRoles: member.teamMemberRoles?.filter(
-      (teamMemberRole) => teamMemberRole.team?.uid === teamId
-    ),
-  };
-
-  return parseMember(memberWithoutOtherTeams);
-};
-
-/**
- * Parse member location fields values into a location string.
- */
-const parseMemberLocation = (
-  location: TMemberResponse['location']
-): IMember['location'] => {
-  const { metroArea, city, country, region } = location ?? {};
-
-  if (metroArea) {
-    return metroArea;
-  }
-
-  if (country) {
-    if (city) {
-      return `${city}, ${country}`;
-    }
-
-    if (region) {
-      return `${region}, ${country}`;
-    }
-
-    return country;
-  }
-
-  return 'Not provided';
-};
-
-/**
  * Get values and available values for members filters
  */
 export const getMembersFilters = async (options: TMemberListOptions) => {
   const [valuesByFilter, availableValuesByFilter] = await Promise.all([
-    geTMembersFiltersValuess({
+    getMembersFiltersValues({
       plnFriend: false,
     }),
-    geTMembersFiltersValuess(options),
+    getMembersFiltersValues(options),
   ]);
 
   if (valuesByFilter.status !== 200 || availableValuesByFilter.status !== 200) {
@@ -154,7 +75,7 @@ export const getMembersFilters = async (options: TMemberListOptions) => {
 /**
  * Get values for teams filters
  */
-const geTMembersFiltersValuess = async (options: TMemberListOptions = {}) => {
+const getMembersFiltersValues = async (options: TMemberListOptions = {}) => {
   return await getMembers({
     ...options,
     pagination: false,

@@ -1,7 +1,7 @@
 import { LocationMarkerIcon, UserIcon } from '@heroicons/react/solid';
-import { IMember } from '@protocol-labs-network/api';
 import { Tooltip } from '@protocol-labs-network/ui';
 import { useRouter } from 'next/router';
+import { IMember } from '../../../../utils/members.types';
 import { DirectoryCard } from '../../../shared/directory/directory-card/directory-card';
 import { DirectoryCardFooter } from '../../../shared/directory/directory-card/directory-card-footer';
 import { DirectoryCardHeader } from '../../../shared/directory/directory-card/directory-card-header';

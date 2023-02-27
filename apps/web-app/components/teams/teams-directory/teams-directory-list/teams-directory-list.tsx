@@ -1,4 +1,4 @@
-import { ITeam } from '@protocol-labs-network/api';
+import { ITeam } from '../../../../utils/teams.types';
 import { DirectoryList } from '../../../shared/directory/directory-list/directory-list';
 import { TeamCard } from '../team-card/team-card';
 

@@ -20,7 +20,6 @@
     - [Sitemap](SITEMAPS.md)
   - Libs
     - [Airtable](../libs/airtable/README.md)
-    - [API](../libs/api/README.md)
     - [Contracts](../libs/contracts/README.md)
     - [Data Access Libraries](DATA_ACCESS_LIBRARIES.md)
       - [Funding Stages](../libs/funding-stages/data-access/README.md)

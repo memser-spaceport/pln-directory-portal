@@ -1,4 +1,4 @@
-import { ITeam } from '@protocol-labs-network/api';
+import { ITeam } from '../../../../utils/teams.types';
 import { TagsGroup } from '../../../shared/tags-group/tags-group';
 
 export function TeamProfileFunding({ fundingStage, membershipSources }: ITeam) {

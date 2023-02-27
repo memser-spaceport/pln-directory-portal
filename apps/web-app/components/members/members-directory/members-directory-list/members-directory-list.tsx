@@ -1,4 +1,4 @@
-import { IMember } from '@protocol-labs-network/api';
+import { IMember } from '../../../../utils/members.types';
 import { DirectoryList } from '../../../shared/directory/directory-list/directory-list';
 import { MemberCard } from '../member-card/member-card';
 
