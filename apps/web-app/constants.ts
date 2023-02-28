@@ -9,6 +9,7 @@ export const FATHOM_EVENTS = {
       launchpad: 'JJPYTSPL',
       mosaia: 'GU0B5FOF',
       events: 'N93YFAXP',
+      ideashub: '4EVLSAXF',
     },
     networkDirectory: '7M1Q65KH',
     labWeek22: {

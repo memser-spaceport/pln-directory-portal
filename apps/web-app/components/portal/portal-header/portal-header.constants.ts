@@ -27,4 +27,9 @@ export const PORTAL_HEADER_LINKS: IPortalHeaderLink[] = [
     url: 'https://discord.com/invite/protocollabs',
     eventCode: FATHOM_EVENTS.portal.nav.discord,
   },
+  {
+    label: 'Ideas Hub',
+    url: 'https://github.com/orgs/memser-spaceport/discussions',
+    eventCode: FATHOM_EVENTS.portal.nav.ideashub,
+  },
 ];
