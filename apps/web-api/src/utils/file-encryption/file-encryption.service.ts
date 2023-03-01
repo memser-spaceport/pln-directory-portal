@@ -32,4 +32,15 @@ export class FileEncryptionService {
 
     return file;
   }
+
+  getDecryptedFile(buffer: Buffer) {
+    const iv = buffer.slice(0, 16);
+    const chunk = buffer.slice(16);
+    const decipher = crypto.createDecipheriv(
+      process.env.FILE_ENCRYPTION_ALGORITHM,
+      this.getScryptKey(),
+      iv
+    );
+    return Buffer.concat([decipher.update(chunk), decipher.final()]);
+  }
 }
