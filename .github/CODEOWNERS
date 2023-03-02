@@ -2,18 +2,18 @@
 # The last matching pattern takes the most precedence.
 
 # Default owners
-* @miguelleite @miguellteixeira
+@aswin-ideas2it @madan-ideas2it
 
 # Libs owners
-/libs/ @miguelleite @miguellteixeira @AnaFigueiredo26 @PedroFonseca17
+# /libs/
 
 # Web App owners
-/apps/web-app/ @miguelleite @AnaFigueiredo26
-/apps/web-app-e2e/ @miguelleite @AnaFigueiredo26
+# /apps/web-app/
+# /apps/web-app-e2e/
 
 # Frontend libs owners
-/libs/ui/ @miguelleite @AnaFigueiredo26
-/libs/storybook-host/ @miguelleite @AnaFigueiredo26
+# /libs/ui/
+# /libs/storybook-host/
 
 # Web API owners
-/apps/web-api/ @miguellteixeira @PedroFonseca17
+# /apps/web-api/
