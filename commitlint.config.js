@@ -12,11 +12,10 @@ module.exports = {
       'always',
       (commit) => {
         const hasScope = !!commit.scope;
-        const hasValidScope = hasScope && /^PL-[0-9]+$/.test(commit.scope);
-        const optionalScopeTypes = ['build', 'ci', 'docs', 'revert'];
+        const optionalScopeTypes = ['build', 'ci', 'docs', 'revert', 'feat'];
         const isScopeOptional = optionalScopeTypes.includes(commit.type);
 
-        return hasValidScope || (isScopeOptional && !hasScope)
+        return isScopeOptional && !hasScope
           ? [true]
           : [
               false,
