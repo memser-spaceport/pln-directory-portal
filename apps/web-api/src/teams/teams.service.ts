@@ -25,6 +25,7 @@ export class TeamsService {
     return this.prisma.team.findUniqueOrThrow({
       where: { uid },
       ...queryOptions,
+      include: {fundingStage: true, industryTags: true, logo: true, membershipSources: true, technologies: true}
     });
   }
 

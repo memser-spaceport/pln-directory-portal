@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { faker } from '@faker-js/faker';
 import { Prisma, Team } from '@prisma/client';
 import { Factory } from 'fishery';
@@ -44,11 +45,17 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(
         faker.internet.email(),
       ]),
       twitterHandler: faker.name.firstName(),
+      officeHours: faker.name.firstName(),
+      linkedinHandler: faker.name.firstName(),
       shortDescription: faker.helpers.arrayElement([
         null,
         faker.lorem.sentence(),
       ]),
       longDescription: faker.helpers.arrayElement([
+        null,
+        faker.lorem.paragraph(),
+      ]),
+      moreDetails:faker.helpers.arrayElement([
         null,
         faker.lorem.paragraph(),
       ]),

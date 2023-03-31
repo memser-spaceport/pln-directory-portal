@@ -37,6 +37,8 @@ export async function createMember({ amount }: TestFactorySeederParams) {
       githubHandler: 'githubHandler',
       discordHandler: 'discordHandler',
       twitterHandler: 'twitterHandler',
+      linkedinHandler: 'linkedinHandler',
+      moreDetails: 'moreDetails',
       officeHours: 'officeHours',
       plnFriend: true,
       airtableRecId: `airtable-rec-id-${sequence}`,
