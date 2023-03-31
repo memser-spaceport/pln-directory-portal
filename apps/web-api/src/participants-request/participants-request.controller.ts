@@ -1,6 +1,7 @@
 /* eslint-disable prettier/prettier */
 import {Body, Controller, Get, Param, Patch, Post,Put,Query, Req} from '@nestjs/common';
 import { ApprovalStatus } from '@prisma/client';
+import { query } from 'express';
 import { ParticipantsRequestService } from './participants-request.service';
 @Controller('participants-request')
 export class ParticipantsRequestController {
@@ -23,11 +24,16 @@ export class ParticipantsRequestController {
 
   @Post()
   async addRequest(@Body() body) {
-    const postData = body;
-    const result = await this.participantsRequestService.addRequest(postData);
+    const validationCheck = body.validationCheck;
+    if(validationCheck) {
+       const result = await this.participantsRequestService.findDuplicates(body.uniqueIdentifier, body.participantType)
+       return result
+      } else {
+      const postData = body;
+      const result = await this.participantsRequestService.addRequest(postData);
+      return result;
+    }
 
-    /*** TODO: Send emails ***/
-    return result;
   }
 
   @Put(':uid')
