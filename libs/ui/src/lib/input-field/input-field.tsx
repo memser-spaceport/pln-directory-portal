@@ -9,6 +9,9 @@ export interface InputFieldProps extends React.ComponentProps<'input'> {
   icon?: HeroIcon;
   hasClear?: boolean;
   onClear?: () => void;
+  required?: boolean;
+  showLabel?: boolean;
+  value: string;
 }
 
 export function InputField({
@@ -17,14 +20,17 @@ export function InputField({
   defaultValue = '',
   hasClear,
   onClear,
+  required,
+  showLabel = true,
+  value,
   ...props
 }: InputFieldProps) {
-  const [inputValue, setInputValue] = useState(defaultValue);
+  const [inputValue, setInputValue] = useState(value);
   const InputIcon = icon;
 
   useEffect(() => {
-    setInputValue(defaultValue);
-  }, [setInputValue, defaultValue]);
+    setInputValue(value);
+  }, [setInputValue, value]);
 
   function handleUserInput(event: React.ChangeEvent<HTMLInputElement>) {
     setInputValue(event.currentTarget.value);
@@ -37,7 +43,11 @@ export function InputField({
 
   return (
     <label className="relative block">
-      <span className="sr-only">{label}</span>
+      {showLabel ? (
+        <span className="py-2">{required ? label + ' *' : label}</span>
+      ) : (
+        <span className="sr-only">{label}</span>
+      )}
       {InputIcon ? (
         <InputIcon className="stroke-1.5 absolute inset-y-0 left-2 my-auto h-4 w-4 text-slate-600" />
       ) : null}

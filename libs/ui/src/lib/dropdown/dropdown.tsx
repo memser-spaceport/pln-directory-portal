@@ -1,12 +1,14 @@
 import { Listbox } from '@headlessui/react';
-import React, { Fragment, useState } from 'react';
+import React, { Fragment, useEffect, useState } from 'react';
 import { ArrowIcon } from '../icons/arrow/arrow';
 
 export interface DropdownProps {
   buttonContent?: React.ReactNode;
   initialOption?: IDropdownOption;
-  onChange?: (value: IDropdownOption) => void;
+  onChange?: (value: IDropdownOption, name?:string) => void;
   options: IDropdownOption[];
+  value: IDropdownOption;
+  name?: string;
 }
 
 export interface IDropdownOption {
@@ -20,6 +22,8 @@ export function Dropdown({
   onChange,
   initialOption = options[0],
   buttonContent,
+  name,
+  value,
 }: DropdownProps) {
   const [selectedOption, setSelectedOption] = useState(initialOption);
 
@@ -30,21 +34,27 @@ export function Dropdown({
 
     if (selectedDropdownOption) {
       setSelectedOption(selectedDropdownOption);
-      onChange && onChange(selectedDropdownOption);
+      onChange && onChange(selectedDropdownOption, name);
     }
   }
+
+  useEffect(() => {
+    console.log('value', value);
+    setSelectedOption(value);
+  }, [setSelectedOption, value]);
 
   return (
     <Listbox
       as="div"
-      value={selectedOption.value}
+      name={name}
+      value={selectedOption?.value}
       onChange={onChangeHandler}
-      className="text-sm"
+      className="text-sm w-full"
     >
       {({ open }) => (
         <div className="relative">
           <Listbox.Button
-            className={`on-focus hover:shadow-on-hover flex h-10 grow items-center rounded-lg border border-white bg-white px-3 shadow-sm shadow-slate-300 transition duration-150 ease-in-out active:border-blue-600 active:ring-2 active:ring-blue-300 ${
+            className={`on-focus hover:shadow-on-hover flex h-10 w-full items-center rounded-lg border border-white bg-white px-3 shadow-sm shadow-slate-300 transition duration-150 ease-in-out active:border-blue-600 active:ring-2 active:ring-blue-300 ${
               open ? 'border-blue-600 ring-2 ring-blue-300' : ''
             }`}
             data-testid="dropdown__button"
@@ -52,9 +62,9 @@ export function Dropdown({
             {buttonContent ? (
               buttonContent
             ) : (
-              <div className="leading-6">{selectedOption.label}</div>
+              <div className="leading-6">{selectedOption?.label}</div>
             )}
-            <div className="ml-4">
+            <div className="right-4 absolute">
               <ArrowIcon />
             </div>
           </Listbox.Button>
