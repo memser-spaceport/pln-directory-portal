@@ -1,4 +1,3 @@
-import { useState, useEffect, ChangeEventHandler } from 'react';
 import { MultiSelect } from '@protocol-labs-network/ui';
 import { TeamAndRoleGrid } from './teamandrole';
 
@@ -9,9 +8,9 @@ export default function AddMemberSkillForm(props) {
   return (
     <>
       <div className="px-8 py-4">
-        <div className="flex pt-4 flex-row">
+        <div className="flex flex-row pt-4">
           <span className="basis-5/12">Team*</span>
-          <span className="pl-5 basis-5/12">Role*</span>
+          <span className="basis-5/12 pl-5">Role*</span>
         </div>
         {teamAndRoles.map((item, index) => (
           <TeamAndRoleGrid
@@ -25,10 +24,7 @@ export default function AddMemberSkillForm(props) {
           />
         ))}
         <div>
-          <button
-            className="text-blue-500"
-            onClick={props.handleAddNewRole}
-          >
+          <button className="text-blue-500" onClick={props.handleAddNewRole}>
             + Add Role
           </button>
         </div>

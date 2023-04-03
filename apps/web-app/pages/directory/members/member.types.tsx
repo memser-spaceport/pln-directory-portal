@@ -7,7 +7,7 @@ interface Roles {
 
 interface Skill {
   label: string;
-  value: string
+  value: string;
 }
 
 export interface FormValues {
@@ -24,6 +24,6 @@ export interface FormValues {
   githubHandler: string;
   officeHours: string;
   comments: string;
-  teamAndRoles:Roles[];
+  teamAndRoles: Roles[];
   skills: [];
 }

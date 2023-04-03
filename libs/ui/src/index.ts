@@ -15,4 +15,3 @@ export * from './lib/tooltip/tooltip';
 export * from './lib/image-upload/image-upload';
 export * from './lib/multi-select/multi-select';
 export * from './lib/text-area/text-area';
-

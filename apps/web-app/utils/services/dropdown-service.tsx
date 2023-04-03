@@ -78,4 +78,3 @@ export const fetchIndustryTags = async () => {
     console.error(error);
   }
 };
-

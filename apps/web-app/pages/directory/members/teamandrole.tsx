@@ -12,13 +12,11 @@ export function TeamAndRoleGrid(props) {
   const [teamRowId, setTeamRowId] = useState(props?.teamAndRole.rowId);
   const [roleTitle, setRoleTitle] = useState(props?.teamAndRole.role);
   const team = props?.teamAndRole;
-  const role = props?.teamAndRole.role;
 
   const dropDownValues = props.dropDownValues;
 
   function handleDropDownChange(selectedOption, name) {
-    console.log('selectedOption', selectedOption);
-    setTeamDetail(selectedOption);
+    // setTeamDetail(selectedOption);
     props.updateParentTeamValue(
       selectedOption.value,
       selectedOption.label,
@@ -30,38 +28,38 @@ export function TeamAndRoleGrid(props) {
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) {
     const { value } = event.target;
-    setRoleTitle(value);
+    // setRoleTitle(value);
     props.updateParentRoleValue(value, props?.teamAndRole.rowId);
   }
 
   return (
     <>
-      <div className="flex pt-4 flex-row">
+      <div className="flex flex-row pt-4">
         <div className="basis-5/12">
           <Dropdown
             name="team"
             options={dropDownValues?.teamNames}
             initialOption={{
-              value: teamDetail?.teamUid,
-              label: teamDetail?.teamTitle,
+              value: props?.teamAndRole.team.teamUid,
+              label: props?.teamAndRole.team.teamTitle,
             }}
             onChange={handleDropDownChange}
             value={{ value: team?.teamUid, label: team?.teamTitle }}
           />
         </div>
-        <div className="pl-5 basis-5/12">
+        <div className="basis-5/12 pl-5">
           <InputField
             name="role"
             showLabel={false}
             label="Role"
             placeholder="Enter Role"
             onChange={handleInputChange}
-            value={roleTitle}
+            value={props?.teamAndRole.role}
           />
         </div>
         <div
           className="basis-2/12 pl-3 pt-3"
-          onClick={() => props.handleDeleteRolesRow(teamRowId)}
+          onClick={() => props.handleDeleteRolesRow(props?.teamAndRole.rowId)}
         >
           <CloseIcon className="h-5 w-5" />
         </div>

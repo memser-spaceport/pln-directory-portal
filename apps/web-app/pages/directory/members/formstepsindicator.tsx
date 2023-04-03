@@ -39,10 +39,15 @@ function getFormStepIndicatorShape(step, formStep) {
   );
 }
 
-export default function FormStepsIndicator({ formStep, steps }: FormStepIndicatorProps) {
+export default function FormStepsIndicator({
+  formStep,
+  steps,
+}: FormStepIndicatorProps) {
   return (
     <div className="flex flex-row justify-evenly border-b-2">
-      {steps.map((step) => {return getFormStepIndicatorShape(step, formStep)})}
+      {steps.map((step) => {
+        return getFormStepIndicatorShape(step, formStep);
+      })}
     </div>
   );
 }

@@ -17,7 +17,6 @@ import {
   fetchTeams,
 } from '../../../utils/services/dropdown-service';
 import axios from 'axios';
-import { json } from 'stream/consumers';
 
 const API_URL = `http://localhost:3001`;
 

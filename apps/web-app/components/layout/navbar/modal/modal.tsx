@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import { Dialog, Transition } from '@headlessui/react';
-import { XIcon as CloseIcon} from '@heroicons/react/outline';
+import { XIcon as CloseIcon } from '@heroicons/react/outline';
 import React, { Dispatch, ReactNode, SetStateAction, Fragment } from 'react';
 
 type ModalProps = {
@@ -30,7 +30,7 @@ function ModalHeader({
   return (
     <>
       <CloseIcon
-        className="stroke-3 absolute top-5 right-5 z-40 h-6 w-6 text-white cursor-pointer"
+        className="stroke-3 absolute top-5 right-5 z-40 h-6 w-6 cursor-pointer text-white"
         onClick={() => setIsOpen(false)}
       />
       <div className={headerStyleClass}>
@@ -57,7 +57,7 @@ function ModalFooter({ setIsOpen }: ModalHeaderProps) {
     <div className="absolute bottom-2 m-3">
       <div className="ml-2">
         <button
-          className="on-focus leading-3.5 mr-2 mb-2 rounded-full border border-slate-300 px-5 py-3 text-left text-md font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
+          className="on-focus leading-3.5 text-md mr-2 mb-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
           onClick={() => setIsOpen(false)}
         >
           Cancel
@@ -81,7 +81,7 @@ function Modal({
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog
         as="div"
-        className="fixed inset-0 top-0 left-0 z-[1055] grow w-full overflow-x-hidden outline-none"
+        className="fixed inset-0 top-0 left-0 z-[1055] w-full grow overflow-x-hidden outline-none"
         onClose={() => setIsOpen(false)}
       >
         <div className="h-full px-4 text-center">
@@ -106,12 +106,14 @@ function Modal({
             leaveTo="opacity-0 scale-95"
           >
             <div className="my-8 inline-block h-auto min-h-full w-[35%] transform rounded-lg bg-white text-left align-middle shadow-xl transition-all">
-              {enableHeader && <ModalHeader
-                setIsOpen={setIsOpen}
-                title={title}
-                image={image}
-                headerStyleClass="h-10"
-              />}
+              {enableHeader && (
+                <ModalHeader
+                  setIsOpen={setIsOpen}
+                  title={title}
+                  image={image}
+                  headerStyleClass="h-10"
+                />
+              )}
               <div className="mt-40">{children}</div>
               {enableFooter && <ModalFooter setIsOpen={setIsOpen} />}
             </div>

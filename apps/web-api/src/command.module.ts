@@ -39,7 +39,7 @@ import { ParticipantsRequestService } from './participants-request/participants-
     FileEncryptionService,
     ImagesService,
     ImagesController,
-    ParticipantsRequestService
+    ParticipantsRequestService,
   ],
 })
 export class CommandModule {}

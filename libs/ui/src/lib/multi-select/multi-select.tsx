@@ -62,9 +62,9 @@ export function MultiSelect({
         className="flex  cursor-pointer items-center justify-between rounded-md border bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
         onClick={toggleDropdown}
         onBlur={() => {
-          console.log('evnet called')
-          setIsExpanded(false)}
-        }
+          console.log('evnet called');
+          setIsExpanded(false);
+        }}
       >
         <div className="flex flex-1 flex-wrap pr-4">
           {selectedValues?.length > 0 ? (
@@ -93,7 +93,7 @@ export function MultiSelect({
       </div>
       {isExpanded && (
         <div
-          className="absolute left-0  z-[1056] mt-1 mr-5 w-full h-[25%] overflow-y-auto rounded-md bg-white shadow-lg"
+          className="absolute left-0  z-[1056] mt-1 mr-5 h-[25%] w-full overflow-y-auto rounded-md bg-white shadow-lg"
           onBlur={() => setIsExpanded(false)}
         >
           {internalOptions?.length > 0 ? (

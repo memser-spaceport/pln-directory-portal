@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { FATHOM_EVENTS } from '../../../../constants';
 import { EditMemberModal } from '../../../../pages/directory/members/editmember';
-import {EditTeamModal} from '../../../../pages/directory/teams/editteam';
+import { EditTeamModal } from '../../../../pages/directory/teams/editteam';
 
 type TAskToEditProfileType = 'team' | 'member';
 
@@ -33,16 +33,14 @@ export function AskToEditCard({ profileType, id }: AskToEditCardProps) {
   const handleOpenEditModal = () => {
     console.log('testttt');
     urlList[profileType].eventCode &&
-    trackGoal(urlList[profileType].eventCode, 0)
-    if(profileType=='team'){
+      trackGoal(urlList[profileType].eventCode, 0);
+    if (profileType == 'team') {
       setIsTeamModalOpen(true);
-    }
-    else{
+    } else {
       setIsMemberModalOpen(true);
     }
-  
-  }
-  
+  };
+
   return (
     <div className="card bg-ask_to_edit_card shadow-card--slate-900 p-7.5">
       <h3 className="flex items-center text-lg font-semibold">

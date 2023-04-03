@@ -5,7 +5,7 @@ import { ArrowIcon } from '../icons/arrow/arrow';
 export interface DropdownProps {
   buttonContent?: React.ReactNode;
   initialOption?: IDropdownOption;
-  onChange?: (value: IDropdownOption, name?:string) => void;
+  onChange?: (value: IDropdownOption, name?: string) => void;
   options: IDropdownOption[];
   value: IDropdownOption;
   name?: string;
@@ -49,7 +49,7 @@ export function Dropdown({
       name={name}
       value={selectedOption?.value}
       onChange={onChangeHandler}
-      className="text-sm w-full"
+      className="w-full text-sm"
     >
       {({ open }) => (
         <div className="relative">
@@ -64,7 +64,7 @@ export function Dropdown({
             ) : (
               <div className="leading-6">{selectedOption?.label}</div>
             )}
-            <div className="right-4 absolute">
+            <div className="absolute right-4">
               <ArrowIcon />
             </div>
           </Listbox.Button>

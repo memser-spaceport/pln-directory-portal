@@ -79,7 +79,11 @@ function getCancelOrBackButton(formStep, setIsModalOpen, setFormStep) {
   return cancelorBackButton;
 }
 
-export function EditTeamModal({ isOpen, setIsModalOpen, id }: AddTeamModalProps) {
+export function EditTeamModal({
+  isOpen,
+  setIsModalOpen,
+  id,
+}: AddTeamModalProps) {
   const [formStep, setFormStep] = useState<number>(1);
   const [errors, setErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({});
