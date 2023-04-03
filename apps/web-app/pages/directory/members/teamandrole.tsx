@@ -16,7 +16,7 @@ export function TeamAndRoleGrid(props) {
   const dropDownValues = props.dropDownValues;
 
   function handleDropDownChange(selectedOption, name) {
-    // setTeamDetail(selectedOption);
+    setTeamDetail(selectedOption);
     props.updateParentTeamValue(
       selectedOption.value,
       selectedOption.label,
@@ -28,7 +28,7 @@ export function TeamAndRoleGrid(props) {
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) {
     const { value } = event.target;
-    // setRoleTitle(value);
+    setRoleTitle(value);
     props.updateParentRoleValue(value, props?.teamAndRole.rowId);
   }
 
@@ -40,8 +40,8 @@ export function TeamAndRoleGrid(props) {
             name="team"
             options={dropDownValues?.teamNames}
             initialOption={{
-              value: props?.teamAndRole.team.teamUid,
-              label: props?.teamAndRole.team.teamTitle,
+              value: teamDetail?.teamUid,
+              label: teamDetail?.teamTitle,
             }}
             onChange={handleDropDownChange}
             value={{ value: team?.teamUid, label: team?.teamTitle }}
@@ -54,12 +54,12 @@ export function TeamAndRoleGrid(props) {
             label="Role"
             placeholder="Enter Role"
             onChange={handleInputChange}
-            value={props?.teamAndRole.role}
+            value={roleTitle}
           />
         </div>
         <div
           className="basis-2/12 pl-3 pt-3"
-          onClick={() => props.handleDeleteRolesRow(props?.teamAndRole.rowId)}
+          onClick={() => props.handleDeleteRolesRow(teamRowId)}
         >
           <CloseIcon className="h-5 w-5" />
         </div>
