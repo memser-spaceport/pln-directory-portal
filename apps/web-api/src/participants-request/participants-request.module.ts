@@ -12,9 +12,13 @@ import { FileUploadService } from "../utils/file-upload/file-upload.service";
 import { LocationTransferService } from "../utils/location-transfer/location-transfer.service";
 import { ParticipantsRequestController } from "./participants-request.controller";
 import { ParticipantsRequestService } from "./participants-request.service";
+import { UniqueIdentifier } from "./unique-identifier.controller";
 
 @Module({
-    controllers: [ParticipantsRequestController],
+    controllers: [
+        ParticipantsRequestController,
+        UniqueIdentifier
+    ],
     providers: [
         ParticipantsRequestService,
         PrismaService,

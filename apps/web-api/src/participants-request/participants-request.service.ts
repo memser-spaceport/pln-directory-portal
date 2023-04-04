@@ -79,13 +79,13 @@ export class ParticipantsRequestService {
   
     const result: any = await this.prisma.participantsRequest.create({ data: { ...postData } });
     if (result.participantType === ParticipantType.MEMBER.toString() && result.referenceUid === null) {
-      await this.awsService.sendEmail(['thangaraj.esakky@ideas2it.com'], `New Labber request: ${result.newData.name}`, `<p>Hi Lachrista</p><p>${result.newData.name} has submitted a request to become a member of the PL Network Directory.</p> <p>For more information , please use the Member Reference ID ${result.uid}</p>`)
+      await this.awsService.sendEmail('NewMemberRequest', ['thangaraj.esakky@ideas2it.com'], {memberName: result.newData.name, requestUid: result.uid, adminSiteUrl: 'https://www.google/com' })
     } else if (result.participantType === ParticipantType.MEMBER.toString() && result.referenceUid !== null) {
-      await this.awsService.sendEmail(['thangaraj.esakky@ideas2it.com'], `Directory Team Member Edit Request`, `<p>Hi Lachrista</p><p>${result.newData.uniqueIdentifier} has requested an edit to ${result.newData.email} in the PLN Directory.</p>`)
+      await this.awsService.sendEmail('EditMemberRequest', ['thangaraj.esakky@ideas2it.com'], {teamName: result.newData.name, requestUid: result.uid, requesterEmailId: requestData.editRequestorEmailId, adminSiteUrl: 'https://www.google/com' } )
     } else if (result.participantType === ParticipantType.TEAM.toString() && result.referenceUid === null) {
-      await this.awsService.sendEmail(['thangaraj.esakky@ideas2it.com'], `New Labber request: ${result.newData.name}`, `<p>Hi Lachrista</p><p>The team <New team Name> requested to be added onto the PL Network Directory.</p> <p>For more information , please use the Team Reference ID ${result.uid}</p>`)
+      await this.awsService.sendEmail('NewTeamRequest',['thangaraj.esakky@ideas2it.com'], {teamName: result.newData.name, requestUid: result.uid, adminSiteUrl: 'https://www.google/com' } )
     } else if (result.participantType === ParticipantType.MEMBER.toString() && result.referenceUid !== null) {
-      await this.awsService.sendEmail(['thangaraj.esakky@ideas2it.com'], `Directory Team Member Edit Request`, `<p>hi Lachrista</p><p>${result.newData.email} has requested an edit to ${result.newData.name} in the PLN Directory.</p>`)
+      await this.awsService.sendEmail('EditTeamRequest', ['thangaraj.esakky@ideas2it.com'], {teamName: result.newData.name, requestUid: result.uid,  requesterEmailId: requestData.editRequestorEmailId, adminSiteUrl: 'https://www.google/com' } )
     }
 
     console.log("sent email and added record", requestData)

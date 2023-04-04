@@ -10,27 +10,20 @@ const SES_CONFIG = {
 @Injectable()
 export class AwsService {
   
- async sendEmail(toAddresses, subject, message) {
+ async sendEmail(templateName, toAddresses, data) {
     const AWS_SES = new AWS.SES(SES_CONFIG);
     let params = {
         Source: 'member-services@plnetwork.io',
         Destination: {
           ToAddresses: toAddresses,
         },
-        Message: {
-          Body: {
-            Html: {
-              Charset: 'UTF-8',
-              Data: message,
-            },
-          },
-          Subject: {
-            Charset: 'UTF-8',
-            Data: subject,
-          }
-        },
+        
+        Template: templateName, /* required */
+        TemplateData: JSON.stringify({...data}) , /* required */
       };
-      await AWS_SES.sendEmail(params);
-      console.log('no error')
+      const promiseData = AWS_SES.sendTemplatedEmail(params).promise()
+      // const promiseData = AWS_SES.sendEmail(params).promise()
+      const sendReponse = await promiseData
+      console.log(sendReponse)
  }
 }

@@ -75,16 +75,17 @@ enum ApprovalStatus {
 }
 
 model ParticipantsRequest {
-   id                Int                @id @default(autoincrement())
-   uid               String             @unique @default(cuid())
-   participantType   ParticipantType
-   status            ApprovalStatus     @default(PENDING)
-   oldData           Json?
-   newData           Json
-   referenceUid      String?            
-   uniqueIdentifier  String
-   createdAt         DateTime           @default(now())
-   updatedAt         DateTime           @updatedAt
+   id                    Int                @id @default(autoincrement())
+   uid                   String             @unique @default(cuid())
+   participantType       ParticipantType
+   status                ApprovalStatus     @default(PENDING)
+   oldData               Json?
+   newData               Json
+   referenceUid          String?
+   editRequestorEmailId  String?            
+   uniqueIdentifier      String
+   createdAt             DateTime           @default(now())
+   updatedAt             DateTime           @updatedAt
 }
 
 model Skill {
