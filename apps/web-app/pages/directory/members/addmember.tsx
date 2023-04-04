@@ -364,7 +364,7 @@ export function AddMemberModal({
           <div className="">
             <FormStepsIndicator formStep={formStep} steps={steps} />
             {errors?.length > 0 && (
-              <div className="w-full rounded-lg border border-gray-200 bg-white p-10 shadow hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
+              <div className="w-full rounded-lg border border-gray-200 bg-white p-5 shadow hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
                 <ul className="list-inside list-disc space-y-1 text-red-500 dark:text-gray-400">
                   {errors.map((item, index) => (
                     <li key={index}>{item}</li>
@@ -372,8 +372,8 @@ export function AddMemberModal({
                 </ul>
               </div>
             )}
-            <div className="">{getFormWithStep()}</div>
-            <div className="absolute bottom-3 flow-root w-full px-8 py-2">
+            <div className="px-3">{getFormWithStep()}</div>
+            <div className={`flow-root w-full px-8 footerdiv formStep${formStep }`}>
               <div className="float-left">
                 {getCancelOrBackButton(formStep, handleModalClose, setFormStep)}
               </div>

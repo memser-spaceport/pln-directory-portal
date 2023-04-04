@@ -57,4 +57,75 @@
   .on-focus--link {
     @apply focus-within:shadow-[0_1px_0_#156ff7] focus-within:outline-none focus:shadow-[0_1px_0_#156ff7] focus:outline-none focus-visible:shadow-[0_1px_0_#156ff7] focus-visible:outline-none;
   }
+  .profileImage > div{
+    width: 100px;
+      height: 100px;
+      position: relative;
+      /* top: 10px; */
+  }
+}
+
+.inputfield input{
+  position: relative;
+  top: 10px;
+}
+
+.namefield{
+  left: 32px;
+  position: relative;
+  flex-basis: 78%;
+}
+
+.inputfield input,.inputfield textarea{
+  position: relative;
+  top: 10px;
+}
+
+.datefield > div:first-of-type {
+  padding-top: 16px;
+}
+
+.cityname > div:first-of-type {
+  padding-top: 16px;
+}
+
+.footerdiv {
+  margin-top: 32px;
+  border-top: solid #E2E8F0 1px;
+  padding-top: 24px;
+  padding-bottom: 32px;
+  padding-left: 54px;
+  padding-right: 54px;
+}
+.cross-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.font-size-13{
+  font-size: 13px;
+}
+
+.font-size-14{
+  font-size: 14px;
+}
+
+.font-size-12{
+  font-size: 12px;
+}
+
+.formStep2{
+  position: absolute;
+  bottom: 0px;
+}
+
+.hint-text > div:first-of-type{
+  padding-top: 16px;
+  font-size: 13px;
+}
+
+.step-line{
+  position: relative;
+  top: 25px;
+  border: 1px solid #156FF7;
 }
