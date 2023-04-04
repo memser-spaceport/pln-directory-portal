@@ -10,8 +10,8 @@ const Options = [
 
 export default function AddTeamStepTwo(props) {
   const values = props?.formValues;
-  console.log('values', values);
   const dropDownValues = props?.dropDownValues;
+  console.log('dropDownValues list', dropDownValues);
   const handleDropDownChange = props?.handleDropDownChange;
 
   return (
@@ -19,7 +19,7 @@ export default function AddTeamStepTwo(props) {
       <div className="px-8 py-4">
         <span className="mr-2 text-sm">Protocol</span>
         <Dropdown
-          options={dropDownValues.protocol}
+          options={dropDownValues?.protocol}
           name="protocol"
           value={values.protocol}
           onChange={handleDropDownChange}
@@ -35,7 +35,7 @@ export default function AddTeamStepTwo(props) {
       <div className="px-8 py-4">
         <span className="mr-2 text-sm">Funding Stage*</span>
         <Dropdown
-          options={dropDownValues.fundingStages}
+          options={dropDownValues?.fundingStages}
           name="fundingStage"
           value={values.fundingStage}
           onChange={handleDropDownChange}
@@ -45,7 +45,7 @@ export default function AddTeamStepTwo(props) {
       <div className="px-8 py-4">
         <span className="mr-2 text-sm">Membership Source</span>
         <Dropdown
-          options={dropDownValues.membershipSources}
+          options={dropDownValues?.membershipSources}
           name="membershipSource"
           value={values.membershipSource}
           onChange={handleDropDownChange}
@@ -66,7 +66,7 @@ export default function AddTeamStepTwo(props) {
       <div className="px-8 py-4">
         <MultiSelect
           name="industryTags"
-          options={dropDownValues.industryTags}
+          options={dropDownValues?.industryTags}
           selectedValues={values.industryTags}
           onChange={props.handleDropDownChange}
           placeholder="Enter the skills"

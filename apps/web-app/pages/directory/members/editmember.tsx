@@ -298,7 +298,7 @@ export function EditMemberModal({
             <div>
               <button
                 className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
-                onClick={() => null}
+                onClick={() => handleModalClose()}
               >
                 Return to home
               </button>

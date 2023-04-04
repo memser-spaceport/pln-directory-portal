@@ -1,16 +1,19 @@
 import { PencilAltIcon } from '@heroicons/react/outline';
 import { trackGoal } from 'fathom-client';
-// import Link from 'next/link';
 import { useState } from 'react';
 import { FATHOM_EVENTS } from '../../../../constants';
 import { EditMemberModal } from '../../../../pages/directory/members/editmember';
 import { EditTeamModal } from '../../../../pages/directory/teams/editteam';
+import { requestPendingCheck } from '../../../../utils/services/members';
+import { IMember } from '../../../../utils/members.types';
+import { ITeam } from '../../../../utils/teams.types';
 
 type TAskToEditProfileType = 'team' | 'member';
 
 interface AskToEditCardProps {
   profileType: TAskToEditProfileType;
-  id: string;
+  member?: IMember;
+  team?: ITeam;
 }
 
 const urlList: {
@@ -26,18 +29,22 @@ const urlList: {
   },
 };
 
-export function AskToEditCard({ profileType, id }: AskToEditCardProps) {
+export function AskToEditCard({
+  profileType,
+  member,
+  team
+}: AskToEditCardProps) {
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
 
   const handleOpenEditModal = () => {
-    console.log('testttt');
     urlList[profileType].eventCode &&
       trackGoal(urlList[profileType].eventCode, 0);
     if (profileType == 'team') {
       setIsTeamModalOpen(true);
     } else {
-      setIsMemberModalOpen(true);
+      const res = requestPendingCheck(member.email);
+      res && setIsMemberModalOpen(true);
     }
   };
 
@@ -75,12 +82,12 @@ export function AskToEditCard({ profileType, id }: AskToEditCardProps) {
       <EditMemberModal
         isOpen={isMemberModalOpen}
         setIsModalOpen={setIsMemberModalOpen}
-        id={id}
+        id={member.id}
       />
       <EditTeamModal
         isOpen={isTeamModalOpen}
         setIsModalOpen={setIsTeamModalOpen}
-        id={id}
+        id={team.id}
       />
     </div>
   );

@@ -1,14 +1,30 @@
 import axios from 'axios';
-const API_URL = `http://localhost:3001/v1`;
+const API_URL = `http://localhost:3001`;
 
 export const fetchMember = async (id) => {
   console.log('iddddddddddddd', id);
   try {
-    const response = await axios.get(`${API_URL}/members/${id}`);
+    const response = await axios.get(`${API_URL}/v1/members/${id}`);
     if (response.data) {
-      return response.data.map((item) => {
-        return { value: item.uid, label: item.title };
-      });
+      console.log('data', response.data);
+      return response.data;
+    }
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+export const requestPendingCheck = async (email) => {
+  try {
+    const data = {
+      uniqueIdentifier:email,
+      participantType: 'MEMBER',
+    };
+    const response = await axios
+    .post(`${API_URL}/participants-request/unique-identifier-checker`, data);
+    if (response.data) {
+      console.log('requesttttdata', response.data);
+      return response.data;
     }
   } catch (error) {
     console.error(error);

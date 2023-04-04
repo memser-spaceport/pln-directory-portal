@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDownIcon, XIcon as CloseIcon } from '@heroicons/react/solid';
 
 interface Option {
@@ -29,6 +29,10 @@ export function MultiSelect({
   const toggleDropdown = () => {
     setIsExpanded(!isExpanded);
   };
+
+  useEffect(() => {
+    setInternalOptions(options);
+  }, [setInternalOptions, options]);
 
   const handleOptionClick = (item: Option) => {
     // const newSelectedValues = selectedValues.includes(item)

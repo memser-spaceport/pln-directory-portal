@@ -18,7 +18,7 @@ export interface IDropdownOption {
 }
 
 export function Dropdown({
-  options,
+  options=[],
   onChange,
   initialOption = options?.[0],
   buttonContent,
@@ -39,7 +39,6 @@ export function Dropdown({
   }
 
   useEffect(() => {
-    console.log('value', value);
     setSelectedOption(value);
   }, [setSelectedOption, value]);
 

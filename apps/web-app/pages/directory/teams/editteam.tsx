@@ -17,6 +17,7 @@ import {
 } from '../../../utils/services/dropdown-service';
 import axios from 'axios';
 import { InputField } from '@protocol-labs-network/ui';
+import { drop } from 'lodash';
 
 const API_URL = `http://localhost:3001`;
 
@@ -300,7 +301,7 @@ export function EditTeamModal({
             <div>
               <button
                 className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
-                onClick={() => handleSubmit()}
+                onClick={() => handleModalClose()}
               >
                 Return to home
               </button>
@@ -313,7 +314,7 @@ export function EditTeamModal({
                 Please fill out only the fields you would like to change for
                 this member. If there is something you want to change that is
                 not available, please leave a detailed explanation in
-                `&quot;`Additional Notes`&quot;`. If you don`&apos;`t want to
+                &quot;Additional Notes&quot;. If you don&apos;t want to
                 change a field, leave it blank.
               </span>
               <div className="pt-4 pb-10">
@@ -321,7 +322,7 @@ export function EditTeamModal({
                   required
                   name="requestorEmail"
                   type="email"
-                  label="Email"
+                  label="Requestor Email"
                   value={formValues?.requestorEmail}
                   onChange={handleInputChange}
                   placeholder="Enter your email address"
