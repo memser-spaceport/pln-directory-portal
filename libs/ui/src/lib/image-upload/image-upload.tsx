@@ -2,10 +2,13 @@ import { CameraIcon } from '@heroicons/react/outline';
 import { useState } from 'react';
 import Image from 'next/image';
 
+type Shape = 'circle' | 'square';
+
 type Props = {
   imageUrl?: string;
   onImageChange: (file: File) => void;
   maxSize: number; // Size in MB
+  previewImageShape?: Shape;
 };
 
 function bytesToSize(bytes: number) {
@@ -20,8 +23,11 @@ export function ProfileImageUpload({
   imageUrl,
   onImageChange,
   maxSize,
+  previewImageShape = 'circle',
 }: Props) {
   const [, setImage] = useState<File | null>(null);
+  const previewClassName =
+    previewImageShape === 'circle' ? 'rounded-full' : 'rounded-xl';
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -31,13 +37,15 @@ export function ProfileImageUpload({
         setImage(file);
         onImageChange(file);
       } else {
-        window.alert('Upload file less than 4MB');
+        window.alert(`Upload file less than ${maxSize}MB`);
       }
     }
   };
 
   return (
-    <div className="relative h-24 w-24 overflow-hidden rounded-full border-4 border-gray-300">
+    <div
+      className={`relative h-24 w-24 overflow-hidden border-4 border-gray-300 ${previewClassName}`}
+    >
       {imageUrl ? (
         <Image
           src={imageUrl}
@@ -48,7 +56,7 @@ export function ProfileImageUpload({
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center bg-gray-100">
           <CameraIcon className="h-10 w-10 text-gray-300" />
-          <span className="text-sm text-blue-600">Add Image</span>
+          <span className="font-size-12 text-sm text-blue-600">Add Image</span>
         </div>
       )}
       <input

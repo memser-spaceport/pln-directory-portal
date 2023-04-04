@@ -8,9 +8,10 @@ const Options = [
   { value: '3', label: 'Option 3' },
 ];
 
-export default function AddMemberStepTwo(props) {
+export default function AddTeamStepTwo(props) {
   const values = props?.formValues;
   const dropDownValues = props?.dropDownValues;
+  console.log('dropDownValues list', dropDownValues);
   const handleDropDownChange = props?.handleDropDownChange;
 
   return (
@@ -18,7 +19,7 @@ export default function AddMemberStepTwo(props) {
       <div className="px-8 py-4">
         <span className="mr-2 text-sm">Protocol</span>
         <Dropdown
-          options={dropDownValues.protocol}
+          options={dropDownValues?.protocol}
           name="protocol"
           value={values.protocol}
           onChange={handleDropDownChange}
@@ -27,14 +28,16 @@ export default function AddMemberStepTwo(props) {
           <div>
             <InformationCircleIcon className="h-5 w-5" />
           </div>
-          <span>Does your team/project use any of these protocol?</span>
+          <span className="font-size-13">
+            Does your team/project use any of these protocol?
+          </span>
         </div>
       </div>
 
       <div className="px-8 py-4">
         <span className="mr-2 text-sm">Funding Stage*</span>
         <Dropdown
-          options={dropDownValues.fundingStages}
+          options={dropDownValues?.fundingStages}
           name="fundingStage"
           value={values.fundingStage}
           onChange={handleDropDownChange}
@@ -44,7 +47,7 @@ export default function AddMemberStepTwo(props) {
       <div className="px-8 py-4">
         <span className="mr-2 text-sm">Membership Source</span>
         <Dropdown
-          options={dropDownValues.membershipSources}
+          options={dropDownValues?.membershipSources}
           name="membershipSource"
           value={values.membershipSource}
           onChange={handleDropDownChange}
@@ -53,7 +56,7 @@ export default function AddMemberStepTwo(props) {
           <div>
             <InformationCircleIcon className="h-5 w-5" />
           </div>
-          <span>
+          <span className="font-size-13">
             Core Contributor = a team that is building improvements/additional
             features for protocols like libp2p, IPFS, IPLD, and Filecoin. A
             Friend of PL = a team that is using protocols like libp2p, IPFS,
@@ -64,9 +67,9 @@ export default function AddMemberStepTwo(props) {
 
       <div className="px-8 py-4">
         <MultiSelect
-          name="skills"
-          options={dropDownValues.industryTags}
-          selectedValues={props.formValues.skills}
+          name="industryTags"
+          options={dropDownValues?.industryTags}
+          selectedValues={values.industryTags}
           onChange={props.handleDropDownChange}
           placeholder="Enter the skills"
           label="Industry Tags*"
@@ -75,7 +78,7 @@ export default function AddMemberStepTwo(props) {
           <div>
             <InformationCircleIcon className="h-5 w-5" />
           </div>
-          <span>
+          <span className="font-size-13">
             Add industries that you had worked in. This will make it easier for
             people to find & connect based on shared professional interests.
           </span>

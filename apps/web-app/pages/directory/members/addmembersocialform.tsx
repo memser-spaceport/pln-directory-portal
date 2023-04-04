@@ -7,7 +7,7 @@ export default function AddMemberSocialForm(props) {
 
   return (
     <>
-      <div className="px-8 py-4">
+      <div className="inputfield px-8 py-4">
         <InputField
           label="LinkedIn URL"
           onChange={onChange}
@@ -17,7 +17,7 @@ export default function AddMemberSocialForm(props) {
         />
       </div>
 
-      <div className="px-8 py-4">
+      <div className="inputfield hint-text px-8 py-4">
         <InputField
           label="Discord Handle"
           name="discordHandler"
@@ -36,8 +36,8 @@ export default function AddMemberSocialForm(props) {
         </div>
       </div>
 
-      <div className="flex">
-        <div className="px-8 py-4">
+      <div className="flex px-8 py-4">
+        <div className="inputfield w-[50%] pr-4">
           <InputField
             label="Twitter Handle"
             name="twitterHandler"
@@ -46,7 +46,7 @@ export default function AddMemberSocialForm(props) {
             placeholder="e.g., @protocollabs"
           />
         </div>
-        <div className="px-8 py-4">
+        <div className="inputfield w-[50%]">
           <InputField
             label="Github Handle"
             name="githubHandler"
@@ -57,7 +57,7 @@ export default function AddMemberSocialForm(props) {
         </div>
       </div>
 
-      <div className="px-8 py-4">
+      <div className="inputfield hint-text px-8 py-4">
         <InputField
           label="Office Hours Link"
           name="officeHours"
@@ -76,16 +76,13 @@ export default function AddMemberSocialForm(props) {
         </div>
       </div>
 
-      <div className="px-8 py-4">
-        <span className="my-1 flex text-sm text-gray-400">
-          Let us know what else you would like to share and wish others would
-          share to make it easier to locate and contact each other!
-        </span>
+      <div className="inputfield px-8 py-4">
         <TextArea
           name="comments"
           onChange={onChange}
           value={values.comments}
           label="Did we miss something?"
+          info="Let us know what else you would like to share and wish others would share to make it easier to locate and contact each other!"
         />
       </div>
     </>

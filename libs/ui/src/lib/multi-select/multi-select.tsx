@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDownIcon, XIcon as CloseIcon } from '@heroicons/react/solid';
 
 interface Option {
@@ -30,6 +30,10 @@ export function MultiSelect({
     setIsExpanded(!isExpanded);
   };
 
+  useEffect(() => {
+    setInternalOptions(options);
+  }, [setInternalOptions, options]);
+
   const handleOptionClick = (item: Option) => {
     // const newSelectedValues = selectedValues.includes(item)
     //   ? selectedValues.filter((selectedItem) => selectedItem.value !== item.value)
@@ -57,9 +61,9 @@ export function MultiSelect({
 
   return (
     <div className="">
-      {label && <span className="">{label}</span>}
+      {label && <span className="mb-4">{label}</span>}
       <div
-        className="flex  cursor-pointer items-center justify-between rounded-md border bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="mt-2.5 flex cursor-pointer items-center justify-between rounded-md border bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
         onClick={toggleDropdown}
         onBlur={() => {
           console.log('evnet called');
@@ -84,7 +88,9 @@ export function MultiSelect({
               </div>
             ))
           ) : (
-            <span className="text-gray-400">{placeholder || 'Select...'}</span>
+            <span className="pl-3 text-gray-400">
+              {placeholder || 'Select...'}
+            </span>
           )}
         </div>
         <ChevronDownIcon
@@ -92,32 +98,37 @@ export function MultiSelect({
         />
       </div>
       {isExpanded && (
-        <div
-          className="absolute left-0  z-[1056] mt-1 mr-5 h-[25%] w-full overflow-y-auto rounded-md bg-white shadow-lg"
-          onBlur={() => setIsExpanded(false)}
-        >
-          {internalOptions?.length > 0 ? (
-            internalOptions.map((item: Option) => (
-              <label
-                className="block w-full cursor-pointer px-3 py-2 text-gray-800 hover:bg-gray-100"
-                key={item.value}
-              >
-                <button
-                  type="button"
-                  value={item.value}
-                  onClick={() => handleOptionClick(item)}
-                  className="mr-2 h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-400"
-                />
-                <span className="font-medium text-gray-900">{item.label}</span>
+        <div className="relative">
+          <div
+            // className="absolute left-0  z-[1056] mt-1 mr-5 h-[25%] w-full overflow-y-auto rounded-md bg-white shadow-lg"
+            className="absolute z-[1056] h-[250px] w-full overflow-y-auto rounded-md bg-white shadow-lg"
+            onBlur={() => setIsExpanded(false)}
+          >
+            {internalOptions?.length > 0 ? (
+              internalOptions.map((item: Option) => (
+                <label
+                  className="block w-full cursor-pointer px-3 py-2 text-gray-800 hover:bg-gray-100"
+                  key={item.value}
+                >
+                  <button
+                    type="button"
+                    value={item.value}
+                    onClick={() => handleOptionClick(item)}
+                    className="mr-2 h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-400"
+                  />
+                  <span className="font-medium text-gray-900">
+                    {item.label}
+                  </span>
+                </label>
+              ))
+            ) : (
+              <label>
+                <span className="font-sm text-gray-500">
+                  No options available
+                </span>
               </label>
-            ))
-          ) : (
-            <label>
-              <span className="font-sm text-gray-500">
-                No options available
-              </span>
-            </label>
-          )}
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -10,6 +10,7 @@ export interface TextAreaProps extends React.ComponentProps<'textarea'> {
   placeholder?: string;
   required?: boolean;
   showLabel?: boolean;
+  info?: string;
 }
 
 export function TextArea({
@@ -21,6 +22,7 @@ export function TextArea({
   placeholder = '',
   required,
   showLabel = true,
+  info,
   ...props
 }: TextAreaProps) {
   const [inputValue, setInputValue] = useState(value);
@@ -39,6 +41,11 @@ export function TextArea({
         {label}
         {required ? <span className="required">*</span> : null}
       </label>
+      {info && (
+        <div className="py-2">
+          <span className="font-size-13 text-sm text-gray-400">{info}</span>
+        </div>
+      )}
       <textarea
         {...props}
         name={name}

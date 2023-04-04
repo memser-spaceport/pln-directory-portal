@@ -9,13 +9,14 @@ interface Team {
 
 export function TeamAndRoleGrid(props) {
   const [teamDetail, setTeamDetail] = useState<Team>(props?.teamAndRole.team);
-  const [teamRowId, setTeamRowId] = useState(props?.teamAndRole.rowId);
+  const [teamRowId] = useState(props?.teamAndRole.rowId);
   const [roleTitle, setRoleTitle] = useState(props?.teamAndRole.role);
   const team = props?.teamAndRole;
 
   const dropDownValues = props.dropDownValues;
 
   function handleDropDownChange(selectedOption, name) {
+    console.log('selectedOption', selectedOption);
     setTeamDetail(selectedOption);
     props.updateParentTeamValue(
       selectedOption.value,
@@ -35,7 +36,7 @@ export function TeamAndRoleGrid(props) {
   return (
     <>
       <div className="flex flex-row pt-4">
-        <div className="basis-5/12">
+        <div className="basis-6/12">
           <Dropdown
             name="team"
             options={dropDownValues?.teamNames}
@@ -47,7 +48,7 @@ export function TeamAndRoleGrid(props) {
             value={{ value: team?.teamUid, label: team?.teamTitle }}
           />
         </div>
-        <div className="basis-5/12 pl-5">
+        <div className="basis-6/12 pl-5">
           <InputField
             name="role"
             showLabel={false}
@@ -58,10 +59,10 @@ export function TeamAndRoleGrid(props) {
           />
         </div>
         <div
-          className="basis-2/12 pl-3 pt-3"
+          className="pl-3 pt-3"
           onClick={() => props.handleDeleteRolesRow(teamRowId)}
         >
-          <CloseIcon className="h-5 w-5" />
+          <CloseIcon className="cross-icon" />
         </div>
       </div>
     </>

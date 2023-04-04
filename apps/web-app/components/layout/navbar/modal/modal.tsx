@@ -1,12 +1,12 @@
 import Image from 'next/image';
 import { Dialog, Transition } from '@headlessui/react';
 import { XIcon as CloseIcon } from '@heroicons/react/outline';
-import React, { Dispatch, ReactNode, SetStateAction, Fragment } from 'react';
+import React, { ReactNode, Fragment } from 'react';
 
 type ModalProps = {
   isOpen: boolean;
   title?: string;
-  setIsOpen: Dispatch<SetStateAction<boolean>>;
+  onClose: () => void;
   children: ReactNode;
   image: string;
   headerStyleClass?: string;
@@ -16,7 +16,7 @@ type ModalProps = {
 
 type ModalHeaderProps = {
   title?: string;
-  setIsOpen: Dispatch<SetStateAction<boolean>>;
+  onClose: () => void;
   image?: string;
   headerStyleClass?: string;
 };
@@ -25,13 +25,13 @@ function ModalHeader({
   title,
   headerStyleClass,
   image,
-  setIsOpen,
+  onClose,
 }: ModalHeaderProps) {
   return (
     <>
       <CloseIcon
         className="stroke-3 absolute top-5 right-5 z-40 h-6 w-6 cursor-pointer text-white"
-        onClick={() => setIsOpen(false)}
+        onClick={() => onClose()}
       />
       <div className={headerStyleClass}>
         {image && (
@@ -52,13 +52,13 @@ function ModalHeader({
   );
 }
 
-function ModalFooter({ setIsOpen }: ModalHeaderProps) {
+function ModalFooter({ onClose }: ModalHeaderProps) {
   return (
     <div className="absolute bottom-2 m-3">
       <div className="ml-2">
         <button
           className="on-focus leading-3.5 text-md mr-2 mb-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
-          onClick={() => setIsOpen(false)}
+          onClick={() => onClose()}
         >
           Cancel
         </button>
@@ -69,11 +69,10 @@ function ModalFooter({ setIsOpen }: ModalHeaderProps) {
 
 function Modal({
   isOpen,
-  setIsOpen,
   title,
   children,
   image,
-  headerStyleClass,
+  onClose,
   enableHeader = true,
   enableFooter = true,
 }: ModalProps) {
@@ -82,7 +81,7 @@ function Modal({
       <Dialog
         as="div"
         className="fixed inset-0 top-0 left-0 z-[1055] w-full grow overflow-x-hidden outline-none"
-        onClose={() => setIsOpen(false)}
+        onClose={() => onClose()}
       >
         <div className="h-full px-4 text-center">
           <Transition.Child
@@ -108,14 +107,14 @@ function Modal({
             <div className="my-8 inline-block h-auto min-h-full w-[35%] transform rounded-lg bg-white text-left align-middle shadow-xl transition-all">
               {enableHeader && (
                 <ModalHeader
-                  setIsOpen={setIsOpen}
+                  onClose={onClose}
                   title={title}
                   image={image}
                   headerStyleClass="h-10"
                 />
               )}
               <div className="mt-40">{children}</div>
-              {enableFooter && <ModalFooter setIsOpen={setIsOpen} />}
+              {enableFooter && <ModalFooter onClose={onClose} />}
             </div>
           </Transition.Child>
         </div>

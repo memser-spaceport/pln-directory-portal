@@ -11,7 +11,7 @@ export interface InputFieldProps extends React.ComponentProps<'input'> {
   onClear?: () => void;
   required?: boolean;
   showLabel?: boolean;
-  value: string;
+  value?: string;
 }
 
 export function InputField({

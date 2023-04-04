@@ -13,7 +13,9 @@ interface Skill {
 export interface FormValues {
   name: string;
   email: string;
-  image: string;
+  requestorEmail?: string;
+  imageUid: string;
+  imageFile: File;
   plnStartDate: string;
   city: string;
   region: string;

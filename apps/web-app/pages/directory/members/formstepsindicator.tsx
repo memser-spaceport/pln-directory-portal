@@ -31,7 +31,55 @@ function getFormStepIndicatorShape(step, formStep) {
           width={50}
         />
         <span className={getStepNumberClass(step.number, formStep)}>
-          {step.number}
+          {(() => {
+            if (formStep === 2) {
+              if (step.number === 1) {
+                return (
+                  <svg
+                    width="14"
+                    height="11"
+                    viewBox="0 0 14 11"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M13 1L4.75 9.25L1 5.5"
+                      stroke="white"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                );
+              } else {
+                return <>{step.number}</>;
+              }
+            } else if (formStep === 3) {
+              if (step.number === 1 || step.number === 2) {
+                return (
+                  <svg
+                    width="14"
+                    height="11"
+                    viewBox="0 0 14 11"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M13 1L4.75 9.25L1 5.5"
+                      stroke="white"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                );
+              } else {
+                return <>{step.number}</>;
+              }
+            } else {
+              return <>{step.number}</>;
+            }
+          })()}
         </span>
       </div>
       <span className="mt-1 text-xs text-blue-500">{step.name}</span>
@@ -39,14 +87,23 @@ function getFormStepIndicatorShape(step, formStep) {
   );
 }
 
+function drawHr() {
+  return <hr className="step-line flex w-full flex-col items-center"></hr>;
+}
+
 export default function FormStepsIndicator({
   formStep,
   steps,
 }: FormStepIndicatorProps) {
   return (
-    <div className="flex flex-row justify-evenly border-b-2">
-      {steps.map((step) => {
-        return getFormStepIndicatorShape(step, formStep);
+    <div className="flex flex-row justify-evenly border-b-2 pb-4 pr-8 pl-8">
+      {steps.map((step, index) => {
+        return (
+          <>
+            {getFormStepIndicatorShape(step, formStep)}
+            {index !== steps.length - 1 ? drawHr() : null}
+          </>
+        );
       })}
     </div>
   );

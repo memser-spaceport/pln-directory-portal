@@ -45,7 +45,7 @@ export const fetchProtocol = async () => {
     const response = await axios.get(`${API_URL}/technologies`);
     if (response.data) {
       return response.data.map((item) => {
-        return { value: item.uid, label: item.name };
+        return { value: item.uid, label: item.title };
       });
     }
   } catch (error) {

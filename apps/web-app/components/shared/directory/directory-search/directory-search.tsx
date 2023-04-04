@@ -26,6 +26,7 @@ export function DirectorySearch({
       <InputField
         label="Search"
         name="searchBy"
+        showLabel={false}
         icon={SearchIcon}
         placeholder={placeholder}
         defaultValue={searchTerm}
