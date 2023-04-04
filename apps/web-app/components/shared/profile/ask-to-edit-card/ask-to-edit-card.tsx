@@ -32,7 +32,7 @@ const urlList: {
 export function AskToEditCard({
   profileType,
   member,
-  team
+  team,
 }: AskToEditCardProps) {
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);

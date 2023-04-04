@@ -30,7 +30,6 @@ export const fetchTeams = async () => {
 export const fetchMembershipSources = async () => {
   try {
     const response = await axios.get(`${API_URL}/membership-sources`);
-    console.log('Membership sources', response)
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
@@ -44,7 +43,6 @@ export const fetchMembershipSources = async () => {
 export const fetchProtocol = async () => {
   try {
     const response = await axios.get(`${API_URL}/technologies`);
-    console.log('Protocol response', response)
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
@@ -58,7 +56,6 @@ export const fetchProtocol = async () => {
 export const fetchFundingStages = async () => {
   try {
     const response = await axios.get(`${API_URL}/funding-stages`);
-    console.log('Funding stages response', response)
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
@@ -72,7 +69,6 @@ export const fetchFundingStages = async () => {
 export const fetchIndustryTags = async () => {
   try {
     const response = await axios.get(`${API_URL}/industry-tags`);
-    console.log('Industry Tags', response)
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };

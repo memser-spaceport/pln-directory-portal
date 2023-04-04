@@ -314,8 +314,8 @@ export function EditTeamModal({
                 Please fill out only the fields you would like to change for
                 this member. If there is something you want to change that is
                 not available, please leave a detailed explanation in
-                &quot;Additional Notes&quot;. If you don&apos;t want to
-                change a field, leave it blank.
+                &quot;Additional Notes&quot;. If you don&apos;t want to change a
+                field, leave it blank.
               </span>
               <div className="pt-4 pb-10">
                 <InputField
