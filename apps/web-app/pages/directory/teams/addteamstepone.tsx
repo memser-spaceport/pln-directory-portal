@@ -51,9 +51,9 @@ export default function AddMemberStepOne(props) {
       <div className="px-8 py-4">
         <TextArea
           required
-          value={values?.description}
+          value={values?.shortDescription}
           onChange={onChange}
-          name="description"
+          name="shortDescription"
           label="Please briefly describe what your team/product/project does"
           placeholder="Enter your email address"
           info="One to two sentences is perfect! Use clear language and minimal jargon."

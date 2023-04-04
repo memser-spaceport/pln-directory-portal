@@ -15,11 +15,18 @@ import {
   fetchIndustryTags,
   fetchProtocol,
 } from '../../../utils/services/dropdown-service';
+import { fetchTeam } from '../../../utils/services/teams';
 import axios from 'axios';
 import { InputField } from '@protocol-labs-network/ui';
-import { drop } from 'lodash';
 
 const API_URL = `http://localhost:3001`;
+
+interface DropDownProps {
+  label?: string;
+  value?: string;
+  uid?: string;
+  title?: string;
+}
 
 interface EditTeamModalProps {
   isOpen: boolean;
@@ -29,19 +36,18 @@ interface EditTeamModalProps {
 
 export interface FormValues {
   name: string;
-  email: string;
   requestorEmail?: string;
   logoUid: string;
   logoFile: File;
-  description: string;
+  shortDescription: string;
   longDescription: string;
-  protocol: string;
-  fundingStage: string;
-  membershipSource: string;
-  industryTags: [];
+  technologies: DropDownProps[];
+  fundingStage: DropDownProps;
+  membershipSource: DropDownProps[];
+  industryTags: DropDownProps[];
   contactMethod: string;
   website: string;
-  linkedinURL: string;
+  linkedinHandler: string;
   twitterHandle: string;
   blog: string;
   officeHours: string;
@@ -51,16 +57,16 @@ function validateBasicForm(formValues) {
   const errors = [];
   const emailRE =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-  if (!formValues.requestorEmail) {
-    errors.push('Please add Requestor email.');
-  }
-  if (!formValues.requestorEmail.match(emailRE)) {
-    errors.push('Please add valid email.');
+  if (
+    !formValues.requestorEmail ||
+    !formValues.requestorEmail?.match(emailRE)
+  ) {
+    errors.push('Please add valid Requestor email.');
   }
   if (!formValues.name) {
     errors.push('Please add Team Name.');
   }
-  if (!formValues.description) {
+  if (!formValues.shortDescription) {
     errors.push('Please add Description.');
   }
   if (!formValues.longDescription) {
@@ -146,19 +152,18 @@ export function EditTeamModal({
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<FormValues>({
     name: '',
-    email: '',
     requestorEmail: '',
     logoUid: '',
     logoFile: null,
-    description: '',
+    shortDescription: '',
     longDescription: '',
-    protocol: '',
-    fundingStage: '',
-    membershipSource: '',
+    technologies: [],
+    fundingStage: {},
+    membershipSource: [],
     industryTags: [],
     contactMethod: '',
     website: '',
-    linkedinURL: '',
+    linkedinHandler: '',
     twitterHandle: '',
     blog: '',
     officeHours: '',
@@ -167,22 +172,52 @@ export function EditTeamModal({
   useEffect(() => {
     if (isOpen) {
       Promise.all([
+        fetchTeam(id),
         fetchMembershipSources(),
         fetchFundingStages(),
         fetchIndustryTags(),
         fetchProtocol(),
       ])
-        .then((data) =>
+        .then((data) => {
+          const team = data[0];
+          const formValues = {
+            name: team.name,
+            logoUid: team.logoUid,
+            logoFile: null,
+            shortDescription: team.shortDescription,
+            longDescription: team.longDescription,
+            technologies: team.technologies?.map((item) => {
+              return { value: item.uid, label: item.title };
+            }),
+            fundingStage: {
+              value: team.fundingStage?.uid,
+              label: team.fundingStage?.title,
+            },
+            membershipSource: team.membershipSources?.map((item) => {
+              return { value: item.uid, label: item.title };
+            }),
+            industryTags: team.industryTags?.map((item) => {
+              return { value: item.uid, label: item.title };
+            }),
+            contactMethod: team.contactMethod,
+            website: team.website,
+            linkedinHandler: team.linkedinHandler,
+            twitterHandle: team.twitterHandler,
+            blog: team.blog,
+            officeHours: team.officeHours,
+          };
+          setFormValues(formValues);
+          setImageUrl(team.logo.url);
           setDropDownValues({
-            membershipSources: data[0],
-            fundingStages: data[1],
-            industryTags: data[2],
-            protocol: data[3],
-          })
-        )
+            membershipSources: data[1],
+            fundingStages: data[2],
+            industryTags: data[3],
+            technologies: data[4],
+          });
+        })
         .catch((e) => console.error(e));
     }
-  }, [isOpen]);
+  }, [isOpen, id]);
 
   function resetState() {
     setErrors([]);
@@ -191,19 +226,18 @@ export function EditTeamModal({
     setSaveCompleted(false);
     setFormValues({
       name: '',
-      email: '',
       requestorEmail: '',
       logoUid: '',
       logoFile: null,
-      description: '',
+      shortDescription: '',
       longDescription: '',
-      protocol: '',
-      fundingStage: '',
-      membershipSource: '',
+      technologies: [],
+      fundingStage: {},
+      membershipSource: [],
       industryTags: [],
       contactMethod: '',
       website: '',
-      linkedinURL: '',
+      linkedinHandler: '',
       twitterHandle: '',
       blog: '',
       officeHours: '',
@@ -215,24 +249,47 @@ export function EditTeamModal({
     setIsModalOpen(false);
   }
 
+  function formatData() {
+
+    const formattedTags = formValues.industryTags.map(item=>{
+      return {uid: item?.value,
+      title: item?.label}
+    })
+    const formattedMembershipSource = formValues.membershipSource.map(item=>{
+      return {uid: item?.value,
+      title: item?.label}
+    })
+    const formattedtechnologies = formValues.technologies.map(item=>{
+      return {uid: item?.value,
+      title: item?.label}
+    })
+
+    const formattedFundingStage = {
+  uid: formValues.fundingStage?.value,
+      title: formValues.fundingStage?.label
+    }
+
+    setFormValues({ ...formValues, fundingStage: formattedFundingStage,  industryTags: formattedTags, membershipSource: formattedMembershipSource, technologies:formattedtechnologies});
+  }
+
   async function handleSubmit() {
     const errors = validateForm(formValues);
     if (errors?.length > 0) {
       setErrors(errors);
       return false;
     }
+    formatData();
     try {
-      console.log('formValues', formValues);
       const token = await axios
         .get(`${API_URL}/token`, { withCredentials: true })
         .then((res) => {
           // console.log('response', res.headers, res.headers.get('set-cookie'));
           return res?.data.token;
         });
-      console.log('token', token);
 
+      let image;
       if (imageChanged) {
-        const image = await axios
+         image = await axios
           .post(`${API_URL}/participants-request`, formValues.logoFile, {
             headers: {
               'content-type': 'application/json',
@@ -241,24 +298,25 @@ export function EditTeamModal({
             },
           })
           .then((response) => {
-            setSaveCompleted(true);
+            return response?.data;
           });
       }
 
       const data = {
         participantType: 'TEAM',
         status: 'PENDING',
-        newData: { ...formValues },
+        requesterEmail: formValues.requestorEmail,
+        newData: { ...formValues, logoUid: image?.uid },
       };
       await axios
-        .post(`${API_URL}/participants-request`, data, {
+        .put(`${API_URL}/participants-request`, data, {
           headers: {
             'content-type': 'application/json',
             'x-csrf-token': token,
           },
         })
         .then((response) => {
-          resetState();
+          setSaveCompleted(true);
         });
     } catch (err) {
       console.log('error', err);
@@ -317,17 +375,6 @@ export function EditTeamModal({
                 &quot;Additional Notes&quot;. If you don&apos;t want to change a
                 field, leave it blank.
               </span>
-              <div className="inputfield pt-4 pb-10">
-                <InputField
-                  required
-                  name="requestorEmail"
-                  type="email"
-                  label="Requestor Email"
-                  value={formValues?.requestorEmail}
-                  onChange={handleInputChange}
-                  placeholder="Enter your email address"
-                />
-              </div>
             </div>
             {errors?.length > 0 && (
               <div className="w-full rounded-lg border border-gray-200 bg-white p-10 shadow hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
@@ -338,6 +385,17 @@ export function EditTeamModal({
                 </ul>
               </div>
             )}
+            <div className="inputfield px-8 pt-4 pb-10">
+              <InputField
+                required
+                name="requestorEmail"
+                type="email"
+                label="Requestor Email"
+                value={formValues?.requestorEmail}
+                onChange={handleInputChange}
+                placeholder="Enter your email address"
+              />
+            </div>
             <div className="overflow-y-auto">
               <AddTeamStepOne
                 formValues={formValues}

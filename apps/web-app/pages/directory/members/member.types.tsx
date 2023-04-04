@@ -6,8 +6,10 @@ interface Roles {
 }
 
 interface Skill {
-  label: string;
-  value: string;
+  label?: string;
+  value?: string;
+  uid?: string;
+  title?: string;
 }
 
 export interface FormValues {
@@ -27,5 +29,5 @@ export interface FormValues {
   officeHours: string;
   comments: string;
   teamAndRoles: Roles[];
-  skills: [];
+  skills: Skill[];
 }

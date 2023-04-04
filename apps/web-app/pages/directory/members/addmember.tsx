@@ -36,13 +36,10 @@ function validateBasicForm(formValues) {
   const emailRE =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   if (!formValues.name) {
-    errors.push('Name is required.');
+    errors.push('Please add Name.');
   }
-  if (!formValues.email) {
-    errors.push('Email field is required.');
-  }
-  if (!formValues.email.match(emailRE)) {
-    errors.push('Please enter valid email.');
+  if (!formValues.email || !formValues.email?.match(emailRE)) {
+    errors.push('Please add valid Email.');
   }
   return errors;
 }
@@ -50,7 +47,7 @@ function validateBasicForm(formValues) {
 function validateSkillForm(formValues) {
   const errors = [];
   if (!formValues.teamAndRoles.length) {
-    errors.push('please add your team and role details');
+    errors.push('Please add your Team and Role details');
   } else {
     const missingValues = formValues.teamAndRoles.filter(
       (item) => item.teamUid == '' || item.role == ''
@@ -203,14 +200,15 @@ export function AddMemberModal({
   }
 
   function formatData() {
-    // const formattedSkills = formValues.skills.map(item=>{
-    //   return {uid: item.value, title: item.label}
-    // })
     const formattedTeamAndRoles = formValues.teamAndRoles.map((item) => {
       delete item.rowId;
       return item;
     });
-    setFormValues({ ...formValues, teamAndRoles: formattedTeamAndRoles });
+    const skills = formValues.skills.map(item=>{
+      return {uid: item?.value,
+      title: item?.label}
+    })
+    setFormValues({ ...formValues, skills: skills, teamAndRoles: formattedTeamAndRoles });
   }
 
   async function handleSubmit() {
@@ -223,7 +221,6 @@ export function AddMemberModal({
           // console.log('response', res.headers, res.headers.get('set-cookie'));
           return res?.data.token;
         });
-      console.log('token', token);
 
       const data = {
         participantType: 'MEMBER',

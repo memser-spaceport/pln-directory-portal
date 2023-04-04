@@ -32,13 +32,13 @@ function validateBasicForm(formValues) {
   const emailRE =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   if (!formValues.name) {
-    errors.push('Name is required.');
+    errors.push('Please add Name.');
   }
-  if (!formValues.email) {
-    errors.push('Email field is required.');
-  }
-  if (!formValues.email.match(emailRE)) {
-    errors.push('Please enter valid email.');
+  if (!formValues.email || !formValues.email?.match(emailRE)) {
+    errors.push('Please add valid Email.');
+  } 
+  if (!formValues.requestorEmail || !formValues.requestorEmail?.match(emailRE)) {
+    errors.push('Please add valid Requestor Email.');
   }
   return errors;
 }
@@ -46,7 +46,7 @@ function validateBasicForm(formValues) {
 function validateSkillForm(formValues) {
   const errors = [];
   if (!formValues.teamAndRoles.length) {
-    errors.push('please add your team and role details');
+    errors.push('Please add your Team and Role details');
   } else {
     const missingValues = formValues.teamAndRoles.filter(
       (item) => item.teamUid == '' || item.role == ''
@@ -127,9 +127,45 @@ export function EditMemberModal({
   useEffect(() => {
     if (isOpen) {
       Promise.all([fetchMember(id), fetchSkills(), fetchTeams()])
-        .then((allData) => {
-          console.log('memberDetail', allData[0]);
-          setDropDownValues({ skillValues: allData[1], teamNames: allData[2] });
+        .then((data) => {
+          const member = data[0];
+          let counter = 1;
+          const teamAndRoles =
+            member.teamMemberRoles?.length &&
+            member.teamMemberRoles.map((team) => {
+              return {
+                role: team.role,
+                teamUid: team.teamUid,
+                teamTitle:
+                  data[2]?.find((item) => item.value == team.teamUid) ||
+                  'protocol',
+                rowId: counter++,
+              };
+            });
+          const formValues = {
+            name: member.name,
+            email: member.email,
+            imageUid: member.imageUid,
+            imageFile: null,
+            plnStartDate: moment(new Date()).format('DD/MM/YYYY'),
+            city: member.location?.city,
+            region: member.location?.region,
+            country: member.location?.country,
+            linkedinURL: member.linkedinHandler,
+            discordHandler: member.discordHandler,
+            twitterHandler: member.twitterHandler,
+            githubHandler: member.githubHandler,
+            officeHours: member.officeHours,
+            comments: '',
+            teamAndRoles: teamAndRoles || [],
+            skills: member.skills?.map((item) => {
+              return { value: item.uid, label: item.title };
+            }),
+          };
+          setImageUrl(member.image?.url);
+          console.log('formmmmmmmmmmm', formValues);
+          setFormValues(formValues);
+          setDropDownValues({ skillValues: data[1], teamNames: data[2] });
         })
         .catch((e) => console.error(e));
     }
@@ -175,7 +211,11 @@ export function EditMemberModal({
       delete item.rowId;
       return item;
     });
-    setFormValues({ ...formValues, teamAndRoles: formattedTeamAndRoles });
+    const skills = formValues.skills.map(item=>{
+      return {uid: item?.value,
+      title: item?.label}
+    })
+    setFormValues({ ...formValues, skills: skills, teamAndRoles: formattedTeamAndRoles });
   }
 
   async function handleSubmit() {
@@ -186,17 +226,16 @@ export function EditMemberModal({
     }
     formatData();
     try {
-      console.log('formValues', formValues);
       const token = await axios
         .get(`${API_URL}/token`, { withCredentials: true })
         .then((res) => {
           // console.log('response', res.headers, res.headers.get('set-cookie'));
           return res?.data.token;
         });
-      console.log('token', token);
 
+      let image;
       if (imageChanged) {
-        const image = await axios
+         image = await axios
           .post(`${API_URL}/participants-request`, formValues.imageFile, {
             headers: {
               'content-type': 'application/json',
@@ -205,21 +244,21 @@ export function EditMemberModal({
             },
           })
           .then((response) => {
-            resetState();
+            return response?.data;
           });
       }
 
       const data = {
         participantType: 'MEMBER',
         status: 'PENDING',
-        newData: { ...formValues },
+        requesterEmail: formValues.requestorEmail,
+        newData: { ...formValues, logoUid: image?.uid },
       };
       await axios
-        .post(`${API_URL}/participants-request`, data, {
+        .put(`${API_URL}/participants-request`, data, {
           headers: {
             'content-type': 'application/json',
             'x-csrf-token': token,
-            // cookie: 'UHaLU99nOgBFBs2g5Iamyw',
           },
         })
         .then((response) => {
@@ -314,17 +353,6 @@ export function EditMemberModal({
                 &quot;Additional Notes&quot;. If you don&apos;t want to change a
                 field, leave it blank.
               </span>
-              <div className="inputfield pt-4 pb-10">
-                <InputField
-                  required
-                  name="requestorEmail"
-                  type="email"
-                  label="Requestor Email"
-                  value={formValues?.requestorEmail}
-                  onChange={handleInputChange}
-                  placeholder="Enter your email address"
-                />
-              </div>
             </div>
             {errors?.length > 0 && (
               <div className="w-full rounded-lg border border-gray-200 bg-white p-10 shadow hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
@@ -335,6 +363,17 @@ export function EditMemberModal({
                 </ul>
               </div>
             )}
+            <div className="inputfield px-8 pt-4 pb-10">
+              <InputField
+                required
+                name="requestorEmail"
+                type="email"
+                label="Requestor Email"
+                value={formValues?.requestorEmail}
+                onChange={handleInputChange}
+                placeholder="Enter your email address"
+              />
+            </div>
             <div className="overflow-y-auto">
               <AddMemberBasicForm
                 formValues={formValues}

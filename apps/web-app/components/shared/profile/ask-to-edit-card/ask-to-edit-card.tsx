@@ -82,12 +82,12 @@ export function AskToEditCard({
       <EditMemberModal
         isOpen={isMemberModalOpen}
         setIsModalOpen={setIsMemberModalOpen}
-        id={member.id}
+        id={member?.id}
       />
       <EditTeamModal
         isOpen={isTeamModalOpen}
         setIsModalOpen={setIsTeamModalOpen}
-        id={team.id}
+        id={team?.id}
       />
     </div>
   );

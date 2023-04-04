@@ -50,8 +50,8 @@ export default function AddMemberStepThree(props) {
       <div className="inputfield px-8 py-4">
         <InputField
           label="LinkedIn URL"
-          name="linkedIn"
-          value={values.linkedIn}
+          name="linkedinHandler"
+          value={values.linkedinHandler}
           onChange={handleInputChange}
           placeholder="eg., https://www.linkedin.com/in/jbenetcs/"
         />

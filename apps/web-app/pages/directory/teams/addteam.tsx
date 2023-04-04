@@ -25,20 +25,27 @@ interface AddTeamModalProps {
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
 }
 
+interface DropDownProps {
+  label?: string;
+  value?: string;
+  uid?: string;
+  title?: string;
+}
+
 export interface FormValues {
   name: string;
-  email: string;
+  requestorEmail?: string;
   logoUid: string;
   logoFile: File;
-  description: string;
+  shortDescription: string;
   longDescription: string;
-  protocol: string;
-  fundingStage: string;
-  membershipSource: string;
-  industryTags: [];
+  technologies: DropDownProps[];
+  fundingStage: DropDownProps;
+  membershipSource: DropDownProps[];
+  industryTags: DropDownProps[];
   contactMethod: string;
   website: string;
-  linkedinURL: string;
+  linkedinHandler: string;
   twitterHandle: string;
   blog: string;
   officeHours: string;
@@ -171,18 +178,17 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
   const [dropDownValues, setDropDownValues] = useState({});
   const [formValues, setFormValues] = useState<FormValues>({
     name: '',
-    email: '',
     logoUid: '',
     logoFile: null,
-    description: '',
+    shortDescription: '',
     longDescription: '',
-    protocol: '',
-    fundingStage: '',
-    membershipSource: '',
+    technologies: [],
+    fundingStage: {},
+    membershipSource: [],
     industryTags: [],
     contactMethod: '',
     website: '',
-    linkedinURL: '',
+    linkedinHandler: '',
     twitterHandle: '',
     blog: '',
     officeHours: '',
@@ -215,18 +221,17 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     setSaveCompleted(false);
     setFormValues({
       name: '',
-      email: '',
       logoUid: '',
       logoFile: null,
-      description: '',
+      shortDescription: '',
       longDescription: '',
-      protocol: '',
-      fundingStage: '',
-      membershipSource: '',
+      technologies: [],
+      fundingStage: {},
+      membershipSource: [],
       industryTags: [],
       contactMethod: '',
       website: '',
-      linkedinURL: '',
+      linkedinHandler: '',
       twitterHandle: '',
       blog: '',
       officeHours: '',
@@ -238,37 +243,71 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     setIsModalOpen(false);
   }
 
+  function formatData() {
+
+    const formattedTags = formValues.industryTags.map(item=>{
+      return {uid: item?.value,
+      title: item?.label}
+    })
+    const formattedMembershipSource = formValues.membershipSource.map(item=>{
+      return {uid: item?.value,
+      title: item?.label}
+    })
+    const formattedtechnologies = formValues.technologies.map(item=>{
+      return {uid: item?.value,
+      title: item?.label}
+    })
+
+    const formattedFundingStage = {
+  uid: formValues.fundingStage?.value,
+      title: formValues.fundingStage?.label
+    }
+
+    setFormValues({ ...formValues, fundingStage: formattedFundingStage,  industryTags: formattedTags, membershipSource: formattedMembershipSource, technologies:formattedtechnologies});
+  }
+
   async function handleSubmit() {
+    formatData();
     console.log('formValues', formValues);
-    axios
-      .get(`${API_URL}/token`)
-      .then((response) => {
-        console.log('token', response?.data);
-        if (response.data) {
-          const options = {
-            method: 'POST',
-            url: `${API_URL}/participants-request`,
+    try {
+      console.log('formValues', formValues);
+      const token = await axios
+        .get(`${API_URL}/token`, { withCredentials: true })
+        .then((res) => {
+          // console.log('response', res.headers, res.headers.get('set-cookie'));
+          return res?.data.token;
+        });
+
+        const image = await axios
+          .post(`${API_URL}/participants-request`, formValues.logoFile, {
             headers: {
               'content-type': 'application/json',
-              'csrf-token': response.data,
+              'x-csrf-token': token,
+              // cookie: 'UHaLU99nOgBFBs2g5Iamyw',
             },
-            data: [
-              {
-                participantType: 'TEAM',
-                status: 'PENDING',
-                newData: { ...formValues },
-              },
-            ],
-          };
-          axios.request(options).then((response) => {
-            console.log(response.data);
-            setSaveCompleted(true);
+          })
+          .then((response) => {
+            return response?.data;
           });
-        }
-      })
-      .catch(function (error) {
-        console.error(error);
-      });
+
+      const data = {
+        participantType: 'TEAM',
+        status: 'PENDING',
+        newData: { ...formValues, logoUid: image?.uid },
+      };
+      await axios
+        .post(`${API_URL}/participants-request`, data, {
+          headers: {
+            'content-type': 'application/json',
+            'x-csrf-token': token,
+          },
+        })
+        .then((response) => {
+          setSaveCompleted(true);
+        });
+    } catch (err) {
+      console.log('error', err);
+    }
   }
 
   function handleInputChange(

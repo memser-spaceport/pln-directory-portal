@@ -18,11 +18,12 @@ export default function AddTeamStepTwo(props) {
     <>
       <div className="px-8 py-4">
         <span className="mr-2 text-sm">Protocol</span>
-        <Dropdown
+        <MultiSelect
           options={dropDownValues?.protocol}
-          name="protocol"
-          value={values.protocol}
+          name="technologies"
+          selectedValues={values.technologies}
           onChange={handleDropDownChange}
+          label="Protocol"
         />
         <div className="flex pt-1 text-sm text-gray-400">
           <div>
@@ -45,12 +46,12 @@ export default function AddTeamStepTwo(props) {
       </div>
 
       <div className="px-8 py-4">
-        <span className="mr-2 text-sm">Membership Source</span>
-        <Dropdown
+        <MultiSelect
           options={dropDownValues?.membershipSources}
           name="membershipSource"
-          value={values.membershipSource}
+          selectedValues={values.membershipSource}
           onChange={handleDropDownChange}
+          label="Membership Source"
         />
         <div className="flex pt-1 text-sm text-gray-400">
           <div>
