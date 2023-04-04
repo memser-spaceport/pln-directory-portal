@@ -6,7 +6,7 @@ import React, { ReactNode, Fragment } from 'react';
 type ModalProps = {
   isOpen: boolean;
   title?: string;
-  onClose: ()=>void;
+  onClose: () => void;
   children: ReactNode;
   image: string;
   headerStyleClass?: string;
@@ -16,7 +16,7 @@ type ModalProps = {
 
 type ModalHeaderProps = {
   title?: string;
-  onClose: ()=>void;
+  onClose: () => void;
   image?: string;
   headerStyleClass?: string;
 };

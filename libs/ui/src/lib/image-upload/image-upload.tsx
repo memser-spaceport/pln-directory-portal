@@ -23,10 +23,11 @@ export function ProfileImageUpload({
   imageUrl,
   onImageChange,
   maxSize,
-  previewImageShape='circle'
+  previewImageShape = 'circle',
 }: Props) {
   const [, setImage] = useState<File | null>(null);
-  const previewClassName = (previewImageShape === "circle") ? "rounded-full" : "rounded-xl";
+  const previewClassName =
+    previewImageShape === 'circle' ? 'rounded-full' : 'rounded-xl';
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -42,7 +43,9 @@ export function ProfileImageUpload({
   };
 
   return (
-    <div className={`relative h-24 w-24 overflow-hidden border-4 border-gray-300 ${previewClassName}`}>
+    <div
+      className={`relative h-24 w-24 overflow-hidden border-4 border-gray-300 ${previewClassName}`}
+    >
       {imageUrl ? (
         <Image
           src={imageUrl}

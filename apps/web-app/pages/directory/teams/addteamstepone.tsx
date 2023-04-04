@@ -16,7 +16,6 @@ export default function AddMemberStepOne(props) {
   const values = props?.formValues;
   const onChange = props?.handleInputChange;
 
-
   return (
     <>
       <div className="flex px-8 py-4">

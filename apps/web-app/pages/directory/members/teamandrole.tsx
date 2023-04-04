@@ -9,7 +9,7 @@ interface Team {
 
 export function TeamAndRoleGrid(props) {
   const [teamDetail, setTeamDetail] = useState<Team>(props?.teamAndRole.team);
-  const [teamRowId,] = useState(props?.teamAndRole.rowId);
+  const [teamRowId] = useState(props?.teamAndRole.rowId);
   const [roleTitle, setRoleTitle] = useState(props?.teamAndRole.role);
   const team = props?.teamAndRole;
 
