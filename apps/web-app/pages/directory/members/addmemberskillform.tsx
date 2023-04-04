@@ -1,5 +1,6 @@
 import { MultiSelect } from '@protocol-labs-network/ui';
 import { TeamAndRoleGrid } from './teamandrole';
+import { InformationCircleIcon } from '@heroicons/react/solid';
 
 export default function AddMemberSkillForm(props) {
   const teamAndRoles = props?.formValues.teamAndRoles;
@@ -28,6 +29,16 @@ export default function AddMemberSkillForm(props) {
             + Add Role
           </button>
         </div>
+        <div className="flex text-sm text-gray-400">
+          <div>
+            <InformationCircleIcon className="h-5 w-5" />
+          </div>
+          <span>
+            Select the team(s) that you work for & the title you hold in your
+            team. If your team is not on the list, click here & add your team
+            first.
+          </span>
+        </div>
       </div>
       <div className="px-8 py-4">
         <MultiSelect
@@ -38,6 +49,12 @@ export default function AddMemberSkillForm(props) {
           placeholder="Enter the skills"
           label="Professional Skills"
         />
+        <div className="flex text-sm text-gray-400">
+          <div>
+            <InformationCircleIcon className="h-5 w-5" />
+          </div>
+          <span>Share what you do! This will help us connect with others!</span>
+        </div>
       </div>
     </>
   );

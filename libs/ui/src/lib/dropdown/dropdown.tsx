@@ -20,7 +20,7 @@ export interface IDropdownOption {
 export function Dropdown({
   options,
   onChange,
-  initialOption = options[0],
+  initialOption = options?.[0],
   buttonContent,
   name,
   value,

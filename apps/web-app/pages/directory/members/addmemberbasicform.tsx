@@ -1,26 +1,18 @@
-import { useState } from 'react';
 import { InputField, ProfileImageUpload } from '@protocol-labs-network/ui';
 import { InformationCircleIcon } from '@heroicons/react/solid';
 
 export default function AddMemberBasicForm(props) {
-  const [imageUrl, setImageUrl] = useState<string>();
   const values = props.formValues;
   const onChange = props.onChange;
-
-  const handleImageChange = (file: File) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => setImageUrl(reader.result as string);
-  };
 
   return (
     <>
       <div className="flex px-8 py-4">
         <div className="basis-1/4">
           <ProfileImageUpload
-            imageUrl={imageUrl}
+            imageUrl={props.imageUrl}
             maxSize={4}
-            onImageChange={handleImageChange}
+            onImageChange={props.handleImageChange}
           />
         </div>
         <div className="basis-3/4 pl-1">

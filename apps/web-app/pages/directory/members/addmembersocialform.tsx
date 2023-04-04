@@ -77,15 +77,12 @@ export default function AddMemberSocialForm(props) {
       </div>
 
       <div className="px-8 py-4">
-        <span className="my-1 flex text-sm text-gray-400">
-          Let us know what else you would like to share and wish others would
-          share to make it easier to locate and contact each other!
-        </span>
         <TextArea
           name="comments"
           onChange={onChange}
           value={values.comments}
           label="Did we miss something?"
+          info="Let us know what else you would like to share and wish others would share to make it easier to locate and contact each other!"
         />
       </div>
     </>

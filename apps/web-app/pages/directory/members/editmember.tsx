@@ -9,36 +9,36 @@ import moment from 'moment';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
-import FormStepsIndicator from './formstepsindicator';
 import { FormValues } from './member.types';
 import Modal from '../../../components/layout/navbar/modal/modal';
 import {
   fetchSkills,
   fetchTeams,
 } from '../../../utils/services/dropdown-service';
+import { fetchMember } from '../../../utils/services/members';
 import axios from 'axios';
+import { InputField } from '@protocol-labs-network/ui';
 
 const API_URL = `http://localhost:3001`;
 
-interface AddMemberModalProps {
+interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
   id: string;
 }
 
-const steps = [
-  { number: 1, name: 'BASIC' },
-  { number: 2, name: 'SKILL' },
-  { number: 3, name: 'SOCIAL' },
-];
-
 function validateBasicForm(formValues) {
   const errors = [];
+  const emailRE =
+    /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   if (!formValues.name) {
     errors.push('Name is required.');
   }
   if (!formValues.email) {
     errors.push('Email field is required.');
+  }
+  if (!formValues.email.match(emailRE)) {
+    errors.push('Please enter valid email.');
   }
   return errors;
 }
@@ -65,7 +65,7 @@ function validateForm(formValues) {
     errors = [...errors, ...basicFormErrors];
   }
   const skillFormErrors = validateSkillForm(formValues);
-  if (skillFormErrors) {
+  if (skillFormErrors.length) {
     errors = [...errors, ...skillFormErrors];
   }
   return errors;
@@ -82,11 +82,11 @@ function getSubmitOrNextButton(handleSubmit) {
   return submitOrNextButton;
 }
 
-function getCancelOrBackButton(setIsModalOpen) {
+function getCancelOrBackButton(handleModalClose) {
   const cancelorBackButton = (
     <button
       className="on-focus leading-3.5 text-md mr-2 mb-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
-      onClick={() => setIsModalOpen(false)}
+      onClick={() => handleModalClose()}
     >
       Cancel
     </button>
@@ -98,14 +98,18 @@ export function EditMemberModal({
   isOpen,
   setIsModalOpen,
   id,
-}: AddMemberModalProps) {
-  const [formStep, setFormStep] = useState<number>(1);
+}: EditMemberModalProps) {
   const [errors, setErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({});
+  const [imageUrl, setImageUrl] = useState<string>();
+  const [imageChanged, setImageChanged] = useState<boolean>(false);
+  const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<FormValues>({
     name: '',
     email: '',
-    image: '',
+    requestorEmail: '',
+    imageUid: '',
+    imageFile: null,
     plnStartDate: moment(new Date()).format('DD/MM/YYYY'),
     city: '',
     region: '',
@@ -121,12 +125,58 @@ export function EditMemberModal({
   });
 
   useEffect(() => {
-    Promise.all([fetchSkills(), fetchTeams()])
-      .then((allData) =>
-        setDropDownValues({ skillValues: allData[0], teamNames: allData[1] })
-      )
-      .catch((e) => console.error(e));
-  }, []);
+    if (isOpen) {
+      Promise.all([fetchMember(id), fetchSkills(), fetchTeams()])
+        .then((allData) => {
+          console.log('memberDetail', allData[0]);
+          setDropDownValues({ skillValues: allData[1], teamNames: allData[2] });
+        })
+        .catch((e) => console.error(e));
+    }
+  }, [isOpen, id]);
+
+  function resetState() {
+    setErrors([]);
+    setDropDownValues({});
+    setImageChanged(false);
+    setSaveCompleted(false);
+    setImageUrl('');
+    setFormValues({
+      name: '',
+      email: '',
+      requestorEmail: '',
+      imageUid: '',
+      imageFile: null,
+      plnStartDate: moment(new Date()).format('DD/MM/YYYY'),
+      city: '',
+      region: '',
+      country: '',
+      linkedinURL: '',
+      discordHandler: '',
+      twitterHandler: '',
+      githubHandler: '',
+      officeHours: '',
+      comments: '',
+      teamAndRoles: [],
+      skills: [],
+    });
+  }
+
+  function handleModalClose() {
+    resetState();
+    setIsModalOpen(false);
+  }
+
+  function formatData() {
+    // const formattedSkills = formValues.skills.map(item=>{
+    //   return {uid: item.value, title: item.label}
+    // })
+    const formattedTeamAndRoles = formValues.teamAndRoles.map((item) => {
+      delete item.rowId;
+      return item;
+    });
+    setFormValues({ ...formValues, teamAndRoles: formattedTeamAndRoles });
+  }
 
   async function handleSubmit() {
     const errors = validateForm(formValues);
@@ -134,53 +184,50 @@ export function EditMemberModal({
       setErrors(errors);
       return false;
     }
-    console.log('formValues', formValues);
-    axios
-      .get(`${API_URL}/token`)
-      .then((response) => {
-        console.log('token', response?.data);
-        if (response.data) {
-          const options = {
-            method: 'POST',
-            url: `${API_URL}/v1/participants-request`,
+    formatData();
+    try {
+      console.log('formValues', formValues);
+      const token = await axios
+        .get(`${API_URL}/token`, { withCredentials: true })
+        .then((res) => {
+          // console.log('response', res.headers, res.headers.get('set-cookie'));
+          return res?.data.token;
+        });
+      console.log('token', token);
+
+      if (imageChanged) {
+        const image = await axios
+          .post(`${API_URL}/participants-request`, formValues.imageFile, {
             headers: {
               'content-type': 'application/json',
-              'csrf-token': response.data,
+              'x-csrf-token': token,
+              // cookie: 'UHaLU99nOgBFBs2g5Iamyw',
             },
-            data: [
-              {
-                participantType: 'MEMBER',
-                status: 'PENDING',
-                requesterEmail: formValues.email,
-                newData: { ...formValues },
-              },
-            ],
-          };
-          axios.request(options).then((response) => {
-            setIsModalOpen(false);
-            setFormValues({
-              name: '',
-              email: '',
-              image: '',
-              plnStartDate: moment(new Date()).format('DD/MM/YYYY'),
-              city: '',
-              region: '',
-              country: '',
-              linkedinURL: '',
-              discordHandler: '',
-              twitterHandler: '',
-              githubHandler: '',
-              officeHours: '',
-              comments: '',
-              teamAndRoles: [],
-              skills: [],
-            });
+          })
+          .then((response) => {
+            resetState();
           });
-        }
-      })
-      .catch(function (error) {
-        console.error(error);
-      });
+      }
+
+      const data = {
+        participantType: 'MEMBER',
+        status: 'PENDING',
+        newData: { ...formValues },
+      };
+      await axios
+        .post(`${API_URL}/participants-request`, data, {
+          headers: {
+            'content-type': 'application/json',
+            'x-csrf-token': token,
+            // cookie: 'UHaLU99nOgBFBs2g5Iamyw',
+          },
+        })
+        .then((response) => {
+          setSaveCompleted(true);
+        });
+    } catch (err) {
+      console.log('error', err);
+    }
   }
 
   function handleAddNewRole() {
@@ -219,6 +266,14 @@ export function EditMemberModal({
     setFormValues({ ...formValues, [name]: selectedOption });
   }
 
+  const handleImageChange = (file: File) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => setImageUrl(reader.result as string);
+    setFormValues({ ...formValues, imageFile: file });
+    setImageChanged(true);
+  };
+
   function handleDeleteRolesRow(rowId) {
     const newRoles = formValues.teamAndRoles.filter(
       (item) => item.rowId != rowId
@@ -230,50 +285,88 @@ export function EditMemberModal({
     <>
       <Modal
         isOpen={isOpen}
-        setIsOpen={setIsModalOpen}
+        onClose={() => handleModalClose()}
         enableFooter={false}
         image="/assets/images/join_as_a_member.jpg"
       >
-        <div className="">
-          <FormStepsIndicator formStep={formStep} steps={steps} />
-          {errors?.length > 0 && (
-            <div className="w-full rounded-lg border border-gray-200 bg-white p-10 shadow hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
-              <ul className="list-inside list-disc space-y-1 text-red-500 dark:text-gray-400">
-                {errors.map((item, index) => (
-                  <li key={index}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <div className="">
-            <AddMemberBasicForm
-              formValues={formValues}
-              onChange={handleInputChange}
-            />
-            <AddMemberSkillForm
-              formValues={formValues}
-              dropDownValues={dropDownValues}
-              handleDropDownChange={handleDropDownChange}
-              handleAddNewRole={handleAddNewRole}
-              updateParentTeamValue={updateParentTeamValue}
-              updateParentRoleValue={updateParentRoleValue}
-              handleDeleteRolesRow={handleDeleteRolesRow}
-              onChange={handleInputChange}
-            />
-            <AddMemberSocialForm
-              formValues={formValues}
-              onChange={handleInputChange}
-            />
-          </div>
-          <div className="absolute bottom-3 flow-root w-full px-8 py-2">
-            <div className="float-left">
-              {getCancelOrBackButton(setIsModalOpen)}
-            </div>
-            <div className="float-right">
-              {getSubmitOrNextButton(handleSubmit)}
+        {saveCompleted ? (
+          <div>
+            <span className="text-lg">Thank you for submitting</span>
+            <span className="text-md">
+              Our team will review your request shortly & get back
+            </span>
+            <div>
+              <button
+                className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
+                onClick={() => null}
+              >
+                Return to home
+              </button>
             </div>
           </div>
-        </div>
+        ) : (
+          <div>
+            <div className="px-8">
+              <span className="text-sm">
+                Please fill out only the fields you would like to change for
+                this member. If there is something you want to change that is
+                not available, please leave a detailed explanation in
+                &quot;Additional Notes&quot;. If you don&apos;t want to change a
+                field, leave it blank.
+              </span>
+              <div className="pt-4 pb-10">
+                <InputField
+                  required
+                  name="requestorEmail"
+                  type="email"
+                  label="Requestor Email"
+                  value={formValues?.requestorEmail}
+                  onChange={handleInputChange}
+                  placeholder="Enter your email address"
+                />
+              </div>
+            </div>
+            {errors?.length > 0 && (
+              <div className="w-full rounded-lg border border-gray-200 bg-white p-10 shadow hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
+                <ul className="list-inside list-disc space-y-1 text-red-500 dark:text-gray-400">
+                  {errors.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="overflow-y-auto">
+              <AddMemberBasicForm
+                formValues={formValues}
+                onChange={handleInputChange}
+                handleImageChange={handleImageChange}
+                imageUrl={imageUrl}
+              />
+              <AddMemberSkillForm
+                formValues={formValues}
+                dropDownValues={dropDownValues}
+                handleDropDownChange={handleDropDownChange}
+                handleAddNewRole={handleAddNewRole}
+                updateParentTeamValue={updateParentTeamValue}
+                updateParentRoleValue={updateParentRoleValue}
+                handleDeleteRolesRow={handleDeleteRolesRow}
+                onChange={handleInputChange}
+              />
+              <AddMemberSocialForm
+                formValues={formValues}
+                onChange={handleInputChange}
+              />
+            </div>
+            <div className="absolute bottom-3 flow-root w-full px-8 py-2">
+              <div className="float-left">
+                {getCancelOrBackButton(handleModalClose)}
+              </div>
+              <div className="float-right">
+                {getSubmitOrNextButton(handleSubmit)}
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
     </>
   );

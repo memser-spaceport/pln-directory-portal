@@ -1,37 +1,31 @@
-import React, { useState, ChangeEvent } from 'react';
+import React from 'react';
 import {
   InputField,
   ProfileImageUpload,
-  Dropdown,
   TextArea,
 } from '@protocol-labs-network/ui';
 import { InformationCircleIcon } from '@heroicons/react/solid';
-import { FormValues } from './addteam';
+// import { FormValues } from './addteam';
 
-interface StepOneProps {
-  values: FormValues;
-  handleInputChange: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>;
-}
+// interface StepOneProps {
+//   values: FormValues;
+//   handleInputChange: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>;
+// }
 
 export default function AddMemberStepOne(props) {
   const values = props?.formValues;
   const onChange = props?.handleInputChange;
-  const [imageUrl, setImageUrl] = useState<string>();
 
-  const handleImageChange = (file: File) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => setImageUrl(reader.result as string);
-  };
 
   return (
     <>
       <div className="flex px-8 py-4">
         <div className="basis-1/4">
           <ProfileImageUpload
-            imageUrl={imageUrl}
+            imageUrl={props.imageUrl}
             maxSize={4}
-            onImageChange={handleImageChange}
+            previewImageShape="square"
+            onImageChange={props.handleImageChange}
           />
         </div>
         <div className="basis-3/4 pl-1">
@@ -61,6 +55,7 @@ export default function AddMemberStepOne(props) {
           name="description"
           label="Please briefly describe what your team/product/project does"
           placeholder="Enter your email address"
+          info="One to two sentences is perfect! Use clear language and minimal jargon."
         />
       </div>
 
@@ -71,16 +66,8 @@ export default function AddMemberStepOne(props) {
           onChange={onChange}
           name="longDescription"
           label="Long Description"
+          info="Please explain what your team does in a bit more detail. 4-5 sentences will be great!"
         />
-        <div className="flex pt-1 text-sm text-gray-400">
-          <div>
-            <InformationCircleIcon className="h-5 w-5" />
-          </div>
-          <span>
-            Please explain what your team does in a bit more detail. 4-5
-            sentences will be great!
-          </span>
-        </div>
       </div>
 
       {/* <div className="px-3 py-4">
@@ -109,8 +96,8 @@ export default function AddMemberStepOne(props) {
       <div className="px-8 py-4">
         <InputField
           required
-          value={values?.officeHoursLink}
-          name="teamOfficeHours"
+          value={values?.officeHours}
+          name="officeHours"
           onChange={onChange}
           label="Team Office Hours"
           placeholder="Enter address here"

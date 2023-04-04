@@ -9,13 +9,14 @@ interface Team {
 
 export function TeamAndRoleGrid(props) {
   const [teamDetail, setTeamDetail] = useState<Team>(props?.teamAndRole.team);
-  const [teamRowId, setTeamRowId] = useState(props?.teamAndRole.rowId);
+  const [teamRowId,] = useState(props?.teamAndRole.rowId);
   const [roleTitle, setRoleTitle] = useState(props?.teamAndRole.role);
   const team = props?.teamAndRole;
 
   const dropDownValues = props.dropDownValues;
 
   function handleDropDownChange(selectedOption, name) {
+    console.log('selectedOption', selectedOption);
     setTeamDetail(selectedOption);
     props.updateParentTeamValue(
       selectedOption.value,

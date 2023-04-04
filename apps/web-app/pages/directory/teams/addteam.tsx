@@ -28,7 +28,8 @@ interface AddTeamModalProps {
 export interface FormValues {
   name: string;
   email: string;
-  image: string;
+  logoUid: string;
+  logoFile: File;
   description: string;
   longDescription: string;
   protocol: string;
@@ -40,7 +41,7 @@ export interface FormValues {
   linkedinURL: string;
   twitterHandle: string;
   blog: string;
-  officeHoursLink: string;
+  officeHours: string;
 }
 
 const teamFormSteps = [
@@ -60,12 +61,15 @@ function validateBasicForm(formValues) {
   if (!formValues.longDescription) {
     errors.push('Please add Long Description.');
   }
+  if (!formValues.officeHours) {
+    errors.push('Please add Office Hours.');
+  }
   return errors;
 }
 
 function validateProjectDetailForm(formValues) {
   const errors = [];
-  if (!formValues.fundingStage.length) {
+  if (!formValues.fundingStage) {
     errors.push('Please add Funding Stage');
   }
   if (!formValues.industryTags.length) {
@@ -139,12 +143,12 @@ function getSubmitOrNextButton(
   return submitOrNextButton;
 }
 
-function getCancelOrBackButton(formStep, setIsModalOpen, setFormStep) {
+function getCancelOrBackButton(formStep, handleModalClose, setFormStep) {
   const cancelorBackButton =
     formStep === 1 ? (
       <button
         className="on-focus leading-3.5 text-md mr-2 mb-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
-        onClick={() => setIsModalOpen(false)}
+        onClick={() => handleModalClose()}
       >
         Cancel
       </button>
@@ -162,11 +166,14 @@ function getCancelOrBackButton(formStep, setIsModalOpen, setFormStep) {
 export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
   const [formStep, setFormStep] = useState<number>(1);
   const [errors, setErrors] = useState([]);
+  const [imageUrl, setImageUrl] = useState<string>();
+  const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [dropDownValues, setDropDownValues] = useState({});
   const [formValues, setFormValues] = useState<FormValues>({
     name: '',
     email: '',
-    image: '',
+    logoUid: '',
+    logoFile: null,
     description: '',
     longDescription: '',
     protocol: '',
@@ -178,26 +185,58 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     linkedinURL: '',
     twitterHandle: '',
     blog: '',
-    officeHoursLink: '',
+    officeHours: '',
   });
 
   useEffect(() => {
-    Promise.all([
-      fetchMembershipSources(),
-      fetchFundingStages(),
-      fetchIndustryTags(),
-      fetchProtocol(),
-    ])
-      .then((data) =>
-        setDropDownValues({
-          membershipSources: data[0],
-          fundingStages: data[1],
-          industryTags: data[2],
-          protocol: data[3],
-        })
-      )
-      .catch((e) => console.error(e));
-  }, []);
+    if (isOpen) {
+      Promise.all([
+        fetchMembershipSources(),
+        fetchFundingStages(),
+        fetchIndustryTags(),
+        fetchProtocol(),
+      ])
+        .then((data) =>
+          setDropDownValues({
+            membershipSources: data[0],
+            fundingStages: data[1],
+            industryTags: data[2],
+            protocol: data[3],
+          })
+        )
+        .catch((e) => console.error(e));
+    }
+  }, [isOpen]);
+
+  function resetState() {
+    setFormStep(1);
+    setErrors([]);
+    setDropDownValues({});
+    setSaveCompleted(false);
+    setFormValues({
+      name: '',
+      email: '',
+      logoUid: '',
+      logoFile: null,
+      description: '',
+      longDescription: '',
+      protocol: '',
+      fundingStage: '',
+      membershipSource: '',
+      industryTags: [],
+      contactMethod: '',
+      website: '',
+      linkedinURL: '',
+      twitterHandle: '',
+      blog: '',
+      officeHours: '',
+    });
+  }
+
+  function handleModalClose() {
+    resetState();
+    setIsModalOpen(false);
+  }
 
   async function handleSubmit() {
     console.log('formValues', formValues);
@@ -217,31 +256,13 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
               {
                 participantType: 'TEAM',
                 status: 'PENDING',
-                requesterEmail: formValues.email,
                 newData: { ...formValues },
               },
             ],
           };
           axios.request(options).then((response) => {
             console.log(response.data);
-            setIsModalOpen(false);
-            setFormValues({
-              name: '',
-              email: '',
-              image: '',
-              description: '',
-              longDescription: '',
-              protocol: '',
-              fundingStage: '',
-              membershipSource: '',
-              industryTags: [],
-              contactMethod: '',
-              website: '',
-              linkedinURL: '',
-              twitterHandle: '',
-              blog: '',
-              officeHoursLink: '',
-            });
+            setSaveCompleted(true);
           });
         }
       })
@@ -257,6 +278,13 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     setFormValues({ ...formValues, [name]: value });
   }
 
+  const handleImageChange = (file: File) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => setImageUrl(reader.result as string);
+    setFormValues({ ...formValues, logoFile: file });
+  };
+
   function handleDropDownChange(selectedOption, name) {
     setFormValues({ ...formValues, [name]: selectedOption });
   }
@@ -269,6 +297,8 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
             formValues={formValues}
             handleInputChange={handleInputChange}
             handleDropDownChange={handleDropDownChange}
+            handleImageChange={handleImageChange}
+            imageUrl={imageUrl}
           />
         );
       case 2:
@@ -303,35 +333,54 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     <>
       <Modal
         isOpen={isOpen}
-        setIsOpen={setIsModalOpen}
+        onClose={handleModalClose}
         enableFooter={false}
         image="/assets/images/join_as_a_member.jpg"
       >
-        <FormStepsIndicator formStep={formStep} steps={teamFormSteps} />
-        {errors?.length > 0 && (
-          <div className="w-full rounded-lg border border-gray-200 bg-white p-10 shadow hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
-            <ul className="list-inside list-disc space-y-1 text-red-500 dark:text-gray-400">
-              {errors.map((item, index) => (
-                <li key={index}>{item}</li>
-              ))}
-            </ul>
+        {saveCompleted ? (
+          <div>
+            <span className="text-lg">Thank you for submitting</span>
+            <span className="text-md">
+              Our team will review your request shortly & get back
+            </span>
+            <div>
+              <button
+                className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
+                onClick={() => null}
+              >
+                Return to home
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <FormStepsIndicator formStep={formStep} steps={teamFormSteps} />
+            {errors?.length > 0 && (
+              <div className="w-full rounded-lg border border-gray-200 bg-white p-10 shadow hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
+                <ul className="list-inside list-disc space-y-1 text-red-500 dark:text-gray-400">
+                  {errors.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="overflow-y-auto">{getFormStep()}</div>
+            <div className="bottom flow-root">
+              <div className="float-left m-2">
+                {getCancelOrBackButton(formStep, handleModalClose, setFormStep)}
+              </div>
+              <div className="float-right m-2">
+                {getSubmitOrNextButton(
+                  formValues,
+                  formStep,
+                  setFormStep,
+                  handleSubmit,
+                  setErrors
+                )}
+              </div>
+            </div>
           </div>
         )}
-        <div className="overflow-y-auto">{getFormStep()}</div>
-        <div className="bottom flow-root">
-          <div className="float-left m-2">
-            {getCancelOrBackButton(formStep, setIsModalOpen, setFormStep)}
-          </div>
-          <div className="float-right m-2">
-            {getSubmitOrNextButton(
-              formValues,
-              formStep,
-              setFormStep,
-              handleSubmit,
-              setErrors
-            )}
-          </div>
-        </div>
       </Modal>
     </>
   );

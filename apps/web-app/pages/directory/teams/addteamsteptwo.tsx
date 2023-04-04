@@ -8,8 +8,9 @@ const Options = [
   { value: '3', label: 'Option 3' },
 ];
 
-export default function AddMemberStepTwo(props) {
+export default function AddTeamStepTwo(props) {
   const values = props?.formValues;
+  console.log('values', values);
   const dropDownValues = props?.dropDownValues;
   const handleDropDownChange = props?.handleDropDownChange;
 
@@ -64,9 +65,9 @@ export default function AddMemberStepTwo(props) {
 
       <div className="px-8 py-4">
         <MultiSelect
-          name="skills"
+          name="industryTags"
           options={dropDownValues.industryTags}
-          selectedValues={props.formValues.skills}
+          selectedValues={values.industryTags}
           onChange={props.handleDropDownChange}
           placeholder="Enter the skills"
           label="Industry Tags*"

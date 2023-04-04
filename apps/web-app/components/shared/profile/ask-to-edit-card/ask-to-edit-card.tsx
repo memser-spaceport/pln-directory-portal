@@ -1,6 +1,6 @@
 import { PencilAltIcon } from '@heroicons/react/outline';
 import { trackGoal } from 'fathom-client';
-import Link from 'next/link';
+// import Link from 'next/link';
 import { useState } from 'react';
 import { FATHOM_EVENTS } from '../../../../constants';
 import { EditMemberModal } from '../../../../pages/directory/members/editmember';

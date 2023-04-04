@@ -33,11 +33,16 @@ const steps = [
 
 function validateBasicForm(formValues) {
   const errors = [];
+  const emailRE =
+    /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   if (!formValues.name) {
     errors.push('Name is required.');
   }
   if (!formValues.email) {
     errors.push('Email field is required.');
+  }
+  if (!formValues.email.match(emailRE)) {
+    errors.push('Please enter valid email.');
   }
   return errors;
 }
@@ -108,12 +113,12 @@ function getSubmitOrNextButton(
   return submitOrNextButton;
 }
 
-function getCancelOrBackButton(formStep, setIsModalOpen, setFormStep) {
+function getCancelOrBackButton(formStep, handleModalClose, setFormStep) {
   const cancelorBackButton =
     formStep === 1 ? (
       <button
         className="on-focus leading-3.5 text-md mr-2 mb-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
-        onClick={() => setIsModalOpen(false)}
+        onClick={() => handleModalClose()}
       >
         Cancel
       </button>
@@ -135,10 +140,13 @@ export function AddMemberModal({
   const [formStep, setFormStep] = useState<number>(1);
   const [errors, setErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({});
+  const [imageUrl, setImageUrl] = useState<string>();
+  const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<FormValues>({
     name: '',
     email: '',
-    image: '',
+    imageUid: '',
+    imageFile: null,
     plnStartDate: moment(new Date()).format('DD/MM/YYYY'),
     city: '',
     region: '',
@@ -154,12 +162,45 @@ export function AddMemberModal({
   });
 
   useEffect(() => {
-    Promise.all([fetchSkills(), fetchTeams()])
-      .then((allData) =>
-        setDropDownValues({ skillValues: allData[0], teamNames: allData[1] })
-      )
-      .catch((e) => console.error(e));
-  }, []);
+    if (isOpen) {
+      Promise.all([fetchSkills(), fetchTeams()])
+        .then((allData) =>
+          setDropDownValues({ skillValues: allData[0], teamNames: allData[1] })
+        )
+        .catch((e) => console.error(e));
+    }
+  }, [isOpen]);
+
+  function resetState() {
+    setFormStep(1);
+    setErrors([]);
+    setDropDownValues({});
+    setSaveCompleted(false);
+    setImageUrl('');
+    setFormValues({
+      name: '',
+      email: '',
+      imageUid: '',
+      imageFile: null,
+      plnStartDate: moment(new Date()).format('DD/MM/YYYY'),
+      city: '',
+      region: '',
+      country: '',
+      linkedinURL: '',
+      discordHandler: '',
+      twitterHandler: '',
+      githubHandler: '',
+      officeHours: '',
+      comments: '',
+      teamAndRoles: [],
+      skills: [],
+    });
+  }
+
+  function handleModalClose() {
+    resetState();
+    setIsModalOpen(false);
+  }
 
   function formatData() {
     // const formattedSkills = formValues.skills.map(item=>{
@@ -198,24 +239,7 @@ export function AddMemberModal({
           },
         })
         .then((response) => {
-          setIsModalOpen(false);
-          setFormValues({
-            name: '',
-            email: '',
-            image: '',
-            plnStartDate: moment(new Date()).format('DD/MM/YYYY'),
-            city: '',
-            region: '',
-            country: '',
-            linkedinURL: '',
-            discordHandler: '',
-            twitterHandler: '',
-            githubHandler: '',
-            officeHours: '',
-            comments: '',
-            teamAndRoles: [],
-            skills: [],
-          });
+          setSaveCompleted(true);
         });
     } catch (err) {
       console.log('error', err);
@@ -258,6 +282,13 @@ export function AddMemberModal({
     setFormValues({ ...formValues, [name]: selectedOption });
   }
 
+  const handleImageChange = (file: File) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => setImageUrl(reader.result as string);
+    setFormValues({ ...formValues, imageFile: file });
+  };
+
   function handleDeleteRolesRow(rowId) {
     const newRoles = formValues.teamAndRoles.filter(
       (item) => item.rowId != rowId
@@ -272,6 +303,8 @@ export function AddMemberModal({
           <AddMemberBasicForm
             formValues={formValues}
             onChange={handleInputChange}
+            handleImageChange={handleImageChange}
+            imageUrl={imageUrl}
           />
         );
       case 2:
@@ -308,37 +341,54 @@ export function AddMemberModal({
     <>
       <Modal
         isOpen={isOpen}
-        setIsOpen={setIsModalOpen}
+        onClose={() => handleModalClose()}
         enableFooter={false}
         image="/assets/images/join_as_a_member.jpg"
       >
-        <div className="">
-          <FormStepsIndicator formStep={formStep} steps={steps} />
-          {errors?.length > 0 && (
-            <div className="w-full rounded-lg border border-gray-200 bg-white p-10 shadow hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
-              <ul className="list-inside list-disc space-y-1 text-red-500 dark:text-gray-400">
-                {errors.map((item, index) => (
-                  <li key={index}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <div className="">{getFormWithStep()}</div>
-          <div className="absolute bottom-3 flow-root w-full px-8 py-2">
-            <div className="float-left">
-              {getCancelOrBackButton(formStep, setIsModalOpen, setFormStep)}
-            </div>
-            <div className="float-right">
-              {getSubmitOrNextButton(
-                formValues,
-                formStep,
-                setFormStep,
-                handleSubmit,
-                setErrors
-              )}
+        {saveCompleted ? (
+          <div>
+            <span className="text-lg">Thank you for submitting</span>
+            <span className="text-md">
+              Our team will review your request shortly & get back
+            </span>
+            <div>
+              <button
+                className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
+                onClick={() => null}
+              >
+                Return to home
+              </button>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="">
+            <FormStepsIndicator formStep={formStep} steps={steps} />
+            {errors?.length > 0 && (
+              <div className="w-full rounded-lg border border-gray-200 bg-white p-10 shadow hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
+                <ul className="list-inside list-disc space-y-1 text-red-500 dark:text-gray-400">
+                  {errors.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="">{getFormWithStep()}</div>
+            <div className="absolute bottom-3 flow-root w-full px-8 py-2">
+              <div className="float-left">
+                {getCancelOrBackButton(formStep, handleModalClose, setFormStep)}
+              </div>
+              <div className="float-right">
+                {getSubmitOrNextButton(
+                  formValues,
+                  formStep,
+                  setFormStep,
+                  handleSubmit,
+                  setErrors
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
     </>
   );
