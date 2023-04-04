@@ -1,58 +1,56 @@
 /* eslint-disable prettier/prettier */
-import { Body, Controller, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { ApprovalStatus } from '@prisma/client';
-import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { ParticipantsRequestService } from './participants-request.service';
-import { apiParticipantRequests } from '../../../../libs/contracts/src/lib/contract-participant-request';
-import { ApiParam } from '@nestjs/swagger';
-
-const server = initNestServer(apiParticipantRequests);
-@Controller()
+@Controller('participants-request')
 export class ParticipantsRequestController {
   constructor(
     private readonly participantsRequestService: ParticipantsRequestService
   ) {}
 
-  @Api(server.route.getParticipantRequests)
+  @Get()
   async findAll(@Query() query) {
+    console.log(query);
     const result = await this.participantsRequestService.getAll(query);
     return result;
   }
 
-  @Api(server.route.getParticipantRequest)
-  @ApiParam({ name: 'uid', type: 'string' })
-  async findOne(@ApiDecorator() { params: { uid } }) {
-    const result = await this.participantsRequestService.getByUid(uid);
+  @Get(':uid')
+  async findOne(@Param() params) {
+    const result = await this.participantsRequestService.getByUid(params.uid);
     return result;
   }
 
-  @Api(server.route.addParticipantRequest)
+  @Post()
   async addRequest(@Body() body) {
     const postData = body;
     const result = await this.participantsRequestService.addRequest(postData);
     return result;
   }
 
-  @Api(server.route.updateParticipantRequest)
-  @ApiParam({ name: 'uid', type: 'string' })
-  async updateRequest(@Body() body, @ApiDecorator() { params: { uid } }) {
+  @Put(':uid')
+  async updateRequest(@Body() body, @Param() params) {
     const postData = body;
     const result = await this.participantsRequestService.updateRequest(
       postData,
-      uid
+      params.uid
     );
     return result;
   }
 
-  @Api(server.route.checkForExistingParticipantsAndRequests)
-  async test() {
-    console.log('in test');
-    return { message: 'Found' };
-  }
-
-  @Api(server.route.processParticipantRequest)
-  @ApiParam({ name: 'uid', type: 'string' })
-  async processRequest(@Body() body, @ApiDecorator() { params: { uid } }) {
+  @Patch(':uid')
+  async processRequest(@Body() body, @Param() params) {
+    const uid = params.uid;
     const participantType = body.participantType;
     const referenceUid = body.referenceUid;
     const statusToProcess = body.status;
