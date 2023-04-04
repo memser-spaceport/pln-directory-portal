@@ -9,13 +9,12 @@ export default function AddMemberSkillForm(props) {
   return (
     <>
       <div className="px-8 py-4">
-        {
-          teamAndRoles.length > 0 &&
+        {teamAndRoles.length > 0 && (
           <div className="flex flex-row pt-4">
             <span className="basis-5/12">Team*</span>
             <span className="basis-5/12 pl-5">Role*</span>
           </div>
-        }
+        )}
         {teamAndRoles.map((item, index) => (
           <TeamAndRoleGrid
             key={item.rowId}
@@ -28,7 +27,10 @@ export default function AddMemberSkillForm(props) {
           />
         ))}
         <div>
-          <button className="text-blue-500 pt-3" onClick={props.handleAddNewRole}>
+          <button
+            className="pt-3 text-blue-500"
+            onClick={props.handleAddNewRole}
+          >
             + Add Role
           </button>
         </div>
@@ -36,7 +38,7 @@ export default function AddMemberSkillForm(props) {
           <div>
             <InformationCircleIcon className="h-5 w-5" />
           </div>
-          <span className='font-size-13'>
+          <span className="font-size-13">
             Select the team(s) that you work for & the title you hold in your
             team. If your team is not on the list, click here & add your team
             first.
@@ -56,7 +58,9 @@ export default function AddMemberSkillForm(props) {
           <div>
             <InformationCircleIcon className="h-5 w-5" />
           </div>
-          <span className='font-size-13'>Share what you do! This will help us connect with others!</span>
+          <span className="font-size-13">
+            Share what you do! This will help us connect with others!
+          </span>
         </div>
       </div>
     </>

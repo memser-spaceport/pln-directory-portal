@@ -27,7 +27,7 @@ export default function AddMemberStepOne(props) {
             onImageChange={props.handleImageChange}
           />
         </div>
-        <div className="basis-3/4 pl-1 inputfield">
+        <div className="inputfield basis-3/4 pl-1">
           <InputField
             required
             value={values?.name}
@@ -43,7 +43,9 @@ export default function AddMemberStepOne(props) {
         <div>
           <InformationCircleIcon className="h-5 w-5" />
         </div>
-        <span className='font-size-13'>Please upload a squared image in PNG or JPEG format only</span>
+        <span className="font-size-13">
+          Please upload a squared image in PNG or JPEG format only
+        </span>
       </div>
 
       <div className="px-8 py-4">
@@ -92,7 +94,7 @@ export default function AddMemberStepOne(props) {
         />
       </div> */}
 
-      <div className="px-8 py-4 inputfield hint-text">
+      <div className="inputfield hint-text px-8 py-4">
         <InputField
           required
           value={values?.officeHours}

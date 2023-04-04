@@ -56,7 +56,7 @@ export function ProfileImageUpload({
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center bg-gray-100">
           <CameraIcon className="h-10 w-10 text-gray-300" />
-          <span className="text-sm text-blue-600 font-size-12">Add Image</span>
+          <span className="font-size-12 text-sm text-blue-600">Add Image</span>
         </div>
       )}
       <input

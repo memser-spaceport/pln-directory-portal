@@ -365,7 +365,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
               </div>
             )}
             <div className="px-3">{getFormStep()}</div>
-            <div className="flow-root w-full px-8 footerdiv ">
+            <div className="footerdiv flow-root w-full px-8 ">
               <div className="float-left m-2">
                 {getCancelOrBackButton(formStep, handleModalClose, setFormStep)}
               </div>

@@ -57,26 +57,27 @@
   .on-focus--link {
     @apply focus-within:shadow-[0_1px_0_#156ff7] focus-within:outline-none focus:shadow-[0_1px_0_#156ff7] focus:outline-none focus-visible:shadow-[0_1px_0_#156ff7] focus-visible:outline-none;
   }
-  .profileImage > div{
+  .profileImage > div {
     width: 100px;
-      height: 100px;
-      position: relative;
-      /* top: 10px; */
+    height: 100px;
+    position: relative;
+    /* top: 10px; */
   }
 }
 
-.inputfield input{
+.inputfield input {
   position: relative;
   top: 10px;
 }
 
-.namefield{
+.namefield {
   left: 32px;
   position: relative;
   flex-basis: 78%;
 }
 
-.inputfield input,.inputfield textarea{
+.inputfield input,
+.inputfield textarea {
   position: relative;
   top: 10px;
 }
@@ -91,7 +92,7 @@
 
 .footerdiv {
   margin-top: 32px;
-  border-top: solid #E2E8F0 1px;
+  border-top: solid #e2e8f0 1px;
   padding-top: 24px;
   padding-bottom: 32px;
   padding-left: 54px;
@@ -102,30 +103,30 @@
   height: 16px;
 }
 
-.font-size-13{
+.font-size-13 {
   font-size: 13px;
 }
 
-.font-size-14{
+.font-size-14 {
   font-size: 14px;
 }
 
-.font-size-12{
+.font-size-12 {
   font-size: 12px;
 }
 
-.formStep2{
+.formStep2 {
   position: absolute;
   bottom: 0px;
 }
 
-.hint-text > div:first-of-type{
+.hint-text > div:first-of-type {
   padding-top: 16px;
   font-size: 13px;
 }
 
-.step-line{
+.step-line {
   position: relative;
   top: 25px;
-  border: 1px solid #156FF7;
+  border: 1px solid #156ff7;
 }

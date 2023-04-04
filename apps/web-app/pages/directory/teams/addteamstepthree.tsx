@@ -8,7 +8,7 @@ export default function AddMemberStepThree(props) {
 
   return (
     <>
-      <div className="px-8 py-4 inputfield hint-text">
+      <div className="inputfield hint-text px-8 py-4">
         <InputField
           label="Preferred method of contact*"
           name="contactMethod"
@@ -28,7 +28,7 @@ export default function AddMemberStepThree(props) {
         </div>
       </div>
 
-      <div className="px-8 py-4 inputfield hint-text">
+      <div className="inputfield hint-text px-8 py-4">
         <InputField
           label="Website address*"
           name="website"
@@ -47,7 +47,7 @@ export default function AddMemberStepThree(props) {
         </div>
       </div>
 
-      <div className="px-8 py-4 inputfield">
+      <div className="inputfield px-8 py-4">
         <InputField
           label="LinkedIn URL"
           name="linkedIn"
@@ -56,7 +56,7 @@ export default function AddMemberStepThree(props) {
           placeholder="eg., https://www.linkedin.com/in/jbenetcs/"
         />
       </div>
-      <div className="px-8 py-4 inputfield">
+      <div className="inputfield px-8 py-4">
         <InputField
           label="Twitter Handle"
           name="twitter"
@@ -66,7 +66,7 @@ export default function AddMemberStepThree(props) {
         />
       </div>
 
-      <div className="px-8 py-4 inputfield hint-text">
+      <div className="inputfield hint-text px-8 py-4">
         <InputField
           label="Blog address"
           name="blog"

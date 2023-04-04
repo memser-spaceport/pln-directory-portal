@@ -43,7 +43,7 @@ export function TextArea({
       </label>
       {info && (
         <div className="py-2">
-          <span className="text-sm text-gray-400 font-size-13">{info}</span>
+          <span className="font-size-13 text-sm text-gray-400">{info}</span>
         </div>
       )}
       <textarea

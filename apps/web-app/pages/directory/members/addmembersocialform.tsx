@@ -7,7 +7,7 @@ export default function AddMemberSocialForm(props) {
 
   return (
     <>
-      <div className="px-8 py-4 inputfield">
+      <div className="inputfield px-8 py-4">
         <InputField
           label="LinkedIn URL"
           onChange={onChange}
@@ -17,7 +17,7 @@ export default function AddMemberSocialForm(props) {
         />
       </div>
 
-      <div className="px-8 py-4 inputfield hint-text">
+      <div className="inputfield hint-text px-8 py-4">
         <InputField
           label="Discord Handle"
           name="discordHandler"
@@ -36,7 +36,7 @@ export default function AddMemberSocialForm(props) {
         </div>
       </div>
 
-      <div className="px-8 py-4 flex">
+      <div className="flex px-8 py-4">
         <div className="inputfield w-[50%] pr-4">
           <InputField
             label="Twitter Handle"
@@ -57,7 +57,7 @@ export default function AddMemberSocialForm(props) {
         </div>
       </div>
 
-      <div className="px-8 py-4 inputfield hint-text">
+      <div className="inputfield hint-text px-8 py-4">
         <InputField
           label="Office Hours Link"
           name="officeHours"
@@ -76,7 +76,7 @@ export default function AddMemberSocialForm(props) {
         </div>
       </div>
 
-      <div className="px-8 py-4 inputfield">
+      <div className="inputfield px-8 py-4">
         <TextArea
           name="comments"
           onChange={onChange}

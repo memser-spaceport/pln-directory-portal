@@ -63,7 +63,7 @@ export function MultiSelect({
     <div className="">
       {label && <span className="mb-4">{label}</span>}
       <div
-        className="flex mt-2.5 cursor-pointer items-center justify-between rounded-md border bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="mt-2.5 flex cursor-pointer items-center justify-between rounded-md border bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
         onClick={toggleDropdown}
         onBlur={() => {
           console.log('evnet called');
@@ -88,7 +88,9 @@ export function MultiSelect({
               </div>
             ))
           ) : (
-            <span className="text-gray-400 pl-3">{placeholder || 'Select...'}</span>
+            <span className="pl-3 text-gray-400">
+              {placeholder || 'Select...'}
+            </span>
           )}
         </div>
         <ChevronDownIcon
@@ -96,35 +98,37 @@ export function MultiSelect({
         />
       </div>
       {isExpanded && (
-        <div className='relative'>
+        <div className="relative">
           <div
-          // className="absolute left-0  z-[1056] mt-1 mr-5 h-[25%] w-full overflow-y-auto rounded-md bg-white shadow-lg"
-          className="absolute z-[1056] overflow-y-auto rounded-md bg-white shadow-lg w-full h-[250px]"
-          onBlur={() => setIsExpanded(false)}
-        >
-          {internalOptions?.length > 0 ? (
-            internalOptions.map((item: Option) => (
-              <label
-                className="block w-full cursor-pointer px-3 py-2 text-gray-800 hover:bg-gray-100"
-                key={item.value}
-              >
-                <button
-                  type="button"
-                  value={item.value}
-                  onClick={() => handleOptionClick(item)}
-                  className="mr-2 h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-400"
-                />
-                <span className="font-medium text-gray-900">{item.label}</span>
+            // className="absolute left-0  z-[1056] mt-1 mr-5 h-[25%] w-full overflow-y-auto rounded-md bg-white shadow-lg"
+            className="absolute z-[1056] h-[250px] w-full overflow-y-auto rounded-md bg-white shadow-lg"
+            onBlur={() => setIsExpanded(false)}
+          >
+            {internalOptions?.length > 0 ? (
+              internalOptions.map((item: Option) => (
+                <label
+                  className="block w-full cursor-pointer px-3 py-2 text-gray-800 hover:bg-gray-100"
+                  key={item.value}
+                >
+                  <button
+                    type="button"
+                    value={item.value}
+                    onClick={() => handleOptionClick(item)}
+                    className="mr-2 h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-400"
+                  />
+                  <span className="font-medium text-gray-900">
+                    {item.label}
+                  </span>
+                </label>
+              ))
+            ) : (
+              <label>
+                <span className="font-sm text-gray-500">
+                  No options available
+                </span>
               </label>
-            ))
-          ) : (
-            <label>
-              <span className="font-sm text-gray-500">
-                No options available
-              </span>
-            </label>
-          )}
-        </div>
+            )}
+          </div>
         </div>
       )}
     </div>

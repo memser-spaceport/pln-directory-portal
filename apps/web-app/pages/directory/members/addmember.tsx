@@ -373,7 +373,9 @@ export function AddMemberModal({
               </div>
             )}
             <div className="px-3">{getFormWithStep()}</div>
-            <div className={`flow-root w-full px-8 footerdiv formStep${formStep }`}>
+            <div
+              className={`footerdiv flow-root w-full px-8 formStep${formStep}`}
+            >
               <div className="float-left">
                 {getCancelOrBackButton(formStep, handleModalClose, setFormStep)}
               </div>
