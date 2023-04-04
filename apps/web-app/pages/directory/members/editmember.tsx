@@ -307,14 +307,14 @@ export function EditMemberModal({
         ) : (
           <div>
             <div className="px-8">
-              <span className="text-sm">
+              <span className="text-sm font-size-14">
                 Please fill out only the fields you would like to change for
                 this member. If there is something you want to change that is
                 not available, please leave a detailed explanation in
                 &quot;Additional Notes&quot;. If you don&apos;t want to change a
                 field, leave it blank.
               </span>
-              <div className="pt-4 pb-10">
+              <div className="pt-4 pb-10 inputfield">
                 <InputField
                   required
                   name="requestorEmail"
@@ -357,7 +357,7 @@ export function EditMemberModal({
                 onChange={handleInputChange}
               />
             </div>
-            <div className="absolute bottom-3 flow-root w-full px-8 py-2">
+            <div className="flow-root w-full px-8 footerdiv">
               <div className="float-left">
                 {getCancelOrBackButton(handleModalClose)}
               </div>

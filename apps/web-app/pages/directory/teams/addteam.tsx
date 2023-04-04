@@ -364,8 +364,8 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
                 </ul>
               </div>
             )}
-            <div className="overflow-y-auto">{getFormStep()}</div>
-            <div className="bottom flow-root">
+            <div className="px-3">{getFormStep()}</div>
+            <div className="flow-root w-full px-8 footerdiv ">
               <div className="float-left m-2">
                 {getCancelOrBackButton(formStep, handleModalClose, setFormStep)}
               </div>

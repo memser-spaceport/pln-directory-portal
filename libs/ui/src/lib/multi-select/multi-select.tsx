@@ -61,9 +61,9 @@ export function MultiSelect({
 
   return (
     <div className="">
-      {label && <span className="">{label}</span>}
+      {label && <span className="mb-4">{label}</span>}
       <div
-        className="flex  cursor-pointer items-center justify-between rounded-md border bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="flex mt-2.5 cursor-pointer items-center justify-between rounded-md border bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
         onClick={toggleDropdown}
         onBlur={() => {
           console.log('evnet called');
@@ -88,7 +88,7 @@ export function MultiSelect({
               </div>
             ))
           ) : (
-            <span className="text-gray-400">{placeholder || 'Select...'}</span>
+            <span className="text-gray-400 pl-3">{placeholder || 'Select...'}</span>
           )}
         </div>
         <ChevronDownIcon
@@ -96,8 +96,10 @@ export function MultiSelect({
         />
       </div>
       {isExpanded && (
-        <div
-          className="absolute left-0  z-[1056] mt-1 mr-5 h-[25%] w-full overflow-y-auto rounded-md bg-white shadow-lg"
+        <div className='relative'>
+          <div
+          // className="absolute left-0  z-[1056] mt-1 mr-5 h-[25%] w-full overflow-y-auto rounded-md bg-white shadow-lg"
+          className="absolute z-[1056] overflow-y-auto rounded-md bg-white shadow-lg w-full h-[250px]"
           onBlur={() => setIsExpanded(false)}
         >
           {internalOptions?.length > 0 ? (
@@ -122,6 +124,7 @@ export function MultiSelect({
               </span>
             </label>
           )}
+        </div>
         </div>
       )}
     </div>

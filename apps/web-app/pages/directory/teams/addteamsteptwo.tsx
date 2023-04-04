@@ -28,7 +28,7 @@ export default function AddTeamStepTwo(props) {
           <div>
             <InformationCircleIcon className="h-5 w-5" />
           </div>
-          <span>Does your team/project use any of these protocol?</span>
+          <span className='font-size-13'>Does your team/project use any of these protocol?</span>
         </div>
       </div>
 
@@ -54,7 +54,7 @@ export default function AddTeamStepTwo(props) {
           <div>
             <InformationCircleIcon className="h-5 w-5" />
           </div>
-          <span>
+          <span className='font-size-13'>
             Core Contributor = a team that is building improvements/additional
             features for protocols like libp2p, IPFS, IPLD, and Filecoin. A
             Friend of PL = a team that is using protocols like libp2p, IPFS,
@@ -76,7 +76,7 @@ export default function AddTeamStepTwo(props) {
           <div>
             <InformationCircleIcon className="h-5 w-5" />
           </div>
-          <span>
+          <span className='font-size-13'>
             Add industries that you had worked in. This will make it easier for
             people to find & connect based on shared professional interests.
           </span>

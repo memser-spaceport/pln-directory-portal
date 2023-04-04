@@ -310,14 +310,14 @@ export function EditTeamModal({
         ) : (
           <div>
             <div className="px-8">
-              <span className="text-sm">
+              <span className="text-sm font-size-14">
                 Please fill out only the fields you would like to change for
                 this member. If there is something you want to change that is
                 not available, please leave a detailed explanation in
-                &quot;Additional Notes&quot;. If you don&apos;t want to change a
-                field, leave it blank.
+                &quot;Additional Notes&quot;. If you don&apos;t want to
+                change a field, leave it blank.
               </span>
-              <div className="pt-4 pb-10">
+              <div className="pt-4 pb-10 inputfield">
                 <InputField
                   required
                   name="requestorEmail"
@@ -358,7 +358,7 @@ export function EditTeamModal({
                 handleDropDownChange={handleDropDownChange}
               />
             </div>
-            <div className="bottom flow-root">
+            <div className="flow-root w-full px-8 footerdiv">
               <div className="float-left m-2">
                 {getCancelOrBackButton(handleModalClose)}
               </div>
