@@ -11,7 +11,7 @@ const server = initNestServer(apiParticipantRequests);
 export class ParticipantsRequestController {
   constructor(
     private readonly participantsRequestService: ParticipantsRequestService
-  ) { }
+  ) {}
 
   @Api(server.route.getParticipantRequests)
   async findAll(@Query() query) {
@@ -37,14 +37,17 @@ export class ParticipantsRequestController {
   @ApiParam({ name: 'uid', type: 'string' })
   async updateRequest(@Body() body, @ApiDecorator() { params: { uid } }) {
     const postData = body;
-    const result = await this.participantsRequestService.updateRequest(postData, uid);
+    const result = await this.participantsRequestService.updateRequest(
+      postData,
+      uid
+    );
     return result;
   }
 
   @Api(server.route.checkForExistingParticipantsAndRequests)
   async test() {
-    console.log('in test')
-    return { message: 'Found' }
+    console.log('in test');
+    return { message: 'Found' };
   }
 
   @Api(server.route.processParticipantRequest)
@@ -60,20 +63,44 @@ export class ParticipantsRequestController {
       result = await this.participantsRequestService.processRejectRequest(uid);
     }
     // Process approval for create team
-    else if (participantType === 'TEAM' && statusToProcess === ApprovalStatus.APPROVED.toString() && !referenceUid) {
-      result = await this.participantsRequestService.processTeamCreateRequest(uid);
+    else if (
+      participantType === 'TEAM' &&
+      statusToProcess === ApprovalStatus.APPROVED.toString() &&
+      !referenceUid
+    ) {
+      result = await this.participantsRequestService.processTeamCreateRequest(
+        uid
+      );
     }
     // Process approval for create Member
-    else if (participantType === 'MEMBER' && statusToProcess === ApprovalStatus.APPROVED.toString() && !referenceUid) {
-      result = await this.participantsRequestService.processMemberCreateRequest(uid);
+    else if (
+      participantType === 'MEMBER' &&
+      statusToProcess === ApprovalStatus.APPROVED.toString() &&
+      !referenceUid
+    ) {
+      result = await this.participantsRequestService.processMemberCreateRequest(
+        uid
+      );
     }
     // Process approval for Edit Team
-    else if (participantType === 'TEAM' && statusToProcess === ApprovalStatus.APPROVED.toString() && referenceUid) {
-      result = await this.participantsRequestService.processTeamEditRequest(uid);
+    else if (
+      participantType === 'TEAM' &&
+      statusToProcess === ApprovalStatus.APPROVED.toString() &&
+      referenceUid
+    ) {
+      result = await this.participantsRequestService.processTeamEditRequest(
+        uid
+      );
     }
     // Process approval for Edit Member
-    else if (participantType === 'MEMBER' && statusToProcess === ApprovalStatus.APPROVED.toString() && referenceUid) {
-      result = await this.participantsRequestService.processMemberEditRequest(uid);
+    else if (
+      participantType === 'MEMBER' &&
+      statusToProcess === ApprovalStatus.APPROVED.toString() &&
+      referenceUid
+    ) {
+      result = await this.participantsRequestService.processMemberEditRequest(
+        uid
+      );
     }
     return result;
   }

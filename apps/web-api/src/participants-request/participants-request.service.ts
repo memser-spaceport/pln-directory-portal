@@ -11,7 +11,7 @@ export class ParticipantsRequestService {
     private prisma: PrismaService,
     private locationTransferService: LocationTransferService,
     private awsService: AwsService
-  ) { }
+  ) {}
 
   async getAll(userQuery) {
     const filters = {};
@@ -54,41 +54,102 @@ export class ParticipantsRequestService {
   }
 
   async findDuplicates(uniqueIdentifier, participantType) {
-    console.log('in duplicates', participantType)
+    console.log('in duplicates', participantType);
 
-    const itemInRequest = await this.prisma.participantsRequest.findMany({where: {AND: {uniqueIdentifier: uniqueIdentifier, status: ApprovalStatus.PENDING}}});
-    if(itemInRequest.length === 0) {
-      if(participantType === 'TEAM') {
-          console.log(uniqueIdentifier)
-          const teamResult = await this.prisma.team.findMany({where: {name: uniqueIdentifier}})
-          return teamResult
-        } else {
-          const memResult = await this.prisma.member.findMany({where: {email: uniqueIdentifier}})
-          return memResult;
-        }
+    const itemInRequest = await this.prisma.participantsRequest.findMany({
+      where: {
+        AND: {
+          uniqueIdentifier: uniqueIdentifier,
+          status: ApprovalStatus.PENDING,
+        },
+      },
+    });
+    if (itemInRequest.length === 0) {
+      if (participantType === 'TEAM') {
+        console.log(uniqueIdentifier);
+        const teamResult = await this.prisma.team.findMany({
+          where: { name: uniqueIdentifier },
+        });
+        return teamResult;
+      } else {
+        const memResult = await this.prisma.member.findMany({
+          where: { email: uniqueIdentifier },
+        });
+        return memResult;
+      }
     } else {
       return itemInRequest;
     }
-    
   }
 
   async addRequest(requestData) {
-    const uniqueIdentifier = requestData.participantType === 'TEAM' ? requestData.newData.name : requestData.newData.email;
-    const postData = {...requestData, uniqueIdentifier}
+    const uniqueIdentifier =
+      requestData.participantType === 'TEAM'
+        ? requestData.newData.name
+        : requestData.newData.email;
+    const postData = { ...requestData, uniqueIdentifier };
     requestData[uniqueIdentifier] = uniqueIdentifier;
-  
-    const result: any = await this.prisma.participantsRequest.create({ data: { ...postData } });
-    if (result.participantType === ParticipantType.MEMBER.toString() && result.referenceUid === null) {
-      await this.awsService.sendEmail('NewMemberRequest', ['thangaraj.esakky@ideas2it.com'], {memberName: result.newData.name, requestUid: result.uid, adminSiteUrl: 'https://www.google/com' })
-    } else if (result.participantType === ParticipantType.MEMBER.toString() && result.referenceUid !== null) {
-      await this.awsService.sendEmail('EditMemberRequest', ['thangaraj.esakky@ideas2it.com'], {teamName: result.newData.name, requestUid: result.uid, requesterEmailId: requestData.editRequestorEmailId, adminSiteUrl: 'https://www.google/com' } )
-    } else if (result.participantType === ParticipantType.TEAM.toString() && result.referenceUid === null) {
-      await this.awsService.sendEmail('NewTeamRequest',['thangaraj.esakky@ideas2it.com'], {teamName: result.newData.name, requestUid: result.uid, adminSiteUrl: 'https://www.google/com' } )
-    } else if (result.participantType === ParticipantType.MEMBER.toString() && result.referenceUid !== null) {
-      await this.awsService.sendEmail('EditTeamRequest', ['thangaraj.esakky@ideas2it.com'], {teamName: result.newData.name, requestUid: result.uid,  requesterEmailId: requestData.editRequestorEmailId, adminSiteUrl: 'https://www.google/com' } )
+
+    const result: any = await this.prisma.participantsRequest.create({
+      data: { ...postData },
+    });
+    if (
+      result.participantType === ParticipantType.MEMBER.toString() &&
+      result.referenceUid === null
+    ) {
+      await this.awsService.sendEmail(
+        'NewMemberRequest',
+        ['thangaraj.esakky@ideas2it.com'],
+        {
+          memberName: result.newData.name,
+          requestUid: result.uid,
+          adminSiteUrl: 'https://www.google/com',
+        }
+      );
+    } else if (
+      result.participantType === ParticipantType.MEMBER.toString() &&
+      result.referenceUid !== null
+    ) {
+      await this.awsService.sendEmail(
+        'EditMemberRequest',
+        ['thangaraj.esakky@ideas2it.com'],
+        {
+          teamName: result.newData.name,
+          requestUid: result.uid,
+          requesterEmailId: requestData.editRequestorEmailId,
+          adminSiteUrl: 'https://www.google/com',
+        }
+      );
+    } else if (
+      result.participantType === ParticipantType.TEAM.toString() &&
+      result.referenceUid === null
+    ) {
+      await this.awsService.sendEmail(
+        'NewTeamRequest',
+        ['thangaraj.esakky@ideas2it.com'],
+        {
+          teamName: result.newData.name,
+          requestUid: result.uid,
+          adminSiteUrl: 'https://www.google/com',
+        }
+      );
+    } else if (
+      result.participantType === ParticipantType.MEMBER.toString() &&
+      result.referenceUid !== null
+    ) {
+      await this.awsService.sendEmail(
+        'EditTeamRequest',
+        ['thangaraj.esakky@ideas2it.com'],
+        {
+          teamName: result.newData.name,
+          requestUid: result.uid,
+          requesterEmailId: requestData.editRequestorEmailId,
+          adminSiteUrl: 'https://www.google/com',
+        }
+      );
     }
 
-    console.log("sent email and added record", requestData)
+    console.log('sent email and added record', requestData);
     return result;
   }
 
@@ -118,9 +179,10 @@ export class ParticipantsRequestService {
   }
 
   async processMemberCreateRequest(uidToApprove) {
-
     // Get
-    const dataFromDB: any = await this.prisma.participantsRequest.findUnique({ where: { uid: uidToApprove }, });
+    const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
+      where: { uid: uidToApprove },
+    });
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
 
@@ -132,7 +194,14 @@ export class ParticipantsRequestService {
     // Team member roles relational mapping
     dataToSave['teamMemberRoles'] = {
       createMany: {
-        data: dataToProcess.teamAndRoles.map((t) => { return { role: t.role, mainTeam: false, teamLead: false, teamUid: t.teamUid }; }),
+        data: dataToProcess.teamAndRoles.map((t) => {
+          return {
+            role: t.role,
+            mainTeam: false,
+            teamLead: false,
+            teamUid: t.teamUid,
+          };
+        }),
       },
     };
 
@@ -145,11 +214,17 @@ export class ParticipantsRequestService {
 
     // Unique Location Uid needs to be formulated based on city, country & region using google places api and mapped to member
     const { city, country, region } = dataToProcess;
-    const result: any = await this.locationTransferService.fetchLocation(city, country, null, region, null);
+    const result: any = await this.locationTransferService.fetchLocation(
+      city,
+      country,
+      null,
+      region,
+      null
+    );
     const finalLocation: any = await this.prisma.location.upsert({
       where: { placeId: result?.location?.placeId },
       update: result?.location,
-      create: result?.location
+      create: result?.location,
     });
     if (finalLocation && finalLocation.uid) {
       dataToSave['location'] = { connect: { uid: finalLocation.uid } };
@@ -248,64 +323,80 @@ export class ParticipantsRequestService {
   }
 
   async processTeamCreateRequest(uidToApprove) {
-    const dataFromDB: any = await this.prisma.participantsRequest.findUnique({ where: { uid: uidToApprove }, });
+    const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
+      where: { uid: uidToApprove },
+    });
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
 
     // Mandatory fields
-    dataToSave["name"] = dataToProcess.name;
-    dataToSave["contactMethod"] = dataToProcess.contactMethod;
-    dataToSave["website"] = dataToProcess.website;
-    dataToSave["shortDescription"] = dataToProcess.shortDescription;
-    dataToSave["longDescription"] = dataToProcess.longDescription;
+    dataToSave['name'] = dataToProcess.name;
+    dataToSave['contactMethod'] = dataToProcess.contactMethod;
+    dataToSave['website'] = dataToProcess.website;
+    dataToSave['shortDescription'] = dataToProcess.shortDescription;
+    dataToSave['longDescription'] = dataToProcess.longDescription;
 
     // Non Mandatory Fields
     if (dataToProcess.twitterHandler) {
-      dataToSave["twitterHandler"] = dataToProcess.twitterHandler;
+      dataToSave['twitterHandler'] = dataToProcess.twitterHandler;
     }
     if (dataToProcess.linkedinHandler) {
-      dataToSave["linkedinHandler"] = dataToProcess.linkedinHandler;
+      dataToSave['linkedinHandler'] = dataToProcess.linkedinHandler;
     }
     if (dataToProcess.airtableRecId) {
-      dataToSave["airtableRecId"] = dataToProcess.airtableRecId;
+      dataToSave['airtableRecId'] = dataToProcess.airtableRecId;
     }
     if (dataToProcess.blog) {
-      dataToSave["blog"] = dataToProcess.blog;
+      dataToSave['blog'] = dataToProcess.blog;
     }
 
-
     // Funding Stage Mapping
-    dataToSave["fundingStage"] = { "connect": { uid: dataToProcess.fundingStageUid } }
+    dataToSave['fundingStage'] = {
+      connect: { uid: dataToProcess.fundingStageUid },
+    };
 
     // Industry Tag Mapping
-    dataToSave["industryTags"] = { "connect": dataToProcess.industryTags.map(i => { return { "uid": i.uid } }) }
+    dataToSave['industryTags'] = {
+      connect: dataToProcess.industryTags.map((i) => {
+        return { uid: i.uid };
+      }),
+    };
 
-    // Technologies Mapping 
-    dataToSave["technologies"] = { "connect": dataToProcess.technologies.map(t => { return { "uid": t.uid } }) }
+    // Technologies Mapping
+    dataToSave['technologies'] = {
+      connect: dataToProcess.technologies.map((t) => {
+        return { uid: t.uid };
+      }),
+    };
 
     // Membership Sources Mapping
-    dataToSave["membershipSources"] = { "connect": dataToProcess.membershipSources.map(m => { return { "uid": m.uid } }) }
-    console.log(dataToSave.fundingStage, dataToSave.industryTags, dataToSave.technologies, dataToSave.membershipSources)
+    dataToSave['membershipSources'] = {
+      connect: dataToProcess.membershipSources.map((m) => {
+        return { uid: m.uid };
+      }),
+    };
+    console.log(
+      dataToSave.fundingStage,
+      dataToSave.industryTags,
+      dataToSave.technologies,
+      dataToSave.membershipSources
+    );
     // Insert member details
 
     //await this.prisma.team.create({ data: { ...dataToSave, id: 301 } });
-     await this.prisma.participantsRequest.update({
+    await this.prisma.participantsRequest.update({
       where: { uid: uidToApprove },
       data: { status: ApprovalStatus.APPROVED },
     });
- 
+
     // Send Email
-   
-
-
   }
 
   async processTeamEditRequest(uidToEdit) {
-    const dataFromDB: any = await this.prisma.participantsRequest.findUnique({ where: { uid: uidToEdit }, });
+    const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
+      where: { uid: uidToEdit },
+    });
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
-
-
-
   }
 }

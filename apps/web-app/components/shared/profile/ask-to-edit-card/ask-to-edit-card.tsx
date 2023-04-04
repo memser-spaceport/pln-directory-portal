@@ -1,12 +1,16 @@
 import { PencilAltIcon } from '@heroicons/react/outline';
 import { trackGoal } from 'fathom-client';
 import Link from 'next/link';
+import { useState } from 'react';
 import { FATHOM_EVENTS } from '../../../../constants';
+import { EditMemberModal } from '../../../../pages/directory/members/editmember';
+import { EditTeamModal } from '../../../../pages/directory/teams/editteam';
 
 type TAskToEditProfileType = 'team' | 'member';
 
 interface AskToEditCardProps {
   profileType: TAskToEditProfileType;
+  id: string;
 }
 
 const urlList: {
@@ -22,7 +26,21 @@ const urlList: {
   },
 };
 
-export function AskToEditCard({ profileType }: AskToEditCardProps) {
+export function AskToEditCard({ profileType, id }: AskToEditCardProps) {
+  const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+
+  const handleOpenEditModal = () => {
+    console.log('testttt');
+    urlList[profileType].eventCode &&
+      trackGoal(urlList[profileType].eventCode, 0);
+    if (profileType == 'team') {
+      setIsTeamModalOpen(true);
+    } else {
+      setIsMemberModalOpen(true);
+    }
+  };
+
   return (
     <div className="card bg-ask_to_edit_card shadow-card--slate-900 p-7.5">
       <h3 className="flex items-center text-lg font-semibold">
@@ -35,7 +53,7 @@ export function AskToEditCard({ profileType }: AskToEditCardProps) {
         As a community, help Teams and Members stay updated with their
         information.
       </p>
-      <Link href={urlList[profileType].url}>
+      {/* <Link href={urlList[profileType].url}>
         <a
           target="_blank"
           className="on-focus shadow-request-button hover:shadow-on-hover flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-medium hover:border-slate-200 hover:text-slate-600 hover:ring-2 hover:ring-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300 active:border-blue-600 active:ring-2 active:ring-blue-300"
@@ -46,7 +64,24 @@ export function AskToEditCard({ profileType }: AskToEditCardProps) {
         >
           Request to Edit
         </a>
-      </Link>
+      </Link> */}
+      <button
+        id="edit-detail"
+        className="on-focus shadow-request-button hover:shadow-on-hover flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-medium hover:border-slate-200 hover:text-slate-600 hover:ring-2 hover:ring-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300 active:border-blue-600 active:ring-2 active:ring-blue-300"
+        onClick={() => handleOpenEditModal()}
+      >
+        Request to Edit
+      </button>
+      <EditMemberModal
+        isOpen={isMemberModalOpen}
+        setIsModalOpen={setIsMemberModalOpen}
+        id={id}
+      />
+      <EditTeamModal
+        isOpen={isTeamModalOpen}
+        setIsModalOpen={setIsTeamModalOpen}
+        id={id}
+      />
     </div>
   );
 }

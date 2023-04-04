@@ -65,7 +65,7 @@ import { TechnologiesModule } from './technologies/technologies.module';
     SkillsModule,
     LocationsModule,
     TechnologiesModule,
-    ParticipantsRequestModule
+    ParticipantsRequestModule,
   ],
   providers: [
     PrismaService,

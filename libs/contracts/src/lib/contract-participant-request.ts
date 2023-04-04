@@ -1,7 +1,5 @@
 import { initContract } from '@ts-rest/core';
-import {
- 
-} from '../schema';
+import {} from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
 const contract = initContract();
@@ -59,5 +57,5 @@ export const apiParticipantRequests = contract.router({
       200: contract.response<any>(),
     },
     summary: 'Process paritcipant request',
-  }
+  },
 });
