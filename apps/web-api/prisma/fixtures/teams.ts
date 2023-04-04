@@ -33,7 +33,6 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(
 
     const companyName = faker.helpers.unique(faker.company.name);
     return {
-      id: sequence,
       uid: faker.helpers.slugify(`uid-${companyName.toLowerCase()}`),
       name: companyName,
       logoUid: null,

@@ -27,6 +27,7 @@ export class MembersService {
     return this.prisma.member.findUniqueOrThrow({
       where: { uid },
       ...queryOptions,
+      include: {image: true, location: true, skills: true, teamMemberRoles: true}
     });
   }
 

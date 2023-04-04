@@ -50,12 +50,5 @@ export const apiParticipantRequests = contract.router({
     },
     summary: 'Process paritcipant request',
   },
-  checkForExistingParticipantsAndRequests: {
-    method: 'GET',
-    path: `${getAPIVersionAsPath('1')}/participants-request/test`,
-    responses: {
-      200: contract.response<any>(),
-    },
-    summary: 'Process paritcipant request',
-  },
+ 
 });

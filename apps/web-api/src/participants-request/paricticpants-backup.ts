@@ -1,56 +1,52 @@
 /* eslint-disable prettier/prettier */
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Put,
-  Query,
-  Req,
-} from '@nestjs/common';
+import { Body, Controller, Query, } from '@nestjs/common';
 import { ApprovalStatus } from '@prisma/client';
+import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { ParticipantsRequestService } from './participants-request.service';
-@Controller('participants-request')
+import { apiParticipantRequests } from '../../../../libs/contracts/src/lib/contract-participant-request';
+import { ApiParam } from '@nestjs/swagger';
+
+const server = initNestServer(apiParticipantRequests);
+@Controller()
 export class ParticipantsRequestController {
   constructor(
     private readonly participantsRequestService: ParticipantsRequestService
   ) {}
 
-  @Get()
+  @Api(server.route.getParticipantRequests)
   async findAll(@Query() query) {
-    console.log(query);
     const result = await this.participantsRequestService.getAll(query);
     return result;
   }
 
-  @Get(':uid')
-  async findOne(@Param() params) {
-    const result = await this.participantsRequestService.getByUid(params.uid);
+  @Api(server.route.getParticipantRequest)
+  @ApiParam({ name: 'uid', type: 'string' })
+  async findOne(@ApiDecorator() { params: { uid } }) {
+    const result = await this.participantsRequestService.getByUid(uid);
     return result;
   }
 
-  @Post()
+  @Api(server.route.addParticipantRequest)
   async addRequest(@Body() body) {
     const postData = body;
     const result = await this.participantsRequestService.addRequest(postData);
     return result;
   }
 
-  @Put(':uid')
-  async updateRequest(@Body() body, @Param() params) {
+  @Api(server.route.updateParticipantRequest)
+  @ApiParam({ name: 'uid', type: 'string' })
+  async updateRequest(@Body() body, @ApiDecorator() { params: { uid } }) {
     const postData = body;
     const result = await this.participantsRequestService.updateRequest(
       postData,
-      params.uid
+      uid
     );
     return result;
   }
 
-  @Patch(':uid')
-  async processRequest(@Body() body, @Param() params) {
-    const uid = params.uid;
+  @Api(server.route.processParticipantRequest)
+  @ApiParam({ name: 'uid', type: 'string' })
+  async processRequest(@Body() body, @ApiDecorator() { params: { uid } }): Promise<any> {
     const participantType = body.participantType;
     const referenceUid = body.referenceUid;
     const statusToProcess = body.status;
@@ -61,44 +57,21 @@ export class ParticipantsRequestController {
       result = await this.participantsRequestService.processRejectRequest(uid);
     }
     // Process approval for create team
-    else if (
-      participantType === 'TEAM' &&
-      statusToProcess === ApprovalStatus.APPROVED.toString() &&
-      !referenceUid
-    ) {
-      result = await this.participantsRequestService.processTeamCreateRequest(
-        uid
-      );
+    else if (participantType === 'TEAM' && statusToProcess === ApprovalStatus.APPROVED.toString() && !referenceUid) {
+      result = await this.participantsRequestService.processTeamCreateRequest(uid);
     }
     // Process approval for create Member
-    else if (
-      participantType === 'MEMBER' &&
-      statusToProcess === ApprovalStatus.APPROVED.toString() &&
-      !referenceUid
-    ) {
-      result = await this.participantsRequestService.processMemberCreateRequest(
-        uid
-      );
+    else if (participantType === 'MEMBER' && statusToProcess === ApprovalStatus.APPROVED.toString() && !referenceUid) {
+       console.log("in create member")
+       result = await this.participantsRequestService.processMemberCreateRequest(uid);
     }
     // Process approval for Edit Team
-    else if (
-      participantType === 'TEAM' &&
-      statusToProcess === ApprovalStatus.APPROVED.toString() &&
-      referenceUid
-    ) {
-      result = await this.participantsRequestService.processTeamEditRequest(
-        uid
-      );
+    else if (participantType === 'TEAM' && statusToProcess === ApprovalStatus.APPROVED.toString() &&referenceUid) {
+       result = await this.participantsRequestService.processTeamEditRequest(uid);
     }
     // Process approval for Edit Member
-    else if (
-      participantType === 'MEMBER' &&
-      statusToProcess === ApprovalStatus.APPROVED.toString() &&
-      referenceUid
-    ) {
-      result = await this.participantsRequestService.processMemberEditRequest(
-        uid
-      );
+    else if (participantType === 'MEMBER' && statusToProcess === ApprovalStatus.APPROVED.toString() && referenceUid) {
+      result = await this.participantsRequestService.processMemberEditRequest(uid);
     }
     return result;
   }
