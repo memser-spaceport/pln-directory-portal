@@ -39,7 +39,7 @@ function validateBasicForm(formValues) {
     !formValues.requestorEmail ||
     !formValues.requestorEmail?.match(emailRE)
   ) {
-    console.log("inside requestor>>>")
+    console.log('inside requestor>>>');
     errors.push('Please add valid Requestor Email.');
   }
   return errors;

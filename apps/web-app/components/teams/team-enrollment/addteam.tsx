@@ -251,11 +251,14 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     console.log('formValues', formValues);
     try {
       console.log('formValues', formValues);
-      const image = await api
+      let image;
+      if(formValues.logoFile){
+        image = await api
         .post(`/v1/images`, formValues.logoFile)
         .then((response) => {
           return response?.data?.image;
         });
+      }
 
       const data = {
         participantType: 'TEAM',
