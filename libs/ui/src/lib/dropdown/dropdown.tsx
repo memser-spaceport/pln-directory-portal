@@ -61,7 +61,7 @@ export function Dropdown({
             {buttonContent ? (
               buttonContent
             ) : (
-              <div className="leading-6">{selectedOption?.label}</div>
+              <div className="leading-6 text-left">{selectedOption?.label}</div>
             )}
             <div className="absolute right-4">
               <ArrowIcon />

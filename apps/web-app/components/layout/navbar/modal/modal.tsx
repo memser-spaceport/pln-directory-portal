@@ -36,7 +36,7 @@ function ModalHeader({
       <div className={headerStyleClass}>
         {image && (
           <div className="relative h-40">
-            <Image alt={`${title} img`} src={image} layout="fill" />
+            <Image alt={`img`} src={image} layout="fill" />
           </div>
         )}
         {title && (

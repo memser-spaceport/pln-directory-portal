@@ -17,8 +17,7 @@ import {
   fetchProtocol,
 } from '../../../utils/services/dropdown-service';
 import axios from 'axios';
-
-const API_URL = `http://localhost:3001`;
+import api from '../../../utils/api';
 
 interface AddTeamModalProps {
   isOpen: boolean;
@@ -58,11 +57,12 @@ const teamFormSteps = [
 ];
 
 function validateBasicForm(formValues) {
+  console.log('formValues>>>>', formValues);
   const errors = [];
   if (!formValues.name) {
     errors.push('Please add Team Name.');
   }
-  if (!formValues.description) {
+  if (!formValues.shortDescription) {
     errors.push('Please add Description.');
   }
   if (!formValues.longDescription) {
@@ -86,6 +86,7 @@ function validateProjectDetailForm(formValues) {
 }
 
 function validateSocialForm(formValues) {
+  console.log('validateSocialForm>>>', formValues);
   const errors = [];
   if (!formValues.contactMethod) {
     errors.push('Please add Preferred method of contact');
@@ -114,6 +115,7 @@ function validateForm(formValues, formStep) {
 
 function handleNextClick(formValues, formStep, setFormStep, setErrors) {
   const errors = validateForm(formValues, formStep);
+  console.log('errors>>>>', errors);
   if (errors?.length > 0) {
     setErrors(errors);
     return false;
@@ -244,26 +246,30 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
   }
 
   function formatData() {
-
-    const formattedTags = formValues.industryTags.map(item=>{
-      return {uid: item?.value,
-      title: item?.label}
-    })
-    const formattedMembershipSource = formValues.membershipSource.map(item=>{
-      return {uid: item?.value,
-      title: item?.label}
-    })
-    const formattedtechnologies = formValues.technologies.map(item=>{
-      return {uid: item?.value,
-      title: item?.label}
-    })
+    const formattedTags = formValues.industryTags.map((item) => {
+      return { uid: item?.value, title: item?.label };
+    });
+    const formattedMembershipSource = formValues.membershipSource.map(
+      (item) => {
+        return { uid: item?.value, title: item?.label };
+      }
+    );
+    const formattedtechnologies = formValues.technologies.map((item) => {
+      return { uid: item?.value, title: item?.label };
+    });
 
     const formattedFundingStage = {
-  uid: formValues.fundingStage?.value,
-      title: formValues.fundingStage?.label
-    }
+      uid: formValues.fundingStage?.value,
+      title: formValues.fundingStage?.label,
+    };
 
-    setFormValues({ ...formValues, fundingStage: formattedFundingStage,  industryTags: formattedTags, membershipSource: formattedMembershipSource, technologies:formattedtechnologies});
+    setFormValues({
+      ...formValues,
+      fundingStage: formattedFundingStage,
+      industryTags: formattedTags,
+      membershipSource: formattedMembershipSource,
+      technologies: formattedtechnologies,
+    });
   }
 
   async function handleSubmit() {
@@ -271,40 +277,20 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     console.log('formValues', formValues);
     try {
       console.log('formValues', formValues);
-      const token = await axios
-        .get(`${API_URL}/token`, { withCredentials: true })
-        .then((res) => {
-          // console.log('response', res.headers, res.headers.get('set-cookie'));
-          return res?.data.token;
+      const image = await api
+        .post(`/v1/participants-request`, formValues.logoFile)
+        .then((response) => {
+          return response?.data;
         });
-
-        const image = await axios
-          .post(`${API_URL}/participants-request`, formValues.logoFile, {
-            headers: {
-              'content-type': 'application/json',
-              'x-csrf-token': token,
-              // cookie: 'UHaLU99nOgBFBs2g5Iamyw',
-            },
-          })
-          .then((response) => {
-            return response?.data;
-          });
 
       const data = {
         participantType: 'TEAM',
         status: 'PENDING',
         newData: { ...formValues, logoUid: image?.uid },
       };
-      await axios
-        .post(`${API_URL}/participants-request`, data, {
-          headers: {
-            'content-type': 'application/json',
-            'x-csrf-token': token,
-          },
-        })
-        .then((response) => {
-          setSaveCompleted(true);
-        });
+      await api.post(`/v1/participants-request`, data).then((response) => {
+        setSaveCompleted(true);
+      });
     } catch (err) {
       console.log('error', err);
     }
@@ -385,7 +371,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
             <div>
               <button
                 className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
-                onClick={() => null}
+                onClick={() => handleModalClose()}
               >
                 Return to home
               </button>
@@ -394,15 +380,6 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
         ) : (
           <div>
             <FormStepsIndicator formStep={formStep} steps={teamFormSteps} />
-            {errors?.length > 0 && (
-              <div className="w-full rounded-lg border border-gray-200 bg-white p-10 shadow hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
-                <ul className="list-inside list-disc space-y-1 text-red-500 dark:text-gray-400">
-                  {errors.map((item, index) => (
-                    <li key={index}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
             <div className="px-3">{getFormStep()}</div>
             <div className="footerdiv flow-root w-full px-8 ">
               <div className="float-left m-2">

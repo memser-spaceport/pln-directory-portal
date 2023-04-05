@@ -26,46 +26,61 @@ export function ProfileImageUpload({
   previewImageShape = 'circle',
 }: Props) {
   const [, setImage] = useState<File | null>(null);
+  const [uploadError, setError] = useState('');
   const previewClassName =
     previewImageShape === 'circle' ? 'rounded-full' : 'rounded-xl';
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      const isValidFormat = ['image/jpeg', 'image/png'].includes(file.type);
+      if (isValidFormat) {
+        setError('');
+      } else {
+        setError(`Please upload image in jpeg or png format`);
+        return;
+      }
       const sizeInMB = bytesToSize(file.size);
       if (sizeInMB <= maxSize) {
         setImage(file);
         onImageChange(file);
+        setError('');
       } else {
-        window.alert(`Upload file less than ${maxSize}MB`);
+        console.log(`Upload file less than ${maxSize}MB`);
+        setError(`Upload file less than ${maxSize}MB`);
       }
     }
   };
 
   return (
-    <div
-      className={`relative h-24 w-24 overflow-hidden border-4 border-gray-300 ${previewClassName}`}
-    >
-      {imageUrl ? (
-        <Image
-          src={imageUrl}
-          alt="Profile Image"
-          layout="fill"
-          objectFit="cover"
+    <>
+      <div
+        className={`relative h-24 w-24 overflow-hidden border-4 border-gray-300 ${previewClassName}`}
+      >
+        {imageUrl ? (
+          <Image
+            src={imageUrl}
+            alt="Profile Image"
+            layout="fill"
+            objectFit="cover"
+          />
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center bg-gray-100">
+            <CameraIcon className="h-10 w-10 text-gray-300" />
+            <span className="font-size-12 text-sm text-blue-600">
+              Add Image
+            </span>
+          </div>
+        )}
+        <input
+          type="file"
+          accept="image/png, image/jpeg"
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          onChange={handleImageChange}
         />
-      ) : (
-        <div className="flex h-full w-full flex-col items-center justify-center bg-gray-100">
-          <CameraIcon className="h-10 w-10 text-gray-300" />
-          <span className="font-size-12 text-sm text-blue-600">Add Image</span>
-        </div>
-      )}
-      <input
-        type="file"
-        accept="image/png, image/jpeg"
-        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-        onChange={handleImageChange}
-      />
-    </div>
+      </div>
+      <span className="text-xs text-rose-600">{uploadError}</span>
+    </>
   );
 }
 

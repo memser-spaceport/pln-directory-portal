@@ -44,7 +44,9 @@ export function InputField({
   return (
     <label className="relative block">
       {showLabel ? (
-        <span className="py-2">{required ? label + ' *' : label}</span>
+        <span className="py-2 text-sm font-bold">
+          {required ? label + ' *' : label}
+        </span>
       ) : (
         <span className="sr-only">{label}</span>
       )}

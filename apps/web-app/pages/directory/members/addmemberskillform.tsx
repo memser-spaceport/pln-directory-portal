@@ -11,8 +11,8 @@ export default function AddMemberSkillForm(props) {
       <div className="px-8 py-4">
         {teamAndRoles.length > 0 && (
           <div className="flex flex-row pt-4">
-            <span className="basis-5/12">Team*</span>
-            <span className="basis-5/12 pl-5">Role*</span>
+            <span className="text-sm font-bold basis-5/12">Team*</span>
+            <span className="text-sm font-bold basis-5/12 pl-5">Role*</span>
           </div>
         )}
         {teamAndRoles.map((item, index) => (
@@ -28,7 +28,7 @@ export default function AddMemberSkillForm(props) {
         ))}
         <div>
           <button
-            className="pt-3 text-blue-500"
+            className="pt-3 text-blue-500 text-sm mb-3"
             onClick={props.handleAddNewRole}
           >
             + Add Role

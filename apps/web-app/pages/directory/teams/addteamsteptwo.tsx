@@ -17,7 +17,6 @@ export default function AddTeamStepTwo(props) {
   return (
     <>
       <div className="px-8 py-4">
-        <span className="mr-2 text-sm">Protocol</span>
         <MultiSelect
           options={dropDownValues?.protocol}
           name="technologies"
@@ -36,7 +35,7 @@ export default function AddTeamStepTwo(props) {
       </div>
 
       <div className="px-8 py-4">
-        <span className="mr-2 text-sm">Funding Stage*</span>
+        <span className="mr-2 text-sm font-bold">Funding Stage*</span>
         <Dropdown
           options={dropDownValues?.fundingStages}
           name="fundingStage"
