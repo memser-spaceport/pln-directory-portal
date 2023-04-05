@@ -278,16 +278,14 @@ export function EditTeamModal({
               return response?.data?.image;
             });
         }
-
         const data = {
           participantType: 'TEAM',
-          status: 'PENDING',
-          requesterEmail: formValues.requestorEmail,
+          referenceUid: id,
+          editRequestorEmailId: formValues.requestorEmail,
           newData: { ...formValues, logoUid: image?.uid },
-          captchaToken,
+          captchaToken
         };
-        console.log('team>>>', data);
-        await api.put(`/v1/participants-request`, data).then((response) => {
+        await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);
         });
       } catch (err) {

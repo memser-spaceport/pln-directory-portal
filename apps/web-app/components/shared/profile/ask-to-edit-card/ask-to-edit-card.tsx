@@ -90,16 +90,20 @@ export function AskToEditCard({
           nonce: undefined,
         }}
       >
-        <EditMemberModal
-          isOpen={isMemberModalOpen}
-          setIsModalOpen={setIsMemberModalOpen}
-          id={member?.id}
-        />
-        <EditTeamModal
-          isOpen={isTeamModalOpen}
-          setIsModalOpen={setIsTeamModalOpen}
-          id={team?.id}
-        />
+        {member?.id && (
+          <EditMemberModal
+            isOpen={isMemberModalOpen}
+            setIsModalOpen={setIsMemberModalOpen}
+            id={member?.id}
+          />
+        )}
+        {team?.id && (
+          <EditTeamModal
+            isOpen={isTeamModalOpen}
+            setIsModalOpen={setIsTeamModalOpen}
+            id={team?.id}
+          />
+        )}
       </GoogleReCaptchaProvider>
     </div>
   );

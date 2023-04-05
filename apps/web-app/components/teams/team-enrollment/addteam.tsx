@@ -264,18 +264,24 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
         const captchaToken = await executeRecaptcha();
 
         if (!captchaToken) return;
-        console.log('formValues', formValues);
-        const image = await api
-          .post(`/v1/images`, formValues.logoFile)
-          .then((response) => {
+        let image;
+        if (formValues.logoFile) {
+          const formData = new FormData();
+          formData.append('file', formValues.logoFile);
+          const config = {
+            headers: {
+              'content-type': 'multipart/form-data',
+            },
+          };
+          image = api.post(`/v1/images`, formData, config).then((response) => {
             return response?.data?.image;
           });
-
+        }
         const data = {
           participantType: 'TEAM',
           status: 'PENDING',
           newData: { ...formValues, logoUid: image?.uid },
-          captchaToken,
+          captchaToken
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);

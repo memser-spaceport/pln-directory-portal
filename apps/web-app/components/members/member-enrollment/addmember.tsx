@@ -220,26 +220,34 @@ export function AddMemberModal({
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
-      formatData();
       if (!executeRecaptcha) {
         console.log('Execute recaptcha not yet available');
         return;
       }
+      formatData();
       try {
         const captchaToken = await executeRecaptcha();
 
         if (!captchaToken) return;
-        const image = await api
-          .post(`/v1/images`, formValues.imageFile)
-          .then((response) => {
+        let image;
+        if (formValues.imageFile) {
+          const formData = new FormData();
+          formData.append('file', formValues.imageFile);
+          const config = {
+            headers: {
+              'content-type': 'multipart/form-data',
+            },
+          };
+          image = api.post(`/v1/images`, formData, config).then((response) => {
             return response?.data?.image;
           });
+        }
 
         const data = {
           participantType: 'MEMBER',
           status: 'PENDING',
           newData: { ...formValues, imageUid: image?.uid },
-          captchaToken,
+          captchaToken
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           console.log('response', response);
