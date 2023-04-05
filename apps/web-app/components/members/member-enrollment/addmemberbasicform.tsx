@@ -33,7 +33,8 @@ export default function AddMemberBasicForm(props) {
           <InformationCircleIcon className="h-5 w-5" />
         </div>
         <span className="font-size-13">
-          Please upload a squared image in PNG or JPEG format with file size less that 4MB.
+          Please upload a squared image in PNG or JPEG format with file size
+          less that 4MB.
         </span>
       </div>
 

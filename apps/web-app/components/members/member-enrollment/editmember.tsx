@@ -39,6 +39,7 @@ function validateBasicForm(formValues) {
     !formValues.requestorEmail ||
     !formValues.requestorEmail?.match(emailRE)
   ) {
+    console.log("inside requestor>>>")
     errors.push('Please add valid Requestor Email.');
   }
   return errors;
@@ -232,9 +233,9 @@ export function EditMemberModal({
       let image;
       if (imageChanged) {
         image = await api
-          .post(`/v1/participants-request`, formValues.imageFile)
+          .post(`/v1/images`, formValues.imageFile)
           .then((response) => {
-            return response?.data;
+            return response?.data?.image;
           });
       }
 
@@ -242,7 +243,7 @@ export function EditMemberModal({
         participantType: 'MEMBER',
         status: 'PENDING',
         requesterEmail: formValues.requestorEmail,
-        newData: { ...formValues, logoUid: image?.uid },
+        newData: { ...formValues, imageUid: image?.uid },
       };
       await api.put(`/v1/participants-request/${id}`, data).then((response) => {
         setSaveCompleted(true);

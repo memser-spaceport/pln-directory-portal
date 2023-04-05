@@ -9,7 +9,7 @@ import moment from 'moment';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
-import FormStepsIndicator from '../../shared/step-indicator/formstepsindicator';
+import FormStepsIndicator from '../../shared/step-indicator/step-indicator';
 import { IFormValues } from '../../../utils/members.types';
 import Modal from '../../layout/navbar/modal/modal';
 import {
@@ -216,10 +216,16 @@ export function AddMemberModal({
   async function handleSubmit() {
     formatData();
     try {
+      const image = await api
+      .post(`/v1/images`, formValues.imageFile)
+      .then((response) => {
+        return response?.data?.image;
+      });
+
       const data = {
         participantType: 'MEMBER',
         status: 'PENDING',
-        newData: { ...formValues },
+        newData: { ...formValues, imageUid: image?.uid },
       };
       await api.post(`/v1/participants-request`, data).then((response) => {
         console.log('response', response);
@@ -339,7 +345,7 @@ export function AddMemberModal({
             </div>
             <div className="text-center">
               <button
-                className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex mb-5 rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
+                className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
                 onClick={() => handleModalClose()}
               >
                 Return to home

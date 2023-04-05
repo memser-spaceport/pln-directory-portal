@@ -9,14 +9,14 @@ import AddTeamStepOne from './addteamstepone';
 import AddTeamStepTwo from './addteamsteptwo';
 import AddTeamStepThree from './addteamstepthree';
 import Modal from '../../layout/navbar/modal/modal';
-import FormStepsIndicator from '../../shared/step-indicator/formstepsindicator';
+import FormStepsIndicator from '../../shared/step-indicator/step-indicator';
 import {
   fetchMembershipSources,
   fetchFundingStages,
   fetchIndustryTags,
   fetchProtocol,
 } from '../../../utils/services/dropdown-service';
-import {IFormValues} from '../../../utils/teams.types';
+import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
 
 interface AddTeamModalProps {
@@ -252,9 +252,9 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     try {
       console.log('formValues', formValues);
       const image = await api
-        .post(`/v1/participants-request`, formValues.logoFile)
+        .post(`/v1/images`, formValues.logoFile)
         .then((response) => {
-          return response?.data;
+          return response?.data?.image;
         });
 
       const data = {

@@ -17,7 +17,7 @@ import {
   fetchProtocol,
 } from '../../../utils/services/dropdown-service';
 import { fetchTeam } from '../../../utils/services/teams';
-import {IFormValues} from '../../../utils/teams.types';
+import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
 
 interface EditTeamModalProps {
@@ -260,9 +260,9 @@ export function EditTeamModal({
       let image;
       if (imageChanged) {
         image = await api
-          .post(`/v1/participants-request`, formValues.logoFile)
+          .post(`/v1/images`, formValues.logoFile)
           .then((response) => {
-            return response?.data;
+            return response?.data?.image;
           });
       }
 
