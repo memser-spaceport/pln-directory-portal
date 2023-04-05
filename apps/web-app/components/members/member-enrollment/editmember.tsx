@@ -9,14 +9,13 @@ import moment from 'moment';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
-import { FormValues } from './member.types';
-import Modal from '../../../components/layout/navbar/modal/modal';
+import { IFormValues } from '../../../utils/members.types';
+import Modal from '../../layout/navbar/modal/modal';
 import {
   fetchSkills,
   fetchTeams,
 } from '../../../utils/services/dropdown-service';
 import { fetchMember } from '../../../utils/services/members';
-import axios from 'axios';
 import { InputField } from '@protocol-labs-network/ui';
 import api from '../../../utils/api';
 
@@ -106,7 +105,7 @@ export function EditMemberModal({
   const [imageUrl, setImageUrl] = useState<string>();
   const [imageChanged, setImageChanged] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
-  const [formValues, setFormValues] = useState<FormValues>({
+  const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     email: '',
     requestorEmail: '',
@@ -165,7 +164,6 @@ export function EditMemberModal({
             }),
           };
           setImageUrl(member.image?.url);
-          console.log('formmmmmmmmmmm', formValues);
           setFormValues(formValues);
           setDropDownValues({ skillValues: data[1], teamNames: data[2] });
         })

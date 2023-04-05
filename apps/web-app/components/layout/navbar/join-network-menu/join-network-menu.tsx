@@ -5,8 +5,8 @@ import { trackGoal } from 'fathom-client';
 import Link from 'next/link';
 import React, { forwardRef, Fragment, useState } from 'react';
 import { FATHOM_EVENTS } from '../../../../constants';
-import { AddMemberModal } from '../../../../pages/directory/members/addmember';
-import { AddTeamModal } from '../../../../pages/directory/teams/addteam';
+import { AddMemberModal } from '../../../members/member-enrollment/addmember';
+import { AddTeamModal } from '../../../teams/team-enrollment/addteam';
 
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 

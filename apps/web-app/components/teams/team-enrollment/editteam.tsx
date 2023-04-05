@@ -1,3 +1,4 @@
+import { InputField } from '@protocol-labs-network/ui';
 import {
   Dispatch,
   SetStateAction,
@@ -8,7 +9,7 @@ import {
 import AddTeamStepOne from './addteamstepone';
 import AddTeamStepTwo from './addteamsteptwo';
 import AddTeamStepThree from './addteamstepthree';
-import Modal from '../../../components/layout/navbar/modal/modal';
+import Modal from '../../layout/navbar/modal/modal';
 import {
   fetchMembershipSources,
   fetchFundingStages,
@@ -16,40 +17,13 @@ import {
   fetchProtocol,
 } from '../../../utils/services/dropdown-service';
 import { fetchTeam } from '../../../utils/services/teams';
-import axios from 'axios';
-import { InputField } from '@protocol-labs-network/ui';
+import {IFormValues} from '../../../utils/teams.types';
 import api from '../../../utils/api';
-
-interface DropDownProps {
-  label?: string;
-  value?: string;
-  uid?: string;
-  title?: string;
-}
 
 interface EditTeamModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
   id: string;
-}
-
-export interface FormValues {
-  name: string;
-  requestorEmail?: string;
-  logoUid: string;
-  logoFile: File;
-  shortDescription: string;
-  longDescription: string;
-  technologies: DropDownProps[];
-  fundingStage: DropDownProps;
-  membershipSource: DropDownProps[];
-  industryTags: DropDownProps[];
-  contactMethod: string;
-  website: string;
-  linkedinHandler: string;
-  twitterHandle: string;
-  blog: string;
-  officeHours: string;
 }
 
 function validateBasicForm(formValues) {
@@ -149,7 +123,7 @@ export function EditTeamModal({
   const [imageChanged, setImageChanged] = useState<boolean>(false);
   const [dropDownValues, setDropDownValues] = useState({});
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
-  const [formValues, setFormValues] = useState<FormValues>({
+  const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     requestorEmail: '',
     logoUid: '',
@@ -360,6 +334,15 @@ export function EditTeamModal({
                 field, leave it blank.
               </span>
             </div>
+            {errors?.length > 0 && (
+              <div className="w-full rounded-lg bg-white p-5 ">
+                <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
+                  {errors.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div className="inputfield px-8 pt-4 pb-10">
               <InputField
                 required

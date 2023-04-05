@@ -15,3 +15,29 @@ export interface ITeam {
   technologies: TTeamResponse['technologies'];
   members: string[];
 }
+
+interface DropDownProps {
+  label?: string;
+  value?: string;
+  uid?: string;
+  title?: string;
+}
+
+export interface IFormValues {
+  name: string;
+  requestorEmail?: string;
+  logoUid: string;
+  logoFile: File;
+  shortDescription: string;
+  longDescription: string;
+  technologies: DropDownProps[];
+  fundingStage: DropDownProps;
+  membershipSource: DropDownProps[];
+  industryTags: DropDownProps[];
+  contactMethod: string;
+  website: string;
+  linkedinHandler: string;
+  twitterHandle: string;
+  blog: string;
+  officeHours: string;
+}
