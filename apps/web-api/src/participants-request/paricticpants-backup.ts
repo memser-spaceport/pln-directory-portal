@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { Body, Controller, Query, } from '@nestjs/common';
+import { Body, Controller, Query } from '@nestjs/common';
 import { ApprovalStatus } from '@prisma/client';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { ParticipantsRequestService } from './participants-request.service';
@@ -46,7 +46,10 @@ export class ParticipantsRequestController {
 
   @Api(server.route.processParticipantRequest)
   @ApiParam({ name: 'uid', type: 'string' })
-  async processRequest(@Body() body, @ApiDecorator() { params: { uid } }): Promise<any> {
+  async processRequest(
+    @Body() body,
+    @ApiDecorator() { params: { uid } }
+  ): Promise<any> {
     const participantType = body.participantType;
     const referenceUid = body.referenceUid;
     const statusToProcess = body.status;
@@ -57,21 +60,45 @@ export class ParticipantsRequestController {
       result = await this.participantsRequestService.processRejectRequest(uid);
     }
     // Process approval for create team
-    else if (participantType === 'TEAM' && statusToProcess === ApprovalStatus.APPROVED.toString() && !referenceUid) {
-      result = await this.participantsRequestService.processTeamCreateRequest(uid);
+    else if (
+      participantType === 'TEAM' &&
+      statusToProcess === ApprovalStatus.APPROVED.toString() &&
+      !referenceUid
+    ) {
+      result = await this.participantsRequestService.processTeamCreateRequest(
+        uid
+      );
     }
     // Process approval for create Member
-    else if (participantType === 'MEMBER' && statusToProcess === ApprovalStatus.APPROVED.toString() && !referenceUid) {
-       console.log("in create member")
-       result = await this.participantsRequestService.processMemberCreateRequest(uid);
+    else if (
+      participantType === 'MEMBER' &&
+      statusToProcess === ApprovalStatus.APPROVED.toString() &&
+      !referenceUid
+    ) {
+      console.log('in create member');
+      result = await this.participantsRequestService.processMemberCreateRequest(
+        uid
+      );
     }
     // Process approval for Edit Team
-    else if (participantType === 'TEAM' && statusToProcess === ApprovalStatus.APPROVED.toString() &&referenceUid) {
-       result = await this.participantsRequestService.processTeamEditRequest(uid);
+    else if (
+      participantType === 'TEAM' &&
+      statusToProcess === ApprovalStatus.APPROVED.toString() &&
+      referenceUid
+    ) {
+      result = await this.participantsRequestService.processTeamEditRequest(
+        uid
+      );
     }
     // Process approval for Edit Member
-    else if (participantType === 'MEMBER' && statusToProcess === ApprovalStatus.APPROVED.toString() && referenceUid) {
-      result = await this.participantsRequestService.processMemberEditRequest(uid);
+    else if (
+      participantType === 'MEMBER' &&
+      statusToProcess === ApprovalStatus.APPROVED.toString() &&
+      referenceUid
+    ) {
+      result = await this.participantsRequestService.processMemberEditRequest(
+        uid
+      );
     }
     return result;
   }

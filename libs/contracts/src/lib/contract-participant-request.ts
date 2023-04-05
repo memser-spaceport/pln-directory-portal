@@ -50,5 +50,4 @@ export const apiParticipantRequests = contract.router({
     },
     summary: 'Process paritcipant request',
   },
- 
 });
