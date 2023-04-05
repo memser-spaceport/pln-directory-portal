@@ -1,9 +1,8 @@
-import axios from 'axios';
-const API_URL = `http://localhost:3001/v1`;
+import api from '../api';
 
 export const fetchSkills = async () => {
   try {
-    const response = await axios.get(`${API_URL}/skills`);
+    const response = await api.get(`/v1/skills`);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
@@ -16,7 +15,7 @@ export const fetchSkills = async () => {
 
 export const fetchTeams = async () => {
   try {
-    const response = await axios.get(`${API_URL}/teams`);
+    const response = await api.get(`/v1/teams`);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.name };
@@ -29,7 +28,7 @@ export const fetchTeams = async () => {
 
 export const fetchMembershipSources = async () => {
   try {
-    const response = await axios.get(`${API_URL}/membership-sources`);
+    const response = await api.get(`/v1/membership-sources`);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
@@ -42,7 +41,7 @@ export const fetchMembershipSources = async () => {
 
 export const fetchProtocol = async () => {
   try {
-    const response = await axios.get(`${API_URL}/technologies`);
+    const response = await api.get(`/v1/technologies`);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
@@ -55,7 +54,7 @@ export const fetchProtocol = async () => {
 
 export const fetchFundingStages = async () => {
   try {
-    const response = await axios.get(`${API_URL}/funding-stages`);
+    const response = await api.get(`/v1/funding-stages`);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
@@ -68,7 +67,7 @@ export const fetchFundingStages = async () => {
 
 export const fetchIndustryTags = async () => {
   try {
-    const response = await axios.get(`${API_URL}/industry-tags`);
+    const response = await api.get(`/v1/industry-tags`);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };

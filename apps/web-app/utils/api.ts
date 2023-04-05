@@ -7,7 +7,7 @@ const api = axios.create({
 
 // Add an interceptor for the getToken request to set the cookie
 api.interceptors.request.use(async (config) => {
-  if (config.method !== 'GET') {
+  if (config.method !== 'get') {
     try {
       const res = await axios.get(
         `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/token`

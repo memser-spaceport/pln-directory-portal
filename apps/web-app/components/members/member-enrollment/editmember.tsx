@@ -139,8 +139,7 @@ export function EditMemberModal({
                 role: team.role,
                 teamUid: team.teamUid,
                 teamTitle:
-                  data[2]?.find((item) => item.value == team.teamUid) ||
-                  'protocol',
+                  data[2]?.find((item) => item.value == team.teamUid),
                 rowId: counter++,
               };
             });
