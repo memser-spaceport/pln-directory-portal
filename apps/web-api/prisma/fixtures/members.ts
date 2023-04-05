@@ -45,6 +45,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
       plnFriend: faker.datatype.boolean(),
       airtableRecId: `airtable-rec-id-${sequence}`,
       createdAt: faker.date.past(),
+      plnStartDate: faker.date.past(),
       updatedAt: faker.date.recent(),
       locationUid: '',
     };

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronDownIcon, XIcon as CloseIcon } from '@heroicons/react/solid';
 
 interface Option {
@@ -25,6 +25,7 @@ export function MultiSelect({
 }: MultiSelectDropdownProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [internalOptions, setInternalOptions] = useState<Option[]>(options);
+  const dropdownOptionsRef = useRef<HTMLDivElement>(null);
 
   const toggleDropdown = () => {
     setIsExpanded(!isExpanded);
@@ -33,6 +34,20 @@ export function MultiSelect({
   useEffect(() => {
     setInternalOptions(options);
   }, [setInternalOptions, options]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownOptionsRef.current && !dropdownOptionsRef.current.contains(event.target as Node)) {
+        setIsExpanded(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [dropdownOptionsRef]);
 
   const handleOptionClick = (item: Option) => {
     // const newSelectedValues = selectedValues.includes(item)
@@ -65,10 +80,6 @@ export function MultiSelect({
       <div
         className="mt-2.5 flex cursor-pointer items-center justify-between rounded-md border bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
         onClick={toggleDropdown}
-        onBlur={() => {
-          console.log('evnet called');
-          setIsExpanded(false);
-        }}
       >
         <div className="flex flex-1 flex-wrap pr-4">
           {selectedValues?.length > 0 ? (
@@ -102,6 +113,7 @@ export function MultiSelect({
           <div
             // className="absolute left-0  z-[1056] mt-1 mr-5 h-[25%] w-full overflow-y-auto rounded-md bg-white shadow-lg"
             className="absolute z-[1056] h-[250px] w-full overflow-y-auto rounded-md bg-white shadow-lg"
+            ref={dropdownOptionsRef}
             onBlur={() => setIsExpanded(false)}
           >
             {internalOptions?.length > 0 ? (

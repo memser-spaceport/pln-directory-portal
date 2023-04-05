@@ -256,16 +256,16 @@ export function EditTeamModal({
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
+      if (!executeRecaptcha) {
+        console.log('Execute recaptcha not yet available');
+        return;
+      }
       const errors = validateForm(formValues);
       if (errors?.length > 0) {
         setErrors(errors);
         return false;
       }
       formatData();
-      if (!executeRecaptcha) {
-        console.log('Execute recaptcha not yet available');
-        return;
-      }
       try {
         const captchaToken = await executeRecaptcha();
 
