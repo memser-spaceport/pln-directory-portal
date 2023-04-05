@@ -27,10 +27,10 @@ export function mainConfig(app: INestApplication) {
   // Apply automatic CSRF protection:
   // app.useGlobalGuards(new CSRFGuard());
   // Enable CORS for the web-app
-  app.enableCors({
-    origin: ALLOWED_CORS_ORIGINS[process.env.ENVIRONMENT || APP_ENV.DEV],
-    credentials: true,
-  });
+  // app.enableCors({
+  //   origin: ALLOWED_CORS_ORIGINS[process.env.ENVIRONMENT || APP_ENV.DEV],
+  //   credentials: true,
+  // });
   /* Limiting the size of the body of the request to 100kb. */
   app.use(json({ limit: '100kb', type: 'text/plain' }));
   /* Apply helmet to the entire app

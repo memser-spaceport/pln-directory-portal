@@ -324,13 +324,15 @@ export function EditTeamModal({
       >
         {saveCompleted ? (
           <div>
-            <span className="text-lg">Thank you for submitting</span>
-            <span className="text-md">
+            <div className="mb-3 text-center text-2xl font-bold">
+              Thank you for submitting
+            </div>
+            <div className="text-md mb-3 text-center">
               Our team will review your request shortly & get back
-            </span>
-            <div>
+            </div>
+            <div className="text-center">
               <button
-                className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
+                className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
                 onClick={() => handleModalClose()}
               >
                 Return to home

@@ -360,7 +360,7 @@ export function AddMemberModal({
         image="/assets/images/join_as_a_member.jpg"
       >
         {saveCompleted ? (
-          <div>
+          <div className="px-5">
             <div className="mb-3 text-center text-2xl font-bold">
               Thank you for submitting
             </div>

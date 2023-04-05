@@ -115,11 +115,6 @@
   font-size: 12px;
 }
 
-.formStep2 {
-  /* position: absolute; */
-  bottom: 0px;
-}
-
 .hint-text > div:first-of-type {
   padding-top: 16px;
   font-size: 13px;
