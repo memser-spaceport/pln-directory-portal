@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { FATHOM_EVENTS } from '../../../../constants';
 import { EditMemberModal } from '../../../members/member-enrollment/editmember';
 import { EditTeamModal } from '../../../teams/team-enrollment/editteam';
-import { requestPendingCheck } from '../../../../utils/services/members';
+// import { requestPendingCheck } from '../../../../utils/services/members';
 import { IMember } from '../../../../utils/members.types';
 import { ITeam } from '../../../../utils/teams.types';
 
@@ -43,8 +43,9 @@ export function AskToEditCard({
     if (profileType == 'team') {
       setIsTeamModalOpen(true);
     } else {
-      const res = requestPendingCheck(member.email);
-      res && setIsMemberModalOpen(true);
+      // const res = requestPendingCheck(member.email);
+      // res && setIsMemberModalOpen(true);
+      setIsMemberModalOpen(true);
     }
   };
 
