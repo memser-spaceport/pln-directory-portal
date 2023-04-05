@@ -2,9 +2,9 @@ import { PencilAltIcon } from '@heroicons/react/outline';
 import { trackGoal } from 'fathom-client';
 import { useState } from 'react';
 import { FATHOM_EVENTS } from '../../../../constants';
-import { EditMemberModal } from '../../../../pages/directory/members/editmember';
-import { EditTeamModal } from '../../../../pages/directory/teams/editteam';
-import { requestPendingCheck } from '../../../../utils/services/members';
+import { EditMemberModal } from '../../../members/member-enrollment/editmember';
+import { EditTeamModal } from '../../../teams/team-enrollment/editteam';
+// import { requestPendingCheck } from '../../../../utils/services/members';
 import { IMember } from '../../../../utils/members.types';
 import { ITeam } from '../../../../utils/teams.types';
 
@@ -43,8 +43,9 @@ export function AskToEditCard({
     if (profileType == 'team') {
       setIsTeamModalOpen(true);
     } else {
-      const res = requestPendingCheck(member.email);
-      res && setIsMemberModalOpen(true);
+      // const res = requestPendingCheck(member.email);
+      // res && setIsMemberModalOpen(true);
+      setIsMemberModalOpen(true);
     }
   };
 
@@ -74,21 +75,25 @@ export function AskToEditCard({
       </Link> */}
       <button
         id="edit-detail"
-        className="on-focus shadow-request-button hover:shadow-on-hover flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-medium hover:border-slate-200 hover:text-slate-600 hover:ring-2 hover:ring-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300 active:border-blue-600 active:ring-2 active:ring-blue-300"
+        className="on-focus shadow-request-button hover:shadow-on-hover flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium hover:border-slate-200 hover:text-slate-600 hover:ring-2 hover:ring-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300 active:border-blue-600 active:ring-2 active:ring-blue-300"
         onClick={() => handleOpenEditModal()}
       >
         Request to Edit
       </button>
-      <EditMemberModal
-        isOpen={isMemberModalOpen}
-        setIsModalOpen={setIsMemberModalOpen}
-        id={member.id}
-      />
-      <EditTeamModal
-        isOpen={isTeamModalOpen}
-        setIsModalOpen={setIsTeamModalOpen}
-        id={team.id}
-      />
+      {member?.id && (
+        <EditMemberModal
+          isOpen={isMemberModalOpen}
+          setIsModalOpen={setIsMemberModalOpen}
+          id={member?.id}
+        />
+      )}
+      {team?.id && (
+        <EditTeamModal
+          isOpen={isTeamModalOpen}
+          setIsModalOpen={setIsTeamModalOpen}
+          id={team?.id}
+        />
+      )}
     </div>
   );
 }

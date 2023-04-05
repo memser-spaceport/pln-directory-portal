@@ -11,7 +11,7 @@ export class ParticipantsRequestService {
     private prisma: PrismaService,
     private locationTransferService: LocationTransferService,
     private awsService: AwsService
-  ) { }
+  ) {}
 
   async getAll(userQuery) {
     const filters = {};
@@ -83,7 +83,10 @@ export class ParticipantsRequestService {
   }
 
   async addRequest(requestData) {
-    const uniqueIdentifier = requestData.participantType === 'TEAM'? requestData.newData.name : requestData.newData.email;
+    const uniqueIdentifier =
+      requestData.participantType === 'TEAM'
+        ? requestData.newData.name
+        : requestData.newData.email;
     const postData = { ...requestData, uniqueIdentifier };
     requestData[uniqueIdentifier] = uniqueIdentifier;
 
@@ -119,13 +122,18 @@ export class ParticipantsRequestService {
   }
 
   async processRejectRequest(uidToReject) {
-    await this.prisma.participantsRequest.update({where: { uid: uidToReject }, data: { status: ApprovalStatus.REJECTED },});
+    await this.prisma.participantsRequest.update({
+      where: { uid: uidToReject },
+      data: { status: ApprovalStatus.REJECTED },
+    });
     return { code: 1, message: 'Success' };
   }
 
   async processMemberCreateRequest(uidToApprove) {
     // Get
-    const dataFromDB: any = await this.prisma.participantsRequest.findUnique({ where: { uid: uidToApprove },});
+    const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
+      where: { uid: uidToApprove },
+    });
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
 

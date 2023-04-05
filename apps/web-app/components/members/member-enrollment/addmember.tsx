@@ -9,16 +9,15 @@ import moment from 'moment';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
-import FormStepsIndicator from './formstepsindicator';
-import { FormValues } from './member.types';
-import Modal from '../../../components/layout/navbar/modal/modal';
+import FormStepsIndicator from '../../shared/step-indicator/step-indicator';
+import { IFormValues } from '../../../utils/members.types';
+import Modal from '../../layout/navbar/modal/modal';
 import {
   fetchSkills,
   fetchTeams,
 } from '../../../utils/services/dropdown-service';
-import axios from 'axios';
 
-const API_URL = `http://localhost:3001`;
+import api from '../../../utils/api';
 
 interface AddMemberModalProps {
   isOpen: boolean;
@@ -36,13 +35,10 @@ function validateBasicForm(formValues) {
   const emailRE =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   if (!formValues.name) {
-    errors.push('Name is required.');
+    errors.push('Name is a mandatory.');
   }
-  if (!formValues.email) {
-    errors.push('Email field is required.');
-  }
-  if (!formValues.email.match(emailRE)) {
-    errors.push('Please enter valid email.');
+  if (!formValues.email || !formValues.email?.match(emailRE)) {
+    errors.push('Email is mandatory.');
   }
   return errors;
 }
@@ -50,7 +46,7 @@ function validateBasicForm(formValues) {
 function validateSkillForm(formValues) {
   const errors = [];
   if (!formValues.teamAndRoles.length) {
-    errors.push('please add your team and role details');
+    errors.push('Please add your Team and Role details');
   } else {
     const missingValues = formValues.teamAndRoles.filter(
       (item) => item.teamUid == '' || item.role == ''
@@ -142,7 +138,7 @@ export function AddMemberModal({
   const [dropDownValues, setDropDownValues] = useState({});
   const [imageUrl, setImageUrl] = useState<string>();
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
-  const [formValues, setFormValues] = useState<FormValues>({
+  const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     email: '',
     imageUid: '',
@@ -203,44 +199,46 @@ export function AddMemberModal({
   }
 
   function formatData() {
-    // const formattedSkills = formValues.skills.map(item=>{
-    //   return {uid: item.value, title: item.label}
-    // })
     const formattedTeamAndRoles = formValues.teamAndRoles.map((item) => {
       delete item.rowId;
       return item;
     });
-    setFormValues({ ...formValues, teamAndRoles: formattedTeamAndRoles });
+    const skills = formValues.skills.map((item) => {
+      return { uid: item?.value, title: item?.label };
+    });
+    setFormValues({
+      ...formValues,
+      skills: skills,
+      teamAndRoles: formattedTeamAndRoles,
+    });
   }
 
   async function handleSubmit() {
     formatData();
     try {
-      console.log('formValues', formValues);
-      const token = await axios
-        .get(`${API_URL}/token`, { withCredentials: true })
-        .then((res) => {
-          // console.log('response', res.headers, res.headers.get('set-cookie'));
-          return res?.data.token;
+      let image;
+      if (formValues.imageFile) {
+        const formData = new FormData();
+        formData.append('file', formValues.imageFile);
+        const config = {
+          headers: {
+            'content-type': 'multipart/form-data',
+          },
+        };
+        image = api.post(`/v1/images`, formData, config).then((response) => {
+          return response?.data?.image;
         });
-      console.log('token', token);
+      }
 
       const data = {
         participantType: 'MEMBER',
         status: 'PENDING',
-        newData: { ...formValues },
+        newData: { ...formValues, imageUid: image?.uid },
       };
-      await axios
-        .post(`${API_URL}/participants-request`, data, {
-          headers: {
-            'content-type': 'application/json',
-            'x-csrf-token': token,
-            // cookie: 'UHaLU99nOgBFBs2g5Iamyw',
-          },
-        })
-        .then((response) => {
-          setSaveCompleted(true);
-        });
+      await api.post(`/v1/participants-request`, data).then((response) => {
+        console.log('response', response);
+        setSaveCompleted(true);
+      });
     } catch (err) {
       console.log('error', err);
     }
@@ -347,14 +345,16 @@ export function AddMemberModal({
       >
         {saveCompleted ? (
           <div>
-            <span className="text-lg">Thank you for submitting</span>
-            <span className="text-md">
+            <div className="mb-3 text-center text-2xl font-bold">
+              Thank you for submitting
+            </div>
+            <div className="text-md mb-3 text-center">
               Our team will review your request shortly & get back
-            </span>
-            <div>
+            </div>
+            <div className="text-center">
               <button
-                className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
-                onClick={() => null}
+                className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
+                onClick={() => handleModalClose()}
               >
                 Return to home
               </button>
@@ -364,8 +364,8 @@ export function AddMemberModal({
           <div className="">
             <FormStepsIndicator formStep={formStep} steps={steps} />
             {errors?.length > 0 && (
-              <div className="w-full rounded-lg border border-gray-200 bg-white p-5 shadow hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
-                <ul className="list-inside list-disc space-y-1 text-red-500 dark:text-gray-400">
+              <div className="w-full rounded-lg bg-white p-5 ">
+                <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
                   {errors.map((item, index) => (
                     <li key={index}>{item}</li>
                   ))}

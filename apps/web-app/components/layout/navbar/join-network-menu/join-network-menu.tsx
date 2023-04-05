@@ -5,8 +5,8 @@ import { trackGoal } from 'fathom-client';
 import Link from 'next/link';
 import React, { forwardRef, Fragment, useState } from 'react';
 import { FATHOM_EVENTS } from '../../../../constants';
-import { AddMemberModal } from '../../../../pages/directory/members/addmember';
-import { AddTeamModal } from '../../../../pages/directory/teams/addteam';
+import { AddMemberModal } from '../../../members/member-enrollment/addmember';
+import { AddTeamModal } from '../../../teams/team-enrollment/addteam';
 
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
@@ -76,19 +76,15 @@ export function JoinNetworkMenu() {
                   const OptionIcon = option.icon;
                   return (
                     <Menu.Item key={option.label}>
-                      {() => (
-                        <>
-                          <div>
-                            <button
-                              id={option.label}
-                              className="on-focus flex items-center rounded-md px-3 py-2 text-sm transition duration-150 ease-in-out hover:bg-slate-100 focus:bg-white"
-                              onClick={() => handleOpenModal(option.label)}
-                            >
-                              <OptionIcon className="stroke-3 mr-2 h-4 w-4" />
-                              {option.label}
-                            </button>
-                          </div>
-                        </>
+                      {(active) => (
+                        <OptionLink
+                          href={'#'}
+                          eventCode={option.eventCode}
+                          onClick={() => handleOpenModal(option.label)}
+                        >
+                          <OptionIcon className="stroke-1.5 mr-2 h-4 w-4" />
+                          {option.label}
+                        </OptionLink>
                       )}
                     </Menu.Item>
                   );
@@ -115,18 +111,21 @@ const OptionLink = forwardRef<
   {
     href: string;
     children: React.ReactNode;
-    active: boolean;
+    active?: boolean;
     eventCode: string;
+    onClick: () => void;
   }
->(({ href, children, active, eventCode }, ref) => {
+>(({ href, children, active, onClick, eventCode }, ref) => {
   return (
     <Link href={href}>
       <a
         className="on-focus flex items-center rounded-md px-3 py-2 text-sm transition duration-150 ease-in-out hover:bg-slate-100 focus:bg-white"
-        target="_blank"
         rel="noopener noreferrer"
         ref={ref}
-        onClick={() => eventCode && trackGoal(eventCode, 0)}
+        onClick={() => {
+          onClick();
+          eventCode && trackGoal(eventCode, 0);
+        }}
       >
         {children}
       </a>

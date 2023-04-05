@@ -91,7 +91,7 @@ function drawHr() {
   return <hr className="step-line flex w-full flex-col items-center"></hr>;
 }
 
-export default function FormStepsIndicator({
+export default function StepIndicator({
   formStep,
   steps,
 }: FormStepIndicatorProps) {

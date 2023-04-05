@@ -37,7 +37,7 @@ export function TextArea({
 
   return (
     <div className="text-area-container ">
-      <label htmlFor={name} className="text-area-label">
+      <label htmlFor={name} className="text-area-label text-sm font-bold">
         {label}
         {required ? <span className="required">*</span> : null}
       </label>

@@ -23,9 +23,9 @@ export function mainConfig(app: INestApplication) {
     })
   );
   // Apply global response messages when encountering CSRF errors:
-  app.useGlobalFilters(new CsrfFilter());
+  // app.useGlobalFilters(new CsrfFilter());
   // Apply automatic CSRF protection:
-  app.useGlobalGuards(new CSRFGuard());
+  // app.useGlobalGuards(new CSRFGuard());
   // Enable CORS for the web-app
   app.enableCors({
     origin: ALLOWED_CORS_ORIGINS[process.env.ENVIRONMENT || APP_ENV.DEV],

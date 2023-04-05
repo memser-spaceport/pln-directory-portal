@@ -7,14 +7,14 @@ export interface DropdownProps {
   initialOption?: IDropdownOption;
   onChange?: (value: IDropdownOption, name?: string) => void;
   options: IDropdownOption[];
-  value: IDropdownOption;
+  value?: IDropdownOption;
   name?: string;
 }
 
 export interface IDropdownOption {
   icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   label: string;
-  value: string;
+  value?: string;
 }
 
 export function Dropdown({
@@ -61,7 +61,7 @@ export function Dropdown({
             {buttonContent ? (
               buttonContent
             ) : (
-              <div className="leading-6">{selectedOption?.label}</div>
+              <div className="text-left leading-6">{selectedOption?.label}</div>
             )}
             <div className="absolute right-4">
               <ArrowIcon />

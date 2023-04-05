@@ -23,6 +23,7 @@ export default function AddMemberBasicForm(props) {
             value={values?.name}
             onChange={onChange}
             placeholder="Enter your full name"
+            className="border-1 border-gray-300"
           />
         </div>
       </div>
@@ -32,7 +33,8 @@ export default function AddMemberBasicForm(props) {
           <InformationCircleIcon className="h-5 w-5" />
         </div>
         <span className="font-size-13">
-          Please upload a squared image in PNG or JPEG format only
+          Please upload a squared image in PNG or JPEG format with file size
+          less that 4MB.
         </span>
       </div>
 
@@ -45,6 +47,7 @@ export default function AddMemberBasicForm(props) {
           value={values?.email}
           onChange={onChange}
           placeholder="Enter your email address"
+          className="border-1 border-gray-300"
         />
       </div>
 
@@ -55,6 +58,7 @@ export default function AddMemberBasicForm(props) {
           onChange={onChange}
           value={values?.plnStartDate}
           label="PLN Start Date"
+          className="border-1 border-gray-300"
         />
         <div className="flex pt-1 text-sm text-gray-400">
           <div>
@@ -74,6 +78,7 @@ export default function AddMemberBasicForm(props) {
           value={values?.city}
           onChange={onChange}
           placeholder="Enter your city name"
+          className="border-1 border-gray-300"
         />
         <div className="flex pt-1 text-sm text-gray-400">
           <div>
@@ -94,6 +99,7 @@ export default function AddMemberBasicForm(props) {
             value={values?.region}
             onChange={onChange}
             placeholder="Enter state or province name"
+            className="border-1 border-gray-300"
           />
         </div>
         <div className="inputfield w-[50%]">
@@ -103,6 +109,7 @@ export default function AddMemberBasicForm(props) {
             value={values?.country}
             onChange={onChange}
             placeholder="Enter country name"
+            className="border-1 border-gray-300"
           />
         </div>
       </div>

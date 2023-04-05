@@ -61,7 +61,7 @@ export function MultiSelect({
 
   return (
     <div className="">
-      {label && <span className="mb-4">{label}</span>}
+      {label && <span className="mb-4 text-sm font-bold">{label}</span>}
       <div
         className="mt-2.5 flex cursor-pointer items-center justify-between rounded-md border bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
         onClick={toggleDropdown}
