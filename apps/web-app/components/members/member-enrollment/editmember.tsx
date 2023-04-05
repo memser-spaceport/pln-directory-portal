@@ -241,11 +241,11 @@ export function EditMemberModal({
 
       const data = {
         participantType: 'MEMBER',
-        status: 'PENDING',
-        requesterEmail: formValues.requestorEmail,
+        referenceUid: id,
+        editRequestorEmailId: formValues.requestorEmail,
         newData: { ...formValues, imageUid: image?.uid },
       };
-      await api.put(`/v1/participants-request/${id}`, data).then((response) => {
+      await api.post(`/v1/participants-request`, data).then((response) => {
         setSaveCompleted(true);
       });
     } catch (err) {

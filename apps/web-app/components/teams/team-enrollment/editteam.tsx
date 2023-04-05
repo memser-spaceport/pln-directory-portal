@@ -273,7 +273,7 @@ export function EditTeamModal({
         newData: { ...formValues, logoUid: image?.uid },
       };
       console.log('team>>>', data);
-      await api.put(`/v1/participants-request`, data).then((response) => {
+      await api.put(`/v1/participants-request/${id}`, data).then((response) => {
         setSaveCompleted(true);
       });
     } catch (err) {

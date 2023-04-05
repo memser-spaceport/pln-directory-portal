@@ -216,11 +216,19 @@ export function AddMemberModal({
   async function handleSubmit() {
     formatData();
     try {
-      const image = await api
-      .post(`/v1/images`, formValues.imageFile)
-      .then((response) => {
-        return response?.data?.image;
-      });
+      let image;
+      if (formValues.imageFile) {
+        const formData = new FormData();
+        formData.append('file', formValues.imageFile);
+        const config = {
+          headers: {
+            'content-type': 'multipart/form-data',
+          },
+        };
+        image = api.post(`/v1/images`, formData, config).then((response) => {
+          return response?.data?.image;
+        });
+      }
 
       const data = {
         participantType: 'MEMBER',

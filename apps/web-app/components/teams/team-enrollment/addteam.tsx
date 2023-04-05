@@ -250,13 +250,19 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     formatData();
     console.log('formValues', formValues);
     try {
-      console.log('formValues', formValues);
-      const image = await api
-        .post(`/v1/images`, formValues.logoFile)
-        .then((response) => {
+      let image;
+      if (formValues.logoFile) {
+        const formData = new FormData();
+        formData.append('file', formValues.logoFile);
+        const config = {
+          headers: {
+            'content-type': 'multipart/form-data',
+          },
+        };
+        image = api.post(`/v1/images`, formData, config).then((response) => {
           return response?.data?.image;
         });
-
+      }
       const data = {
         participantType: 'TEAM',
         status: 'PENDING',
