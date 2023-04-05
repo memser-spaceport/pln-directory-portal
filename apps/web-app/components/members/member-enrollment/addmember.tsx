@@ -217,12 +217,12 @@ export function AddMemberModal({
     formatData();
     try {
       let image;
-      if(formValues.imageFile){
+      if (formValues.imageFile) {
         image = await api
-        .post(`/v1/images`, formValues.imageFile)
-        .then((response) => {
-          return response?.data?.image;
-        });
+          .post(`/v1/images`, formValues.imageFile)
+          .then((response) => {
+            return response?.data?.image;
+          });
       }
 
       const data = {

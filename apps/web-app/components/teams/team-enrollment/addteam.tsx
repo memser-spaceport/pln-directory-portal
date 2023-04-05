@@ -252,12 +252,12 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     try {
       console.log('formValues', formValues);
       let image;
-      if(formValues.logoFile){
+      if (formValues.logoFile) {
         image = await api
-        .post(`/v1/images`, formValues.logoFile)
-        .then((response) => {
-          return response?.data?.image;
-        });
+          .post(`/v1/images`, formValues.logoFile)
+          .then((response) => {
+            return response?.data?.image;
+          });
       }
 
       const data = {
