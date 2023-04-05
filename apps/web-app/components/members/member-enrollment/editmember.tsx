@@ -142,8 +142,7 @@ export function EditMemberModal({
               return {
                 role: team.role,
                 teamUid: team.teamUid,
-                teamTitle:
-                  data[2]?.find((item) => item.value == team.teamUid),
+                teamTitle: data[2]?.find((item) => item.value == team.teamUid),
                 rowId: counter++,
               };
             });

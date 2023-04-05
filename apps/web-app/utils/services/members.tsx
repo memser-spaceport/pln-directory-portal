@@ -1,4 +1,4 @@
-import api from "../api";
+import api from '../api';
 
 export const fetchMember = async (id) => {
   try {
@@ -19,12 +19,14 @@ export const requestPendingCheck = async (email) => {
       participantType: 'MEMBER',
     };
 
-    const response = await api.post(`/participants-request/unique-identifier-checker`, data);
+    const response = await api.post(
+      `/participants-request/unique-identifier-checker`,
+      data
+    );
     if (response.data) {
       console.log('datrequest pending >>>>>>', response.data);
       return response.data;
     }
-
   } catch (error) {
     console.error(error);
   }

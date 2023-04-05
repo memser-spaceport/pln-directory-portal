@@ -37,7 +37,10 @@ export function MultiSelect({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownOptionsRef.current && !dropdownOptionsRef.current.contains(event.target as Node)) {
+      if (
+        dropdownOptionsRef.current &&
+        !dropdownOptionsRef.current.contains(event.target as Node)
+      ) {
         setIsExpanded(false);
       }
     };
