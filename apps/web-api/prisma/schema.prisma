@@ -3,6 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["interactiveTransactions"]
 }
 
 datasource db {
@@ -54,6 +55,7 @@ model Member {
   officeHours     String?
   moreDetails     String?
   plnFriend       Boolean          @default(false)
+  plnStartDate    DateTime?        @default(now())
   airtableRecId   String?          @unique
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
