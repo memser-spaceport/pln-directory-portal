@@ -4,6 +4,7 @@ import {
   useState,
   ChangeEvent,
   useEffect,
+  useCallback,
 } from 'react';
 import AddTeamStepOne from './addteamstepone';
 import AddTeamStepTwo from './addteamsteptwo';
@@ -18,6 +19,7 @@ import {
 } from '../../../utils/services/dropdown-service';
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddTeamModalProps {
   isOpen: boolean;
@@ -170,6 +172,8 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     officeHours: '',
   });
 
+  const { executeRecaptcha } = useGoogleReCaptcha();
+
   useEffect(() => {
     if (isOpen) {
       Promise.all([
@@ -246,29 +250,42 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     });
   }
 
-  async function handleSubmit() {
-    formatData();
-    console.log('formValues', formValues);
-    try {
-      console.log('formValues', formValues);
-      const image = await api
-        .post(`/v1/images`, formValues.logoFile)
-        .then((response) => {
-          return response?.data?.image;
-        });
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
 
-      const data = {
-        participantType: 'TEAM',
-        status: 'PENDING',
-        newData: { ...formValues, logoUid: image?.uid },
-      };
-      await api.post(`/v1/participants-request`, data).then((response) => {
-        setSaveCompleted(true);
-      });
-    } catch (err) {
-      console.log('error', err);
-    }
-  }
+      if (!executeRecaptcha) {
+        console.log('Execute recaptcha not yet available');
+        return;
+      }
+      formatData();
+      console.log('formValues', formValues);
+      try {
+        const captchaToken = await executeRecaptcha();
+
+        if (!captchaToken) return;
+        console.log('formValues', formValues);
+        const image = await api
+          .post(`/v1/images`, formValues.logoFile)
+          .then((response) => {
+            return response?.data?.image;
+          });
+
+        const data = {
+          participantType: 'TEAM',
+          status: 'PENDING',
+          newData: { ...formValues, logoUid: image?.uid },
+          captchaToken,
+        };
+        await api.post(`/v1/participants-request`, data).then((response) => {
+          setSaveCompleted(true);
+        });
+      } catch (err) {
+        console.log('error', err);
+      }
+    },
+    [executeRecaptcha]
+  );
 
   function handleInputChange(
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>

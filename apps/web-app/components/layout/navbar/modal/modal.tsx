@@ -83,7 +83,7 @@ function Modal({
         className="fixed inset-0 top-0 left-0 z-[1055] w-full grow overflow-x-hidden outline-none"
         onClose={() => onClose()}
       >
-        <div className="h-full px-4 text-center">
+        <div className="">
           <Transition.Child
             as={Fragment}
             enter="ease-out duration-300"
@@ -93,7 +93,7 @@ function Modal({
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+            <div className="fixed left-0 top-0 h-full w-full overflow-y-auto overflow-x-hidden bg-gray-500 bg-opacity-75  outline-none transition-opacity" />
           </Transition.Child>
           <Transition.Child
             as={Fragment}
@@ -104,7 +104,7 @@ function Modal({
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <div className="my-8 inline-block h-auto min-h-full w-[35%] transform rounded-lg bg-white text-left align-middle shadow-xl transition-all">
+            <div className="dia relative my-8 h-auto w-[500px] transform rounded-lg bg-white text-left align-middle shadow-xl transition-all ">
               {enableHeader && (
                 <ModalHeader
                   onClose={onClose}

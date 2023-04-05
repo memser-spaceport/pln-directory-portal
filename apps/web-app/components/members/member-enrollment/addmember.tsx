@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   ChangeEvent,
+  useCallback,
 } from 'react';
 import moment from 'moment';
 import AddMemberBasicForm from './addmemberbasicform';
@@ -18,6 +19,7 @@ import {
 } from '../../../utils/services/dropdown-service';
 
 import api from '../../../utils/api';
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddMemberModalProps {
   isOpen: boolean;
@@ -157,6 +159,8 @@ export function AddMemberModal({
     skills: [],
   });
 
+  const { executeRecaptcha } = useGoogleReCaptcha();
+
   useEffect(() => {
     if (isOpen) {
       Promise.all([fetchSkills(), fetchTeams()])
@@ -213,28 +217,40 @@ export function AddMemberModal({
     });
   }
 
-  async function handleSubmit() {
-    formatData();
-    try {
-      const image = await api
-      .post(`/v1/images`, formValues.imageFile)
-      .then((response) => {
-        return response?.data?.image;
-      });
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      formatData();
+      if (!executeRecaptcha) {
+        console.log('Execute recaptcha not yet available');
+        return;
+      }
+      try {
+        const captchaToken = await executeRecaptcha();
 
-      const data = {
-        participantType: 'MEMBER',
-        status: 'PENDING',
-        newData: { ...formValues, imageUid: image?.uid },
-      };
-      await api.post(`/v1/participants-request`, data).then((response) => {
-        console.log('response', response);
-        setSaveCompleted(true);
-      });
-    } catch (err) {
-      console.log('error', err);
-    }
-  }
+        if (!captchaToken) return;
+        const image = await api
+          .post(`/v1/images`, formValues.imageFile)
+          .then((response) => {
+            return response?.data?.image;
+          });
+
+        const data = {
+          participantType: 'MEMBER',
+          status: 'PENDING',
+          newData: { ...formValues, imageUid: image?.uid },
+          captchaToken,
+        };
+        await api.post(`/v1/participants-request`, data).then((response) => {
+          console.log('response', response);
+          setSaveCompleted(true);
+        });
+      } catch (err) {
+        console.log('error', err);
+      }
+    },
+    [executeRecaptcha]
+  );
 
   function handleAddNewRole() {
     const newRoles = formValues.teamAndRoles;

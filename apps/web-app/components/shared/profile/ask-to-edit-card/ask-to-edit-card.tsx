@@ -7,6 +7,7 @@ import { EditTeamModal } from '../../../teams/team-enrollment/editteam';
 // import { requestPendingCheck } from '../../../../utils/services/members';
 import { IMember } from '../../../../utils/members.types';
 import { ITeam } from '../../../../utils/teams.types';
+import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 
 type TAskToEditProfileType = 'team' | 'member';
 
@@ -80,16 +81,26 @@ export function AskToEditCard({
       >
         Request to Edit
       </button>
-      <EditMemberModal
-        isOpen={isMemberModalOpen}
-        setIsModalOpen={setIsMemberModalOpen}
-        id={member?.id}
-      />
-      <EditTeamModal
-        isOpen={isTeamModalOpen}
-        setIsModalOpen={setIsTeamModalOpen}
-        id={team?.id}
-      />
+      <GoogleReCaptchaProvider
+        reCaptchaKey="6Ld76k8lAAAAAJiNTUN7wDcWhZDsIWyakj_9Qf2I"
+        scriptProps={{
+          async: false,
+          defer: false,
+          appendTo: 'head',
+          nonce: undefined,
+        }}
+      >
+        <EditMemberModal
+          isOpen={isMemberModalOpen}
+          setIsModalOpen={setIsMemberModalOpen}
+          id={member?.id}
+        />
+        <EditTeamModal
+          isOpen={isTeamModalOpen}
+          setIsModalOpen={setIsTeamModalOpen}
+          id={team?.id}
+        />
+      </GoogleReCaptchaProvider>
     </div>
   );
 }

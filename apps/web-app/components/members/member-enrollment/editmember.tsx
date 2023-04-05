@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   ChangeEvent,
+  useCallback,
 } from 'react';
 import moment from 'moment';
 import AddMemberBasicForm from './addmemberbasicform';
@@ -18,6 +19,7 @@ import {
 import { fetchMember } from '../../../utils/services/members';
 import { InputField } from '@protocol-labs-network/ui';
 import api from '../../../utils/api';
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditMemberModalProps {
   isOpen: boolean;
@@ -39,7 +41,7 @@ function validateBasicForm(formValues) {
     !formValues.requestorEmail ||
     !formValues.requestorEmail?.match(emailRE)
   ) {
-    console.log("inside requestor>>>")
+    console.log('inside requestor>>>');
     errors.push('Please add valid Requestor Email.');
   }
   return errors;
@@ -125,6 +127,8 @@ export function EditMemberModal({
     teamAndRoles: [],
     skills: [],
   });
+
+  const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
     if (isOpen) {
@@ -222,36 +226,49 @@ export function EditMemberModal({
     });
   }
 
-  async function handleSubmit() {
-    const errors = validateForm(formValues);
-    if (errors?.length > 0) {
-      setErrors(errors);
-      return false;
-    }
-    formatData();
-    try {
-      let image;
-      if (imageChanged) {
-        image = await api
-          .post(`/v1/images`, formValues.imageFile)
-          .then((response) => {
-            return response?.data?.image;
-          });
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      if (!executeRecaptcha) {
+        console.log('Execute recaptcha not yet available');
+        return;
       }
+      const errors = validateForm(formValues);
+      if (errors?.length > 0) {
+        setErrors(errors);
+        return false;
+      }
+      formatData();
+      try {
+        const captchaToken = await executeRecaptcha();
 
-      const data = {
-        participantType: 'MEMBER',
-        status: 'PENDING',
-        requesterEmail: formValues.requestorEmail,
-        newData: { ...formValues, imageUid: image?.uid },
-      };
-      await api.put(`/v1/participants-request/${id}`, data).then((response) => {
-        setSaveCompleted(true);
-      });
-    } catch (err) {
-      console.log('error', err);
-    }
-  }
+        if (!captchaToken) return;
+        let image;
+        if (imageChanged) {
+          image = await api
+            .post(`/v1/images`, formValues.imageFile)
+            .then((response) => {
+              return response?.data?.image;
+            });
+        }
+
+        const data = {
+          participantType: 'MEMBER',
+          status: 'PENDING',
+          requesterEmail: formValues.requestorEmail,
+          newData: { ...formValues, imageUid: image?.uid },
+        };
+        await api
+          .put(`/v1/participants-request/${id}`, data)
+          .then((response) => {
+            setSaveCompleted(true);
+          });
+      } catch (err) {
+        console.log('error', err);
+      }
+    },
+    [executeRecaptcha]
+  );
 
   function handleAddNewRole() {
     const newRoles = formValues.teamAndRoles;
