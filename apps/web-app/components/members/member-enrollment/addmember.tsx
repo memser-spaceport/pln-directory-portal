@@ -218,11 +218,16 @@ export function AddMemberModal({
     try {
       let image;
       if (formValues.imageFile) {
-        image = await api
-          .post(`/v1/images`, formValues.imageFile)
-          .then((response) => {
-            return response?.data?.image;
-          });
+        const formData = new FormData();
+        formData.append('file', formValues.imageFile);
+        const config = {
+          headers: {
+            'content-type': 'multipart/form-data',
+          },
+        };
+        image = api.post(`/v1/images`, formData, config).then((response) => {
+          return response?.data?.image;
+        });
       }
 
       const data = {
