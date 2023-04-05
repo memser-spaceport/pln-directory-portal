@@ -1219,6 +1219,22 @@
       {
         "defaultValue": null,
         "enums": null,
+        "field": "plnStartDate",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "Date",
+        "validations": []
+      },
+      {
+        "defaultValue": null,
+        "enums": null,
         "field": "twitterHandler",
         "integration": null,
         "inverseOf": null,
