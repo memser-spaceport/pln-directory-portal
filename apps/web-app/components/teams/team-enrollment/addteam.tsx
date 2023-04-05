@@ -281,7 +281,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
           participantType: 'TEAM',
           status: 'PENDING',
           newData: { ...formValues, logoUid: image?.uid },
-          captchaToken
+          captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);

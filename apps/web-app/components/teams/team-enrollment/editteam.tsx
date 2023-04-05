@@ -283,7 +283,7 @@ export function EditTeamModal({
           referenceUid: id,
           editRequestorEmailId: formValues.requestorEmail,
           newData: { ...formValues, logoUid: image?.uid },
-          captchaToken
+          captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);

@@ -247,7 +247,7 @@ export function AddMemberModal({
           participantType: 'MEMBER',
           status: 'PENDING',
           newData: { ...formValues, imageUid: image?.uid },
-          captchaToken
+          captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           console.log('response', response);
