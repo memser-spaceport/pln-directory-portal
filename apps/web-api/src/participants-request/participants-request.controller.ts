@@ -9,9 +9,11 @@ import {
   Put,
   Query,
   Req,
+  UseGuards,
 } from '@nestjs/common';
 import { ApprovalStatus } from '@prisma/client';
 import { ParticipantsRequestService } from './participants-request.service';
+import { GoogleRecaptchaGuard } from '../guards/google-recaptcha.guard';
 
 @Controller('v1/participants-request')
 export class ParticipantsRequestController {
@@ -33,6 +35,7 @@ export class ParticipantsRequestController {
   }
 
   @Post()
+  @UseGuards(GoogleRecaptchaGuard)
   async addRequest(@Body() body) {
     const postData = body;
     const result = await this.participantsRequestService.addRequest(postData);
@@ -40,6 +43,7 @@ export class ParticipantsRequestController {
   }
 
   @Put(':uid')
+  @UseGuards(GoogleRecaptchaGuard)
   async updateRequest(@Body() body, @Param() params) {
     const postData = body;
     const result = await this.participantsRequestService.updateRequest(
@@ -50,6 +54,7 @@ export class ParticipantsRequestController {
   }
 
   @Patch(':uid')
+  @UseGuards(GoogleRecaptchaGuard)
   async processRequest(@Body() body, @Param() params) {
     const uid = params.uid;
     const participantType = body.participantType;
