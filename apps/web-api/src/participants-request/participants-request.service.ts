@@ -99,8 +99,12 @@ export class ParticipantsRequestService {
     ) {
       await this.awsService.sendEmail(
         'NewMemberRequest',
-        ['thangaraj.esakky@ideas2it.com', 'abarna.visvanathan@ideas2it.com', 'dineshkumar.manoharan@ideas2it.com',
-         'winstonmanuelvijay.amaljeyakumar@ideas2it.com'],
+        [
+          'thangaraj.esakky@ideas2it.com',
+          'abarna.visvanathan@ideas2it.com',
+          'dineshkumar.manoharan@ideas2it.com',
+          'winstonmanuelvijay.amaljeyakumar@ideas2it.com',
+        ],
         {
           memberName: result.newData.name,
           requestUid: result.uid,
@@ -113,8 +117,12 @@ export class ParticipantsRequestService {
     ) {
       await this.awsService.sendEmail(
         'EditMemberRequest',
-        ['thangaraj.esakky@ideas2it.com', 'abarna.visvanathan@ideas2it.com', 'dineshkumar.manoharan@ideas2it.com',
-         'winstonmanuelvijay.amaljeyakumar@ideas2it.com'],
+        [
+          'thangaraj.esakky@ideas2it.com',
+          'abarna.visvanathan@ideas2it.com',
+          'dineshkumar.manoharan@ideas2it.com',
+          'winstonmanuelvijay.amaljeyakumar@ideas2it.com',
+        ],
         {
           memberName: result.newData.name,
           requestUid: result.uid,
@@ -128,8 +136,12 @@ export class ParticipantsRequestService {
     ) {
       await this.awsService.sendEmail(
         'NewTeamRequest',
-        ['thangaraj.esakky@ideas2it.com', 'abarna.visvanathan@ideas2it.com', 'dineshkumar.manoharan@ideas2it.com',
-         'winstonmanuelvijay.amaljeyakumar@ideas2it.com'],
+        [
+          'thangaraj.esakky@ideas2it.com',
+          'abarna.visvanathan@ideas2it.com',
+          'dineshkumar.manoharan@ideas2it.com',
+          'winstonmanuelvijay.amaljeyakumar@ideas2it.com',
+        ],
         {
           teamName: result.newData.name,
           requestUid: result.uid,
@@ -142,8 +154,12 @@ export class ParticipantsRequestService {
     ) {
       await this.awsService.sendEmail(
         'EditTeamRequest',
-        ['thangaraj.esakky@ideas2it.com', 'abarna.visvanathan@ideas2it.com', 'dineshkumar.manoharan@ideas2it.com',
-         'winstonmanuelvijay.amaljeyakumar@ideas2it.com'],
+        [
+          'thangaraj.esakky@ideas2it.com',
+          'abarna.visvanathan@ideas2it.com',
+          'dineshkumar.manoharan@ideas2it.com',
+          'winstonmanuelvijay.amaljeyakumar@ideas2it.com',
+        ],
         {
           teamName: result.newData.name,
           requesterEmailId: requestData.editRequestorEmailId,
@@ -255,8 +271,12 @@ export class ParticipantsRequestService {
     });
     await this.awsService.sendEmail(
       'MemberCreated',
-      ['thangaraj.esakky@ideas2it.com', 'abarna.visvanathan@ideas2it.com', 'dineshkumar.manoharan@ideas2it.com',
-         'winstonmanuelvijay.amaljeyakumar@ideas2it.com'],
+      [
+        'thangaraj.esakky@ideas2it.com',
+        'abarna.visvanathan@ideas2it.com',
+        'dineshkumar.manoharan@ideas2it.com',
+        'winstonmanuelvijay.amaljeyakumar@ideas2it.com',
+      ],
       {
         memberName: dataToProcess.name,
         memberUid: newMember.uid,
@@ -410,8 +430,12 @@ export class ParticipantsRequestService {
     });
     await this.awsService.sendEmail(
       'MemberEditRequestCompleted',
-      ['thangaraj.esakky@ideas2it.com', 'abarna.visvanathan@ideas2it.com', 'dineshkumar.manoharan@ideas2it.com',
-      'winstonmanuelvijay.amaljeyakumar@ideas2it.com'],
+      [
+        'thangaraj.esakky@ideas2it.com',
+        'abarna.visvanathan@ideas2it.com',
+        'dineshkumar.manoharan@ideas2it.com',
+        'winstonmanuelvijay.amaljeyakumar@ideas2it.com',
+      ],
       { memberName: dataToProcess.name }
     );
     return { code: 1, message: 'Success' };
@@ -479,8 +503,12 @@ export class ParticipantsRequestService {
     });
     await this.awsService.sendEmail(
       'TeamCreated',
-      ['thangaraj.esakky@ideas2it.com', 'abarna.visvanathan@ideas2it.com', 'dineshkumar.manoharan@ideas2it.com',
-         'winstonmanuelvijay.amaljeyakumar@ideas2it.com'],
+      [
+        'thangaraj.esakky@ideas2it.com',
+        'abarna.visvanathan@ideas2it.com',
+        'dineshkumar.manoharan@ideas2it.com',
+        'winstonmanuelvijay.amaljeyakumar@ideas2it.com',
+      ],
       {
         teamName: dataToProcess.name,
         teamUid: newTeam.uid,
@@ -569,8 +597,12 @@ export class ParticipantsRequestService {
     });
     await this.awsService.sendEmail(
       'TeamEditRequestCompleted',
-      ['thangaraj.esakky@ideas2it.com', 'abarna.visvanathan@ideas2it.com', 'dineshkumar.manoharan@ideas2it.com',
-      'winstonmanuelvijay.amaljeyakumar@ideas2it.com'],
+      [
+        'thangaraj.esakky@ideas2it.com',
+        'abarna.visvanathan@ideas2it.com',
+        'dineshkumar.manoharan@ideas2it.com',
+        'winstonmanuelvijay.amaljeyakumar@ideas2it.com',
+      ],
       { teamName: dataToProcess.name }
     );
     return { code: 1, message: 'Success' };
