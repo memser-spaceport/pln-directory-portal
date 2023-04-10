@@ -11,7 +11,7 @@ const SES_CONFIG = {
 export class AwsService {
   async sendEmail(templateName, toAddresses, data) {
     const AWS_SES = new AWS.SES(SES_CONFIG);
-    let params = {
+    const params = {
       Source: 'member-services@plnetwork.io',
       Destination: {
         ToAddresses: toAddresses,

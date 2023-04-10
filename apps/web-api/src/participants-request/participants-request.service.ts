@@ -66,7 +66,6 @@ export class ParticipantsRequestService {
     });
     if (itemInRequest.length === 0) {
       if (participantType === 'TEAM') {
-        console.log(uniqueIdentifier);
         const teamResult = await this.prisma.team.findMany({
           where: { name: uniqueIdentifier },
         });

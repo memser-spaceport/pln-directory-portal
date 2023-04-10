@@ -84,7 +84,7 @@ model ParticipantsRequest {
    oldData               Json?
    newData               Json
    referenceUid          String?
-   editRequestorEmailId  String?            
+   requesterEmailId      String
    uniqueIdentifier      String
    createdAt             DateTime           @default(now())
    updatedAt             DateTime           @updatedAt

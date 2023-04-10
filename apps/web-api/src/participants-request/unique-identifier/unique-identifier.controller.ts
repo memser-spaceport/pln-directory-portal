@@ -12,9 +12,9 @@ import {
 } from '@nestjs/common';
 import { ApprovalStatus } from '@prisma/client';
 import { query } from 'express';
-import { ParticipantsRequestService } from './participants-request.service';
+import { ParticipantsRequestService } from '../participants-request.service';
 
-@Controller('participants-request/unique-identifier-checker')
+@Controller('v1/participants-request/unique-identifier')
 export class UniqueIdentifier {
   constructor(
     private readonly participantsRequestService: ParticipantsRequestService
