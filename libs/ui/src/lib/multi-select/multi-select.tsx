@@ -12,7 +12,7 @@ interface MultiSelectDropdownProps {
   onChange: (selectedValues: Option[], name: string) => void;
   placeholder?: string;
   label?: string;
-  required?:boolean;
+  required?: boolean;
   name: string;
 }
 
@@ -40,7 +40,8 @@ export function MultiSelect({
   const [isExpanded, setIsExpanded] = useState(false);
   const [internalOptions, setInternalOptions] = useState<Option[]>(options);
   const dropdownOptionsRef = useRef<HTMLDivElement>(null);
-  const requiredIndicator = (required && !selectedValues.length) ? "border border-red-500" : "";
+  const requiredIndicator =
+    required && !selectedValues.length ? 'border border-red-500' : '';
 
   const toggleDropdown = () => {
     setIsExpanded(!isExpanded);
@@ -48,9 +49,9 @@ export function MultiSelect({
 
   useEffect(() => {
     let filteredOptions = options;
-    if(selectedValues?.length){
-      const values = new Set(selectedValues.map(item => item.value));
-      filteredOptions = options?.filter(item => !values.has(item.value));
+    if (selectedValues?.length) {
+      const values = new Set(selectedValues.map((item) => item.value));
+      filteredOptions = options?.filter((item) => !values.has(item.value));
     }
     filteredOptions = sortOptions(filteredOptions);
     setInternalOptions(filteredOptions);
@@ -73,37 +74,43 @@ export function MultiSelect({
     };
   }, [dropdownOptionsRef]);
 
+  const handleOptionClick = useCallback(
+    (item: Option) => {
+      // const newSelectedValues = selectedValues.includes(item)
+      //   ? selectedValues.filter((selectedItem) => selectedItem.value !== item.value)
+      //   : [...selectedValues, item];
+      const newSelectedValues = [...selectedValues, item];
+      let refreshedOption = internalOptions.filter(
+        (option) => option.value !== item.value
+      );
+      refreshedOption = sortOptions(refreshedOption);
+      setInternalOptions(refreshedOption);
+      onChange(newSelectedValues, name);
+    },
+    [internalOptions, name, onChange, selectedValues]
+  );
 
-  const handleOptionClick = useCallback((item: Option) => {
-    // const newSelectedValues = selectedValues.includes(item)
-    //   ? selectedValues.filter((selectedItem) => selectedItem.value !== item.value)
-    //   : [...selectedValues, item];
-    const newSelectedValues = [...selectedValues, item];
-    let refreshedOption = internalOptions.filter(
-      (option) => option.value !== item.value
-    );
-    refreshedOption = sortOptions(refreshedOption);
-    setInternalOptions(refreshedOption);
-    onChange(newSelectedValues, name);
-  },[internalOptions, name, onChange, selectedValues]);
-
-  const handleRemoveOption = useCallback((
-    event: React.MouseEvent<HTMLButtonElement>,
-    item: Option
-  ) => {
-    event.preventDefault();
-    const newSelectedValues = selectedValues.filter(
-      (selectedItem) => selectedItem.value !== item.value
-    );
-    let  newOptions = [...internalOptions, item];
-    newOptions = sortOptions(newOptions);
-    setInternalOptions(newOptions);
-    onChange(newSelectedValues, name);
-  },[internalOptions, name, onChange, selectedValues]);
+  const handleRemoveOption = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>, item: Option) => {
+      event.preventDefault();
+      const newSelectedValues = selectedValues.filter(
+        (selectedItem) => selectedItem.value !== item.value
+      );
+      let newOptions = [...internalOptions, item];
+      newOptions = sortOptions(newOptions);
+      setInternalOptions(newOptions);
+      onChange(newSelectedValues, name);
+    },
+    [internalOptions, name, onChange, selectedValues]
+  );
 
   return (
     <div className="">
-      {label && <span className="mb-4 text-sm font-bold">{required ? label + ' *' : label}</span>}
+      {label && (
+        <span className="mb-4 text-sm font-bold">
+          {required ? label + ' *' : label}
+        </span>
+      )}
       <div
         className={`mt-2.5 flex cursor-pointer items-center justify-between rounded-md border bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${requiredIndicator}`}
         onClick={toggleDropdown}
@@ -112,7 +119,7 @@ export function MultiSelect({
           {selectedValues?.length > 0 ? (
             selectedValues.map((item) => (
               <div
-                className="m-1 flex items-center rounded-full bg-gray-100 py-1 px-2 font-semibold text-gray-600"
+                className="m-1 flex items-center rounded-full bg-gray-100 px-2 py-1 font-semibold text-gray-600"
                 key={item.value}
               >
                 <span className="mr-1">{item.label}</span>

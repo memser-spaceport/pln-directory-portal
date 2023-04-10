@@ -21,7 +21,7 @@ export default function AddMemberStepOne(props) {
           value={values?.requestorEmail}
           onChange={onChange}
           placeholder="Enter your email address"
-          className="border custom-grey custom-outline-none"
+          className="custom-grey custom-outline-none border"
         />
       </div>
       <div className="flex px-8 pb-4 pt-6">
@@ -43,7 +43,7 @@ export default function AddMemberStepOne(props) {
             name="name"
             label="What is your organization, company, or team name?"
             placeholder="Enter name here"
-            className="border custom-grey custom-outline-none"
+            className="custom-grey custom-outline-none border"
           />
           {props.nameExists && (
             <div className="pt-2">
@@ -74,7 +74,7 @@ export default function AddMemberStepOne(props) {
           name="shortDescription"
           label="Please briefly describe what your team/product/project does"
           info="One to two sentences is perfect! Use clear language and minimal jargon."
-          className="border custom-grey custom-outline-none"
+          className="custom-grey custom-outline-none border"
         />
       </div>
 
@@ -87,7 +87,7 @@ export default function AddMemberStepOne(props) {
           name="longDescription"
           label="Long Description"
           info="Please explain what your team does in a bit more detail. 4-5 sentences will be great!"
-          className="border custom-grey custom-outline-none"
+          className="custom-grey custom-outline-none border"
         />
       </div>
 
@@ -122,7 +122,7 @@ export default function AddMemberStepOne(props) {
           onChange={onChange}
           label="Team Office Hours"
           placeholder="Enter address here"
-          className="border custom-grey custom-outline-none"
+          className="custom-grey custom-outline-none border"
         />
         <div className="flex pt-1 text-sm text-gray-400">
           <div>

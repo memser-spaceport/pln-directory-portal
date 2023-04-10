@@ -95,7 +95,11 @@ function getSubmitOrNextButton(handleSubmit, isProcessing) {
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
   const submitOrNextButton = (
-    <button className={buttonClassName} disabled={isProcessing} onClick={handleSubmit}>
+    <button
+      className={buttonClassName}
+      disabled={isProcessing}
+      onClick={handleSubmit}
+    >
       Request Changes
     </button>
   );
@@ -105,7 +109,7 @@ function getSubmitOrNextButton(handleSubmit, isProcessing) {
 function getCancelOrBackButton(handleModalClose) {
   const cancelorBackButton = (
     <button
-      className="on-focus leading-3.5 text-md mr-2 mb-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
+      className="on-focus leading-3.5 text-md mb-2 mr-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
       onClick={() => handleModalClose()}
     >
       Cancel
@@ -258,10 +262,15 @@ export function EditTeamModal({
   }
 
   function onNameBlur(event: ChangeEvent<HTMLInputElement>) {
-    const data = { uniqueIdentifier: event.target.value, participantType: 'team' };
-    api.post(`/participants-request/unique-identifier-checker`, data).then((response) => {
-      (response?.data.length) ? setNameExists(true): setNameExists(false);
-    });
+    const data = {
+      uniqueIdentifier: event.target.value,
+      participantType: 'team',
+    };
+    api
+      .post(`/participants-request/unique-identifier-checker`, data)
+      .then((response) => {
+        response?.data.length ? setNameExists(true) : setNameExists(false);
+      });
   }
 
   const handleSubmit = useCallback(

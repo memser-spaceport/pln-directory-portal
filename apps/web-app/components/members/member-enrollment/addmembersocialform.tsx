@@ -14,12 +14,12 @@ export default function AddMemberSocialForm(props) {
           name="linkedinHandler"
           maxLength={200}
           value={values.linkedinHandler}
-          className="border custom-grey custom-outline-none"
+          className="custom-grey custom-outline-none border"
           placeholder="eg., https://www.linkedin.com/in/jbenetcs/"
         />
       </div>
 
-      <div className="inputfield hint-text px-8 pt-4 pb-2">
+      <div className="inputfield hint-text px-8 pb-2 pt-4">
         <InputField
           label="Discord Handle"
           name="discordHandler"
@@ -27,7 +27,7 @@ export default function AddMemberSocialForm(props) {
           maxLength={200}
           value={values.discordHandler}
           placeholder="e.g., name#1234"
-          className="border custom-grey custom-outline-none"
+          className="custom-grey custom-outline-none border"
         />
         <div className="flex pt-1 text-sm text-gray-400">
           <div>
@@ -49,7 +49,7 @@ export default function AddMemberSocialForm(props) {
             maxLength={200}
             value={values.twitterHandler}
             placeholder="e.g., @protocollabs"
-            className="border custom-grey custom-outline-none"
+            className="custom-grey custom-outline-none border"
           />
         </div>
         <div className="inputfield w-[50%]">
@@ -60,19 +60,19 @@ export default function AddMemberSocialForm(props) {
             maxLength={200}
             onChange={onChange}
             placeholder="Enter Github handle"
-            className="border custom-grey custom-outline-none"
+            className="custom-grey custom-outline-none border"
           />
         </div>
       </div>
 
-      <div className="inputfield hint-text px-8 pt-5 pb-3">
+      <div className="inputfield hint-text px-8 pb-3 pt-5">
         <InputField
           label="Office Hours Link"
           name="officeHours"
           maxLength={300}
           value={values.officeHours}
           onChange={onChange}
-          className="border custom-grey custom-outline-none"
+          className="custom-grey custom-outline-none border"
         />
         <div className="flex pt-1 text-sm text-gray-400">
           <div>
@@ -93,7 +93,7 @@ export default function AddMemberSocialForm(props) {
           maxLength={1000}
           value={values.comments}
           label="Did we miss something?"
-          className="border custom-grey custom-outline-none"
+          className="custom-grey custom-outline-none border"
           info="Let us know what else you would like to share and wish others would share to make it easier to locate and contact each other!"
         />
       </div>

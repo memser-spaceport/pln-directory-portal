@@ -26,11 +26,12 @@ export function Dropdown({
   buttonContent,
   name,
   value,
-  required=false,
+  required = false,
   placeholder = 'Select a value... ',
 }: DropdownProps) {
   const [selectedOption, setSelectedOption] = useState(initialOption);
-  const requiredIndicator = required && !selectedOption?.value ? 'border custom-red' : '';
+  const requiredIndicator =
+    required && !selectedOption?.value ? 'border custom-red' : '';
 
   function onChangeHandler(value: string) {
     const selectedDropdownOption = options.find(

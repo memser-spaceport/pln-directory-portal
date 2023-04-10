@@ -29,7 +29,8 @@ export function InputField({
 }: InputFieldProps) {
   const [inputValue, setInputValue] = useState(value);
   const InputIcon = icon;
-  const requiredIndicator = required && !value?.trim() ? 'border custom-red' : '';
+  const requiredIndicator =
+    required && !value?.trim() ? 'border custom-red' : '';
 
   useEffect(() => {
     setInputValue(value);

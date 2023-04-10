@@ -121,7 +121,11 @@ function getSubmitOrNextButton(
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
   const submitOrNextButton =
     formStep === 3 ? (
-      <button className={buttonClassName} disabled={isProcessing} onClick={handleSubmit}>
+      <button
+        className={buttonClassName}
+        disabled={isProcessing}
+        onClick={handleSubmit}
+      >
         Add to Network
       </button>
     ) : (
@@ -170,7 +174,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     logoUid: '',
     logoFile: null,
     shortDescription: '',
-    requestorEmail:'',
+    requestorEmail: '',
     longDescription: '',
     technologies: [],
     fundingStage: {},
@@ -217,7 +221,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       name: '',
       logoUid: '',
       logoFile: null,
-      requestorEmail:'',
+      requestorEmail: '',
       shortDescription: '',
       longDescription: '',
       technologies: [],

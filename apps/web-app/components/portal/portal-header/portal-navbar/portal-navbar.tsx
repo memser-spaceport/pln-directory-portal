@@ -15,7 +15,7 @@ function getNavItems() {
       return (
         <Menu key={item.label}>
           <div className="w-20">
-            <Menu.Button className="flex w-full flex-row flex-nowrap items-center justify-around rounded py-1 px-2 font-medium outline-none transition-all duration-300 ease-in-out focus:ring-opacity-25 focus:ring-offset-1">
+            <Menu.Button className="flex w-full flex-row flex-nowrap items-center justify-around rounded px-2 py-1 font-medium outline-none transition-all duration-300 ease-in-out focus:ring-opacity-25 focus:ring-offset-1">
               <span>{item.label}</span>
               <span>
                 <ArrowDownFilled />
@@ -59,7 +59,7 @@ function getNavItems() {
 
       return (
         <a
-          className="rounded py-1 px-2 outline-none transition-all duration-300 ease-in-out hover:bg-blue-600 hover:text-white focus:outline-1 focus:outline-offset-0 focus:outline-blue-600 focus:ring-2 focus:ring-blue-600 focus:ring-opacity-25 focus:ring-offset-1"
+          className="rounded px-2 py-1 outline-none transition-all duration-300 ease-in-out hover:bg-blue-600 hover:text-white focus:outline-1 focus:outline-offset-0 focus:outline-blue-600 focus:ring-2 focus:ring-blue-600 focus:ring-opacity-25 focus:ring-offset-1"
           href={item.url}
           key={item.label}
           target="_blank"

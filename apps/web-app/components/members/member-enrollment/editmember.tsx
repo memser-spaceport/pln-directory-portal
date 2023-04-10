@@ -26,7 +26,7 @@ interface EditMemberModalProps {
   id: string;
 }
 
-function validateBasicForm(formValues,imageUrl) {
+function validateBasicForm(formValues, imageUrl) {
   const errors = [];
   const emailRE =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
@@ -60,7 +60,7 @@ function validateSkillForm(formValues) {
       errors.push('Please add missing Team(s)/Role(s)');
     }
   }
-  if (!formValues.skills.length){
+  if (!formValues.skills.length) {
     errors.push('Please add your skill details');
   }
   return errors;
@@ -83,7 +83,11 @@ function getSubmitOrNextButton(handleSubmit, isProcessing) {
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
   const submitOrNextButton = (
-    <button className={buttonClassName} disabled={isProcessing} onClick={handleSubmit}>
+    <button
+      className={buttonClassName}
+      disabled={isProcessing}
+      onClick={handleSubmit}
+    >
       Request Changes
     </button>
   );
@@ -120,7 +124,7 @@ export function EditMemberModal({
     requestorEmail: '',
     imageUid: '',
     imageFile: null,
-    plnStartDate: new Date().toLocaleDateString("af-ZA"),
+    plnStartDate: new Date().toLocaleDateString('af-ZA'),
     city: '',
     region: '',
     country: '',
@@ -193,7 +197,7 @@ export function EditMemberModal({
       requestorEmail: '',
       imageUid: '',
       imageFile: null,
-      plnStartDate: new Date().toLocaleDateString("af-ZA"),
+      plnStartDate: new Date().toLocaleDateString('af-ZA'),
       city: '',
       region: '',
       country: '',
@@ -224,8 +228,7 @@ export function EditMemberModal({
     const skills = formValues.skills.map((item) => {
       return { uid: item?.value, title: item?.label };
     });
-    const formattedData = 
-    {
+    const formattedData = {
       ...formValues,
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
@@ -234,10 +237,15 @@ export function EditMemberModal({
   }
 
   function onEmailBlur(event: ChangeEvent<HTMLInputElement>) {
-    const data = { uniqueIdentifier: event.target.value, participantType: 'member' };
-    api.post(`/participants-request/unique-identifier-checker`, data).then((response) => {
-      (response?.data.length) ? setEmailExists(true): setEmailExists(false);
-    });
+    const data = {
+      uniqueIdentifier: event.target.value,
+      participantType: 'member',
+    };
+    api
+      .post(`/participants-request/unique-identifier-checker`, data)
+      .then((response) => {
+        response?.data.length ? setEmailExists(true) : setEmailExists(false);
+      });
   }
 
   const handleSubmit = useCallback(

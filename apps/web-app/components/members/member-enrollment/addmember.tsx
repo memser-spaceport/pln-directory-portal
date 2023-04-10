@@ -38,10 +38,7 @@ function validateBasicForm(formValues) {
   if (!formValues.name.trim()) {
     errors.push('Please add your Name.');
   }
-  if (
-    !formValues.email.trim() ||
-    !formValues.email?.match(emailRE)
-  ) {
+  if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
     errors.push('Please add valid Email.');
   }
   if (!formValues.imageFile) {
@@ -62,7 +59,7 @@ function validateSkillForm(formValues) {
       errors.push('Please add missing Team(s)/Role(s)');
     }
   }
-  if (!formValues.skills.length){
+  if (!formValues.skills.length) {
     errors.push('Please add your skill details');
   }
   return errors;
@@ -98,13 +95,17 @@ function getSubmitOrNextButton(
   setFormStep,
   handleSubmit,
   setErrors,
-  isProcessing,
+  isProcessing
 ) {
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
   const submitOrNextButton =
     formStep === 3 ? (
-      <button className={buttonClassName} disabled={isProcessing} onClick={handleSubmit}>
+      <button
+        className={buttonClassName}
+        disabled={isProcessing}
+        onClick={handleSubmit}
+      >
         Add to Network
       </button>
     ) : (
@@ -124,14 +125,14 @@ function getCancelOrBackButton(formStep, handleModalClose, setFormStep) {
   const cancelorBackButton =
     formStep === 1 ? (
       <button
-        className="on-focus leading-3.5 text-md mr-2 mb-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
+        className="on-focus leading-3.5 text-md mb-2 mr-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
         onClick={() => handleModalClose()}
       >
         Cancel
       </button>
     ) : (
       <button
-        className="on-focus leading-3.5 text-md mr-2 mb-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
+        className="on-focus leading-3.5 text-md mb-2 mr-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
         onClick={() => setFormStep(--formStep)}
       >
         Back
@@ -156,7 +157,7 @@ export function AddMemberModal({
     email: '',
     imageUid: '',
     imageFile: null,
-    plnStartDate: new Date().toLocaleDateString("af-ZA"),
+    plnStartDate: new Date().toLocaleDateString('af-ZA'),
     city: '',
     region: '',
     country: '',
@@ -194,7 +195,7 @@ export function AddMemberModal({
       email: '',
       imageUid: '',
       imageFile: null,
-      plnStartDate: new Date().toLocaleDateString("af-ZA"),
+      plnStartDate: new Date().toLocaleDateString('af-ZA'),
       city: '',
       region: '',
       country: '',
@@ -222,8 +223,7 @@ export function AddMemberModal({
     const skills = formValues.skills.map((item) => {
       return { uid: item?.value, title: item?.label };
     });
-    const formattedData = 
-    {
+    const formattedData = {
       ...formValues,
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
@@ -232,10 +232,15 @@ export function AddMemberModal({
   }
 
   function onEmailBlur(event: ChangeEvent<HTMLInputElement>) {
-    const data = { uniqueIdentifier: event.target.value, participantType: 'member' };
-    api.post(`/participants-request/unique-identifier-checker`, data).then((response) => {
-      (response?.data.length) ? setEmailExists(true): setEmailExists(false);
-    });
+    const data = {
+      uniqueIdentifier: event.target.value,
+      participantType: 'member',
+    };
+    api
+      .post(`/participants-request/unique-identifier-checker`, data)
+      .then((response) => {
+        response?.data.length ? setEmailExists(true) : setEmailExists(false);
+      });
   }
 
   const handleSubmit = useCallback(
@@ -260,10 +265,12 @@ export function AddMemberModal({
               'content-type': 'multipart/form-data',
             },
           };
-          image = await api.post(`/v1/images`, formData, config).then((response) => {
-            console.log('response.data', response.data);
-            return response?.data?.image;
-          });
+          image = await api
+            .post(`/v1/images`, formData, config)
+            .then((response) => {
+              console.log('response.data', response.data);
+              return response?.data?.image;
+            });
           console.log('imageeeeeeeeee', image);
         }
 

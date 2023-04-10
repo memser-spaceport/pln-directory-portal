@@ -30,7 +30,7 @@ function ModalHeader({
   return (
     <>
       <CloseIcon
-        className="stroke-3 absolute top-5 right-5 z-40 h-6 w-6 cursor-pointer text-white"
+        className="stroke-3 absolute right-5 top-5 z-40 h-6 w-6 cursor-pointer text-white"
         onClick={() => onClose()}
       />
       <div className={headerStyleClass}>
@@ -57,7 +57,7 @@ function ModalFooter({ onClose }: ModalHeaderProps) {
     <div className="absolute bottom-2 m-3">
       <div className="ml-2">
         <button
-          className="on-focus leading-3.5 text-md mr-2 mb-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
+          className="on-focus leading-3.5 text-md mb-2 mr-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
           onClick={() => onClose()}
         >
           Cancel
@@ -80,7 +80,7 @@ function Modal({
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog
         as="div"
-        className="fixed inset-0 top-0 left-0 z-[1055] w-full grow overflow-x-hidden outline-none"
+        className="fixed inset-0 left-0 top-0 z-[1055] w-full grow overflow-x-hidden outline-none"
         onClose={() => onClose()}
       >
         <div className="">

@@ -56,7 +56,7 @@ export function TeamAndRoleGrid(props) {
             label="Role"
             maxLength={100}
             placeholder="Enter Role"
-            className="border custom-grey custom-outline-none"
+            className="custom-grey custom-outline-none border"
             onChange={handleInputChange}
             value={roleTitle}
           />

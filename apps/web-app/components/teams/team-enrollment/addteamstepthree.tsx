@@ -16,7 +16,7 @@ export default function AddMemberStepThree(props) {
           maxLength={200}
           onChange={handleInputChange}
           placeholder="Enter contact method"
-          className="border custom-grey custom-outline-none"
+          className="custom-grey custom-outline-none border"
         />
         <div className="flex pt-1 text-sm text-gray-400">
           <div>
@@ -38,7 +38,7 @@ export default function AddMemberStepThree(props) {
           value={values.website}
           onChange={handleInputChange}
           placeholder="Enter address here"
-          className="border custom-grey custom-outline-none"
+          className="custom-grey custom-outline-none border"
         />
         <div className="mt-1 flex px-2 text-sm text-gray-400">
           <div>
@@ -59,7 +59,7 @@ export default function AddMemberStepThree(props) {
           value={values.linkedinHandler}
           onChange={handleInputChange}
           placeholder="eg., https://www.linkedin.com/in/jbenetcs/"
-          className="border custom-grey custom-outline-none"
+          className="custom-grey custom-outline-none border"
         />
       </div>
       <div className="inputfield px-8 py-4">
@@ -70,7 +70,7 @@ export default function AddMemberStepThree(props) {
           value={values.twitter}
           onChange={handleInputChange}
           placeholder="e.g., @protocollabs"
-          className="border custom-grey custom-outline-none"
+          className="custom-grey custom-outline-none border"
         />
       </div>
 
@@ -82,7 +82,7 @@ export default function AddMemberStepThree(props) {
           value={values.blog}
           onChange={handleInputChange}
           placeholder="Enter address here"
-          className="border custom-grey custom-outline-none"
+          className="custom-grey custom-outline-none border"
         />
         <div className="mt-1 flex px-2 text-sm text-gray-400">
           <div>

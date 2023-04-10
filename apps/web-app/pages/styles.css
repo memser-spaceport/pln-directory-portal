@@ -14,7 +14,7 @@
   }
 
   .directory-view-type:first-child > button {
-    @apply rounded-r-none rounded-l-lg;
+    @apply rounded-l-lg rounded-r-none;
   }
   .directory-view-type:last-child > button {
     @apply rounded-l-none rounded-r-lg;
@@ -133,21 +133,21 @@
   max-width: 500px;
 }
 
-.custom-grey{
+.custom-grey {
   --tw-border-opacity: 1;
   border-color: rgb(209 213 219 / var(--tw-border-opacity));
 }
 
-.custom-red{
+.custom-red {
   --tw-border-opacity: 1;
   border-color: rgb(239 68 68 / var(--tw-border-opacity));
 }
 
-.custom-outline-none:hover{
+.custom-outline-none:hover {
   box-shadow: none !important;
   outline: none !important;
 }
-.custom-outline-none:focus-visible{
+.custom-outline-none:focus-visible {
   box-shadow: none !important;
   outline: none !important;
 }
