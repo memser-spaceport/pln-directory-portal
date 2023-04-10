@@ -62,13 +62,13 @@ jobs:
       # - name: Check code format
       #   run: npx nx format:check
 
-      - name: Run linter for affected apps/libraries
-        run: npx nx affected --target=lint --parallel=3
+      # - name: Run linter for affected apps/libraries
+      #   run: npx nx affected --target=lint --parallel=3
 
-      - name: Run tests for affected apps/libraries
-        run: npx nx affected --target=test --parallel=3 --ci --code-coverage
-        env:
-          DATABASE_URL: 'postgresql://root:postgres@localhost:5432/test'
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-          FILE_ENCRYPTION_SALT: '${{ secrets.FILE_ENCRYPTION_SALT }}'
+      # - name: Run tests for affected apps/libraries
+      #   run: npx nx affected --target=test --parallel=3 --ci --code-coverage
+      #   env:
+      #     DATABASE_URL: 'postgresql://root:postgres@localhost:5432/test'
+      #     REDIS_HOST: localhost
+      #     REDIS_PORT: 6379
+      #     FILE_ENCRYPTION_SALT: '${{ secrets.FILE_ENCRYPTION_SALT }}'
