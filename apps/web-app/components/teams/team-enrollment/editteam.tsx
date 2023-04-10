@@ -1,4 +1,3 @@
-import { InputField } from '@protocol-labs-network/ui';
 import {
   Dispatch,
   SetStateAction,
@@ -28,27 +27,27 @@ interface EditTeamModalProps {
   id: string;
 }
 
-function validateBasicForm(formValues) {
+function validateBasicForm(formValues, imageUrl) {
   const errors = [];
   const emailRE =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   if (
-    !formValues.requestorEmail ||
+    !formValues.requestorEmail?.trim() ||
     !formValues.requestorEmail?.match(emailRE)
   ) {
     errors.push('Please add valid Requestor email.');
   }
-  if (!formValues.name) {
+  if (!formValues.name?.trim()) {
     errors.push('Please add Team Name.');
   }
-  if (!formValues.shortDescription) {
+  if (!imageUrl) {
+    errors.push('Please add logo.');
+  }
+  if (!formValues.shortDescription?.trim()) {
     errors.push('Please add Description.');
   }
-  if (!formValues.longDescription) {
+  if (!formValues.longDescription?.trim()) {
     errors.push('Please add Long Description.');
-  }
-  if (!formValues.officeHours) {
-    errors.push('Please add Office Hours.');
   }
   return errors;
 }
@@ -66,18 +65,18 @@ function validateProjectDetailForm(formValues) {
 
 function validateSocialForm(formValues) {
   const errors = [];
-  if (!formValues.contactMethod) {
+  if (!formValues.contactMethod?.trim()) {
     errors.push('Please add Preferred method of contact');
   }
-  if (!formValues.website) {
+  if (!formValues.website?.trim()) {
     errors.push('Please add website');
   }
   return errors;
 }
 
-function validateForm(formValues) {
+function validateForm(formValues, imageUrl) {
   let errors = [];
-  const basicFormErrors = validateBasicForm(formValues);
+  const basicFormErrors = validateBasicForm(formValues, imageUrl);
   if (basicFormErrors.length) {
     errors = [...errors, ...basicFormErrors];
   }
@@ -92,11 +91,11 @@ function validateForm(formValues) {
   return errors;
 }
 
-function getSubmitOrNextButton(handleSubmit) {
+function getSubmitOrNextButton(handleSubmit, isProcessing) {
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
   const submitOrNextButton = (
-    <button className={buttonClassName} onClick={handleSubmit}>
+    <button className={buttonClassName} disabled={isProcessing} onClick={handleSubmit}>
       Request Changes
     </button>
   );
@@ -123,7 +122,9 @@ export function EditTeamModal({
   const [errors, setErrors] = useState([]);
   const [imageUrl, setImageUrl] = useState<string>();
   const [imageChanged, setImageChanged] = useState<boolean>(false);
+  const [nameExists, setNameExists] = useState<boolean>(false);
   const [dropDownValues, setDropDownValues] = useState({});
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
@@ -189,7 +190,7 @@ export function EditTeamModal({
             membershipSources: data[1],
             fundingStages: data[2],
             industryTags: data[3],
-            technologies: data[4],
+            protocol: data[4],
           });
         })
         .catch((e) => console.error(e));
@@ -201,6 +202,7 @@ export function EditTeamModal({
     setDropDownValues({});
     setImageChanged(false);
     setSaveCompleted(false);
+    setIsProcessing(false);
     setFormValues({
       name: '',
       requestorEmail: '',
@@ -244,28 +246,40 @@ export function EditTeamModal({
       title: formValues.fundingStage?.label,
     };
 
-    setFormValues({
+    const formattedValue = {
       ...formValues,
       fundingStage: formattedFundingStage,
       industryTags: formattedTags,
       membershipSource: formattedMembershipSource,
       technologies: formattedtechnologies,
+    };
+    delete formattedValue.requestorEmail;
+    return formattedValue;
+  }
+
+  function onNameBlur(event: ChangeEvent<HTMLInputElement>) {
+    const data = { uniqueIdentifier: event.target.value, participantType: 'team' };
+    api.post(`/participants-request/unique-identifier-checker`, data).then((response) => {
+      (response?.data.length) ? setNameExists(true): setNameExists(false);
     });
   }
 
   const handleSubmit = useCallback(
     async (e) => {
+      setIsProcessing(true);
       e.preventDefault();
       if (!executeRecaptcha) {
         console.log('Execute recaptcha not yet available');
         return;
       }
-      const errors = validateForm(formValues);
+      console.log('formmmmmmmmmm Values', formValues);
+      const errors = validateForm(formValues, imageUrl);
       if (errors?.length > 0) {
         setErrors(errors);
         return false;
       }
-      formatData();
+      const requestorEmail = formValues.requestorEmail;
+      const values = formatData();
       try {
         const captchaToken = await executeRecaptcha();
 
@@ -273,19 +287,21 @@ export function EditTeamModal({
         let image;
         if (imageChanged) {
           image = await api
-            .post(`/v1/images`, formValues.logoFile)
+            .post(`/v1/images`, values.logoFile)
             .then((response) => {
+              delete values.logoFile;
               return response?.data?.image;
             });
         }
         const data = {
           participantType: 'TEAM',
           referenceUid: id,
-          editRequestorEmailId: formValues.requestorEmail,
-          newData: { ...formValues, logoUid: image?.uid },
+          editRequestorEmailId: requestorEmail,
+          newData: { ...values, logoUid: image?.uid },
           captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
+          setIsProcessing(false);
           setSaveCompleted(true);
         });
       } catch (err) {
@@ -359,17 +375,6 @@ export function EditTeamModal({
                 </ul>
               </div>
             )}
-            <div className="inputfield px-8 pt-4 pb-10">
-              <InputField
-                required
-                name="requestorEmail"
-                type="email"
-                label="Requestor Email"
-                value={formValues?.requestorEmail}
-                onChange={handleInputChange}
-                placeholder="Enter your email address"
-              />
-            </div>
             <div className="overflow-y-auto">
               <AddTeamStepOne
                 formValues={formValues}
@@ -377,6 +382,8 @@ export function EditTeamModal({
                 handleDropDownChange={handleDropDownChange}
                 handleImageChange={handleImageChange}
                 imageUrl={imageUrl}
+                onNameBlur={onNameBlur}
+                nameExists={nameExists}
               />
               <AddTeamStepTwo
                 formValues={formValues}
@@ -395,7 +402,7 @@ export function EditTeamModal({
                 {getCancelOrBackButton(handleModalClose)}
               </div>
               <div className="float-right m-2">
-                {getSubmitOrNextButton(handleSubmit)}
+                {getSubmitOrNextButton(handleSubmit, isProcessing)}
               </div>
             </div>
           </div>

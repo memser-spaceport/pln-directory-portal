@@ -18,14 +18,15 @@ export function TextArea({
   name,
   value,
   onChange,
-  rows = 4,
-  placeholder = '',
+  rows = 1,
+  placeholder = 'Enter details here',
   required,
   showLabel = true,
   info,
   ...props
 }: TextAreaProps) {
   const [inputValue, setInputValue] = useState(value);
+  const requiredIndicator = required && !value?.trim() ? 'border custom-red' : '';
 
   useEffect(() => {
     setInputValue(value);
@@ -49,10 +50,11 @@ export function TextArea({
       <textarea
         {...props}
         name={name}
+        placeholder={placeholder}
         className={`on-focus hover:shadow-on-hover block h-10 w-full rounded-lg border border-white bg-white text-sm leading-6 leading-10 text-slate-900 shadow-sm shadow-slate-300 transition duration-150
-        ease-in-out placeholder:text-sm placeholder:text-slate-600 ${
+        ease-in-out px-3 py-2  placeholder:text-sm placeholder:text-slate-400 ${
           props.className || ''
-        }`}
+        } ${requiredIndicator}`}
         rows={rows}
         onChange={composeEventHandlers(onChange, handleUserInput)}
         value={inputValue}

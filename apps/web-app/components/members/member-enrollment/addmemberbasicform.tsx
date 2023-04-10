@@ -17,13 +17,15 @@ export default function AddMemberBasicForm(props) {
         </div>
         <div className="namefield inputfield">
           <InputField
-            required
+            required = {true}
             name="name"
             label="Name"
+            pattern="^[a-zA-Z\s]*$"
+            maxLength={64}
             value={values?.name}
             onChange={onChange}
             placeholder="Enter your full name"
-            className="border-1 border-gray-300"
+            className="border custom-grey custom-outline-none"
           />
         </div>
       </div>
@@ -33,7 +35,7 @@ export default function AddMemberBasicForm(props) {
           <InformationCircleIcon className="h-5 w-5" />
         </div>
         <span className="font-size-13">
-          Please upload a squared image in PNG or JPEG format with file size
+          Please upload a image in PNG or JPEG format with file size
           less that 4MB.
         </span>
       </div>
@@ -44,21 +46,25 @@ export default function AddMemberBasicForm(props) {
           name="email"
           type="email"
           label="Email"
+          maxLength={255}
           value={values?.email}
           onChange={onChange}
+          onBlur={props.onEmailBlur}
           placeholder="Enter your email address"
-          className="border-1 border-gray-300"
+          className="border custom-grey custom-outline-none"
         />
       </div>
 
-      <div className="inputfield datefield px-8 py-4">
+      {props.emailExists && <span className="text-xs text-rose-600 px-8 py-1">Email already exists!</span>}
+
+      <div className="px-8 py-4">
         <InputField
           name="plnStartDate"
           type="date"
           onChange={onChange}
           value={values?.plnStartDate}
-          label="PLN Start Date"
-          className="border-1 border-gray-300"
+          label="PLN Start Date"    
+          className="border custom-grey custom-outline-none"
         />
         <div className="flex pt-1 text-sm text-gray-400">
           <div>
@@ -71,14 +77,16 @@ export default function AddMemberBasicForm(props) {
         </div>
       </div>
 
-      <div className="inputfield cityname px-8 py-4">
+      <div className="inputfield cityname px-8">
         <InputField
           name="city"
           label="City"
           value={values?.city}
+          pattern="^[a-zA-Z\s]*$"
+          maxLength={100}
           onChange={onChange}
           placeholder="Enter your city name"
-          className="border-1 border-gray-300"
+          className="border custom-grey custom-outline-none"
         />
         <div className="flex pt-1 text-sm text-gray-400">
           <div>
@@ -97,19 +105,23 @@ export default function AddMemberBasicForm(props) {
             name="region"
             label="State or Province"
             value={values?.region}
+            pattern="^[a-zA-Z\s]*$"
+            maxLength={100}
             onChange={onChange}
-            placeholder="Enter state or province name"
-            className="border-1 border-gray-300"
+            placeholder="Enter state or province"
+            className="border custom-grey custom-outline-none"
           />
         </div>
         <div className="inputfield w-[50%]">
           <InputField
             name="country"
             label="Country"
+            pattern="^[a-zA-Z\s]*$"
             value={values?.country}
+            maxLength={100}
             onChange={onChange}
-            placeholder="Enter country name"
-            className="border-1 border-gray-300"
+            placeholder="Enter country"
+            className="border custom-grey custom-outline-none"
           />
         </div>
       </div>

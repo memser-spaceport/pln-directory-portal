@@ -6,7 +6,6 @@ import {
   ChangeEvent,
   useCallback,
 } from 'react';
-import moment from 'moment';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
@@ -36,11 +35,17 @@ function validateBasicForm(formValues) {
   const errors = [];
   const emailRE =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-  if (!formValues.name) {
-    errors.push('Name is a mandatory.');
+  if (!formValues.name.trim()) {
+    errors.push('Please add your Name.');
   }
-  if (!formValues.email || !formValues.email?.match(emailRE)) {
-    errors.push('Email is mandatory.');
+  if (
+    !formValues.email.trim() ||
+    !formValues.email?.match(emailRE)
+  ) {
+    errors.push('Please add valid Email.');
+  }
+  if (!formValues.imageFile) {
+    errors.push('Please upload a profile image.');
   }
   return errors;
 }
@@ -51,11 +56,14 @@ function validateSkillForm(formValues) {
     errors.push('Please add your Team and Role details');
   } else {
     const missingValues = formValues.teamAndRoles.filter(
-      (item) => item.teamUid == '' || item.role == ''
+      (item) => item.teamUid == '' || item.role.trim() == ''
     );
     if (missingValues.length) {
-      errors.push('Team or Role value is missing');
+      errors.push('Please add missing Team(s)/Role(s)');
     }
+  }
+  if (!formValues.skills.length){
+    errors.push('Please add your skill details');
   }
   return errors;
 }
@@ -89,13 +97,14 @@ function getSubmitOrNextButton(
   formStep,
   setFormStep,
   handleSubmit,
-  setErrors
+  setErrors,
+  isProcessing,
 ) {
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
   const submitOrNextButton =
     formStep === 3 ? (
-      <button className={buttonClassName} onClick={handleSubmit}>
+      <button className={buttonClassName} disabled={isProcessing} onClick={handleSubmit}>
         Add to Network
       </button>
     ) : (
@@ -138,24 +147,26 @@ export function AddMemberModal({
   const [formStep, setFormStep] = useState<number>(1);
   const [errors, setErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({});
+  const [emailExists, setEmailExists] = useState<boolean>(false);
   const [imageUrl, setImageUrl] = useState<string>();
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     email: '',
     imageUid: '',
     imageFile: null,
-    plnStartDate: moment(new Date()).format('DD/MM/YYYY'),
+    plnStartDate: new Date().toLocaleDateString("af-ZA"),
     city: '',
     region: '',
     country: '',
-    linkedinURL: '',
+    linkedinHandler: '',
     discordHandler: '',
     twitterHandler: '',
     githubHandler: '',
     officeHours: '',
     comments: '',
-    teamAndRoles: [],
+    teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
     skills: [],
   });
 
@@ -177,22 +188,23 @@ export function AddMemberModal({
     setDropDownValues({});
     setSaveCompleted(false);
     setImageUrl('');
+    setIsProcessing(false);
     setFormValues({
       name: '',
       email: '',
       imageUid: '',
       imageFile: null,
-      plnStartDate: moment(new Date()).format('DD/MM/YYYY'),
+      plnStartDate: new Date().toLocaleDateString("af-ZA"),
       city: '',
       region: '',
       country: '',
-      linkedinURL: '',
+      linkedinHandler: '',
       discordHandler: '',
       twitterHandler: '',
       githubHandler: '',
       officeHours: '',
       comments: '',
-      teamAndRoles: [],
+      teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
       skills: [],
     });
   }
@@ -210,47 +222,60 @@ export function AddMemberModal({
     const skills = formValues.skills.map((item) => {
       return { uid: item?.value, title: item?.label };
     });
-    setFormValues({
+    const formattedData = 
+    {
       ...formValues,
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
+    };
+    return formattedData;
+  }
+
+  function onEmailBlur(event: ChangeEvent<HTMLInputElement>) {
+    const data = { uniqueIdentifier: event.target.value, participantType: 'member' };
+    api.post(`/participants-request/unique-identifier-checker`, data).then((response) => {
+      (response?.data.length) ? setEmailExists(true): setEmailExists(false);
     });
   }
 
   const handleSubmit = useCallback(
     async (e) => {
+      setIsProcessing(true);
       e.preventDefault();
       if (!executeRecaptcha) {
         console.log('Execute recaptcha not yet available');
         return;
       }
-      formatData();
+      const values = formatData();
       try {
         const captchaToken = await executeRecaptcha();
 
         if (!captchaToken) return;
         let image;
-        if (formValues.imageFile) {
+        if (values.imageFile) {
           const formData = new FormData();
-          formData.append('file', formValues.imageFile);
+          formData.append('file', values.imageFile);
           const config = {
             headers: {
               'content-type': 'multipart/form-data',
             },
           };
-          image = api.post(`/v1/images`, formData, config).then((response) => {
+          image = await api.post(`/v1/images`, formData, config).then((response) => {
+            console.log('response.data', response.data);
             return response?.data?.image;
           });
+          console.log('imageeeeeeeeee', image);
         }
 
         const data = {
           participantType: 'MEMBER',
           status: 'PENDING',
-          newData: { ...formValues, imageUid: image?.uid },
+          newData: { ...values, imageUid: image?.uid },
           captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           console.log('response', response);
+          setIsProcessing(false);
           setSaveCompleted(true);
         });
       } catch (err) {
@@ -297,10 +322,11 @@ export function AddMemberModal({
   }
 
   const handleImageChange = (file: File) => {
+    const imageFile = file;
+    setFormValues({ ...formValues, imageFile: imageFile });
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = () => setImageUrl(reader.result as string);
-    setFormValues({ ...formValues, imageFile: file });
   };
 
   function handleDeleteRolesRow(rowId) {
@@ -319,6 +345,8 @@ export function AddMemberModal({
             onChange={handleInputChange}
             handleImageChange={handleImageChange}
             imageUrl={imageUrl}
+            emailExists={emailExists}
+            onEmailBlur={onEmailBlur}
           />
         );
       case 2:
@@ -401,7 +429,8 @@ export function AddMemberModal({
                   formStep,
                   setFormStep,
                   handleSubmit,
-                  setErrors
+                  setErrors,
+                  isProcessing
                 )}
               </div>
             </div>

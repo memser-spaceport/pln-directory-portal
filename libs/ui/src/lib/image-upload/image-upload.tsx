@@ -46,8 +46,7 @@ export function ProfileImageUpload({
         onImageChange(file);
         setError('');
       } else {
-        console.log(`Upload file less than ${maxSize}MB`);
-        setError(`Upload file less than ${maxSize}MB`);
+        setError(`Please upload a file less than ${maxSize}MB`);
       }
     }
   };

@@ -12,6 +12,7 @@ export interface InputFieldProps extends React.ComponentProps<'input'> {
   required?: boolean;
   showLabel?: boolean;
   value?: string;
+  error?: string;
 }
 
 export function InputField({
@@ -23,17 +24,22 @@ export function InputField({
   required,
   showLabel = true,
   value,
+  error,
   ...props
 }: InputFieldProps) {
   const [inputValue, setInputValue] = useState(value);
   const InputIcon = icon;
+  const requiredIndicator = required && !value?.trim() ? 'border custom-red' : '';
 
   useEffect(() => {
     setInputValue(value);
   }, [setInputValue, value]);
 
   function handleUserInput(event: React.ChangeEvent<HTMLInputElement>) {
-    setInputValue(event.currentTarget.value);
+    if (!props?.pattern || event.currentTarget.value.match(props.pattern)) {
+      setInputValue(event.currentTarget.value);
+      props.onChange !== undefined && props.onChange(event);
+    }
   }
 
   function handleClear() {
@@ -45,7 +51,7 @@ export function InputField({
     <label className="relative block">
       {showLabel ? (
         <span className="py-2 text-sm font-bold">
-          {required ? label + ' *' : label}
+          {error ? error : required ? label + ' *' : label}
         </span>
       ) : (
         <span className="sr-only">{label}</span>
@@ -55,10 +61,12 @@ export function InputField({
       ) : null}
       <input
         {...props}
-        className={`block w-full rounded-lg border border-white bg-white text-sm leading-6 text-slate-900 shadow-sm shadow-slate-300 transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-600
+        className={`block w-full rounded-lg bg-white text-sm leading-6 text-slate-900 shadow-sm shadow-slate-300 transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-400
         ${icon ? 'pl-8' : 'pl-3'} ${hasClear ? 'pr-6' : 'pr-3'} on-focus
-        hover:shadow-on-hover h-10 leading-10 ${props.className || ''}`}
-        onChange={composeEventHandlers(props.onChange, handleUserInput)}
+        hover:shadow-on-hover h-10 leading-10 ${
+          props.className
+        } ${requiredIndicator}`}
+        onChange={handleUserInput}
         value={inputValue}
       />
       {hasClear ? (

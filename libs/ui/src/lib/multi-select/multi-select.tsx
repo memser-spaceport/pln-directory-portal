@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronDownIcon, XIcon as CloseIcon } from '@heroicons/react/solid';
 
 interface Option {
@@ -12,8 +12,21 @@ interface MultiSelectDropdownProps {
   onChange: (selectedValues: Option[], name: string) => void;
   placeholder?: string;
   label?: string;
+  required?:boolean;
   name: string;
 }
+
+const sortOptions = (arrayToSort: Option[]) => {
+  return arrayToSort?.sort((a, b) => {
+    if (a.label < b.label) {
+      return -1;
+    } else if (a.label > b.label) {
+      return 1;
+    } else {
+      return 0;
+    }
+  });
+};
 
 export function MultiSelect({
   options,
@@ -22,18 +35,26 @@ export function MultiSelect({
   placeholder,
   label,
   name,
+  required,
 }: MultiSelectDropdownProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [internalOptions, setInternalOptions] = useState<Option[]>(options);
   const dropdownOptionsRef = useRef<HTMLDivElement>(null);
+  const requiredIndicator = (required && !selectedValues.length) ? "border border-red-500" : "";
 
   const toggleDropdown = () => {
     setIsExpanded(!isExpanded);
   };
 
   useEffect(() => {
-    setInternalOptions(options);
-  }, [setInternalOptions, options]);
+    let filteredOptions = options;
+    if(selectedValues?.length){
+      const values = new Set(selectedValues.map(item => item.value));
+      filteredOptions = options?.filter(item => !values.has(item.value));
+    }
+    filteredOptions = sortOptions(filteredOptions);
+    setInternalOptions(filteredOptions);
+  }, [setInternalOptions, options, selectedValues]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -52,36 +73,39 @@ export function MultiSelect({
     };
   }, [dropdownOptionsRef]);
 
-  const handleOptionClick = (item: Option) => {
+
+  const handleOptionClick = useCallback((item: Option) => {
     // const newSelectedValues = selectedValues.includes(item)
     //   ? selectedValues.filter((selectedItem) => selectedItem.value !== item.value)
     //   : [...selectedValues, item];
     const newSelectedValues = [...selectedValues, item];
-    const refreshedOption = internalOptions.filter(
+    let refreshedOption = internalOptions.filter(
       (option) => option.value !== item.value
     );
+    refreshedOption = sortOptions(refreshedOption);
     setInternalOptions(refreshedOption);
     onChange(newSelectedValues, name);
-  };
+  },[internalOptions, name, onChange, selectedValues]);
 
-  const handleRemoveOption = (
+  const handleRemoveOption = useCallback((
     event: React.MouseEvent<HTMLButtonElement>,
     item: Option
   ) => {
     event.preventDefault();
-    event.stopPropagation();
     const newSelectedValues = selectedValues.filter(
       (selectedItem) => selectedItem.value !== item.value
     );
-    setInternalOptions([...internalOptions, item]);
+    let  newOptions = [...internalOptions, item];
+    newOptions = sortOptions(newOptions);
+    setInternalOptions(newOptions);
     onChange(newSelectedValues, name);
-  };
+  },[internalOptions, name, onChange, selectedValues]);
 
   return (
     <div className="">
-      {label && <span className="mb-4 text-sm font-bold">{label}</span>}
+      {label && <span className="mb-4 text-sm font-bold">{required ? label + ' *' : label}</span>}
       <div
-        className="mt-2.5 flex cursor-pointer items-center justify-between rounded-md border bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className={`mt-2.5 flex cursor-pointer items-center justify-between rounded-md border bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${requiredIndicator}`}
         onClick={toggleDropdown}
       >
         <div className="flex flex-1 flex-wrap pr-4">
@@ -102,7 +126,7 @@ export function MultiSelect({
               </div>
             ))
           ) : (
-            <span className="pl-3 text-gray-400">
+            <span className="pl-3 text-sm text-slate-400">
               {placeholder || 'Select...'}
             </span>
           )}

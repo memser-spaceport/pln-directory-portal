@@ -6,9 +6,11 @@ export interface DropdownProps {
   buttonContent?: React.ReactNode;
   initialOption?: IDropdownOption;
   onChange?: (value: IDropdownOption, name?: string) => void;
+  placeholder?: string;
   options: IDropdownOption[];
   value?: IDropdownOption;
   name?: string;
+  required?: boolean;
 }
 
 export interface IDropdownOption {
@@ -24,8 +26,11 @@ export function Dropdown({
   buttonContent,
   name,
   value,
+  required=false,
+  placeholder = 'Select a value... ',
 }: DropdownProps) {
   const [selectedOption, setSelectedOption] = useState(initialOption);
+  const requiredIndicator = required && !selectedOption?.value ? 'border custom-red' : '';
 
   function onChangeHandler(value: string) {
     const selectedDropdownOption = options.find(
@@ -39,7 +44,7 @@ export function Dropdown({
   }
 
   useEffect(() => {
-    setSelectedOption(value);
+    if (value !== undefined) setSelectedOption(value);
   }, [setSelectedOption, value]);
 
   return (
@@ -48,6 +53,7 @@ export function Dropdown({
       name={name}
       value={selectedOption?.value}
       onChange={onChangeHandler}
+      placeholder="Enter value"
       className="w-full text-sm"
     >
       {({ open }) => (
@@ -55,13 +61,15 @@ export function Dropdown({
           <Listbox.Button
             className={`on-focus hover:shadow-on-hover flex h-10 w-full items-center rounded-lg border border-white bg-white px-3 shadow-sm shadow-slate-300 transition duration-150 ease-in-out active:border-blue-600 active:ring-2 active:ring-blue-300 ${
               open ? 'border-blue-600 ring-2 ring-blue-300' : ''
-            }`}
+            } ${requiredIndicator}`}
             data-testid="dropdown__button"
           >
             {buttonContent ? (
               buttonContent
-            ) : (
+            ) : selectedOption?.label ? (
               <div className="text-left leading-6">{selectedOption?.label}</div>
+            ) : (
+              <div className="text-sm text-slate-400">{placeholder}</div>
             )}
             <div className="absolute right-4">
               <ArrowIcon />
@@ -70,7 +78,7 @@ export function Dropdown({
 
           <Listbox.Options
             as="div"
-            className="absolute z-20 mt-2 w-full space-y-1 rounded-lg bg-white p-2 leading-6 shadow-md focus:outline-none"
+            className="absolute z-20 mt-2 h-[14rem] w-full space-y-1 overflow-y-auto rounded-lg bg-white p-2 leading-6 shadow-md focus:outline-none"
           >
             {options.map((option) => {
               const OptionIcon = option.icon;
