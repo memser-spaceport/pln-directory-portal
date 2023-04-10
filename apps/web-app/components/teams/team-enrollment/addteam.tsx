@@ -98,7 +98,13 @@ function validateForm(formValues, formStep) {
   }
 }
 
-function handleNextClick(formValues, formStep, setFormStep, setErrors, nameExists) {
+function handleNextClick(
+  formValues,
+  formStep,
+  setFormStep,
+  setErrors,
+  nameExists
+) {
   const errors = validateForm(formValues, formStep);
   if (errors?.length > 0 || nameExists) {
     setErrors(errors);
@@ -133,7 +139,13 @@ function getSubmitOrNextButton(
       <button
         className={buttonClassName}
         onClick={() =>
-          handleNextClick(formValues, formStep, setFormStep, setErrors, nameExists)
+          handleNextClick(
+            formValues,
+            formStep,
+            setFormStep,
+            setErrors,
+            nameExists
+          )
         }
       >
         Next

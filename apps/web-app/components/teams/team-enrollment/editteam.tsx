@@ -275,7 +275,7 @@ export function EditTeamModal({
 
   const handleSubmit = useCallback(
     async (e) => {
-      if(nameExists) return;
+      if (nameExists) return;
       e.preventDefault();
       if (!executeRecaptcha) {
         console.log('Execute recaptcha not yet available');

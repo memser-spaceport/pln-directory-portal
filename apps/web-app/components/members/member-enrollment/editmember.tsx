@@ -250,7 +250,7 @@ export function EditMemberModal({
 
   const handleSubmit = useCallback(
     async (e) => {
-      if(emailExists) return;
+      if (emailExists) return;
       e.preventDefault();
       const errors = validateForm(formValues, imageUrl);
       if (!executeRecaptcha) {

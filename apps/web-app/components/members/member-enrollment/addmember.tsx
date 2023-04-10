@@ -78,7 +78,13 @@ function validateForm(formValues, formStep) {
   }
 }
 
-function handleNextClick(formValues, formStep, setFormStep, setErrors, emailExists) {
+function handleNextClick(
+  formValues,
+  formStep,
+  setFormStep,
+  setErrors,
+  emailExists
+) {
   const errors = validateForm(formValues, formStep);
   if (errors?.length > 0 || emailExists) {
     setErrors(errors);
@@ -113,7 +119,13 @@ function getSubmitOrNextButton(
       <button
         className={buttonClassName}
         onClick={() =>
-          handleNextClick(formValues, formStep, setFormStep, setErrors, emailExists)
+          handleNextClick(
+            formValues,
+            formStep,
+            setFormStep,
+            setErrors,
+            emailExists
+          )
         }
       >
         Next
@@ -438,8 +450,8 @@ export function AddMemberModal({
                   setFormStep,
                   handleSubmit,
                   setErrors,
-                  isProcessing, 
-                  emailExists,
+                  isProcessing,
+                  emailExists
                 )}
               </div>
             </div>
