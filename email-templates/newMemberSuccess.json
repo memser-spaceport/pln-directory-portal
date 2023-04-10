@@ -1,10 +1,8 @@
-
-
 {
-    "Template": {
-      "TemplateName": "NewMemberSuccess",
-      "SubjectPart": "Edit Labber Request : {{memberName}}",
-      "HtmlPart": "<div style='font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5; color: #333; background-color: #f7f7f7; padding: 20px; margin: 0;'> <table cellpadding='0' cellspacing='0' border='0' width='100%' style='max-width: 600px; margin: 0 auto;'> <tr> <td style='background-color: #fff; border-radius: 5px; padding: 20px;'> <table cellpadding='0' cellspacing='0' border='0' width='100%'> <tr> <td style='text-align: center; padding-bottom: 20px;'> <h1 style='font-size: 24px; color: #333; margin: 0;'>PLN Directory</h1> </td> </tr> <tr> <td style='padding-bottom: 20px;'> <p style='margin: 0;'>Hi {{firstName}},</p> <p style='margin: 20px 0 0 0;'>Your information has been added to the PLN directory. You can view and edit your profile <a href='{{profileUrl}}'>here</a>.</p> <ul style='list-style-type: disc; margin-left: 20px;'> <li>Add your office hours link to your profile (e.g.,https://calendly.com/johnpln/15min-plnsync)</li> <li>Join the PLN Discord (let me know your handle when you are done and I can tag you with the correct role)</li> </ul> <p style='margin: 20px 0 0 0;'>Please reach out with any questions. We are happy to help!</p> <p style='margin: 0;'>Best regards,</p> <p style='margin: 0;'>PLN Team</p> </td> </tr> </table> </td> </tr> </table></div>",
-      "TextPart": ""
-    }
+  "Template": {
+    "TemplateName": "NewMemberSuccess",
+    "SubjectPart": "Edit Labber Request : {{memberName}}",
+    "HtmlPart": "<div style='font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5; color: #333; background-color: #f7f7f7; padding: 20px; margin: 0;'> <table cellpadding='0' cellspacing='0' border='0' width='100%' style='max-width: 600px; margin: 0 auto;'> <tr> <td style='background-color: #fff; border-radius: 5px; padding: 20px;'> <table cellpadding='0' cellspacing='0' border='0' width='100%'> <tr> <td style='text-align: center; padding-bottom: 20px;'> <h1 style='font-size: 24px; color: #333; margin: 0;'>PLN Directory</h1> </td> </tr> <tr> <td style='padding-bottom: 20px;'> <p style='margin: 0;'>Hi {{firstName}},</p> <p style='margin: 20px 0 0 0;'>Your information has been added to the PLN directory. You can view and edit your profile <a href='{{profileUrl}}'>here</a>.</p> <ul style='list-style-type: disc; margin-left: 20px;'> <li>Add your office hours link to your profile (e.g.,https://calendly.com/johnpln/15min-plnsync)</li> <li>Join the PLN Discord (let me know your handle when you are done and I can tag you with the correct role)</li> </ul> <p style='margin: 20px 0 0 0;'>Please reach out with any questions. We are happy to help!</p> <p style='margin: 0;'>Best regards,</p> <p style='margin: 0;'>PLN Team</p> </td> </tr> </table> </td> </tr> </table></div>",
+    "TextPart": ""
   }
+}

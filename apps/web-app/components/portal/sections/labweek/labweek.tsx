@@ -57,7 +57,7 @@ export const LabWeek = () => {
         </div>
       </div>
 
-      <div className="mt-6 mr-3 flex md:mt-5 md:justify-end">
+      <div className="mr-3 mt-6 flex md:mt-5 md:justify-end">
         <a
           href="https://22.labweek.io/#schedule"
           className="group mr-3 flex items-center text-sm font-semibold leading-5"

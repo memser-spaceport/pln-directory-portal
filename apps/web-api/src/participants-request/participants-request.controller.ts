@@ -14,7 +14,7 @@ import {
 import { ApprovalStatus } from '@prisma/client';
 import { ParticipantsRequestService } from './participants-request.service';
 import { GoogleRecaptchaGuard } from '../guards/google-recaptcha.guard';
-import {ParticipantRequestMemberSchema} from '../../../../libs/contracts/src/schema/participants-request'
+import { ParticipantRequestMemberSchema } from '../../../../libs/contracts/src/schema/participants-request';
 @Controller('v1/participants-request')
 export class ParticipantsRequestController {
   constructor(
@@ -39,7 +39,7 @@ export class ParticipantsRequestController {
   async addRequest(@Body() body) {
     const postData = body;
     const validation = ParticipantRequestMemberSchema.parse(postData);
-    console.log(validation)
+    console.log(validation);
     const result = await this.participantsRequestService.addRequest(postData);
     return result;
   }

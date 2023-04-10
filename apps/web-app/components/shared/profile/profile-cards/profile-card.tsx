@@ -54,19 +54,19 @@ export function ProfileCard({
               )}
             </div>
             {showTeamLeadBadge ? (
-              <div className="absolute -top-1 -right-1 z-10">
+              <div className="absolute -right-1 -top-1 z-10">
                 <TeamLeadBadge size="4" />
               </div>
             ) : null}
             {showMainTeamBadge ? (
-              <div className="absolute -top-1 -right-1 z-10">
+              <div className="absolute -right-1 -top-1 z-10">
                 <MainTeamBadge />
               </div>
             ) : null}
           </div>
           <div className="mr-4 w-64 shrink-0">
             <h3 className="line-clamp-1 text-sm font-semibold">{name}</h3>
-            <p className="line-clamp-2 leading-3.5 text-xs text-slate-600">
+            <p className="leading-3.5 line-clamp-2 text-xs text-slate-600">
               {description || '-'}
             </p>
           </div>
