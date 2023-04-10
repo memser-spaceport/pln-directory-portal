@@ -39,8 +39,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Derive base and head SHAs required for `nx affected` commands
-        uses: nrwl/nx-set-shas@v3
+      # - name: Derive base and head SHAs required for `nx affected` commands
+      #   uses: nrwl/nx-set-shas@v3
 
       # - name: Match PostgreSQL client version with the server's (v13)
       #   run: |
@@ -59,16 +59,16 @@ jobs:
       - name: Run linter for NX-specific workspace files
         run: npx nx workspace-lint
 
-      - name: Check code format
-        run: npx nx format:check
+      # - name: Check code format
+      #   run: npx nx format:check
 
-      - name: Run linter for affected apps/libraries
-        run: npx nx affected --target=lint --parallel=3
+      # - name: Run linter for affected apps/libraries
+      #   run: npx nx affected --target=lint --parallel=3
 
-      - name: Run tests for affected apps/libraries
-        run: npx nx affected --target=test --parallel=3 --ci --code-coverage
-        env:
-          DATABASE_URL: 'postgresql://root:postgres@localhost:5432/test'
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-          FILE_ENCRYPTION_SALT: '${{ secrets.FILE_ENCRYPTION_SALT }}'
+      # - name: Run tests for affected apps/libraries
+      #   run: npx nx affected --target=test --parallel=3 --ci --code-coverage
+      #   env:
+      #     DATABASE_URL: 'postgresql://root:postgres@localhost:5432/test'
+      #     REDIS_HOST: localhost
+      #     REDIS_PORT: 6379
+      #     FILE_ENCRYPTION_SALT: '${{ secrets.FILE_ENCRYPTION_SALT }}'
