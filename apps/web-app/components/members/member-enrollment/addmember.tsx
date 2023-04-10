@@ -78,9 +78,9 @@ function validateForm(formValues, formStep) {
   }
 }
 
-function handleNextClick(formValues, formStep, setFormStep, setErrors) {
+function handleNextClick(formValues, formStep, setFormStep, setErrors, emailExists) {
   const errors = validateForm(formValues, formStep);
-  if (errors?.length > 0) {
+  if (errors?.length > 0 || emailExists) {
     setErrors(errors);
     return false;
   }
@@ -95,7 +95,8 @@ function getSubmitOrNextButton(
   setFormStep,
   handleSubmit,
   setErrors,
-  isProcessing
+  isProcessing,
+  emailExists
 ) {
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
@@ -112,7 +113,7 @@ function getSubmitOrNextButton(
       <button
         className={buttonClassName}
         onClick={() =>
-          handleNextClick(formValues, formStep, setFormStep, setErrors)
+          handleNextClick(formValues, formStep, setFormStep, setErrors, emailExists)
         }
       >
         Next
@@ -245,7 +246,6 @@ export function AddMemberModal({
 
   const handleSubmit = useCallback(
     async (e) => {
-      setIsProcessing(true);
       e.preventDefault();
       if (!executeRecaptcha) {
         console.log('Execute recaptcha not yet available');
@@ -257,6 +257,7 @@ export function AddMemberModal({
 
         if (!captchaToken) return;
         let image;
+        setIsProcessing(true);
         if (values.imageFile) {
           const formData = new FormData();
           formData.append('file', values.imageFile);
@@ -271,12 +272,12 @@ export function AddMemberModal({
               console.log('response.data', response.data);
               return response?.data?.image;
             });
-          console.log('imageeeeeeeeee', image);
         }
 
         const data = {
           participantType: 'MEMBER',
           status: 'PENDING',
+          requesterEmailId: values.email,
           newData: { ...values, imageUid: image?.uid },
           captchaToken,
         };
@@ -437,7 +438,8 @@ export function AddMemberModal({
                   setFormStep,
                   handleSubmit,
                   setErrors,
-                  isProcessing
+                  isProcessing, 
+                  emailExists,
                 )}
               </div>
             </div>

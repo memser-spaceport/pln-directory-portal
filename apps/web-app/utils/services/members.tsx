@@ -4,7 +4,6 @@ export const fetchMember = async (id) => {
   try {
     const response = await api.get(`/v1/members/${id}`);
     if (response.data) {
-      console.log('data', response.data);
       return response.data;
     }
   } catch (error) {
@@ -24,7 +23,6 @@ export const requestPendingCheck = async (email) => {
       data
     );
     if (response.data) {
-      console.log('datrequest pending >>>>>>', response.data);
       return response.data;
     }
   } catch (error) {

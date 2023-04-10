@@ -275,13 +275,12 @@ export function EditTeamModal({
 
   const handleSubmit = useCallback(
     async (e) => {
-      setIsProcessing(true);
+      if(nameExists) return;
       e.preventDefault();
       if (!executeRecaptcha) {
         console.log('Execute recaptcha not yet available');
         return;
       }
-      console.log('formmmmmmmmmm Values', formValues);
       const errors = validateForm(formValues, imageUrl);
       if (errors?.length > 0) {
         setErrors(errors);
@@ -294,6 +293,7 @@ export function EditTeamModal({
 
         if (!captchaToken) return;
         let image;
+        setIsProcessing(true);
         if (imageChanged) {
           image = await api
             .post(`/v1/images`, values.logoFile)

@@ -98,9 +98,9 @@ function validateForm(formValues, formStep) {
   }
 }
 
-function handleNextClick(formValues, formStep, setFormStep, setErrors) {
+function handleNextClick(formValues, formStep, setFormStep, setErrors, nameExists) {
   const errors = validateForm(formValues, formStep);
-  if (errors?.length > 0) {
+  if (errors?.length > 0 || nameExists) {
     setErrors(errors);
     return false;
   }
@@ -115,7 +115,8 @@ function getSubmitOrNextButton(
   setFormStep,
   handleSubmit,
   setErrors,
-  isProcessing
+  isProcessing,
+  nameExists
 ) {
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
@@ -132,7 +133,7 @@ function getSubmitOrNextButton(
       <button
         className={buttonClassName}
         onClick={() =>
-          handleNextClick(formValues, formStep, setFormStep, setErrors)
+          handleNextClick(formValues, formStep, setFormStep, setErrors, nameExists)
         }
       >
         Next
@@ -285,7 +286,6 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
 
   const handleSubmit = useCallback(
     async (e) => {
-      setIsProcessing(true);
       e.preventDefault();
 
       if (!executeRecaptcha) {
@@ -304,6 +304,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
 
         if (!captchaToken) return;
         let image;
+        setIsProcessing(true);
         if (value.logoFile) {
           const formData = new FormData();
           formData.append('file', value.logoFile);
@@ -322,7 +323,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
         const data = {
           participantType: 'TEAM',
           status: 'PENDING',
-          requestorEmailId: requestorEmail,
+          requesterEmailId: requestorEmail,
           newData: { ...value, logoUid: image?.uid },
           captchaToken,
         };
@@ -445,7 +446,8 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
                   setFormStep,
                   handleSubmit,
                   setErrors,
-                  isProcessing
+                  isProcessing,
+                  nameExists
                 )}
               </div>
             </div>

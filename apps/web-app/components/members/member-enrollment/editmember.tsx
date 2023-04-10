@@ -250,7 +250,7 @@ export function EditMemberModal({
 
   const handleSubmit = useCallback(
     async (e) => {
-      setIsProcessing(true);
+      if(emailExists) return;
       e.preventDefault();
       const errors = validateForm(formValues, imageUrl);
       if (!executeRecaptcha) {
@@ -267,6 +267,7 @@ export function EditMemberModal({
 
         if (!captchaToken) return;
         let image;
+        setIsProcessing(true);
         if (imageChanged) {
           image = await api
             .post(`/v1/images`, values.imageFile)
