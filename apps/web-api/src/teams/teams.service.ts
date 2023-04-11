@@ -15,7 +15,12 @@ export class TeamsService {
   ) {}
 
   async findAll(queryOptions: Prisma.TeamFindManyArgs) {
-    return this.prisma.team.findMany(queryOptions);
+    return this.prisma.team.findMany({
+      ...queryOptions,
+      orderBy: {
+        name: 'asc',
+      },
+    });
   }
 
   findOne(

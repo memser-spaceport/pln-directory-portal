@@ -2,6 +2,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -11,10 +12,10 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApprovalStatus } from '@prisma/client';
+import { ApprovalStatus, ParticipantType } from '@prisma/client';
 import { ParticipantsRequestService } from './participants-request.service';
 import { GoogleRecaptchaGuard } from '../guards/google-recaptcha.guard';
-import {ParticipantRequestMemberSchema} from '../../../../libs/contracts/src/schema/participants-request'
+import {ParticipantProcessRequestSchema,ParticipantRequestTeamSchema, ParticipantRequestMemberSchema} from '../../../../libs/contracts/src/schema/participants-request'
 @Controller('v1/participants-request')
 export class ParticipantsRequestController {
   constructor(
@@ -35,11 +36,19 @@ export class ParticipantsRequestController {
   }
 
   @Post()
-  //@UseGuards(GoogleRecaptchaGuard)
+  @UseGuards(GoogleRecaptchaGuard)
   async addRequest(@Body() body) {
     const postData = body;
-    const validation = ParticipantRequestMemberSchema.parse(postData);
-    console.log(validation)
+    const participantType = body.participantType;
+
+    if(participantType === ParticipantType.MEMBER.toString() && !ParticipantRequestMemberSchema.safeParse(postData).success) {
+      throw new ForbiddenException();
+    } else if(participantType === ParticipantType.TEAM.toString() && !ParticipantRequestTeamSchema.safeParse(postData).success) {
+      throw new ForbiddenException();
+    } else if (participantType !== ParticipantType.TEAM.toString() && participantType !== ParticipantType.MEMBER.toString()) {
+      throw new ForbiddenException();
+    }
+
     const result = await this.participantsRequestService.addRequest(postData);
     return result;
   }
@@ -48,6 +57,15 @@ export class ParticipantsRequestController {
   @UseGuards(GoogleRecaptchaGuard)
   async updateRequest(@Body() body, @Param() params) {
     const postData = body;
+    const participantType = body.participantType;
+
+    if(participantType === ParticipantType.MEMBER.toString() && !ParticipantRequestMemberSchema.safeParse(postData).success) {
+      throw new ForbiddenException();
+    } else if(participantType === ParticipantType.TEAM.toString() && !ParticipantRequestTeamSchema.safeParse(postData).success) {
+      throw new ForbiddenException();
+    } else if (participantType !== ParticipantType.TEAM.toString() && participantType !== ParticipantType.MEMBER.toString()) {
+      throw new ForbiddenException();
+    }
     const result = await this.participantsRequestService.updateRequest(
       postData,
       params.uid
@@ -58,6 +76,10 @@ export class ParticipantsRequestController {
   @Patch(':uid')
   @UseGuards(GoogleRecaptchaGuard)
   async processRequest(@Body() body, @Param() params) {
+    const validation = ParticipantProcessRequestSchema.safeParse(body);
+    if(!validation.success) {
+      throw new ForbiddenException();
+    }
     const uid = params.uid;
     const participantType = body.participantType;
     const referenceUid = body.referenceUid;

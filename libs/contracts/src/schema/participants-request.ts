@@ -71,6 +71,12 @@ export const ParticipantRequestMemberSchema = z.object({
     uniqueIdentifier: z.string()
 })
 
+export const ParticipantProcessRequestSchema = z.object({
+    participantType: participantTypeEnum,
+    status: statusEnum,
+    referenceUid: z.string()
+})
+
 
 export const ParticipantRequestTeamSchema = z.object({
     participantType: participantTypeEnum,
