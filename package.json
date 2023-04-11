@@ -7,6 +7,7 @@
     "start": "nx serve",
     "build": "nx build",
     "test": "nx test",
+    "start:back-office": "nx serve back-office -p 4201",
     "api:prisma-sync": "npx prisma generate --schema=./apps/web-api/prisma/schema.prisma && npx prisma db push --schema=./apps/web-api/prisma/schema.prisma",
     "api:prod-migrate-airtable-data": "node ./dist/apps/web-api/cli/cli.js migrate-airtable-data",
     "api:migrate-airtable-data": "ts-node apps/web-api/src/cli.ts migrate-airtable-data",
