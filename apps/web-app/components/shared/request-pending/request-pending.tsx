@@ -20,8 +20,8 @@ export function RequestPending({
       >
         <div className="p-5">
           <div className="mb-3 text-center text-xl font-bold">
-            Edit request is blocked as the previous request is awaiting for
-            approval.
+            You already have a request awaiting for approval. Please wait until
+            it&apos;s processed.
           </div>
           <div className="text-center">
             <button

@@ -18,7 +18,7 @@ import {
 import { fetchMember } from '../../../utils/services/members';
 import { InputField } from '@protocol-labs-network/ui';
 import api from '../../../utils/api';
-// import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditMemberModalProps {
   isOpen: boolean;
@@ -138,7 +138,7 @@ export function EditMemberModal({
     skills: [],
   });
 
-  // const { executeRecaptcha } = useGoogleReCaptcha();
+  const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
     if (isOpen) {
@@ -226,9 +226,7 @@ export function EditMemberModal({
   }
 
   function formatData() {
-    // const formattedSkills = formValues.skills.map(item=>{
-    //   return {uid: item.value, title: item.label}
-    // })
+
     const formattedTeamAndRoles = formValues.teamAndRoles.map((item) => {
       delete item.rowId;
       return item;
@@ -250,19 +248,19 @@ export function EditMemberModal({
       e.preventDefault();
       setErrors([]);
       const errors = validateForm(formValues, imageUrl);
-      // if (!executeRecaptcha) {
-      //   console.log('Execute recaptcha not yet available');
-      //   return;
-      // }
+      if (!executeRecaptcha) {
+        console.log('Execute recaptcha not yet available');
+        return;
+      }
       if (errors?.length > 0) {
         setErrors(errors);
         return false;
       }
       const values = formatData();
       try {
-        // const captchaToken = await executeRecaptcha();
+        const captchaToken = await executeRecaptcha();
 
-        // if (!captchaToken) return;
+        if (!captchaToken) return;
         let image;
         setIsProcessing(true);
         if (imageChanged) {
@@ -280,6 +278,7 @@ export function EditMemberModal({
           requesterEmailId: values.requestorEmail,
           uniqueIdentifier: values.email,
           newData: { ...values, imageUid: image?.uid },
+          captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);
@@ -290,8 +289,7 @@ export function EditMemberModal({
         setIsProcessing(false);
       }
     },
-    // [executeRecaptcha, formValues, imageUrl, imageChanged]
-    [formValues, imageUrl, imageChanged]
+    [executeRecaptcha, formValues, imageUrl, imageChanged]
   );
 
   function handleAddNewRole() {

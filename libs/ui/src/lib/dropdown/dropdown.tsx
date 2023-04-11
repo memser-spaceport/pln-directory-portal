@@ -27,7 +27,7 @@ export function Dropdown({
   name,
   value,
   required = false,
-  placeholder = 'Select a value... ',
+  placeholder = 'Select a value',
 }: DropdownProps) {
   const [selectedOption, setSelectedOption] = useState(initialOption);
   const requiredIndicator =

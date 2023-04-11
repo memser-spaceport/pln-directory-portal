@@ -19,7 +19,7 @@ import {
 import { fetchTeam } from '../../../utils/services/teams';
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
-// import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditTeamModalProps {
   isOpen: boolean;
@@ -149,7 +149,7 @@ export function EditTeamModal({
     officeHours: '',
   });
 
-  // const { executeRecaptcha } = useGoogleReCaptcha();
+  const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
     if (isOpen) {
@@ -265,10 +265,10 @@ export function EditTeamModal({
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
-      // if (!executeRecaptcha) {
-      //   console.log('Execute recaptcha not yet available');
-      //   return;
-      // }
+      if (!executeRecaptcha) {
+        console.log('Execute recaptcha not yet available');
+        return;
+      }
       setErrors([]);
       const errors = validateForm(formValues, imageUrl);
       if (errors?.length > 0) {
@@ -278,9 +278,9 @@ export function EditTeamModal({
       const requestorEmail = formValues.requestorEmail;
       const values = formatData();
       try {
-        // const captchaToken = await executeRecaptcha();
+        const captchaToken = await executeRecaptcha();
 
-        // if (!captchaToken) return;
+        if (!captchaToken) return;
         let image;
         setIsProcessing(true);
         if (imageChanged) {
@@ -297,7 +297,7 @@ export function EditTeamModal({
           requesterEmailId: requestorEmail,
           uniqueIdentifier: values.name,
           newData: { ...values, logoUid: image?.uid },
-          // captchaToken,
+          captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);
@@ -308,8 +308,7 @@ export function EditTeamModal({
         setIsProcessing(false);
       }
     },
-    // [executeRecaptcha, formValues, imageUrl, imageChanged]
-    [formValues, imageUrl, imageChanged, id]
+    [executeRecaptcha, formValues, imageUrl, imageChanged]
   );
 
   function handleInputChange(

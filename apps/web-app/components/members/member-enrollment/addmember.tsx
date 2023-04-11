@@ -18,7 +18,7 @@ import {
 } from '../../../utils/services/dropdown-service';
 
 import api from '../../../utils/api';
-// import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddMemberModalProps {
   isOpen: boolean;
@@ -184,7 +184,7 @@ export function AddMemberModal({
     skills: [],
   });
 
-  // const { executeRecaptcha } = useGoogleReCaptcha();
+  const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
     if (isOpen) {
@@ -262,15 +262,15 @@ export function AddMemberModal({
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
-      // if (!executeRecaptcha) {
-      //   console.log('Execute recaptcha not yet available');
-      //   return;
-      // }
+      if (!executeRecaptcha) {
+        console.log('Execute recaptcha not yet available');
+        return;
+      }
       const values = formatData();
       try {
-        // const captchaToken = await executeRecaptcha();
+        const captchaToken = await executeRecaptcha();
 
-        // if (!captchaToken) return;
+        if (!captchaToken) return;
         let image;
         setIsProcessing(true);
         if (values.imageFile) {
@@ -296,7 +296,7 @@ export function AddMemberModal({
           requesterEmailId: values.email,
           uniqueIdentifier: values.email,
           newData: { ...values, imageUid: image?.uid },
-          // captchaToken,
+          captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           console.log('response', response);
@@ -308,8 +308,7 @@ export function AddMemberModal({
         setIsProcessing(false);
       }
     },
-    // [executeRecaptcha, formValues]
-    [formValues]
+    [executeRecaptcha, formValues]
   );
 
   function handleAddNewRole() {

@@ -31,6 +31,7 @@ export default function AddTeamStepTwo(props) {
         <Dropdown
           options={dropDownValues?.fundingStages}
           name="fundingStage"
+          placeholder="Select Stage"
           value={values.fundingStage}
           onChange={handleDropDownChange}
         />
@@ -42,6 +43,7 @@ export default function AddTeamStepTwo(props) {
           name="membershipSource"
           required={true}
           selectedValues={values.membershipSource}
+          placeholder="Please select applicable options"
           onChange={handleDropDownChange}
           label="Membership Source"
         />

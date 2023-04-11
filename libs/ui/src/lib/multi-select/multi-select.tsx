@@ -134,7 +134,7 @@ export function MultiSelect({
             ))
           ) : (
             <span className="pl-3 text-sm text-slate-400">
-              {placeholder || 'Select...'}
+              {placeholder || 'Select'}
             </span>
           )}
         </div>
