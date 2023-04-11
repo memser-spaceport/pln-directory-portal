@@ -73,7 +73,7 @@ export const ParticipantRequestMemberSchema = z.object({
 export const ParticipantProcessRequestSchema = z.object({
     participantType: participantTypeEnum,
     status: statusEnum,
-    referenceUid: z.string()
+    referenceUid: z.string().optional().nullable()
 })
 
 

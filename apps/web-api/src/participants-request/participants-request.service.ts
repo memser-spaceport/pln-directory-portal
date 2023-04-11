@@ -54,8 +54,6 @@ export class ParticipantsRequestService {
   }
 
   async findDuplicates(uniqueIdentifier, participantType) {
-    console.log('in duplicates', participantType);
-
     const itemInRequest = await this.prisma.participantsRequest.findMany({
       where: {
         AND: {
@@ -69,15 +67,23 @@ export class ParticipantsRequestService {
         const teamResult = await this.prisma.team.findMany({
           where: { name: uniqueIdentifier },
         });
-        return teamResult;
+        if(teamResult.length > 0) {
+          return {isRequestPending: false, isUniqueIdentifierExist: true}
+        } else {
+          return {isRequestPending: false, isUniqueIdentifierExist: false}
+        }
       } else {
         const memResult = await this.prisma.member.findMany({
           where: { email: uniqueIdentifier },
         });
-        return memResult;
+        if(memResult.length > 0) {
+          return {isRequestPending: false, isUniqueIdentifierExist: true}
+        } else {
+          return {isRequestPending: false, isUniqueIdentifierExist: false}
+        }
       }
     } else {
-      return itemInRequest;
+      return {isRequestPending: true};
     }
   }
 
@@ -282,6 +288,13 @@ export class ParticipantsRequestService {
         adminSiteUrl: 'https://www.google/com',
       }
     );
+    await this.awsService.sendEmail(
+      'NewMemberSuccess',
+      [
+        dataFromDB.requesterEmailId
+      ],
+      { memberName: dataToProcess.name, memberProfileLink: `https://www.plnetwork.io/directory/members/${newMember.uid}` }
+    );
     return { code: 1, message: 'Success' };
   }
 
@@ -437,6 +450,13 @@ export class ParticipantsRequestService {
       ],
       { memberName: dataToProcess.name }
     );
+    await this.awsService.sendEmail(
+      'EditMemberSuccess',
+      [
+        dataFromDB.requesterEmailId
+      ],
+      { memberName: dataToProcess.name, memberProfileLink: `https://www.plnetwork.io/directory/members/${existingData.uid}` }
+    );
     return { code: 1, message: 'Success' };
   }
 
@@ -513,6 +533,13 @@ export class ParticipantsRequestService {
         teamUid: newTeam.uid,
         adminSiteUrl: 'https://www.google/com',
       }
+    );
+    await this.awsService.sendEmail(
+      'NewTeamSuccess',
+      [
+        dataFromDB.requesterEmailId
+      ],
+      { teamName: dataToProcess.name, teamProfileLink: `https://www.plnetwork.io/directory/teams/${newTeam.uid}` }
     );
     return { code: 1, message: 'Success' };
   }
@@ -603,6 +630,13 @@ export class ParticipantsRequestService {
         'winstonmanuelvijay.amaljeyakumar@ideas2it.com',
       ],
       { teamName: dataToProcess.name }
+    );
+    await this.awsService.sendEmail(
+      'EditTeamSuccess',
+      [
+        dataFromDB.requesterEmailId
+      ],
+      { teamName: dataToProcess.name, teamProfileLink: `https://www.plnetwork.io/directory/teams/${existingData.uid}` }
     );
     return { code: 1, message: 'Success' };
   }
