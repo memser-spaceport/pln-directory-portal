@@ -96,7 +96,7 @@ export default function StepIndicator({
   steps,
 }: FormStepIndicatorProps) {
   return (
-    <div className="flex flex-row justify-evenly border-b-2 pb-4 pr-8 pl-8">
+    <div className="flex flex-row justify-evenly border-b-2 pb-4 pl-8 pr-8">
       {steps.map((step, index) => {
         return (
           <>

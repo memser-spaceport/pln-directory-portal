@@ -1,17 +1,9 @@
-// import { useState } from 'react';
 import { InformationCircleIcon } from '@heroicons/react/solid';
 import { Dropdown, MultiSelect } from '@protocol-labs-network/ui';
-
-const Options = [
-  { value: '1', label: 'Option 1' },
-  { value: '2', label: 'Option 2' },
-  { value: '3', label: 'Option 3' },
-];
 
 export default function AddTeamStepTwo(props) {
   const values = props?.formValues;
   const dropDownValues = props?.dropDownValues;
-  console.log('dropDownValues list', dropDownValues);
   const handleDropDownChange = props?.handleDropDownChange;
 
   return (
@@ -48,6 +40,7 @@ export default function AddTeamStepTwo(props) {
         <MultiSelect
           options={dropDownValues?.membershipSources}
           name="membershipSource"
+          required={true}
           selectedValues={values.membershipSource}
           onChange={handleDropDownChange}
           label="Membership Source"
@@ -72,7 +65,8 @@ export default function AddTeamStepTwo(props) {
           selectedValues={values.industryTags}
           onChange={props.handleDropDownChange}
           placeholder="Enter the skills"
-          label="Industry Tags*"
+          label="Industry Tags"
+          required={true}
         />
         <div className="flex pt-1 text-sm text-gray-400">
           <div>

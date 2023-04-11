@@ -40,7 +40,7 @@ export const FooterSocialNav = () => {
               layout="fill"
               objectFit="contain"
             />
-            <div className="absolute top-0 left-0 h-full w-full bg-white/25 opacity-0 transition-all duration-150 ease-out group-hover:opacity-100"></div>
+            <div className="absolute left-0 top-0 h-full w-full bg-white/25 opacity-0 transition-all duration-150 ease-out group-hover:opacity-100"></div>
           </a>
         </Link>
       ))}

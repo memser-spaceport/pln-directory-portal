@@ -13,10 +13,9 @@ export function TeamAndRoleGrid(props) {
   const [roleTitle, setRoleTitle] = useState(props?.teamAndRole.role);
   const team = props?.teamAndRole;
 
-  const dropDownValues = props.dropDownValues;
+  const teamNames = props.teamNames;
 
   function handleDropDownChange(selectedOption, name) {
-    console.log('selectedOption', selectedOption);
     setTeamDetail(selectedOption);
     props.updateParentTeamValue(
       selectedOption.value,
@@ -39,7 +38,8 @@ export function TeamAndRoleGrid(props) {
         <div className="basis-6/12">
           <Dropdown
             name="team"
-            options={dropDownValues?.teamNames}
+            required={true}
+            options={teamNames}
             initialOption={{
               value: teamDetail?.teamUid,
               label: teamDetail?.teamTitle,
@@ -51,9 +51,12 @@ export function TeamAndRoleGrid(props) {
         <div className="basis-6/12 pl-5">
           <InputField
             name="role"
+            required={true}
             showLabel={false}
             label="Role"
+            maxLength={100}
             placeholder="Enter Role"
+            className="custom-grey custom-outline-none border"
             onChange={handleInputChange}
             value={roleTitle}
           />

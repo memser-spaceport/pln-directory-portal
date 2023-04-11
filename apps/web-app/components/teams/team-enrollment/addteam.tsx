@@ -33,41 +33,50 @@ const teamFormSteps = [
 ];
 
 function validateBasicForm(formValues) {
-  console.log('formValues>>>>', formValues);
   const errors = [];
-  if (!formValues.name) {
+  const emailRE =
+    /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  if (
+    !formValues.requestorEmail.trim() ||
+    !formValues.requestorEmail?.match(emailRE)
+  ) {
+    errors.push('Please add valid Requestor email.');
+  }
+  if (!formValues.name.trim()) {
     errors.push('Please add Team Name.');
   }
-  if (!formValues.shortDescription) {
+  if (!formValues.logoFile) {
+    errors.push('Please add logo.');
+  }
+  if (!formValues.shortDescription.trim()) {
     errors.push('Please add Description.');
   }
-  if (!formValues.longDescription) {
+  if (!formValues.longDescription.trim()) {
     errors.push('Please add Long Description.');
-  }
-  if (!formValues.officeHours) {
-    errors.push('Please add Office Hours.');
   }
   return errors;
 }
 
 function validateProjectDetailForm(formValues) {
   const errors = [];
-  if (!formValues.fundingStage) {
+  if (!formValues.fundingStage?.value) {
     errors.push('Please add Funding Stage');
   }
+  if (!formValues.membershipSource.length) {
+    errors.push('Please add Membership Source');
+  }
   if (!formValues.industryTags.length) {
-    errors.push('Please add IndustryTags');
+    errors.push('Please add Industry Tags');
   }
   return errors;
 }
 
 function validateSocialForm(formValues) {
-  console.log('validateSocialForm>>>', formValues);
   const errors = [];
-  if (!formValues.contactMethod) {
+  if (!formValues.contactMethod.trim()) {
     errors.push('Please add Preferred method of contact');
   }
-  if (!formValues.website) {
+  if (!formValues.website.trim()) {
     errors.push('Please add website');
   }
   return errors;
@@ -89,10 +98,15 @@ function validateForm(formValues, formStep) {
   }
 }
 
-function handleNextClick(formValues, formStep, setFormStep, setErrors) {
+function handleNextClick(
+  formValues,
+  formStep,
+  setFormStep,
+  setErrors,
+  nameExists
+) {
   const errors = validateForm(formValues, formStep);
-  console.log('errors>>>>', errors);
-  if (errors?.length > 0) {
+  if (errors?.length > 0 || nameExists) {
     setErrors(errors);
     return false;
   }
@@ -106,20 +120,32 @@ function getSubmitOrNextButton(
   formStep,
   setFormStep,
   handleSubmit,
-  setErrors
+  setErrors,
+  isProcessing,
+  nameExists
 ) {
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
   const submitOrNextButton =
     formStep === 3 ? (
-      <button className={buttonClassName} onClick={handleSubmit}>
+      <button
+        className={buttonClassName}
+        disabled={isProcessing}
+        onClick={handleSubmit}
+      >
         Add to Network
       </button>
     ) : (
       <button
         className={buttonClassName}
         onClick={() =>
-          handleNextClick(formValues, formStep, setFormStep, setErrors)
+          handleNextClick(
+            formValues,
+            formStep,
+            setFormStep,
+            setErrors,
+            nameExists
+          )
         }
       >
         Next
@@ -132,14 +158,14 @@ function getCancelOrBackButton(formStep, handleModalClose, setFormStep) {
   const cancelorBackButton =
     formStep === 1 ? (
       <button
-        className="on-focus leading-3.5 text-md mr-2 mb-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
+        className="on-focus leading-3.5 text-md mb-2 mr-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
         onClick={() => handleModalClose()}
       >
         Cancel
       </button>
     ) : (
       <button
-        className="on-focus leading-3.5 text-md mr-2 mb-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
+        className="on-focus leading-3.5 text-md mb-2 mr-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
         onClick={() => setFormStep(--formStep)}
       >
         Back
@@ -151,7 +177,9 @@ function getCancelOrBackButton(formStep, handleModalClose, setFormStep) {
 export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
   const [formStep, setFormStep] = useState<number>(1);
   const [errors, setErrors] = useState([]);
-  const [imageUrl, setImageUrl] = useState<string>();
+  const [nameExists, setNameExists] = useState<boolean>(false);
+  const [imageUrl, setImageUrl] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [dropDownValues, setDropDownValues] = useState({});
   const [formValues, setFormValues] = useState<IFormValues>({
@@ -159,6 +187,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     logoUid: '',
     logoFile: null,
     shortDescription: '',
+    requestorEmail: '',
     longDescription: '',
     technologies: [],
     fundingStage: {},
@@ -198,11 +227,14 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     setFormStep(1);
     setErrors([]);
     setDropDownValues({});
+    setImageUrl('');
     setSaveCompleted(false);
+    setIsProcessing(false);
     setFormValues({
       name: '',
       logoUid: '',
       logoFile: null,
+      requestorEmail: '',
       shortDescription: '',
       longDescription: '',
       technologies: [],
@@ -241,13 +273,27 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       title: formValues.fundingStage?.label,
     };
 
-    setFormValues({
+    const formattedValue = {
       ...formValues,
       fundingStage: formattedFundingStage,
       industryTags: formattedTags,
       membershipSource: formattedMembershipSource,
       technologies: formattedtechnologies,
-    });
+    };
+    delete formattedValue.requestorEmail;
+    return formattedValue;
+  }
+
+  function onNameBlur(event: ChangeEvent<HTMLInputElement>) {
+    const data = {
+      uniqueIdentifier: event.target.value,
+      participantType: 'team',
+    };
+    api
+      .post(`/participants-request/unique-identifier-checker`, data)
+      .then((response) => {
+        response?.data.length ? setNameExists(true) : setNameExists(false);
+      });
   }
 
   const handleSubmit = useCallback(
@@ -258,32 +304,43 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
         console.log('Execute recaptcha not yet available');
         return;
       }
-      formatData();
-      console.log('formValues', formValues);
+      const errors = validateSocialForm(formValues);
+      if (errors?.length > 0) {
+        setErrors(errors);
+        return false;
+      }
+      const requestorEmail = formValues.requestorEmail;
+      const value = formatData();
       try {
         const captchaToken = await executeRecaptcha();
 
         if (!captchaToken) return;
         let image;
-        if (formValues.logoFile) {
+        setIsProcessing(true);
+        if (value.logoFile) {
           const formData = new FormData();
-          formData.append('file', formValues.logoFile);
+          formData.append('file', value.logoFile);
           const config = {
             headers: {
               'content-type': 'multipart/form-data',
             },
           };
-          image = api.post(`/v1/images`, formData, config).then((response) => {
-            return response?.data?.image;
-          });
+          image = await api
+            .post(`/v1/images`, formData, config)
+            .then((response) => {
+              delete value.logoFile;
+              return response?.data?.image;
+            });
         }
         const data = {
           participantType: 'TEAM',
           status: 'PENDING',
-          newData: { ...formValues, logoUid: image?.uid },
+          requesterEmailId: requestorEmail,
+          newData: { ...value, logoUid: image?.uid },
           captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
+          setIsProcessing(false);
           setSaveCompleted(true);
         });
       } catch (err) {
@@ -320,7 +377,9 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
             handleInputChange={handleInputChange}
             handleDropDownChange={handleDropDownChange}
             handleImageChange={handleImageChange}
+            onNameBlur={onNameBlur}
             imageUrl={imageUrl}
+            nameExists={nameExists}
           />
         );
       case 2:
@@ -337,7 +396,6 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
           <AddTeamStepThree
             formValues={formValues}
             handleInputChange={handleInputChange}
-            handleDropDownChange={handleDropDownChange}
           />
         );
       default:
@@ -399,7 +457,9 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
                   formStep,
                   setFormStep,
                   handleSubmit,
-                  setErrors
+                  setErrors,
+                  isProcessing,
+                  nameExists
                 )}
               </div>
             </div>

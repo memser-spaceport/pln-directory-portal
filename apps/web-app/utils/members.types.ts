@@ -48,7 +48,7 @@ export interface IFormValues {
   city: string;
   region: string;
   country: string;
-  linkedinURL: string;
+  linkedinHandler: string;
   discordHandler: string;
   twitterHandler: string;
   githubHandler: string;

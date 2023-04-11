@@ -4,17 +4,19 @@ import { InformationCircleIcon } from '@heroicons/react/solid';
 export default function AddMemberStepThree(props) {
   const values = props?.formValues;
   const handleInputChange = props?.handleInputChange;
-  const handleDropDownChange = props?.handleDropDownChange;
 
   return (
     <>
       <div className="inputfield hint-text px-8 py-4">
         <InputField
-          label="Preferred method of contact*"
+          label="Preferred method of contact"
           name="contactMethod"
+          required={true}
           value={values.contactMethod}
+          maxLength={200}
           onChange={handleInputChange}
           placeholder="Enter contact method"
+          className="custom-grey custom-outline-none border"
         />
         <div className="flex pt-1 text-sm text-gray-400">
           <div>
@@ -32,9 +34,11 @@ export default function AddMemberStepThree(props) {
         <InputField
           label="Website address*"
           name="website"
+          maxLength={1000}
           value={values.website}
           onChange={handleInputChange}
           placeholder="Enter address here"
+          className="custom-grey custom-outline-none border"
         />
         <div className="mt-1 flex px-2 text-sm text-gray-400">
           <div>
@@ -51,18 +55,22 @@ export default function AddMemberStepThree(props) {
         <InputField
           label="LinkedIn URL"
           name="linkedinHandler"
+          maxLength={200}
           value={values.linkedinHandler}
           onChange={handleInputChange}
           placeholder="eg., https://www.linkedin.com/in/jbenetcs/"
+          className="custom-grey custom-outline-none border"
         />
       </div>
       <div className="inputfield px-8 py-4">
         <InputField
           label="Twitter Handle"
           name="twitter"
+          maxLength={200}
           value={values.twitter}
           onChange={handleInputChange}
           placeholder="e.g., @protocollabs"
+          className="custom-grey custom-outline-none border"
         />
       </div>
 
@@ -70,9 +78,11 @@ export default function AddMemberStepThree(props) {
         <InputField
           label="Blog address"
           name="blog"
+          maxLength={1000}
           value={values.blog}
           onChange={handleInputChange}
           placeholder="Enter address here"
+          className="custom-grey custom-outline-none border"
         />
         <div className="mt-1 flex px-2 text-sm text-gray-400">
           <div>

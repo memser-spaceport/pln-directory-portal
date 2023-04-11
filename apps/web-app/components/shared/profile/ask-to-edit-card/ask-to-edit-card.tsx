@@ -58,7 +58,7 @@ export function AskToEditCard({
         </span>
         Anything missing?
       </h3>
-      <p className="mt-4 mb-6 text-base leading-6">
+      <p className="mb-6 mt-4 text-base leading-6">
         As a community, help Teams and Members stay updated with their
         information.
       </p>

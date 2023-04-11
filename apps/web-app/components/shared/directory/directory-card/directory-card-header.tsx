@@ -40,7 +40,7 @@ export function DirectoryCardHeader({
           <Icon className="w-22 h-22 mt-2 fill-white" />
         )}
         {teamLead ? (
-          <div className="absolute top-0 right-1 z-10">
+          <div className="absolute right-1 top-0 z-10">
             <TeamLeadBadge size="5" />
           </div>
         ) : null}

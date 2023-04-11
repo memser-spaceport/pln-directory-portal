@@ -1,10 +1,8 @@
-
-
-  {
-    "Template": {
-      "TemplateName": "EditMemberRequest",
-      "SubjectPart": "Edit Labber Request : {{memberName}}",
-      "HtmlPart": "<div style='font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5; color: #333; background-color: #f7f7f7; padding: 20px; margin: 0;'> <table cellpadding='0' cellspacing='0' border='0' width='100%' style='max-width: 600px; margin: 0 auto;'> <tr> <td style='background-color: #fff; border-radius: 5px; padding: 20px;'> <table cellpadding='0' cellspacing='0' border='0' width='100%'> <tr> <td style='text-align: center; padding-bottom: 20px;'> <h1 style='font-size: 24px; color: #333; margin: 0;'>Edit Member Request</h1> </td> </tr> <tr> <td style='padding-bottom: 20px;'> <p style='margin: 0;'>Hi,</p> <p style='margin: 20px 0 0 0;'>{{requesterEmailId}} has requested an edit to {{memberName}} in the PLN Directory. For more information , please use the Member Reference ID <span style='font-weight:700;'>{{memberUid}}</span></p> <p style='margin: 20px 0 0 0; text-align: center;'><a href='{{adminSiteUrl}}' style='display: inline-block; background-color: #007bff; color: #fff; text-decoration: none; padding: 10px 20px; border-radius: 5px;'>View Member Details</a></p> <p style='margin: 20px 0 0 0;'>Thank you!</p> <p style='margin: 0;'>Best regards,</p> <p style='margin: 0;'>PLN Team</p> </td> </tr> </table> </td> </tr> </table></div>",
-      "TextPart": ""
-    }
+{
+  "Template": {
+    "TemplateName": "EditMemberRequest",
+    "SubjectPart": "Edit Labber Request : {{memberName}}",
+    "HtmlPart": "<div style='font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5; color: #333; background-color: #f7f7f7; padding: 20px; margin: 0;'> <table cellpadding='0' cellspacing='0' border='0' width='100%' style='max-width: 600px; margin: 0 auto;'> <tr> <td style='background-color: #fff; border-radius: 5px; padding: 20px;'> <table cellpadding='0' cellspacing='0' border='0' width='100%'> <tr> <td style='text-align: center; padding-bottom: 20px;'> <h1 style='font-size: 24px; color: #333; margin: 0;'>Edit Member Request</h1> </td> </tr> <tr> <td style='padding-bottom: 20px;'> <p style='margin: 0;'>Hi,</p> <p style='margin: 20px 0 0 0;'>{{requesterEmailId}} has requested an edit to {{memberName}} in the PLN Directory. For more information , please use the Member Reference ID <span style='font-weight:700;'>{{memberUid}}</span></p> <p style='margin: 20px 0 0 0; text-align: center;'><a href='{{adminSiteUrl}}' style='display: inline-block; background-color: #007bff; color: #fff; text-decoration: none; padding: 10px 20px; border-radius: 5px;'>View Member Details</a></p> <p style='margin: 20px 0 0 0;'>Thank you!</p> <p style='margin: 0;'>Best regards,</p> <p style='margin: 0;'>PLN Team</p> </td> </tr> </table> </td> </tr> </table></div>",
+    "TextPart": ""
   }
+}

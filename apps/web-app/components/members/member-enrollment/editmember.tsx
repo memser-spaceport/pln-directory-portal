@@ -6,7 +6,6 @@ import {
   ChangeEvent,
   useCallback,
 } from 'react';
-import moment from 'moment';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
@@ -27,21 +26,23 @@ interface EditMemberModalProps {
   id: string;
 }
 
-function validateBasicForm(formValues) {
+function validateBasicForm(formValues, imageUrl) {
   const errors = [];
   const emailRE =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-  if (!formValues.name) {
-    errors.push('Please add Name.');
+  if (!formValues.name.trim()) {
+    errors.push('Please add your Name.');
   }
-  if (!formValues.email || !formValues.email?.match(emailRE)) {
+  if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
     errors.push('Please add valid Email.');
   }
+  if (!imageUrl) {
+    errors.push('Please upload a profile image.');
+  }
   if (
-    !formValues.requestorEmail ||
+    !formValues.requestorEmail.trim() ||
     !formValues.requestorEmail?.match(emailRE)
   ) {
-    console.log('inside requestor>>>');
     errors.push('Please add valid Requestor Email.');
   }
   return errors;
@@ -56,15 +57,18 @@ function validateSkillForm(formValues) {
       (item) => item.teamUid == '' || item.role == ''
     );
     if (missingValues.length) {
-      errors.push('Team or Role value is missing');
+      errors.push('Please add missing Team(s)/Role(s)');
     }
+  }
+  if (!formValues.skills.length) {
+    errors.push('Please add your skill details');
   }
   return errors;
 }
 
-function validateForm(formValues) {
+function validateForm(formValues, imageUrl) {
   let errors = [];
-  const basicFormErrors = validateBasicForm(formValues);
+  const basicFormErrors = validateBasicForm(formValues, imageUrl);
   if (basicFormErrors.length) {
     errors = [...errors, ...basicFormErrors];
   }
@@ -75,11 +79,15 @@ function validateForm(formValues) {
   return errors;
 }
 
-function getSubmitOrNextButton(handleSubmit) {
+function getSubmitOrNextButton(handleSubmit, isProcessing) {
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
   const submitOrNextButton = (
-    <button className={buttonClassName} onClick={handleSubmit}>
+    <button
+      className={buttonClassName}
+      disabled={isProcessing}
+      onClick={handleSubmit}
+    >
       Request Changes
     </button>
   );
@@ -89,7 +97,7 @@ function getSubmitOrNextButton(handleSubmit) {
 function getCancelOrBackButton(handleModalClose) {
   const cancelorBackButton = (
     <button
-      className="on-focus leading-3.5 text-md mr-2 mb-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
+      className="on-focus leading-3.5 text-md mb-2 mr-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
       onClick={() => handleModalClose()}
     >
       Cancel
@@ -106,7 +114,9 @@ export function EditMemberModal({
   const [errors, setErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({});
   const [imageUrl, setImageUrl] = useState<string>();
+  const [emailExists, setEmailExists] = useState<boolean>(false);
   const [imageChanged, setImageChanged] = useState<boolean>(false);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
@@ -114,17 +124,17 @@ export function EditMemberModal({
     requestorEmail: '',
     imageUid: '',
     imageFile: null,
-    plnStartDate: moment(new Date()).format('DD/MM/YYYY'),
+    plnStartDate: new Date().toLocaleDateString('af-ZA'),
     city: '',
     region: '',
     country: '',
-    linkedinURL: '',
+    linkedinHandler: '',
     discordHandler: '',
     twitterHandler: '',
     githubHandler: '',
     officeHours: '',
     comments: '',
-    teamAndRoles: [],
+    teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
     skills: [],
   });
 
@@ -151,11 +161,11 @@ export function EditMemberModal({
             email: member.email,
             imageUid: member.imageUid,
             imageFile: null,
-            plnStartDate: moment(new Date()).format('DD/MM/YYYY'),
+            plnStartDate: member.plnStartDate,
             city: member.location?.city,
             region: member.location?.region,
             country: member.location?.country,
-            linkedinURL: member.linkedinHandler,
+            linkedinHandler: member.linkedinHandler,
             discordHandler: member.discordHandler,
             twitterHandler: member.twitterHandler,
             githubHandler: member.githubHandler,
@@ -179,6 +189,7 @@ export function EditMemberModal({
     setDropDownValues({});
     setImageChanged(false);
     setSaveCompleted(false);
+    setIsProcessing(false);
     setImageUrl('');
     setFormValues({
       name: '',
@@ -186,11 +197,11 @@ export function EditMemberModal({
       requestorEmail: '',
       imageUid: '',
       imageFile: null,
-      plnStartDate: moment(new Date()).format('DD/MM/YYYY'),
+      plnStartDate: new Date().toLocaleDateString('af-ZA'),
       city: '',
       region: '',
       country: '',
-      linkedinURL: '',
+      linkedinHandler: '',
       discordHandler: '',
       twitterHandler: '',
       githubHandler: '',
@@ -217,17 +228,31 @@ export function EditMemberModal({
     const skills = formValues.skills.map((item) => {
       return { uid: item?.value, title: item?.label };
     });
-    setFormValues({
+    const formattedData = {
       ...formValues,
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
-    });
+    };
+    return formattedData;
+  }
+
+  function onEmailBlur(event: ChangeEvent<HTMLInputElement>) {
+    const data = {
+      uniqueIdentifier: event.target.value,
+      participantType: 'member',
+    };
+    api
+      .post(`/participants-request/unique-identifier-checker`, data)
+      .then((response) => {
+        response?.data.length ? setEmailExists(true) : setEmailExists(false);
+      });
   }
 
   const handleSubmit = useCallback(
     async (e) => {
+      if (emailExists) return;
       e.preventDefault();
-      const errors = validateForm(formValues);
+      const errors = validateForm(formValues, imageUrl);
       if (!executeRecaptcha) {
         console.log('Execute recaptcha not yet available');
         return;
@@ -236,15 +261,16 @@ export function EditMemberModal({
         setErrors(errors);
         return false;
       }
-      formatData();
+      const values = formatData();
       try {
         const captchaToken = await executeRecaptcha();
 
         if (!captchaToken) return;
         let image;
+        setIsProcessing(true);
         if (imageChanged) {
           image = await api
-            .post(`/v1/images`, formValues.imageFile)
+            .post(`/v1/images`, values.imageFile)
             .then((response) => {
               return response?.data?.image;
             });
@@ -253,11 +279,12 @@ export function EditMemberModal({
         const data = {
           participantType: 'MEMBER',
           referenceUid: id,
-          editRequestorEmailId: formValues.requestorEmail,
-          newData: { ...formValues, imageUid: image?.uid },
+          editRequestorEmailId: values.requestorEmail,
+          newData: { ...values, imageUid: image?.uid },
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);
+          setIsProcessing(false);
         });
       } catch (err) {
         console.log('error', err);
@@ -362,7 +389,7 @@ export function EditMemberModal({
                 </ul>
               </div>
             )}
-            <div className="inputfield px-8 pt-4 pb-10">
+            <div className="inputfield px-8 pb-10 pt-4">
               <InputField
                 required
                 name="requestorEmail"
@@ -379,6 +406,8 @@ export function EditMemberModal({
                 onChange={handleInputChange}
                 handleImageChange={handleImageChange}
                 imageUrl={imageUrl}
+                emailExists={emailExists}
+                onEmailBlur={onEmailBlur}
               />
               <AddMemberSkillForm
                 formValues={formValues}
@@ -400,7 +429,7 @@ export function EditMemberModal({
                 {getCancelOrBackButton(handleModalClose)}
               </div>
               <div className="float-right">
-                {getSubmitOrNextButton(handleSubmit)}
+                {getSubmitOrNextButton(handleSubmit, isProcessing)}
               </div>
             </div>
           </div>

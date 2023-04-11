@@ -53,7 +53,7 @@ export function LoadingOverlay({ excludeUrlFn }: LoadingOverlayProps) {
 
   return (
     <div
-      className={`fixed top-20 left-0 z-50 flex h-[calc(100%_-_80px)] w-full items-center justify-center bg-slate-100/50 transition-[visibility,_opacity] duration-[0s,_300ms] ease-[linear,_linear] ${
+      className={`fixed left-0 top-20 z-50 flex h-[calc(100%_-_80px)] w-full items-center justify-center bg-slate-100/50 transition-[visibility,_opacity] duration-[0s,_300ms] ease-[linear,_linear] ${
         loading
           ? 'visible opacity-100 delay-[0s,0s]'
           : 'invisible opacity-0 delay-[300ms,0s]'

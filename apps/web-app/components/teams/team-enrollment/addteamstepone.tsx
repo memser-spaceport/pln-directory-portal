@@ -5,12 +5,6 @@ import {
   TextArea,
 } from '@protocol-labs-network/ui';
 import { InformationCircleIcon } from '@heroicons/react/solid';
-// import { FormValues } from './addteam';
-
-// interface StepOneProps {
-//   values: FormValues;
-//   handleInputChange: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>;
-// }
 
 export default function AddMemberStepOne(props) {
   const values = props?.formValues;
@@ -18,7 +12,19 @@ export default function AddMemberStepOne(props) {
 
   return (
     <>
-      <div className="flex px-8 py-4">
+      <div className="px-8 py-4">
+        <InputField
+          required
+          name="requestorEmail"
+          type="email"
+          label="Requestor Email"
+          value={values?.requestorEmail}
+          onChange={onChange}
+          placeholder="Enter your email address"
+          className="custom-grey custom-outline-none border"
+        />
+      </div>
+      <div className="flex px-8 pb-4 pt-6">
         <div className="basis-1/4">
           <ProfileImageUpload
             imageUrl={props.imageUrl}
@@ -32,10 +38,20 @@ export default function AddMemberStepOne(props) {
             required
             value={values?.name}
             onChange={onChange}
+            maxLength={150}
+            onBlur={props.onNameBlur}
             name="name"
             label="What is your organization, company, or team name?"
             placeholder="Enter name here"
+            className="custom-grey custom-outline-none border"
           />
+          {props.nameExists && (
+            <div className="pt-2">
+              <span className="text-xs text-rose-600">
+                Name already exists!
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -44,7 +60,8 @@ export default function AddMemberStepOne(props) {
           <InformationCircleIcon className="h-5 w-5" />
         </div>
         <span className="font-size-13">
-          Please upload a squared image in PNG or JPEG format only
+          Please upload a squared image in PNG or JPEG format with file size
+          less that 4MB.
         </span>
       </div>
 
@@ -53,10 +70,11 @@ export default function AddMemberStepOne(props) {
           required
           value={values?.shortDescription}
           onChange={onChange}
+          maxLength={1000}
           name="shortDescription"
           label="Please briefly describe what your team/product/project does"
-          placeholder="Enter your email address"
           info="One to two sentences is perfect! Use clear language and minimal jargon."
+          className="custom-grey custom-outline-none border"
         />
       </div>
 
@@ -65,9 +83,11 @@ export default function AddMemberStepOne(props) {
           required
           value={values?.longDescription}
           onChange={onChange}
+          maxLength={2000}
           name="longDescription"
           label="Long Description"
           info="Please explain what your team does in a bit more detail. 4-5 sentences will be great!"
+          className="custom-grey custom-outline-none border"
         />
       </div>
 
@@ -96,12 +116,13 @@ export default function AddMemberStepOne(props) {
 
       <div className="inputfield hint-text px-8 py-4">
         <InputField
-          required
           value={values?.officeHours}
           name="officeHours"
+          maxLength={300}
           onChange={onChange}
           label="Team Office Hours"
           placeholder="Enter address here"
+          className="custom-grey custom-outline-none border"
         />
         <div className="flex pt-1 text-sm text-gray-400">
           <div>
