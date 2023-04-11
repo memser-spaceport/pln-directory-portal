@@ -52,7 +52,7 @@ export function TextArea({
         {...props}
         name={name}
         placeholder={placeholder}
-        className={`on-focus hover:shadow-on-hover block h-10 w-full rounded-lg border border-white bg-white px-3 py-2 text-sm leading-10 text-slate-900 shadow-sm shadow-slate-300
+        className={`on-focus hover:shadow-on-hover block w-full rounded-lg border border-white bg-white px-3 py-2 text-sm leading-5 text-slate-900 shadow-sm shadow-slate-300
         transition duration-150 ease-in-out  placeholder:text-sm placeholder:text-slate-400 ${
           props.className || ''
         } ${requiredIndicator}`}

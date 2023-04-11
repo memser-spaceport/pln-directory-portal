@@ -19,7 +19,7 @@ import {
 } from '../../../utils/services/dropdown-service';
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
-import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+// import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddTeamModalProps {
   isOpen: boolean;
@@ -37,7 +37,7 @@ function validateBasicForm(formValues) {
   const emailRE =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   if (
-    !formValues.requestorEmail.trim() ||
+    !formValues.requestorEmail?.trim() ||
     !formValues.requestorEmail?.match(emailRE)
   ) {
     errors.push('Please add valid Requestor email.');
@@ -48,10 +48,10 @@ function validateBasicForm(formValues) {
   if (!formValues.logoFile) {
     errors.push('Please add logo.');
   }
-  if (!formValues.shortDescription.trim()) {
+  if (!formValues.shortDescription?.trim()) {
     errors.push('Please add Description.');
   }
-  if (!formValues.longDescription.trim()) {
+  if (!formValues.longDescription?.trim()) {
     errors.push('Please add Long Description.');
   }
   return errors;
@@ -201,7 +201,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     officeHours: '',
   });
 
-  const { executeRecaptcha } = useGoogleReCaptcha();
+  // const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
     if (isOpen) {
@@ -276,8 +276,9 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     const formattedValue = {
       ...formValues,
       fundingStage: formattedFundingStage,
+      fundingStageUid: formattedFundingStage.uid,
       industryTags: formattedTags,
-      membershipSource: formattedMembershipSource,
+      membershipSources: formattedMembershipSource,
       technologies: formattedtechnologies,
     };
     delete formattedValue.requestorEmail;
@@ -290,9 +291,11 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       participantType: 'team',
     };
     api
-      .post(`/participants-request/unique-identifier-checker`, data)
+      .post(`/v1/participants-request/unique-identifier`, data)
       .then((response) => {
-        response?.data.length ? setNameExists(true) : setNameExists(false);
+        response?.data && response.data?.isUniqueIdentifierExist
+          ? setNameExists(true)
+          : setNameExists(false);
       });
   }
 
@@ -300,10 +303,11 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     async (e) => {
       e.preventDefault();
 
-      if (!executeRecaptcha) {
-        console.log('Execute recaptcha not yet available');
-        return;
-      }
+      // if (!executeRecaptcha) {
+      //   console.log('Execute recaptcha not yet available');
+      //   return;
+      // }
+      setErrors([]);
       const errors = validateSocialForm(formValues);
       if (errors?.length > 0) {
         setErrors(errors);
@@ -312,9 +316,9 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       const requestorEmail = formValues.requestorEmail;
       const value = formatData();
       try {
-        const captchaToken = await executeRecaptcha();
+        // const captchaToken = await executeRecaptcha();
 
-        if (!captchaToken) return;
+        // if (!captchaToken) return;
         let image;
         setIsProcessing(true);
         if (value.logoFile) {
@@ -336,18 +340,21 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
           participantType: 'TEAM',
           status: 'PENDING',
           requesterEmailId: requestorEmail,
+          uniqueIdentifier: value.name,
           newData: { ...value, logoUid: image?.uid },
-          captchaToken,
+          // captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
-          setIsProcessing(false);
           setSaveCompleted(true);
         });
       } catch (err) {
         console.log('error', err);
+      } finally {
+        setIsProcessing(false);
       }
     },
-    [executeRecaptcha]
+    // [executeRecaptcha, formValues]
+    [formValues]
   );
 
   function handleInputChange(

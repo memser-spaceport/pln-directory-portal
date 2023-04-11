@@ -39,7 +39,8 @@ export default function AddMemberStepOne(props) {
             value={values?.name}
             onChange={onChange}
             maxLength={150}
-            onBlur={props.onNameBlur}
+            pattern="^[a-zA-Z\s]*$"
+            onBlur={props.onNameBlur && props.onNameBlur}
             name="name"
             label="What is your organization, company, or team name?"
             placeholder="Enter name here"

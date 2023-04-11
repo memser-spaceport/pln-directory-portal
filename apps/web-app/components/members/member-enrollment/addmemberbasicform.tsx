@@ -49,7 +49,7 @@ export default function AddMemberBasicForm(props) {
           maxLength={255}
           value={values?.email}
           onChange={onChange}
-          onBlur={props.onEmailBlur}
+          onBlur={props.onEmailBlur && props.onEmailBlur}
           placeholder="Enter your email address"
           className="custom-grey custom-outline-none border"
         />

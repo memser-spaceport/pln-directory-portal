@@ -58,7 +58,7 @@ export function TeamAndRoleGrid(props) {
             placeholder="Enter Role"
             className="custom-grey custom-outline-none border"
             onChange={handleInputChange}
-            value={roleTitle}
+            value={team.role}
           />
         </div>
         <div

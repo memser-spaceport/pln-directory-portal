@@ -8,7 +8,7 @@ type ModalProps = {
   title?: string;
   onClose: () => void;
   children: ReactNode;
-  image: string;
+  image?: string;
   headerStyleClass?: string;
   enableHeader?: boolean;
   enableFooter?: boolean;

@@ -41,7 +41,7 @@ export function MultiSelect({
   const [internalOptions, setInternalOptions] = useState<Option[]>(options);
   const dropdownOptionsRef = useRef<HTMLDivElement>(null);
   const requiredIndicator =
-    required && !selectedValues.length ? 'border border-red-500' : '';
+    required && !selectedValues?.length ? 'border border-red-500' : '';
 
   const toggleDropdown = () => {
     setIsExpanded(!isExpanded);

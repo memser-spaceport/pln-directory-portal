@@ -18,7 +18,7 @@ import {
 import { fetchMember } from '../../../utils/services/members';
 import { InputField } from '@protocol-labs-network/ui';
 import api from '../../../utils/api';
-import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+// import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditMemberModalProps {
   isOpen: boolean;
@@ -40,7 +40,7 @@ function validateBasicForm(formValues, imageUrl) {
     errors.push('Please upload a profile image.');
   }
   if (
-    !formValues.requestorEmail.trim() ||
+    !formValues.requestorEmail?.trim() ||
     !formValues.requestorEmail?.match(emailRE)
   ) {
     errors.push('Please add valid Requestor Email.');
@@ -114,7 +114,7 @@ export function EditMemberModal({
   const [errors, setErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({});
   const [imageUrl, setImageUrl] = useState<string>();
-  const [emailExists, setEmailExists] = useState<boolean>(false);
+  // const [emailExists, setEmailExists] = useState<boolean>(false);
   const [imageChanged, setImageChanged] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
@@ -138,7 +138,7 @@ export function EditMemberModal({
     skills: [],
   });
 
-  const { executeRecaptcha } = useGoogleReCaptcha();
+  // const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
     if (isOpen) {
@@ -149,10 +149,13 @@ export function EditMemberModal({
           const teamAndRoles =
             member.teamMemberRoles?.length &&
             member.teamMemberRoles.map((team) => {
+              const teamName =
+                data[2]?.filter((item) => item.value == team.teamUid)?.[0]
+                  ?.label ?? '';
               return {
                 role: team.role,
                 teamUid: team.teamUid,
-                teamTitle: data[2]?.find((item) => item.value == team.teamUid),
+                teamTitle: teamName,
                 rowId: counter++,
               };
             });
@@ -161,7 +164,9 @@ export function EditMemberModal({
             email: member.email,
             imageUid: member.imageUid,
             imageFile: null,
-            plnStartDate: member.plnStartDate,
+            plnStartDate: new Date(member.plnStartDate).toLocaleDateString(
+              'af-ZA'
+            ),
             city: member.location?.city,
             region: member.location?.region,
             country: member.location?.country,
@@ -171,11 +176,14 @@ export function EditMemberModal({
             githubHandler: member.githubHandler,
             officeHours: member.officeHours,
             comments: '',
-            teamAndRoles: teamAndRoles || [],
+            teamAndRoles: teamAndRoles || [
+              { teamUid: '', teamTitle: '', role: '', rowId: 1 },
+            ],
             skills: member.skills?.map((item) => {
               return { value: item.uid, label: item.title };
             }),
           };
+          console.log('formValues', formValues);
           setImageUrl(member.image?.url);
           setFormValues(formValues);
           setDropDownValues({ skillValues: data[1], teamNames: data[2] });
@@ -230,48 +238,38 @@ export function EditMemberModal({
     });
     const formattedData = {
       ...formValues,
+      plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
     };
     return formattedData;
   }
 
-  function onEmailBlur(event: ChangeEvent<HTMLInputElement>) {
-    const data = {
-      uniqueIdentifier: event.target.value,
-      participantType: 'member',
-    };
-    api
-      .post(`/participants-request/unique-identifier-checker`, data)
-      .then((response) => {
-        response?.data.length ? setEmailExists(true) : setEmailExists(false);
-      });
-  }
-
   const handleSubmit = useCallback(
     async (e) => {
-      if (emailExists) return;
       e.preventDefault();
+      setErrors([]);
       const errors = validateForm(formValues, imageUrl);
-      if (!executeRecaptcha) {
-        console.log('Execute recaptcha not yet available');
-        return;
-      }
+      // if (!executeRecaptcha) {
+      //   console.log('Execute recaptcha not yet available');
+      //   return;
+      // }
       if (errors?.length > 0) {
         setErrors(errors);
         return false;
       }
       const values = formatData();
       try {
-        const captchaToken = await executeRecaptcha();
+        // const captchaToken = await executeRecaptcha();
 
-        if (!captchaToken) return;
+        // if (!captchaToken) return;
         let image;
         setIsProcessing(true);
         if (imageChanged) {
           image = await api
             .post(`/v1/images`, values.imageFile)
             .then((response) => {
+              delete values.imageFile;
               return response?.data?.image;
             });
         }
@@ -279,18 +277,21 @@ export function EditMemberModal({
         const data = {
           participantType: 'MEMBER',
           referenceUid: id,
-          editRequestorEmailId: values.requestorEmail,
+          requesterEmailId: values.requestorEmail,
+          uniqueIdentifier: values.email,
           newData: { ...values, imageUid: image?.uid },
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);
-          setIsProcessing(false);
         });
       } catch (err) {
         console.log('error', err);
+      } finally {
+        setIsProcessing(false);
       }
     },
-    [executeRecaptcha]
+    // [executeRecaptcha, formValues, imageUrl, imageChanged]
+    [formValues, imageUrl, imageChanged]
   );
 
   function handleAddNewRole() {
@@ -398,6 +399,7 @@ export function EditMemberModal({
                 value={formValues?.requestorEmail}
                 onChange={handleInputChange}
                 placeholder="Enter your email address"
+                className="custom-grey custom-outline-none border"
               />
             </div>
             <div className="overflow-y-auto">
@@ -406,8 +408,7 @@ export function EditMemberModal({
                 onChange={handleInputChange}
                 handleImageChange={handleImageChange}
                 imageUrl={imageUrl}
-                emailExists={emailExists}
-                onEmailBlur={onEmailBlur}
+                // emailExists={emailExists}
               />
               <AddMemberSkillForm
                 formValues={formValues}

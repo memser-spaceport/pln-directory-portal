@@ -62,20 +62,19 @@ const newDataTeamSchema = z.object({
 });
 
 export const ParticipantRequestMemberSchema = z.object({
-    participantType: participantTypeEnum,
-    oldData: oldDataPostSchema.optional().nullable(),
-    newData: newDataMemberSchema,
-    referenceUid: z.string().optional().nullable(),
-    requesterEmailId: z.string(),
-    uniqueIdentifier: z.string()
-})
+  participantType: participantTypeEnum,
+  oldData: oldDataPostSchema.optional().nullable(),
+  newData: newDataMemberSchema,
+  referenceUid: z.string().optional().nullable(),
+  requesterEmailId: z.string(),
+  uniqueIdentifier: z.string(),
+});
 
 export const ParticipantProcessRequestSchema = z.object({
-    participantType: participantTypeEnum,
-    status: statusEnum,
-    referenceUid: z.string().optional().nullable()
-})
-
+  participantType: participantTypeEnum,
+  status: statusEnum,
+  referenceUid: z.string().optional().nullable(),
+});
 
 export const ParticipantRequestTeamSchema = z.object({
   participantType: participantTypeEnum,

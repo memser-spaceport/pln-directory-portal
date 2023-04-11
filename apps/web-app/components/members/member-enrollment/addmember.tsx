@@ -18,7 +18,7 @@ import {
 } from '../../../utils/services/dropdown-service';
 
 import api from '../../../utils/api';
-import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+// import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddMemberModalProps {
   isOpen: boolean;
@@ -184,7 +184,7 @@ export function AddMemberModal({
     skills: [],
   });
 
-  const { executeRecaptcha } = useGoogleReCaptcha();
+  // const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
     if (isOpen) {
@@ -238,6 +238,7 @@ export function AddMemberModal({
     });
     const formattedData = {
       ...formValues,
+      plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
     };
@@ -250,24 +251,26 @@ export function AddMemberModal({
       participantType: 'member',
     };
     api
-      .post(`/participants-request/unique-identifier-checker`, data)
+      .post(`/v1/participants-request/unique-identifier`, data)
       .then((response) => {
-        response?.data.length ? setEmailExists(true) : setEmailExists(false);
+        response?.data && response.data?.isUniqueIdentifierExist
+          ? setEmailExists(true)
+          : setEmailExists(false);
       });
   }
 
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
-      if (!executeRecaptcha) {
-        console.log('Execute recaptcha not yet available');
-        return;
-      }
+      // if (!executeRecaptcha) {
+      //   console.log('Execute recaptcha not yet available');
+      //   return;
+      // }
       const values = formatData();
       try {
-        const captchaToken = await executeRecaptcha();
+        // const captchaToken = await executeRecaptcha();
 
-        if (!captchaToken) return;
+        // if (!captchaToken) return;
         let image;
         setIsProcessing(true);
         if (values.imageFile) {
@@ -282,6 +285,7 @@ export function AddMemberModal({
             .post(`/v1/images`, formData, config)
             .then((response) => {
               console.log('response.data', response.data);
+              delete values.imageFile;
               return response?.data?.image;
             });
         }
@@ -290,19 +294,22 @@ export function AddMemberModal({
           participantType: 'MEMBER',
           status: 'PENDING',
           requesterEmailId: values.email,
+          uniqueIdentifier: values.email,
           newData: { ...values, imageUid: image?.uid },
-          captchaToken,
+          // captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           console.log('response', response);
-          setIsProcessing(false);
           setSaveCompleted(true);
         });
       } catch (err) {
         console.log('error', err);
+      } finally {
+        setIsProcessing(false);
       }
     },
-    [executeRecaptcha]
+    // [executeRecaptcha, formValues]
+    [formValues]
   );
 
   function handleAddNewRole() {

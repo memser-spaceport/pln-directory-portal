@@ -1,8 +1,8 @@
 {
-    "Template": {
-      "TemplateName": "EditMemberSuccess",
-      "SubjectPart": "PLN Member Edit Request processed successfully",
-      "HtmlPart": "<div><p>Hi {{memberName}},</p><p>Your information has been added to the PLN directory. You can view and edit your profile <a style='text-decoration: none;' href='{{teamProfileLink}}'>here</a>!</p><p>If you haven’t already, here are the next set of things you can do as a member to improve your visibility in the network:</p><p><ul><li>Add your office hours link to your profile</li><li>Join the PLN Discord (let me know your handle when you are done and I can tag you with the correct role)</li></ul></p><p>Please reach out with any questions.  We are happy to help!</p><p>Thanks ,</p><p>PLN Team</p></div>",
-      "TextPart": ""
-    }
+  "Template": {
+    "TemplateName": "EditMemberSuccess",
+    "SubjectPart": "PLN Member Edit Request processed successfully",
+    "HtmlPart": "<div><p>Hi {{memberName}},</p><p>Your information has been added to the PLN directory. You can view and edit your profile <a style='text-decoration: none;' href='{{teamProfileLink}}'>here</a>!</p><p>If you haven’t already, here are the next set of things you can do as a member to improve your visibility in the network:</p><p><ul><li>Add your office hours link to your profile</li><li>Join the PLN Discord (let me know your handle when you are done and I can tag you with the correct role)</li></ul></p><p>Please reach out with any questions.  We are happy to help!</p><p>Thanks ,</p><p>PLN Team</p></div>",
+    "TextPart": ""
   }
+}

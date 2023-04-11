@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { FATHOM_EVENTS } from '../../../../constants';
 import { EditMemberModal } from '../../../members/member-enrollment/editmember';
 import { EditTeamModal } from '../../../teams/team-enrollment/editteam';
+import { RequestPending } from '../../request-pending/request-pending';
 import { requestPendingCheck } from '../../../../utils/services/members';
+import { editTeamRequestPendingCheck } from '../../../../utils/services/teams';
 import { IMember } from '../../../../utils/members.types';
 import { ITeam } from '../../../../utils/teams.types';
 import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
@@ -37,16 +39,23 @@ export function AskToEditCard({
 }: AskToEditCardProps) {
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [isPendingRequestModalOpen, setIsPendingRequestModalOpen] =
+    useState(false);
 
-  const handleOpenEditModal = () => {
+  const handleOpenEditModal = async () => {
     urlList[profileType].eventCode &&
       trackGoal(urlList[profileType].eventCode, 0);
     if (profileType == 'team') {
-      setIsTeamModalOpen(true);
+      const res = await editTeamRequestPendingCheck(team.name);
+      res?.isRequestPending
+        ? setIsPendingRequestModalOpen(true)
+        : setIsTeamModalOpen(true);
     } else {
-      const res = requestPendingCheck(member.email);
-      res && setIsMemberModalOpen(true);
-      setIsMemberModalOpen(true);
+      const res = await requestPendingCheck(member.email);
+      console.log('res?.data && res.data?.isRequestPending', res);
+      res?.isRequestPending
+        ? setIsPendingRequestModalOpen(true)
+        : setIsMemberModalOpen(true);
     }
   };
 
@@ -104,6 +113,10 @@ export function AskToEditCard({
             id={team?.id}
           />
         )}
+        <RequestPending
+          isOpen={isPendingRequestModalOpen}
+          setIsModalOpen={setIsPendingRequestModalOpen}
+        />
       </GoogleReCaptchaProvider>
     </div>
   );

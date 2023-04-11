@@ -19,7 +19,7 @@ export const requestPendingCheck = async (email) => {
     };
 
     const response = await api.post(
-      `/participants-request/unique-identifier-checker`,
+      `/v1/participants-request/unique-identifier`,
       data
     );
     if (response.data) {

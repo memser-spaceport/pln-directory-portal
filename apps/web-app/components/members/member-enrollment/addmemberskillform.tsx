@@ -3,7 +3,7 @@ import { TeamAndRoleGrid } from './teamandrole';
 import { InformationCircleIcon } from '@heroicons/react/solid';
 
 function getAvailableTeams(teamNames, selectedTeams) {
-  const availableTeams = teamNames.filter((item) =>
+  const availableTeams = teamNames?.filter((item) =>
     selectedTeams.every((filterItem) => filterItem.teamUid !== item.value)
   );
   return availableTeams;
@@ -16,13 +16,13 @@ export default function AddMemberSkillForm(props) {
   return (
     <>
       <div className="px-8 py-4">
-        {teamAndRoles.length > 0 && (
+        {teamAndRoles?.length > 0 && (
           <div className="flex flex-row pt-4">
             <span className="basis-6/12 text-sm font-bold">Team*</span>
             <span className="basis-6/12 pl-5 text-sm font-bold">Role*</span>
           </div>
         )}
-        {teamAndRoles.map((item, index) => (
+        {teamAndRoles?.map((item, index) => (
           <TeamAndRoleGrid
             key={item.rowId}
             teamNames={teamNames}

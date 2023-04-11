@@ -19,7 +19,7 @@ import {
 import { fetchTeam } from '../../../utils/services/teams';
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
-import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+// import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditTeamModalProps {
   isOpen: boolean;
@@ -126,7 +126,7 @@ export function EditTeamModal({
   const [errors, setErrors] = useState([]);
   const [imageUrl, setImageUrl] = useState<string>();
   const [imageChanged, setImageChanged] = useState<boolean>(false);
-  const [nameExists, setNameExists] = useState<boolean>(false);
+  // const [nameExists, setNameExists] = useState<boolean>(false);
   const [dropDownValues, setDropDownValues] = useState({});
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
@@ -149,7 +149,7 @@ export function EditTeamModal({
     officeHours: '',
   });
 
-  const { executeRecaptcha } = useGoogleReCaptcha();
+  // const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
     if (isOpen) {
@@ -253,34 +253,23 @@ export function EditTeamModal({
     const formattedValue = {
       ...formValues,
       fundingStage: formattedFundingStage,
+      fundingStageUid: formattedFundingStage.uid,
       industryTags: formattedTags,
-      membershipSource: formattedMembershipSource,
+      membershipSources: formattedMembershipSource,
       technologies: formattedtechnologies,
     };
     delete formattedValue.requestorEmail;
     return formattedValue;
   }
 
-  function onNameBlur(event: ChangeEvent<HTMLInputElement>) {
-    const data = {
-      uniqueIdentifier: event.target.value,
-      participantType: 'team',
-    };
-    api
-      .post(`/participants-request/unique-identifier-checker`, data)
-      .then((response) => {
-        response?.data.length ? setNameExists(true) : setNameExists(false);
-      });
-  }
-
   const handleSubmit = useCallback(
     async (e) => {
-      if (nameExists) return;
       e.preventDefault();
-      if (!executeRecaptcha) {
-        console.log('Execute recaptcha not yet available');
-        return;
-      }
+      // if (!executeRecaptcha) {
+      //   console.log('Execute recaptcha not yet available');
+      //   return;
+      // }
+      setErrors([]);
       const errors = validateForm(formValues, imageUrl);
       if (errors?.length > 0) {
         setErrors(errors);
@@ -289,9 +278,9 @@ export function EditTeamModal({
       const requestorEmail = formValues.requestorEmail;
       const values = formatData();
       try {
-        const captchaToken = await executeRecaptcha();
+        // const captchaToken = await executeRecaptcha();
 
-        if (!captchaToken) return;
+        // if (!captchaToken) return;
         let image;
         setIsProcessing(true);
         if (imageChanged) {
@@ -305,19 +294,22 @@ export function EditTeamModal({
         const data = {
           participantType: 'TEAM',
           referenceUid: id,
-          editRequestorEmailId: requestorEmail,
+          requesterEmailId: requestorEmail,
+          uniqueIdentifier: values.name,
           newData: { ...values, logoUid: image?.uid },
-          captchaToken,
+          // captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
-          setIsProcessing(false);
           setSaveCompleted(true);
         });
       } catch (err) {
         console.log('error', err);
+      } finally {
+        setIsProcessing(false);
       }
     },
-    [executeRecaptcha]
+    // [executeRecaptcha, formValues, imageUrl, imageChanged]
+    [formValues, imageUrl, imageChanged, id]
   );
 
   function handleInputChange(
@@ -391,8 +383,7 @@ export function EditTeamModal({
                 handleDropDownChange={handleDropDownChange}
                 handleImageChange={handleImageChange}
                 imageUrl={imageUrl}
-                onNameBlur={onNameBlur}
-                nameExists={nameExists}
+                // nameExists={nameExists}
               />
               <AddTeamStepTwo
                 formValues={formValues}
