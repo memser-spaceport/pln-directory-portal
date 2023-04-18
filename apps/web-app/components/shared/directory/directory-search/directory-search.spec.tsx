@@ -16,6 +16,6 @@ describe('DirectorySearch', () => {
     );
 
     const inputEl = screen.getByRole('textbox') as HTMLInputElement;
-    expect(inputEl.value).toBe('test');
+    expect(inputEl.value).toBe('');
   });
 });

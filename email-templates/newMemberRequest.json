@@ -1,0 +1,8 @@
+{
+  "Template": {
+    "TemplateName": "NewMemberRequest",
+    "SubjectPart": "New Labber Request : {{memberName}}",
+    "HtmlPart": "<div><p>Hi,</p><p>{{memberName}} has submitted a request to become a member of the PL Network Directory.</p><p>For more information , please use the Member Reference ID {{requestUid}} or </p><div style='text-align:center'><a style='text-decoration: none;padding: 8px 16px;background: #1458cf;color: white;border-radius: 5px;' href='{{adminSiteUrl}}' target='_blank'>View request</a></div><p>Thanks ,</p><p>PLN Team</p></div>",
+    "TextPart": ""
+  }
+}

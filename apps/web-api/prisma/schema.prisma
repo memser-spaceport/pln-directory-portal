@@ -3,6 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["interactiveTransactions"]
 }
 
 datasource db {
@@ -20,13 +21,15 @@ model Team {
   logo              Image?             @relation(fields: [logoUid], references: [uid])
   logoUid           String?
   blog              String?
+  officeHours       String?
   website           String?
   contactMethod     String?
   twitterHandler    String?
+  linkedinHandler   String?
   shortDescription  String?
   longDescription   String?
-  plnFriend         Boolean
-  airtableRecId   String?             @unique
+  plnFriend         Boolean            @default(false)
+  airtableRecId     String?            @unique
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   teamMemberRoles   TeamMemberRole[]
@@ -35,6 +38,7 @@ model Team {
   fundingStage      FundingStage?      @relation(fields: [fundingStageUid], references: [uid])
   fundingStageUid   String?
   technologies      Technology[]
+  moreDetails       String?
 }
 
 model Member {
@@ -47,15 +51,43 @@ model Member {
   githubHandler   String?
   discordHandler  String?
   twitterHandler  String?
+  linkedinHandler String?
   officeHours     String?
-  plnFriend       Boolean
-  airtableRecId   String?             @unique
+  moreDetails     String?
+  plnFriend       Boolean          @default(false)
+  plnStartDate    DateTime?        @default(now())
+  airtableRecId   String?          @unique
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   skills          Skill[]
   location        Location?        @relation(fields: [locationUid], references: [uid])
   locationUid     String?
   teamMemberRoles TeamMemberRole[]
+}
+
+enum ParticipantType {
+  MEMBER
+  TEAM
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ParticipantsRequest {
+   id                    Int                @id @default(autoincrement())
+   uid                   String             @unique @default(cuid())
+   participantType       ParticipantType
+   status                ApprovalStatus     @default(PENDING)
+   oldData               Json?
+   newData               Json
+   referenceUid          String?
+   requesterEmailId      String
+   uniqueIdentifier      String
+   createdAt             DateTime           @default(now())
+   updatedAt             DateTime           @updatedAt
 }
 
 model Skill {
@@ -92,8 +124,8 @@ model Location {
 
 model TeamMemberRole {
   id        Int       @id @default(autoincrement())
-  mainTeam  Boolean
-  teamLead  Boolean
+  mainTeam  Boolean   @default(false)
+  teamLead  Boolean   @default(false)
   startDate DateTime?
   endDate   DateTime?
   role      String?

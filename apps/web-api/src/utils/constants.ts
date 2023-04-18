@@ -5,7 +5,13 @@ export enum APP_ENV {
 }
 
 export const ALLOWED_CORS_ORIGINS = {
-  [APP_ENV.DEV]: [/localhost/, /app.forestadmin.com/],
+  [APP_ENV.DEV]: [
+    /localhost/,
+    /app.forestadmin.com/,
+    /.-protocol-labs-spaceport.vercel.app/,
+    /protocol-labs-network-lk82taf1j-protocol-labs-spaceport.vercel.app/,
+    /protocol-labs-network-web-admin.vercel.app/,
+  ],
   [APP_ENV.STAGING]: [
     /.-protocol-labs-spaceport.vercel.app/,
     /app.forestadmin.com/,

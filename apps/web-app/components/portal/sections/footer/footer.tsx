@@ -5,7 +5,7 @@ import { FooterSocialNav } from './footer-social-nav';
 export const Footer = () => {
   return (
     <>
-      <footer className="flex flex-col items-center justify-between py-24 px-6 md:flex-row md:py-8 md:px-16">
+      <footer className="flex flex-col items-center justify-between px-6 py-24 md:flex-row md:px-16 md:py-8">
         <Image
           src="/assets/images/protocol-labs-network-small-logo.svg"
           width="64px"

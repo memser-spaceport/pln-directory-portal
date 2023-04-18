@@ -23,21 +23,41 @@ export function PortalMenuMobile() {
       >
         <Menu.Items className="absolute right-0 z-40 mt-2 w-full rounded-lg bg-white p-2 shadow-[0_2px_4px_2px_rgba(15,23,42,.04)] focus:outline-none">
           {PORTAL_HEADER_LINKS.map((option) => {
-            const eventCode = FATHOM_EVENTS.portal.nav[option.eventCode];
+            if (option.subMenu?.length) {
+              return option.subMenu.map((item) => {
+                const eventCode = FATHOM_EVENTS.portal.nav[item.eventCode];
 
-            return (
-              <Menu.Item key={option.label}>
-                <a
-                  href={option.url}
-                  className="block px-3 py-2 text-sm"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => eventCode && trackGoal(eventCode, 0)}
-                >
-                  {option.label}
-                </a>
-              </Menu.Item>
-            );
+                return (
+                  <Menu.Item key={item.label}>
+                    <a
+                      href={item.url}
+                      className="block px-3 py-2 text-sm"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => eventCode && trackGoal(eventCode, 0)}
+                    >
+                      {item.label}
+                    </a>
+                  </Menu.Item>
+                );
+              });
+            } else {
+              const eventCode = FATHOM_EVENTS.portal.nav[option.eventCode];
+
+              return (
+                <Menu.Item key={option.label}>
+                  <a
+                    href={option.url}
+                    className="block px-3 py-2 text-sm"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => eventCode && trackGoal(eventCode, 0)}
+                  >
+                    {option.label}
+                  </a>
+                </Menu.Item>
+              );
+            }
           })}
         </Menu.Items>
       </Transition>
