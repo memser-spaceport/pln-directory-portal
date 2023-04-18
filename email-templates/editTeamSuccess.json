@@ -1,0 +1,8 @@
+{
+  "Template": {
+    "TemplateName": "EditTeamSuccess",
+    "SubjectPart": "PLN Team Edit Request processed successfully",
+    "HtmlPart": "<div><p>Hi,</p><p>Your team profile has been edited in the PLN directory. You can view and edit your team profile <a style='text-decoration: none;' href='{{memberProfileLink}}'>here</a>!</p><p>If you haven’t already, here are the next set of things you can do as a team member to improve your team's visibility in the network:</p><p><ul><li>Add missing team members to the directory through this</li><li>Include your teams preferred method of contact in your team profile</li></ul></p><p>Please reach out with any questions.  We are happy to help!</p><p>Thanks ,</p><p>PLN Team</p></div>",
+    "TextPart": ""
+  }
+}

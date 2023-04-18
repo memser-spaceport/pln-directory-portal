@@ -12,6 +12,7 @@ import type { ClientOpts } from 'redis';
 import { AppController } from './app.controller';
 import { FundingStagesModule } from './funding-stages/funding-stages.module';
 import { HealthModule } from './health/health.module';
+import { ImagesModule } from './images/images.module';
 import { IndustryTagsModule } from './industry-tags/industry-tags.module';
 import { MyCacheInterceptor } from './interceptors/cache.interceptor';
 import { ConcealEntityIDInterceptor } from './interceptors/conceal-entity-id.interceptor';
@@ -19,6 +20,7 @@ import { LocationsModule } from './locations/locations.module';
 import { MembersModule } from './members/members.module';
 import { MembershipSourcesModule } from './membership-sources/membership-sources.module';
 import { ContentTypeMiddleware } from './middlewares/content-type.middleware';
+import { ParticipantsRequestModule } from './participants-request/participants-request.module';
 import { PrismaService } from './prisma.service';
 import { SkillsModule } from './skills/skills.module';
 import { TeamsModule } from './teams/teams.module';
@@ -57,11 +59,13 @@ import { TechnologiesModule } from './technologies/technologies.module';
     HealthModule,
     TeamsModule,
     IndustryTagsModule,
+    ImagesModule,
     MembershipSourcesModule,
     FundingStagesModule,
     SkillsModule,
     LocationsModule,
     TechnologiesModule,
+    ParticipantsRequestModule,
   ],
   providers: [
     PrismaService,
@@ -86,6 +90,7 @@ export class AppModule {
       .exclude({ path: 'v1/images', method: RequestMethod.POST })
       .forRoutes(
         { path: '*', method: RequestMethod.POST },
+        { path: '*', method: RequestMethod.PUT },
         { path: '*', method: RequestMethod.PATCH }
       );
     // we can use .exclude() to exclude routes from the middleware (e.g. file upload endpoint)

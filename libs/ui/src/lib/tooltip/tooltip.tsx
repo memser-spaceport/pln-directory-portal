@@ -26,7 +26,7 @@ export function Tooltip({
           side="top"
           align="center"
           sideOffset={8}
-          className="z-40 max-w-[260px] flex-shrink-0 break-words rounded bg-slate-900 py-1 px-2 text-xs font-medium text-white"
+          className="z-40 max-w-[260px] flex-shrink-0 break-words rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white"
         >
           {content}
         </TooltipPrimitive.Content>
