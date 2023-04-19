@@ -19,6 +19,7 @@ import {
 import { fetchTeam } from '../../../utils/services/teams';
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
+import { ENROLLMENT_TYPE } from '../../../constants';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditTeamModalProps {
@@ -288,16 +289,16 @@ export function EditTeamModal({
             .post(`/v1/images`, formData, config)
             .then((response) => {
               console.log('response.data', response.data);
-              delete values.logoFile;
               return response?.data?.image;
             });
         }
+        delete values?.logoFile;
         const data = {
-          participantType: 'TEAM',
+          participantType: ENROLLMENT_TYPE.TEAM,
           referenceUid: id,
           requesterEmailId: requestorEmail,
           uniqueIdentifier: values.name,
-          newData: { ...values, logoUid: image?.uid },
+          newData: { ...values, logoUid: image?.uid, logoUrl: image?.url },
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);

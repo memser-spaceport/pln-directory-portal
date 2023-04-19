@@ -34,7 +34,7 @@ export function TeamAndRoleGrid(props) {
 
   return (
     <>
-      <div className="flex flex-row pt-4">
+      <div className="flex flex-row">
         <div className="basis-6/12">
           <Dropdown
             name="team"

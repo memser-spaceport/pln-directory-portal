@@ -4,7 +4,7 @@ const APP_CONSTANTS = {
   REJECTED_LABEL: 'Rejected',
   APPROVED_FLAG: 'APPROVED',
   CLOSED_FLAG: 'CLOSED',
-  MEMBER_LABEL: 'Member',
+  MEMBER_LABEL: 'Members',
   TEAMS_LABEL: 'Teams',
   NO_DATA_AVAILABLE_LABEL: 'No data available',
   VIEW_CLOSED_REQUEST_LABEL: 'View closed requests',

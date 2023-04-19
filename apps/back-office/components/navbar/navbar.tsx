@@ -15,11 +15,11 @@ function onLogout() {
 export function Navbar() {
   const { isOpenRequest } = useNavbarContext();
   return (
-    <div className="header h-[8%]">
+    <div className="header h-[8%] min-h-[80px]">
       <nav className="navbar top-0 flex h-[80px] items-center justify-between pr-[40px] only-of-type:shadow-[0_1px_4px_0_#e2e8f0]">
         <div className="flex h-full items-center space-x-5">
           <div className="m-auto h-full w-[80px] bg-[#1D4ED8]">
-            <Link href="/directory">
+            <Link href={ROUTE_CONSTANTS.PENDING_LIST}>
               <a className="on-focus relative left-[15px] top-[20px]">
                 <ProtocolLabsLogo
                   title="Protocol Labs Network Directory Beta Black Logo"
@@ -63,7 +63,7 @@ export function Navbar() {
           </Link>
           <LogOut
             onClick={onLogout}
-            className="w-[30px]"
+            className="w-[30px] cursor-pointer"
             title="LogOut"
             width="45"
             height="40"

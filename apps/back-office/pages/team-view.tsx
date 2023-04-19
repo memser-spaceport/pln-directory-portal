@@ -87,7 +87,7 @@ function validateForm(formValues, imageUrl) {
 
 export default function TeamView(props) {
   const [errors, setErrors] = useState([]);
-  const [imageUrl, setImageUrl] = useState<string>();
+  const [imageUrl, setImageUrl] = useState<string>(props?.imageUrl);
   const [imageChanged, setImageChanged] = useState<boolean>(false);
   const [dropDownValues, setDropDownValues] = useState({
     membershipSources: props?.membershipSources,
@@ -160,7 +160,7 @@ export default function TeamView(props) {
             });
         }
         const data = {
-          participantType: 'TEAM',
+          participantType: ENROLLMENT_TYPE.TEAM,
           // referenceUid: props?.id,
           requesterEmailId: requestorEmail,
           uniqueIdentifier: values.name,
@@ -286,7 +286,7 @@ export const getServerSideProps = async ({ query, res }) => {
   let fundingStages = [];
   let industryTags = [];
   let technologies = [];
-  let referenceUid;
+  let referenceUid, imageUrl;
 
   const [
     requestDetailResponse,
@@ -311,7 +311,6 @@ export const getServerSideProps = async ({ query, res }) => {
     industryTagsResponse.status === 200 &&
     technologiesResponse.status === 200
   ) {
-    console.log('requestDetailResponse', requestDetailResponse);
     referenceUid = requestDetailResponse?.data?.referenceUid ?? '';
     const team = requestDetailResponse?.data?.newData;
     formValues = {
@@ -320,7 +319,7 @@ export const getServerSideProps = async ({ query, res }) => {
       logoFile: null,
       shortDescription: team.shortDescription,
       longDescription: team.longDescription,
-      requestorEmail: requestDetailResponse.data.requesterEmail ?? '',
+      requestorEmail: requestDetailResponse.data.requesterEmailId ?? '',
       technologies: team.technologies?.map((item) => {
         return { value: item.uid, label: item.title };
       }),
@@ -342,6 +341,7 @@ export const getServerSideProps = async ({ query, res }) => {
       blog: team.blog ?? '',
       officeHours: team.officeHours ?? '',
     };
+    imageUrl = team?.logoUrl ?? '';
     membershipSources = membershipSourcesResponse?.data.map((item) => {
       return { value: item.uid, label: item.title };
     });
@@ -380,6 +380,7 @@ export const getServerSideProps = async ({ query, res }) => {
       technologies,
       id,
       referenceUid,
+      imageUrl,
       type,
       backLink,
     },

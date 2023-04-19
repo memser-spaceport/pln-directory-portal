@@ -65,21 +65,10 @@
   }
 }
 
-.inputfield input {
-  position: relative;
-  top: 10px;
-}
-
 .namefield {
   left: 32px;
   position: relative;
   flex-basis: 69%;
-}
-
-.inputfield input,
-.inputfield textarea {
-  position: relative;
-  top: 10px;
 }
 
 .datefield > div:first-of-type {

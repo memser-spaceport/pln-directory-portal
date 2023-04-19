@@ -66,6 +66,7 @@ export default function AddMemberBasicForm(props) {
           name="plnStartDate"
           type="date"
           onChange={onChange}
+          onKeyDown={(e) => e.preventDefault()}
           value={values?.plnStartDate}
           label="PLN Start Date"
           className="custom-grey custom-outline-none border"

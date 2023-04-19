@@ -1,6 +1,5 @@
 import { EyeIcon, EyeOffIcon, XIcon } from '@heroicons/react/outline';
 import React, { useEffect, useState } from 'react';
-import { composeEventHandlers } from '../../utils/event-handlers.utils';
 
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
@@ -57,7 +56,7 @@ export function InputField({
     <label className="relative block">
       {showLabel ? (
         <span className="py-2 text-sm font-bold">
-          {error ? error : required ? label + ' *' : label}
+          {error ? error : required ? label + '*' : label}
         </span>
       ) : (
         <span className="sr-only">{label}</span>
@@ -68,7 +67,7 @@ export function InputField({
       <input
         {...props}
         type={showPassword ? 'text' : props.type}
-        className={`block w-full rounded-lg bg-white text-sm leading-6 text-slate-900 shadow-sm shadow-slate-300 transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-400
+        className={`mt-[10px] block w-full rounded-lg bg-white text-sm leading-6 text-slate-900 shadow-sm shadow-slate-300 transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-400
         ${icon ? 'pl-8' : 'pl-3'} ${hasClear ? 'pr-6' : 'pr-3'} on-focus
         hover:shadow-on-hover h-10 leading-10 disabled:bg-gray-200 ${
           props.className
@@ -82,7 +81,7 @@ export function InputField({
        my-auto h-[20px] w-[20px] text-slate-600"
           onClick={showPasswordAction}
         >
-          {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+          {showPassword ? <EyeIcon /> : <EyeOffIcon />}
         </div>
       )}
 

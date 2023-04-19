@@ -33,8 +33,9 @@ export default function TeamStepThree(props) {
 
       <div className="inputfield hint-text px-8 py-4">
         <InputField
-          label="Website address*"
+          label="Website address"
           name="website"
+          required={true}
           maxLength={1000}
           value={values.website}
           disabled={!props.isEditEnabled}
@@ -70,7 +71,7 @@ export default function TeamStepThree(props) {
           label="Twitter Handle"
           name="twitterHandler"
           maxLength={200}
-          value={values.twitter}
+          value={values.twitterHandler}
           onChange={handleInputChange}
           disabled={!props.isEditEnabled}
           placeholder="e.g., @protocollabs"

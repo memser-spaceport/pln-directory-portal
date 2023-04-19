@@ -7,13 +7,10 @@ const withAuth = (WrappedComponent) => {
 
     useEffect(() => {
       const token = localStorage.getItem('back-office');
-      console.log('textinsideEffect');
-      console.log('token', token);
       if (!token) {
-        console.log('textinsideIf');
         router.push('/');
       }
-    }, []);
+    }, [router]);
 
     return <WrappedComponent {...props} />;
   };

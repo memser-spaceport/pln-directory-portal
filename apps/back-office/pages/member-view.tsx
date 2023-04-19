@@ -72,7 +72,7 @@ function validateForm(formValues, imageUrl) {
 export default function MemberView(props) {
   const [errors, setErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({});
-  const [imageUrl, setImageUrl] = useState<string>();
+  const [imageUrl, setImageUrl] = useState<string>(props?.imageUrl);
   const [imageChanged, setImageChanged] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
@@ -97,6 +97,18 @@ export default function MemberView(props) {
     });
     const formattedData = {
       ...formValues,
+      name: formValues.name.trim(),
+      email: formValues.email.trim(),
+      requestorEmail: formValues.requestorEmail.trim(),
+      city: formValues.city.trim(),
+      region: formValues.region.trim(),
+      country: formValues.country.trim(),
+      linkedinHandler: formValues.linkedinHandler.trim(),
+      discordHandler: formValues.discordHandler.trim(),
+      twitterHandler: formValues.twitterHandler.trim(),
+      githubHandler: formValues.githubHandler.trim(),
+      officeHours: formValues.officeHours.trim(),
+      comments: formValues.comments.trim(),
       plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
@@ -132,13 +144,14 @@ export default function MemberView(props) {
             .post(`/v1/images`, formData, config)
             .then((response) => {
               console.log('response.data', response.data);
-              delete values.imageFile;
               return response?.data?.image;
             });
         }
 
+        delete values?.imageFile;
+        console.log('values', values);
         const data = {
-          participantType: 'MEMBER',
+          participantType: ENROLLMENT_TYPE.MEMBER,
           // referenceUid: props.id,
           requesterEmailId: requestorEmail,
           uniqueIdentifier: values.email,
@@ -189,6 +202,7 @@ export default function MemberView(props) {
   ) {
     const { name, value } = event.target;
     setFormValues({ ...formValues, [name]: value });
+    console.log('value', formValues);
   }
 
   function handleDropDownChange(selectedOption, name) {
@@ -306,7 +320,7 @@ export const getServerSideProps = async ({ query, res }) => {
     backLink: string;
   };
   let formValues: IFormValues;
-  let teams, skills, referenceUid;
+  let teams, skills, referenceUid, imageUrl;
 
   // Check if provided ID is an Airtable ID, and if so, get the corresponding backend UID
 
@@ -352,7 +366,7 @@ export const getServerSideProps = async ({ query, res }) => {
       githubHandler: requestData.githubHandler ?? '',
       officeHours: requestData.officeHours ?? '',
       requestorEmail: requestDetailResponse?.data?.requesterEmailId ?? '',
-      comments: '',
+      comments: requestData?.comments ?? '',
       teamAndRoles: teamAndRoles || [
         { teamUid: '', teamTitle: '', role: '', rowId: 1 },
       ],
@@ -360,6 +374,7 @@ export const getServerSideProps = async ({ query, res }) => {
         return { value: item.uid, label: item.title };
       }),
     };
+    imageUrl = requestData?.imageUrl ?? '';
     teams = memberTeamsResponse?.data;
     skills = skillsResponse?.data;
   }
@@ -380,6 +395,15 @@ export const getServerSideProps = async ({ query, res }) => {
   );
 
   return {
-    props: { formValues, teams, skills, id, referenceUid, type, backLink },
+    props: {
+      formValues,
+      teams,
+      skills,
+      id,
+      referenceUid,
+      imageUrl,
+      type,
+      backLink,
+    },
   };
 };

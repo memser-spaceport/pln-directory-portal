@@ -32,6 +32,7 @@ export default function TeamStepTwo(props) {
         <Dropdown
           options={dropDownValues?.fundingStages}
           name="fundingStage"
+          required={true}
           placeholder="Select Stage"
           value={values.fundingStage}
           disabled={!props.isEditEnabled}

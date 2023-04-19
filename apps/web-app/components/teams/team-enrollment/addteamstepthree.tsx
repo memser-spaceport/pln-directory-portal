@@ -1,7 +1,7 @@
 import { InputField } from '@protocol-labs-network/ui';
 import { InformationCircleIcon } from '@heroicons/react/solid';
 
-export default function AddMemberStepThree(props) {
+export default function AddTeamStepThree(props) {
   const values = props?.formValues;
   const handleInputChange = props?.handleInputChange;
 
@@ -32,9 +32,10 @@ export default function AddMemberStepThree(props) {
 
       <div className="inputfield hint-text px-8 py-4">
         <InputField
-          label="Website address*"
+          label="Website address"
           name="website"
           maxLength={1000}
+          required={true}
           value={values.website}
           onChange={handleInputChange}
           placeholder="Enter address here"
@@ -67,7 +68,7 @@ export default function AddMemberStepThree(props) {
           label="Twitter Handle"
           name="twitterHandler"
           maxLength={200}
-          value={values.twitter}
+          value={values.twitterHandler}
           onChange={handleInputChange}
           placeholder="e.g., @protocollabs"
           className="custom-grey custom-outline-none border"

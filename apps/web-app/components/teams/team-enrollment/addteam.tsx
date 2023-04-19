@@ -19,6 +19,7 @@ import {
 } from '../../../utils/services/dropdown-service';
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
+import { ENROLLMENT_TYPE } from '../../../constants';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddTeamModalProps {
@@ -296,12 +297,14 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
   function onNameBlur(event: ChangeEvent<HTMLInputElement>) {
     const data = {
       uniqueIdentifier: event.target.value,
-      participantType: 'team',
+      participantType: ENROLLMENT_TYPE.TEAM,
     };
     api
       .post(`/v1/participants-request/unique-identifier`, data)
       .then((response) => {
-        response?.data && response.data?.isUniqueIdentifierExist
+        response?.data &&
+        (response.data?.isUniqueIdentifierExist ||
+          response.data?.isRequestPending)
           ? setNameExists(true)
           : setNameExists(false);
       });
@@ -345,11 +348,11 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
             });
         }
         const data = {
-          participantType: 'TEAM',
+          participantType: ENROLLMENT_TYPE.TEAM,
           status: 'PENDING',
           requesterEmailId: requestorEmail,
           uniqueIdentifier: value.name,
-          newData: { ...value, logoUid: image?.uid },
+          newData: { ...value, logoUid: image?.uid, logoUrl: image?.url },
           // captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
