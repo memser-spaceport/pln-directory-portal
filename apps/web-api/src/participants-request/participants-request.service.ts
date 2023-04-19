@@ -105,43 +105,63 @@ export class ParticipantsRequestService {
       result.participantType === ParticipantType.MEMBER.toString() &&
       result.referenceUid === null
     ) {
-      await this.awsService.sendEmail('NewMemberRequest', true, [], {
-        memberName: result.newData.name,
-        requestUid: result.uid,
-        adminSiteUrl: 'https://www.google/com',
-      });
+      await this.awsService.sendEmail(
+        'NewMemberRequest',
+        true,
+        [],
+        {
+          memberName: result.newData.name,
+          requestUid: result.uid,
+          adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}&type=PENDING`,
+        }
+      );
     } else if (
       result.participantType === ParticipantType.MEMBER.toString() &&
       result.referenceUid !== null
     ) {
-      await this.awsService.sendEmail('EditMemberRequest', true, [], {
-        memberName: result.newData.name,
-        requestUid: result.uid,
-        requesterEmailId: requestData.editRequestorEmailId,
-        adminSiteUrl: 'https://www.google/com',
-      });
+      await this.awsService.sendEmail(
+        'EditMemberRequest',
+        true,
+        [],
+        {
+          memberName: result.newData.name,
+          requestUid: result.uid,
+          requesterEmailId: requestData.editRequestorEmailId,
+          adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}&type=PENDING`,
+        }
+      );
     } else if (
       result.participantType === ParticipantType.TEAM.toString() &&
       result.referenceUid === null
     ) {
-      await this.awsService.sendEmail('NewTeamRequest', true, [], {
-        teamName: result.newData.name,
-        requestUid: result.uid,
-        adminSiteUrl: 'https://www.google/com',
-      });
+      await this.awsService.sendEmail(
+        'NewTeamRequest',
+        true,
+        [],
+        {
+          teamName: result.newData.name,
+          requestUid: result.uid,
+          adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}&type=PENDING`,
+        }
+      );
     } else if (
       result.participantType === ParticipantType.TEAM.toString() &&
       result.referenceUid !== null
     ) {
-      await this.awsService.sendEmail('EditTeamRequest', true, [], {
-        teamName: result.newData.name,
-        requesterEmailId: requestData.editRequestorEmailId,
-        adminSiteUrl: 'https://www.google/com',
-      });
+      await this.awsService.sendEmail(
+        'EditTeamRequest',
+        true,
+        [],
+        {
+          teamName: result.newData.name,
+          requesterEmailId: requestData.editRequestorEmailId,
+          adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}&type=PENDING`,
+        }
+      );
     }
 
     console.log('sent email and added record', requestData);
-    await this.redisService.resetAllCache();
+    await this.redisService.resetAllCache()
     return result;
   }
 
@@ -158,7 +178,7 @@ export class ParticipantsRequestService {
       where: { uid: requestedUid },
       data: { ...formattedData },
     });
-    await this.redisService.resetAllCache();
+    await this.redisService.resetAllCache()
     return { code: 1, message: 'success' };
   }
 
@@ -246,21 +266,26 @@ export class ParticipantsRequestService {
       where: { uid: uidToApprove },
       data: { status: ApprovalStatus.APPROVED },
     });
-    await this.awsService.sendEmail('MemberCreated', true, [], {
-      memberName: dataToProcess.name,
-      memberUid: newMember.uid,
-      adminSiteUrl: 'https://www.google/com',
-    });
+    await this.awsService.sendEmail(
+      'MemberCreated',
+      true,
+      [],
+      {
+        memberName: dataToProcess.name,
+        memberUid: newMember.uid,
+        adminSiteUrl: `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}`
+      }
+    );
     await this.awsService.sendEmail(
       'NewMemberSuccess',
       false,
       [dataFromDB.requesterEmailId],
       {
         memberName: dataToProcess.name,
-        memberProfileLink: `https://www.plnetwork.io/directory/members/${newMember.uid}`,
+        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}`
       }
     );
-    await this.redisService.resetAllCache();
+    await this.redisService.resetAllCache()
     return { code: 1, message: 'Success' };
   }
 
@@ -409,19 +434,22 @@ export class ParticipantsRequestService {
         data: { status: ApprovalStatus.APPROVED },
       });
     });
-    await this.awsService.sendEmail('MemberEditRequestCompleted', true, [], {
-      memberName: dataToProcess.name,
-    });
+    await this.awsService.sendEmail(
+      'MemberEditRequestCompleted',
+      true,
+      [],
+      {memberName: dataToProcess.name}
+    );
     await this.awsService.sendEmail(
       'EditMemberSuccess',
       false,
       [dataFromDB.requesterEmailId],
       {
         memberName: dataToProcess.name,
-        memberProfileLink: `https://www.plnetwork.io/directory/members/${existingData.uid}`,
+        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}`,
       }
     );
-    await this.redisService.resetAllCache();
+    await this.redisService.resetAllCache()
     return { code: 1, message: 'Success' };
   }
 
@@ -487,21 +515,26 @@ export class ParticipantsRequestService {
       where: { uid: uidToApprove },
       data: { status: ApprovalStatus.APPROVED },
     });
-    await this.awsService.sendEmail('TeamCreated', true, [], {
-      teamName: dataToProcess.name,
-      teamUid: newTeam.uid,
-      adminSiteUrl: 'https://www.google/com',
-    });
+    await this.awsService.sendEmail(
+      'TeamCreated',
+      true,
+      [],
+      {
+        teamName: dataToProcess.name,
+        teamUid: newTeam.uid,
+        adminSiteUrl: `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}`,
+      }
+    );
     await this.awsService.sendEmail(
       'NewTeamSuccess',
       false,
       [dataFromDB.requesterEmailId],
       {
         teamName: dataToProcess.name,
-        teamProfileLink: `https://www.plnetwork.io/directory/teams/${newTeam.uid}`,
+        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}`,
       }
     );
-    await this.redisService.resetAllCache();
+    await this.redisService.resetAllCache()
     return { code: 1, message: 'Success' };
   }
 
@@ -584,16 +617,19 @@ export class ParticipantsRequestService {
         data: { status: ApprovalStatus.APPROVED },
       });
     });
-    await this.awsService.sendEmail('TeamEditRequestCompleted', true, [], {
-      teamName: dataToProcess.name,
-    });
+    await this.awsService.sendEmail(
+      'TeamEditRequestCompleted',
+      true,
+      [],
+      {teamName: dataToProcess.name}
+    );
     await this.awsService.sendEmail(
       'EditTeamSuccess',
       false,
       [dataFromDB.requesterEmailId],
       {
         teamName: dataToProcess.name,
-        teamProfileLink: `https://www.plnetwork.io/directory/teams/${existingData.uid}`,
+        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`,
       }
     );
     await this.redisService.resetAllCache();
