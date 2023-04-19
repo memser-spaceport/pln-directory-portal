@@ -1,7 +1,7 @@
 import { InputField } from '@protocol-labs-network/ui';
 import { InformationCircleIcon } from '@heroicons/react/solid';
 
-export default function AddMemberStepThree(props) {
+export default function AddTeamStepThree(props) {
   const values = props?.formValues;
   const handleInputChange = props?.handleInputChange;
 
@@ -67,7 +67,7 @@ export default function AddMemberStepThree(props) {
           label="Twitter Handle"
           name="twitterHandler"
           maxLength={200}
-          value={values.twitter}
+          value={values.twitterHandler}
           onChange={handleInputChange}
           placeholder="e.g., @protocollabs"
           className="custom-grey custom-outline-none border"

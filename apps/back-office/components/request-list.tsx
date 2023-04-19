@@ -69,7 +69,7 @@ export default function RequestList({ list, type }) {
             dataList.map((request) => {
               return (
                 <div
-                  className="h-[60px] w-[656px] border-b border-[#E2E8F0]
+                  className="h-[60px] w-[656px] cursor-pointer border-b border-[#E2E8F0]
                 bg-[#FFFFFF] drop-shadow-[0_0_1px_rgba(15,23,42,0.12)] hover:bg-[#F8FAFC]"
                   key={request.id}
                   onClick={() => redirectToDetail(request)}

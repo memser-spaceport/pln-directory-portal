@@ -1,3 +1,4 @@
+import { ENROLLMENT_TYPE } from '../../constants';
 import api from '../api';
 
 export const fetchTeam = async (id) => {
@@ -15,7 +16,7 @@ export const editTeamRequestPendingCheck = async (name) => {
   try {
     const data = {
       uniqueIdentifier: name,
-      participantType: 'TEAM',
+      participantType: ENROLLMENT_TYPE.TEAM,
     };
 
     const response = await api.post(

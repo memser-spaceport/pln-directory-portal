@@ -63,7 +63,7 @@ export function Dropdown({
       {({ open }) => (
         <div className="relative">
           <Listbox.Button
-            className={`on-focus hover:shadow-on-hover flex h-10 w-full items-center rounded-lg border border-white bg-white px-3 shadow-sm shadow-slate-300 transition duration-150 ease-in-out active:border-blue-600 active:ring-2 active:ring-blue-300 disabled:bg-gray-200 ${
+            className={`on-focus hover:shadow-on-hover mt-[10px] flex h-10 w-full items-center rounded-lg border border-white bg-white px-3 shadow-sm shadow-slate-300 transition duration-150 ease-in-out active:border-blue-600 active:ring-2 active:ring-blue-300 disabled:bg-gray-200 ${
               open ? 'border-blue-600 ring-2 ring-blue-300' : ''
             } ${requiredIndicator}`}
             data-testid="dropdown__button"

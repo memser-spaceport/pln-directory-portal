@@ -4,7 +4,7 @@ export function ApprovalLayout({ children }) {
   return (
     <>
       <Navbar />
-      <main className="h-[84%] min-w-[1272px] overflow-y-auto">{children}</main>
+      <main className="h-[84%] overflow-y-auto">{children}</main>
     </>
   );
 }

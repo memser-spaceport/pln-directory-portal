@@ -18,6 +18,7 @@ import {
 import { fetchMember } from '../../../utils/services/members';
 import { InputField } from '@protocol-labs-network/ui';
 import api from '../../../utils/api';
+import { ENROLLMENT_TYPE } from '../../../constants';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditMemberModalProps {
@@ -243,6 +244,18 @@ export function EditMemberModal({
     });
     const formattedData = {
       ...formValues,
+      name: formValues.name.trim(),
+      email: formValues.email.trim(),
+      requestorEmail: formValues.requestorEmail.trim(),
+      city: formValues.city.trim(),
+      region: formValues.region.trim(),
+      country: formValues.country.trim(),
+      linkedinHandler: formValues.linkedinHandler.trim(),
+      discordHandler: formValues.discordHandler.trim(),
+      twitterHandler: formValues.twitterHandler.trim(),
+      githubHandler: formValues.githubHandler.trim(),
+      officeHours: formValues.officeHours.trim(),
+      comments: formValues.comments.trim(),
       plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
@@ -282,17 +295,18 @@ export function EditMemberModal({
             .post(`/v1/images`, formData, config)
             .then((response) => {
               console.log('response.data', response.data);
-              delete values.imageFile;
               return response?.data?.image;
             });
         }
 
+        delete values?.imageFile;
+
         const data = {
-          participantType: 'MEMBER',
+          participantType: ENROLLMENT_TYPE.MEMBER,
           referenceUid: id,
           requesterEmailId: values.requestorEmail,
           uniqueIdentifier: values.email,
-          newData: { ...values, imageUid: image?.uid },
+          newData: { ...values, imageUid: image?.uid, imageUrl: image?.url },
           // captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {

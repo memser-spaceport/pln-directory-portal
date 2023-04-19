@@ -18,6 +18,7 @@ import {
 } from '../../../utils/services/dropdown-service';
 
 import api from '../../../utils/api';
+import { ENROLLMENT_TYPE } from '../../../constants';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddMemberModalProps {
@@ -246,6 +247,18 @@ export function AddMemberModal({
     });
     const formattedData = {
       ...formValues,
+      name: formValues.name.trim(),
+      email: formValues.email.trim(),
+      requestorEmail: formValues.requestorEmail.trim(),
+      city: formValues.city.trim(),
+      region: formValues.region.trim(),
+      country: formValues.country.trim(),
+      linkedinHandler: formValues.linkedinHandler.trim(),
+      discordHandler: formValues.discordHandler.trim(),
+      twitterHandler: formValues.twitterHandler.trim(),
+      githubHandler: formValues.githubHandler.trim(),
+      officeHours: formValues.officeHours.trim(),
+      comments: formValues.comments.trim(),
       plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
@@ -256,12 +269,14 @@ export function AddMemberModal({
   function onEmailBlur(event: ChangeEvent<HTMLInputElement>) {
     const data = {
       uniqueIdentifier: event.target.value,
-      participantType: 'member',
+      participantType: ENROLLMENT_TYPE.MEMBER,
     };
     api
       .post(`/v1/participants-request/unique-identifier`, data)
       .then((response) => {
-        response?.data && response.data?.isUniqueIdentifierExist
+        response?.data &&
+        (response.data?.isUniqueIdentifierExist ||
+          response.data?.isRequestPending)
           ? setEmailExists(true)
           : setEmailExists(false);
       });
@@ -299,11 +314,11 @@ export function AddMemberModal({
         }
 
         const data = {
-          participantType: 'MEMBER',
+          participantType: ENROLLMENT_TYPE.MEMBER,
           status: 'PENDING',
           requesterEmailId: values.email,
           uniqueIdentifier: values.email,
-          newData: { ...values, imageUid: image?.uid },
+          newData: { ...values, imageUid: image?.uid, imageUrl: image?.url },
           // captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
@@ -428,7 +443,7 @@ export function AddMemberModal({
         isOpen={isOpen}
         onClose={() => handleModalClose()}
         enableFooter={false}
-        image="/assets/images/join_as_a_member.jpg"
+        image="/assets/images/Banner.svg"
       >
         {saveCompleted ? (
           <div className="px-5">

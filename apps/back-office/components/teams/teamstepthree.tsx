@@ -70,7 +70,7 @@ export default function TeamStepThree(props) {
           label="Twitter Handle"
           name="twitterHandler"
           maxLength={200}
-          value={values.twitter}
+          value={values.twitterHandler}
           onChange={handleInputChange}
           disabled={!props.isEditEnabled}
           placeholder="e.g., @protocollabs"

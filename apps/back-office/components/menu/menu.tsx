@@ -44,12 +44,10 @@ export function Menu() {
             >
               <a
                 onClick={() => {
-                  console.log('onTeamClickFunction');
                   // onItemClick(item.name);
                   item.name === APP_CONSTANTS.TEAMS_LABEL
                     ? setIsTeamActive(true)
                     : setIsTeamActive(false);
-                  console.log('isTeamActive', isTeamActive);
                 }}
                 className={`on-focus group flex items-center rounded-lg px-3 py-2.5 text-sm focus:text-slate-900 `}
               >
@@ -59,7 +57,9 @@ export function Menu() {
                 />
                 {item.name}
                 <div
-                  className={`m-[4px] h-[20px] w-[20px] rounded-[15px] border border-solid
+                  className={`m-[4px] h-[20px] rounded-[15px] border border-solid ${
+                    item.count > 9 ? 'w-[25px]' : 'w-[20px]'
+                  }
                    border-[#1D4ED8] bg-[#1D4ED8] pl-[5px] pt-[1px] text-xs text-white
                    ${
                      (isTeamActive &&
