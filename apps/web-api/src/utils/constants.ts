@@ -11,12 +11,20 @@ export const ALLOWED_CORS_ORIGINS = {
     /.-protocol-labs-spaceport.vercel.app/,
     /protocol-labs-network-lk82taf1j-protocol-labs-spaceport.vercel.app/,
     /protocol-labs-network-web-admin.vercel.app/,
+    /dev.plnetwork.io/,
+    /dev-admin.plnetwork.io/,
   ],
   [APP_ENV.STAGING]: [
     /.-protocol-labs-spaceport.vercel.app/,
     /app.forestadmin.com/,
+    /stage.plnetwork.io/,
+    /stage-admin.plnetwork.io/,
   ],
-  [APP_ENV.PRODUCTION]: ['https://www.plnetwork.io', /app.forestadmin.com/],
+  [APP_ENV.PRODUCTION]: [
+    'https://www.plnetwork.io',
+    /app.forestadmin.com/,
+    /admin.plnetwork.io/,
+  ],
 };
 
 export const IS_DEV_ENVIRONMENT = process.env.ENVIRONMENT == APP_ENV.DEV;
