@@ -10,7 +10,7 @@ const withAuth = (WrappedComponent) => {
       if (!token) {
         router.push('/');
       }
-    }, [router]);
+    }, []);
 
     return <WrappedComponent {...props} />;
   };
