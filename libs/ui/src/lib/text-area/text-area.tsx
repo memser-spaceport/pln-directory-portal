@@ -40,8 +40,7 @@ export function TextArea({
   return (
     <div className="text-area-container ">
       <label htmlFor={name} className="text-area-label text-sm font-bold">
-        {label}
-        {required ? <span className="required">*</span> : null}
+        {required ? label + '*' : label}
       </label>
       {info && (
         <div className="py-2">

@@ -110,11 +110,11 @@ export function MultiSelect({
     <div className="">
       {label && (
         <span className="mb-4 text-sm font-bold">
-          {required ? label + ' *' : label}
+          {required ? label + '*' : label}
         </span>
       )}
       <div
-        className={`mt-2.5 flex cursor-pointer items-center justify-between rounded-md border border-gray-300 bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${requiredIndicator}`}
+        className={`mt-[10px] flex cursor-pointer items-center justify-between rounded-md border border-gray-300 bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${requiredIndicator}`}
         onClick={!disabled ? toggleDropdown : () => null}
       >
         <div className="flex flex-1 flex-wrap pr-4">

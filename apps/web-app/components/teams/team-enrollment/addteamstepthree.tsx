@@ -32,9 +32,10 @@ export default function AddTeamStepThree(props) {
 
       <div className="inputfield hint-text px-8 py-4">
         <InputField
-          label="Website address*"
+          label="Website address"
           name="website"
           maxLength={1000}
+          required={true}
           value={values.website}
           onChange={handleInputChange}
           placeholder="Enter address here"
