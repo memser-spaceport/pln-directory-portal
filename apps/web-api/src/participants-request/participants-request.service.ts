@@ -45,6 +45,7 @@ export class ParticipantsRequestService {
 
     const results = await this.prisma.participantsRequest.findMany({
       where: filters,
+      orderBy: {createdAt: 'desc'}
     });
     return results;
   }
@@ -105,39 +106,60 @@ export class ParticipantsRequestService {
       result.participantType === ParticipantType.MEMBER.toString() &&
       result.referenceUid === null
     ) {
-      await this.awsService.sendEmail('NewMemberRequest', true, [], {
-        memberName: result.newData.name,
-        requestUid: result.uid,
-        adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}&type=PENDING`,
-      });
+      await this.awsService.sendEmail(
+        'NewMemberRequest',
+        true,
+        [],
+        {
+          memberName: result.newData.name,
+          requestUid: result.uid,
+          adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`,
+        }
+      );
     } else if (
       result.participantType === ParticipantType.MEMBER.toString() &&
       result.referenceUid !== null
     ) {
-      await this.awsService.sendEmail('EditMemberRequest', true, [], {
-        memberName: result.newData.name,
-        requestUid: result.uid,
-        requesterEmailId: requestData.editRequestorEmailId,
-        adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}&type=PENDING`,
-      });
+      await this.awsService.sendEmail(
+        'EditMemberRequest',
+        true,
+        [],
+        {
+          memberName: result.newData.name,
+          requestUid: result.uid,
+          requesterEmailId: requestData.editRequestorEmailId,
+          adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`,
+        }
+      );
     } else if (
       result.participantType === ParticipantType.TEAM.toString() &&
       result.referenceUid === null
     ) {
-      await this.awsService.sendEmail('NewTeamRequest', true, [], {
-        teamName: result.newData.name,
-        requestUid: result.uid,
-        adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}&type=PENDING`,
-      });
+      await this.awsService.sendEmail(
+        'NewTeamRequest',
+        true,
+        [],
+        {
+          teamName: result.newData.name,
+          requestUid: result.uid,
+          adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,
+        }
+      );
     } else if (
       result.participantType === ParticipantType.TEAM.toString() &&
       result.referenceUid !== null
     ) {
-      await this.awsService.sendEmail('EditTeamRequest', true, [], {
-        teamName: result.newData.name,
-        requesterEmailId: requestData.editRequestorEmailId,
-        adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}&type=PENDING`,
-      });
+      await this.awsService.sendEmail(
+        'EditTeamRequest',
+        true,
+        [],
+        {
+          teamName: result.newData.name,
+          teamUid: result.referenceUid,
+          requesterEmailId: requestData.editRequestorEmailId,
+          adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,
+        }
+      );
     }
 
     console.log('sent email and added record', requestData);
