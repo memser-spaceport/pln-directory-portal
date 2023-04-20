@@ -19,6 +19,7 @@ import { ApprovalLayout } from '../layout/approval-layout';
 import { FooterButtons } from '../components/footer-buttons/footer-buttons';
 import router from 'next/router';
 import Loader from '../components/common/loader';
+import { useNavbarContext } from '../context/navbar-context';
 
 function validateBasicForm(formValues, imageUrl) {
   const errors = [];
@@ -88,6 +89,7 @@ function validateForm(formValues, imageUrl) {
 }
 
 export default function TeamView(props) {
+  console.log('props', props);
   const [errors, setErrors] = useState([]);
   const [imageUrl, setImageUrl] = useState<string>(props?.imageUrl);
   const [imageChanged, setImageChanged] = useState<boolean>(false);
@@ -101,6 +103,8 @@ export default function TeamView(props) {
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [isEditEnabled, setIsEditEnabled] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
+  const { setIsOpenRequest } = useNavbarContext();
+  setIsOpenRequest(props.status === APP_CONSTANTS.PENDING_LABEL ? true : false);
 
   function formatData() {
     const formattedTags = formValues.industryTags.map((item) => {
@@ -263,7 +267,7 @@ export default function TeamView(props) {
             </div>
           </div>
         </div>
-        {props.type === APP_CONSTANTS.PENDING_LABEL && (
+        {props.status === APP_CONSTANTS.PENDING_LABEL && (
           <FooterButtons
             isEditEnabled={isEditEnabled}
             setIsEditEnabled={setIsEditEnabled}
@@ -280,13 +284,8 @@ export default function TeamView(props) {
 }
 
 export const getServerSideProps = async ({ query, res }) => {
-  const {
-    id,
-    type,
-    backLink = ROUTE_CONSTANTS.PENDING_LIST,
-  } = query as {
+  const { id, backLink = ROUTE_CONSTANTS.PENDING_LIST } = query as {
     id: string;
-    type: string;
     backLink: string;
   };
   let formValues: IFormValues;
@@ -294,7 +293,7 @@ export const getServerSideProps = async ({ query, res }) => {
   let fundingStages = [];
   let industryTags = [];
   let technologies = [];
-  let referenceUid, imageUrl;
+  let referenceUid, imageUrl, status;
 
   const [
     requestDetailResponse,
@@ -319,6 +318,7 @@ export const getServerSideProps = async ({ query, res }) => {
   ) {
     referenceUid = requestDetailResponse?.data?.referenceUid ?? '';
     const team = requestDetailResponse?.data?.newData;
+    status = requestDetailResponse?.data?.status;
     formValues = {
       name: team.name,
       logoUid: team?.logoUid ?? '',
@@ -387,7 +387,7 @@ export const getServerSideProps = async ({ query, res }) => {
       id,
       referenceUid,
       imageUrl,
-      type,
+      status,
       backLink,
     },
   };

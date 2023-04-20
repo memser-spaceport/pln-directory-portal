@@ -388,7 +388,7 @@ export function EditTeamModal({
                 handleDropDownChange={handleDropDownChange}
                 handleImageChange={handleImageChange}
                 imageUrl={imageUrl}
-                // nameExists={nameExists}
+                disableName={true}
               />
               <AddTeamStepTwo
                 formValues={formValues}

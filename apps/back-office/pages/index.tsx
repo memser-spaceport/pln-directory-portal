@@ -34,7 +34,8 @@ export function Index() {
     ) {
       setToken(TOKEN);
       setIsLoading(false);
-      router.push(ROUTE_CONSTANTS.PENDING_LIST);
+      const backLink = (router.query.backlink)?.toString() ?? '';
+      router.push(backLink? backLink : ROUTE_CONSTANTS.PENDING_LIST);
     } else {
       setIsLoading(false);
       setError('Incorrect Username and Password!');
