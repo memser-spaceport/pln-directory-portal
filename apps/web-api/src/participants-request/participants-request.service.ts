@@ -115,17 +115,12 @@ export class ParticipantsRequestService {
       result.participantType === ParticipantType.MEMBER.toString() &&
       result.referenceUid !== null
     ) {
-      await this.awsService.sendEmail(
-        'EditMemberRequest',
-        true,
-        [],
-        {
-          memberName: result.newData.name,
-          requestUid: result.uid,
-          requesterEmailId: requestData.requesterEmailId,
-          adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`,
-        }
-      );
+      await this.awsService.sendEmail('EditMemberRequest', true, [], {
+        memberName: result.newData.name,
+        requestUid: result.uid,
+        requesterEmailId: requestData.requesterEmailId,
+        adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`,
+      });
     } else if (
       result.participantType === ParticipantType.TEAM.toString() &&
       result.referenceUid === null
@@ -139,17 +134,12 @@ export class ParticipantsRequestService {
       result.participantType === ParticipantType.TEAM.toString() &&
       result.referenceUid !== null
     ) {
-      await this.awsService.sendEmail(
-        'EditTeamRequest',
-        true,
-        [],
-        {
-          teamName: result.newData.name,
-          teamUid: result.referenceUid,
-          requesterEmailId: requestData.requesterEmailId,
-          adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,
-        }
-      );
+      await this.awsService.sendEmail('EditTeamRequest', true, [], {
+        teamName: result.newData.name,
+        teamUid: result.referenceUid,
+        requesterEmailId: requestData.requesterEmailId,
+        adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,
+      });
     }
     await this.redisService.resetAllCache();
     return result;

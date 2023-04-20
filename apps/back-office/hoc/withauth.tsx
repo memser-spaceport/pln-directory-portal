@@ -14,8 +14,7 @@ const withAuth = (WrappedComponent) => {
             backlink: backLink,
           },
         });
-      }
-      else if(token && router.asPath == '/'){
+      } else if (token && router.asPath == '/') {
         router.push({
           pathname: '/pending-list',
           query: {

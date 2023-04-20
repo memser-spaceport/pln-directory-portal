@@ -150,7 +150,7 @@ export function MultiSelect({
         <div className="relative">
           <div
             // className="absolute left-0  z-[1056] mt-1 mr-5 h-[25%] w-full overflow-y-auto rounded-md bg-white shadow-lg"
-            className="absolute z-[1056] h-[250px] w-full overflow-y-auto rounded-md bg-white shadow-lg"
+            className="absolute z-[1056] h-auto max-h-[250px] w-full overflow-y-auto rounded-md bg-white shadow-lg"
             ref={dropdownOptionsRef}
             onBlur={() => setIsExpanded(false)}
           >
@@ -166,16 +166,14 @@ export function MultiSelect({
                     onClick={() => handleOptionClick(item)}
                     className="mr-2 h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-400"
                   />
-                  <span className="font-medium text-gray-900">
+                  <span className="font-xs leading-3 text-gray-900">
                     {item.label}
                   </span>
                 </label>
               ))
             ) : (
               <label>
-                <span className="font-sm text-gray-500">
-                  No options available
-                </span>
+                <span className="p-2 text-gray-500">No options available</span>
               </label>
             )}
           </div>

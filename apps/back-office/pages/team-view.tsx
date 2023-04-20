@@ -172,7 +172,7 @@ export default function TeamView(props) {
           uniqueIdentifier: values.name,
           newData: {
             ...values,
-            logoUid: image?.uid,
+            logoUid: image?.uid ?? values.logoUid,
             logoUrl: image?.url ?? imageUrl,
           },
         };

@@ -191,7 +191,7 @@ export function EditTeamModal({
             officeHours: team.officeHours,
           };
           setFormValues(formValues);
-          setImageUrl(team.logo.url);
+          setImageUrl(team.logo?.url ?? '');
           setDropDownValues({
             membershipSources: data[1],
             fundingStages: data[2],
@@ -301,7 +301,7 @@ export function EditTeamModal({
           uniqueIdentifier: values.name,
           newData: {
             ...values,
-            logoUid: image?.uid,
+            logoUid: image?.uid ?? values.logoUid,
             logoUrl: image?.url ?? imageUrl,
           },
         };
