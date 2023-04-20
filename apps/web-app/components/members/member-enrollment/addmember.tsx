@@ -19,6 +19,7 @@ import {
 
 import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
+import { ReactComponent as TextImage } from '/public/assets/images/create-member.svg';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddMemberModalProps {
@@ -442,7 +443,7 @@ export function AddMemberModal({
         isOpen={isOpen}
         onClose={() => handleModalClose()}
         enableFooter={false}
-        image="/assets/images/Banner.svg"
+        image={<TextImage />}
       >
         {saveCompleted ? (
           <div className="px-5">

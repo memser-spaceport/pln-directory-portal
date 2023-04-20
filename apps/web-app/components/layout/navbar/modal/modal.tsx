@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import { Dialog, Transition } from '@headlessui/react';
 import { XIcon as CloseIcon } from '@heroicons/react/outline';
 import React, { ReactNode, Fragment } from 'react';
@@ -8,7 +7,7 @@ type ModalProps = {
   title?: string;
   onClose: () => void;
   children: ReactNode;
-  image?: string;
+  image?: ReactNode;
   headerStyleClass?: string;
   enableHeader?: boolean;
   enableFooter?: boolean;
@@ -17,7 +16,7 @@ type ModalProps = {
 type ModalHeaderProps = {
   title?: string;
   onClose: () => void;
-  image?: string;
+  image?: ReactNode;
   headerStyleClass?: string;
 };
 
@@ -35,8 +34,8 @@ function ModalHeader({
       />
       <div className={headerStyleClass}>
         {image && (
-          <div className="relative h-40">
-            <Image alt={`img`} src={image} layout="fill" />
+          <div className="flex h-40 bg-[url('/assets/images/Banner.svg')]">
+            <div className="my-auto ml-5">{image}</div>
           </div>
         )}
         {title && (

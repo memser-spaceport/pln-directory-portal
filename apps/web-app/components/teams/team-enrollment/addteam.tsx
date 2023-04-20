@@ -20,6 +20,7 @@ import {
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
+import { ReactComponent as TextImage } from '/public/assets/images/create-team.svg';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddTeamModalProps {
@@ -433,7 +434,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
         isOpen={isOpen}
         onClose={handleModalClose}
         enableFooter={false}
-        image="/assets/images/join_as_a_member.jpg"
+        image={<TextImage />}
       >
         {saveCompleted ? (
           <div>

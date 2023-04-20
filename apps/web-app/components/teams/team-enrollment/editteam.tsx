@@ -20,6 +20,7 @@ import { fetchTeam } from '../../../utils/services/teams';
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
+import { ReactComponent as TextImage } from '/public/assets/images/edit-team.svg';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditTeamModalProps {
@@ -341,7 +342,7 @@ export function EditTeamModal({
         isOpen={isOpen}
         onClose={handleModalClose}
         enableFooter={false}
-        image="/assets/images/join_as_a_member.jpg"
+        image={<TextImage />}
       >
         {saveCompleted ? (
           <div>

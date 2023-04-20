@@ -19,6 +19,7 @@ import { fetchMember } from '../../../utils/services/members';
 import { InputField } from '@protocol-labs-network/ui';
 import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
+import { ReactComponent as TextImage } from '/public/assets/images/edit-member.svg';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditMemberModalProps {
