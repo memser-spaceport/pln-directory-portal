@@ -166,7 +166,11 @@ export default function TeamView(props) {
           // referenceUid: props?.id,
           requesterEmailId: requestorEmail,
           uniqueIdentifier: values.name,
-          newData: { ...values, logoUid: image?.uid },
+          newData: {
+            ...values,
+            logoUid: image?.uid,
+            logoUrl: image?.url ?? imageUrl,
+          },
         };
         await api
           .put(`${API_ROUTE.PARTICIPANTS_REQUEST}/${props.id}`, data)
