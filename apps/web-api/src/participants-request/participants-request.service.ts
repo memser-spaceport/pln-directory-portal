@@ -127,7 +127,7 @@ export class ParticipantsRequestService {
         {
           memberName: result.newData.name,
           requestUid: result.uid,
-          requesterEmailId: requestData.editRequestorEmailId,
+          requesterEmailId: requestData.requesterEmailId,
           adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`,
         }
       );
@@ -156,13 +156,11 @@ export class ParticipantsRequestService {
         {
           teamName: result.newData.name,
           teamUid: result.referenceUid,
-          requesterEmailId: requestData.editRequestorEmailId,
+          requesterEmailId: requestData.requesterEmailId,
           adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,
         }
       );
     }
-
-    console.log('sent email and added record', requestData);
     await this.redisService.resetAllCache();
     return result;
   }
