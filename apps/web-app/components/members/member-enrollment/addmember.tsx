@@ -249,7 +249,6 @@ export function AddMemberModal({
       ...formValues,
       name: formValues.name.trim(),
       email: formValues.email.trim(),
-      requestorEmail: formValues.requestorEmail.trim(),
       city: formValues.city.trim(),
       region: formValues.region.trim(),
       country: formValues.country.trim(),
