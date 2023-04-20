@@ -1,8 +1,9 @@
 import api from '../api';
+import { API_ROUTE } from '../constants';
 
 export const fetchMembershipSources = async () => {
   try {
-    const response = await api.get(`/v1/membership-sources`);
+    const response = await api.get(API_ROUTE.MEMBERSHIP);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
@@ -15,7 +16,7 @@ export const fetchMembershipSources = async () => {
 
 export const fetchProtocol = async () => {
   try {
-    const response = await api.get(`/v1/technologies`);
+    const response = await api.get(API_ROUTE.TECHNOLOGIES);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
@@ -28,7 +29,7 @@ export const fetchProtocol = async () => {
 
 export const fetchSkills = async () => {
   try {
-    const response = await api.get(`/v1/skills`);
+    const response = await api.get(API_ROUTE.SKILLS);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
@@ -41,7 +42,7 @@ export const fetchSkills = async () => {
 
 export const fetchFundingStages = async () => {
   try {
-    const response = await api.get(`/v1/funding-stages`);
+    const response = await api.get(API_ROUTE.FUNDING_STAGE);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
@@ -54,7 +55,7 @@ export const fetchFundingStages = async () => {
 
 export const fetchIndustryTags = async () => {
   try {
-    const response = await api.get(`/v1/industry-tags`);
+    const response = await api.get(API_ROUTE.INDUSTRIES);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };

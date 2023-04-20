@@ -57,7 +57,7 @@ export function MemberProfileHeader({
             />
           ) : null}
         </div>
-        <p className="mt-0.5 line-clamp-1 text-sm">{memberRole}</p>
+        <p className="line-clamp-1 mt-0.5 text-sm">{memberRole}</p>
         <div className="mr-2 mt-1 flex items-center text-sm text-slate-600">
           {location ? (
             <>

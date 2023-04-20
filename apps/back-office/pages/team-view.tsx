@@ -11,12 +11,14 @@ import TeamStepThree from '../components/teams/teamstepthree';
 import { IFormValues } from '../utils/teams.types';
 import api from '../utils/api';
 import APP_CONSTANTS, {
+  API_ROUTE,
   ENROLLMENT_TYPE,
   ROUTE_CONSTANTS,
 } from '../utils/constants';
 import { ApprovalLayout } from '../layout/approval-layout';
 import { FooterButtons } from '../components/footer-buttons/footer-buttons';
 import router from 'next/router';
+import Loader from '../components/common/loader';
 
 function validateBasicForm(formValues, imageUrl) {
   const errors = [];
@@ -153,7 +155,7 @@ export default function TeamView(props) {
             },
           };
           image = await api
-            .post(`/v1/images`, formData, config)
+            .post(API_ROUTE.IMAGES, formData, config)
             .then((response) => {
               delete values.logoFile;
               return response?.data?.image;
@@ -167,7 +169,7 @@ export default function TeamView(props) {
           newData: { ...values, logoUid: image?.uid },
         };
         await api
-          .put(`/v1/participants-request/${props.id}`, data)
+          .put(`${API_ROUTE.PARTICIPANTS_REQUEST}/${props.id}`, data)
           .then((response) => {
             setSaveCompleted(true);
             setIsEditEnabled(false);
@@ -210,6 +212,7 @@ export default function TeamView(props) {
   return (
     <>
       <ApprovalLayout>
+        {isProcessing && <Loader />}
         <div className="bg-gray-200 py-10">
           <div className="relative m-auto w-[40%]">
             <div
@@ -264,6 +267,7 @@ export default function TeamView(props) {
             type={ENROLLMENT_TYPE.TEAM}
             saveChanges={handleSubmit}
             referenceUid={props.referenceUid}
+            setLoader={setIsProcessing}
           />
         )}
       </ApprovalLayout>
@@ -295,14 +299,12 @@ export const getServerSideProps = async ({ query, res }) => {
     industryTagsResponse,
     technologiesResponse,
   ] = await Promise.all([
-    api.get(`/v1/participants-request/${id}`),
-    api.get(`/v1/membership-sources`),
-    api.get(`/v1/funding-stages`),
-    api.get(`/v1/industry-tags`),
-    api.get(`/v1/technologies`),
+    api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`),
+    api.get(API_ROUTE.MEMBERSHIP),
+    api.get(API_ROUTE.FUNDING_STAGE),
+    api.get(API_ROUTE.INDUSTRIES),
+    api.get(API_ROUTE.TECHNOLOGIES),
   ]);
-
-  console.log('requestDetailResponse', requestDetailResponse);
 
   if (
     requestDetailResponse.status === 200 &&
