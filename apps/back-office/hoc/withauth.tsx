@@ -4,11 +4,24 @@ import { useEffect } from 'react';
 const withAuth = (WrappedComponent) => {
   const AuthComponent = (props) => {
     const router = useRouter();
-
+    const backLink = router?.asPath;
     useEffect(() => {
       const token = localStorage.getItem('back-office');
       if (!token) {
-        router.push('/');
+        router.push({
+          pathname: '/',
+          query: {
+            backlink: backLink,
+          },
+        });
+      }
+      else if(token && router.asPath == '/'){
+        router.push({
+          pathname: '/pending-list',
+          query: {
+            backlink: backLink,
+          },
+        });
       }
     }, []);
 

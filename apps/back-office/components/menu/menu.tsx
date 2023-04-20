@@ -14,11 +14,7 @@ interface IMenuItem {
 }
 
 export function Menu() {
-  const {
-    setIsTeamActive,
-    isTeamActive,
-    isOpenRequest,
-  } = useNavbarContext();
+  const { setIsTeamActive, isTeamActive, isOpenRequest } = useNavbarContext();
   const [memberCount, setMemberCount] = useState<number>(0);
   const [teamCount, setTeamCount] = useState<number>(0);
   const router = useRouter();
@@ -26,9 +22,13 @@ export function Menu() {
   useEffect(() => {
     Promise.all([getPendingClosedCount()])
       .then((data) => {
-        console.log('data', data)
-        setMemberCount(isOpenRequest ? data[0].memberOpenCount : data[0].memberClosedCount);
-        setTeamCount(isOpenRequest ? data[0].teamOpenCount : data[0].teamClosedCount);
+        console.log('data', data);
+        setMemberCount(
+          isOpenRequest ? data[0].memberOpenCount : data[0].memberClosedCount
+        );
+        setTeamCount(
+          isOpenRequest ? data[0].teamOpenCount : data[0].teamClosedCount
+        );
       })
       .catch((e) => console.error(e));
   }, [isOpenRequest]);

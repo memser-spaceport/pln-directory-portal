@@ -71,6 +71,7 @@ function validateForm(formValues, imageUrl) {
 }
 
 export default function MemberView(props) {
+  console.log('props', props);
   const [errors, setErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({});
   const [imageUrl, setImageUrl] = useState<string>(props?.imageUrl);
@@ -81,7 +82,7 @@ export default function MemberView(props) {
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const { setIsOpenRequest } = useNavbarContext();
-  setIsOpenRequest(props.status === APP_CONSTANTS.PENDING_LABEL ? true:false);
+  setIsOpenRequest(props.status === APP_CONSTANTS.PENDING_LABEL ? true : false);
 
   // useEffect(() => {
   //   Promise.all([fetchSkills(), fetchTeams()])

@@ -45,7 +45,7 @@ export class ParticipantsRequestService {
 
     const results = await this.prisma.participantsRequest.findMany({
       where: filters,
-      orderBy: {createdAt: 'desc'}
+      orderBy: { createdAt: 'desc' },
     });
     return results;
   }
@@ -106,16 +106,11 @@ export class ParticipantsRequestService {
       result.participantType === ParticipantType.MEMBER.toString() &&
       result.referenceUid === null
     ) {
-      await this.awsService.sendEmail(
-        'NewMemberRequest',
-        true,
-        [],
-        {
-          memberName: result.newData.name,
-          requestUid: result.uid,
-          adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`,
-        }
-      );
+      await this.awsService.sendEmail('NewMemberRequest', true, [], {
+        memberName: result.newData.name,
+        requestUid: result.uid,
+        adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`,
+      });
     } else if (
       result.participantType === ParticipantType.MEMBER.toString() &&
       result.referenceUid !== null
@@ -135,16 +130,11 @@ export class ParticipantsRequestService {
       result.participantType === ParticipantType.TEAM.toString() &&
       result.referenceUid === null
     ) {
-      await this.awsService.sendEmail(
-        'NewTeamRequest',
-        true,
-        [],
-        {
-          teamName: result.newData.name,
-          requestUid: result.uid,
-          adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,
-        }
-      );
+      await this.awsService.sendEmail('NewTeamRequest', true, [], {
+        teamName: result.newData.name,
+        requestUid: result.uid,
+        adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,
+      });
     } else if (
       result.participantType === ParticipantType.TEAM.toString() &&
       result.referenceUid !== null

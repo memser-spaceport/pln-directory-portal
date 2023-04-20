@@ -40,6 +40,7 @@ export default function AddMemberStepOne(props) {
             onChange={onChange}
             maxLength={150}
             pattern="^[a-zA-Z\s]*$"
+            disabled={props.disableName ? props.disableName : false}
             onBlur={props.onNameBlur && props.onNameBlur}
             name="name"
             label="What is your organization, company, or team name?"

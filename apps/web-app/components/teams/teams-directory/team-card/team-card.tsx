@@ -35,7 +35,7 @@ export function TeamCard({ team, isGrid = true }: TeamCardProps) {
         </h2>
         <p
           className={`${
-            isGrid ? 'line-clamp-3 h-[60px]' : 'line-clamp-2 mt-1'
+            isGrid ? 'line-clamp-3 h-[60px]' : 'mt-1 line-clamp-2'
           }  leading-5 text-slate-600`}
         >
           {team.shortDescription}

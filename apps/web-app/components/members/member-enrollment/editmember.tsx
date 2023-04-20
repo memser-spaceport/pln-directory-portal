@@ -441,7 +441,7 @@ export function EditMemberModal({
                 onChange={handleInputChange}
                 handleImageChange={handleImageChange}
                 imageUrl={imageUrl}
-                // emailExists={emailExists}
+                disableEmail={true}
               />
               <AddMemberSkillForm
                 formValues={formValues}

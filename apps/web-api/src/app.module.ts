@@ -37,7 +37,7 @@ import { TechnologiesModule } from './technologies/technologies.module';
       store: redisStore,
       url: process.env.REDIS_URL,
       isGlobal: true,
-      ttl: 86400, // 1 day in seconds
+      ttl: 1, // 1 day in seconds
       max: 100, // maximum number of items in cache
       tls: process.env.REDIS_WITH_TLS
         ? {
