@@ -1,10 +1,8 @@
-import { useState, useEffect, ChangeEvent, useCallback } from 'react';
+import { useState, ChangeEvent, useCallback } from 'react';
 import MemberBasicForm from '../components/members/memberbasicform';
 import MemberSkillForm from '../components/members/memberskillform';
 import MemberSocialForm from '../components/members/membersocialform';
 import { IFormValues } from '../utils/members.types';
-import { fetchSkills } from '../utils/services/shared';
-import { fetchTeams } from '../utils/services/team';
 // import { fetchPendingMemberRequest } from '../utils/services/member';
 import { InputField } from '@protocol-labs-network/ui';
 import api from '../utils/api';
@@ -17,6 +15,7 @@ import APP_CONSTANTS, {
 } from '../utils/constants';
 import router from 'next/router';
 import Loader from '../components/common/loader';
+import { useNavbarContext } from '../context/navbar-context';
 
 function validateBasicForm(formValues, imageUrl) {
   const errors = [];
@@ -81,14 +80,16 @@ export default function MemberView(props) {
   const [isEditEnabled, setIsEditEnabled] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const { setIsOpenRequest } = useNavbarContext();
+  setIsOpenRequest(props.status === APP_CONSTANTS.PENDING_LABEL ? true:false);
 
-  useEffect(() => {
-    Promise.all([fetchSkills(), fetchTeams()])
-      .then((data) => {
-        setDropDownValues({ skillValues: data[0], teamNames: data[1] });
-      })
-      .catch((e) => console.error(e));
-  }, [props]);
+  // useEffect(() => {
+  //   Promise.all([fetchSkills(), fetchTeams()])
+  //     .then((data) => {
+  //       setDropDownValues({ skillValues: data[0], teamNames: data[1] });
+  //     })
+  //     .catch((e) => console.error(e));
+  // }, [props]);
 
   function formatData() {
     const formattedTeamAndRoles = formValues.teamAndRoles.map((item) => {
@@ -233,7 +234,7 @@ export default function MemberView(props) {
 
   function redirectToList() {
     const route =
-      props.type === APP_CONSTANTS.PENDING_LABEL
+      props.status === APP_CONSTANTS.PENDING_LABEL
         ? ROUTE_CONSTANTS.PENDING_LIST
         : ROUTE_CONSTANTS.CLOSED_LIST;
     router.push({
@@ -303,7 +304,7 @@ export default function MemberView(props) {
           </div>
         </div>
       </div>
-      {props.type === APP_CONSTANTS.PENDING_LABEL && (
+      {props.status === APP_CONSTANTS.PENDING_LABEL && (
         <FooterButtons
           isEditEnabled={isEditEnabled}
           setIsEditEnabled={setIsEditEnabled}
@@ -319,17 +320,12 @@ export default function MemberView(props) {
 }
 
 export const getServerSideProps = async ({ query, res }) => {
-  const {
-    id,
-    type,
-    backLink = ROUTE_CONSTANTS.PENDING_LIST,
-  } = query as {
+  const { id, backLink = ROUTE_CONSTANTS.PENDING_LIST } = query as {
     id: string;
-    type: string;
     backLink: string;
   };
   let formValues: IFormValues;
-  let teams, skills, referenceUid, imageUrl;
+  let teams, skills, referenceUid, imageUrl, status;
 
   // Check if provided ID is an Airtable ID, and if so, get the corresponding backend UID
 
@@ -348,6 +344,7 @@ export const getServerSideProps = async ({ query, res }) => {
     let counter = 1;
     referenceUid = requestDetailResponse?.data?.referenceUid ?? null;
     const requestData = requestDetailResponse?.data?.newData;
+    status = requestDetailResponse?.data?.status;
     const teamAndRoles =
       requestData.teamAndRoles?.length &&
       requestData.teamAndRoles.map((team) => {
@@ -411,7 +408,7 @@ export const getServerSideProps = async ({ query, res }) => {
       id,
       referenceUid,
       imageUrl,
-      type,
+      status,
       backLink,
     },
   };

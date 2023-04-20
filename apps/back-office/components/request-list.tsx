@@ -9,7 +9,7 @@ import { useEffect } from 'react';
 import Loader from '../components/common/loader';
 
 export default function RequestList({ list, type }) {
-  const { isOpenRequest, isTeamActive } = useNavbarContext();
+  const { isTeamActive } = useNavbarContext();
   const [dataList, setDataList] = useState([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -27,9 +27,6 @@ export default function RequestList({ list, type }) {
       pathname: route,
       query: {
         id: request.id,
-        type: isOpenRequest
-          ? APP_CONSTANTS.PENDING_LABEL
-          : APP_CONSTANTS.CLOSED_FLAG,
       },
     });
   }

@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { UserGroupIcon, UserIcon } from '@heroicons/react/solid';
 import APP_CONSTANTS, { ROUTE_CONSTANTS } from '../../utils/constants';
 import { useNavbarContext } from '../../context/navbar-context';
 import { useRouter } from 'next/router';
+import { getPendingClosedCount } from '../../utils/services/shared';
 
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
@@ -13,13 +15,24 @@ interface IMenuItem {
 
 export function Menu() {
   const {
-    teamCount,
-    memberCount,
     setIsTeamActive,
     isTeamActive,
     isOpenRequest,
   } = useNavbarContext();
-  // const [isTeamActive, setIsTeamActive] = useState<boolean>(true);
+  const [memberCount, setMemberCount] = useState<number>(0);
+  const [teamCount, setTeamCount] = useState<number>(0);
+  const router = useRouter();
+
+  useEffect(() => {
+    Promise.all([getPendingClosedCount()])
+      .then((data) => {
+        console.log('data', data)
+        setMemberCount(isOpenRequest ? data[0].memberOpenCount : data[0].memberClosedCount);
+        setTeamCount(isOpenRequest ? data[0].teamOpenCount : data[0].teamClosedCount);
+      })
+      .catch((e) => console.error(e));
+  }, [isOpenRequest]);
+
   const MENU_ITEMS: IMenuItem[] = [
     {
       icon: UserGroupIcon,
@@ -32,8 +45,6 @@ export function Menu() {
       count: memberCount,
     },
   ];
-
-  const router = useRouter();
 
   return (
     <ul className="flex space-x-4 text-sm text-gray-700">

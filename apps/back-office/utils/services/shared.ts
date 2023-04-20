@@ -1,5 +1,5 @@
 import api from '../api';
-import { API_ROUTE } from '../constants';
+import APP_CONSTANTS, { API_ROUTE, ENROLLMENT_TYPE } from '../constants';
 
 export const fetchMembershipSources = async () => {
   try {
@@ -60,6 +60,44 @@ export const fetchIndustryTags = async () => {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
       });
+    }
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+export const getPendingClosedCount = async () => {
+  try {
+    const response = await api.get(API_ROUTE.PARTICIPANTS_REQUEST);
+    if (response.data) {
+      const memberOpen = response.data?.filter(
+        (item) =>
+          item.participantType === ENROLLMENT_TYPE.MEMBER &&
+          item.status === APP_CONSTANTS.PENDING_LABEL
+      ).length;
+      console.log();
+      const teamOpen = response.data?.filter(
+        (item) =>
+          item.participantType === ENROLLMENT_TYPE.TEAM &&
+          item.status === APP_CONSTANTS.PENDING_LABEL
+      ).length;
+      const teamClosed = response.data?.filter(
+        (item) =>
+          item.participantType === ENROLLMENT_TYPE.TEAM &&
+          item.status !== APP_CONSTANTS.PENDING_LABEL
+      ).length;
+      console.log();
+      const memberClosed = response.data?.filter(
+        (item) =>
+          item.participantType === ENROLLMENT_TYPE.MEMBER &&
+          item.status !== APP_CONSTANTS.PENDING_LABEL
+      ).length;
+      return {
+        memberOpenCount: memberOpen,
+        teamOpenCount: teamOpen,
+        memberClosedCount: memberClosed,
+        teamClosedCount: teamClosed,
+      };
     }
   } catch (error) {
     console.error(error);
