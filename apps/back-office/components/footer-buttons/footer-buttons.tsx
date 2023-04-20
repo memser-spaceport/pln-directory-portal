@@ -1,28 +1,47 @@
 import { CheckIcon, XIcon } from '@heroicons/react/outline';
 import api from '../../utils/api';
 import router from 'next/router';
-import { ROUTE_CONSTANTS } from '../../utils/constants';
-
-async function handleAprroveOrReject(id, type, referenceUid, isApproved) {
-  const data = {
-    status: isApproved ? 'APPROVED' : 'REJECTED',
-    participantType: type,
-    ...(referenceUid ?? { referenceUid: referenceUid }),
-  };
-  await api
-    .patch(`/v1/participants-request/${id}`, data)
-    .then((res) => {
-      router.push({
-        pathname: ROUTE_CONSTANTS.PENDING_LIST,
-      });
-    })
-    .catch((e) => console.error(e));
-}
+import APP_CONSTANTS, {
+  API_ROUTE,
+  ROUTE_CONSTANTS,
+} from '../../utils/constants';
 
 export function FooterButtons(props) {
+  async function handleAprroveOrReject(
+    id,
+    type,
+    referenceUid,
+    isApproved,
+    setLoader
+  ) {
+    setLoader(true);
+    const data = {
+      status: isApproved
+        ? APP_CONSTANTS.APPROVED_FLAG
+        : APP_CONSTANTS.REJECTED_FLAG,
+      participantType: type,
+      ...(referenceUid ?? { referenceUid: referenceUid }),
+    };
+    await api
+      .patch(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, data)
+      .then((res) => {
+        router.push({
+          pathname: ROUTE_CONSTANTS.PENDING_LIST,
+        });
+      })
+      .catch((e) => {
+        if (e.response.status === 500) {
+          router.push({
+            pathname: ROUTE_CONSTANTS.INTERNAL_SERVER_ERROR,
+          });
+        }
+      })
+      .finally(() => setLoader(false));
+  }
+
   return (
     <div className="header">
-      <nav className="navbar absolute bottom-0 grid h-[8%] min-h-[80px] w-full grid-flow-col items-center px-12 only-of-type:shadow-[0_1px_4px_0_#e2e8f0]">
+      <nav className="navbar absolute bottom-0  grid h-[8%] min-h-[80px] w-full grid-flow-col items-center bg-[white] px-12 only-of-type:shadow-[0_1px_4px_0_#e2e8f0]">
         <div className="col-span-4 justify-self-end">
           {!props.isEditEnabled ? (
             <button
@@ -53,7 +72,8 @@ export function FooterButtons(props) {
                     props?.id,
                     props?.type,
                     props?.referenceUid,
-                    false
+                    false,
+                    props?.setLoader
                   )
                 }
               >
@@ -63,16 +83,17 @@ export function FooterButtons(props) {
             </div>
             <div>
               <button
-                className={`on-focus leading-3.5 text-md mb-2 mr-2 flex items-center rounded-full border border-slate-300 bg-[#0F9F5A] px-5 py-2 text-left font-medium text-white last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full ${
+                className={`on-focus leading-3.5 text-md mb-2 mr-2 flex items-center rounded-full border border-slate-300  px-5 py-2 text-left font-medium text-white last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full ${
                   props.isEditEnabled && 'bg-slate-400'
-                }`}
+                } ${!props.isEditEnabled && 'bg-[#0F9F5A]'}`}
                 disabled={props.isEditEnabled}
                 onClick={() =>
                   handleAprroveOrReject(
                     props?.id,
                     props?.type,
                     props?.referenceUid,
-                    true
+                    true,
+                    props?.setLoader
                   )
                 }
               >

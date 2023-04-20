@@ -1,6 +1,7 @@
 import { UserGroupIcon, UserIcon } from '@heroicons/react/solid';
-import APP_CONSTANTS from '../../utils/constants';
+import APP_CONSTANTS, { ROUTE_CONSTANTS } from '../../utils/constants';
 import { useNavbarContext } from '../../context/navbar-context';
+import { useRouter } from 'next/router';
 
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
@@ -11,8 +12,13 @@ interface IMenuItem {
 }
 
 export function Menu() {
-  const { teamCount, memberCount, setIsTeamActive, isTeamActive } =
-    useNavbarContext();
+  const {
+    teamCount,
+    memberCount,
+    setIsTeamActive,
+    isTeamActive,
+    isOpenRequest,
+  } = useNavbarContext();
   // const [isTeamActive, setIsTeamActive] = useState<boolean>(true);
   const MENU_ITEMS: IMenuItem[] = [
     {
@@ -26,6 +32,8 @@ export function Menu() {
       count: memberCount,
     },
   ];
+
+  const router = useRouter();
 
   return (
     <ul className="flex space-x-4 text-sm text-gray-700">
@@ -45,6 +53,15 @@ export function Menu() {
               <a
                 onClick={() => {
                   // onItemClick(item.name);
+                  if (
+                    router.pathname === ROUTE_CONSTANTS.TEAM_VIEW ||
+                    router.pathname === ROUTE_CONSTANTS.MEMBER_VIEW
+                  ) {
+                    isOpenRequest
+                      ? router.push(ROUTE_CONSTANTS.PENDING_LIST)
+                      : router.push(ROUTE_CONSTANTS.CLOSED_LIST);
+                  }
+
                   item.name === APP_CONSTANTS.TEAMS_LABEL
                     ? setIsTeamActive(true)
                     : setIsTeamActive(false);
@@ -53,7 +70,7 @@ export function Menu() {
               >
                 <Icon
                   data-testid={`${item.name}-icon`}
-                  className={`mr-2 h-5 w-5 group-hover:fill-slate-900`}
+                  className={`mr-2 h-5 w-5 `}
                 />
                 {item.name}
                 <div

@@ -6,10 +6,12 @@ import { useNavbarContext } from '../context/navbar-context';
 import router from 'next/router';
 import { useState } from 'react';
 import { useEffect } from 'react';
+import Loader from '../components/common/loader';
 
 export default function RequestList({ list, type }) {
   const { isOpenRequest, isTeamActive } = useNavbarContext();
   const [dataList, setDataList] = useState([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   useEffect(() => {
     setDataList(list);
@@ -17,6 +19,7 @@ export default function RequestList({ list, type }) {
 
   const backupList = list;
   function redirectToDetail(request) {
+    setIsLoading(true);
     const route = isTeamActive
       ? ROUTE_CONSTANTS.TEAM_VIEW
       : ROUTE_CONSTANTS.MEMBER_VIEW;
@@ -45,6 +48,7 @@ export default function RequestList({ list, type }) {
 
   return (
     <>
+      {isLoading && <Loader />}
       <div className="webkit-available absolute flex w-full justify-center overflow-auto bg-[#F5F6F7]">
         <div className="relative pt-[32px]">
           {type !== APP_CONSTANTS.PENDING_LABEL && (
