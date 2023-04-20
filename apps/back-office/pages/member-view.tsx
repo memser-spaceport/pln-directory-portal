@@ -162,7 +162,7 @@ export default function MemberView(props) {
           uniqueIdentifier: values.email,
           newData: {
             ...values,
-            imageUid: image?.uid,
+            imageUid: image?.uid ?? values.imageUid,
             imageUrl: image?.url ?? imageUrl,
           },
         };

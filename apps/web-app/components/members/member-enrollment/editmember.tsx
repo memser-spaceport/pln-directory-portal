@@ -186,7 +186,7 @@ export function EditMemberModal({
             }),
           };
           console.log('formValues', formValues);
-          setImageUrl(member.image?.url);
+          setImageUrl(member.image?.url ?? '');
           setFormValues(formValues);
           setDropDownValues({ skillValues: data[1], teamNames: data[2] });
         })
@@ -309,7 +309,7 @@ export function EditMemberModal({
           uniqueIdentifier: values.email,
           newData: {
             ...values,
-            imageUid: image?.uid,
+            imageUid: image?.uid ?? values.imageUid,
             imageUrl: image?.url ?? imageUrl,
           },
           // captchaToken,
@@ -384,7 +384,7 @@ export function EditMemberModal({
         isOpen={isOpen}
         onClose={() => handleModalClose()}
         enableFooter={false}
-        image="/assets/images/join_as_a_member.jpg"
+        image={<TextImage />}
       >
         {saveCompleted ? (
           <div>

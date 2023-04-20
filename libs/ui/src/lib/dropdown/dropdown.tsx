@@ -82,7 +82,7 @@ export function Dropdown({
 
           <Listbox.Options
             as="div"
-            className="absolute z-20 mt-2 h-[14rem] w-full space-y-1 overflow-y-auto rounded-lg bg-white p-2 leading-6 shadow-md focus:outline-none"
+            className="absolute z-20 mt-2 h-auto max-h-[14rem] w-full space-y-1 overflow-y-auto rounded-lg bg-white p-2 leading-6 shadow-md focus:outline-none"
           >
             {options.map((option) => {
               const OptionIcon = option.icon;
