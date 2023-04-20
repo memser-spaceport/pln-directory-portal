@@ -1,4 +1,4 @@
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useEffect, useState } from 'react';
 import Image from 'next/image';
 import styles from './index.module.css';
 import { InputField } from '@protocol-labs-network/ui';
@@ -6,11 +6,13 @@ import { useRouter } from 'next/router';
 import { ReactComponent as Building } from '/public/assets/icons/building.svg';
 import APP_CONSTANTS, { ROUTE_CONSTANTS, TOKEN } from '../utils/constants';
 import { setToken } from '../utils/auth';
+import Loader from '../components/common/loader';
 
 export function Index() {
   const [userName, setUserName] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   function onChange(
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -19,22 +21,29 @@ export function Index() {
     name === 'name' ? setUserName(value) : setPassword(value);
   }
 
+  useEffect(() => {
+    setIsLoading(isLoading);
+  }, [isLoading]);
+
   const router = useRouter();
-  function onSubmit() {
-    console.log(process.env, userName, password);
+  async function onSubmit() {
+    setIsLoading(true);
     if (
       userName === process.env.NEXT_PUBLIC_USERNAME &&
       password === process.env.NEXT_PUBLIC_PASSWORD
     ) {
       setToken(TOKEN);
+      setIsLoading(false);
       router.push(ROUTE_CONSTANTS.PENDING_LIST);
     } else {
+      setIsLoading(false);
       setError('Incorrect Username and Password!');
     }
   }
 
   return (
     <div className="relative h-screen bg-gray-100">
+      {isLoading && <Loader />}
       <div className="absolute left-[50%] top-[50%] w-[75%] translate-x-[-50%] translate-y-[-50%] rounded-lg bg-white p-8 md:w-[30%]">
         <div className="inline-block">
           <div className="inline-block">

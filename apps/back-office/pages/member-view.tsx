@@ -11,10 +11,12 @@ import api from '../utils/api';
 import { ApprovalLayout } from '../layout/approval-layout';
 import { FooterButtons } from '../components/footer-buttons/footer-buttons';
 import APP_CONSTANTS, {
+  API_ROUTE,
   ENROLLMENT_TYPE,
   ROUTE_CONSTANTS,
 } from '../utils/constants';
 import router from 'next/router';
+import Loader from '../components/common/loader';
 
 function validateBasicForm(formValues, imageUrl) {
   const errors = [];
@@ -78,6 +80,7 @@ export default function MemberView(props) {
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [isEditEnabled, setIsEditEnabled] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   useEffect(() => {
     Promise.all([fetchSkills(), fetchTeams()])
@@ -119,12 +122,14 @@ export default function MemberView(props) {
 
   const handleSubmit = useCallback(
     async (e) => {
+      setIsLoading(true);
       e.preventDefault();
       setErrors([]);
       const errors = validateForm(formValues, imageUrl);
 
       if (errors?.length > 0) {
         setErrors(errors);
+        setIsLoading(false);
         return false;
       }
       const requestorEmail = formValues.requestorEmail;
@@ -141,15 +146,13 @@ export default function MemberView(props) {
             },
           };
           image = await api
-            .post(`/v1/images`, formData, config)
+            .post(API_ROUTE.IMAGES, formData, config)
             .then((response) => {
-              console.log('response.data', response.data);
               return response?.data?.image;
             });
         }
 
         delete values?.imageFile;
-        console.log('values', values);
         const data = {
           participantType: ENROLLMENT_TYPE.MEMBER,
           // referenceUid: props.id,
@@ -158,7 +161,7 @@ export default function MemberView(props) {
           newData: { ...values, imageUid: image?.uid },
         };
         await api
-          .put(`/v1/participants-request/${props.id}`, data)
+          .put(`${API_ROUTE.PARTICIPANTS_REQUEST}/${props.id}`, data)
           .then((response) => {
             setSaveCompleted(true);
             setIsEditEnabled(false);
@@ -167,6 +170,7 @@ export default function MemberView(props) {
         console.log('error', err);
       } finally {
         setIsProcessing(false);
+        setIsLoading(false);
       }
     },
     [formValues, imageUrl, imageChanged, props.id]
@@ -202,7 +206,6 @@ export default function MemberView(props) {
   ) {
     const { name, value } = event.target;
     setFormValues({ ...formValues, [name]: value });
-    console.log('value', formValues);
   }
 
   function handleDropDownChange(selectedOption, name) {
@@ -236,6 +239,7 @@ export default function MemberView(props) {
 
   return (
     <ApprovalLayout>
+      {isLoading && <Loader />}
       <div className="bg-gray-200 py-10">
         <div className="relative m-auto w-[40%]">
           <div
@@ -303,6 +307,7 @@ export default function MemberView(props) {
           type={ENROLLMENT_TYPE.MEMBER}
           saveChanges={handleSubmit}
           referenceUid={props.referenceUid}
+          setLoader={setIsLoading}
         />
       )}
     </ApprovalLayout>
@@ -326,9 +331,9 @@ export const getServerSideProps = async ({ query, res }) => {
 
   const [requestDetailResponse, memberTeamsResponse, skillsResponse] =
     await Promise.all([
-      api.get(`/v1/participants-request/${id}`),
-      api.get(`/v1/teams`),
-      api.get(`/v1/skills`),
+      api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`),
+      api.get(API_ROUTE.TEAMS),
+      api.get(API_ROUTE.SKILLS),
     ]);
 
   if (

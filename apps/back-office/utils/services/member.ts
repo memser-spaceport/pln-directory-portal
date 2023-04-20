@@ -1,8 +1,9 @@
 import api from '../api';
+import { API_ROUTE } from '../constants';
 
 export const fetchMember = async (id) => {
   try {
-    const response = await api.get(`/v1/members/${id}`);
+    const response = await api.get(`${API_ROUTE.MEMBERS}/${id}`);
     if (response.data) {
       return response.data;
     }
@@ -13,7 +14,7 @@ export const fetchMember = async (id) => {
 
 export const fetchPendingMemberRequest = async (id) => {
   try {
-    const response = await api.get(`/v1/participants-request/${id}`);
+    const response = await api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`);
     if (response.data) {
       return response.data;
     }

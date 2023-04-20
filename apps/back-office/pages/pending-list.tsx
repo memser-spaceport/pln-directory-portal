@@ -3,7 +3,7 @@ import { IRequest } from '../utils/request.types';
 import { GetServerSideProps } from 'next';
 import api from '../utils/api';
 import RequestList from '../components/request-list';
-import APP_CONSTANTS, { ENROLLMENT_TYPE } from '../utils/constants';
+import APP_CONSTANTS, { API_ROUTE, ENROLLMENT_TYPE } from '../utils/constants';
 import { useNavbarContext } from '../context/navbar-context';
 import { ApprovalLayout } from '../layout/approval-layout';
 
@@ -35,7 +35,9 @@ export default function PendingList(props) {
 }
 
 export const getServerSideProps: GetServerSideProps<IRequest> = async () => {
-  const listData = await api.get(`/v1/participants-request?status=PENDING`);
+  const listData = await api.get(
+    `${API_ROUTE.PARTICIPANTS_REQUEST}?status=PENDING`
+  );
 
   let memberResponse = [];
   let teamResponse = [];
