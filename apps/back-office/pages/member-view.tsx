@@ -158,7 +158,11 @@ export default function MemberView(props) {
           // referenceUid: props.id,
           requesterEmailId: requestorEmail,
           uniqueIdentifier: values.email,
-          newData: { ...values, imageUid: image?.uid },
+          newData: {
+            ...values,
+            imageUid: image?.uid,
+            imageUrl: image?.url ?? imageUrl,
+          },
         };
         await api
           .put(`${API_ROUTE.PARTICIPANTS_REQUEST}/${props.id}`, data)

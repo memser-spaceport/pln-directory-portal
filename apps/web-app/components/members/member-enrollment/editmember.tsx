@@ -306,7 +306,11 @@ export function EditMemberModal({
           referenceUid: id,
           requesterEmailId: values.requestorEmail,
           uniqueIdentifier: values.email,
-          newData: { ...values, imageUid: image?.uid, imageUrl: image?.url },
+          newData: {
+            ...values,
+            imageUid: image?.uid,
+            imageUrl: image?.url ?? imageUrl,
+          },
           // captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {

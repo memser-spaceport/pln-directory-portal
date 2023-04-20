@@ -14,14 +14,14 @@ export function FooterButtons(props) {
     isApproved,
     setLoader
   ) {
-    setLoader(true);
     const data = {
       status: isApproved
         ? APP_CONSTANTS.APPROVED_FLAG
         : APP_CONSTANTS.REJECTED_FLAG,
       participantType: type,
-      ...(referenceUid ?? { referenceUid: referenceUid }),
+      ...(referenceUid && { referenceUid: referenceUid }),
     };
+    setLoader(true);
     await api
       .patch(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, data)
       .then((res) => {

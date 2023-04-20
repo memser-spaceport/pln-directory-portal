@@ -298,7 +298,11 @@ export function EditTeamModal({
           referenceUid: id,
           requesterEmailId: requestorEmail,
           uniqueIdentifier: values.name,
-          newData: { ...values, logoUid: image?.uid, logoUrl: image?.url },
+          newData: {
+            ...values,
+            logoUid: image?.uid,
+            logoUrl: image?.url ?? imageUrl,
+          },
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);
