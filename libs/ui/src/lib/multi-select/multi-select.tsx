@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronDownIcon, XIcon as CloseIcon } from '@heroicons/react/solid';
+import { XIcon as CloseIcon } from '@heroicons/react/solid';
+import { ReactComponent as ArrowDown } from '../../assets/icons/arrow-down-filled.svg';
 
 interface Option {
   label: string;
@@ -121,10 +122,10 @@ export function MultiSelect({
           {selectedValues?.length > 0 ? (
             selectedValues.map((item) => (
               <div
-                className="m-1 flex items-center rounded-full bg-gray-100 px-2 py-1 font-semibold text-gray-600"
+                className="m-1 flex items-center rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-600"
                 key={item.value}
               >
-                <span className="mr-1">{item.label}</span>
+                <span className="mr-1 text-sm">{item.label}</span>
                 {!disabled && (
                   <button
                     type="button"
@@ -142,9 +143,9 @@ export function MultiSelect({
             </span>
           )}
         </div>
-        <ChevronDownIcon
-          className={`h-5 w-5 text-gray-400 ${isExpanded ? '-rotate-180' : ''}`}
-        />
+        <div className="relative right-4">
+          <ArrowDown width={8} height={8} className={`text-gray-400`} />
+        </div>
       </div>
       {isExpanded && (
         <div className="relative">
@@ -166,9 +167,7 @@ export function MultiSelect({
                     onClick={() => handleOptionClick(item)}
                     className="mr-2 h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-400"
                   />
-                  <span className="font-xs leading-3 text-gray-900">
-                    {item.label}
-                  </span>
+                  <span className="text-sm text-gray-900">{item.label}</span>
                 </label>
               ))
             ) : (

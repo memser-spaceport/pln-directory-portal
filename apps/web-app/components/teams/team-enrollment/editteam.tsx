@@ -21,7 +21,7 @@ import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-team.svg';
-// import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditTeamModalProps {
   isOpen: boolean;
@@ -153,6 +153,8 @@ export function EditTeamModal({
     officeHours: '',
   });
 
+  const { executeRecaptcha } = useGoogleReCaptcha();
+
   useEffect(() => {
     if (isOpen) {
       Promise.all([
@@ -254,6 +256,14 @@ export function EditTeamModal({
 
     const formattedValue = {
       ...formValues,
+      name: formValues.name?.trim(),
+      shortDescription: formValues.shortDescription?.trim(),
+      longDescription: formValues.longDescription?.trim(),
+      website: formValues.website?.trim(),
+      twitterHandler: formValues.twitterHandler?.trim(),
+      linkedinHandler: formValues.linkedinHandler?.trim(),
+      blog: formValues.blog?.trim(),
+      officeHours: formValues.officeHours?.trim(),
       fundingStage: formattedFundingStage,
       fundingStageUid: formattedFundingStage.uid,
       industryTags: formattedTags,
@@ -267,15 +277,22 @@ export function EditTeamModal({
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
+      if (!executeRecaptcha) {
+        console.log('Execute recaptcha not yet available');
+        return;
+      }
       setErrors([]);
       const errors = validateForm(formValues, imageUrl);
       if (errors?.length > 0) {
         setErrors(errors);
         return false;
       }
-      const requestorEmail = formValues.requestorEmail;
+      const requestorEmail = formValues.requestorEmail?.trim();
       const values = formatData();
       try {
+        const captchaToken = await executeRecaptcha();
+
+        if (!captchaToken) return;
         let image;
         setIsProcessing(true);
         if (imageChanged) {
@@ -304,6 +321,7 @@ export function EditTeamModal({
             logoUid: image?.uid ?? values.logoUid,
             logoUrl: image?.url ?? imageUrl,
           },
+          captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);
@@ -314,7 +332,7 @@ export function EditTeamModal({
         setIsProcessing(false);
       }
     },
-    [formValues, imageUrl, imageChanged]
+    [executeRecaptcha, formValues, imageUrl, imageChanged, id]
   );
 
   function handleInputChange(

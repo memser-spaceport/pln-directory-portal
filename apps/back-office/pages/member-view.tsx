@@ -1,4 +1,4 @@
-import { useState, ChangeEvent, useCallback } from 'react';
+import { useState, ChangeEvent, useCallback, useEffect } from 'react';
 import MemberBasicForm from '../components/members/memberbasicform';
 import MemberSkillForm from '../components/members/memberskillform';
 import MemberSocialForm from '../components/members/membersocialform';
@@ -73,7 +73,10 @@ function validateForm(formValues, imageUrl) {
 export default function MemberView(props) {
   console.log('props', props);
   const [errors, setErrors] = useState([]);
-  const [dropDownValues, setDropDownValues] = useState({});
+  const [dropDownValues, setDropDownValues] = useState({
+    skillValues: props?.skills,
+    teamNames: props?.teams,
+  });
   const [imageUrl, setImageUrl] = useState<string>(props?.imageUrl);
   const [imageChanged, setImageChanged] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -84,13 +87,9 @@ export default function MemberView(props) {
   const { setIsOpenRequest } = useNavbarContext();
   setIsOpenRequest(props.status === APP_CONSTANTS.PENDING_LABEL ? true : false);
 
-  // useEffect(() => {
-  //   Promise.all([fetchSkills(), fetchTeams()])
-  //     .then((data) => {
-  //       setDropDownValues({ skillValues: data[0], teamNames: data[1] });
-  //     })
-  //     .catch((e) => console.error(e));
-  // }, [props]);
+  useEffect(() => {
+    setDropDownValues({ skillValues: props?.skills, teamNames: props?.teams });
+  }, [props]);
 
   function formatData() {
     const formattedTeamAndRoles = formValues.teamAndRoles.map((item) => {
@@ -382,8 +381,12 @@ export const getServerSideProps = async ({ query, res }) => {
       }),
     };
     imageUrl = requestData?.imageUrl ?? '';
-    teams = memberTeamsResponse?.data;
-    skills = skillsResponse?.data;
+    teams = memberTeamsResponse?.data?.map((item) => {
+      return { value: item.uid, label: item.name };
+    });
+    skills = skillsResponse?.data?.map((item) => {
+      return { value: item.uid, label: item.title };
+    });
   }
 
   // Redirects user to the 404 page if response from
