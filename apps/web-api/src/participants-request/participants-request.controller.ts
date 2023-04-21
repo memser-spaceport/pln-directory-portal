@@ -20,6 +20,7 @@ import {
   ParticipantRequestTeamSchema,
   ParticipantRequestMemberSchema,
 } from '../../../../libs/contracts/src/schema/participants-request';
+import { NoCache } from '../decorators/no-cache.decorator';
 @Controller('v1/participants-request')
 export class ParticipantsRequestController {
   constructor(
@@ -27,6 +28,7 @@ export class ParticipantsRequestController {
   ) {}
 
   @Get()
+  @NoCache()
   async findAll(@Query() query) {
     console.log(query);
     const result = await this.participantsRequestService.getAll(query);
@@ -34,16 +36,18 @@ export class ParticipantsRequestController {
   }
 
   @Get(':uid')
+  @NoCache()
   async findOne(@Param() params) {
     const result = await this.participantsRequestService.getByUid(params.uid);
     return result;
   }
 
   @Post()
-  //@UseGuards(GoogleRecaptchaGuard)
+  @UseGuards(GoogleRecaptchaGuard)
   async addRequest(@Body() body) {
     const postData = body;
     const participantType = body.participantType;
+    delete postData.captchaToken;
 
     if (
       participantType === ParticipantType.MEMBER.toString() &&

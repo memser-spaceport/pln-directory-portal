@@ -20,7 +20,7 @@ import { InputField } from '@protocol-labs-network/ui';
 import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-member.svg';
-// import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditMemberModalProps {
   isOpen: boolean;
@@ -140,7 +140,7 @@ export function EditMemberModal({
     skills: [],
   });
 
-  // const { executeRecaptcha } = useGoogleReCaptcha();
+  const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
     if (isOpen) {
@@ -247,16 +247,15 @@ export function EditMemberModal({
       ...formValues,
       name: formValues.name.trim(),
       email: formValues.email.trim(),
-      requestorEmail: formValues.requestorEmail.trim(),
-      city: formValues.city.trim(),
-      region: formValues.region.trim(),
-      country: formValues.country.trim(),
-      linkedinHandler: formValues.linkedinHandler.trim(),
-      discordHandler: formValues.discordHandler.trim(),
-      twitterHandler: formValues.twitterHandler.trim(),
-      githubHandler: formValues.githubHandler.trim(),
-      officeHours: formValues.officeHours.trim(),
-      comments: formValues.comments.trim(),
+      city: formValues.city?.trim(),
+      region: formValues.region?.trim(),
+      country: formValues.country?.trim(),
+      linkedinHandler: formValues.linkedinHandler?.trim(),
+      discordHandler: formValues.discordHandler?.trim(),
+      twitterHandler: formValues.twitterHandler?.trim(),
+      githubHandler: formValues.githubHandler?.trim(),
+      officeHours: formValues.officeHours?.trim(),
+      comments: formValues.comments?.trim(),
       plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
@@ -269,19 +268,19 @@ export function EditMemberModal({
       e.preventDefault();
       setErrors([]);
       const errors = validateForm(formValues, imageUrl);
-      // if (!executeRecaptcha) {
-      //   console.log('Execute recaptcha not yet available');
-      //   return;
-      // }
+      if (!executeRecaptcha) {
+        console.log('Execute recaptcha not yet available');
+        return;
+      }
       if (errors?.length > 0) {
         setErrors(errors);
         return false;
       }
       const values = formatData();
       try {
-        // const captchaToken = await executeRecaptcha();
+        const captchaToken = await executeRecaptcha();
 
-        // if (!captchaToken) return;
+        if (!captchaToken) return;
         let image;
         setIsProcessing(true);
         if (imageChanged) {
@@ -301,18 +300,19 @@ export function EditMemberModal({
         }
 
         delete values?.imageFile;
+        delete values?.requestorEmail;
 
         const data = {
           participantType: ENROLLMENT_TYPE.MEMBER,
           referenceUid: id,
-          requesterEmailId: values.requestorEmail,
+          requesterEmailId: formValues.requestorEmail?.trim(),
           uniqueIdentifier: values.email,
           newData: {
             ...values,
             imageUid: image?.uid ?? values.imageUid,
             imageUrl: image?.url ?? imageUrl,
           },
-          // captchaToken,
+          captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);
@@ -323,8 +323,8 @@ export function EditMemberModal({
         setIsProcessing(false);
       }
     },
-    // [executeRecaptcha, formValues, imageUrl, imageChanged]
-    [formValues, imageUrl, imageChanged]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [executeRecaptcha, formValues, imageUrl, imageChanged]
   );
 
   function handleAddNewRole() {

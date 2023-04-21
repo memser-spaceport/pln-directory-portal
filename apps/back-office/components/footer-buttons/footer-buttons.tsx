@@ -40,7 +40,7 @@ export function FooterButtons(props) {
   }
 
   return (
-    <div className="header">
+    <div className="header z-[1057]">
       <nav className="navbar absolute bottom-0  grid h-[8%] min-h-[80px] w-full grid-flow-col items-center bg-[white] px-12 only-of-type:shadow-[0_1px_4px_0_#e2e8f0]">
         <div className="col-span-4 justify-self-end">
           {!props.isEditEnabled ? (
