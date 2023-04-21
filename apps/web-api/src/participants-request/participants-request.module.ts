@@ -7,6 +7,7 @@ import { ParticipantsRequestController } from './participants-request.controller
 import { ParticipantsRequestService } from './participants-request.service';
 import { UniqueIdentifier } from './unique-identifier/unique-identifier.controller';
 import { RedisService } from '../utils/redis/redis.service';
+import { SlackService } from '../utils/slack/slack.service';
 @Module({
   imports: [CacheModule.register()],
   controllers: [ParticipantsRequestController, UniqueIdentifier],
@@ -16,6 +17,7 @@ import { RedisService } from '../utils/redis/redis.service';
     LocationTransferService,
     AwsService,
     RedisService,
+    SlackService,
   ],
 })
 export class ParticipantsRequestModule {}
