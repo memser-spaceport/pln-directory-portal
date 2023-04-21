@@ -43,11 +43,11 @@ export class ParticipantsRequestController {
   }
 
   @Post()
-  @UseGuards(GoogleRecaptchaGuard)
+  // @UseGuards(GoogleRecaptchaGuard)
   async addRequest(@Body() body) {
     const postData = body;
     const participantType = body.participantType;
-    delete postData.captchaToken;
+    // delete postData.captchaToken;
 
     if (
       participantType === ParticipantType.MEMBER.toString() &&

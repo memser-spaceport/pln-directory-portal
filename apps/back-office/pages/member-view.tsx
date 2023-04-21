@@ -84,7 +84,9 @@ export default function MemberView(props) {
   const [isEditEnabled, setIsEditEnabled] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const { setIsOpenRequest } = useNavbarContext();
+  const { setIsOpenRequest, setMemberList, setTeamList } = useNavbarContext();
+  setMemberList(props.memberList);
+  setTeamList(props.teamList);
   setIsOpenRequest(props.status === APP_CONSTANTS.PENDING_LABEL ? true : false);
 
   useEffect(() => {
@@ -101,18 +103,17 @@ export default function MemberView(props) {
     });
     const formattedData = {
       ...formValues,
-      name: formValues.name.trim(),
-      email: formValues.email.trim(),
-      requestorEmail: formValues.requestorEmail.trim(),
-      city: formValues.city.trim(),
-      region: formValues.region.trim(),
-      country: formValues.country.trim(),
-      linkedinHandler: formValues.linkedinHandler.trim(),
-      discordHandler: formValues.discordHandler.trim(),
-      twitterHandler: formValues.twitterHandler.trim(),
-      githubHandler: formValues.githubHandler.trim(),
-      officeHours: formValues.officeHours.trim(),
-      comments: formValues.comments.trim(),
+      name: formValues.name?.trim(),
+      email: formValues.email?.trim(),
+      city: formValues.city?.trim(),
+      region: formValues.region?.trim(),
+      country: formValues.country?.trim(),
+      linkedinHandler: formValues.linkedinHandler?.trim(),
+      discordHandler: formValues.discordHandler?.trim(),
+      twitterHandler: formValues.twitterHandler?.trim(),
+      githubHandler: formValues.githubHandler?.trim(),
+      officeHours: formValues.officeHours?.trim(),
+      comments: formValues.comments?.trim(),
       plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
@@ -133,7 +134,7 @@ export default function MemberView(props) {
         setIsLoading(false);
         return false;
       }
-      const requestorEmail = formValues.requestorEmail;
+      const requestorEmail = formValues.requestorEmail?.trim();
       const values = formatData();
       try {
         let image;
@@ -154,6 +155,7 @@ export default function MemberView(props) {
         }
 
         delete values?.imageFile;
+        delete values?.requestorEmail;
         const data = {
           participantType: ENROLLMENT_TYPE.MEMBER,
           // referenceUid: props.id,
@@ -326,21 +328,36 @@ export const getServerSideProps = async ({ query, res }) => {
   };
   let formValues: IFormValues;
   let teams, skills, referenceUid, imageUrl, status;
+  let memberList = [];
+  let teamList = [];
 
   // Check if provided ID is an Airtable ID, and if so, get the corresponding backend UID
 
-  const [requestDetailResponse, memberTeamsResponse, skillsResponse] =
-    await Promise.all([
-      api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`),
-      api.get(API_ROUTE.TEAMS),
-      api.get(API_ROUTE.SKILLS),
-    ]);
+  const [
+    requestDetailResponse,
+    allRequestResponse,
+    memberTeamsResponse,
+    skillsResponse,
+  ] = await Promise.all([
+    api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`),
+    api.get(API_ROUTE.PARTICIPANTS_REQUEST),
+    api.get(API_ROUTE.TEAMS),
+    api.get(API_ROUTE.SKILLS),
+  ]);
 
   if (
     requestDetailResponse.status === 200 &&
+    allRequestResponse.status === 200 &&
     memberTeamsResponse.status === 200 &&
     skillsResponse.status === 200
   ) {
+    teamList = allRequestResponse?.data?.filter(
+      (item) => item.participantType === ENROLLMENT_TYPE.TEAM
+    );
+    memberList = allRequestResponse?.data?.filter(
+      (item) => item.participantType === ENROLLMENT_TYPE.MEMBER
+    );
+
     let counter = 1;
     referenceUid = requestDetailResponse?.data?.referenceUid ?? null;
     const requestData = requestDetailResponse?.data?.newData;
@@ -381,6 +398,23 @@ export const getServerSideProps = async ({ query, res }) => {
       }),
     };
     imageUrl = requestData?.imageUrl ?? '';
+
+    if (status == APP_CONSTANTS.PENDING_LABEL) {
+      teamList = allRequestResponse?.data
+        ?.filter((item) => item.participantType === ENROLLMENT_TYPE.TEAM)
+        ?.filter((item) => item.status === APP_CONSTANTS.PENDING_LABEL);
+      memberList = allRequestResponse?.data
+        ?.filter((item) => item.participantType === ENROLLMENT_TYPE.MEMBER)
+        .filter((item) => item.status === APP_CONSTANTS.PENDING_LABEL);
+    } else {
+      teamList = allRequestResponse?.data
+        ?.filter((item) => item.participantType === ENROLLMENT_TYPE.TEAM)
+        ?.filter((item) => item.status !== APP_CONSTANTS.PENDING_LABEL);
+      memberList = allRequestResponse?.data
+        ?.filter((item) => item.participantType === ENROLLMENT_TYPE.MEMBER)
+        .filter((item) => item.status !== APP_CONSTANTS.PENDING_LABEL);
+    }
+
     teams = memberTeamsResponse?.data?.map((item) => {
       return { value: item.uid, label: item.name };
     });
@@ -414,6 +448,8 @@ export const getServerSideProps = async ({ query, res }) => {
       imageUrl,
       status,
       backLink,
+      teamList,
+      memberList,
     },
   };
 };

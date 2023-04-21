@@ -60,7 +60,6 @@ export function AskToEditCard({
         : setIsTeamModalOpen(true);
     } else {
       const res = await requestPendingCheck(member.email);
-      console.log('res?.data && res.data?.isRequestPending', res);
       res?.isRequestPending
         ? setIsPendingRequestModalOpen(true)
         : setIsMemberModalOpen(true);

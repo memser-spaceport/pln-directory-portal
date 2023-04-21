@@ -20,7 +20,7 @@ import { InputField } from '@protocol-labs-network/ui';
 import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-member.svg';
-import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+// import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditMemberModalProps {
   isOpen: boolean;
@@ -140,7 +140,7 @@ export function EditMemberModal({
     skills: [],
   });
 
-  const { executeRecaptcha } = useGoogleReCaptcha();
+  // const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
     if (isOpen) {
@@ -185,7 +185,6 @@ export function EditMemberModal({
               return { value: item.uid, label: item.title };
             }),
           };
-          console.log('formValues', formValues);
           setImageUrl(member.image?.url ?? '');
           setFormValues(formValues);
           setDropDownValues({ skillValues: data[1], teamNames: data[2] });
@@ -268,19 +267,19 @@ export function EditMemberModal({
       e.preventDefault();
       setErrors([]);
       const errors = validateForm(formValues, imageUrl);
-      if (!executeRecaptcha) {
-        console.log('Execute recaptcha not yet available');
-        return;
-      }
+      // if (!executeRecaptcha) {
+      //   console.log('Execute recaptcha not yet available');
+      //   return;
+      // }
       if (errors?.length > 0) {
         setErrors(errors);
         return false;
       }
       const values = formatData();
       try {
-        const captchaToken = await executeRecaptcha();
+        // const captchaToken = await executeRecaptcha();
 
-        if (!captchaToken) return;
+        // if (!captchaToken) return;
         let image;
         setIsProcessing(true);
         if (imageChanged) {
@@ -294,7 +293,6 @@ export function EditMemberModal({
           image = await api
             .post(`/v1/images`, formData, config)
             .then((response) => {
-              console.log('response.data', response.data);
               return response?.data?.image;
             });
         }
@@ -312,7 +310,7 @@ export function EditMemberModal({
             imageUid: image?.uid ?? values.imageUid,
             imageUrl: image?.url ?? imageUrl,
           },
-          captchaToken,
+          // captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);
@@ -323,8 +321,8 @@ export function EditMemberModal({
         setIsProcessing(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [executeRecaptcha, formValues, imageUrl, imageChanged]
+    // [executeRecaptcha, formValues, imageUrl, imageChanged]
+    [formValues, imageUrl, imageChanged]
   );
 
   function handleAddNewRole() {

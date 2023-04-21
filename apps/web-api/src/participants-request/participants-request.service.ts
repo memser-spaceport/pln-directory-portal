@@ -180,6 +180,12 @@ export class ParticipantsRequestService {
   }
 
   async processRejectRequest(uidToReject) {
+    const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
+      where: { uid: uidToReject },
+    });
+    if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
+      return { code: -1, message: 'Request already Processed' };
+    }
     await this.prisma.participantsRequest.update({
       where: { uid: uidToReject },
       data: { status: ApprovalStatus.REJECTED },
@@ -193,6 +199,11 @@ export class ParticipantsRequestService {
     const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
       where: { uid: uidToApprove },
     });
+
+    if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
+      return { code: -1, message: 'Request already Processed' };
+    }
+
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
     const slackConfig = {
@@ -293,6 +304,9 @@ export class ParticipantsRequestService {
     const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
       where: { uid: uidToEdit },
     });
+    if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
+      return { code: -1, message: 'Request already Processed' };
+    }
     const existingData: any = await this.prisma.member.findUnique({
       where: { uid: dataFromDB.referenceUid },
       include: {
@@ -461,6 +475,9 @@ export class ParticipantsRequestService {
     const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
       where: { uid: uidToApprove },
     });
+    if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
+      return { code: -1, message: 'Request already Processed' };
+    }
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
     const slackConfig = {
@@ -549,6 +566,9 @@ export class ParticipantsRequestService {
     const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
       where: { uid: uidToEdit },
     });
+    if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
+      return { code: -1, message: 'Request already Processed' };
+    }
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
 
