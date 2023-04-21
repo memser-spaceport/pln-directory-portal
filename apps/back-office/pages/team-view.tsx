@@ -103,7 +103,9 @@ export default function TeamView(props) {
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [isEditEnabled, setIsEditEnabled] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
-  const { setIsOpenRequest } = useNavbarContext();
+  const { setIsOpenRequest, setMemberList, setTeamList } = useNavbarContext();
+  setMemberList(props.memberList);
+  setTeamList(props.teamList);
   setIsOpenRequest(props.status === APP_CONSTANTS.PENDING_LABEL ? true : false);
 
   function formatData() {
@@ -126,6 +128,14 @@ export default function TeamView(props) {
 
     const formattedValue = {
       ...formValues,
+      name: formValues.name?.trim(),
+      shortDescription: formValues.shortDescription?.trim(),
+      longDescription: formValues.longDescription?.trim(),
+      website: formValues.website?.trim(),
+      twitterHandler: formValues.twitterHandler?.trim(),
+      linkedinHandler: formValues.linkedinHandler?.trim(),
+      blog: formValues.blog?.trim(),
+      officeHours: formValues.officeHours?.trim(),
       fundingStage: formattedFundingStage,
       fundingStageUid: formattedFundingStage.uid,
       industryTags: formattedTags,
@@ -293,16 +303,20 @@ export const getServerSideProps = async ({ query, res }) => {
   let fundingStages = [];
   let industryTags = [];
   let technologies = [];
+  let memberList = [];
+  let teamList = [];
   let referenceUid, imageUrl, status;
 
   const [
     requestDetailResponse,
+    allRequestResponse,
     membershipSourcesResponse,
     fundingStagesResponse,
     industryTagsResponse,
     technologiesResponse,
   ] = await Promise.all([
     api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`),
+    api.get(API_ROUTE.PARTICIPANTS_REQUEST),
     api.get(API_ROUTE.MEMBERSHIP),
     api.get(API_ROUTE.FUNDING_STAGE),
     api.get(API_ROUTE.INDUSTRIES),
@@ -311,6 +325,7 @@ export const getServerSideProps = async ({ query, res }) => {
 
   if (
     requestDetailResponse.status === 200 &&
+    allRequestResponse.status === 200 &&
     membershipSourcesResponse.status === 200 &&
     fundingStagesResponse.status === 200 &&
     industryTagsResponse.status === 200 &&
@@ -348,6 +363,23 @@ export const getServerSideProps = async ({ query, res }) => {
       officeHours: team.officeHours ?? '',
     };
     imageUrl = team?.logoUrl ?? '';
+
+    if (status == APP_CONSTANTS.PENDING_LABEL) {
+      teamList = allRequestResponse?.data
+        ?.filter((item) => item.participantType === ENROLLMENT_TYPE.TEAM)
+        ?.filter((item) => item.status === APP_CONSTANTS.PENDING_LABEL);
+      memberList = allRequestResponse?.data
+        ?.filter((item) => item.participantType === ENROLLMENT_TYPE.MEMBER)
+        .filter((item) => item.status === APP_CONSTANTS.PENDING_LABEL);
+    } else {
+      teamList = allRequestResponse?.data
+        ?.filter((item) => item.participantType === ENROLLMENT_TYPE.TEAM)
+        ?.filter((item) => item.status !== APP_CONSTANTS.PENDING_LABEL);
+      memberList = allRequestResponse?.data
+        ?.filter((item) => item.participantType === ENROLLMENT_TYPE.MEMBER)
+        .filter((item) => item.status !== APP_CONSTANTS.PENDING_LABEL);
+    }
+
     membershipSources = membershipSourcesResponse?.data.map((item) => {
       return { value: item.uid, label: item.title };
     });
@@ -389,6 +421,8 @@ export const getServerSideProps = async ({ query, res }) => {
       imageUrl,
       status,
       backLink,
+      teamList,
+      memberList,
     },
   };
 };

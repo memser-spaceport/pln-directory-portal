@@ -21,7 +21,7 @@ import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/create-team.svg';
-import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+// import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddTeamModalProps {
   isOpen: boolean;
@@ -203,7 +203,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     officeHours: '',
   });
 
-  const { executeRecaptcha } = useGoogleReCaptcha();
+  // const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
     if (isOpen) {
@@ -323,10 +323,10 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     async (e) => {
       e.preventDefault();
 
-      if (!executeRecaptcha) {
-        console.log('Execute recaptcha not yet available');
-        return;
-      }
+      // if (!executeRecaptcha) {
+      //   console.log('Execute recaptcha not yet available');
+      //   return;
+      // }
       setErrors([]);
       const errors = validateSocialForm(formValues);
       if (errors?.length > 0) {
@@ -336,9 +336,9 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       const requestorEmail = formValues.requestorEmail?.trim();
       const value = formatData();
       try {
-        const captchaToken = await executeRecaptcha();
+        // const captchaToken = await executeRecaptcha();
 
-        if (!captchaToken) return;
+        // if (!captchaToken) return;
         let image;
         setIsProcessing(true);
         if (value.logoFile) {
@@ -362,7 +362,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
           requesterEmailId: requestorEmail,
           uniqueIdentifier: value.name,
           newData: { ...value, logoUid: image?.uid, logoUrl: image?.url },
-          captchaToken,
+          // captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);
@@ -373,8 +373,8 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
         setIsProcessing(false);
       }
     },
-    [executeRecaptcha, formValues]
-    // [formValues]
+    // [executeRecaptcha, formValues]
+    [formValues]
   );
 
   function handleInputChange(
