@@ -7,13 +7,15 @@ import { LocationTransferService } from '../utils/location-transfer/location-tra
 import cacheManager from 'cache-manager';
 import redisStore from 'cache-manager-redis-store';
 import { RedisService } from '../utils/redis/redis.service';
+import { SlackService } from '../utils/slack/slack.service';
 @Injectable()
 export class ParticipantsRequestService {
   constructor(
     private prisma: PrismaService,
     private locationTransferService: LocationTransferService,
     private awsService: AwsService,
-    private redisService: RedisService
+    private redisService: RedisService,
+    private slackService: SlackService
   ) {}
 
   async getAll(userQuery) {
@@ -99,6 +101,11 @@ export class ParticipantsRequestService {
     const postData = { ...requestData, uniqueIdentifier };
     requestData[uniqueIdentifier] = uniqueIdentifier;
 
+    const slackConfig = {
+      requestLabel: '',
+      url: '',
+      name: requestData.newData.name,
+    };
     const result: any = await this.prisma.participantsRequest.create({
       data: { ...postData },
     });
@@ -106,6 +113,8 @@ export class ParticipantsRequestService {
       result.participantType === ParticipantType.MEMBER.toString() &&
       result.referenceUid === null
     ) {
+      slackConfig.requestLabel = 'New Labber Request';
+      slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`;
       await this.awsService.sendEmail('NewMemberRequest', true, [], {
         memberName: result.newData.name,
         requestUid: result.uid,
@@ -115,6 +124,8 @@ export class ParticipantsRequestService {
       result.participantType === ParticipantType.MEMBER.toString() &&
       result.referenceUid !== null
     ) {
+      slackConfig.requestLabel = 'Edit Labber Request';
+      slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`;
       await this.awsService.sendEmail('EditMemberRequest', true, [], {
         memberName: result.newData.name,
         requestUid: result.uid,
@@ -125,6 +136,8 @@ export class ParticipantsRequestService {
       result.participantType === ParticipantType.TEAM.toString() &&
       result.referenceUid === null
     ) {
+      slackConfig.requestLabel = 'New Team Request';
+      slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`;
       await this.awsService.sendEmail('NewTeamRequest', true, [], {
         teamName: result.newData.name,
         requestUid: result.uid,
@@ -134,6 +147,8 @@ export class ParticipantsRequestService {
       result.participantType === ParticipantType.TEAM.toString() &&
       result.referenceUid !== null
     ) {
+      slackConfig.requestLabel = 'Edit Team Request';
+      slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`;
       await this.awsService.sendEmail('EditTeamRequest', true, [], {
         teamName: result.newData.name,
         teamUid: result.referenceUid,
@@ -141,6 +156,8 @@ export class ParticipantsRequestService {
         adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,
       });
     }
+
+    await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     return result;
   }
@@ -178,7 +195,11 @@ export class ParticipantsRequestService {
     });
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
-
+    const slackConfig = {
+      requestLabel: '',
+      url: '',
+      name: dataToProcess.name,
+    };
     // Mandatory fields
     dataToSave['name'] = dataToProcess.name;
     dataToSave['email'] = dataToProcess.email;
@@ -260,6 +281,9 @@ export class ParticipantsRequestService {
         memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}`,
       }
     );
+    slackConfig.requestLabel = 'New Labber Added';
+    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}`;
+    await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     return { code: 1, message: 'Success' };
   }
@@ -280,6 +304,11 @@ export class ParticipantsRequestService {
     });
     const dataToProcess = dataFromDB?.newData;
     const dataToSave: any = {};
+    const slackConfig = {
+      requestLabel: '',
+      url: '',
+      name: dataToProcess.name,
+    };
 
     // Mandatory fields
     dataToSave['name'] = dataToProcess.name;
@@ -421,6 +450,9 @@ export class ParticipantsRequestService {
         memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}`,
       }
     );
+    slackConfig.requestLabel = 'Edit Labber Request Completed';
+    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}`;
+    await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     return { code: 1, message: 'Success' };
   }
@@ -431,6 +463,11 @@ export class ParticipantsRequestService {
     });
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
+    const slackConfig = {
+      requestLabel: '',
+      url: '',
+      name: dataToProcess.name,
+    };
 
     // Mandatory fields
     dataToSave['name'] = dataToProcess.name;
@@ -501,6 +538,9 @@ export class ParticipantsRequestService {
         teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}`,
       }
     );
+    slackConfig.requestLabel = 'New Team Added';
+    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}`;
+    await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     return { code: 1, message: 'Success' };
   }
@@ -511,6 +551,12 @@ export class ParticipantsRequestService {
     });
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
+
+    const slackConfig = {
+      requestLabel: '',
+      url: '',
+      name: dataToProcess.name,
+    };
     const existingData: any = await this.prisma.team.findUnique({
       where: { uid: dataFromDB.referenceUid },
       include: {
@@ -596,6 +642,9 @@ export class ParticipantsRequestService {
         teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`,
       }
     );
+    slackConfig.requestLabel = 'Edit Team Request Completed ';
+    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`;
+    await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     return { code: 1, message: 'Success' };
   }
