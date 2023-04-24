@@ -3,6 +3,7 @@ import Head from 'next/head';
 import './styles.css';
 import { NavbarContextProvider } from '../context/navbar-context';
 import withAuth from '../hoc/withauth';
+import  Toaster from '../components/common/toaster'
 
 // export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
 //   getLayout?: (page: ReactElement) => ReactNode
@@ -24,6 +25,7 @@ function CustomApp({ Component, pageProps }: AppProps) {
         <NavbarContextProvider>
           <Component {...pageProps} />
         </NavbarContextProvider>
+        <Toaster />
       </main>
     </>
   );

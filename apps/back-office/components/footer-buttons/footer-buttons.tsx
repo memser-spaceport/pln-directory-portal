@@ -5,6 +5,7 @@ import APP_CONSTANTS, {
   API_ROUTE,
   ROUTE_CONSTANTS,
 } from '../../utils/constants';
+import { toast } from 'react-toastify';
 
 export function FooterButtons(props) {
   async function handleAprroveOrReject(
@@ -25,6 +26,13 @@ export function FooterButtons(props) {
     await api
       .patch(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, data)
       .then((res) => {
+        if(res?.data?.code == 1){
+          const message = `${isApproved ? APP_CONSTANTS.APPROVED_LABEL : APP_CONSTANTS.REJECTED_LABEL} successfully`;
+          toast(message);
+        }
+        else{
+          toast(res?.data?.message);
+        }        
         router.push({
           pathname: ROUTE_CONSTANTS.PENDING_LIST,
         });

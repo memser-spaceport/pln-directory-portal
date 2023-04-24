@@ -380,11 +380,11 @@ export const getServerSideProps = async ({ query, res }) => {
       plnStartDate: new Date(requestData.plnStartDate).toLocaleDateString(
         'af-ZA'
       ),
-      city: requestData?.city,
-      region: requestData?.region,
-      country: requestData?.country,
-      linkedinHandler: requestData.linkedinHandler,
-      discordHandler: requestData.discordHandler,
+      city: requestData?.city ?? '',
+      region: requestData?.region ?? '' ,
+      country: requestData?.country ?? '',
+      linkedinHandler: requestData.linkedinHandler ?? '',
+      discordHandler: requestData.discordHandler ?? '',
       twitterHandler: requestData.twitterHandler ?? '',
       githubHandler: requestData.githubHandler ?? '',
       officeHours: requestData.officeHours ?? '',
