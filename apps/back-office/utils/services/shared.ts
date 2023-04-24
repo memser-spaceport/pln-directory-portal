@@ -86,7 +86,6 @@ export const getPendingClosedCount = async () => {
           item.participantType === ENROLLMENT_TYPE.TEAM &&
           item.status !== APP_CONSTANTS.PENDING_LABEL
       ).length;
-      console.log();
       const memberClosed = response.data?.filter(
         (item) =>
           item.participantType === ENROLLMENT_TYPE.MEMBER &&

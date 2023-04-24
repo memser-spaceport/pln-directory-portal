@@ -338,8 +338,8 @@ export const getServerSideProps = async ({ query, res }) => {
       name: team.name,
       logoUid: team?.logoUid ?? '',
       logoFile: null,
-      shortDescription: team.shortDescription,
-      longDescription: team.longDescription,
+      shortDescription: team.shortDescription ?? '',
+      longDescription: team.longDescription ?? '',
       requestorEmail: requestDetailResponse.data.requesterEmailId ?? '',
       technologies: team.technologies?.map((item) => {
         return { value: item.uid, label: item.title };

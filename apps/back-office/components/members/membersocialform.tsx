@@ -99,7 +99,7 @@ export default function AddMemberSocialForm(props) {
           maxLength={1000}
           value={values.comments}
           label="Did we miss something?"
-          className="custom-grey custom-outline-none border"
+          className="custom-grey custom-outline-none border min-h-[60px]"
           info="Let us know what else you would like to share and wish others would share to make it easier to locate and contact each other!"
         />
       </div>
