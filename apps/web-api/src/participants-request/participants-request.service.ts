@@ -368,7 +368,7 @@ export class ParticipantsRequestService {
         if (
           finalLocation &&
           finalLocation.uid &&
-          existingData.location.uid !== finalLocation.uid
+          existingData?.location?.uid !== finalLocation.uid
         ) {
           dataToSave['location'] = { connect: { uid: finalLocation.uid } };
         }

@@ -21,6 +21,7 @@ import {
 import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/create-member.svg';
+import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddMemberModalProps {
@@ -444,7 +445,13 @@ export function AddMemberModal({
         enableFooter={false}
         image={<TextImage />}
       >
-        {isProcessing && <Loader />}
+        {isProcessing && (
+          <div
+            className={`visible absolute left-0 top-0 z-[2000] flex h-full w-full items-center justify-center overflow-x-hidden overscroll-none bg-slate-100/50 opacity-100 transition-[visibility,_opacity] delay-[0s,0s] duration-[0s,_300ms] ease-[linear,_linear]`}
+          >
+            <LoadingIndicator />
+          </div>
+        )}
         {saveCompleted ? (
           <div className="px-5">
             <div className="mb-3 text-center text-2xl font-bold">
