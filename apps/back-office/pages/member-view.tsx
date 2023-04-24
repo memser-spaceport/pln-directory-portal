@@ -381,7 +381,7 @@ export const getServerSideProps = async ({ query, res }) => {
         'af-ZA'
       ),
       city: requestData?.city ?? '',
-      region: requestData?.region ?? '' ,
+      region: requestData?.region ?? '',
       country: requestData?.country ?? '',
       linkedinHandler: requestData.linkedinHandler ?? '',
       discordHandler: requestData.discordHandler ?? '',

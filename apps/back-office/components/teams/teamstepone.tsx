@@ -42,7 +42,6 @@ export default function TeamStepOne(props) {
             onChange={onChange}
             maxLength={150}
             disabled={!props.isEditEnabled}
-            pattern="^[a-zA-Z\s]*$"
             onBlur={props.onNameBlur && props.onNameBlur}
             name="name"
             label="What is your organization, company, or team name?"
@@ -79,7 +78,7 @@ export default function TeamStepOne(props) {
           name="shortDescription"
           label="Please briefly describe what your team/product/project does"
           info="One to two sentences is perfect! Use clear language and minimal jargon."
-          className="custom-grey custom-outline-none border min-h-[60px]"
+          className="custom-grey custom-outline-none min-h-[60px] border"
         />
       </div>
 
@@ -93,7 +92,7 @@ export default function TeamStepOne(props) {
           name="longDescription"
           label="Long Description"
           info="Please explain what your team does in a bit more detail. 4-5 sentences will be great!"
-          className="custom-grey custom-outline-none border min-h-[60px]"
+          className="custom-grey custom-outline-none min-h-[60px] border"
         />
       </div>
 

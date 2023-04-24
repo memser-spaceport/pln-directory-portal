@@ -16,7 +16,7 @@ import {
   fetchTeams,
 } from '../../../utils/services/dropdown-service';
 import { fetchMember } from '../../../utils/services/members';
-import { InputField } from '@protocol-labs-network/ui';
+import { InputField, Loader } from '@protocol-labs-network/ui';
 import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-member.svg';
@@ -384,6 +384,7 @@ export function EditMemberModal({
         enableFooter={false}
         image={<TextImage />}
       >
+        {isProcessing && <Loader />}
         {saveCompleted ? (
           <div>
             <div className="mb-3 text-center text-2xl font-bold">

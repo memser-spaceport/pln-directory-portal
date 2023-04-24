@@ -39,7 +39,6 @@ export default function AddMemberStepOne(props) {
             value={values?.name}
             onChange={onChange}
             maxLength={150}
-            pattern="^[a-zA-Z\s]*$"
             disabled={props.disableName ? props.disableName : false}
             onBlur={props.onNameBlur && props.onNameBlur}
             name="name"
@@ -76,7 +75,7 @@ export default function AddMemberStepOne(props) {
           name="shortDescription"
           label="Please briefly describe what your team/product/project does"
           info="One to two sentences is perfect! Use clear language and minimal jargon."
-          className="custom-grey custom-outline-none border min-h-[60px]"
+          className="custom-grey custom-outline-none min-h-[60px] border"
         />
       </div>
 
@@ -89,7 +88,7 @@ export default function AddMemberStepOne(props) {
           name="longDescription"
           label="Long Description"
           info="Please explain what your team does in a bit more detail. 4-5 sentences will be great!"
-          className="custom-grey custom-outline-none border min-h-[60px]"
+          className="custom-grey custom-outline-none min-h-[60px] border"
         />
       </div>
 

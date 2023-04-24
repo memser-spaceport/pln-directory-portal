@@ -6,6 +6,7 @@ import {
   useEffect,
   useCallback,
 } from 'react';
+import { Loader } from '@protocol-labs-network/ui';
 import AddTeamStepOne from './addteamstepone';
 import AddTeamStepTwo from './addteamsteptwo';
 import AddTeamStepThree from './addteamstepthree';
@@ -444,6 +445,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
         enableFooter={false}
         image={<TextImage />}
       >
+        {isProcessing && <Loader />}
         {saveCompleted ? (
           <div>
             <div className="mb-3 text-center text-2xl font-bold">

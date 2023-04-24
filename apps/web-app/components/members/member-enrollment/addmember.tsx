@@ -6,6 +6,7 @@ import {
   ChangeEvent,
   useCallback,
 } from 'react';
+import { Loader } from '@protocol-labs-network/ui';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
@@ -443,6 +444,7 @@ export function AddMemberModal({
         enableFooter={false}
         image={<TextImage />}
       >
+        {isProcessing && <Loader />}
         {saveCompleted ? (
           <div className="px-5">
             <div className="mb-3 text-center text-2xl font-bold">
