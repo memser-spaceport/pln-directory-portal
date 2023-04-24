@@ -366,7 +366,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
           newData: { ...value, logoUid: image?.uid, logoUrl: image?.url },
           // captchaToken,
         };
-        await api.post(`/v1/participants-reques`, data).then((response) => {
+        await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);
         });
       } catch (err) {
