@@ -17,7 +17,7 @@ function Toaster({
   position = toast.POSITION.BOTTOM_RIGHT,
   autoClose = 5000,
   hideProgressBar = false,
-  closeOnClick= true,
+  closeOnClick = true,
   pauseOnHover = true,
   draggable = true,
 }: ToasterProps) {

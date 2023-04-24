@@ -26,13 +26,16 @@ export function FooterButtons(props) {
     await api
       .patch(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, data)
       .then((res) => {
-        if(res?.data?.code == 1){
-          const message = `${isApproved ? APP_CONSTANTS.APPROVED_LABEL : APP_CONSTANTS.REJECTED_LABEL} successfully`;
+        if (res?.data?.code == 1) {
+          const message = `${
+            isApproved
+              ? APP_CONSTANTS.APPROVED_LABEL
+              : APP_CONSTANTS.REJECTED_LABEL
+          } successfully`;
           toast(message);
-        }
-        else{
+        } else {
           toast(res?.data?.message);
-        }        
+        }
         router.push({
           pathname: ROUTE_CONSTANTS.PENDING_LIST,
         });

@@ -4,14 +4,14 @@ import { useEffect } from 'react';
 const withAuth = (WrappedComponent) => {
   const AuthComponent = (props) => {
     const router = useRouter();
-    const backLink = router?.asPath;
+    const backLink = router?.asPath === '/' ? '' : router.asPath;
     useEffect(() => {
       const token = localStorage.getItem('back-office');
       if (!token) {
         router.push({
           pathname: '/',
           query: {
-            backlink: backLink,
+            ...(backLink !== '' && { backlink: backLink }),
           },
         });
       } else if (token && router.asPath == '/') {

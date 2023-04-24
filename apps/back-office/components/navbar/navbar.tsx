@@ -30,7 +30,7 @@ export function Navbar() {
             </Link>
           </div>
           <span className="text-bold text-lg">
-            {isOpenRequest ? `Change Request` : `Closed Request`}
+            {isOpenRequest ? `Pending Requests` : `Closed Requests`}
           </span>
         </div>
         <div>
