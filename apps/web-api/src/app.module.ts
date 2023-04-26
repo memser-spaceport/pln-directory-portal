@@ -67,7 +67,7 @@ import { AdminModule } from './admin/admin.module';
     LocationsModule,
     TechnologiesModule,
     ParticipantsRequestModule,
-    AdminModule
+    AdminModule,
   ],
   providers: [
     PrismaService,

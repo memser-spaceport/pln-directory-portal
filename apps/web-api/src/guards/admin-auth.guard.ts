@@ -6,8 +6,6 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '../utils/jwt/jwt.service';
 
-
-
 @Injectable()
 export class AdminAuthGuard implements CanActivate {
   constructor(private jwtService: JwtService) {}

@@ -22,7 +22,7 @@ import { AdminController } from './admin.controller';
     RedisService,
     SlackService,
     AdminService,
-    JwtService
+    JwtService,
   ],
 })
 export class AdminModule {}
