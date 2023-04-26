@@ -42,12 +42,19 @@ export const getTeamUIDByAirtableId = async (id: string) => {
  * Get values and available values for teams filters
  */
 export const getTeamsFilters = async (options: TTeamListOptions) => {
+  console.log('calling getTeamsFilters');
   const [valuesByFilter, availableValuesByFilter] = await Promise.all([
     getTeamsFiltersValues({
       plnFriend: false,
     }),
     getTeamsFiltersValues(options),
   ]);
+
+  console.log(
+    'valuesByFilter, availableValuesByFilter>>>>',
+    valuesByFilter,
+    availableValuesByFilter
+  );
 
   if (valuesByFilter.status !== 200 || availableValuesByFilter.status !== 200) {
     const emptyFilters = {
