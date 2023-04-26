@@ -24,7 +24,6 @@ export class AdminAuthGuard implements CanActivate {
       // so that we can access it in our route handlers
       request['user'] = payload;
     } catch (e) {
-      console.error(e)
       throw new UnauthorizedException();
     }
     return true;
