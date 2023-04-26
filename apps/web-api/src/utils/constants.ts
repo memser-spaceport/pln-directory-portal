@@ -17,7 +17,7 @@ export const ALLOWED_CORS_ORIGINS = {
   [APP_ENV.STAGING]: [
     /.-protocol-labs-spaceport.vercel.app/,
     /app.forestadmin.com/,
-    /stage.plnetwork.io/,
+    /staging.plnetwork.io/,
     /stage-admin.plnetwork.io/,
   ],
   [APP_ENV.PRODUCTION]: [
