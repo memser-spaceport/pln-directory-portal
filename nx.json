@@ -1,7 +1,7 @@
 {
   "npmScope": "protocol-labs-network",
   "affected": {
-    "defaultBase": "develop"
+    "defaultBase": "main"
   },
   "cli": {
     "defaultCollection": "@nrwl/next"
