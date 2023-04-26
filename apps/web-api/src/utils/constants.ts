@@ -13,6 +13,8 @@ export const ALLOWED_CORS_ORIGINS = {
     /protocol-labs-network-web-admin.vercel.app/,
     /dev.plnetwork.io/,
     /dev-admin.plnetwork.io/,
+    /staging.plnetwork.io/,
+    /stage-admin.plnetwork.io/,
   ],
   [APP_ENV.STAGING]: [
     /.-protocol-labs-spaceport.vercel.app/,
