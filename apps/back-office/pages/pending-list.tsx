@@ -38,7 +38,6 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async () => {
   const listData = await api.get(
     `${API_ROUTE.PARTICIPANTS_REQUEST}?status=PENDING`
   );
-
   let memberResponse = [];
   let teamResponse = [];
   let team = [];

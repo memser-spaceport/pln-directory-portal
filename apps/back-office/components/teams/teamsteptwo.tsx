@@ -1,4 +1,4 @@
-import { InformationCircleIcon } from '@heroicons/react/solid';
+import { ReactComponent as InformationCircleIcon } from '../../public/assets/icons/info_icon.svg';
 import { Dropdown, MultiSelect } from '@protocol-labs-network/ui';
 
 export default function TeamStepTwo(props) {
@@ -8,7 +8,7 @@ export default function TeamStepTwo(props) {
 
   return (
     <>
-      <div className="px-8 py-4">
+      <div className="pt-5">
         <MultiSelect
           options={dropDownValues?.protocol}
           name="technologies"
@@ -17,17 +17,17 @@ export default function TeamStepTwo(props) {
           disabled={!props.isEditEnabled}
           label="Protocol"
         />
-        <div className="flex pt-1 text-sm text-gray-400">
+        <div className="flex pt-3">
           <div>
-            <InformationCircleIcon className="h-5 w-5" />
+            <InformationCircleIcon />
           </div>
-          <span className="font-size-13">
+          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
             Does your team/project use any of these protocol?
           </span>
         </div>
       </div>
 
-      <div className="px-8 py-4">
+      <div className="pt-5">
         <span className="mr-2 text-sm font-bold">Funding Stage*</span>
         <Dropdown
           options={dropDownValues?.fundingStages}
@@ -40,7 +40,7 @@ export default function TeamStepTwo(props) {
         />
       </div>
 
-      <div className="px-8 py-4">
+      <div className="pt-5">
         <MultiSelect
           options={dropDownValues?.membershipSources}
           name="membershipSources"
@@ -51,11 +51,11 @@ export default function TeamStepTwo(props) {
           disabled={!props.isEditEnabled}
           label="Membership Source"
         />
-        <div className="flex pt-1 text-sm text-gray-400">
+        <div className="flex pt-3">
           <div>
-            <InformationCircleIcon className="h-5 w-5" />
+            <InformationCircleIcon />
           </div>
-          <span className="font-size-13">
+          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
             Core Contributor = a team that is building improvements/additional
             features for protocols like libp2p, IPFS, IPLD, and Filecoin. A
             Friend of PL = a team that is using protocols like libp2p, IPFS,
@@ -64,7 +64,7 @@ export default function TeamStepTwo(props) {
         </div>
       </div>
 
-      <div className="px-8 py-4">
+      <div className="pt-5">
         <MultiSelect
           name="industryTags"
           options={dropDownValues?.industryTags}
@@ -75,11 +75,11 @@ export default function TeamStepTwo(props) {
           label="Industry Tags"
           required={true}
         />
-        <div className="flex pt-1 text-sm text-gray-400">
+        <div className="flex pt-3">
           <div>
-            <InformationCircleIcon className="h-5 w-5" />
+            <InformationCircleIcon />
           </div>
-          <span className="font-size-13">
+          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
             Add industries that you had worked in. This will make it easier for
             people to find & connect based on shared professional interests.
           </span>

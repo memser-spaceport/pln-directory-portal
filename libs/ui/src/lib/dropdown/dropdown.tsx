@@ -12,6 +12,7 @@ export interface DropdownProps {
   name?: string;
   required?: boolean;
   disabled?: boolean;
+  className?: string;
 }
 
 export interface IDropdownOption {
@@ -30,6 +31,7 @@ export function Dropdown({
   required = false,
   disabled = false,
   placeholder = 'Select a value',
+  className = '',
 }: DropdownProps) {
   const [selectedOption, setSelectedOption] = useState(initialOption);
   const requiredIndicator =
@@ -57,15 +59,15 @@ export function Dropdown({
       value={selectedOption?.value}
       onChange={onChangeHandler}
       placeholder="Enter value"
-      className="w-full text-sm"
+      className="mt-[12px] w-full text-sm"
       disabled={disabled}
     >
       {({ open }) => (
         <div className="relative">
           <Listbox.Button
-            className={`on-focus hover:shadow-on-hover flex h-10 w-full items-center rounded-lg border border-white bg-white px-3 shadow-sm shadow-slate-300 transition duration-150 ease-in-out active:border-blue-600 active:ring-2 active:ring-blue-300 disabled:bg-gray-200 ${
+            className={`on-focus flex h-10 w-full items-center rounded-lg border border-white bg-white px-3 shadow-sm shadow-slate-300 transition duration-150 ease-in-out active:border-blue-600 active:ring-2 active:ring-blue-300 disabled:bg-slate-100 ${
               open ? 'border-blue-600 ring-2 ring-blue-300' : ''
-            } ${requiredIndicator}`}
+            } ${className} ${requiredIndicator}`}
             data-testid="dropdown__button"
           >
             {buttonContent ? (
@@ -73,9 +75,11 @@ export function Dropdown({
             ) : selectedOption?.label ? (
               <div className="text-left leading-6">{selectedOption?.label}</div>
             ) : (
-              <div className="text-sm text-slate-400">{placeholder}</div>
+              <div className="text-sm text-slate-600 opacity-50">
+                {placeholder}
+              </div>
             )}
-            <div className="absolute right-4">
+            <div className="absolute right-4 text-slate-500">
               <ArrowIcon />
             </div>
           </Listbox.Button>

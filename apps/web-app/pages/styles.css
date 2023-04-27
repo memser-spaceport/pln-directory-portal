@@ -75,17 +75,17 @@
   padding-top: 16px;
 }
 
-.cityname > div:first-of-type {
+/* .cityname > div:first-of-type {
   padding-top: 16px;
-}
+} */
 
 .footerdiv {
   margin-top: 32px;
   border-top: solid #e2e8f0 1px;
   padding-top: 24px;
   padding-bottom: 32px;
-  padding-left: 54px;
-  padding-right: 54px;
+  padding-left: 44px;
+  padding-right: 44px;
 }
 .cross-icon {
   width: 16px;
@@ -111,7 +111,7 @@
 
 .step-line {
   position: relative;
-  top: 25px;
+  top: 20px;
   border: 1px solid #156ff7;
 }
 

@@ -34,39 +34,44 @@ export function TeamAndRoleGrid(props) {
 
   return (
     <>
-      <div className="flex flex-row">
-        <div className="mt-[10px] basis-6/12">
-          <Dropdown
-            name="team"
-            required={true}
-            options={teamNames}
-            initialOption={{
-              value: teamDetail?.teamUid,
-              label: teamDetail?.teamTitle,
-            }}
-            onChange={handleDropDownChange}
-            value={{ value: team?.teamUid, label: team?.teamTitle }}
-          />
+      <div className="flex">
+        <div className="flex flex-row">
+          <div className="basis-6/12">
+            <Dropdown
+              name="team"
+              required={true}
+              options={teamNames}
+              initialOption={{
+                value: teamDetail?.teamUid,
+                label: teamDetail?.teamTitle,
+              }}
+              onChange={handleDropDownChange}
+              className="custom-grey custom-outline-none border"
+              value={{ value: team?.teamUid, label: team?.teamTitle }}
+            />
+          </div>
+          <div className="basis-6/12 pl-5">
+            <InputField
+              name="role"
+              required={true}
+              showLabel={false}
+              label="Role"
+              maxLength={100}
+              placeholder="Enter Role"
+              className="custom-grey custom-outline-none border"
+              onChange={handleInputChange}
+              value={team.role}
+            />
+          </div>
         </div>
-        <div className="basis-6/12 pl-5">
-          <InputField
-            name="role"
-            required={true}
-            showLabel={false}
-            label="Role"
-            maxLength={100}
-            placeholder="Enter Role"
-            className="custom-grey custom-outline-none border"
-            onChange={handleInputChange}
-            value={team.role}
-          />
-        </div>
-        <div
-          className="pl-3 pt-3"
-          onClick={() => props.handleDeleteRolesRow(teamRowId)}
-        >
-          <CloseIcon className="cross-icon" />
-        </div>
+        {teamRowId > 1 && (
+          <div
+            className="pl-3 pt-5"
+            onClick={() => props.handleDeleteRolesRow(teamRowId)}
+          >
+            <CloseIcon className="cross-icon" />
+          </div>
+        )}
       </div>
     </>
   );

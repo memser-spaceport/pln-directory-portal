@@ -34,19 +34,19 @@ function validateBasicForm(formValues, imageUrl) {
   const emailRE =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   if (!formValues.name.trim()) {
-    errors.push('Please add your Name.');
+    errors.push('Please add your Name');
   }
   if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
-    errors.push('Please add valid Email.');
+    errors.push('Please add valid Email');
   }
   if (!imageUrl) {
-    errors.push('Please upload a profile image.');
+    errors.push('Please upload a profile image');
   }
   if (
     !formValues.requestorEmail?.trim() ||
     !formValues.requestorEmail?.match(emailRE)
   ) {
-    errors.push('Please add valid Requestor Email.');
+    errors.push('Please add valid Requestor Email');
   }
   return errors;
 }
@@ -411,7 +411,7 @@ export function EditMemberModal({
           </div>
         ) : (
           <div>
-            <div className="px-8">
+            <div className="px-11">
               <span className="font-size-14 text-sm">
                 Please fill out only the fields you would like to change for
                 this member. If there is something you want to change that is
@@ -429,7 +429,7 @@ export function EditMemberModal({
                 </ul>
               </div>
             )}
-            <div className="inputfield px-8 pb-10 pt-4">
+            <div className="inputfield px-11 pt-5">
               <InputField
                 required
                 name="requestorEmail"
@@ -441,7 +441,7 @@ export function EditMemberModal({
                 className="custom-grey custom-outline-none border"
               />
             </div>
-            <div className="overflow-y-auto">
+            <div className="overflow-y-auto px-11">
               <AddMemberBasicForm
                 formValues={formValues}
                 onChange={handleInputChange}
@@ -464,7 +464,7 @@ export function EditMemberModal({
                 onChange={handleInputChange}
               />
             </div>
-            <div className="footerdiv flow-root w-full px-8">
+            <div className="footerdiv flow-root w-full">
               <div className="float-left">
                 {getCancelOrBackButton(handleModalClose)}
               </div>

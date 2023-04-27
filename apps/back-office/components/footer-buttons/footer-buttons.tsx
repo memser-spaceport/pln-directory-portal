@@ -51,8 +51,8 @@ export function FooterButtons(props) {
   }
 
   return (
-    <div className="header z-[1057]">
-      <nav className="navbar absolute bottom-0  grid h-[8%] min-h-[80px] w-full grid-flow-col items-center bg-[white] px-12 only-of-type:shadow-[0_1px_4px_0_#e2e8f0]">
+    <div className="header">
+      <nav className="navbar absolute bottom-0 z-[1157]  grid min-h-[40px] w-full grid-flow-col items-center bg-[white] px-12 only-of-type:shadow-[0_1px_4px_0_#e2e8f0] md:min-h-[80px]">
         <div className="col-span-4 justify-self-end">
           {!props.isEditEnabled ? (
             <button
@@ -88,7 +88,7 @@ export function FooterButtons(props) {
                   )
                 }
               >
-                <XIcon className="stroke-3 h-6 w-6 p-1" />
+                <XIcon className="stroke-3 h-6 w-6 pr-1" />
                 <span>Reject</span>
               </button>
             </div>
@@ -108,7 +108,7 @@ export function FooterButtons(props) {
                   )
                 }
               >
-                <CheckIcon className="stroke-3 h-6 w-6 p-1" />
+                <CheckIcon className="stroke-3 h-6 w-6 pr-1" />
                 <span>Approve</span>
               </button>
             </div>

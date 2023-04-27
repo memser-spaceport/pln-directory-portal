@@ -43,16 +43,16 @@ export function TextArea({
         {required ? label + '*' : label}
       </label>
       {info && (
-        <div className="py-2">
-          <span className="font-size-13 text-sm text-gray-400">{info}</span>
+        <div className="text-[13px] leading-[18px] text-[#0F172A] opacity-40">
+          {info}
         </div>
       )}
       <textarea
         {...props}
         name={name}
         placeholder={placeholder}
-        className={`on-focus hover:shadow-on-hover mt-[10px] block w-full rounded-lg border border-white bg-white px-3 py-2 text-sm leading-5 text-slate-900 shadow-sm shadow-slate-300
-        transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-400 disabled:bg-gray-200 ${
+        className={`on-focus hover:shadow-on-hover mt-[12px] block w-full rounded-lg border border-white bg-white px-3 py-2 text-sm leading-5 text-slate-900 shadow-sm shadow-slate-300
+        transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-600 placeholder:opacity-50 disabled:bg-slate-100 ${
           props.className || ''
         } ${requiredIndicator}`}
         rows={rows}

@@ -1,6 +1,6 @@
-import { CameraIcon } from '@heroicons/react/outline';
 import { useState } from 'react';
 import Image from 'next/image';
+import { ReactComponent as CameraIcon } from '../../assets/icons/cameraicon.svg';
 
 type Shape = 'circle' | 'square';
 
@@ -67,7 +67,7 @@ export function ProfileImageUpload({
           />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center bg-gray-100">
-            <CameraIcon className="h-10 w-10 text-gray-300" />
+            <CameraIcon />
             <span className="font-size-12 text-sm text-blue-600">
               Add Image
             </span>

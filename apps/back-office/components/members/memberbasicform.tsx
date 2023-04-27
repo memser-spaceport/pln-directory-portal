@@ -1,5 +1,5 @@
 import { InputField, ProfileImageUpload } from '@protocol-labs-network/ui';
-import { InformationCircleIcon } from '@heroicons/react/solid';
+import { ReactComponent as InformationCircleIcon } from '../../public/assets/icons/info_icon.svg';
 
 export default function AddMemberBasicForm(props) {
   const values = props.formValues;
@@ -7,8 +7,8 @@ export default function AddMemberBasicForm(props) {
 
   return (
     <>
-      <div className="flex content-around px-8 pt-3">
-        <div className="profileImage justify-content basis-1/3">
+      <div className="flex content-around pt-5">
+        <div className="profileImage justify-content basis-[20%]">
           <ProfileImageUpload
             imageUrl={props.imageUrl}
             maxSize={4}
@@ -16,7 +16,7 @@ export default function AddMemberBasicForm(props) {
             disabled={!props.isEditEnabled}
           />
         </div>
-        <div className="namefield inputfield basis-2/3">
+        <div className="namefield inputfield basis-[80%]">
           <InputField
             required={true}
             name="name"
@@ -32,17 +32,17 @@ export default function AddMemberBasicForm(props) {
         </div>
       </div>
 
-      <div className="flex px-8 pt-3 text-sm text-gray-400">
+      <div className="flex pt-3">
         <div>
-          <InformationCircleIcon className="h-5 w-5" />
+          <InformationCircleIcon />
         </div>
-        <span className="font-size-13">
+        <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
           Please upload a image in PNG or JPEG format with file size less that
           4MB.
         </span>
       </div>
 
-      <div className="inputfield px-8 py-4">
+      <div className="inputfield pt-5">
         <InputField
           required
           name="email"
@@ -59,12 +59,12 @@ export default function AddMemberBasicForm(props) {
       </div>
 
       {props.emailExists && (
-        <span className="px-8 py-1 text-xs text-rose-600">
+        <span className="pt-3 text-sm text-rose-600">
           Email already exists!
         </span>
       )}
 
-      <div className="px-8 py-4">
+      <div className="pt-5">
         <InputField
           name="plnStartDate"
           type="date"
@@ -75,18 +75,18 @@ export default function AddMemberBasicForm(props) {
           label="PLN Start Date"
           className="custom-grey custom-outline-none border"
         />
-        <div className="flex pt-1 text-sm text-gray-400">
+        <div className="flex pt-3">
           <div>
-            <InformationCircleIcon className="h-5 w-5" />
+            <InformationCircleIcon />
           </div>
-          <span className="font-size-13">
+          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
             What date did your team join the PLN? If you don&apos;t know, pick
             today.
           </span>
         </div>
       </div>
 
-      <div className="inputfield cityname px-8">
+      <div className="inputfield cityname pt-5">
         <InputField
           name="city"
           label="City"
@@ -98,19 +98,19 @@ export default function AddMemberBasicForm(props) {
           placeholder="Enter your city name"
           className="custom-grey custom-outline-none border"
         />
-        <div className="flex pt-1 text-sm text-gray-400">
+        <div className="flex pt-3">
           <div>
-            <InformationCircleIcon className="h-5 w-5" />
+            <InformationCircleIcon />
           </div>
-          <span className="font-size-13">
+          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
             Please share your location so we can be sure to invite you to in
             person events in your area!
           </span>
         </div>
       </div>
 
-      <div className="flex px-8 py-4">
-        <div className="inputfield w-[50%] pr-6">
+      <div className="flex pt-5">
+        <div className="inputfield basis-6/12 pr-6">
           <InputField
             name="region"
             label="State or Province"
@@ -123,7 +123,7 @@ export default function AddMemberBasicForm(props) {
             className="custom-grey custom-outline-none border"
           />
         </div>
-        <div className="inputfield w-[50%]">
+        <div className="inputfield basis-6/12">
           <InputField
             name="country"
             label="Country"
