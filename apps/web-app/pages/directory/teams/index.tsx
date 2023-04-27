@@ -24,10 +24,9 @@ import {
 
 type TeamsProps = {
   teams: ITeam[];
-  filtersValues: ITeamsFiltersValues;
 };
 
-export default function Teams({ teams, filtersValues }: TeamsProps) {
+export default function Teams({ teams }: TeamsProps) {
   const { selectedViewType } = useViewType();
   const isGrid = selectedViewType === 'grid';
   const filterProperties = [
@@ -50,10 +49,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
 
       <section className="pl-sidebar flex">
         <div className="w-sidebar fixed left-0 z-40 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">
-          <TeamsDirectoryFilters
-            filtersValues={filtersValues}
-            filterProperties={filterProperties}
-          />
+          TESTING FILTERS
         </div>
 
         <div className="mx-auto p-8">
@@ -87,19 +83,16 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
 }) => {
   const optionsFromQuery = getTeamsOptionsFromQuery(query);
   const listOptions = getTeamsListOptions(optionsFromQuery);
-  const [teamsResponse, filtersValues] = await Promise.all([
-    getTeams(listOptions),
-    getTeamsFilters(optionsFromQuery),
-  ]);
+  const teamsResponse = await getTeams(listOptions);
 
   const teams: ITeam[] =
     teamsResponse.status === 200
       ? teamsResponse.body.map((team) => parseTeam(team))
       : [];
-  const parsedFilters: ITeamsFiltersValues = parseTeamsFilters(
-    filtersValues,
-    query
-  );
+  // const parsedFilters: ITeamsFiltersValues = parseTeamsFilters(
+  //   filtersValues,
+  //   query
+  // );
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
@@ -109,6 +102,6 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
   );
 
   return {
-    props: { teams, filtersValues: parsedFilters },
+    props: { teams },
   };
 };
