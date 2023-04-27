@@ -99,7 +99,7 @@ export function Index() {
           <div className="p-2">
             <InputField
               name="name"
-              label="UserName"
+              label="Username"
               value={userName}
               onChange={onChange}
               placeholder="Enter username"
