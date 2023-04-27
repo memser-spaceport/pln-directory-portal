@@ -29,7 +29,7 @@ export function Navbar() {
               </a>
             </Link>
           </div>
-          <span className="text-bold text-lg">
+          <span className="text-base font-semibold">
             {isOpenRequest ? `Pending Requests` : `Closed Requests`}
           </span>
         </div>
@@ -47,12 +47,12 @@ export function Navbar() {
             <a
               target="_self"
               className={`on-focus shadow-request-button
-            hover:shadow-on-hover flex h-10 items-center justify-center rounded-lg border border-blue-600
+            hover:shadow-on-hover flex h-10 items-center justify-center rounded-lg border border-blue-700
             p-2 text-sm font-medium hover:border-slate-200
             hover:ring-2 hover:ring-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300
-            active:border-blue-600 active:ring-2 active:ring-blue-300 ${
+            active:border-blue-700 active:ring-2 active:ring-blue-300 ${
               isOpenRequest
-                ? 'bg-white text-blue-600 '
+                ? 'bg-white text-blue-700 '
                 : 'bg-[#1D4ED8] text-white'
             }`}
             >

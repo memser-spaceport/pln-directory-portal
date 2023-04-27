@@ -1,6 +1,6 @@
 import { Dialog, Transition } from '@headlessui/react';
-import { XIcon as CloseIcon } from '@heroicons/react/outline';
 import React, { ReactNode, Fragment } from 'react';
+import { ReactComponent as CloseIcon } from '../../../../public/assets/images/icons/closeIcon.svg';
 
 type ModalProps = {
   isOpen: boolean;
@@ -29,12 +29,12 @@ function ModalHeader({
   return (
     <>
       <CloseIcon
-        className="stroke-3 absolute right-5 top-5 z-40 h-6 w-6 cursor-pointer text-white"
+        className="stroke-3 absolute right-5 top-5 z-40 cursor-pointer"
         onClick={() => onClose()}
       />
-      <div className={headerStyleClass}>
+      <div className={`${headerStyleClass} rounded-lg`}>
         {image && (
-          <div className="flex h-40 bg-[url('/assets/images/Banner.svg')]">
+          <div className="flex h-40 rounded-tr-lg rounded-tl-lg bg-[url('/assets/images/Banner.svg')]">
             <div className="my-auto ml-5">{image}</div>
           </div>
         )}

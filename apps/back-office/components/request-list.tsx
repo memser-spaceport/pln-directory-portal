@@ -1,5 +1,5 @@
 import React from 'react';
-import { SearchIcon } from '@heroicons/react/outline';
+import { SearchIcon } from '@heroicons/react/solid';
 import APP_CONSTANTS, { ROUTE_CONSTANTS } from '../utils/constants';
 import { InputField } from '@protocol-labs-network/ui';
 import { useNavbarContext } from '../context/navbar-context';
@@ -67,11 +67,19 @@ export default function RequestList({ list, type }) {
             </div>
           )}
           {dataList &&
-            dataList.map((request) => {
+            dataList.map((request, index) => {
+              const borderClass =
+                dataList.length == 1
+                  ? 'rounded-xl'
+                  : index == 0
+                  ? 'rounded-tl-xl rounded-tr-xl'
+                  : index == dataList.length - 1
+                  ? 'rounded-bl-xl rounded-br-xl'
+                  : '';
               return (
                 <div
-                  className="h-[60px] w-[656px] cursor-pointer border-b border-[#E2E8F0]
-                bg-[#FFFFFF] drop-shadow-[0_0_1px_rgba(15,23,42,0.12)] hover:bg-[#F8FAFC]"
+                  className={`h-[60px] w-[656px] cursor-pointer border-b border-[#E2E8F0]
+                bg-[#FFFFFF] drop-shadow-[0_0_1px_rgba(15,23,42,0.12)] hover:bg-[#F8FAFC] ${borderClass}`}
                   key={request.id}
                   onClick={() => redirectToDetail(request)}
                 >
@@ -79,7 +87,9 @@ export default function RequestList({ list, type }) {
                     className="h-full w-full items-center pl-[24px] pr-[24px] pt-[20px]
                   text-[14px] leading-[20px] text-[#475569]"
                   >
-                    <span className="font-semibold ">{request?.name}</span>
+                    <span className="text-sm font-semibold">
+                      {request?.name}
+                    </span>
                     {request.status !== APP_CONSTANTS.PENDING_LABEL && (
                       <span
                         className={`float-right text-[12px] ${
@@ -107,7 +117,7 @@ export default function RequestList({ list, type }) {
                 className="h-full w-full items-center pl-[24px] pr-[24px] pt-[20px]
               text-[14px] leading-[20px] text-[#475569]"
               >
-                <span className="font-semibold ">
+                <span className="text-sm font-semibold">
                   {APP_CONSTANTS.NO_DATA_AVAILABLE_LABEL}
                 </span>
               </div>

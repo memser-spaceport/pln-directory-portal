@@ -22,19 +22,19 @@ function validateBasicForm(formValues, imageUrl) {
   const emailRE =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   if (!formValues.name.trim()) {
-    errors.push('Please add your Name.');
+    errors.push('Please add your Name');
   }
   if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
-    errors.push('Please add valid Email.');
+    errors.push('Please add valid Email');
   }
   if (!imageUrl) {
-    errors.push('Please upload a profile image.');
+    errors.push('Please upload a profile image');
   }
   if (
     !formValues.requestorEmail?.trim() ||
     !formValues.requestorEmail?.match(emailRE)
   ) {
-    errors.push('Please add valid Requestor Email.');
+    errors.push('Please add valid Requestor Email');
   }
   return errors;
 }
@@ -250,15 +250,15 @@ export default function MemberView(props) {
       <div className="bg-gray-200 py-10">
         <div className="relative m-auto w-[40%]">
           <div
-            className="cursor-pointer pb-[24px] text-[12px] font-semibold text-[#1D4ED8]"
+            className="cursor-pointer pb-[24px] text-[14px] font-semibold text-[#1D4ED8]"
             onClick={() => redirectToList()}
           >
             Back to requests
           </div>
-          <div className="rounded-lg border border-gray-300 bg-white">
-            <div className="inputfield px-8 pb-10 pt-4">
+          <div className="rounded-xl border border-gray-300 bg-white px-11">
+            <div className="inputfield pb-10 pt-4">
               {errors?.length > 0 && (
-                <div className="w-full rounded-lg bg-white p-5 ">
+                <div className="w-full rounded-xl bg-white p-5 ">
                   <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
                     {errors.map((item, index) => (
                       <li key={index}>{item}</li>

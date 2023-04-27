@@ -27,8 +27,8 @@ function getFormStepIndicatorShape(step, formStep) {
       <div className="relative inline-flex items-center justify-center">
         <HexagonOutline
           className={getShapeClass(step.number, formStep)}
-          height={50}
-          width={50}
+          height={40}
+          width={40}
         />
         <span className={getStepNumberClass(step.number, formStep)}>
           {(() => {
@@ -82,7 +82,15 @@ function getFormStepIndicatorShape(step, formStep) {
           })()}
         </span>
       </div>
-      <span className="mt-1 text-xs text-blue-500">{step.name}</span>
+      <span
+        className={
+          step.number == formStep
+            ? 'text-[13px] font-semibold leading-[24px] text-[#156FF7]'
+            : 'text-[13px] font-medium leading-[24px] text-slate-600'
+        }
+      >
+        {step.name}
+      </span>
     </div>
   );
 }

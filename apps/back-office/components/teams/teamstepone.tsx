@@ -4,7 +4,7 @@ import {
   ProfileImageUpload,
   TextArea,
 } from '@protocol-labs-network/ui';
-import { InformationCircleIcon } from '@heroicons/react/solid';
+import { ReactComponent as InformationCircleIcon } from '../../public/assets/icons/info_icon.svg';
 
 export default function TeamStepOne(props) {
   const values = props?.formValues;
@@ -12,7 +12,7 @@ export default function TeamStepOne(props) {
 
   return (
     <>
-      <div className="px-8 py-4">
+      <div className="pt-5">
         <InputField
           required
           name="requestorEmail"
@@ -25,8 +25,8 @@ export default function TeamStepOne(props) {
           className="custom-grey custom-outline-none border"
         />
       </div>
-      <div className="flex px-8 pb-4 pt-6">
-        <div className="basis-1/4">
+      <div className="flex pt-5">
+        <div className="basis-[20%]">
           <ProfileImageUpload
             imageUrl={props.imageUrl}
             maxSize={4}
@@ -35,7 +35,7 @@ export default function TeamStepOne(props) {
             disabled={!props.isEditEnabled}
           />
         </div>
-        <div className="inputfield basis-3/4 pl-1">
+        <div className="inputfield basis-[80%] pl-1">
           <InputField
             required
             value={values?.name}
@@ -49,7 +49,7 @@ export default function TeamStepOne(props) {
             className="custom-grey custom-outline-none border"
           />
           {props.nameExists && (
-            <div className="pt-2">
+            <div className="pt-3">
               <span className="text-xs text-rose-600">
                 Name already exists!
               </span>
@@ -58,17 +58,17 @@ export default function TeamStepOne(props) {
         </div>
       </div>
 
-      <div className="flex px-8 pb-4 text-sm text-gray-400">
+      <div className="flex pt-3">
         <div>
-          <InformationCircleIcon className="h-5 w-5" />
+          <InformationCircleIcon />
         </div>
-        <span className="font-size-13">
+        <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
           Please upload a squared image in PNG or JPEG format with file size
           less that 4MB.
         </span>
       </div>
 
-      <div className="px-8 py-4">
+      <div className="pt-5">
         <TextArea
           required
           value={values?.shortDescription}
@@ -82,7 +82,7 @@ export default function TeamStepOne(props) {
         />
       </div>
 
-      <div className="px-8 py-4">
+      <div className="pt-5">
         <TextArea
           required
           value={values?.longDescription}
@@ -119,7 +119,7 @@ export default function TeamStepOne(props) {
         />
       </div> */}
 
-      <div className="inputfield hint-text px-8 py-4">
+      <div className="inputfield hint-text pt-5">
         <InputField
           value={values?.officeHours}
           name="officeHours"
@@ -130,11 +130,11 @@ export default function TeamStepOne(props) {
           placeholder="Enter address here"
           className="custom-grey custom-outline-none border"
         />
-        <div className="flex pt-1 text-sm text-gray-400">
+        <div className="flex pt-3">
           <div>
-            <InformationCircleIcon className="h-5 w-5" />
+            <InformationCircleIcon />
           </div>
-          <span>
+          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
             If your team offers group office hours or open meetings that are
             open to the public, please share the link so PLN members can join
             and learn more.
