@@ -29,19 +29,19 @@ function validateBasicForm(formValues, imageUrl) {
     !formValues.requestorEmail?.trim() ||
     !formValues.requestorEmail?.match(emailRE)
   ) {
-    errors.push('Please add valid Requestor email.');
+    errors.push('Please add valid Requestor email');
   }
   if (!formValues.name?.trim()) {
-    errors.push('Please add Team Name.');
+    errors.push('Please add Team Name');
   }
   if (!imageUrl) {
-    errors.push('Please add logo.');
+    errors.push('Please add logo');
   }
   if (!formValues.shortDescription?.trim()) {
-    errors.push('Please add Description.');
+    errors.push('Please add Description');
   }
   if (!formValues.longDescription?.trim()) {
-    errors.push('Please add Long Description.');
+    errors.push('Please add Long Description');
   }
   return errors;
 }
@@ -234,13 +234,13 @@ export default function TeamView(props) {
         <div className="bg-gray-200 py-10">
           <div className="relative m-auto w-[40%]">
             <div
-              className="cursor-pointer pb-[24px] text-[12px] font-semibold text-[#1D4ED8]"
+              className="cursor-pointer pb-[24px] text-[14px] font-semibold text-[#1D4ED8]"
               onClick={() => redirectToList()}
             >
               Back to requests
             </div>
-            <div className="rounded-lg border border-gray-300 bg-white">
-              <div>
+            <div className="rounded-xl border border-gray-300 bg-white px-11">
+              <div className="inputfield pb-10 pt-4">
                 {errors?.length > 0 && (
                   <div className="w-full rounded-lg bg-white p-5 ">
                     <ul className="list-inside list-disc space-y-1 text-xs text-red-500">

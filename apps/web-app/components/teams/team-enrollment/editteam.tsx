@@ -39,19 +39,19 @@ function validateBasicForm(formValues, imageUrl) {
     !formValues.requestorEmail?.trim() ||
     !formValues.requestorEmail?.match(emailRE)
   ) {
-    errors.push('Please add valid Requestor email.');
+    errors.push('Please add valid Requestor email');
   }
   if (!formValues.name?.trim()) {
-    errors.push('Please add Team Name.');
+    errors.push('Please add Team Name');
   }
   if (!imageUrl) {
-    errors.push('Please add logo.');
+    errors.push('Please add logo');
   }
   if (!formValues.shortDescription?.trim()) {
-    errors.push('Please add Description.');
+    errors.push('Please add Description');
   }
   if (!formValues.longDescription?.trim()) {
-    errors.push('Please add Long Description.');
+    errors.push('Please add Long Description');
   }
   return errors;
 }
@@ -390,7 +390,7 @@ export function EditTeamModal({
           </div>
         ) : (
           <div>
-            <div className="px-8">
+            <div className="px-11">
               <span className="font-size-14 text-sm">
                 Please fill out only the fields you would like to change for
                 this member. If there is something you want to change that is
@@ -408,7 +408,7 @@ export function EditTeamModal({
                 </ul>
               </div>
             )}
-            <div className="overflow-y-auto">
+            <div className="overflow-y-auto px-11">
               <AddTeamStepOne
                 formValues={formValues}
                 handleInputChange={handleInputChange}
@@ -429,11 +429,11 @@ export function EditTeamModal({
                 handleDropDownChange={handleDropDownChange}
               />
             </div>
-            <div className="footerdiv flow-root w-full px-8">
-              <div className="float-left m-2">
+            <div className="footerdiv flow-root w-full">
+              <div className="float-left">
                 {getCancelOrBackButton(handleModalClose)}
               </div>
-              <div className="float-right m-2">
+              <div className="float-right">
                 {getSubmitOrNextButton(handleSubmit, isProcessing)}
               </div>
             </div>

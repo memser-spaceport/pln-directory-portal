@@ -1,5 +1,5 @@
 import { ChangeEvent, useEffect, useState } from 'react';
-import Image from 'next/image';
+import jwt_decode from 'jwt-decode';
 import styles from './index.module.css';
 import { InputField } from '@protocol-labs-network/ui';
 import { useRouter } from 'next/router';
@@ -7,6 +7,8 @@ import { ReactComponent as Building } from '/public/assets/icons/building.svg';
 import APP_CONSTANTS, { ROUTE_CONSTANTS, TOKEN } from '../utils/constants';
 import { setToken } from '../utils/auth';
 import Loader from '../components/common/loader';
+import { ReactComponent as LogoImage } from '/public/assets/images/Back_office_Logo.svg';
+import api from '../utils/api';
 
 export function Index() {
   const [userName, setUserName] = useState<string>('');
@@ -28,18 +30,38 @@ export function Index() {
   const router = useRouter();
   async function onSubmit() {
     setIsLoading(true);
-    if (
-      userName === process.env.NEXT_PUBLIC_USERNAME &&
-      password === process.env.NEXT_PUBLIC_PASSWORD
-    ) {
-      setToken(TOKEN);
-      setIsLoading(false);
-      const backLink = router.query.backlink?.toString() ?? '';
-      router.push(backLink ? backLink : ROUTE_CONSTANTS.PENDING_LIST);
-    } else {
-      setIsLoading(false);
-      setError('Incorrect Username and Password!');
-    }
+    await api
+      .post('/v1/admin/signin', { username: userName, password: password })
+      .then((res) => {
+        if (res?.data?.accessToken) {
+          const decoded = jwt_decode(res.data.accessToken) ?? {};
+          console.log('decoded', decoded);
+          const expiry = new Date(decoded?.exp * 1000);
+          document.cookie = `plnadmin=${decoded?.iat}; Expires=${expiry}; path=/`;
+          const backLink = router.query.backlink?.toString() ?? '';
+          router.push(backLink ? backLink : ROUTE_CONSTANTS.PENDING_LIST);
+          return res?.data;
+        }
+      })
+      .catch((err) => {
+        console.log(err);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+
+    // if (
+    //   userName === process.env.NEXT_PUBLIC_USERNAME &&
+    //   password === process.env.NEXT_PUBLIC_PASSWORD
+    // ) {
+    //   setToken(TOKEN);
+    //   setIsLoading(false);
+    //   const backLink = router.query.backlink?.toString() ?? '';
+    //   router.push(backLink ? backLink : ROUTE_CONSTANTS.PENDING_LIST);
+    // } else {
+    //   setIsLoading(false);
+    //   setError('Incorrect Username and Password!');
+    // }
   }
 
   return (
@@ -48,10 +70,16 @@ export function Index() {
       <div className="absolute left-[50%] top-[50%] w-[75%] translate-x-[-50%] translate-y-[-50%] rounded-lg bg-white p-8 md:w-[30%]">
         <div className="inline-block">
           <div className="inline-block">
-            <Image
+            {/* <Image
               src="/assets/images/protocol-labs-network-open-graph.png"
               height={100}
               width={200}
+              alt="Protocol Labs Logo"
+            /> */}
+            <LogoImage
+              className="pl-3"
+              height={95}
+              width={195}
               alt="Protocol Labs Logo"
             />
           </div>

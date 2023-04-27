@@ -1,5 +1,5 @@
 import { InputField, TextArea } from '@protocol-labs-network/ui';
-import { InformationCircleIcon } from '@heroicons/react/solid';
+import { ReactComponent as InformationCircleIcon } from '../../../public/assets/images/icons/info_icon.svg';
 
 export default function AddMemberSocialForm(props) {
   const values = props.formValues;
@@ -7,7 +7,7 @@ export default function AddMemberSocialForm(props) {
 
   return (
     <>
-      <div className="inputfield px-8 py-4">
+      <div className="inputfield pt-5">
         <InputField
           label="LinkedIn URL"
           onChange={onChange}
@@ -19,7 +19,7 @@ export default function AddMemberSocialForm(props) {
         />
       </div>
 
-      <div className="inputfield hint-text px-8 pb-2 pt-4">
+      <div className="inputfield hint-text pt-5">
         <InputField
           label="Discord Handle"
           name="discordHandler"
@@ -29,18 +29,18 @@ export default function AddMemberSocialForm(props) {
           placeholder="e.g., name#1234"
           className="custom-grey custom-outline-none border"
         />
-        <div className="flex pt-1 text-sm text-gray-400">
+        <div className="flex pt-3">
           <div>
             <InformationCircleIcon className="h-5 w-5" />
           </div>
-          <span>
+          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
             This will help us tag you with permissions to access the best
             Discord channels for you
           </span>
         </div>
       </div>
 
-      <div className="flex px-8 py-4">
+      <div className="flex pt-5">
         <div className="inputfield w-[50%] pr-4">
           <InputField
             label="Twitter Handle"
@@ -65,7 +65,7 @@ export default function AddMemberSocialForm(props) {
         </div>
       </div>
 
-      <div className="inputfield hint-text px-8 pb-3 pt-5">
+      <div className="inputfield hint-text pt-5">
         <InputField
           label="Office Hours Link"
           name="officeHours"
@@ -74,11 +74,11 @@ export default function AddMemberSocialForm(props) {
           onChange={onChange}
           className="custom-grey custom-outline-none border"
         />
-        <div className="flex pt-1 text-sm text-gray-400">
+        <div className="flex pt-3">
           <div>
             <InformationCircleIcon className="h-5 w-5" />
           </div>
-          <span>
+          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
             Drop your calendar link here so others can get in touch with you at
             a time that is convenient. We recommend 15-min meetings scheduled
             via Calendly or Google Calendar appointments
@@ -86,7 +86,7 @@ export default function AddMemberSocialForm(props) {
         </div>
       </div>
 
-      <div className="inputfield px-8 py-4">
+      <div className="inputfield pt-5">
         <TextArea
           name="comments"
           onChange={onChange}

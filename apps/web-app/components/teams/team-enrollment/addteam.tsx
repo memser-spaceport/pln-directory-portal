@@ -6,7 +6,6 @@ import {
   useEffect,
   useCallback,
 } from 'react';
-import { Loader } from '@protocol-labs-network/ui';
 import AddTeamStepOne from './addteamstepone';
 import AddTeamStepTwo from './addteamsteptwo';
 import AddTeamStepThree from './addteamstepthree';
@@ -44,19 +43,19 @@ function validateBasicForm(formValues) {
     !formValues.requestorEmail?.trim() ||
     !formValues.requestorEmail?.match(emailRE)
   ) {
-    errors.push('Please add valid Requestor email.');
+    errors.push('Please add valid Requestor email');
   }
   if (!formValues.name.trim()) {
-    errors.push('Please add Team Name.');
+    errors.push('Please add Team Name');
   }
   if (!formValues.logoFile) {
-    errors.push('Please add logo.');
+    errors.push('Please add logo');
   }
   if (!formValues.shortDescription?.trim()) {
-    errors.push('Please add Description.');
+    errors.push('Please add Description');
   }
   if (!formValues.longDescription?.trim()) {
-    errors.push('Please add Long Description.');
+    errors.push('Please add Long Description');
   }
   return errors;
 }
@@ -482,12 +481,12 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
                 </ul>
               </div>
             )}
-            <div className="px-3">{getFormStep()}</div>
-            <div className="footerdiv flow-root w-full px-8 ">
-              <div className="float-left m-2">
+            <div className="px-11">{getFormStep()}</div>
+            <div className="footerdiv flow-root w-full">
+              <div className="float-left">
                 {getCancelOrBackButton(formStep, handleModalClose, setFormStep)}
               </div>
-              <div className="float-right m-2">
+              <div className="float-right">
                 {getSubmitOrNextButton(
                   formValues,
                   formStep,

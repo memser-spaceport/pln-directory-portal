@@ -6,7 +6,12 @@ const withAuth = (WrappedComponent) => {
     const router = useRouter();
     const backLink = router?.asPath === '/' ? '' : router.asPath;
     useEffect(() => {
-      const token = localStorage.getItem('back-office');
+      const token = document.cookie
+        // ?.split(';')
+        // ?.map((cookie) => cookie.trim())
+        // ?.find((cookie) => cookie.startsWith('plnadmin='))
+        ?.split('=')[1];
+      // const token = localStorage.getItem('back-office');
       if (!token) {
         router.push({
           pathname: '/',

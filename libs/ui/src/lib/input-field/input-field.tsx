@@ -55,7 +55,7 @@ export function InputField({
   return (
     <label className="relative block">
       {showLabel ? (
-        <span className="py-2 text-sm font-bold">
+        <span className="text-sm font-bold">
           {error ? error : required ? label + '*' : label}
         </span>
       ) : (
@@ -67,9 +67,9 @@ export function InputField({
       <input
         {...props}
         type={showPassword ? 'text' : props.type}
-        className={`mt-[10px] block w-full rounded-lg bg-white text-sm leading-6 text-slate-900 shadow-sm shadow-slate-300 transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-400
+        className={`mt-[12px] block w-full rounded-lg bg-white text-sm leading-6 text-slate-900  shadow-slate-300 transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-600 placeholder:opacity-50
         ${icon ? 'pl-8' : 'pl-3'} ${hasClear ? 'pr-6' : 'pr-3'} on-focus
-        hover:shadow-on-hover h-10 leading-10 disabled:bg-gray-200 ${
+        h-10 leading-10 disabled:bg-slate-100 ${
           props.className
         } ${requiredIndicator}`}
         onChange={handleUserInput}

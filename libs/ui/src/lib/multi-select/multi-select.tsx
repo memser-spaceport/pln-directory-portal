@@ -115,21 +115,21 @@ export function MultiSelect({
         </span>
       )}
       <div
-        className={`mt-[10px] flex cursor-pointer items-center justify-between rounded-md border border-gray-300 bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${requiredIndicator}`}
+        className={`mt-[12px] flex cursor-pointer items-center justify-between rounded-md border border-gray-300 bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${requiredIndicator}`}
         onClick={!disabled ? toggleDropdown : () => null}
       >
         <div className="flex flex-1 flex-wrap pr-4">
           {selectedValues?.length > 0 ? (
             selectedValues.map((item) => (
               <div
-                className="m-1 flex items-center rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-600"
+                className="m-1 flex items-center rounded-full bg-gray-100 p-1 font-medium text-gray-600"
                 key={item.value}
               >
-                <span className="mr-1 text-sm">{item.label}</span>
+                <span className="text-sm">{item.label}</span>
                 {!disabled && (
                   <button
                     type="button"
-                    className="flex h-4 w-4 items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 focus:bg-gray-300 focus:outline-none"
+                    className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 focus:bg-gray-300 focus:outline-none"
                     onClick={(event) => handleRemoveOption(event, item)}
                   >
                     <CloseIcon className="h-3 w-3" />
@@ -138,13 +138,13 @@ export function MultiSelect({
               </div>
             ))
           ) : (
-            <span className="pl-3 text-sm text-slate-400">
+            <span className="pl-3 text-sm text-slate-600 opacity-50">
               {placeholder || 'Select'}
             </span>
           )}
         </div>
-        <div className="relative right-4">
-          <ArrowDown width={8} height={8} className={`text-gray-400`} />
+        <div className="relative right-4 text-slate-500">
+          <ArrowDown width={8} height={8} />
         </div>
       </div>
       {isExpanded && (

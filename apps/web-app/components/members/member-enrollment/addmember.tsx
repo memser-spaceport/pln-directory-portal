@@ -6,7 +6,6 @@ import {
   ChangeEvent,
   useCallback,
 } from 'react';
-import { Loader } from '@protocol-labs-network/ui';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
@@ -40,13 +39,13 @@ function validateBasicForm(formValues) {
   const emailRE =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   if (!formValues.name.trim()) {
-    errors.push('Please add your Name.');
+    errors.push('Please add your Name');
   }
   if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
-    errors.push('Please add valid Email.');
+    errors.push('Please add valid Email');
   }
   if (!formValues.imageFile) {
-    errors.push('Please upload a profile image.');
+    errors.push('Please upload a profile image');
   }
   return errors;
 }
@@ -481,10 +480,8 @@ export function AddMemberModal({
                 </ul>
               </div>
             )}
-            <div className="px-3">{getFormWithStep()}</div>
-            <div
-              className={`footerdiv flow-root w-full px-8 formStep${formStep}`}
-            >
+            <div className="px-11">{getFormWithStep()}</div>
+            <div className={`footerdiv flow-root w-full`}>
               <div className="float-left">
                 {getCancelOrBackButton(formStep, handleModalClose, setFormStep)}
               </div>
