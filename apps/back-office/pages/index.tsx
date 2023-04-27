@@ -10,6 +10,11 @@ import Loader from '../components/common/loader';
 import { ReactComponent as LogoImage } from '/public/assets/images/Back_office_Logo.svg';
 import api from '../utils/api';
 
+interface DecodedJwtPayload {
+  exp: number;
+  iat: number;
+}
+
 export function Index() {
   const [userName, setUserName] = useState<string>('');
   const [password, setPassword] = useState<string>('');
@@ -34,7 +39,7 @@ export function Index() {
       .post('/v1/admin/signin', { username: userName, password: password })
       .then((res) => {
         if (res?.data?.accessToken) {
-          const decoded = jwt_decode(res.data.accessToken) ?? {};
+          const decoded = jwt_decode<DecodedJwtPayload>(res.data.accessToken);
           console.log('decoded', decoded);
           const expiry = new Date(decoded?.exp * 1000);
           document.cookie = `plnadmin=${decoded?.iat}; Expires=${expiry}; path=/`;
