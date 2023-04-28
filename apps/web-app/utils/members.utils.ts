@@ -1,5 +1,6 @@
 import { TMemberResponse } from '@protocol-labs-network/contracts';
 import { TMemberListOptions } from '@protocol-labs-network/members/data-access';
+import nookies from 'nookies';
 import { ParsedUrlQuery } from 'querystring';
 import { getSortFromQuery, stringifyQueryValues } from './list.utils';
 import { IMember } from './members.types';
@@ -137,4 +138,30 @@ export const parseTeamMember = (
   };
 
   return parseMember(memberWithoutOtherTeams);
+};
+
+/**
+ * Used to parse member that currently logged in from cookie.
+ **/
+export const getMemberFromCookie = (
+  res?
+): { isUserLoggedIn: boolean; member?: IMember } => {
+  let { member, refreshToken } = nookies.get(res);
+  if (member && member.length) {
+    let memberDetails: IMember = JSON.parse(member);
+    memberDetails.id = JSON.parse(member).uid;
+    memberDetails.image = JSON.parse(member).profileImageUrl;
+    return {
+      isUserLoggedIn: true,
+      member: memberDetails,
+    };
+  } else if (refreshToken) {
+    return {
+      isUserLoggedIn: true,
+    };
+  } else {
+    return {
+      isUserLoggedIn: false,
+    };
+  }
 };

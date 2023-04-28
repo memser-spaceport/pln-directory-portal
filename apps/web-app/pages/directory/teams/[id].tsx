@@ -18,7 +18,10 @@ import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcr
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember } from '../../../utils/members.types';
-import { parseTeamMember } from '../../../utils/members.utils';
+import {
+  parseTeamMember,
+  getMemberFromCookie,
+} from '../../../utils/members.utils';
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
 
@@ -26,9 +29,11 @@ interface TeamProps {
   team: ITeam;
   members: IMember[];
   backLink: string;
+  isUserLoggedIn: boolean;
+  member: IMember;
 }
 
-export default function Team({ team, members, backLink }: TeamProps) {
+export default function Team({ team, members, backLink, member }: TeamProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
     directoryName: 'Teams',
@@ -46,7 +51,7 @@ export default function Team({ team, members, backLink }: TeamProps) {
       <Breadcrumb items={breadcrumbItems} />
       <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-24">
         <div className="card p-7.5 w-full">
-          <TeamProfileHeader {...team} />
+          <TeamProfileHeader team={team} loggedInMember={member} />
           <TeamProfileDetails {...team} />
           {team.fundingStage || team.membershipSources.length ? (
             <TeamProfileFunding {...team} />
@@ -69,6 +74,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
   query,
   res,
 }) => {
+  const { isUserLoggedIn, member } = getMemberFromCookie(res);
   const { id, backLink = '/directory/teams' } = query as {
     id: string;
     backLink: string;
@@ -131,6 +137,6 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
   );
 
   return {
-    props: { team, members, backLink },
+    props: { team, members, backLink, isUserLoggedIn, member: member || null },
   };
 };

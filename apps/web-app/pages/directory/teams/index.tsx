@@ -15,7 +15,9 @@ import { TeamsDirectoryList } from '../../../components/teams/teams-directory/te
 import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-directory-filters-fathom-logger.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
+import { IMember } from '../../../utils/members.types';
 import { ITeam } from '../../../utils/teams.types';
+import { getMemberFromCookie } from '../../../utils/members.utils';
 import {
   getTeamsListOptions,
   getTeamsOptionsFromQuery,
@@ -25,6 +27,8 @@ import {
 type TeamsProps = {
   teams: ITeam[];
   filtersValues: ITeamsFiltersValues;
+  isUserLoggedIn: boolean;
+  member: IMember | {};
 };
 
 export default function Teams({ teams, filtersValues }: TeamsProps) {
@@ -85,6 +89,7 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
   query,
   res,
 }) => {
+  const { isUserLoggedIn, member } = getMemberFromCookie(res);
   const optionsFromQuery = getTeamsOptionsFromQuery(query);
   const listOptions = getTeamsListOptions(optionsFromQuery);
   const [teamsResponse, filtersValues] = await Promise.all([
@@ -109,6 +114,11 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
   );
 
   return {
-    props: { teams, filtersValues: parsedFilters },
+    props: {
+      teams,
+      filtersValues: parsedFilters,
+      isUserLoggedIn,
+      member: member || {},
+    },
   };
 };

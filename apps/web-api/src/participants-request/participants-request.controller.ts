@@ -21,6 +21,7 @@ import {
   ParticipantRequestMemberSchema,
 } from '../../../../libs/contracts/src/schema/participants-request';
 import { NoCache } from '../decorators/no-cache.decorator';
+import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
 @Controller('v1/participants-request')
 export class ParticipantsRequestController {
   constructor(
@@ -44,6 +45,8 @@ export class ParticipantsRequestController {
 
   @Post()
   // @UseGuards(GoogleRecaptchaGuard)
+  //@UseGuards(GoogleRecaptchaGuard)
+  @UseGuards(UserAuthValidateGuard)
   async addRequest(@Body() body) {
     const postData = body;
     const participantType = body.participantType;

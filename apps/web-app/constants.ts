@@ -42,6 +42,7 @@ export const FATHOM_EVENTS = {
     joinNetwork: 'HUGDIQDP',
     joinNetworkAsMember: 'KJLW2EYZ',
     joinNetworkAsTeam: 'GWGBBAHB',
+    loginAsUser: 'ZUADLQRM',
   },
   members: {
     directory: {

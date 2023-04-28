@@ -2,9 +2,11 @@ import { ArrowSmRightIcon, CalendarIcon } from '@heroicons/react/outline';
 import { AnchorLink } from '@protocol-labs-network/ui';
 import { trackGoal } from 'fathom-client';
 import { FATHOM_EVENTS } from '../../../../constants';
+import { IMember } from '../../../../utils/members.types';
 
 type MemberProfileOfficeHoursProps = {
   url?: string;
+  loggedInMember: IMember;
 };
 
 const LEARN_MORE_URL =
@@ -12,6 +14,7 @@ const LEARN_MORE_URL =
 
 export function MemberProfileOfficeHours({
   url,
+  loggedInMember,
 }: MemberProfileOfficeHoursProps) {
   return (
     <div className="mt-6 rounded-xl bg-slate-50 p-4">
@@ -27,23 +30,27 @@ export function MemberProfileOfficeHours({
         facing.
       </p>
       <div className="mt-6 flex space-x-4">
-        {url ? (
-          <AnchorLink
-            href={url}
-            linkClassName="shadow-request-button rounded-lg border border-slate-300 bg-white px-6 py-2.5 text-sm font-medium hover:shadow-on-hover hover:text-slate-600 on-focus active:border-blue-600 active:ring-2"
-            handleOnClick={() =>
-              trackGoal(
-                FATHOM_EVENTS.members.profile.officeHours.scheduleMeeting,
-                0
-              )
-            }
-          >
-            Schedule Meeting
-          </AnchorLink>
-        ) : (
-          <span className="rounded-lg border border-slate-200 bg-white px-6 py-2.5 text-sm font-medium text-slate-400">
-            Not Available
-          </span>
+        {loggedInMember?.id && (
+          <>
+            {url ? (
+              <AnchorLink
+                href={url}
+                linkClassName="shadow-request-button rounded-lg border border-slate-300 bg-white px-6 py-2.5 text-sm font-medium hover:shadow-on-hover hover:text-slate-600 on-focus active:border-blue-600 active:ring-2"
+                handleOnClick={() =>
+                  trackGoal(
+                    FATHOM_EVENTS.members.profile.officeHours.scheduleMeeting,
+                    0
+                  )
+                }
+              >
+                Schedule Meeting
+              </AnchorLink>
+            ) : (
+              <span className="rounded-lg border border-slate-200 bg-white px-6 py-2.5 text-sm font-medium text-slate-400">
+                Not Available
+              </span>
+            )}
+          </>
         )}
         <AnchorLink
           href={LEARN_MORE_URL}

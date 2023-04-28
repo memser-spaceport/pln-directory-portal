@@ -16,7 +16,7 @@ import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcr
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember } from '../../../utils/members.types';
-import { parseMember } from '../../../utils/members.utils';
+import { parseMember, getMemberFromCookie } from '../../../utils/members.utils';
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
 
@@ -24,9 +24,16 @@ interface MemberProps {
   member: IMember;
   teams: ITeam[];
   backLink: string;
+  isUserLoggedIn: boolean;
+  loggedInMember: IMember;
 }
 
-export default function Member({ member, teams, backLink }: MemberProps) {
+export default function Member({
+  member,
+  teams,
+  backLink,
+  loggedInMember,
+}: MemberProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
     directoryName: 'Members',
@@ -48,14 +55,20 @@ export default function Member({ member, teams, backLink }: MemberProps) {
 
       <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-24">
         <div className="card p-7.5 w-full">
-          <MemberProfileHeader {...member} />
+          <MemberProfileHeader
+            member={member}
+            loggedInMember={loggedInMember}
+          />
           <MemberProfileDetails {...member} />
-          <MemberProfileOfficeHours url={member.officeHours} />
+          <MemberProfileOfficeHours
+            url={member.officeHours}
+            loggedInMember={loggedInMember}
+          />
           <MemberProfileTeams teams={teams} member={member} />
         </div>
-        <div className="w-sidebar shrink-0">
+        {/* <div className="w-sidebar shrink-0">
           <AskToEditCard profileType="member" member={member} />
-        </div>
+        </div> */}
       </section>
     </>
   );
@@ -66,6 +79,9 @@ Member.getLayout = function getLayout(page: ReactElement) {
 };
 
 export const getServerSideProps = async ({ query, res }) => {
+  const memberDetails = getMemberFromCookie(res);
+  const isUserLoggedIn = memberDetails.isUserLoggedIn;
+  const loggedInMember = memberDetails.member || {};
   const { id, backLink = '/directory/members' } = query as {
     id: string;
     backLink: string;
@@ -122,6 +138,6 @@ export const getServerSideProps = async ({ query, res }) => {
   );
 
   return {
-    props: { member, teams, backLink },
+    props: { member, teams, backLink, isUserLoggedIn, loggedInMember },
   };
 };

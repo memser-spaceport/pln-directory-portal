@@ -14,6 +14,13 @@
   dependencies:
     "@jridgewell/trace-mapping" "^0.3.0"
 
+"@anatine/zod-openapi@^1.12.0":
+  version "1.12.1"
+  resolved "https://registry.yarnpkg.com/@anatine/zod-openapi/-/zod-openapi-1.12.1.tgz#1069febe52948179dbcd8e3cae8a40eed2289a2f"
+  integrity sha512-scMpuku9VkDG4NahlnTRQcxlNZP7RGFpjKTOYkteZl/P8SSNaTogyOB1DRak/efQhyJryUAno3wvMVY9WBNxGA==
+  dependencies:
+    ts-deepmerge "^4.0.0"
+
 "@angular-devkit/core@14.0.5":
   version "14.0.5"
   resolved "https://registry.yarnpkg.com/@angular-devkit/core/-/core-14.0.5.tgz#19f5940b53aeb0ce56479c44670d3bc3b2df92b1"
@@ -6011,20 +6018,23 @@
   resolved "https://registry.yarnpkg.com/@trysound/sax/-/sax-0.2.0.tgz#cccaab758af56761eb7bf37af6f03f326dd798ad"
   integrity sha512-L7z9BgrNEcYyUYtF+HaEfiS5ebkh9jXqbszz7pC0hRBPaatV0XjSD3+eHrpqFemQfgwiFF0QPIarnIihIDn7OA==
 
-"@ts-rest/core@3.11.2":
-  version "3.11.2"
-  resolved "https://registry.yarnpkg.com/@ts-rest/core/-/core-3.11.2.tgz#c15f5518965b57dba591ae85e84bb07984806bf1"
-  integrity sha512-XEAHiEW0xN9oFW3XWYSlmkECosEbAe6M4HmCc5raBMPaJAS3t7HVZSjrn2q8mnM70T42GweURWt7nV/A7itUZw==
+"@ts-rest/core@^3.19.3":
+  version "3.19.3"
+  resolved "https://registry.yarnpkg.com/@ts-rest/core/-/core-3.19.3.tgz#4e22fb5aac6b163ff41b57db7bba83e3829f62a7"
+  integrity sha512-ickBYv0IfyeQn/w2ypf+aNhreNwnrMyVULk+fcRpMPU/rkB490YRqd/5N0nSIRkMgMZ3USFwc9z+rIlj2cyh8A==
 
-"@ts-rest/nest@3.11.2":
-  version "3.11.2"
-  resolved "https://registry.yarnpkg.com/@ts-rest/nest/-/nest-3.11.2.tgz#0d2bfe38057a4387ad57fdb400e94e2bbf8ef148"
-  integrity sha512-5UrWY0ADF6OISIzVFZo7QTcXUzJsKM1CQMFS35ed7rhtel/qImn7dLM//wJOlMK6Sk1Hg00JGKe0vTBnDeO58A==
+"@ts-rest/nest@^3.19.3":
+  version "3.19.3"
+  resolved "https://registry.yarnpkg.com/@ts-rest/nest/-/nest-3.19.3.tgz#df86865d945c7cf0fbf90d857ed5d3ab0b783298"
+  integrity sha512-fdlGBOHUyaokDtmzUJk0YdaR6qLOXb0pJMSYvmz6kVDPmS1A4eD5EnT2l0WxkmBI55D/GTj88sw5X9oC5otStQ==
 
-"@ts-rest/open-api@3.11.2":
-  version "3.11.2"
-  resolved "https://registry.yarnpkg.com/@ts-rest/open-api/-/open-api-3.11.2.tgz#b96b64ae3c775342993d9e46a5a865156b4e02b5"
-  integrity sha512-M4WVRUAE87hIJJRZyn/LaUtFVnJMUYUpfLiEZlHi2SDY6ENttZtZTC+d/hAqwZiGGqnBYaCsy9jjmchPdiiDfw==
+"@ts-rest/open-api@^3.19.3":
+  version "3.19.3"
+  resolved "https://registry.yarnpkg.com/@ts-rest/open-api/-/open-api-3.19.3.tgz#6e434f30c3a6dec4ddbfa9fa1f4ad615e363faae"
+  integrity sha512-K7ZenwxUetlZU0eGeP11Bx50Z+SOtIW+a9wLV467iAhdy6Ir7JTIpYDmj5QpZ2vnjKMPhXit5qRxchpcJdbIag==
+  dependencies:
+    "@anatine/zod-openapi" "^1.12.0"
+    openapi3-ts "^2.0.2"
 
 "@tsconfig/node10@^1.0.7":
   version "1.0.8"
@@ -15482,6 +15492,16 @@ jsonwebtoken@^8.5.1:
     ms "^2.1.1"
     semver "^5.6.0"
 
+jsonwebtoken@^9.0.0:
+  version "9.0.0"
+  resolved "https://registry.yarnpkg.com/jsonwebtoken/-/jsonwebtoken-9.0.0.tgz#d0faf9ba1cc3a56255fe49c0961a67e520c1926d"
+  integrity sha512-tuGfYXxkQGDPnLJ7SibiQgVgeDgfbPq2k2ICcbgqW8WxWLBAxKQM/ZCu/IT8SOSwmaYl4dpTFCW5xZv7YbbWUw==
+  dependencies:
+    jws "^3.2.2"
+    lodash "^4.17.21"
+    ms "^2.1.1"
+    semver "^7.3.8"
+
 jsprim@^2.0.2:
   version "2.0.2"
   resolved "https://registry.yarnpkg.com/jsprim/-/jsprim-2.0.2.tgz#77ca23dbcd4135cd364800d22ff82c2185803d4d"
@@ -17291,6 +17311,14 @@ node-releases@^2.0.6:
   resolved "https://registry.yarnpkg.com/node-releases/-/node-releases-2.0.6.tgz#8a7088c63a55e493845683ebf3c828d8c51c5503"
   integrity sha512-PiVXnNuFm5+iYkLBNeq5211hvO38y63T0i2KKh2KnUs3RpzJ+JtODFjkD8yjLwnDkTYF1eKXheUwdssR+NRZdg==
 
+nookies@^2.5.2:
+  version "2.5.2"
+  resolved "https://registry.yarnpkg.com/nookies/-/nookies-2.5.2.tgz#cc55547efa982d013a21475bd0db0c02c1b35b27"
+  integrity sha512-x0TRSaosAEonNKyCrShoUaJ5rrT5KHRNZ5DwPCuizjgrnkpE5DRf3VL7AyyQin4htict92X1EQ7ejDbaHDVdYA==
+  dependencies:
+    cookie "^0.4.1"
+    set-cookie-parser "^2.4.6"
+
 nopt@^5.0.0:
   version "5.0.0"
   resolved "https://registry.yarnpkg.com/nopt/-/nopt-5.0.0.tgz#530942bb58a512fccafe53fe210f13a25355dc88"
@@ -17834,6 +17862,13 @@ open@^8.0.9, open@^8.4.0:
     define-lazy-prop "^2.0.0"
     is-docker "^2.1.1"
     is-wsl "^2.2.0"
+
+openapi3-ts@^2.0.2:
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/openapi3-ts/-/openapi3-ts-2.0.2.tgz#a200dd838bf24c9086c8eedcfeb380b7eb31e82a"
+  integrity sha512-TxhYBMoqx9frXyOgnRHufjQfPXomTIHYKhSKJ6jHfj13kS8OEIhvmE8CTuQyKtjjWttAjX5DPxM1vmalEpo8Qw==
+  dependencies:
+    yaml "^1.10.2"
 
 opener@^1.5.1, opener@^1.5.2:
   version "1.5.2"
@@ -20676,6 +20711,11 @@ set-blocking@^2.0.0, set-blocking@~2.0.0:
   resolved "https://registry.yarnpkg.com/set-blocking/-/set-blocking-2.0.0.tgz#045f9782d011ae9a6803ddd382b24392b3d890f7"
   integrity sha1-BF+XgtARrppoA93TgrJDkrPYkPc=
 
+set-cookie-parser@^2.4.6:
+  version "2.6.0"
+  resolved "https://registry.yarnpkg.com/set-cookie-parser/-/set-cookie-parser-2.6.0.tgz#131921e50f62ff1a66a461d7d62d7b21d5d15a51"
+  integrity sha512-RVnVQxTXuerk653XfuliOxBP81Sf0+qfQE73LIYKcyMYHG94AuH0kgrQpRDuTZnSmjpysHmzxJXKNfa6PjFhyQ==
+
 set-value@^2.0.0, set-value@^2.0.1:
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/set-value/-/set-value-2.0.1.tgz#a18d40530e6f07de4228c7defe4227af8cad005b"
@@ -22097,6 +22137,11 @@ ts-dedent@^2.0.0:
   version "2.2.0"
   resolved "https://registry.yarnpkg.com/ts-dedent/-/ts-dedent-2.2.0.tgz#39e4bd297cd036292ae2394eb3412be63f563bb5"
   integrity sha512-q5W7tVM71e2xjHZTlgfTDoPF/SmqKG5hddq9SzR49CH2hayqRKJtQ4mtRlSxKaJlR/+9rEM+mnBHf7I2/BQcpQ==
+
+ts-deepmerge@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/ts-deepmerge/-/ts-deepmerge-4.0.0.tgz#e236314a601ff9a6526cbd07c4b97e885f58532a"
+  integrity sha512-IrjjAwfM/J6ajWv5wDRZBdpVaTmuONJN1vC85mXlWVPXKelouLFiqsjR7m0h245qY6zZEtcDtcOTc4Rozgg1TQ==
 
 ts-jest@27.1.5:
   version "27.1.5"

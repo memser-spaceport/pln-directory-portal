@@ -44,6 +44,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
       moreDetails: faker.helpers.arrayElement([null, faker.lorem.paragraph()]),
       plnFriend: faker.datatype.boolean(),
       airtableRecId: `airtable-rec-id-${sequence}`,
+      externalId: faker.helpers.slugify(`external-${name.toLowerCase()}`),
       createdAt: faker.date.past(),
       plnStartDate: faker.date.past(),
       updatedAt: faker.date.recent(),
@@ -57,7 +58,7 @@ export const members = async () => await membersFactory.createList(800);
 export const memberRelations = async (members) => {
   const skillUids = await getUidsFrom(Prisma.ModelName.Skill);
 
-  return members.map((member) => {
+  return members.map((member, mIndex) => {
     const randomSkills = sampleSize(skillUids, random(0, 5));
     return {
       where: {
@@ -66,6 +67,9 @@ export const memberRelations = async (members) => {
       data: {
         ...(randomSkills.length && {
           skills: { connect: randomSkills },
+        }),
+        ...(mIndex === 0 && {
+          memberRoles: { connect: [{ id: 1 }] },
         }),
       },
     };

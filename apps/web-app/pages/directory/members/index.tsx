@@ -3,8 +3,10 @@ import {
   getMembersFilters,
 } from '@protocol-labs-network/members/data-access';
 import { GetServerSideProps } from 'next';
+import { useRouter } from 'next/router';
 import { NextSeo } from 'next-seo';
-import { ReactElement } from 'react';
+import { ReactElement, useState } from 'react';
+import { ToastContainer, toast } from 'react-toastify';
 import { LoadingOverlay } from '../../../components/layout/loading-overlay/loading-overlay';
 import { MembersDirectoryFilters } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters';
 import { IMembersFiltersValues } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters.types';
@@ -16,20 +18,33 @@ import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-dire
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember } from '../../../utils/members.types';
-import { parseMember } from '../../../utils/members.utils';
-
+import { parseMember, getMemberFromCookie } from '../../../utils/members.utils';
+import { VerifyEmailModal } from '../../../components/layout/navbar/login-menu/verify-email-modal';
 import {
   getMembersListOptions,
   getMembersOptionsFromQuery,
 } from '../../../utils/members.utils';
+import { ReactComponent as SuccessIcon } from '../../../public/assets/images/icons/success.svg';
+import 'react-toastify/dist/ReactToastify.css';
 
 type MembersProps = {
   members: IMember[];
   filtersValues: IMembersFiltersValues;
+  isUserLoggedIn: boolean;
+  member: IMember;
+  verified: boolean;
 };
 
-export default function Members({ members, filtersValues }: MembersProps) {
+export default function Members({
+  members,
+  filtersValues,
+  verified,
+  member,
+}: MembersProps) {
+  const isVerified = verified === null ? true : verified;
+  const [isOpen, setIsModalOpen] = useState(!isVerified);
   const { selectedViewType } = useViewType();
+  const router = useRouter();
   const isGrid = selectedViewType === 'grid';
   const filterProperties = [
     'skills',
@@ -39,9 +54,23 @@ export default function Members({ members, filtersValues }: MembersProps) {
     'officeHoursOnly',
     'includeFriends',
   ];
-
+  if (isVerified && verified) {
+    toast.success('Your account has been verified', {
+      position: 'top-right',
+      autoClose: 5000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      theme: 'dark',
+      icon: <SuccessIcon />,
+      onClose: () => {
+        // router.push('/directory/members/');
+      },
+    });
+  }
   useDirectoryFiltersFathomLogger('members', filterProperties);
-
   return (
     <>
       <NextSeo {...DIRECTORY_SEO} title="Members" />
@@ -71,10 +100,24 @@ export default function Members({ members, filtersValues }: MembersProps) {
               members={members}
               isGrid={isGrid}
               filterProperties={filterProperties}
+              loggedInMember={member}
             />
           </div>
         </div>
       </section>
+      <VerifyEmailModal
+        isOpen={isOpen}
+        setIsModalOpen={(isOpen) => {
+          setIsModalOpen(isOpen);
+          router.push('/directory/members/');
+        }}
+      />
+      <ToastContainer
+        bodyClassName="text-sm"
+        className="!top-20"
+        toastClassName="!rounded-md !bg-[#1E293B]"
+        progressClassName="!bg-[#30C593]"
+      />
     </>
   );
 }
@@ -87,6 +130,8 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
   query,
   res,
 }) => {
+  const { verified } = query;
+  const { isUserLoggedIn, member } = getMemberFromCookie(res);
   const optionsFromQuery = getMembersOptionsFromQuery(query);
   const listOptions = getMembersListOptions(optionsFromQuery);
   const [membersResponse, filtersValues] = await Promise.all([
@@ -111,6 +156,13 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
   );
 
   return {
-    props: { members, filtersValues: parsedFilters },
+    props: {
+      members,
+      filtersValues: parsedFilters,
+      isUserLoggedIn,
+      member: member || null,
+      verified:
+        verified === 'true' ? true : verified === 'false' ? false : null,
+    },
   };
 };

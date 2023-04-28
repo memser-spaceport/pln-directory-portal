@@ -26,6 +26,7 @@ import { SkillsModule } from './skills/skills.module';
 import { TeamsModule } from './teams/teams.module';
 import { TechnologiesModule } from './technologies/technologies.module';
 import { AdminModule } from './admin/admin.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   controllers: [AppController],
@@ -68,6 +69,7 @@ import { AdminModule } from './admin/admin.module';
     TechnologiesModule,
     ParticipantsRequestModule,
     AdminModule,
+    AuthModule,
   ],
   providers: [
     PrismaService,

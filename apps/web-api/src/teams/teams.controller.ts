@@ -15,6 +15,7 @@ import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { ENABLED_RETRIEVAL_PROFILE } from '../utils/prisma-query-builder/profile/defaults';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { TeamsService } from './teams.service';
+import { NoCache } from '../decorators/no-cache.decorator';
 
 const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
@@ -25,6 +26,7 @@ export class TeamsController {
   @Api(server.route.getTeams)
   @ApiQueryFromZod(TeamQueryParams)
   @ApiOkResponseFromZod(ResponseTeamWithRelationsSchema.array())
+  @NoCache()
   findAll(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(
       ResponseTeamWithRelationsSchema
@@ -39,6 +41,7 @@ export class TeamsController {
   @ApiOkResponseFromZod(ResponseTeamWithRelationsSchema)
   @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
   @ApiQueryFromZod(TeamDetailQueryParams)
+  @NoCache()
   findOne(
     @Req() request: Request,
     @ApiDecorator() { params: { uid } }: RouteShape['getTeam']

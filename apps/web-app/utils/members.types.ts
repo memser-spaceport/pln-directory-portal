@@ -14,6 +14,7 @@ export interface IMember {
   teams: IMemberTeam[];
   mainTeam: IMemberTeam | null;
   twitter: string | null;
+  roles?: string[];
 }
 
 export interface IMemberTeam {

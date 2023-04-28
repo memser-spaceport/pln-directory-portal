@@ -9,9 +9,14 @@ import { DirectoryCardHeader } from '../../../shared/directory/directory-card/di
 interface MemberCardProps {
   isGrid?: boolean;
   member: IMember;
+  loggedInMember: IMember;
 }
 
-export function MemberCard({ isGrid = true, member }: MemberCardProps) {
+export function MemberCard({
+  isGrid = true,
+  member,
+  loggedInMember,
+}: MemberCardProps) {
   const router = useRouter();
   const backLink = encodeURIComponent(router.asPath);
   const mainTeam = member.mainTeam;
@@ -70,20 +75,21 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
             {role}
           </div>
         </div>
-
-        <div
-          className={`${isGrid ? 'mt-2 justify-center' : 'mt-1'}
-            flex items-center text-sm text-slate-600`}
-        >
-          {member.location ? (
-            <>
-              <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0 fill-slate-400" />
-              <span className="line-clamp-1">{member.location}</span>
-            </>
-          ) : (
-            '-'
-          )}
-        </div>
+        {loggedInMember?.id && (
+          <div
+            className={`${isGrid ? 'mt-2 justify-center' : 'mt-1'}
+              flex items-center text-sm text-slate-600`}
+          >
+            {member.location ? (
+              <>
+                <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0 fill-slate-400" />
+                <span className="line-clamp-1">{member.location}</span>
+              </>
+            ) : (
+              '-'
+            )}
+          </div>
+        )}
       </div>
       <DirectoryCardFooter
         isGrid={isGrid}

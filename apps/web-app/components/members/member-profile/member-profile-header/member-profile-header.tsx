@@ -1,16 +1,17 @@
 import { FlagIcon, LocationMarkerIcon, UserIcon } from '@heroicons/react/solid';
 import { Tooltip } from '@protocol-labs-network/ui';
 import Image from 'next/image';
+import { AskToEditCard } from '../../../shared/profile/ask-to-edit-card/ask-to-edit-card';
 import { IMember } from '../../../../utils/members.types';
 
 export function MemberProfileHeader({
-  image,
-  name,
-  teams,
-  location,
-  teamLead,
-  mainTeam,
-}: IMember) {
+  member,
+  loggedInMember,
+}: {
+  member: IMember;
+  loggedInMember: IMember;
+}) {
+  const { image, name, teams, location, teamLead, mainTeam } = member;
   const otherTeams = teams
     .filter((team) => team.id !== mainTeam?.id)
     .map((team) => team.name)
@@ -18,7 +19,7 @@ export function MemberProfileHeader({
   const memberRole = mainTeam?.role || 'Contributor';
 
   return (
-    <div className="flex space-x-4">
+    <div className="relative flex space-x-4">
       <div
         className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-full border border-slate-200 ${
           image ? 'bg-white' : 'bg-slate-200'
@@ -37,8 +38,8 @@ export function MemberProfileHeader({
           <UserIcon className="w-22 h-22 mt-2 fill-white" />
         )}
       </div>
-      <div className="grow">
-        <h1 className="text-2xl font-bold">{name}</h1>
+      <div>
+        <h1 className="pt-1 text-2xl font-bold">{name}</h1>
         <div className="flex items-center">
           <div className="max-w-sm overflow-hidden text-ellipsis whitespace-nowrap font-medium">
             {mainTeam?.name}
@@ -58,19 +59,21 @@ export function MemberProfileHeader({
           ) : null}
         </div>
         <p className="line-clamp-1 mt-0.5 text-sm">{memberRole}</p>
-        <div className="mr-2 mt-1 flex items-center text-sm text-slate-600">
-          {location ? (
-            <>
-              <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0 fill-slate-400" />
-              <span className="line-clamp-1">{location}</span>
-            </>
-          ) : (
-            '-'
-          )}
-        </div>
+        {loggedInMember?.id && (
+          <div className="mr-2 mt-1 flex items-center text-sm text-slate-600">
+            {location ? (
+              <>
+                <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0 fill-slate-400" />
+                <span className="line-clamp-1">{location}</span>
+              </>
+            ) : (
+              '-'
+            )}
+          </div>
+        )}
       </div>
       {teamLead ? (
-        <div className="flex w-24 items-start justify-end">
+        <div className="flex w-20 items-start justify-start">
           <Tooltip
             asChild
             trigger={
@@ -84,6 +87,11 @@ export function MemberProfileHeader({
           />
         </div>
       ) : null}
+      {(loggedInMember.id === member.id ||
+        (loggedInMember.roles?.length > 0 &&
+          loggedInMember.roles.includes('DIRECTORYADMIN'))) && (
+        <AskToEditCard profileType="member" member={member} />
+      )}
     </div>
   );
 }

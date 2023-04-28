@@ -6,12 +6,14 @@ interface MembersDirectoryListProps {
   members: IMember[];
   isGrid: boolean;
   filterProperties: string[];
+  loggedInMember: IMember;
 }
 
 export function MembersDirectoryList({
   members,
   isGrid,
   filterProperties,
+  loggedInMember,
 }: MembersDirectoryListProps) {
   return (
     <DirectoryList
@@ -19,7 +21,12 @@ export function MembersDirectoryList({
       itemsCount={members.length}
     >
       {members.map((member) => (
-        <MemberCard key={member.id} member={member} isGrid={isGrid} />
+        <MemberCard
+          key={member.id}
+          member={member}
+          isGrid={isGrid}
+          loggedInMember={loggedInMember}
+        />
       ))}
     </DirectoryList>
   );
