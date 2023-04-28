@@ -157,7 +157,12 @@ function getSubmitOrNextButton(
   return submitOrNextButton;
 }
 
-function getCancelOrBackButton(formStep, handleModalClose, setFormStep) {
+function getCancelOrBackButton(
+  formStep,
+  handleModalClose,
+  setFormStep,
+  setErrors
+) {
   const cancelorBackButton =
     formStep === 1 ? (
       <button
@@ -169,7 +174,10 @@ function getCancelOrBackButton(formStep, handleModalClose, setFormStep) {
     ) : (
       <button
         className="on-focus leading-3.5 text-md mb-2 mr-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
-        onClick={() => setFormStep(--formStep)}
+        onClick={() => {
+          setFormStep(--formStep);
+          setErrors([]);
+        }}
       >
         Back
       </button>
@@ -484,7 +492,12 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
             <div className="px-11">{getFormStep()}</div>
             <div className="footerdiv flow-root w-full">
               <div className="float-left">
-                {getCancelOrBackButton(formStep, handleModalClose, setFormStep)}
+                {getCancelOrBackButton(
+                  formStep,
+                  handleModalClose,
+                  setFormStep,
+                  setErrors
+                )}
               </div>
               <div className="float-right">
                 {getSubmitOrNextButton(
