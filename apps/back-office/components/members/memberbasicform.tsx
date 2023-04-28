@@ -7,8 +7,8 @@ export default function AddMemberBasicForm(props) {
 
   return (
     <>
-      <div className="flex content-around pt-5">
-        <div className="profileImage justify-content basis-[20%]">
+      <div className="flex pt-5">
+        <div className="profileImage justify-content pr-5">
           <ProfileImageUpload
             imageUrl={props.imageUrl}
             maxSize={4}
@@ -16,7 +16,7 @@ export default function AddMemberBasicForm(props) {
             disabled={!props.isEditEnabled}
           />
         </div>
-        <div className="namefield inputfield basis-[80%]">
+        <div className="w-full">
           <InputField
             required={true}
             name="name"

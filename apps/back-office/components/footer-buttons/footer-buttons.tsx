@@ -52,7 +52,7 @@ export function FooterButtons(props) {
 
   return (
     <div className="header">
-      <nav className="navbar absolute bottom-0 z-[1157]  grid min-h-[40px] w-full grid-flow-col items-center bg-[white] px-12 only-of-type:shadow-[0_1px_4px_0_#e2e8f0] md:min-h-[80px]">
+      <nav className="navbar absolute bottom-0 z-[1157]  grid min-h-[40px] min-h-[60px] w-full grid-flow-col items-center bg-[white] px-12 only-of-type:shadow-[0_1px_4px_0_#e2e8f0] md:min-h-[80px]">
         <div className="col-span-4 justify-self-end">
           {!props.isEditEnabled ? (
             <button
@@ -63,7 +63,7 @@ export function FooterButtons(props) {
             </button>
           ) : (
             <button
-              className="on-focus leading-3.5 text-md mb-2 mr-2 flex items-center rounded-full border border-blue-600 bg-blue-600 px-5 py-3 text-left font-medium text-white last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
+              className="on-focus leading-3.5 text-md mb-2 mr-2 flex items-center rounded-full border border-blue-600 bg-blue-600 px-4 py-3 text-left font-medium text-white last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
               onClick={props.saveChanges}
             >
               <span>Save Changes</span>
@@ -74,7 +74,7 @@ export function FooterButtons(props) {
           <div className="flex items-end space-x-3">
             <div>
               <button
-                className={`on-focus leading-3.5 text-md mb-2 mr-2 flex items-center rounded-full border border-slate-300 bg-[#D65229] px-5 py-2 text-left font-medium text-white last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full ${
+                className={`on-focus leading-3.5 text-md mb-2 mr-2 flex items-center rounded-full border border-slate-300 bg-[#D65229] px-4 py-2 text-left font-medium text-white last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full ${
                   props.isEditEnabled && 'bg-slate-400'
                 }`}
                 disabled={props.isEditEnabled}

@@ -72,6 +72,7 @@ export default function AddMemberSocialForm(props) {
           maxLength={300}
           value={values.officeHours}
           onChange={onChange}
+          placeholder="Enter office hours"
           className="custom-grey custom-outline-none border"
         />
         <div className="flex pt-3">

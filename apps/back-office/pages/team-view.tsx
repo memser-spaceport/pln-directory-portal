@@ -103,7 +103,9 @@ export default function TeamView(props) {
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [isEditEnabled, setIsEditEnabled] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
-  const { setIsOpenRequest, setMemberList, setTeamList } = useNavbarContext();
+  const { setIsOpenRequest, setMemberList, setTeamList, setIsTeamActive } =
+    useNavbarContext();
+  setIsTeamActive(true);
   setMemberList(props.memberList);
   setTeamList(props.teamList);
   setIsOpenRequest(props.status === APP_CONSTANTS.PENDING_LABEL ? true : false);
@@ -239,8 +241,8 @@ export default function TeamView(props) {
             >
               Back to requests
             </div>
-            <div className="rounded-xl border border-gray-300 bg-white px-11">
-              <div className="inputfield pb-10 pt-4">
+            <div className="rounded-xl border border-gray-300 bg-white px-11 py-10">
+              <div className="inputfield pt-5">
                 {errors?.length > 0 && (
                   <div className="w-full rounded-lg bg-white p-5 ">
                     <ul className="list-inside list-disc space-y-1 text-xs text-red-500">

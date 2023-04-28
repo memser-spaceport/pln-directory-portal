@@ -28,6 +28,14 @@ export function Index() {
     name === 'name' ? setUserName(value) : setPassword(value);
   }
 
+  function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>): void {
+    if (event.key === 'Enter' || event.code === 'NumpadEnter') {
+      event.preventDefault();
+      event.stopPropagation();
+      onSubmit();
+    }
+  }
+
   useEffect(() => {
     setIsLoading(isLoading);
   }, [isLoading]);
@@ -42,7 +50,7 @@ export function Index() {
           const decoded = jwt_decode<DecodedJwtPayload>(res.data.accessToken);
           console.log('decoded', decoded);
           const expiry = new Date(decoded?.exp * 1000);
-          document.cookie = `plnadmin=${decoded?.iat}; Expires=${expiry}; path=/`;
+          document.cookie = `plnadmin=${res?.data?.accessToken}; Expires=${expiry}; path=/`;
           const backLink = router.query.backlink?.toString() ?? '';
           router.push(backLink ? backLink : ROUTE_CONSTANTS.PENDING_LIST);
           return res?.data;
@@ -107,6 +115,7 @@ export function Index() {
               label="Username"
               value={userName}
               onChange={onChange}
+              onKeyDown={onKeyDown}
               placeholder="Enter username"
               className="custom-grey custom-outline-none border"
             />
@@ -117,6 +126,7 @@ export function Index() {
               name="password"
               label="Password"
               value={password}
+              onKeyDown={onKeyDown}
               onChange={onChange}
               placeholder="Enter password"
               className="custom-grey custom-outline-none border"

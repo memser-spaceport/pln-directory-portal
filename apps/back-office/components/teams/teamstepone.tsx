@@ -26,7 +26,7 @@ export default function TeamStepOne(props) {
         />
       </div>
       <div className="flex pt-5">
-        <div className="basis-[20%]">
+        <div className="pr-5">
           <ProfileImageUpload
             imageUrl={props.imageUrl}
             maxSize={4}
@@ -35,7 +35,7 @@ export default function TeamStepOne(props) {
             disabled={!props.isEditEnabled}
           />
         </div>
-        <div className="inputfield basis-[80%] pl-1">
+        <div className="w-full">
           <InputField
             required
             value={values?.name}

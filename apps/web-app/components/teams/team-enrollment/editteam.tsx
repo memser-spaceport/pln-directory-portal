@@ -5,6 +5,7 @@ import {
   ChangeEvent,
   useEffect,
   useCallback,
+  useRef,
 } from 'react';
 import { Loader } from '@protocol-labs-network/ui';
 import AddTeamStepOne from './addteamstepone';
@@ -154,8 +155,18 @@ export function EditTeamModal({
     blog: '',
     officeHours: '',
   });
+  const divRef = useRef<HTMLDivElement>(null);
 
   // const { executeRecaptcha } = useGoogleReCaptcha();
+
+  useEffect(() => {
+    console.log('scrollllllllllllllllllllllllllllll');
+    const divElement = document.getElementById('myDiv') as HTMLDivElement;
+    if (divElement) {
+      divElement.setAttribute('tabIndex', '0');
+      divElement.focus();
+    }
+  }, [saveCompleted, errors]);
 
   useEffect(() => {
     if (isOpen) {
@@ -286,6 +297,9 @@ export function EditTeamModal({
       setErrors([]);
       const errors = validateForm(formValues, imageUrl);
       if (errors?.length > 0) {
+        if (divRef.current) {
+          divRef.current.focus();
+        }
         setErrors(errors);
         return false;
       }
@@ -358,88 +372,90 @@ export function EditTeamModal({
 
   return (
     <>
-      <Modal
-        isOpen={isOpen}
-        onClose={handleModalClose}
-        enableFooter={false}
-        image={<TextImage />}
-      >
-        {isProcessing && (
-          <div
-            className={`visible absolute left-0 top-0 z-[2000] flex h-full w-full items-center justify-center overflow-x-hidden overscroll-none bg-slate-100/50 opacity-100 transition-[visibility,_opacity] delay-[0s,0s] duration-[0s,_300ms] ease-[linear,_linear]`}
-          >
-            <LoadingIndicator />
-          </div>
-        )}
-        {saveCompleted ? (
-          <div>
-            <div className="mb-3 text-center text-2xl font-bold">
-              Thank you for submitting
-            </div>
-            <div className="text-md mb-3 text-center">
-              Our team will review your request shortly & get back
-            </div>
-            <div className="text-center">
-              <button
-                className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
-                onClick={() => handleModalClose()}
-              >
-                Return to home
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div>
-            <div className="px-11">
-              <span className="font-size-14 text-sm">
-                Please fill out only the fields you would like to change for
-                this member. If there is something you want to change that is
-                not available, please leave a detailed explanation in
-                &quot;Additional Notes&quot;. If you don&apos;t want to change a
-                field, leave it blank.
-              </span>
-            </div>
-            {errors?.length > 0 && (
-              <div className="w-full rounded-lg bg-white p-5 ">
-                <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
-                  {errors.map((item, index) => (
-                    <li key={index}>{item}</li>
-                  ))}
-                </ul>
+      {isProcessing && (
+        <div
+          className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
+        >
+          <LoadingIndicator />
+        </div>
+      )}
+      <div id="myDiv">
+        <Modal
+          isOpen={isOpen}
+          onClose={handleModalClose}
+          enableFooter={false}
+          image={<TextImage />}
+        >
+          {saveCompleted ? (
+            <div>
+              <div className="mb-3 text-center text-2xl font-bold">
+                Thank you for submitting
               </div>
-            )}
-            <div className="overflow-y-auto px-11">
-              <AddTeamStepOne
-                formValues={formValues}
-                handleInputChange={handleInputChange}
-                handleDropDownChange={handleDropDownChange}
-                handleImageChange={handleImageChange}
-                imageUrl={imageUrl}
-                disableName={true}
-              />
-              <AddTeamStepTwo
-                formValues={formValues}
-                dropDownValues={dropDownValues}
-                handleInputChange={handleInputChange}
-                handleDropDownChange={handleDropDownChange}
-              />
-              <AddTeamStepThree
-                formValues={formValues}
-                handleInputChange={handleInputChange}
-                handleDropDownChange={handleDropDownChange}
-              />
-            </div>
-            <div className="footerdiv flow-root w-full">
-              <div className="float-left">
-                {getCancelOrBackButton(handleModalClose)}
+              <div className="text-md mb-3 text-center">
+                Our team will review your request shortly & get back
               </div>
-              <div className="float-right">
-                {getSubmitOrNextButton(handleSubmit, isProcessing)}
+              <div className="text-center">
+                <button
+                  className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
+                  onClick={() => handleModalClose()}
+                >
+                  Return to home
+                </button>
               </div>
             </div>
-          </div>
-        )}
-      </Modal>
+          ) : (
+            <div ref={divRef}>
+              <div className="px-11">
+                <span className="font-size-14 text-sm">
+                  Please fill out only the fields you would like to change for
+                  this member. If there is something you want to change that is
+                  not available, please leave a detailed explanation in
+                  &quot;Additional Notes&quot;. If you don&apos;t want to change
+                  a field, leave it blank.
+                </span>
+              </div>
+              {errors?.length > 0 && (
+                <div className="w-full rounded-lg bg-white p-5 ">
+                  <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
+                    {errors.map((item, index) => (
+                      <li key={index}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div className="overflow-y-auto px-11">
+                <AddTeamStepOne
+                  formValues={formValues}
+                  handleInputChange={handleInputChange}
+                  handleDropDownChange={handleDropDownChange}
+                  handleImageChange={handleImageChange}
+                  imageUrl={imageUrl}
+                  disableName={true}
+                />
+                <AddTeamStepTwo
+                  formValues={formValues}
+                  dropDownValues={dropDownValues}
+                  handleInputChange={handleInputChange}
+                  handleDropDownChange={handleDropDownChange}
+                />
+                <AddTeamStepThree
+                  formValues={formValues}
+                  handleInputChange={handleInputChange}
+                  handleDropDownChange={handleDropDownChange}
+                />
+              </div>
+              <div className="footerdiv flow-root w-full">
+                <div className="float-left">
+                  {getCancelOrBackButton(handleModalClose)}
+                </div>
+                <div className="float-right">
+                  {getSubmitOrNextButton(handleSubmit, isProcessing)}
+                </div>
+              </div>
+            </div>
+          )}
+        </Modal>
+      </div>
     </>
   );
 }

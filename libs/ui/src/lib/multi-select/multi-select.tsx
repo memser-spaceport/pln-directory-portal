@@ -115,14 +115,14 @@ export function MultiSelect({
         </span>
       )}
       <div
-        className={`mt-[12px] flex cursor-pointer items-center justify-between rounded-md border border-gray-300 bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${requiredIndicator}`}
+        className={`mt-[12px] flex cursor-pointer items-center justify-between rounded-md border border-gray-300 bg-white py-2 px-1 focus:outline-none focus:ring-2 focus:ring-blue-500 ${requiredIndicator}`}
         onClick={!disabled ? toggleDropdown : () => null}
       >
         <div className="flex flex-1 flex-wrap pr-4">
           {selectedValues?.length > 0 ? (
             selectedValues.map((item) => (
               <div
-                className="m-1 flex items-center rounded-full bg-gray-100 p-1 font-medium text-gray-600"
+                className="flex items-center rounded-full bg-gray-100 p-1 font-medium text-gray-600"
                 key={item.value}
               >
                 <span className="text-sm">{item.label}</span>
@@ -171,9 +171,7 @@ export function MultiSelect({
                 </label>
               ))
             ) : (
-              <label>
-                <span className="p-2 text-gray-500">No options available</span>
-              </label>
+              <span className="p-2 text-gray-500">No options available</span>
             )}
           </div>
         </div>

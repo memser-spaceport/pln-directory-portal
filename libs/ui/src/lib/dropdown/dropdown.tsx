@@ -88,41 +88,45 @@ export function Dropdown({
             as="div"
             className="absolute z-20 mt-2 h-auto max-h-[14rem] w-full space-y-1 overflow-y-auto rounded-lg bg-white p-2 leading-6 shadow-md focus:outline-none"
           >
-            {options.map((option) => {
-              const OptionIcon = option.icon;
+            {options?.length ? (
+              options.map((option) => {
+                const OptionIcon = option.icon;
 
-              return (
-                <Listbox.Option
-                  as={Fragment}
-                  key={option.value}
-                  value={option.value}
-                >
-                  {({ active, selected }) => (
-                    <div
-                      className={`${
-                        selected
-                          ? 'border-blue-600 bg-blue-600 text-white'
-                          : 'border-white bg-white'
-                      } ${
-                        !selected && active
-                          ? 'border-slate-100 bg-slate-100 active:border-blue-600 active:bg-white active:ring-2 active:ring-blue-300'
-                          : ''
-                      }
+                return (
+                  <Listbox.Option
+                    as={Fragment}
+                    key={option.value}
+                    value={option.value}
+                  >
+                    {({ active, selected }) => (
+                      <div
+                        className={`${
+                          selected
+                            ? 'border-blue-600 bg-blue-600 text-white'
+                            : 'border-white bg-white'
+                        } ${
+                          !selected && active
+                            ? 'border-slate-100 bg-slate-100 active:border-blue-600 active:bg-white active:ring-2 active:ring-blue-300'
+                            : ''
+                        }
                       relative cursor-pointer select-none overflow-hidden rounded-lg border py-1 pl-8 pr-4 transition duration-150 ease-in-out`}
-                    >
-                      {OptionIcon && (
-                        <OptionIcon
-                          className={`${
-                            selected ? 'text-white' : ''
-                          } pointer-events-none absolute inset-y-0 left-2 my-auto h-4`}
-                        />
-                      )}
-                      {option.label}
-                    </div>
-                  )}
-                </Listbox.Option>
-              );
-            })}
+                      >
+                        {OptionIcon && (
+                          <OptionIcon
+                            className={`${
+                              selected ? 'text-white' : ''
+                            } pointer-events-none absolute inset-y-0 left-2 my-auto h-4`}
+                          />
+                        )}
+                        {option.label}
+                      </div>
+                    )}
+                  </Listbox.Option>
+                );
+              })
+            ) : (
+              <span className="p-2 text-gray-500">No options available</span>
+            )}
           </Listbox.Options>
         </div>
       )}
