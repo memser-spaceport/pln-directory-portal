@@ -62,9 +62,9 @@ export function TeamAndRoleGrid(props) {
             value={team.role}
           />
         </div>
-        <div className="basis-1/12 pl-3 pt-6">
+        <div className="basis-1/12 pl-3 pt-5 ">
           <div
-            className={teamRowId > 1 ? `cursor-pointer"` : `invisible`}
+            className={teamRowId > 1 ? `cursor-pointer` : `invisible`}
             onClick={() => props.handleDeleteRolesRow(teamRowId)}
           >
             <CloseIcon className="cross-icon" />

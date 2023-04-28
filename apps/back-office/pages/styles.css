@@ -423,6 +423,11 @@ summary svg {
   min-width: 770px;
 }
 
+.cross-icon {
+  width: 16px;
+  height: 16px;
+}
+
 .custom-outline-none:hover {
   box-shadow: none !important;
   outline: none !important;

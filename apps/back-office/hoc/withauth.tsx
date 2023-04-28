@@ -19,7 +19,7 @@ const withAuth = (WrappedComponent) => {
         router.push({
           pathname: '/pending-list',
           query: {
-            backlink: backLink,
+            ...(backLink !== '' && { backlink: backLink }),
           },
         });
       }
