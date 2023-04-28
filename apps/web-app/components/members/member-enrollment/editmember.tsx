@@ -379,19 +379,19 @@ export function EditMemberModal({
 
   return (
     <>
+      {isProcessing && (
+        <div
+          className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
+        >
+          <LoadingIndicator />
+        </div>
+      )}
       <Modal
         isOpen={isOpen}
         onClose={() => handleModalClose()}
         enableFooter={false}
         image={<TextImage />}
       >
-        {isProcessing && (
-          <div
-            className={`visible absolute left-0 top-0 z-[2000] flex h-full w-full items-center justify-center overflow-x-hidden overscroll-none bg-slate-100/50 opacity-100 transition-[visibility,_opacity] delay-[0s,0s] duration-[0s,_300ms] ease-[linear,_linear]`}
-          >
-            <LoadingIndicator />
-          </div>
-        )}
         {saveCompleted ? (
           <div>
             <div className="mb-3 text-center text-2xl font-bold">

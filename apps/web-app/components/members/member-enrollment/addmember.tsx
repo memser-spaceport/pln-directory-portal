@@ -137,7 +137,12 @@ function getSubmitOrNextButton(
   return submitOrNextButton;
 }
 
-function getCancelOrBackButton(formStep, handleModalClose, setFormStep) {
+function getCancelOrBackButton(
+  formStep,
+  handleModalClose,
+  setFormStep,
+  setErrors
+) {
   const cancelorBackButton =
     formStep === 1 ? (
       <button
@@ -149,7 +154,10 @@ function getCancelOrBackButton(formStep, handleModalClose, setFormStep) {
     ) : (
       <button
         className="on-focus leading-3.5 text-md mb-2 mr-2 rounded-full border border-slate-300 px-5 py-3 text-left font-medium last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
-        onClick={() => setFormStep(--formStep)}
+        onClick={() => {
+          setFormStep(--formStep);
+          setErrors([]);
+        }}
       >
         Back
       </button>
@@ -438,19 +446,19 @@ export function AddMemberModal({
 
   return (
     <>
+      {isProcessing && (
+        <div
+          className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
+        >
+          <LoadingIndicator />
+        </div>
+      )}
       <Modal
         isOpen={isOpen}
         onClose={() => handleModalClose()}
         enableFooter={false}
         image={<TextImage />}
       >
-        {isProcessing && (
-          <div
-            className={`visible absolute left-0 top-0 z-[2000] flex h-full w-full items-center justify-center overflow-x-hidden overscroll-none bg-slate-100/50 opacity-100 transition-[visibility,_opacity] delay-[0s,0s] duration-[0s,_300ms] ease-[linear,_linear]`}
-          >
-            <LoadingIndicator />
-          </div>
-        )}
         {saveCompleted ? (
           <div className="px-5">
             <div className="mb-3 text-center text-2xl font-bold">
@@ -483,7 +491,12 @@ export function AddMemberModal({
             <div className="px-11">{getFormWithStep()}</div>
             <div className={`footerdiv flow-root w-full`}>
               <div className="float-left">
-                {getCancelOrBackButton(formStep, handleModalClose, setFormStep)}
+                {getCancelOrBackButton(
+                  formStep,
+                  handleModalClose,
+                  setFormStep,
+                  setErrors
+                )}
               </div>
               <div className="float-right">
                 {getSubmitOrNextButton(

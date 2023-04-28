@@ -1,17 +1,13 @@
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
+import { getToken } from '../utils/auth';
 
 const withAuth = (WrappedComponent) => {
   const AuthComponent = (props) => {
     const router = useRouter();
     const backLink = router?.asPath === '/' ? '' : router.asPath;
     useEffect(() => {
-      const token = document.cookie
-        // ?.split(';')
-        // ?.map((cookie) => cookie.trim())
-        // ?.find((cookie) => cookie.startsWith('plnadmin='))
-        ?.split('=')[1];
-      // const token = localStorage.getItem('back-office');
+      const token = getToken();
       if (!token) {
         router.push({
           pathname: '/',

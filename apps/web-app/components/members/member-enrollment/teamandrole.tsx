@@ -34,44 +34,42 @@ export function TeamAndRoleGrid(props) {
 
   return (
     <>
-      <div className="flex">
-        <div className="flex flex-row">
-          <div className="basis-6/12">
-            <Dropdown
-              name="team"
-              required={true}
-              options={teamNames}
-              initialOption={{
-                value: teamDetail?.teamUid,
-                label: teamDetail?.teamTitle,
-              }}
-              onChange={handleDropDownChange}
-              className="custom-grey custom-outline-none border"
-              value={{ value: team?.teamUid, label: team?.teamTitle }}
-            />
-          </div>
-          <div className="basis-6/12 pl-5">
-            <InputField
-              name="role"
-              required={true}
-              showLabel={false}
-              label="Role"
-              maxLength={100}
-              placeholder="Enter Role"
-              className="custom-grey custom-outline-none border"
-              onChange={handleInputChange}
-              value={team.role}
-            />
-          </div>
+      <div className="flex flex-row">
+        <div className="basis-6/12">
+          <Dropdown
+            name="team"
+            required={true}
+            options={teamNames}
+            initialOption={{
+              value: teamDetail?.teamUid,
+              label: teamDetail?.teamTitle,
+            }}
+            onChange={handleDropDownChange}
+            className="custom-grey custom-outline-none border"
+            value={{ value: team?.teamUid, label: team?.teamTitle }}
+          />
         </div>
-        {teamRowId > 1 && (
+        <div className="basis-5/12 pl-5">
+          <InputField
+            name="role"
+            required={true}
+            showLabel={false}
+            label="Role"
+            maxLength={100}
+            placeholder="Enter Role"
+            className="custom-grey custom-outline-none border"
+            onChange={handleInputChange}
+            value={team.role}
+          />
+        </div>
+        <div className="basis-1/12 pl-3 pt-6">
           <div
-            className="pl-3 pt-5"
+            className={teamRowId > 1 ? `cursor-pointer"` : `invisible`}
             onClick={() => props.handleDeleteRolesRow(teamRowId)}
           >
             <CloseIcon className="cross-icon" />
           </div>
-        )}
+        </div>
       </div>
     </>
   );

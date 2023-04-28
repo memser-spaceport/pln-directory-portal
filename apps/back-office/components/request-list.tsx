@@ -1,5 +1,4 @@
 import React from 'react';
-import { SearchIcon } from '@heroicons/react/solid';
 import APP_CONSTANTS, { ROUTE_CONSTANTS } from '../utils/constants';
 import { InputField } from '@protocol-labs-network/ui';
 import { useNavbarContext } from '../context/navbar-context';
@@ -7,6 +6,7 @@ import router from 'next/router';
 import { useState } from 'react';
 import { useEffect } from 'react';
 import Loader from '../components/common/loader';
+import { ReactComponent as SearchIcon } from '../public/assets/icons/searchicon.svg';
 
 export default function RequestList({ list, type }) {
   const { isTeamActive } = useNavbarContext();

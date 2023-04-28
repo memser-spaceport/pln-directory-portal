@@ -86,7 +86,7 @@ function getFormStepIndicatorShape(step, formStep) {
         className={
           step.number == formStep
             ? 'text-[13px] font-semibold leading-[24px] text-[#156FF7]'
-            : 'text-[13px] font-medium leading-[24px] text-slate-600'
+            : 'text-[13px] font-medium leading-[24px] text-slate-600 opacity-40'
         }
       >
         {step.name}
