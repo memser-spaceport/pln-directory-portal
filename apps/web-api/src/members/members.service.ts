@@ -7,7 +7,6 @@ import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.s
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
 import { hashFileName } from '../utils/hashing';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
-import { maskEmail, maskText } from '../utils/mask-email';
 
 @Injectable()
 export class MembersService {
@@ -17,41 +16,15 @@ export class MembersService {
     private fileMigrationService: FileMigrationService
   ) {}
 
-  async findAll(
-    queryOptions: Prisma.MemberFindManyArgs,
-    maskPrivateInfo: boolean
-  ) {
-    let allMembers = await this.prisma.member.findMany(queryOptions);
-    if (maskPrivateInfo) {
-      allMembers = [...allMembers].map((member) => {
-        member.email = member.email ? maskEmail(member.email) : member.email;
-        member.discordHandler = member.discordHandler
-          ? maskText(member.discordHandler)
-          : member.discordHandler;
-
-        member.githubHandler = member.githubHandler
-          ? maskText(member.githubHandler)
-          : member.githubHandler;
-
-        member.discordHandler = member.discordHandler
-          ? maskText(member.discordHandler)
-          : member.discordHandler;
-        member.twitterHandler = member.twitterHandler
-          ? maskText(member.twitterHandler)
-          : member.twitterHandler;
-        return member;
-      });
-    }
-
-    return allMembers;
+  findAll(queryOptions: Prisma.MemberFindManyArgs) {
+    return this.prisma.member.findMany(queryOptions);
   }
 
-  async findOne(
+  findOne(
     uid: string,
-    queryOptions: Omit<Prisma.MemberFindUniqueArgsBase, 'where'> = {},
-    maskPrivateInfo: boolean
+    queryOptions: Omit<Prisma.MemberFindUniqueArgsBase, 'where'> = {}
   ) {
-    const memberInfo = await this.prisma.member.findUniqueOrThrow({
+    return this.prisma.member.findUniqueOrThrow({
       where: { uid },
       ...queryOptions,
       include: {
@@ -66,28 +39,6 @@ export class MembersService {
         },
       },
     });
-
-    if (maskPrivateInfo) {
-      memberInfo.email = memberInfo.email
-        ? maskEmail(memberInfo.email)
-        : memberInfo.email;
-      memberInfo.discordHandler = memberInfo.discordHandler
-        ? maskText(memberInfo.discordHandler)
-        : memberInfo.discordHandler;
-
-      memberInfo.githubHandler = memberInfo.githubHandler
-        ? maskText(memberInfo.githubHandler)
-        : memberInfo.githubHandler;
-
-      memberInfo.discordHandler = memberInfo.discordHandler
-        ? maskText(memberInfo.discordHandler)
-        : memberInfo.discordHandler;
-      memberInfo.twitterHandler = memberInfo.twitterHandler
-        ? maskText(memberInfo.twitterHandler)
-        : memberInfo.twitterHandler;
-    }
-
-    return memberInfo;
   }
 
   async insertManyWithLocationsFromAirtable(

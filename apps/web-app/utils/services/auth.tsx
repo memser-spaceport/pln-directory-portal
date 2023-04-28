@@ -37,24 +37,15 @@ export const getAccessToken = async (code) => {
   try {
     // code denotes auth code for oauth.
     const response = await api.post(`/v1/auth/token`, { code });
+    return {
+      status: 201,
+      data: response.data,
+    };
 
-    if (response.data && response.status === 201) {
-      return {
-        status: 201,
-        data: response.data,
-      };
-    } else if (response.status === 401) {
-      return {
-        status: 401,
-        msg: 'authentication error',
-      };
-    } else if (response.status === 403) {
-      return {
-        status: 403,
-        msg: 'forbidden error',
-      };
-    }
   } catch (error) {
     console.error(error);
+    return {
+      status: 401
+    }
   }
 };

@@ -16,7 +16,7 @@ import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcr
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember } from '../../../utils/members.types';
-import { parseMember, getMemberFromCookie } from '../../../utils/members.utils';
+import { parseMember, getMemberFromCookie, maskMemberDetails } from '../../../utils/members.utils';
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
 
@@ -78,7 +78,8 @@ Member.getLayout = function getLayout(page: ReactElement) {
   return <DirectoryLayout>{page}</DirectoryLayout>;
 };
 
-export const getServerSideProps = async ({ query, res }) => {
+export const getServerSideProps = async ({ query, res, req }) => {
+  const isMaskingRequired = req?.cookies?.authToken ? false : true
   const memberDetails = getMemberFromCookie(res);
   const isUserLoggedIn = memberDetails.isUserLoggedIn;
   const loggedInMember = memberDetails.member || {};
@@ -128,6 +129,10 @@ export const getServerSideProps = async ({ query, res }) => {
     return {
       notFound: true,
     };
+  }
+
+  if(isMaskingRequired) {
+    member = maskMemberDetails({...member});
   }
 
   // Cache response data in the browser for 1 minute,

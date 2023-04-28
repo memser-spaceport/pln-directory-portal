@@ -18,7 +18,7 @@ import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-dire
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember } from '../../../utils/members.types';
-import { parseMember, getMemberFromCookie } from '../../../utils/members.utils';
+import { parseMember, getMemberFromCookie, maskMemberDetails } from '../../../utils/members.utils';
 import { VerifyEmailModal } from '../../../components/layout/navbar/login-menu/verify-email-modal';
 import {
   getMembersListOptions,
@@ -129,8 +129,10 @@ Members.getLayout = function getLayout(page: ReactElement) {
 export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
   query,
   res,
+  req
 }) => {
   const { verified } = query;
+  const isMaskingRequired = req?.cookies?.authToken ? false : true
   const { isUserLoggedIn, member } = getMemberFromCookie(res);
   const optionsFromQuery = getMembersOptionsFromQuery(query);
   const listOptions = getMembersListOptions(optionsFromQuery);
@@ -139,7 +141,7 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
     getMembersFilters(optionsFromQuery),
   ]);
 
-  const members: IMember[] =
+  let members: IMember[] =
     membersResponse.status === 200
       ? membersResponse.body.map((member) => parseMember(member))
       : [];
@@ -147,6 +149,10 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
     filtersValues,
     query
   );
+
+  if(isMaskingRequired) {
+     members = [...members].map(m => maskMemberDetails(m))
+  }
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
