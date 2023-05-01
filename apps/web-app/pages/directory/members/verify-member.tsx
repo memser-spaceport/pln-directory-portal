@@ -49,10 +49,17 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
   const authResp = await getAccessToken(code);
   // If response code equals to -1 it consider to be an error in server.
   if (authResp.status === 401 || authResp.status === 403) {
+    setCookie(ctx, 'verified', 'false' , {
+      maxAge: Math.round((Date.now() + (60 * 10))/1000),
+      path: '/',
+      // httpOnly: true,
+      // secure: true,
+      // sameSite: 'strict',
+    });
     return {
       redirect: {
         permanent: false,
-        destination: '/directory/members?verified=false',
+        destination: '/directory/members',
       },
     };
   }
@@ -75,8 +82,16 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
       // secure: true,
       // sameSite: 'strict',
     });
-    setCookie(ctx, 'member', JSON.stringify(userInfo), {
+    setCookie(ctx, 'userInfo', JSON.stringify(userInfo), {
       maxAge: calculateExpiry(accessTokenExpiry.exp),
+      path: '/',
+      // httpOnly: true,
+      // secure: true,
+      // sameSite: 'strict',
+    });
+
+    setCookie(ctx, 'verified', 'true' , {
+      maxAge: Math.round((Date.now() + (60 * 10))/1000),
       path: '/',
       // httpOnly: true,
       // secure: true,
@@ -87,7 +102,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
   return {
     redirect: {
       permanent: false,
-      destination: '/directory/members?verified=true',
+      destination: '/directory/members',
     },
   };
 };

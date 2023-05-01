@@ -26,7 +26,7 @@ import { ReactComponent as TextImage } from '/public/assets/images/edit-member.s
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { requestPendingCheck } from '../../../utils/services/members';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
-
+import Cookies from 'js-cookie';
 interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -214,6 +214,13 @@ export function EditMemberModal({
               return { value: item.uid, label: item.title };
             }),
           };
+          // set requestor email
+          const userInfoFromCookie = Cookies.get('userInfo');
+          if(userInfoFromCookie) {
+            const parsedUserInfo = JSON.parse(userInfoFromCookie);
+            formValues['requestorEmail'] = parsedUserInfo.email;
+          }
+
           setImageUrl(member.image?.url ?? '');
           setFormValues(formValues);
           setDropDownValues({ skillValues: data[1], teamNames: data[2] });
@@ -331,7 +338,7 @@ export function EditMemberModal({
         }
 
         delete values?.imageFile;
-        delete values?.requestorEmail;
+        //delete values?.requestorEmail;
 
         const data = {
           participantType: ENROLLMENT_TYPE.MEMBER,
@@ -354,7 +361,11 @@ export function EditMemberModal({
             return false;
           }
         }
-        await api.post(`/v1/participants-request`, data).then((response) => {
+        await api.post(`/v1/participants-request`, data, {
+          headers: {
+            'Authorization': `Bearer ${Cookies.get('authToken')}`
+          }
+        }).then((response) => {
           setSaveCompleted(true);
         });
       } catch (err) {

@@ -10,6 +10,7 @@ import {
   Put,
   Query,
   Req,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ApprovalStatus, ParticipantType } from '@prisma/client';
@@ -22,6 +23,7 @@ import {
 } from '../../../../libs/contracts/src/schema/participants-request';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
+import { UserTokenValidation } from '../guards/user-token-validation.guard';
 @Controller('v1/participants-request')
 export class ParticipantsRequestController {
   constructor(
@@ -44,13 +46,12 @@ export class ParticipantsRequestController {
   }
 
   @Post()
-  // @UseGuards(GoogleRecaptchaGuard)
-  //@UseGuards(GoogleRecaptchaGuard)
-  @UseGuards(UserAuthValidateGuard)
-  async addRequest(@Body() body) {
+  @UseGuards()
+  @UseGuards(UserTokenValidation)
+  async addRequest(@Body() body, @Req() req) {
     const postData = body;
     const participantType = body.participantType;
-    // delete postData.captchaToken;
+    const referenceUid = body.referenceUid;
 
     if (
       participantType === ParticipantType.MEMBER.toString() &&
@@ -67,98 +68,20 @@ export class ParticipantsRequestController {
       participantType !== ParticipantType.MEMBER.toString()
     ) {
       throw new ForbiddenException();
+    }
+
+    if(referenceUid) {
+      const requestorDetails = await this.participantsRequestService.findMemberByExternalIdAndEmail(req.userExternaId, req.userEmail);
+      if(!requestorDetails) {
+        throw new UnauthorizedException()
+      }
+      if(!requestorDetails.isDirectoryAdmin && (referenceUid !== requestorDetails.uid)) {
+        console.log(requestorDetails, 'in edit exception')
+        throw new ForbiddenException()
+      }
     }
 
     const result = await this.participantsRequestService.addRequest(postData);
-    return result;
-  }
-
-  @Put(':uid')
-  //@UseGuards(GoogleRecaptchaGuard)
-  async updateRequest(@Body() body, @Param() params) {
-    const postData = body;
-    const participantType = body.participantType;
-
-    if (
-      participantType === ParticipantType.MEMBER.toString() &&
-      !ParticipantRequestMemberSchema.safeParse(postData).success
-    ) {
-      throw new ForbiddenException();
-    } else if (
-      participantType === ParticipantType.TEAM.toString() &&
-      !ParticipantRequestTeamSchema.safeParse(postData).success
-    ) {
-      throw new ForbiddenException();
-    } else if (
-      participantType !== ParticipantType.TEAM.toString() &&
-      participantType !== ParticipantType.MEMBER.toString()
-    ) {
-      throw new ForbiddenException();
-    }
-    const result = await this.participantsRequestService.updateRequest(
-      postData,
-      params.uid
-    );
-    return result;
-  }
-
-  @Patch(':uid')
-  // @UseGuards(GoogleRecaptchaGuard)
-  async processRequest(@Body() body, @Param() params) {
-    const validation = ParticipantProcessRequestSchema.safeParse(body);
-    if (!validation.success) {
-      throw new ForbiddenException();
-    }
-    const uid = params.uid;
-    const participantType = body.participantType;
-    const referenceUid = body.referenceUid;
-    const statusToProcess = body.status;
-    let result;
-
-    // Process reject
-    if (statusToProcess === ApprovalStatus.REJECTED.toString()) {
-      result = await this.participantsRequestService.processRejectRequest(uid);
-    }
-    // Process approval for create team
-    else if (
-      participantType === 'TEAM' &&
-      statusToProcess === ApprovalStatus.APPROVED.toString() &&
-      !referenceUid
-    ) {
-      result = await this.participantsRequestService.processTeamCreateRequest(
-        uid
-      );
-    }
-    // Process approval for create Member
-    else if (
-      participantType === 'MEMBER' &&
-      statusToProcess === ApprovalStatus.APPROVED.toString() &&
-      !referenceUid
-    ) {
-      result = await this.participantsRequestService.processMemberCreateRequest(
-        uid
-      );
-    }
-    // Process approval for Edit Team
-    else if (
-      participantType === 'TEAM' &&
-      statusToProcess === ApprovalStatus.APPROVED.toString() &&
-      referenceUid
-    ) {
-      result = await this.participantsRequestService.processTeamEditRequest(
-        uid
-      );
-    }
-    // Process approval for Edit Member
-    else if (
-      participantType === 'MEMBER' &&
-      statusToProcess === ApprovalStatus.APPROVED.toString() &&
-      referenceUid
-    ) {
-      result = await this.participantsRequestService.processMemberEditRequest(
-        uid
-      );
-    }
     return result;
   }
 }

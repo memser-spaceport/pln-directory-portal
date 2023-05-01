@@ -20,7 +20,6 @@ import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember } from '../../../utils/members.types';
 import {
   parseTeamMember,
-  getMemberFromCookie,
 } from '../../../utils/members.utils';
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
@@ -30,10 +29,10 @@ interface TeamProps {
   members: IMember[];
   backLink: string;
   isUserLoggedIn: boolean;
-  member: IMember;
+  userInfo: any;
 }
 
-export default function Team({ team, members, backLink, member }: TeamProps) {
+export default function Team({ team, members, backLink, userInfo }: TeamProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
     directoryName: 'Teams',
@@ -73,8 +72,10 @@ Team.getLayout = function getLayout(page: ReactElement) {
 export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
   query,
   res,
+  req
 }) => {
-  const { isUserLoggedIn, member } = getMemberFromCookie(res);
+  const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
+  const isUserLoggedIn = req?.cookies?.authToken &&  req?.cookies?.userInfo ? true : false
   const { id, backLink = '/directory/teams' } = query as {
     id: string;
     backLink: string;
@@ -137,6 +138,6 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
   );
 
   return {
-    props: { team, members, backLink, isUserLoggedIn, member: member || null },
+    props: { team, members, backLink, isUserLoggedIn, userInfo },
   };
 };

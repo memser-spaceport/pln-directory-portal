@@ -16,7 +16,7 @@ export class ParticipantsRequestService {
     private awsService: AwsService,
     private redisService: RedisService,
     private slackService: SlackService
-  ) {}
+  ) { }
 
   async getAll(userQuery) {
     const filters = {};
@@ -57,6 +57,33 @@ export class ParticipantsRequestService {
       where: { uid: uid },
     });
     return result;
+  }
+
+  async findMemberByExternalIdAndEmail(userExternalId, userEmail) {
+    const foundMember = await this.prisma.member.findFirst({
+      where: {
+        externalId: userExternalId,
+        email: userEmail
+      },
+      include: {
+        memberRoles: true
+      }
+    })
+
+    if(!foundMember) {
+      return null;
+    }
+
+    const roleNames = foundMember.memberRoles.map(m => m.name);
+    const isDirectoryAdmin = roleNames.includes('DIRECTORYADMIN');
+
+    const formattedMemberDetails =  {
+      ...foundMember,
+      isDirectoryAdmin,
+      roleNames
+      }
+
+    return formattedMemberDetails
   }
 
   async findDuplicates(uniqueIdentifier, participantType) {

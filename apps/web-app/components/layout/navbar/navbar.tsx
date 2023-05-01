@@ -10,13 +10,13 @@ import { Login } from './login-menu/login-menu';
 import { Menu as AppMenu } from './menu/menu';
 import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/protocol-labs-network-logo-horizontal-black.svg';
 import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
-import { IMember } from 'apps/web-app/utils/members.types';
 import { destroyCookie } from 'nookies';
+import Cookies from 'js-cookie'
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
 type INavbarProbs = {
   isUserLoggedIn: boolean;
-  member: IMember;
+  userInfo: any;
 };
 
 type ISettingMenu = {
@@ -37,17 +37,17 @@ const settingMenu: ISettingMenu[] = [
   {
     icon: ArrowNarrowRightIcon,
     label: 'Logout',
-    url: '/directory/members/logout',
+    url: '/directory/members',
     eventCode: '',
     onClick: () => {
-      destroyCookie(null, 'state', {
-        path: '/',
-      });
+      Cookies.remove('authToken')
+      Cookies.remove('refreshToken')
+      Cookies.remove('userInfo')
     },
   },
 ];
 
-export function Navbar({ isUserLoggedIn = false, member }: INavbarProbs) {
+export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
   return (
     <nav className="navbar top-0 h-20 justify-between pl-12 only-of-type:shadow-[0_1px_4px_0_#e2e8f0]">
       <div className="flex items-center space-x-5">
@@ -73,15 +73,15 @@ export function Navbar({ isUserLoggedIn = false, member }: INavbarProbs) {
       >
         {isUserLoggedIn ? (
           <div className="flex h-14 w-full justify-end space-x-4">
-            {member.name && (
+            {userInfo.name && (
               <div className="my-auto font-medium text-slate-600">
                 {' '}
-                Welcome {member.name}{' '}
+                Welcome {userInfo.name}{' '}
               </div>
             )}
-            {member.image ? (
+            {userInfo.profileImageUrl ? (
               <img
-                src={member.image}
+                src={userInfo.profileImageUrl}
                 alt=""
                 className="h-full w-14 rounded-full"
               />
@@ -117,7 +117,7 @@ export function Navbar({ isUserLoggedIn = false, member }: INavbarProbs) {
                               <OptionLink
                                 href={
                                   option.label === 'Account Settings'
-                                    ? `/directory/members/${member.id}/accountSettings`
+                                    ? `/directory/members/${userInfo.uid}/accountSettings`
                                     : option.url
                                 }
                                 onClick={

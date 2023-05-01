@@ -178,7 +178,7 @@ export const parseTeamMember = (
  **/
 export const getMemberFromCookie = (
   res?
-): { isUserLoggedIn: boolean; member?: IMember } => {
+): { isUserLoggedIn: boolean; member? } => {
   const { member, refreshToken } = nookies.get(res);
   if (member && member.length) {
     const memberDetails: IMember = JSON.parse(member);

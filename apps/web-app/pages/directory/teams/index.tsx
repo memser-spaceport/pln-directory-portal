@@ -17,7 +17,7 @@ import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember } from '../../../utils/members.types';
 import { ITeam } from '../../../utils/teams.types';
-import { getMemberFromCookie } from '../../../utils/members.utils';
+
 import {
   getTeamsListOptions,
   getTeamsOptionsFromQuery,
@@ -28,7 +28,7 @@ type TeamsProps = {
   teams: ITeam[];
   filtersValues: ITeamsFiltersValues;
   isUserLoggedIn: boolean;
-  member: IMember | {};
+  userInfo: any
 };
 
 export default function Teams({ teams, filtersValues }: TeamsProps) {
@@ -88,8 +88,10 @@ Teams.getLayout = function getLayout(page: ReactElement) {
 export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
   query,
   res,
+  req
 }) => {
-  const { isUserLoggedIn, member } = getMemberFromCookie(res);
+  const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
+  const isUserLoggedIn = req?.cookies?.authToken &&  req?.cookies?.userInfo ? true : false
   const optionsFromQuery = getTeamsOptionsFromQuery(query);
   const listOptions = getTeamsListOptions(optionsFromQuery);
   const [teamsResponse, filtersValues] = await Promise.all([
@@ -118,7 +120,7 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
       teams,
       filtersValues: parsedFilters,
       isUserLoggedIn,
-      member: member || {},
+      userInfo
     },
   };
 };

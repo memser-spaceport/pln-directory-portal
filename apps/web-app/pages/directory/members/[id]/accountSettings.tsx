@@ -7,18 +7,18 @@ import { useProfileBreadcrumb } from '../../../../hooks/profile/use-profile-brea
 import { DirectoryLayout } from '../../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../../seo.config';
 import { IMember } from '../../../../utils/members.types';
-import { getMemberFromCookie } from '../../../../utils/members.utils';
+
 interface IAccountSettingsProp {
   id: string;
   backLink: string;
   isUserLoggedIn: boolean;
-  member: IMember;
+  userInfo: any;
 }
 
 export default function AccountSettings({
   id,
   backLink,
-  member,
+  userInfo,
   isUserLoggedIn,
 }: IAccountSettingsProp) {
   const { breadcrumbItems } = useProfileBreadcrumb({
@@ -29,7 +29,7 @@ export default function AccountSettings({
 
   return (
     <>
-      <NextSeo {...DIRECTORY_SEO} title={member.name} />
+      <NextSeo {...DIRECTORY_SEO} title={userInfo.name} />
       <Breadcrumb items={breadcrumbItems} />
       <div className="mt-20 flex w-full">
         <EditMemberModal
@@ -47,15 +47,15 @@ AccountSettings.getLayout = function getLayout(page: ReactElement) {
   return <DirectoryLayout>{page}</DirectoryLayout>;
 };
 
-export const getServerSideProps = async ({ query, res }) => {
-  const memberDetails = getMemberFromCookie(res);
-  const isUserLoggedIn = memberDetails.isUserLoggedIn;
-  const member: IMember = memberDetails.member;
+export const getServerSideProps = async ({ query, res, req }) => {
+  const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
+  const isUserLoggedIn = req?.cookies?.authToken &&  req?.cookies?.userInfo ? true : false
+  console.log(req.query)
   const { id, backLink = '/directory/members' } = query as {
     id: string;
     backLink: string;
   };
-  if (member.id != id && isUserLoggedIn) {
+  if (userInfo.uid != id && isUserLoggedIn) {
     return {
       redirect: {
         permanent: false,
@@ -64,6 +64,6 @@ export const getServerSideProps = async ({ query, res }) => {
     };
   }
   return {
-    props: { backLink, id, isUserLoggedIn, member: member || {} },
+    props: { backLink, id, isUserLoggedIn, userInfo },
   };
 };

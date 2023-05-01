@@ -16,7 +16,7 @@ import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcr
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember } from '../../../utils/members.types';
-import { parseMember, getMemberFromCookie, maskMemberDetails } from '../../../utils/members.utils';
+import { parseMember, maskMemberDetails } from '../../../utils/members.utils';
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
 
@@ -25,14 +25,14 @@ interface MemberProps {
   teams: ITeam[];
   backLink: string;
   isUserLoggedIn: boolean;
-  loggedInMember: IMember;
+  userInfo: any;
 }
 
 export default function Member({
   member,
   teams,
   backLink,
-  loggedInMember,
+  userInfo,
 }: MemberProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
@@ -57,12 +57,12 @@ export default function Member({
         <div className="card p-7.5 w-full">
           <MemberProfileHeader
             member={member}
-            loggedInMember={loggedInMember}
+            userInfo={userInfo}
           />
           <MemberProfileDetails {...member} />
           <MemberProfileOfficeHours
             url={member.officeHours}
-            loggedInMember={loggedInMember}
+            loggedInMember={userInfo}
           />
           <MemberProfileTeams teams={teams} member={member} />
         </div>
@@ -80,9 +80,8 @@ Member.getLayout = function getLayout(page: ReactElement) {
 
 export const getServerSideProps = async ({ query, res, req }) => {
   const isMaskingRequired = req?.cookies?.authToken ? false : true
-  const memberDetails = getMemberFromCookie(res);
-  const isUserLoggedIn = memberDetails.isUserLoggedIn;
-  const loggedInMember = memberDetails.member || {};
+  const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
+  const isUserLoggedIn = req?.cookies?.userInfo && req?.cookies?.authToken ? true : false
   const { id, backLink = '/directory/members' } = query as {
     id: string;
     backLink: string;
@@ -143,6 +142,6 @@ export const getServerSideProps = async ({ query, res, req }) => {
   );
 
   return {
-    props: { member, teams, backLink, isUserLoggedIn, loggedInMember },
+    props: { member, teams, backLink, isUserLoggedIn, userInfo },
   };
 };

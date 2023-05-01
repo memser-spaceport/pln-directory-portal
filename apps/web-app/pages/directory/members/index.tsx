@@ -5,7 +5,7 @@ import {
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
 import { NextSeo } from 'next-seo';
-import { ReactElement, useState } from 'react';
+import { ReactElement, useEffect, useState } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import { LoadingOverlay } from '../../../components/layout/loading-overlay/loading-overlay';
 import { MembersDirectoryFilters } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters';
@@ -18,7 +18,7 @@ import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-dire
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember } from '../../../utils/members.types';
-import { parseMember, getMemberFromCookie, maskMemberDetails } from '../../../utils/members.utils';
+import { parseMember, maskMemberDetails } from '../../../utils/members.utils';
 import { VerifyEmailModal } from '../../../components/layout/navbar/login-menu/verify-email-modal';
 import {
   getMembersListOptions,
@@ -26,12 +26,13 @@ import {
 } from '../../../utils/members.utils';
 import { ReactComponent as SuccessIcon } from '../../../public/assets/images/icons/success.svg';
 import 'react-toastify/dist/ReactToastify.css';
+import Cookies from 'js-cookie';
 
 type MembersProps = {
   members: IMember[];
   filtersValues: IMembersFiltersValues;
   isUserLoggedIn: boolean;
-  member: IMember;
+  userInfo: any,
   verified: boolean;
 };
 
@@ -39,10 +40,9 @@ export default function Members({
   members,
   filtersValues,
   verified,
-  member,
+  userInfo,
 }: MembersProps) {
-  const isVerified = verified === null ? true : verified;
-  const [isOpen, setIsModalOpen] = useState(!isVerified);
+  const [isOpen, setIsModalOpen] = useState(false);
   const { selectedViewType } = useViewType();
   const router = useRouter();
   const isGrid = selectedViewType === 'grid';
@@ -54,7 +54,12 @@ export default function Members({
     'officeHoursOnly',
     'includeFriends',
   ];
-  if (isVerified && verified) {
+
+  useDirectoryFiltersFathomLogger('members', filterProperties);
+
+  useEffect(() => {
+   const isVerified = Cookies.get('verified');
+   if(isVerified === 'true') {
     toast.success('Your account has been verified', {
       position: 'top-right',
       autoClose: 5000,
@@ -69,12 +74,15 @@ export default function Members({
         // router.push('/directory/members/');
       },
     });
-  }
-  useDirectoryFiltersFathomLogger('members', filterProperties);
+   } else if (isVerified === 'false') {
+      setIsModalOpen(true);
+   }
+   Cookies.remove('verified')
+  }, [])
+
   return (
     <>
       <NextSeo {...DIRECTORY_SEO} title="Members" />
-
       <LoadingOverlay
         excludeUrlFn={(url) => url.startsWith('/directory/members/')}
       />
@@ -100,7 +108,7 @@ export default function Members({
               members={members}
               isGrid={isGrid}
               filterProperties={filterProperties}
-              loggedInMember={member}
+              loggedInMember={userInfo}
             />
           </div>
         </div>
@@ -133,7 +141,8 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
 }) => {
   const { verified } = query;
   const isMaskingRequired = req?.cookies?.authToken ? false : true
-  const { isUserLoggedIn, member } = getMemberFromCookie(res);
+  const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
+  const isUserLoggedIn = req?.cookies?.authToken &&  req?.cookies?.userInfo ? true : false
   const optionsFromQuery = getMembersOptionsFromQuery(query);
   const listOptions = getMembersListOptions(optionsFromQuery);
   const [membersResponse, filtersValues] = await Promise.all([
@@ -166,7 +175,7 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
       members,
       filtersValues: parsedFilters,
       isUserLoggedIn,
-      member: member || null,
+      userInfo,
       verified:
         verified === 'true' ? true : verified === 'false' ? false : null,
     },

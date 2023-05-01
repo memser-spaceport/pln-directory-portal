@@ -6,10 +6,10 @@ import { IMember } from '../../../../utils/members.types';
 
 export function MemberProfileHeader({
   member,
-  loggedInMember,
+  userInfo,
 }: {
   member: IMember;
-  loggedInMember: IMember;
+  userInfo: any;
 }) {
   const { image, name, teams, location, teamLead, mainTeam } = member;
   const otherTeams = teams
@@ -59,7 +59,7 @@ export function MemberProfileHeader({
           ) : null}
         </div>
         <p className="line-clamp-1 mt-0.5 text-sm">{memberRole}</p>
-        {loggedInMember?.id && (
+        {userInfo?.id && (
           <div className="mr-2 mt-1 flex items-center text-sm text-slate-600">
             {location ? (
               <>
@@ -87,9 +87,9 @@ export function MemberProfileHeader({
           />
         </div>
       ) : null}
-      {(loggedInMember.id === member.id ||
-        (loggedInMember.roles?.length > 0 &&
-          loggedInMember.roles.includes('DIRECTORYADMIN'))) && (
+      {(userInfo.uid === member.id ||
+        (userInfo.roles?.length > 0 &&
+          userInfo.roles.includes('DIRECTORYADMIN'))) && (
         <AskToEditCard profileType="member" member={member} />
       )}
     </div>
