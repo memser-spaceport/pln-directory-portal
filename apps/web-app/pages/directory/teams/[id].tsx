@@ -50,7 +50,7 @@ export default function Team({ team, members, backLink, userInfo }: TeamProps) {
       <Breadcrumb items={breadcrumbItems} />
       <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-24">
         <div className="card p-7.5 w-full">
-          <TeamProfileHeader team={team} loggedInMember={member} />
+          <TeamProfileHeader team={team} loggedInMember={userInfo} />
           <TeamProfileDetails {...team} />
           {team.fundingStage || team.membershipSources.length ? (
             <TeamProfileFunding {...team} />

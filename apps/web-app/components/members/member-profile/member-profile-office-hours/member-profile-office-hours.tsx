@@ -6,7 +6,7 @@ import { IMember } from '../../../../utils/members.types';
 
 type MemberProfileOfficeHoursProps = {
   url?: string;
-  loggedInMember: IMember;
+  userInfo: any;
 };
 
 const LEARN_MORE_URL =
@@ -14,7 +14,7 @@ const LEARN_MORE_URL =
 
 export function MemberProfileOfficeHours({
   url,
-  loggedInMember,
+  userInfo,
 }: MemberProfileOfficeHoursProps) {
   return (
     <div className="mt-6 rounded-xl bg-slate-50 p-4">
@@ -30,7 +30,7 @@ export function MemberProfileOfficeHours({
         facing.
       </p>
       <div className="mt-6 flex space-x-4">
-        {loggedInMember?.id && (
+        {userInfo.uid && (
           <>
             {url ? (
               <AnchorLink

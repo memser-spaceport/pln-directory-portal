@@ -62,7 +62,7 @@ export default function Member({
           <MemberProfileDetails {...member} />
           <MemberProfileOfficeHours
             url={member.officeHours}
-            loggedInMember={userInfo}
+            userInfo={userInfo}
           />
           <MemberProfileTeams teams={teams} member={member} />
         </div>
