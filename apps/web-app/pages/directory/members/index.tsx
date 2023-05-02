@@ -27,6 +27,7 @@ import {
 import { ReactComponent as SuccessIcon } from '../../../public/assets/images/icons/success.svg';
 import 'react-toastify/dist/ReactToastify.css';
 import Cookies from 'js-cookie';
+import { destroyCookie } from 'nookies';
 
 type MembersProps = {
   members: IMember[];
@@ -139,6 +140,7 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
   res,
   req
 }) => {
+  destroyCookie(null, 'state');
   const { verified } = query;
   const isMaskingRequired = req?.cookies?.authToken ? false : true
   const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};

@@ -2,7 +2,6 @@ import { ReactElement } from 'react';
 import { Breadcrumb } from '@protocol-labs-network/ui';
 import { NextSeo } from 'next-seo';
 import { EditMemberModal } from '../../../../components/members/member-enrollment/editmember';
-import { AIRTABLE_REGEX } from '../../../../constants';
 import { useProfileBreadcrumb } from '../../../../hooks/profile/use-profile-breadcrumb.hook';
 import { DirectoryLayout } from '../../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../../seo.config';
@@ -24,9 +23,9 @@ export default function AccountSettings({
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
     directoryName: 'Members',
-    pageName: id,
+    pageName: `${id}`,
   });
-
+  breadcrumbItems.push({ label: 'Account Settings' });
   return (
     <>
       <NextSeo {...DIRECTORY_SEO} title={userInfo.name} />
@@ -55,12 +54,9 @@ export const getServerSideProps = async ({ query, res, req }) => {
     id: string;
     backLink: string;
   };
-  if (userInfo.uid != id && isUserLoggedIn) {
+  if (userInfo?.uid != id) {
     return {
-      redirect: {
-        permanent: false,
-        destination: '/directory/members',
-      },
+      notFound: true,
     };
   }
   return {

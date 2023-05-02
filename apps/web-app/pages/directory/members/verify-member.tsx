@@ -1,5 +1,5 @@
 import { GetServerSideProps } from 'next';
-import nookies from 'nookies';
+import nookies, { destroyCookie } from 'nookies';
 import { setCookie } from 'nookies';
 import { ReactElement } from 'react';
 import { LoadingIndicator } from '../../../components/shared/loading-indicator/loading-indicator';
@@ -39,6 +39,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
   const cookies = nookies.get(ctx);
   // validating state which we gave to auth service to get auth code.
   if (cookies.state && cookies.state != state) {
+    destroyCookie(null, 'state');
     return {
       redirect: {
         permanent: false,
@@ -47,7 +48,6 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
     };
   }
   const authResp = await getAccessToken(code);
-  // If response code equals to -1 it consider to be an error in server.
   if (authResp.status === 401 || authResp.status === 403) {
     setCookie(ctx, 'verified', 'false' , {
       maxAge: Math.round((Date.now() + (60 * 10))/1000),

@@ -12,6 +12,7 @@ import { useRouter } from 'next/router';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
+import { ValidationErrorMessages } from '../../../components/shared/account-setttings/validation-error-message';
 import { RequestPending } from '../../shared/request-pending/request-pending';
 import { IFormValues } from '../../../utils/members.types';
 import Modal from '../../layout/navbar/modal/modal';
@@ -92,7 +93,11 @@ function validateForm(formValues, imageUrl, isProfileSettings) {
   if (skillFormErrors.length) {
     errors = [...errors, ...skillFormErrors];
   }
-  return errors;
+  return {
+    basicFormErrors,
+    skillFormErrors,
+    errors
+  };
 }
 
 function getSubmitOrNextButton(handleSubmit, isProcessing) {
@@ -122,17 +127,17 @@ function getCancelOrBackButton(handleModalClose) {
   return cancelorBackButton;
 }
 
-// function getResetButton(handleReset) {
-//   const resetButton = (
-//     <button
-//       className="hadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full px-6 py-2 text-base font-semibold leading-6 text-[#156FF7] outline outline-1 outline-[#156FF7] hover:outline-2"
-//       onClick={() => handleReset()}
-//     >
-//       Reset
-//     </button>
-//   );
-//   return resetButton;
-// }
+function getResetButton(handleReset) {
+  const resetButton = (
+    <button
+      className="hadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full px-6 py-2 text-base font-semibold leading-6 text-[#156FF7] outline outline-1 outline-[#156FF7] hover:outline-2"
+      onClick={() => handleReset()}
+    >
+      Reset
+    </button>
+  );
+  return resetButton;
+}
 
 export function EditMemberModal({
   isOpen,
@@ -142,6 +147,9 @@ export function EditMemberModal({
 }: EditMemberModalProps) {
   const [openTab, setOpenTab] = useState(1);
   const [errors, setErrors] = useState([]);
+  const [isErrorPopupOpen, setIsErrorPopupOpen] = useState(false);
+  const [basicErrors, setBasicErrors] = useState([]);
+  const [skillErrors, setSkillErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({});
   const [imageUrl, setImageUrl] = useState<string>();
   // const [emailExists, setEmailExists] = useState<boolean>(false);
@@ -236,8 +244,74 @@ export function EditMemberModal({
     }
   }, [isOpen, id]);
 
+  function handleReset(){
+    if (isProfileSettings) {
+      setErrors([]);
+      setBasicErrors([]);
+      setSkillErrors([]);
+      Promise.all([fetchMember(id), fetchSkills(), fetchTeams()])
+        .then((data) => {
+          const member = data[0];
+          let counter = 1;
+          const teamAndRoles =
+            member.teamMemberRoles?.length &&
+            member.teamMemberRoles.map((team) => {
+              const teamName =
+                data[2]?.filter((item) => item.value == team.teamUid)?.[0]
+                  ?.label ?? '';
+              return {
+                role: team.role,
+                teamUid: team.teamUid,
+                teamTitle: teamName,
+                rowId: counter++,
+              };
+            });
+          const formValues = {
+            name: member.name,
+            email: member.email,
+            imageUid: member.imageUid,
+            imageFile: null,
+            plnStartDate: new Date(member.plnStartDate).toLocaleDateString(
+              'af-ZA'
+            ),
+            city: member.location?.city,
+            region: member.location?.region,
+            country: member.location?.country,
+            linkedinHandler: member.linkedinHandler,
+            discordHandler: member.discordHandler,
+            twitterHandler: member.twitterHandler,
+            githubHandler: member.githubHandler,
+            officeHours: member.officeHours,
+            comments: '',
+            teamAndRoles: teamAndRoles || [
+              { teamUid: '', teamTitle: '', role: '', rowId: 1 },
+            ],
+            skills: member.skills?.map((item) => {
+              return { value: item.uid, label: item.title };
+            }),
+          };
+          // set requestor email
+          const userInfoFromCookie = Cookies.get('userInfo');
+          if(userInfoFromCookie) {
+            const parsedUserInfo = JSON.parse(userInfoFromCookie);
+            formValues['requestorEmail'] = parsedUserInfo.email;
+          }
+
+          setImageUrl(member.image?.url ?? '');
+          setFormValues(formValues);
+          setDropDownValues({ skillValues: data[1], teamNames: data[2] });
+        })
+        .catch((err) => {
+          toast(err?.message);
+          console.log('error', err);
+        });
+    }
+  }
+
   function resetState() {
     setErrors([]);
+    setBasicErrors([]);
+    setSkillErrors([]);
     setDropDownValues({});
     setImageChanged(false);
     setSaveCompleted(false);
@@ -313,7 +387,7 @@ export function EditMemberModal({
     async (e) => {
       e.preventDefault();
       setErrors([]);
-      const errors = validateForm(formValues, imageUrl, isProfileSettings);
+      const { basicFormErrors, skillFormErrors, errors } = validateForm(formValues, imageUrl, isProfileSettings);
       // if (!executeRecaptcha) {
       //   console.log('Execute recaptcha not yet available');
       //   return;
@@ -325,6 +399,9 @@ export function EditMemberModal({
           // element1.scrollTop = 0;
         }
         setErrors(errors);
+        setBasicErrors(basicFormErrors);
+        setSkillErrors(skillFormErrors);
+        setIsErrorPopupOpen(true);
         return false;
       }
       const values = formatData();
@@ -460,7 +537,7 @@ export function EditMemberModal({
                 <button
                   className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
                     openTab == 1 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
-                  }`}
+                  } ${ basicErrors?.length > 0 && openTab == 1 ? 'border-b-[#DD2C5A] text-[#DD2C5A]': basicErrors?.length > 0? 'text-[#DD2C5A]' : ''}`}
                   onClick={() => setOpenTab(1)}
                 >
                   {' '}
@@ -469,7 +546,7 @@ export function EditMemberModal({
                 <button
                   className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
                     openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
-                  }`}
+                  } ${ skillErrors?.length > 0 && openTab == 2 ? 'border-b-[#DD2C5A] text-[#DD2C5A]': skillErrors?.length > 0? 'text-[#DD2C5A]' : ''}`}
                   onClick={() => setOpenTab(2)}
                 >
                   {' '}
@@ -506,15 +583,6 @@ export function EditMemberModal({
                 </div>
               ) : (
                 <Fragment>
-                  {errors?.length > 0 && (
-                    <div className="w-full rounded-lg bg-white p-5 ">
-                      <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
-                        {errors.map((item, index) => (
-                          <li key={index}>{item}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
                   <div className={openTab === 1 ? 'block' : 'hidden'}>
                     <AddMemberBasicForm
                       formValues={formValues}
@@ -547,19 +615,27 @@ export function EditMemberModal({
           </div>
           {!saveCompleted && (
             <div className="footerdiv fixed bottom-0 w-full bg-white px-8">
-              {/* <div className="float-left">
-								{getResetButton(()=>{
-									router.reload();
-								})}
-							</div> */}
               <div className="float-right">
                 {getSubmitOrNextButton(handleSubmit, isProcessing)}
               </div>
+              <div className="float-right mx-5">
+								{getResetButton(()=>{
+								   handleReset()
+								})}
+							</div>
             </div>
           )}
           <RequestPending
             isOpen={isPendingRequestModalOpen}
             setIsModalOpen={setIsPendingRequestModalOpen}
+          />
+          <ValidationErrorMessages
+            isOpen={isErrorPopupOpen}
+            setIsModalOpen={() => {setIsErrorPopupOpen(false)}}
+            errors={{
+              basic: basicErrors,
+              skills: skillErrors
+            }}
           />
         </div>
       ) : (
@@ -588,7 +664,7 @@ export function EditMemberModal({
               </div>
             </div>
           ) : (
-            <div>
+            <div className='px-5'>
               <div className="px-8">
                 <span className="font-size-14 text-sm">
                   Please fill out only the fields you would like to change for

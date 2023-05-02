@@ -3,6 +3,7 @@ import { AnchorLink } from '@protocol-labs-network/ui';
 import { trackGoal } from 'fathom-client';
 import { FATHOM_EVENTS } from '../../../../constants';
 import { IMember } from '../../../../utils/members.types';
+import { authenticate } from '../../../../utils/services/auth';
 
 type MemberProfileOfficeHoursProps = {
   url?: string;
@@ -16,6 +17,11 @@ export function MemberProfileOfficeHours({
   url,
   userInfo,
 }: MemberProfileOfficeHoursProps) {
+  const loginAsUserCode = FATHOM_EVENTS.directory.loginAsUser;
+  const handleOpenModal = () => {
+    authenticate();
+    trackGoal(loginAsUserCode, 0);
+  };
   return (
     <div className="mt-6 rounded-xl bg-slate-50 p-4">
       <div className="flex items-center">
@@ -30,7 +36,7 @@ export function MemberProfileOfficeHours({
         facing.
       </p>
       <div className="mt-6 flex space-x-4">
-        {userInfo.uid && (
+        {userInfo.uid ? (
           <>
             {url ? (
               <AnchorLink
@@ -50,8 +56,19 @@ export function MemberProfileOfficeHours({
                 Not Available
               </span>
             )}
-          </>
-        )}
+          </> ):
+          (url ?
+            <>
+              <button
+                onClick={handleOpenModal}
+                className="shadow-request-button rounded-lg border border-slate-300 bg-white px-6 py-2.5 text-sm font-medium hover:shadow-on-hover hover:text-slate-600 on-focus active:border-blue-600 active:ring-2"
+              >
+                Login to Schedule
+              </button>
+            </>:<></>
+          )
+        }
+        
         <AnchorLink
           href={LEARN_MORE_URL}
           linkClassName="flex items-center text-sm font-semibold group outline-none"

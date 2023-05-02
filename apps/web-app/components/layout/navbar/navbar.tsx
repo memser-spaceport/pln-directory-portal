@@ -10,7 +10,6 @@ import { Login } from './login-menu/login-menu';
 import { Menu as AppMenu } from './menu/menu';
 import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/protocol-labs-network-logo-horizontal-black.svg';
 import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
-import { destroyCookie } from 'nookies';
 import Cookies from 'js-cookie'
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 

@@ -1,16 +1,21 @@
 import { XCircleIcon } from '@heroicons/react/solid';
 import { Dispatch, Fragment, SetStateAction } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { ReactComponent as FailedIcon } from '../../../../public/assets/images/icons/danger.svg';
-interface IVerifyEmailModalProps {
+import { ReactComponent as FailedIcon } from '../../../public/assets/images/icons/danger.svg';
+interface IValidationErrorMessages {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
+  errors: {
+    basic: any[];
+    skills: any[];
+  }
 }
 
-export function VerifyEmailModal({
+export function ValidationErrorMessages({
   isOpen,
   setIsModalOpen,
-}: IVerifyEmailModalProps) {
+  errors
+}: IValidationErrorMessages) {
   const handleModalClose = () => {
     setIsModalOpen(false);
   };
@@ -51,21 +56,23 @@ export function VerifyEmailModal({
                     className="text-2xl font-bold leading-6"
                   >
                     <FailedIcon />
-                    <p className="mt-4">Verify Membership</p>
+                    <p className="mt-4">Validation Error</p>
                   </Dialog.Title>
-                  <div className="text-sm/5 mt-3">
-                    Email doesn't match our membership email in the directory.
-                    Please contact our support at{' '}
-                    <span className="font-bold"> supportmail@protocol.ai </span>{' '}
-                    for assistance or try to{' '}
-                    <span
-                      onClick={handleModalClose}
-                      className="cursor-pointer font-bold italic underline"
-                    >
-                      {' '}
-                      sign in{' '}
-                    </span>
-                    again.
+                  { errors?.basic?.length>0 && <div className="w-full text-base mt-2 font-semibold"> Basic </div>}
+                    <div className="w-full rounded-lg bg-white px-5 py-2">
+                      <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
+                        {errors?.basic?.map((item, index) => (
+                        <li key={index}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  { errors?.skills?.length > 0 &&  <div className="w-full text-base mt-2 font-semibold"> Skills </div>}
+                  <div className="w-full rounded-lg bg-white px-5 py-2">
+                    <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
+                      {errors?.skills?.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
+                    </ul>
                   </div>
                   <div className="w-100 mt-6 flex justify-end">
                     <button
