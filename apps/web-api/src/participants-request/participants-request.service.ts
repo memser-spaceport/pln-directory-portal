@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ApprovalStatus, ParticipantType } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { AwsService } from '../utils/aws/aws.service';
@@ -8,6 +8,7 @@ import cacheManager from 'cache-manager';
 import redisStore from 'cache-manager-redis-store';
 import { RedisService } from '../utils/redis/redis.service';
 import { SlackService } from '../utils/slack/slack.service';
+import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 @Injectable()
 export class ParticipantsRequestService {
   constructor(
@@ -15,7 +16,8 @@ export class ParticipantsRequestService {
     private locationTransferService: LocationTransferService,
     private awsService: AwsService,
     private redisService: RedisService,
-    private slackService: SlackService
+    private slackService: SlackService,
+    private forestAdminService: ForestAdminService
   ) {}
 
   async getAll(userQuery) {
@@ -260,13 +262,18 @@ export class ParticipantsRequestService {
         region,
         null
       );
-      const finalLocation: any = await this.prisma.location.upsert({
-        where: { placeId: result?.location?.placeId },
-        update: result?.location,
-        create: result?.location,
-      });
-      if (finalLocation && finalLocation.uid) {
-        dataToSave['location'] = { connect: { uid: finalLocation.uid } };
+      if(result && result?.location?.placeId) {
+        const finalLocation: any = await this.prisma.location.upsert({
+          where: { placeId: result?.location?.placeId },
+          update: result?.location,
+          create: result?.location,
+        });
+        if (finalLocation && finalLocation.uid) {
+          dataToSave['location'] = { connect: { uid: finalLocation.uid } };
+        }
+      }
+      else {
+        throw new BadRequestException('Invalid Location info')
       }
     }
 
@@ -296,6 +303,7 @@ export class ParticipantsRequestService {
     slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
+    await this.forestAdminService.triggerAirtableSync()
     return { code: 1, message: 'Success' };
   }
 
@@ -359,7 +367,7 @@ export class ParticipantsRequestService {
         region,
         null
       );
-      if (result.status !== 'NO_REQUIRED_PLACE') {
+      if (result && result?.location?.placeId) {
         const finalLocation: any = await this.prisma.location.upsert({
           where: { placeId: result?.location?.placeId },
           update: result?.location,
@@ -372,6 +380,8 @@ export class ParticipantsRequestService {
         ) {
           dataToSave['location'] = { connect: { uid: finalLocation.uid } };
         }
+      } else {
+        throw new BadRequestException('Invalid Location info')
       }
     }
 
@@ -468,6 +478,7 @@ export class ParticipantsRequestService {
     slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
+    await this.forestAdminService.triggerAirtableSync()
     return { code: 1, message: 'Success' };
   }
 
@@ -559,6 +570,7 @@ export class ParticipantsRequestService {
     slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
+    await this.forestAdminService.triggerAirtableSync()
     return { code: 1, message: 'Success' };
   }
 
@@ -666,6 +678,7 @@ export class ParticipantsRequestService {
     slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
+    await this.forestAdminService.triggerAirtableSync()
     return { code: 1, message: 'Success' };
   }
 }
