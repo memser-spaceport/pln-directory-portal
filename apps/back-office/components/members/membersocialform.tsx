@@ -77,6 +77,7 @@ export default function AddMemberSocialForm(props) {
           disabled={!props.isEditEnabled}
           value={values.officeHours}
           onChange={onChange}
+          placeholder="Enter office hours"
           className="custom-grey custom-outline-none border"
         />
         <div className="flex pt-3">

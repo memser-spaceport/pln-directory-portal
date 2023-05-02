@@ -1,22 +1,16 @@
 import { ChangeEvent, useEffect, useState } from 'react';
-import jwt_decode from 'jwt-decode';
 import styles from './index.module.css';
 import { InputField } from '@protocol-labs-network/ui';
 import { useRouter } from 'next/router';
 import { ReactComponent as Building } from '/public/assets/icons/building.svg';
-import APP_CONSTANTS, { ROUTE_CONSTANTS, TOKEN } from '../utils/constants';
-import { setToken } from '../utils/auth';
+import APP_CONSTANTS, { ROUTE_CONSTANTS } from '../utils/constants';
+import { parseCookies } from 'nookies';
 import Loader from '../components/common/loader';
 import { ReactComponent as LogoImage } from '/public/assets/images/Back_office_Logo.svg';
-import api from '../utils/api';
-
-interface DecodedJwtPayload {
-  exp: number;
-  iat: number;
-}
+import { GetServerSideProps } from 'next';
 
 export function Index() {
-  const [userName, setUserName] = useState<string>('');
+  const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -25,7 +19,7 @@ export function Index() {
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) {
     const { name, value } = event.target;
-    name === 'name' ? setUserName(value) : setPassword(value);
+    name === 'name' ? setUsername(value) : setPassword(value);
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>): void {
@@ -43,38 +37,28 @@ export function Index() {
   const router = useRouter();
   async function onSubmit() {
     setIsLoading(true);
-    await api
-      .post('/v1/admin/signin', { username: userName, password: password })
+    await fetch('/api/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ username, password }),
+    })
       .then((res) => {
-        if (res?.data?.accessToken) {
-          const decoded = jwt_decode<DecodedJwtPayload>(res.data.accessToken);
-          console.log('decoded', decoded);
-          const expiry = new Date(decoded?.exp * 1000);
-          document.cookie = `plnadmin=${res?.data?.accessToken}; Expires=${expiry}; path=/`;
+        console.log('res', res);
+        if (res.ok) {
           const backLink = router.query.backlink?.toString() ?? '';
           router.push(backLink ? backLink : ROUTE_CONSTANTS.PENDING_LIST);
-          return res?.data;
+        } else if (res.status === 401) {
+          setError('Incorrect Username and Password!');
         }
       })
       .catch((err) => {
-        console.log(err);
+        setError('Please try again!');
       })
       .finally(() => {
         setIsLoading(false);
       });
-
-    // if (
-    //   userName === process.env.NEXT_PUBLIC_USERNAME &&
-    //   password === process.env.NEXT_PUBLIC_PASSWORD
-    // ) {
-    //   setToken(TOKEN);
-    //   setIsLoading(false);
-    //   const backLink = router.query.backlink?.toString() ?? '';
-    //   router.push(backLink ? backLink : ROUTE_CONSTANTS.PENDING_LIST);
-    // } else {
-    //   setIsLoading(false);
-    //   setError('Incorrect Username and Password!');
-    // }
   }
 
   return (
@@ -83,12 +67,6 @@ export function Index() {
       <div className="absolute left-[50%] top-[50%] w-[75%] translate-x-[-50%] translate-y-[-50%] rounded-lg bg-white p-8 md:w-[30%]">
         <div className="inline-block">
           <div className="inline-block">
-            {/* <Image
-              src="/assets/images/protocol-labs-network-open-graph.png"
-              height={100}
-              width={200}
-              alt="Protocol Labs Logo"
-            /> */}
             <LogoImage
               className="pl-3"
               height={95}
@@ -113,7 +91,7 @@ export function Index() {
             <InputField
               name="name"
               label="Username"
-              value={userName}
+              value={username}
               onChange={onChange}
               onKeyDown={onKeyDown}
               placeholder="Enter username"
@@ -137,7 +115,7 @@ export function Index() {
           <button
             className="on-focus leading-3.5 text-md mr-2 rounded-full border border-slate-300 bg-blue-700 px-5 py-3 text-left font-medium text-white last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full disabled:bg-slate-400"
             onClick={onSubmit}
-            disabled={!userName || !password}
+            disabled={!username || !password}
           >
             Login
           </button>
@@ -153,3 +131,19 @@ export function Index() {
 }
 
 export default Index;
+
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  const { plnadmin } = parseCookies(context);
+
+  if (plnadmin) {
+    return {
+      redirect: {
+        destination: '/pending-list',
+        permanent: false,
+      },
+    };
+  }
+  return {
+    props: {},
+  };
+};

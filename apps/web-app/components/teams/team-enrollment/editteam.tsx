@@ -7,7 +7,6 @@ import {
   useCallback,
   useRef,
 } from 'react';
-import { Loader } from '@protocol-labs-network/ui';
 import AddTeamStepOne from './addteamstepone';
 import AddTeamStepTwo from './addteamsteptwo';
 import AddTeamStepThree from './addteamstepthree';
@@ -24,6 +23,7 @@ import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-team.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
+import { toast } from 'react-toastify';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditTeamModalProps {
@@ -160,7 +160,6 @@ export function EditTeamModal({
   // const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
-    console.log('scrollllllllllllllllllllllllllllll');
     const divElement = document.getElementById('myDiv') as HTMLDivElement;
     if (divElement) {
       divElement.setAttribute('tabIndex', '0');
@@ -214,7 +213,10 @@ export function EditTeamModal({
             protocol: data[4],
           });
         })
-        .catch((e) => console.error(e));
+        .catch((err) => {
+          toast(err?.message);
+          console.error(err);
+        });
     }
   }, [isOpen, id]);
 
@@ -297,8 +299,10 @@ export function EditTeamModal({
       setErrors([]);
       const errors = validateForm(formValues, imageUrl);
       if (errors?.length > 0) {
-        if (divRef.current) {
-          divRef.current.focus();
+        const element1 = divRef.current;
+        if (element1) {
+          element1.scrollTo({ top: 0, behavior: 'smooth' });
+          // element1.scrollTop = 0;
         }
         setErrors(errors);
         return false;
@@ -342,6 +346,7 @@ export function EditTeamModal({
           setSaveCompleted(true);
         });
       } catch (err) {
+        toast(err?.message);
         console.log('error', err);
       } finally {
         setIsProcessing(false);
@@ -374,7 +379,7 @@ export function EditTeamModal({
     <>
       {isProcessing && (
         <div
-          className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
+          className={`pointer-events-none fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
         >
           <LoadingIndicator />
         </div>
@@ -385,6 +390,7 @@ export function EditTeamModal({
           onClose={handleModalClose}
           enableFooter={false}
           image={<TextImage />}
+          modalRef={divRef}
         >
           {saveCompleted ? (
             <div>
@@ -404,7 +410,7 @@ export function EditTeamModal({
               </div>
             </div>
           ) : (
-            <div ref={divRef}>
+            <div>
               <div className="px-11">
                 <span className="font-size-14 text-sm">
                   Please fill out only the fields you would like to change for

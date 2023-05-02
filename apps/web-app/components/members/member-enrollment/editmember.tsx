@@ -6,6 +6,7 @@ import {
   ChangeEvent,
   useCallback,
   Fragment,
+  useRef,
 } from 'react';
 import { useRouter } from 'next/router';
 import AddMemberBasicForm from './addmemberbasicform';
@@ -19,12 +20,13 @@ import {
   fetchTeams,
 } from '../../../utils/services/dropdown-service';
 import { fetchMember } from '../../../utils/services/members';
-import { InputField, Loader } from '@protocol-labs-network/ui';
+import { InputField } from '@protocol-labs-network/ui';
 import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-member.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { requestPendingCheck } from '../../../utils/services/members';
+import { toast } from 'react-toastify';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import Cookies from 'js-cookie';
 interface EditMemberModalProps {
@@ -169,6 +171,8 @@ export function EditMemberModal({
     useState(false);
   const router = useRouter();
 
+  const divRef = useRef<HTMLDivElement>(null);
+
   // const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
@@ -225,7 +229,10 @@ export function EditMemberModal({
           setFormValues(formValues);
           setDropDownValues({ skillValues: data[1], teamNames: data[2] });
         })
-        .catch((e) => console.error(e));
+        .catch((err) => {
+          toast(err?.message);
+          console.log('error', err);
+        });
     }
   }, [isOpen, id]);
 
@@ -312,6 +319,11 @@ export function EditMemberModal({
       //   return;
       // }
       if (errors?.length > 0) {
+        const element1 = divRef.current;
+        if (element1) {
+          element1.scrollTo({ top: 0, behavior: 'smooth' });
+          // element1.scrollTop = 0;
+        }
         setErrors(errors);
         return false;
       }
@@ -369,6 +381,7 @@ export function EditMemberModal({
           setSaveCompleted(true);
         });
       } catch (err) {
+        toast(err?.message);
         console.log('error', err);
       } finally {
         setIsProcessing(false);
@@ -431,6 +444,13 @@ export function EditMemberModal({
 
   return (
     <>
+    {isProcessing && (
+        <div
+          className={`pointer-events-none fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
+        >
+          <LoadingIndicator />
+        </div>
+      )}
       {isProfileSettings ? (
         <div className="h-full w-full">
           <div className="mx-auto mb-40 h-full w-2/4 px-5">
@@ -547,7 +567,8 @@ export function EditMemberModal({
           isOpen={isOpen}
           onClose={() => handleModalClose()}
           enableFooter={false}
-          image="/assets/images/join_as_a_member.jpg"
+          image={<TextImage />}
+        modalRef={divRef}
         >
           {saveCompleted ? (
             <div>

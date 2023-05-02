@@ -1,5 +1,5 @@
 import { Dialog, Transition } from '@headlessui/react';
-import React, { ReactNode, Fragment } from 'react';
+import React, { ReactNode, Fragment, LegacyRef } from 'react';
 import { ReactComponent as CloseIcon } from '../../../../public/assets/images/icons/closeIcon.svg';
 
 type ModalProps = {
@@ -11,6 +11,8 @@ type ModalProps = {
   headerStyleClass?: string;
   enableHeader?: boolean;
   enableFooter?: boolean;
+  modalClassName?: string;
+  modalRef?: LegacyRef<HTMLDivElement>;
 };
 
 type ModalHeaderProps = {
@@ -74,12 +76,17 @@ function Modal({
   onClose,
   enableHeader = true,
   enableFooter = true,
+  modalClassName = '',
+  modalRef,
 }: ModalProps) {
+  // const modalRef = useRef(null);
+
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog
         as="div"
-        className="fixed inset-0 left-0 top-0 z-[1055] w-full grow overflow-x-hidden outline-none"
+        ref={modalRef}
+        className={`fixed inset-0 left-0 top-0 z-[50] w-full grow overflow-x-hidden outline-none ${modalClassName}`}
         onClose={() => onClose()}
       >
         <div className="">
@@ -103,7 +110,9 @@ function Modal({
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <div className="dia relative my-8 h-auto w-[500px] transform rounded-lg bg-white text-left align-middle shadow-xl transition-all ">
+            <div
+              className="dia relative my-8 h-auto w-[500px] transform rounded-lg bg-white text-left align-middle shadow-xl transition-all "
+            >
               {enableHeader && (
                 <ModalHeader
                   onClose={onClose}

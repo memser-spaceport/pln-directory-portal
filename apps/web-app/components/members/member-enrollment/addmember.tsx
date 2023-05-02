@@ -5,6 +5,7 @@ import {
   useEffect,
   ChangeEvent,
   useCallback,
+  useRef,
 } from 'react';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
@@ -21,6 +22,7 @@ import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/create-member.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
+import { toast } from 'react-toastify';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddMemberModalProps {
@@ -86,9 +88,15 @@ function handleNextClick(
   formStep,
   setFormStep,
   setErrors,
-  emailExists
+  emailExists,
+  divRef
 ) {
   const errors = validateForm(formValues, formStep);
+  const element1 = divRef.current;
+  if (element1) {
+    element1.scrollTo({ top: 0, behavior: 'smooth' });
+    // element1.scrollTop = 0;
+  }
   if (errors?.length > 0 || emailExists) {
     setErrors(errors);
     return false;
@@ -105,7 +113,8 @@ function getSubmitOrNextButton(
   handleSubmit,
   setErrors,
   isProcessing,
-  emailExists
+  emailExists,
+  divRef
 ) {
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
@@ -127,7 +136,8 @@ function getSubmitOrNextButton(
             formStep,
             setFormStep,
             setErrors,
-            emailExists
+            emailExists,
+            divRef
           )
         }
       >
@@ -195,6 +205,7 @@ export function AddMemberModal({
     skills: [],
   });
 
+  const divRef = useRef<HTMLDivElement>(null);
   // const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
@@ -203,7 +214,10 @@ export function AddMemberModal({
         .then((allData) =>
           setDropDownValues({ skillValues: allData[0], teamNames: allData[1] })
         )
-        .catch((e) => console.error(e));
+        .catch((err) => {
+          toast(err?.message);
+          console.log('error', err);
+        });
     }
   }, [isOpen]);
 
@@ -280,9 +294,11 @@ export function AddMemberModal({
       uniqueIdentifier: event.target.value,
       participantType: ENROLLMENT_TYPE.MEMBER,
     };
+    setIsProcessing(true);
     api
       .post(`/v1/participants-request/unique-identifier`, data)
       .then((response) => {
+        setIsProcessing(false);
         response?.data &&
         (response.data?.isUniqueIdentifierExist ||
           response.data?.isRequestPending)
@@ -341,6 +357,7 @@ export function AddMemberModal({
           setSaveCompleted(true);
         });
       } catch (err) {
+        toast(err?.message);
         console.log('error', err);
       } finally {
         setIsProcessing(false);
@@ -448,7 +465,7 @@ export function AddMemberModal({
     <>
       {isProcessing && (
         <div
-          className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
+          className={`pointer-events-none fixed inset-0 z-[99999] flex h-screen w-screen cursor-not-allowed items-center justify-center bg-gray-500 bg-opacity-75 outline-none transition-opacity`}
         >
           <LoadingIndicator />
         </div>
@@ -458,6 +475,8 @@ export function AddMemberModal({
         onClose={() => handleModalClose()}
         enableFooter={false}
         image={<TextImage />}
+        modalClassName={isProcessing ? 'z-[49]' : ''}
+        modalRef={divRef}
       >
         {saveCompleted ? (
           <div className="px-5">
@@ -506,7 +525,8 @@ export function AddMemberModal({
                   handleSubmit,
                   setErrors,
                   isProcessing,
-                  emailExists
+                  emailExists,
+                  divRef
                 )}
               </div>
             </div>
