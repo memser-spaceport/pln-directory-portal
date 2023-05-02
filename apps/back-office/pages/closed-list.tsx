@@ -6,6 +6,7 @@ import RequestList from '../components/request-list';
 import APP_CONSTANTS, { API_ROUTE, ENROLLMENT_TYPE } from '../utils/constants';
 import { useNavbarContext } from '../context/navbar-context';
 import { ApprovalLayout } from '../layout/approval-layout';
+import { parseCookies } from 'nookies';
 
 type RequestList = {
   list: IRequest[];
@@ -38,11 +39,28 @@ export default function ClosedList(props) {
   );
 }
 
-export const getServerSideProps: GetServerSideProps<IRequest> = async ({
-  query,
-  res,
-}) => {
-  const listData = await api.get(API_ROUTE.PARTICIPANTS_REQUEST);
+export const getServerSideProps: GetServerSideProps<IRequest> = async (
+  context
+) => {
+  const { plnadmin } = parseCookies(context);
+
+  if (!plnadmin) {
+    const currentUrl = context.resolvedUrl;
+    const loginUrl = `/?backlink=${currentUrl}`;
+    return {
+      redirect: {
+        destination: loginUrl,
+        permanent: false,
+      },
+    };
+  }
+  const config = {
+    headers: {
+      authorization: `Bearer ${plnadmin}`,
+    },
+  };
+
+  const listData = await api.get(API_ROUTE.PARTICIPANTS_REQUEST, config);
 
   let memberResponse = [];
   let teamResponse = [];

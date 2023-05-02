@@ -22,6 +22,7 @@ import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/create-team.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
+import { toast } from 'react-toastify';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddTeamModalProps {
@@ -230,7 +231,10 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
             protocol: data[3],
           })
         )
-        .catch((e) => console.error(e));
+        .catch((err) => {
+          toast(err?.message);
+          console.log('error', err);
+        });
     }
   }, [isOpen]);
 
@@ -377,6 +381,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
           setSaveCompleted(true);
         });
       } catch (err) {
+        toast(err?.message);
         console.log('error', err);
       } finally {
         setIsProcessing(false);
@@ -449,7 +454,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     <>
       {isProcessing && (
         <div
-          className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
+          className={`pointer-events-none fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
         >
           <LoadingIndicator />
         </div>
@@ -459,6 +464,8 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
         onClose={handleModalClose}
         enableFooter={false}
         image={<TextImage />}
+        modalClassName={isProcessing ? 'z-[49]' : ''}
+        scrollTop={errors?.length ? true : false}
       >
         {saveCompleted ? (
           <div>

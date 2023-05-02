@@ -73,6 +73,7 @@
     "next": "12.1.0",
     "next-seo": "^5.5.0",
     "node-cache-manager": "^1.2.0",
+    "nookies": "^2.5.2",
     "pg": "^8.8.0",
     "postcss": "^8.4.12",
     "react": "17.0.2",

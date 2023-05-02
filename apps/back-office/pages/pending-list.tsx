@@ -6,6 +6,7 @@ import RequestList from '../components/request-list';
 import APP_CONSTANTS, { API_ROUTE, ENROLLMENT_TYPE } from '../utils/constants';
 import { useNavbarContext } from '../context/navbar-context';
 import { ApprovalLayout } from '../layout/approval-layout';
+import { parseCookies } from 'nookies';
 
 export default function PendingList(props) {
   const { setIsOpenRequest, setMemberList, setTeamList, isTeamActive } =
@@ -34,9 +35,31 @@ export default function PendingList(props) {
   );
 }
 
-export const getServerSideProps: GetServerSideProps<IRequest> = async () => {
+export const getServerSideProps: GetServerSideProps<IRequest> = async (
+  context
+) => {
+  const { plnadmin } = parseCookies(context);
+  console.log('plnadmin', plnadmin);
+
+  if (!plnadmin) {
+    console.log('insidet');
+    const currentUrl = context.resolvedUrl;
+    const loginUrl = `/?backlink=${currentUrl}`;
+    return {
+      redirect: {
+        destination: loginUrl,
+        permanent: false,
+      },
+    };
+  }
+  const config = {
+    headers: {
+      authorization: `Bearer ${plnadmin}`,
+    },
+  };
   const listData = await api.get(
-    `${API_ROUTE.PARTICIPANTS_REQUEST}?status=PENDING`
+    `${API_ROUTE.PARTICIPANTS_REQUEST}?status=PENDING`,
+    config
   );
   let memberResponse = [];
   let teamResponse = [];

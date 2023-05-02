@@ -22,9 +22,14 @@ export function FooterButtons(props) {
       participantType: type,
       ...(referenceUid && { referenceUid: referenceUid }),
     };
+    const configuration = {
+      headers: {
+        authorization: `Bearer ${props.token}`,
+      },
+    };
     setLoader(true);
     await api
-      .patch(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, data)
+      .patch(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, data, configuration)
       .then((res) => {
         if (res?.data?.code == 1) {
           const message = `${
@@ -46,13 +51,14 @@ export function FooterButtons(props) {
             pathname: ROUTE_CONSTANTS.INTERNAL_SERVER_ERROR,
           });
         }
+        toast(e?.message);
       })
       .finally(() => setLoader(false));
   }
 
   return (
     <div className="header">
-      <nav className="navbar absolute bottom-0 z-[1157]  grid min-h-[40px] min-h-[60px] w-full grid-flow-col items-center bg-[white] px-12 only-of-type:shadow-[0_1px_4px_0_#e2e8f0] md:min-h-[80px]">
+      <nav className="navbar fixed bottom-0 z-[1157] grid h-[80px] w-full grid-flow-col items-center bg-[white] px-12 only-of-type:shadow-[0_1px_4px_0_#e2e8f0]">
         <div className="col-span-4 justify-self-end">
           {!props.isEditEnabled ? (
             <button

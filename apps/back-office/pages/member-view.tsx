@@ -16,6 +16,8 @@ import APP_CONSTANTS, {
 import router from 'next/router';
 import Loader from '../components/common/loader';
 import { useNavbarContext } from '../context/navbar-context';
+import { toast } from 'react-toastify';
+import { parseCookies } from 'nookies';
 
 function validateBasicForm(formValues, imageUrl) {
   const errors = [];
@@ -169,13 +171,24 @@ export default function MemberView(props) {
             imageUrl: image?.url ?? imageUrl,
           },
         };
+        const configuration = {
+          headers: {
+            authorization: `Bearer ${props.plnadmin}`,
+          },
+        };
+
         await api
-          .put(`${API_ROUTE.PARTICIPANTS_REQUEST}/${props.id}`, data)
+          .put(
+            `${API_ROUTE.PARTICIPANTS_REQUEST}/${props.id}`,
+            data,
+            configuration
+          )
           .then((response) => {
             setSaveCompleted(true);
             setIsEditEnabled(false);
           });
       } catch (err) {
+        toast(err?.message);
         console.log('error', err);
       } finally {
         setIsProcessing(false);
@@ -247,67 +260,69 @@ export default function MemberView(props) {
   }
 
   return (
-    <ApprovalLayout>
-      {isLoading && <Loader />}
-      <div className="bg-gray-200 py-10">
-        <div className="relative m-auto w-[40%]">
-          <div
-            className="cursor-pointer pb-[24px] text-[14px] font-semibold text-[#1D4ED8]"
-            onClick={() => redirectToList()}
-          >
-            Back to requests
-          </div>
-          <div className="rounded-xl border border-gray-300 bg-white px-11 py-10">
-            <div className="inputfield pt-5">
-              {errors?.length > 0 && (
-                <div className="w-full rounded-xl bg-white p-5 ">
-                  <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
-                    {errors.map((item, index) => (
-                      <li key={index}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <InputField
-                required
-                name="requestorEmail"
-                type="email"
-                disabled={!isEditEnabled}
-                label="Requestor Email"
-                value={formValues?.requestorEmail}
-                onChange={handleInputChange}
-                placeholder="Enter your email address"
-                className="custom-grey custom-outline-none border"
-              />
+    <>
+      <ApprovalLayout>
+        {isLoading && <Loader />}
+        <div className="bg-gray-200">
+          <div className="relative m-auto w-[40%]">
+            <div
+              className="cursor-pointer pb-[24px] text-[14px] font-semibold text-[#1D4ED8]"
+              onClick={() => redirectToList()}
+            >
+              Back to requests
             </div>
-            <div className="overflow-y-auto">
-              <MemberBasicForm
-                formValues={formValues}
-                onChange={handleInputChange}
-                handleImageChange={handleImageChange}
-                imageUrl={imageUrl}
-                isEditEnabled={isEditEnabled}
-              />
-              <MemberSkillForm
-                formValues={formValues}
-                dropDownValues={dropDownValues}
-                handleDropDownChange={handleDropDownChange}
-                handleAddNewRole={handleAddNewRole}
-                updateParentTeamValue={updateParentTeamValue}
-                updateParentRoleValue={updateParentRoleValue}
-                handleDeleteRolesRow={handleDeleteRolesRow}
-                onChange={handleInputChange}
-                isEditEnabled={isEditEnabled}
-              />
-              <MemberSocialForm
-                formValues={formValues}
-                onChange={handleInputChange}
-                isEditEnabled={isEditEnabled}
-              />
+            <div className="rounded-xl border border-gray-300 bg-white px-11 py-10">
+              <div className="inputfield pt-5">
+                {errors?.length > 0 && (
+                  <div className="w-full rounded-xl bg-white p-5 ">
+                    <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
+                      {errors.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <InputField
+                  required
+                  name="requestorEmail"
+                  type="email"
+                  disabled={!isEditEnabled}
+                  label="Requestor Email"
+                  value={formValues?.requestorEmail}
+                  onChange={handleInputChange}
+                  placeholder="Enter your email address"
+                  className="custom-grey custom-outline-none border"
+                />
+              </div>
+              <div className="overflow-y-auto">
+                <MemberBasicForm
+                  formValues={formValues}
+                  onChange={handleInputChange}
+                  handleImageChange={handleImageChange}
+                  imageUrl={imageUrl}
+                  isEditEnabled={isEditEnabled}
+                />
+                <MemberSkillForm
+                  formValues={formValues}
+                  dropDownValues={dropDownValues}
+                  handleDropDownChange={handleDropDownChange}
+                  handleAddNewRole={handleAddNewRole}
+                  updateParentTeamValue={updateParentTeamValue}
+                  updateParentRoleValue={updateParentRoleValue}
+                  handleDeleteRolesRow={handleDeleteRolesRow}
+                  onChange={handleInputChange}
+                  isEditEnabled={isEditEnabled}
+                />
+                <MemberSocialForm
+                  formValues={formValues}
+                  onChange={handleInputChange}
+                  isEditEnabled={isEditEnabled}
+                />
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </ApprovalLayout>
       {props.status === APP_CONSTANTS.PENDING_LABEL && (
         <FooterButtons
           isEditEnabled={isEditEnabled}
@@ -317,17 +332,36 @@ export default function MemberView(props) {
           saveChanges={handleSubmit}
           referenceUid={props.referenceUid}
           setLoader={setIsLoading}
+          token={props.plnadmin}
         />
       )}
-    </ApprovalLayout>
+    </>
   );
 }
 
-export const getServerSideProps = async ({ query, res }) => {
-  const { id, backLink = ROUTE_CONSTANTS.PENDING_LIST } = query as {
+export const getServerSideProps = async (context) => {
+  const { id, backLink = ROUTE_CONSTANTS.PENDING_LIST } = context.query as {
     id: string;
     backLink: string;
   };
+  const { plnadmin } = parseCookies(context);
+
+  if (!plnadmin) {
+    const currentUrl = context.resolvedUrl;
+    const loginUrl = `/?backlink=${currentUrl}`;
+    return {
+      redirect: {
+        destination: loginUrl,
+        permanent: false,
+      },
+    };
+  }
+  const config = {
+    headers: {
+      authorization: `Bearer ${plnadmin}`,
+    },
+  };
+
   let formValues: IFormValues;
   let teams, skills, referenceUid, imageUrl, status;
   let memberList = [];
@@ -341,8 +375,8 @@ export const getServerSideProps = async ({ query, res }) => {
     memberTeamsResponse,
     skillsResponse,
   ] = await Promise.all([
-    api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`),
-    api.get(API_ROUTE.PARTICIPANTS_REQUEST),
+    api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, config),
+    api.get(API_ROUTE.PARTICIPANTS_REQUEST, config),
     api.get(API_ROUTE.TEAMS),
     api.get(API_ROUTE.SKILLS),
   ]);
@@ -435,10 +469,10 @@ export const getServerSideProps = async ({ query, res }) => {
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
-  res.setHeader(
-    'Cache-Control',
-    'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
-  );
+  // res.setHeader(
+  //   'Cache-Control',
+  //   'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
+  // );
 
   return {
     props: {
@@ -452,6 +486,7 @@ export const getServerSideProps = async ({ query, res }) => {
       backLink,
       teamList,
       memberList,
+      plnadmin,
     },
   };
 };

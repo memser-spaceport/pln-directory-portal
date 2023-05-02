@@ -37,7 +37,7 @@ export default function AddMemberBasicForm(props) {
           <InformationCircleIcon />
         </div>
         <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-          Please upload a image in PNG or JPEG format with file size less that
+          Please upload a image in PNG or JPEG format with file size less than
           4MB.
         </span>
       </div>

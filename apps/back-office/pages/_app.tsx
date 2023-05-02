@@ -35,4 +35,4 @@ function CustomApp({ Component, pageProps }: AppProps) {
   );
 }
 
-export default withAuth(CustomApp);
+export default CustomApp;

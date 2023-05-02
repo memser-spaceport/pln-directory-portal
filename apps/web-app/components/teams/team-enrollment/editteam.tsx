@@ -7,7 +7,6 @@ import {
   useCallback,
   useRef,
 } from 'react';
-import { Loader } from '@protocol-labs-network/ui';
 import AddTeamStepOne from './addteamstepone';
 import AddTeamStepTwo from './addteamsteptwo';
 import AddTeamStepThree from './addteamstepthree';
@@ -24,6 +23,7 @@ import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-team.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
+import { toast } from 'react-toastify';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditTeamModalProps {
@@ -214,7 +214,10 @@ export function EditTeamModal({
             protocol: data[4],
           });
         })
-        .catch((e) => console.error(e));
+        .catch((err) => {
+          toast(err?.message);
+          console.error(err);
+        });
     }
   }, [isOpen, id]);
 
@@ -342,6 +345,7 @@ export function EditTeamModal({
           setSaveCompleted(true);
         });
       } catch (err) {
+        toast(err?.message);
         console.log('error', err);
       } finally {
         setIsProcessing(false);
@@ -374,7 +378,7 @@ export function EditTeamModal({
     <>
       {isProcessing && (
         <div
-          className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
+          className={`pointer-events-none fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
         >
           <LoadingIndicator />
         </div>
@@ -385,6 +389,7 @@ export function EditTeamModal({
           onClose={handleModalClose}
           enableFooter={false}
           image={<TextImage />}
+          scrollTop={errors?.length ? true : false}
         >
           {saveCompleted ? (
             <div>

@@ -16,11 +16,12 @@ import {
   fetchTeams,
 } from '../../../utils/services/dropdown-service';
 import { fetchMember } from '../../../utils/services/members';
-import { InputField, Loader } from '@protocol-labs-network/ui';
+import { InputField } from '@protocol-labs-network/ui';
 import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-member.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
+import { toast } from 'react-toastify';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditMemberModalProps {
@@ -190,7 +191,10 @@ export function EditMemberModal({
           setFormValues(formValues);
           setDropDownValues({ skillValues: data[1], teamNames: data[2] });
         })
-        .catch((e) => console.error(e));
+        .catch((err) => {
+          toast(err?.message);
+          console.log('error', err);
+        });
     }
   }, [isOpen, id]);
 
@@ -317,6 +321,7 @@ export function EditMemberModal({
           setSaveCompleted(true);
         });
       } catch (err) {
+        toast(err?.message);
         console.log('error', err);
       } finally {
         setIsProcessing(false);
@@ -381,7 +386,7 @@ export function EditMemberModal({
     <>
       {isProcessing && (
         <div
-          className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
+          className={`pointer-events-none fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
         >
           <LoadingIndicator />
         </div>
@@ -391,6 +396,7 @@ export function EditMemberModal({
         onClose={() => handleModalClose()}
         enableFooter={false}
         image={<TextImage />}
+        scrollTop={errors?.length ? true : false}
       >
         {saveCompleted ? (
           <div>

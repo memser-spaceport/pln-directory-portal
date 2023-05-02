@@ -21,6 +21,7 @@ import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/create-member.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
+import { toast } from 'react-toastify';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddMemberModalProps {
@@ -203,7 +204,10 @@ export function AddMemberModal({
         .then((allData) =>
           setDropDownValues({ skillValues: allData[0], teamNames: allData[1] })
         )
-        .catch((e) => console.error(e));
+        .catch((err) => {
+          toast(err?.message);
+          console.log('error', err);
+        });
     }
   }, [isOpen]);
 
@@ -341,6 +345,7 @@ export function AddMemberModal({
           setSaveCompleted(true);
         });
       } catch (err) {
+        toast(err?.message);
         console.log('error', err);
       } finally {
         setIsProcessing(false);
@@ -448,7 +453,7 @@ export function AddMemberModal({
     <>
       {isProcessing && (
         <div
-          className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
+          className={`pointer-events-none fixed inset-0 z-[99999] flex h-screen w-screen cursor-not-allowed items-center justify-center bg-gray-500 bg-opacity-75 outline-none transition-opacity`}
         >
           <LoadingIndicator />
         </div>
@@ -458,6 +463,8 @@ export function AddMemberModal({
         onClose={() => handleModalClose()}
         enableFooter={false}
         image={<TextImage />}
+        modalClassName={isProcessing ? 'z-[49]' : ''}
+        scrollTop={errors?.length ? true : false}
       >
         {saveCompleted ? (
           <div className="px-5">

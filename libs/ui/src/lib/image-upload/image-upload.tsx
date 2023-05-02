@@ -81,7 +81,7 @@ export function ProfileImageUpload({
           disabled={disabled}
         />
       </div>
-      <span className="text-xs text-rose-600">{uploadError}</span>
+      <span className="absolute pt-1 text-xs text-rose-600">{uploadError}</span>
     </>
   );
 }
