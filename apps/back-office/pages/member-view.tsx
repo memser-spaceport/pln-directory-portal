@@ -36,7 +36,7 @@ function validateBasicForm(formValues, imageUrl) {
     !formValues.requestorEmail?.trim() ||
     !formValues.requestorEmail?.match(emailRE)
   ) {
-    errors.push('Please add valid Requestor Email');
+    errors.push('Please add a valid Requestor Email');
   }
   return errors;
 }

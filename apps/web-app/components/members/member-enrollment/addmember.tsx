@@ -224,6 +224,7 @@ export function AddMemberModal({
   function resetState() {
     setFormStep(1);
     setErrors([]);
+    setEmailExists(false);
     setDropDownValues({});
     setSaveCompleted(false);
     setImageUrl('');
