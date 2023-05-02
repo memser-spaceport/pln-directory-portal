@@ -40,19 +40,19 @@ function validateBasicForm(formValues, imageUrl) {
     !formValues.requestorEmail?.trim() ||
     !formValues.requestorEmail?.match(emailRE)
   ) {
-    errors.push('Please add valid Requestor email');
+    errors.push('Please add a valid Requestor email');
   }
   if (!formValues.name?.trim()) {
     errors.push('Please add Team Name');
   }
   if (!imageUrl) {
-    errors.push('Please add logo');
+    errors.push('Please add your team logo');
   }
   if (!formValues.shortDescription?.trim()) {
-    errors.push('Please add Description');
+    errors.push('Please add a Description');
   }
   if (!formValues.longDescription?.trim()) {
-    errors.push('Please add Long Description');
+    errors.push('Please add a Long Description');
   }
   return errors;
 }
@@ -63,7 +63,7 @@ function validateProjectDetailForm(formValues) {
     errors.push('Please add Funding Stage');
   }
   if (!formValues.membershipSources.length) {
-    errors.push('Please add Membership Source');
+    errors.push('Please add Membership Source(s)');
   }
   if (!formValues.industryTags.length) {
     errors.push('Please add IndustryTags');
