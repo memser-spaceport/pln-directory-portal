@@ -1,4 +1,4 @@
-import api from 'apps/back-office/utils/api';
+import api from '../../utils/api';
 import { setCookie } from 'nookies';
 import jwt_decode from 'jwt-decode';
 
