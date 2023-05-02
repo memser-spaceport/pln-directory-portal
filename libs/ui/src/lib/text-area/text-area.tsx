@@ -43,7 +43,7 @@ export function TextArea({
         {required ? label + '*' : label}
       </label>
       {info && (
-        <div className="text-[13px] leading-[18px] text-[#0F172A] opacity-40">
+        <div className="text-[13px] font-medium leading-[18px] text-[#0F172A] opacity-40">
           {info}
         </div>
       )}

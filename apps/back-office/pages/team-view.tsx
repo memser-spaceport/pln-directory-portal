@@ -20,6 +20,8 @@ import { FooterButtons } from '../components/footer-buttons/footer-buttons';
 import router from 'next/router';
 import Loader from '../components/common/loader';
 import { useNavbarContext } from '../context/navbar-context';
+import { toast } from 'react-toastify';
+import { parseCookies } from 'nookies';
 
 function validateBasicForm(formValues, imageUrl) {
   const errors = [];
@@ -177,6 +179,11 @@ export default function TeamView(props) {
               return response?.data?.image;
             });
         }
+        const configuration = {
+          headers: {
+            authorization: `Bearer ${props.plnadmin}`,
+          },
+        };
         const data = {
           participantType: ENROLLMENT_TYPE.TEAM,
           // referenceUid: props?.id,
@@ -189,12 +196,17 @@ export default function TeamView(props) {
           },
         };
         await api
-          .put(`${API_ROUTE.PARTICIPANTS_REQUEST}/${props.id}`, data)
+          .put(
+            `${API_ROUTE.PARTICIPANTS_REQUEST}/${props.id}`,
+            data,
+            configuration
+          )
           .then((response) => {
             setSaveCompleted(true);
             setIsEditEnabled(false);
           });
       } catch (err) {
+        toast(err?.message);
         console.log('error', err);
       } finally {
         setIsProcessing(false);
@@ -279,27 +291,47 @@ export default function TeamView(props) {
             </div>
           </div>
         </div>
-        {props.status === APP_CONSTANTS.PENDING_LABEL && (
-          <FooterButtons
-            isEditEnabled={isEditEnabled}
-            setIsEditEnabled={setIsEditEnabled}
-            id={props.id}
-            type={ENROLLMENT_TYPE.TEAM}
-            saveChanges={handleSubmit}
-            referenceUid={props.referenceUid}
-            setLoader={setIsProcessing}
-          />
-        )}
       </ApprovalLayout>
+      {props.status === APP_CONSTANTS.PENDING_LABEL && (
+        <FooterButtons
+          isEditEnabled={isEditEnabled}
+          setIsEditEnabled={setIsEditEnabled}
+          id={props.id}
+          type={ENROLLMENT_TYPE.TEAM}
+          saveChanges={handleSubmit}
+          referenceUid={props.referenceUid}
+          setLoader={setIsProcessing}
+          token={props.plnadmin}
+        />
+      )}
     </>
   );
 }
 
-export const getServerSideProps = async ({ query, res }) => {
-  const { id, backLink = ROUTE_CONSTANTS.PENDING_LIST } = query as {
+export const getServerSideProps = async (context) => {
+  const { id, backLink = ROUTE_CONSTANTS.PENDING_LIST } = context.query as {
     id: string;
     backLink: string;
   };
+
+  const { plnadmin } = parseCookies(context);
+
+  if (!plnadmin) {
+    const currentUrl = context.resolvedUrl;
+    const loginUrl = `/?backlink=${currentUrl}`;
+    return {
+      redirect: {
+        destination: loginUrl,
+        permanent: false,
+      },
+    };
+  }
+  const config = {
+    headers: {
+      authorization: `Bearer ${plnadmin}`,
+    },
+  };
+
   let formValues: IFormValues;
   let membershipSources = [];
   let fundingStages = [];
@@ -317,8 +349,8 @@ export const getServerSideProps = async ({ query, res }) => {
     industryTagsResponse,
     technologiesResponse,
   ] = await Promise.all([
-    api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`),
-    api.get(API_ROUTE.PARTICIPANTS_REQUEST),
+    api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, config),
+    api.get(API_ROUTE.PARTICIPANTS_REQUEST, config),
     api.get(API_ROUTE.MEMBERSHIP),
     api.get(API_ROUTE.FUNDING_STAGE),
     api.get(API_ROUTE.INDUSTRIES),
@@ -404,13 +436,6 @@ export const getServerSideProps = async ({ query, res }) => {
   //   };
   // }
 
-  // Cache response data in the browser for 1 minute,
-  // and in the CDN for 5 minutes, while keeping it stale for 7 days
-  res.setHeader(
-    'Cache-Control',
-    'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
-  );
-
   return {
     props: {
       formValues,
@@ -425,6 +450,7 @@ export const getServerSideProps = async ({ query, res }) => {
       backLink,
       teamList,
       memberList,
+      plnadmin,
     },
   };
 };
