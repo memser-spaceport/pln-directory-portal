@@ -76,17 +76,18 @@ function Modal({
   onClose,
   enableHeader = true,
   enableFooter = true,
-  modalClassName = '',
+  modalClassName,
   modalRef,
 }: ModalProps) {
   // const modalRef = useRef(null);
+  const zIndex = !modalClassName ? 'z-50' : modalClassName;
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog
         as="div"
         ref={modalRef}
-        className={`fixed inset-0 left-0 top-0 z-[50] w-full grow overflow-x-hidden outline-none ${modalClassName}`}
+        className={`fixed inset-0 left-0 top-0 w-full grow overflow-x-hidden outline-none ${zIndex}`}
         onClose={() => onClose()}
       >
         <div className="">
@@ -110,9 +111,7 @@ function Modal({
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <div
-              className="dia relative my-8 h-auto w-[500px] transform rounded-lg bg-white text-left align-middle shadow-xl transition-all "
-            >
+            <div className="dia relative my-8 h-auto w-[500px] transform rounded-lg bg-white text-left align-middle shadow-xl transition-all ">
               {enableHeader && (
                 <ModalHeader
                   onClose={onClose}
