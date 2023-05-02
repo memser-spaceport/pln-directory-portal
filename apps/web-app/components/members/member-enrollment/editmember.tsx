@@ -5,6 +5,7 @@ import {
   useEffect,
   ChangeEvent,
   useCallback,
+  useRef,
 } from 'react';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
@@ -142,6 +143,8 @@ export function EditMemberModal({
     skills: [],
   });
 
+  const divRef = useRef<HTMLDivElement>(null);
+
   // const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
@@ -277,6 +280,11 @@ export function EditMemberModal({
       //   return;
       // }
       if (errors?.length > 0) {
+        const element1 = divRef.current;
+        if (element1) {
+          element1.scrollTo({ top: 0, behavior: 'smooth' });
+          // element1.scrollTop = 0;
+        }
         setErrors(errors);
         return false;
       }
@@ -396,7 +404,7 @@ export function EditMemberModal({
         onClose={() => handleModalClose()}
         enableFooter={false}
         image={<TextImage />}
-        scrollTop={errors?.length ? true : false}
+        modalRef={divRef}
       >
         {saveCompleted ? (
           <div>

@@ -5,6 +5,7 @@ import {
   ChangeEvent,
   useEffect,
   useCallback,
+  useRef,
 } from 'react';
 import AddTeamStepOne from './addteamstepone';
 import AddTeamStepTwo from './addteamsteptwo';
@@ -107,9 +108,15 @@ function handleNextClick(
   formStep,
   setFormStep,
   setErrors,
-  nameExists
+  nameExists,
+  divRef
 ) {
   const errors = validateForm(formValues, formStep);
+  const element1 = divRef.current;
+  if (element1) {
+    element1.scrollTo({ top: 0, behavior: 'smooth' });
+    // element1.scrollTop = 0;
+  }
   if (errors?.length > 0 || nameExists) {
     setErrors(errors);
     return false;
@@ -126,7 +133,8 @@ function getSubmitOrNextButton(
   handleSubmit,
   setErrors,
   isProcessing,
-  nameExists
+  nameExists,
+  divRef
 ) {
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
@@ -148,7 +156,8 @@ function getSubmitOrNextButton(
             formStep,
             setFormStep,
             setErrors,
-            nameExists
+            nameExists,
+            divRef
           )
         }
       >
@@ -213,6 +222,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     officeHours: '',
   });
 
+  const divRef = useRef<HTMLDivElement>(null);
   // const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
@@ -321,9 +331,11 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       uniqueIdentifier: event.target.value,
       participantType: ENROLLMENT_TYPE.TEAM,
     };
+    setIsProcessing(true);
     api
       .post(`/v1/participants-request/unique-identifier`, data)
       .then((response) => {
+        setIsProcessing(false);
         response?.data &&
         (response.data?.isUniqueIdentifierExist ||
           response.data?.isRequestPending)
@@ -343,6 +355,11 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       setErrors([]);
       const errors = validateSocialForm(formValues);
       if (errors?.length > 0) {
+        const element1 = divRef.current;
+        if (element1) {
+          element1.scrollTo({ top: 0, behavior: 'smooth' });
+          // element1.scrollTop = 0;
+        }
         setErrors(errors);
         return false;
       }
@@ -465,7 +482,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
         enableFooter={false}
         image={<TextImage />}
         modalClassName={isProcessing ? 'z-[49]' : ''}
-        scrollTop={errors?.length ? true : false}
+        modalRef={divRef}
       >
         {saveCompleted ? (
           <div>
@@ -514,7 +531,8 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
                   handleSubmit,
                   setErrors,
                   isProcessing,
-                  nameExists
+                  nameExists,
+                  divRef
                 )}
               </div>
             </div>

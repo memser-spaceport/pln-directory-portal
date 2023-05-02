@@ -122,7 +122,7 @@ export function MultiSelect({
           {selectedValues?.length > 0 ? (
             selectedValues.map((item) => (
               <div
-                className="flex items-center rounded-full bg-gray-100 p-1 font-medium text-gray-600"
+                className="flex items-center rounded-full bg-gray-100 p-1 mx-1 font-medium text-gray-600"
                 key={item.value}
               >
                 <span className="text-sm">{item.label}</span>
