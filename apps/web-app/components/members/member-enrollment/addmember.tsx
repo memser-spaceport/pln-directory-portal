@@ -249,16 +249,18 @@ export function AddMemberModal({
   }
 
   function handleModalClose() {
-    if (
-      typeof document !== 'undefined' &&
-      document.getElementsByClassName('grecaptcha-badge').length
-    ) {
-      document
-        .getElementsByClassName('grecaptcha-badge')[0]
-        .classList.remove('width-full');
+    if (!isProcessing) {
+      if (
+        typeof document !== 'undefined' &&
+        document.getElementsByClassName('grecaptcha-badge').length
+      ) {
+        document
+          .getElementsByClassName('grecaptcha-badge')[0]
+          .classList.remove('width-full');
+      }
+      resetState();
+      setIsModalOpen(false);
     }
-    resetState();
-    setIsModalOpen(false);
   }
 
   function formatData() {
@@ -465,7 +467,7 @@ export function AddMemberModal({
     <>
       {isProcessing && (
         <div
-          className={`pointer-events-none fixed inset-0 z-[99999] flex h-screen w-screen cursor-not-allowed items-center justify-center bg-gray-500 bg-opacity-75 outline-none transition-opacity`}
+          className={`fixed inset-0 z-[99999] flex h-screen w-screen items-center justify-center bg-gray-500 bg-opacity-75 outline-none transition-opacity`}
         >
           <LoadingIndicator />
         </div>
