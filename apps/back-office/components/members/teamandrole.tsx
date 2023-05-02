@@ -46,6 +46,7 @@ export function TeamAndRoleGrid(props) {
             }}
             onChange={handleDropDownChange}
             disabled={!props.isEditEnabled}
+            placeholder="Select a Team"
             className="custom-grey custom-outline-none border"
             value={{ value: team?.teamUid, label: team?.teamTitle }}
           />
@@ -57,7 +58,7 @@ export function TeamAndRoleGrid(props) {
             showLabel={false}
             label="Role"
             maxLength={100}
-            placeholder="Enter Role"
+            placeholder="Enter the Role"
             disabled={!props.isEditEnabled}
             className="custom-grey custom-outline-none border"
             onChange={handleInputChange}
