@@ -276,16 +276,18 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
   }
 
   function handleModalClose() {
-    if (
-      typeof document !== 'undefined' &&
-      document.getElementsByClassName('grecaptcha-badge').length
-    ) {
-      document
-        .getElementsByClassName('grecaptcha-badge')[0]
-        .classList.remove('width-full');
+    if (!isProcessing) {
+      if (
+        typeof document !== 'undefined' &&
+        document.getElementsByClassName('grecaptcha-badge').length
+      ) {
+        document
+          .getElementsByClassName('grecaptcha-badge')[0]
+          .classList.remove('width-full');
+      }
+      resetState();
+      setIsModalOpen(false);
     }
-    resetState();
-    setIsModalOpen(false);
   }
 
   function formatData() {
@@ -471,7 +473,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     <>
       {isProcessing && (
         <div
-          className={`pointer-events-none fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
+          className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
         >
           <LoadingIndicator />
         </div>
