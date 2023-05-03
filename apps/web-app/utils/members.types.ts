@@ -11,7 +11,7 @@ export interface IMember {
   officeHours: string | null;
   skills: TMemberResponse['skills'];
   teamLead: boolean;
-  openForWork: boolean;
+  openForWork?: boolean;
   teams: IMemberTeam[];
   mainTeam: IMemberTeam | null;
   twitter: string | null;
