@@ -22,7 +22,6 @@ export default function AddMemberBasicForm(props) {
             label="Name"
             pattern="^[a-zA-Z\s]*$"
             maxLength={64}
-            onKeyDown={() => props?.setDisableNext(true)}
             value={values?.name}
             onChange={onChange}
             placeholder="Enter your full name"
@@ -49,6 +48,7 @@ export default function AddMemberBasicForm(props) {
           label="Email"
           maxLength={255}
           value={values?.email}
+          onKeyDown={() => props?.setDisableNext(true)}
           disabled={props.disableEmail ? props.disableEmail : false}
           onChange={onChange}
           onBlur={props.onEmailBlur && props.onEmailBlur}
