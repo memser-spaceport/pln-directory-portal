@@ -61,7 +61,7 @@ export const getServerSideProps = async ({ query, res, req }) => {
   }
   res.setHeader(
     'Cache-Control',
-    'public, max-age=1, s-maxage=1, stale-while-revalidate=604800'
+    'no-cache, no-store, max-age=0, must-revalidate'
   );
   return {
     props: { backLink, id, isUserLoggedIn, userInfo },
