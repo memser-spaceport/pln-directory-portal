@@ -19,6 +19,8 @@ interface NavbarContextProps {
   setMemberList: Dispatch<SetStateAction<IPendingResponse[]>>;
   teamList: IPendingResponse[];
   setTeamList: Dispatch<SetStateAction<IPendingResponse[]>>;
+  showMenu: boolean;
+  setShowMenu: Dispatch<SetStateAction<boolean>>;
 }
 
 const NavbarContext = createContext<NavbarContextProps>({
@@ -35,6 +37,8 @@ const NavbarContext = createContext<NavbarContextProps>({
   setMemberList: () => null,
   teamList: [],
   setTeamList: () => null,
+  showMenu: true,
+  setShowMenu: () => null,
 });
 
 export function useNavbarContext() {
@@ -46,6 +50,7 @@ export function NavbarContextProvider(props) {
   const [isOpenRequest, setIsOpenRequest] = useState<boolean>(true);
   const [teamList, setTeamList] = useState<IPendingResponse[]>();
   const [memberList, setMemberList] = useState<IPendingResponse[]>();
+  const [showMenu, setShowMenu] = useState<boolean>(true);
 
   // const navbarVaues = useMemo(
   //   () => ({
@@ -75,6 +80,8 @@ export function NavbarContextProvider(props) {
     teamList: teamList,
     setMemberList: setMemberList,
     memberList: memberList,
+    showMenu: showMenu,
+    setShowMenu: setShowMenu,
   };
 
   return (

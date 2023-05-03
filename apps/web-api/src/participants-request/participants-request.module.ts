@@ -19,7 +19,7 @@ import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
     AwsService,
     RedisService,
     SlackService,
-    ForestAdminService
+    ForestAdminService,
   ],
 })
 export class ParticipantsRequestModule {}

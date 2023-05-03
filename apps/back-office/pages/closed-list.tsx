@@ -13,8 +13,14 @@ type RequestList = {
 };
 
 export default function ClosedList(props) {
-  const { setIsOpenRequest, setMemberList, setTeamList, isTeamActive } =
-    useNavbarContext();
+  const {
+    setIsOpenRequest,
+    setMemberList,
+    setTeamList,
+    isTeamActive,
+    setShowMenu,
+  } = useNavbarContext();
+  setShowMenu(true);
 
   useEffect(() => {
     setMemberList(props.memberList);

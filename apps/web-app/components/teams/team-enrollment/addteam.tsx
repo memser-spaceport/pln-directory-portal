@@ -134,10 +134,11 @@ function getSubmitOrNextButton(
   setErrors,
   isProcessing,
   nameExists,
+  disableNext,
   divRef
 ) {
   const buttonClassName =
-    'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
+    'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8] disabled:bg-slate-400';
   const submitOrNextButton =
     formStep === 3 ? (
       <button
@@ -150,6 +151,7 @@ function getSubmitOrNextButton(
     ) : (
       <button
         className={buttonClassName}
+        disabled={disableNext}
         onClick={() =>
           handleNextClick(
             formValues,
@@ -203,6 +205,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [dropDownValues, setDropDownValues] = useState({});
+  const [disableNext, setDisableNext] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     logoUid: '',
@@ -334,11 +337,10 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       uniqueIdentifier: event.target.value,
       participantType: ENROLLMENT_TYPE.TEAM,
     };
-    setIsProcessing(true);
     api
       .post(`/v1/participants-request/unique-identifier`, data)
       .then((response) => {
-        setIsProcessing(false);
+        setDisableNext(false);
         response?.data &&
         (response.data?.isUniqueIdentifierExist ||
           response.data?.isRequestPending)
@@ -441,6 +443,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
             onNameBlur={onNameBlur}
             imageUrl={imageUrl}
             nameExists={nameExists}
+            setDisableNext={setDisableNext}
           />
         );
       case 2:
@@ -535,6 +538,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
                   setErrors,
                   isProcessing,
                   nameExists,
+                  disableNext,
                   divRef
                 )}
               </div>
