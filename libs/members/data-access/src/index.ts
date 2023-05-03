@@ -12,7 +12,7 @@ export const getMembers = async (options: TMemberListOptions) => {
   return await client.members.getMembers({
     query: {
       ...options,
-    },
+    } as any,
   });
 };
 
@@ -35,7 +35,7 @@ export const getMember = async (
  */
 export const getMemberUIDByAirtableId = async (id: string) => {
   const res = await client.members.getMembers({
-    query: { airtableRecId: id, select: 'uid' },
+    query: { airtableRecId: id, select: 'uid' } as any,
   });
 
   return res.status === 200 && res.body[0] ? res.body[0].uid : null;
