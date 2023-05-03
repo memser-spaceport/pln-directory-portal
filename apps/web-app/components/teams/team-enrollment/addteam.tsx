@@ -150,7 +150,11 @@ function getSubmitOrNextButton(
       </button>
     ) : (
       <button
-      className={disableNext ? 'shadow-special-button-default inline-flex w-full justify-center rounded-full bg-slate-400 px-6 py-2 text-base font-semibold leading-6 text-white outline-none':buttonClassName}
+        className={
+          disableNext
+            ? 'shadow-special-button-default inline-flex w-full justify-center rounded-full bg-slate-400 px-6 py-2 text-base font-semibold leading-6 text-white outline-none'
+            : buttonClassName
+        }
         disabled={disableNext}
         onClick={() =>
           handleNextClick(

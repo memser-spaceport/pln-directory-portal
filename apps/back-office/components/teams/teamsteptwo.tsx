@@ -47,7 +47,7 @@ export default function TeamStepTwo(props) {
           name="membershipSources"
           required={true}
           selectedValues={values.membershipSources}
-          placeholder="Please select applicable options"
+          placeholder="Select the Membership Sources"
           onChange={handleDropDownChange}
           disabled={!props.isEditEnabled}
           label="Membership Source"
@@ -72,7 +72,7 @@ export default function TeamStepTwo(props) {
           selectedValues={values.industryTags}
           onChange={props.handleDropDownChange}
           disabled={!props.isEditEnabled}
-          placeholder="Enter the skills"
+          placeholder="Select the Industry Tags"
           label="Industry Tags"
           required={true}
         />
