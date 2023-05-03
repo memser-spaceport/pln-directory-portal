@@ -134,7 +134,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
   // and in the CDN for 5 minutes, while keeping it stale for 7 days.
   res.setHeader(
     'Cache-Control',
-    'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
+    'public, max-age=1, s-maxage=1, stale-while-revalidate=604800'
   );
 
   return {
