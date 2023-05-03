@@ -14,7 +14,7 @@ export default function TeamStepTwo(props) {
           name="technologies"
           selectedValues={values.technologies}
           onChange={handleDropDownChange}
-          placeholder="select a Protocol"
+          placeholder="Select a Protocol"
           disabled={!props.isEditEnabled}
           label="Protocol"
         />
@@ -34,7 +34,7 @@ export default function TeamStepTwo(props) {
           options={dropDownValues?.fundingStages}
           name="fundingStage"
           required={true}
-          placeholder="Select Stage"
+          placeholder="Select a Stage"
           value={values.fundingStage}
           disabled={!props.isEditEnabled}
           onChange={handleDropDownChange}

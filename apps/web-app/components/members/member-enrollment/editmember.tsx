@@ -155,14 +155,11 @@ export function EditMemberModal({
           let counter = 1;
           const teamAndRoles =
             member.teamMemberRoles?.length &&
-            member.teamMemberRoles.map((team) => {
-              const teamName =
-                data[2]?.filter((item) => item.value == team.teamUid)?.[0]
-                  ?.label ?? '';
+            member.teamMemberRoles.map((item) => {
               return {
-                role: team.role,
-                teamUid: team.teamUid,
-                teamTitle: teamName,
+                role: item.role,
+                teamUid: item?.team?.uid,
+                teamTitle: item?.team?.name,
                 rowId: counter++,
               };
             });

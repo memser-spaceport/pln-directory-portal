@@ -73,7 +73,6 @@ function validateForm(formValues, imageUrl) {
 }
 
 export default function MemberView(props) {
-  console.log('props', props);
   const [errors, setErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({
     skillValues: props?.skills,
@@ -86,11 +85,17 @@ export default function MemberView(props) {
   const [isEditEnabled, setIsEditEnabled] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const { setIsOpenRequest, setMemberList, setTeamList, setIsTeamActive } =
-    useNavbarContext();
+  const {
+    setIsOpenRequest,
+    setMemberList,
+    setTeamList,
+    setIsTeamActive,
+    setShowMenu,
+  } = useNavbarContext();
   setIsTeamActive(false);
   setMemberList(props.memberList);
   setTeamList(props.teamList);
+  setShowMenu(false);
   setIsOpenRequest(props.status === APP_CONSTANTS.PENDING_LABEL ? true : false);
 
   useEffect(() => {
@@ -98,7 +103,8 @@ export default function MemberView(props) {
   }, [props]);
 
   function formatData() {
-    const formattedTeamAndRoles = formValues.teamAndRoles.map((item) => {
+    const teamAndRoles = structuredClone(formValues.teamAndRoles);
+    const formattedTeamAndRoles = teamAndRoles.map((item) => {
       delete item.rowId;
       return item;
     });
@@ -266,7 +272,7 @@ export default function MemberView(props) {
         <div className="bg-gray-200">
           <div className="relative m-auto w-[40%]">
             <div
-              className="cursor-pointer pb-[24px] text-[14px] font-semibold text-[#1D4ED8]"
+              className="cursor-pointer py-[20px] text-[14px] font-semibold text-[#1D4ED8]"
               onClick={() => redirectToList()}
             >
               Back to requests
@@ -458,21 +464,6 @@ export const getServerSideProps = async (context) => {
       return { value: item.uid, label: item.title };
     });
   }
-
-  // Redirects user to the 404 page if response from
-  // getMember is undefined or the member has no teams
-  // if (!formValues) {
-  //   return {
-  //     notFound: true,
-  //   };
-  // }
-
-  // Cache response data in the browser for 1 minute,
-  // and in the CDN for 5 minutes, while keeping it stale for 7 days
-  // res.setHeader(
-  //   'Cache-Control',
-  //   'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
-  // );
 
   return {
     props: {

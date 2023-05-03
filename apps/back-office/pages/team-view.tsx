@@ -91,7 +91,6 @@ function validateForm(formValues, imageUrl) {
 }
 
 export default function TeamView(props) {
-  console.log('props', props);
   const [errors, setErrors] = useState([]);
   const [imageUrl, setImageUrl] = useState<string>(props?.imageUrl);
   const [imageChanged, setImageChanged] = useState<boolean>(false);
@@ -105,11 +104,17 @@ export default function TeamView(props) {
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [isEditEnabled, setIsEditEnabled] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
-  const { setIsOpenRequest, setMemberList, setTeamList, setIsTeamActive } =
-    useNavbarContext();
+  const {
+    setIsOpenRequest,
+    setMemberList,
+    setTeamList,
+    setIsTeamActive,
+    setShowMenu,
+  } = useNavbarContext();
   setIsTeamActive(true);
   setMemberList(props.memberList);
   setTeamList(props.teamList);
+  setShowMenu(false);
   setIsOpenRequest(props.status === APP_CONSTANTS.PENDING_LABEL ? true : false);
 
   function formatData() {
@@ -245,10 +250,10 @@ export default function TeamView(props) {
     <>
       <ApprovalLayout>
         {isProcessing && <Loader />}
-        <div className="bg-gray-200 py-10">
+        <div className="bg-gray-200">
           <div className="relative m-auto w-[40%]">
             <div
-              className="cursor-pointer pb-[24px] text-[14px] font-semibold text-[#1D4ED8]"
+              className="cursor-pointer py-[20px] text-[14px] font-semibold text-[#1D4ED8]"
               onClick={() => redirectToList()}
             >
               Back to requests

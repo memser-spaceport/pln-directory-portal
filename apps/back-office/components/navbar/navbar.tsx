@@ -13,7 +13,7 @@ function onLogout() {
 }
 
 export function Navbar() {
-  const { isOpenRequest } = useNavbarContext();
+  const { isOpenRequest, showMenu } = useNavbarContext();
   return (
     <div className="header h-[8%] min-h-[80px]">
       <nav className="navbar top-0 flex h-[80px] items-center justify-between pr-[40px] only-of-type:shadow-[0_1px_4px_0_#e2e8f0]">
@@ -33,9 +33,7 @@ export function Navbar() {
             {isOpenRequest ? `Pending Requests` : `Closed Requests`}
           </span>
         </div>
-        <div>
-          <Menu />
-        </div>
+        <div>{showMenu && <Menu />}</div>
         <div className="flex space-x-4 text-sm text-gray-700">
           <Link
             href={

@@ -114,10 +114,11 @@ function getSubmitOrNextButton(
   setErrors,
   isProcessing,
   emailExists,
+  disableNext,
   divRef
 ) {
   const buttonClassName =
-    'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
+    'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8] disabled:bg-slate-400';
   const submitOrNextButton =
     formStep === 3 ? (
       <button
@@ -130,6 +131,7 @@ function getSubmitOrNextButton(
     ) : (
       <button
         className={buttonClassName}
+        disabled={disableNext}
         onClick={() =>
           handleNextClick(
             formValues,
@@ -186,6 +188,7 @@ export function AddMemberModal({
   const [imageUrl, setImageUrl] = useState<string>();
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
+  const [disableNext, setDisableNext] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     email: '',
@@ -297,11 +300,10 @@ export function AddMemberModal({
       uniqueIdentifier: event.target.value,
       participantType: ENROLLMENT_TYPE.MEMBER,
     };
-    setIsProcessing(true);
     api
       .post(`/v1/participants-request/unique-identifier`, data)
       .then((response) => {
-        setIsProcessing(false);
+        setDisableNext(false);
         response?.data &&
         (response.data?.isUniqueIdentifierExist ||
           response.data?.isRequestPending)
@@ -432,6 +434,7 @@ export function AddMemberModal({
             imageUrl={imageUrl}
             emailExists={emailExists}
             onEmailBlur={onEmailBlur}
+            setDisableNext={setDisableNext}
           />
         );
       case 2:
@@ -529,6 +532,7 @@ export function AddMemberModal({
                   setErrors,
                   isProcessing,
                   emailExists,
+                  disableNext,
                   divRef
                 )}
               </div>
