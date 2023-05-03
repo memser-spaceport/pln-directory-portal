@@ -1234,6 +1234,22 @@
       {
         "defaultValue": false,
         "enums": null,
+        "field": "openForWork",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "Boolean",
+        "validations": []
+      },
+      {
+        "defaultValue": false,
+        "enums": null,
         "field": "plnFriend",
         "integration": null,
         "inverseOf": null,

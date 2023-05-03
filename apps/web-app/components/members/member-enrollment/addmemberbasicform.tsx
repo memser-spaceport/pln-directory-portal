@@ -1,10 +1,10 @@
-import { InputField, ProfileImageUpload } from '@protocol-labs-network/ui';
+import { InputField, ProfileImageUpload, Switch } from '@protocol-labs-network/ui';
 import { ReactComponent as InformationCircleIcon } from '../../../public/assets/images/icons/info_icon.svg';
 
 export default function AddMemberBasicForm(props) {
   const values = props.formValues;
   const onChange = props.onChange;
-
+  const isEditMode = props.isEditMode;
   return (
     <>
       <div className="flex pt-5">
@@ -62,6 +62,15 @@ export default function AddMemberBasicForm(props) {
         </span>
       )}
 
+      {isEditMode && <div className="pt-5">
+        <Switch
+          label="Open For Work"
+          customClassName="font-bold text-black"
+          initialValue={values?.openForWork}
+          onChange={(v) => onChange({target: {name: 'openForWork', value: v}})}
+        />
+
+      </div>}
       <div className="pt-5">
         <InputField
           name="plnStartDate"

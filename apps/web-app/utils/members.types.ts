@@ -11,6 +11,7 @@ export interface IMember {
   officeHours: string | null;
   skills: TMemberResponse['skills'];
   teamLead: boolean;
+  openForWork: boolean;
   teams: IMemberTeam[];
   mainTeam: IMemberTeam | null;
   twitter: string | null;
@@ -43,6 +44,7 @@ export interface IFormValues {
   name: string;
   email: string;
   requestorEmail?: string;
+  openForWork?: boolean;
   imageUid: string;
   imageFile: File;
   plnStartDate: string;

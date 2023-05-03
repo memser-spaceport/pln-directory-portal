@@ -4,10 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 export interface SwitchProps {
   label?: string;
   initialValue?: boolean;
+  customClassName?: string;
   onChange?: (enabled: boolean) => void;
 }
 
-export function Switch({ label, initialValue = false, onChange }: SwitchProps) {
+export function Switch({ label, initialValue = false, onChange, customClassName }: SwitchProps) {
   const [enabled, setEnabled] = useState(initialValue);
 
   useEffect(() => {
@@ -28,7 +29,7 @@ export function Switch({ label, initialValue = false, onChange }: SwitchProps) {
         {label ? (
           <HeadlessSwitch.Label
             passive
-            className="select-none text-sm text-slate-600"
+            className={`select-none text-sm text-slate-600 ${customClassName ?? ''}`}
           >
             {label}
           </HeadlessSwitch.Label>

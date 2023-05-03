@@ -159,6 +159,7 @@ export function EditMemberModal({
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     email: '',
+    openForWork: false,
     requestorEmail: '',
     imageUid: '',
     imageFile: null,
@@ -205,6 +206,7 @@ export function EditMemberModal({
           const formValues = {
             name: member.name,
             email: member.email,
+            openForWork: member.openForWork ?? false,
             imageUid: member.imageUid,
             imageFile: null,
             plnStartDate: new Date(member.plnStartDate).toLocaleDateString(
@@ -589,6 +591,7 @@ export function EditMemberModal({
                       onChange={handleInputChange}
                       handleImageChange={handleImageChange}
                       imageUrl={imageUrl}
+                      isEditMode={true}
                     />
                   </div>
                   <div className={openTab === 2 ? 'block' : 'hidden'}>
@@ -695,12 +698,13 @@ export function EditMemberModal({
                   className="custom-grey custom-outline-none border"
                 />
               </div>
-              <div className="overflow-y-auto">
+              <div className="overflow-y-auto px-11">
                 <AddMemberBasicForm
                   formValues={formValues}
                   onChange={handleInputChange}
                   handleImageChange={handleImageChange}
                   imageUrl={imageUrl}
+                  isEditMode={true}
                   // emailExists={emailExists}
                 />
                 <AddMemberSkillForm

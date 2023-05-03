@@ -43,6 +43,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
       officeHours: faker.helpers.arrayElement([null, faker.internet.url()]),
       moreDetails: faker.helpers.arrayElement([null, faker.lorem.paragraph()]),
       plnFriend: faker.datatype.boolean(),
+      openForWork: faker.datatype.boolean(),
       airtableRecId: `airtable-rec-id-${sequence}`,
       externalId: faker.helpers.slugify(`external-${name.toLowerCase()}`),
       createdAt: faker.date.past(),
