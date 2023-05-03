@@ -50,7 +50,7 @@ export default function AddMemberBasicForm(props) {
           label="Email"
           maxLength={255}
           value={values?.email}
-          disabled={!props.isEditEnabled}
+          disabled={true}
           onChange={onChange}
           onBlur={props.onEmailBlur && props.onEmailBlur}
           placeholder="Enter your email address"

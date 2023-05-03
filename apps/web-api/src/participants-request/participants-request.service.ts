@@ -262,7 +262,7 @@ export class ParticipantsRequestService {
         region,
         null
       );
-      if(result && result?.location?.placeId) {
+      if (result && result?.location?.placeId) {
         const finalLocation: any = await this.prisma.location.upsert({
           where: { placeId: result?.location?.placeId },
           update: result?.location,
@@ -271,9 +271,8 @@ export class ParticipantsRequestService {
         if (finalLocation && finalLocation.uid) {
           dataToSave['location'] = { connect: { uid: finalLocation.uid } };
         }
-      }
-      else {
-        throw new BadRequestException('Invalid Location info')
+      } else {
+        throw new BadRequestException('Invalid Location info');
       }
     }
 
@@ -303,7 +302,7 @@ export class ParticipantsRequestService {
     slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
-    await this.forestAdminService.triggerAirtableSync()
+    await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
 
@@ -381,7 +380,7 @@ export class ParticipantsRequestService {
           dataToSave['location'] = { connect: { uid: finalLocation.uid } };
         }
       } else {
-        throw new BadRequestException('Invalid Location info')
+        throw new BadRequestException('Invalid Location info');
       }
     }
 
@@ -478,7 +477,7 @@ export class ParticipantsRequestService {
     slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
-    await this.forestAdminService.triggerAirtableSync()
+    await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
 
@@ -570,7 +569,7 @@ export class ParticipantsRequestService {
     slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
-    await this.forestAdminService.triggerAirtableSync()
+    await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
 
@@ -678,7 +677,7 @@ export class ParticipantsRequestService {
     slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
-    await this.forestAdminService.triggerAirtableSync()
+    await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
 }

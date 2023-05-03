@@ -13,7 +13,7 @@ export default function AddTeamStepTwo(props) {
           options={dropDownValues?.protocol}
           name="technologies"
           selectedValues={values.technologies}
-          placeholder="select a Protocol"
+          placeholder="Select a Protocol"
           onChange={handleDropDownChange}
           label="Protocol"
         />
@@ -33,7 +33,7 @@ export default function AddTeamStepTwo(props) {
           options={dropDownValues?.fundingStages}
           name="fundingStage"
           required={true}
-          placeholder="Select Stage"
+          placeholder="Select a Stage"
           value={values.fundingStage}
           onChange={handleDropDownChange}
         />
@@ -45,7 +45,7 @@ export default function AddTeamStepTwo(props) {
           name="membershipSources"
           required={true}
           selectedValues={values.membershipSources}
-          placeholder="Please select applicable options"
+          placeholder="Select the Membership Sources"
           onChange={handleDropDownChange}
           label="Membership Source"
         />
@@ -68,7 +68,7 @@ export default function AddTeamStepTwo(props) {
           options={dropDownValues?.industryTags}
           selectedValues={values.industryTags}
           onChange={props.handleDropDownChange}
-          placeholder="Enter the skills"
+          placeholder="Select the Industry Tags"
           label="Industry Tags"
           required={true}
         />

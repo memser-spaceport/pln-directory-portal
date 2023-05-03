@@ -41,7 +41,7 @@ export default function TeamStepOne(props) {
             value={values?.name}
             onChange={onChange}
             maxLength={150}
-            disabled={!props.isEditEnabled}
+            disabled={true}
             onBlur={props.onNameBlur && props.onNameBlur}
             name="name"
             label="What is your organization, company, or team name?"
