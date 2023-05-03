@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { TeamLeadBadge } from '../../team-lead-badge/team-lead-badge';
+import { ReactComponent as ExploreIcon } from '../../../../public/assets/images/icons/explore.svg';
 
 export interface DirectoryCardHeaderProps {
   isGrid?: boolean;
@@ -8,6 +9,7 @@ export interface DirectoryCardHeaderProps {
   name: string;
   avatarIcon: (props: React.ComponentProps<'svg'>) => JSX.Element;
   teamLead?: boolean;
+  isOpenForWork?: boolean;
 }
 
 export function DirectoryCardHeader({
@@ -17,11 +19,20 @@ export function DirectoryCardHeader({
   name,
   avatarIcon,
   teamLead,
+  isOpenForWork
 }: DirectoryCardHeaderProps) {
   const Icon = avatarIcon;
 
   return (
-    <>
+    <> 
+      { 
+          isOpenForWork
+          ? (
+            <div className='flex absolute left-3 top-2 text-xs text-[#475569]'>
+              <ExploreIcon/> <div className='ml-1'>OPEN TO WORK</div>
+            </div> 
+        ) : null
+      }
       <div
         className={`h-18 w-18 relative shrink-0 border border-slate-200 ${
           isImageRounded ? 'rounded-full' : 'rounded-lg'

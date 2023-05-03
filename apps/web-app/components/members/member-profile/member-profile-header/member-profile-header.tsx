@@ -2,6 +2,7 @@ import { FlagIcon, LocationMarkerIcon, UserIcon } from '@heroicons/react/solid';
 import { Tooltip } from '@protocol-labs-network/ui';
 import Image from 'next/image';
 import { AskToEditCard } from '../../../shared/profile/ask-to-edit-card/ask-to-edit-card';
+import { ReactComponent as ExploreIcon } from '../../../../public/assets/images/icons/explore.svg';
 import { IMember } from '../../../../utils/members.types';
 
 export function MemberProfileHeader({
@@ -11,7 +12,7 @@ export function MemberProfileHeader({
   member: IMember;
   userInfo: any;
 }) {
-  const { image, name, teams, location, teamLead, mainTeam } = member;
+  const { image, name, teams, location, teamLead, mainTeam, openForWork } = member;
   const otherTeams = teams
     .filter((team) => team.id !== mainTeam?.id)
     .map((team) => team.name)
@@ -21,7 +22,7 @@ export function MemberProfileHeader({
   return (
     <div className="relative flex space-x-4">
       <div
-        className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-full border border-slate-200 ${
+        className={`relative h-20 w-20 mt-1 shrink-0 overflow-hidden rounded-full border border-slate-200 ${
           image ? 'bg-white' : 'bg-slate-200'
         }`}
       >
@@ -39,7 +40,7 @@ export function MemberProfileHeader({
         )}
       </div>
       <div>
-        <h1 className="pt-1 text-2xl font-bold">{name}</h1>
+        <h1 className="mt-0.5 text-2xl font-bold">{name}</h1>
         <div className="flex items-center">
           <div className="max-w-sm overflow-hidden text-ellipsis whitespace-nowrap font-medium">
             {mainTeam?.name}
@@ -58,7 +59,14 @@ export function MemberProfileHeader({
             />
           ) : null}
         </div>
-        <p className="line-clamp-1 mt-0.5 text-sm">{memberRole}</p>
+        <p className="line-clamp-1 text-sm">{memberRole}</p>
+        { 
+          openForWork ? (
+              <div className='flex w-32 mt-0.5 text-xs text-[#475569]'>
+                <ExploreIcon/> <div className='ml-1'>OPEN TO WORK</div>
+              </div> 
+          ) : null
+        }
         {userInfo?.id && (
           <div className="mr-2 mt-1 flex items-center text-sm text-slate-600">
             {location ? (

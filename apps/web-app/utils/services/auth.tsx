@@ -26,8 +26,8 @@ export const authenticate = async () => {
       path: '/',
       maxAge: 60 * 1000,
     });
-    const redirectURL = 'http://localhost:4200/directory/members/verify-member';
-    window.location.href = `http://localhost:3000/auth?redirect_uri=${redirectURL}&state=${state}`;
+    const redirectURL = `${location.protocol + '//' + location.host}/directory/members/verify-member`;
+    window.location.href = `${process.env.AUTH_API_URL}/auth?redirect_uri=${redirectURL}&state=${state}`;
   } catch (error) {
     console.error(error);
   }
