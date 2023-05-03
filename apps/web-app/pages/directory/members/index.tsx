@@ -28,6 +28,7 @@ import { ReactComponent as SuccessIcon } from '../../../public/assets/images/ico
 import 'react-toastify/dist/ReactToastify.css';
 import Cookies from 'js-cookie';
 import { destroyCookie } from 'nookies';
+import nookies from 'nookies'
 
 type MembersProps = {
   members: IMember[];
@@ -135,11 +136,13 @@ Members.getLayout = function getLayout(page: ReactElement) {
   return <DirectoryLayout>{page}</DirectoryLayout>;
 };
 
-export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
-  query,
-  res,
-  req
-}) => {
+export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) => {
+  const {
+    query,
+    res,
+    req
+  } = ctx;
+  const testcookies = nookies.get(ctx)
   destroyCookie(null, 'state');
   const { verified } = query;
   const isMaskingRequired = req?.cookies?.authToken ? false : true
@@ -165,6 +168,9 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
      members = [...members].map(m => maskMemberDetails(m))
   }
 
+  const letAllCookies = JSON.parse(JSON.stringify(testcookies))
+  const testCookies = JSON.parse(JSON.stringify(req?.cookies))
+
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
   res.setHeader(
@@ -177,7 +183,9 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
       members,
       filtersValues: parsedFilters,
       isUserLoggedIn,
+      testCookies,
       userInfo,
+      letAllCookies,
       verified:
         verified === 'true' ? true : verified === 'false' ? false : null,
     },
