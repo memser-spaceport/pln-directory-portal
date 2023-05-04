@@ -12,14 +12,15 @@ function getAvailableTeams(teamNames, selectedTeams) {
 export default function AddMemberSkillForm(props) {
   const teamAndRoles = props?.formValues.teamAndRoles;
   const dropDownValues = props?.dropDownValues;
-  const teamNames = getAvailableTeams(dropDownValues.teamNames, teamAndRoles);
+  // const teamNames = getAvailableTeams(dropDownValues.teamNames, teamAndRoles);
+  const teamNames = teamAndRoles.map(item=>item.teamUid);
   return (
     <>
       <div className="pt-5">
         {teamAndRoles?.length > 0 && (
           <div className="flex flex-row">
-            <span className="basis-6/12 pr-6 text-sm font-bold">Team*</span>
-            <span className="basis-6/12 text-sm font-bold">Role*</span>
+            <span className="basis-6/12 text-sm font-bold">Team*</span>
+            <span className="basis-6/12 pl-1 text-sm font-bold">Role*</span>
           </div>
         )}
         {teamAndRoles?.map((item, index) => (
