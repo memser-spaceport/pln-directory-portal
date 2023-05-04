@@ -240,7 +240,10 @@ export default function TeamView(props) {
   }
 
   function redirectToList() {
-    const route = props.backLink;
+    const route =
+      props.status === APP_CONSTANTS.PENDING_LABEL
+        ? ROUTE_CONSTANTS.PENDING_LIST
+        : ROUTE_CONSTANTS.CLOSED_LIST;
     router.push({
       pathname: route,
     });

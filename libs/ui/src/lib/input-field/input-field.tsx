@@ -53,7 +53,7 @@ export function InputField({
   }
 
   return (
-    <label className="relative block">
+    <label className="relative block w-full">
       {showLabel ? (
         <span className="text-sm font-bold">
           {error ? error : required ? label + '*' : label}

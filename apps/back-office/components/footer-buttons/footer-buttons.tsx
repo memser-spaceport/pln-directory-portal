@@ -50,8 +50,11 @@ export function FooterButtons(props) {
           router.push({
             pathname: ROUTE_CONSTANTS.INTERNAL_SERVER_ERROR,
           });
+        } else if (e.response.status === 400) {
+          toast(e?.response?.data?.message);
+        } else {
+          toast(e?.message);
         }
-        toast(e?.message);
       })
       .finally(() => setLoader(false));
   }
