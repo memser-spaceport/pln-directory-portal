@@ -9,7 +9,7 @@ import { requestPendingCheck } from '../../../../utils/services/members';
 import { editTeamRequestPendingCheck } from '../../../../utils/services/teams';
 import { IMember } from '../../../../utils/members.types';
 import { ITeam } from '../../../../utils/teams.types';
-import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
+// import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 
 type TAskToEditProfileType = 'team' | 'member';
 
@@ -43,14 +43,14 @@ export function AskToEditCard({
     useState(false);
 
   const handleOpenEditModal = async () => {
-    if (
-      typeof document !== 'undefined' &&
-      document.getElementsByClassName('grecaptcha-badge').length
-    ) {
-      document
-        .getElementsByClassName('grecaptcha-badge')[0]
-        .classList.add('width-full');
-    }
+    // if (
+    //   typeof document !== 'undefined' &&
+    //   document.getElementsByClassName('grecaptcha-badge').length
+    // ) {
+    //   document
+    //     .getElementsByClassName('grecaptcha-badge')[0]
+    //     .classList.add('width-full');
+    // }
     urlList[profileType].eventCode &&
       trackGoal(urlList[profileType].eventCode, 0);
     if (profileType == 'team') {
@@ -97,7 +97,7 @@ export function AskToEditCard({
       >
         Request to Edit
       </button>
-      <GoogleReCaptchaProvider
+      {/* <GoogleReCaptchaProvider
         reCaptchaKey={process.env.NEXT_PUBLIC_GOOGLE_SITE_KEY}
         scriptProps={{
           async: false,
@@ -105,26 +105,26 @@ export function AskToEditCard({
           appendTo: 'head',
           nonce: undefined,
         }}
-      >
-        {member?.id && (
-          <EditMemberModal
-            isOpen={isMemberModalOpen}
-            setIsModalOpen={setIsMemberModalOpen}
-            id={member?.id}
-          />
-        )}
-        {team?.id && (
-          <EditTeamModal
-            isOpen={isTeamModalOpen}
-            setIsModalOpen={setIsTeamModalOpen}
-            id={team?.id}
-          />
-        )}
-        <RequestPending
-          isOpen={isPendingRequestModalOpen}
-          setIsModalOpen={setIsPendingRequestModalOpen}
+      > */}
+      {member?.id && (
+        <EditMemberModal
+          isOpen={isMemberModalOpen}
+          setIsModalOpen={setIsMemberModalOpen}
+          id={member?.id}
         />
-      </GoogleReCaptchaProvider>
+      )}
+      {team?.id && (
+        <EditTeamModal
+          isOpen={isTeamModalOpen}
+          setIsModalOpen={setIsTeamModalOpen}
+          id={team?.id}
+        />
+      )}
+      <RequestPending
+        isOpen={isPendingRequestModalOpen}
+        setIsModalOpen={setIsPendingRequestModalOpen}
+      />
+      {/* </GoogleReCaptchaProvider> */}
     </div>
   );
 }
