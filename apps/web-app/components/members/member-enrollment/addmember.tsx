@@ -259,14 +259,14 @@ export function AddMemberModal({
 
   function handleModalClose() {
     if (!isProcessing) {
-      if (
-        typeof document !== 'undefined' &&
-        document.getElementsByClassName('grecaptcha-badge').length
-      ) {
-        document
-          .getElementsByClassName('grecaptcha-badge')[0]
-          .classList.remove('width-full');
-      }
+      // if (
+      //   typeof document !== 'undefined' &&
+      //   document.getElementsByClassName('grecaptcha-badge').length
+      // ) {
+      //   document
+      //     .getElementsByClassName('grecaptcha-badge')[0]
+      //     .classList.remove('width-full');
+      // }
       resetState();
       setIsModalOpen(false);
     }

@@ -20,7 +20,7 @@ export default function AddMemberSkillForm(props) {
         {teamAndRoles?.length > 0 && (
           <div className="flex flex-row">
             <span className="basis-6/12 text-sm font-bold">Team*</span>
-            <span className="basis-6/12 pl-3 text-sm font-bold">Role*</span>
+            <span className="basis-5/12 pl-3 text-sm font-bold">Role*</span>
           </div>
         )}
         {teamAndRoles?.map((item, index) => (

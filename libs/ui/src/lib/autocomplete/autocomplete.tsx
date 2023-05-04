@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { InputField } from '../input-field/input-field';
 import { ReactComponent as ArrowDown } from '../../assets/icons/arrow-down-filled.svg';
 
@@ -32,14 +32,18 @@ export function Autocomplete({
   excludeValues = [],
   name,
 }: AutocompleteProps) {
-  const [searchTerm, setSearchTerm] = useState<string | undefined>(
-    selectedOption?.label
-  );
+  const [searchTerm, setSearchTerm] = useState<string>(selectedOption.label);
   const [filteredOptions, setFilteredOptions] = useState<IDropdownOption[]>([]);
   const [selectedValue, setSelectedValue] =
     useState<IDropdownOption>(selectedOption);
   const [isExpanded, setIsExpanded] = useState(false);
   const dropdownOptionsRef = useRef<HTMLDivElement>(null);
+
+  useMemo(() => {
+    if (searchTerm === '') {
+      setSearchTerm(selectedOption.label);
+    }
+  }, [searchTerm, selectedOption.label]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -71,14 +75,6 @@ export function Autocomplete({
     return () => clearTimeout(getData);
   }, [debounceCall, debounceTime, searchTerm]);
 
-  // const handleUserInput = debounce((event: React.ChangeEvent<HTMLInputElement>) => {
-  //   console.log('event', event);
-  //   setSearchTerm(event.currentTarget?.value);
-  //   debounceCall(searchTerm).then((res) => {
-  //     setFilteredOptions(res);
-  //   });
-  // }, debounceTime);
-
   const handleUserInput = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.currentTarget?.value);
   };
@@ -99,10 +95,6 @@ export function Autocomplete({
     onSelectOption(option);
     setFilteredOptions([]);
   };
-
-  // const tabClickCheck = ((event: React.ChangeEvent<HTMLInputElement>)) => {
-
-  // }
 
   return (
     <div onBlur={() => checkValidData()}>

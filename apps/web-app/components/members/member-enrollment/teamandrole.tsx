@@ -41,7 +41,6 @@ export function TeamAndRoleGrid(props) {
             name="team"
             className="custom-grey custom-outline-none border"
             required={true}
-            disabled={false}
             placeholder="Select a Team"
             selectedOption={{ value: team?.teamUid, label: team?.teamTitle }}
             onSelectOption={handleDropDownChange}
@@ -49,7 +48,7 @@ export function TeamAndRoleGrid(props) {
             debounceCall={fetchTeamsForAutocomplete}
           />
         </div>
-        <div className="basis-5/12 pl-5">
+        <div className="basis-5/12 pl-2">
           <InputField
             name="role"
             required={true}

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { JoinNetworkMenu } from './join-network-menu/join-network-menu';
 import { Menu } from './menu/menu';
 import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/protocol-labs-network-logo-horizontal-black.svg';
-import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
+// import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 
 export function Navbar() {
   return (
@@ -19,7 +19,7 @@ export function Navbar() {
         </Link>
         <Menu />
       </div>
-      <GoogleReCaptchaProvider
+      {/* <GoogleReCaptchaProvider
         reCaptchaKey={process.env.NEXT_PUBLIC_GOOGLE_SITE_KEY}
         scriptProps={{
           async: false,
@@ -27,9 +27,9 @@ export function Navbar() {
           appendTo: 'head',
           nonce: undefined,
         }}
-      >
-        <JoinNetworkMenu />
-      </GoogleReCaptchaProvider>
+      > */}
+      <JoinNetworkMenu />
+      {/* </GoogleReCaptchaProvider> */}
     </nav>
   );
 }
