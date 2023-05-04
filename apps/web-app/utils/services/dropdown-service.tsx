@@ -26,7 +26,6 @@ export const fetchTeams = async () => {
   }
 };
 
-
 export const fetchTeamsForAutocomplete = async (searchTerm) => {
   try {
     const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}`);

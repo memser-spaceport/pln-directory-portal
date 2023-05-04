@@ -13,7 +13,7 @@ export default function AddMemberSkillForm(props) {
   const teamAndRoles = props?.formValues.teamAndRoles;
   const dropDownValues = props?.dropDownValues;
   // const teamNames = getAvailableTeams(dropDownValues.teamNames, teamAndRoles);
-  const teamNames = teamAndRoles.map(item=>item.teamUid);
+  const teamNames = teamAndRoles.map((item) => item.teamUid);
   return (
     <>
       <div className="pt-5">

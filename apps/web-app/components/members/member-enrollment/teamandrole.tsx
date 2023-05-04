@@ -1,7 +1,7 @@
 import { ChangeEvent, useState } from 'react';
 import { InputField, Autocomplete } from '@protocol-labs-network/ui';
 import { XIcon as CloseIcon } from '@heroicons/react/outline';
-import {fetchTeamsForAutocomplete} from '../../../utils/services/dropdown-service'
+import { fetchTeamsForAutocomplete } from '../../../utils/services/dropdown-service';
 
 interface Team {
   teamUid: string;
@@ -37,16 +37,16 @@ export function TeamAndRoleGrid(props) {
     <>
       <div className="flex flex-row">
         <div className="basis-6/12">
-          <Autocomplete 
-           name="team"
-           className="custom-grey custom-outline-none border"
-           required={true}
-           disabled={false}
-           placeholder="Select a Team"
-           selectedOption={{ value: team?.teamUid, label: team?.teamTitle }}
-           onSelectOption={handleDropDownChange}
-           excludeValues={teamNames}
-           debounceCall={fetchTeamsForAutocomplete}
+          <Autocomplete
+            name="team"
+            className="custom-grey custom-outline-none border"
+            required={true}
+            disabled={false}
+            placeholder="Select a Team"
+            selectedOption={{ value: team?.teamUid, label: team?.teamTitle }}
+            onSelectOption={handleDropDownChange}
+            excludeValues={teamNames}
+            debounceCall={fetchTeamsForAutocomplete}
           />
         </div>
         <div className="basis-5/12 pl-5">

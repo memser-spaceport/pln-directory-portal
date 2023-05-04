@@ -1,7 +1,7 @@
 import { ChangeEvent, useState } from 'react';
 import { InputField, Autocomplete } from '@protocol-labs-network/ui';
 import { XIcon as CloseIcon } from '@heroicons/react/outline';
-import { fetchTeamsForAutocomplete } from '../../utils/services/team'
+import { fetchTeamsForAutocomplete } from '../../utils/services/team';
 
 interface Team {
   teamUid: string;
@@ -36,7 +36,7 @@ export function TeamAndRoleGrid(props) {
   return (
     <>
       <div className="flex flex-row">
-        <div className="basis-6/12 w-full">
+        <div className="w-full basis-6/12">
           <Autocomplete
             name="team"
             className="custom-grey custom-outline-none border"
