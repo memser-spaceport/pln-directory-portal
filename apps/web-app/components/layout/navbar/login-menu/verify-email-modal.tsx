@@ -2,6 +2,7 @@ import { XCircleIcon } from '@heroicons/react/solid';
 import { Dispatch, Fragment, SetStateAction } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { ReactComponent as FailedIcon } from '../../../../public/assets/images/icons/danger.svg';
+import { authenticate } from 'apps/web-app/utils/services/auth';
 interface IVerifyEmailModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -59,7 +60,7 @@ export function VerifyEmailModal({
                     <span className="font-bold"> supportmail@protocol.ai </span>{' '}
                     for assistance or try to{' '}
                     <span
-                      onClick={handleModalClose}
+                      onClick={authenticate}
                       className="cursor-pointer font-bold italic underline"
                     >
                       {' '}
