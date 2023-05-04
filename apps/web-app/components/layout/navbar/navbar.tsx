@@ -28,7 +28,7 @@ export function Navbar() {
           nonce: undefined,
         }}
       > */}
-        <JoinNetworkMenu />
+      <JoinNetworkMenu />
       {/* </GoogleReCaptchaProvider> */}
     </nav>
   );
