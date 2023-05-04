@@ -42,6 +42,7 @@ export default function AddMemberStepOne(props) {
             disabled={props.disableName ? props.disableName : false}
             onBlur={props.onNameBlur && props.onNameBlur}
             name="name"
+            onKeyDown={() => props?.setDisableNext(true)}
             label="What is your organization, company, or team name?"
             placeholder="Enter name here"
             className="custom-grey custom-outline-none border"

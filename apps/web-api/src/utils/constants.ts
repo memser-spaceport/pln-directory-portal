@@ -16,20 +16,21 @@ export const ALLOWED_CORS_ORIGINS = {
     /staging.plnetwork.io/,
     /dev-auth-admin.plnetwork.io/,
     /dev-auth-app.plnetwork.io/,
-    /stage-admin.plnetwork.io/,
+    /staging-admin.plnetwork.io/,
   ],
   [APP_ENV.STAGING]: [
     /.-protocol-labs-spaceport.vercel.app/,
     /app.forestadmin.com/,
     /staging.plnetwork.io/,
-    /stage-admin.plnetwork.io/,
     /dev-auth-admin.plnetwork.io/,
     /dev-auth-app.plnetwork.io/,
+    /staging-admin.plnetwork.io/,
   ],
   [APP_ENV.PRODUCTION]: [
     'https://www.plnetwork.io',
     /app.forestadmin.com/,
     /admin.plnetwork.io/,
+    /plnetwork.io/,
   ],
 };
 

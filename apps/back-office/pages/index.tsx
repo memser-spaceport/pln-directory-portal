@@ -45,7 +45,6 @@ export function Index() {
       body: JSON.stringify({ username, password }),
     })
       .then((res) => {
-        console.log('res', res);
         if (res.ok) {
           const backLink = router.query.backlink?.toString() ?? '';
           router.push(backLink ? backLink : ROUTE_CONSTANTS.PENDING_LIST);

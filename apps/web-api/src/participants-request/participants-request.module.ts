@@ -8,6 +8,7 @@ import { ParticipantsRequestService } from './participants-request.service';
 import { UniqueIdentifier } from './unique-identifier/unique-identifier.controller';
 import { RedisService } from '../utils/redis/redis.service';
 import { SlackService } from '../utils/slack/slack.service';
+import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 @Module({
   imports: [CacheModule.register()],
   controllers: [ParticipantsRequestController, UniqueIdentifier],
@@ -18,6 +19,7 @@ import { SlackService } from '../utils/slack/slack.service';
     AwsService,
     RedisService,
     SlackService,
+    ForestAdminService,
   ],
 })
 export class ParticipantsRequestModule {}

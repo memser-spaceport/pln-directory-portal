@@ -45,19 +45,19 @@ function validateBasicForm(formValues) {
     !formValues.requestorEmail?.trim() ||
     !formValues.requestorEmail?.match(emailRE)
   ) {
-    errors.push('Please add valid Requestor email');
+    errors.push('Please add a valid Requestor email');
   }
   if (!formValues.name.trim()) {
     errors.push('Please add Team Name');
   }
   if (!formValues.logoFile) {
-    errors.push('Please add logo');
+    errors.push('Please add your team logo');
   }
   if (!formValues.shortDescription?.trim()) {
-    errors.push('Please add Description');
+    errors.push('Please add a Description');
   }
   if (!formValues.longDescription?.trim()) {
-    errors.push('Please add Long Description');
+    errors.push('Please add a Long Description');
   }
   return errors;
 }
@@ -68,7 +68,7 @@ function validateProjectDetailForm(formValues) {
     errors.push('Please add Funding Stage');
   }
   if (!formValues.membershipSources.length) {
-    errors.push('Please add Membership Source');
+    errors.push('Please add Membership Source(s)');
   }
   if (!formValues.industryTags.length) {
     errors.push('Please add Industry Tags');
@@ -134,10 +134,11 @@ function getSubmitOrNextButton(
   setErrors,
   isProcessing,
   nameExists,
+  disableNext,
   divRef
 ) {
   const buttonClassName =
-    'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
+    'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8] disabled:bg-slate-400';
   const submitOrNextButton =
     formStep === 3 ? (
       <button
@@ -149,7 +150,12 @@ function getSubmitOrNextButton(
       </button>
     ) : (
       <button
-        className={buttonClassName}
+        className={
+          disableNext
+            ? 'shadow-special-button-default inline-flex w-full justify-center rounded-full bg-slate-400 px-6 py-2 text-base font-semibold leading-6 text-white outline-none'
+            : buttonClassName
+        }
+        disabled={disableNext}
         onClick={() =>
           handleNextClick(
             formValues,
@@ -203,6 +209,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [dropDownValues, setDropDownValues] = useState({});
+  const [disableNext, setDisableNext] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     logoUid: '',
@@ -251,8 +258,10 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
   function resetState() {
     setFormStep(1);
     setErrors([]);
+    setNameExists(false);
     setDropDownValues({});
     setImageUrl('');
+    setDisableNext(false);
     setSaveCompleted(false);
     setIsProcessing(false);
     setFormValues({
@@ -276,16 +285,18 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
   }
 
   function handleModalClose() {
-    if (
-      typeof document !== 'undefined' &&
-      document.getElementsByClassName('grecaptcha-badge').length
-    ) {
-      document
-        .getElementsByClassName('grecaptcha-badge')[0]
-        .classList.remove('width-full');
+    if (!isProcessing) {
+      if (
+        typeof document !== 'undefined' &&
+        document.getElementsByClassName('grecaptcha-badge').length
+      ) {
+        document
+          .getElementsByClassName('grecaptcha-badge')[0]
+          .classList.remove('width-full');
+      }
+      resetState();
+      setIsModalOpen(false);
     }
-    resetState();
-    setIsModalOpen(false);
   }
 
   function formatData() {
@@ -331,11 +342,10 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       uniqueIdentifier: event.target.value,
       participantType: ENROLLMENT_TYPE.TEAM,
     };
-    setIsProcessing(true);
     api
       .post(`/v1/participants-request/unique-identifier`, data)
       .then((response) => {
-        setIsProcessing(false);
+        setDisableNext(false);
         response?.data &&
         (response.data?.isUniqueIdentifierExist ||
           response.data?.isRequestPending)
@@ -438,6 +448,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
             onNameBlur={onNameBlur}
             imageUrl={imageUrl}
             nameExists={nameExists}
+            setDisableNext={setDisableNext}
           />
         );
       case 2:
@@ -471,7 +482,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     <>
       {isProcessing && (
         <div
-          className={`pointer-events-none fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
+          className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
         >
           <LoadingIndicator />
         </div>
@@ -532,6 +543,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
                   setErrors,
                   isProcessing,
                   nameExists,
+                  disableNext,
                   divRef
                 )}
               </div>

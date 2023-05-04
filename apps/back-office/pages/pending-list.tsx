@@ -9,8 +9,14 @@ import { ApprovalLayout } from '../layout/approval-layout';
 import { parseCookies } from 'nookies';
 
 export default function PendingList(props) {
-  const { setIsOpenRequest, setMemberList, setTeamList, isTeamActive } =
-    useNavbarContext();
+  const {
+    setIsOpenRequest,
+    setMemberList,
+    setTeamList,
+    isTeamActive,
+    setShowMenu,
+  } = useNavbarContext();
+  setShowMenu(true);
 
   useEffect(() => {
     setMemberList(props.memberList);
@@ -39,10 +45,8 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (
   context
 ) => {
   const { plnadmin } = parseCookies(context);
-  console.log('plnadmin', plnadmin);
 
   if (!plnadmin) {
-    console.log('insidet');
     const currentUrl = context.resolvedUrl;
     const loginUrl = `/?backlink=${currentUrl}`;
     return {
