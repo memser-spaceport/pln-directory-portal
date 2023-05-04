@@ -10,7 +10,7 @@ import { editTeamRequestPendingCheck } from '../../../../utils/services/teams';
 import { IMember } from '../../../../utils/members.types';
 import { ITeam } from '../../../../utils/teams.types';
 import { ReactComponent as EditIcon } from '/public/assets/images/icons/edit.svg';
-import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
+// import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 
 type TAskToEditProfileType = 'team' | 'member';
 
@@ -18,6 +18,7 @@ interface AskToEditCardProps {
   profileType: TAskToEditProfileType;
   member?: IMember;
   team?: ITeam;
+  userInfo?: any
 }
 
 const urlList: {
@@ -37,6 +38,7 @@ export function AskToEditCard({
   profileType,
   member,
   team,
+  userInfo
 }: AskToEditCardProps) {
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
@@ -99,7 +101,7 @@ export function AskToEditCard({
         <EditIcon className="m-1" />{' '}
         {profileType === 'member' ? 'Edit Profile' : 'Edit Team'}
       </button>
-      <GoogleReCaptchaProvider
+      {/* <GoogleReCaptchaProvider
         reCaptchaKey={process.env.NEXT_PUBLIC_GOOGLE_SITE_KEY}
         scriptProps={{
           async: false,
@@ -107,12 +109,13 @@ export function AskToEditCard({
           appendTo: 'head',
           nonce: undefined,
         }}
-      >
+      > */}
         {member?.id && (
           <EditMemberModal
             isOpen={isMemberModalOpen}
             setIsModalOpen={setIsMemberModalOpen}
             id={member?.id}
+            userInfo={userInfo}
           />
         )}
         {team?.id && (
@@ -126,7 +129,7 @@ export function AskToEditCard({
           isOpen={isPendingRequestModalOpen}
           setIsModalOpen={setIsPendingRequestModalOpen}
         />
-      </GoogleReCaptchaProvider>
+      {/* </GoogleReCaptchaProvider> */}
     </div>
   );
 }

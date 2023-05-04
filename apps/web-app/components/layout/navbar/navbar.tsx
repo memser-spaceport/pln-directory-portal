@@ -9,7 +9,7 @@ import { JoinNetworkMenu } from './join-network-menu/join-network-menu';
 import { Login } from './login-menu/login-menu';
 import { Menu as AppMenu } from './menu/menu';
 import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/protocol-labs-network-logo-horizontal-black.svg';
-import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
+// import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 import Cookies from 'js-cookie'
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
@@ -61,7 +61,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
         </Link>
         <AppMenu />
       </div>
-      <GoogleReCaptchaProvider
+      {/* <GoogleReCaptchaProvider
         reCaptchaKey={process.env.NEXT_PUBLIC_GOOGLE_SITE_KEY}
         scriptProps={{
           async: false,
@@ -69,7 +69,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
           appendTo: 'head',
           nonce: undefined,
         }}
-      >
+      > */}
         {isUserLoggedIn ? (
           <div className="flex h-14 w-full justify-end space-x-4">
             {userInfo.name && (
@@ -143,7 +143,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
             <Login />
           </div>
         )}
-      </GoogleReCaptchaProvider>
+      {/* </GoogleReCaptchaProvider> */}
     </nav>
   );
 }

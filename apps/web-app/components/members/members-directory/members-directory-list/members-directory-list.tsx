@@ -6,7 +6,7 @@ interface MembersDirectoryListProps {
   members: IMember[];
   isGrid: boolean;
   filterProperties: string[];
-  loggedInMember: IMember;
+  loggedInMember: any;
 }
 
 export function MembersDirectoryList({

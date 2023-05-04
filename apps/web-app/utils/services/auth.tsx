@@ -43,9 +43,12 @@ export const getAccessToken = async (code) => {
     };
 
   } catch (error) {
-    console.error(error);
-    return {
-      status: 401
+    if (error.response) {
+      return error.response;
     }
+  }
+  return {
+    status: 500,
+    data: {}
   }
 };

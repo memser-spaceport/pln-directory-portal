@@ -35,6 +35,7 @@ interface EditMemberModalProps {
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
   id: string;
   isProfileSettings?: boolean;
+  userInfo?:any;
 }
 
 function validateBasicForm(formValues, imageUrl, isProfileSettings) {
@@ -144,6 +145,7 @@ export function EditMemberModal({
   setIsModalOpen,
   id,
   isProfileSettings = false,
+  userInfo
 }: EditMemberModalProps) {
   const [openTab, setOpenTab] = useState(1);
   const [errors, setErrors] = useState([]);
@@ -338,14 +340,14 @@ export function EditMemberModal({
   }
 
   function handleModalClose() {
-    if (
-      typeof document !== 'undefined' &&
-      document.getElementsByClassName('grecaptcha-badge').length
-    ) {
-      document
-        .getElementsByClassName('grecaptcha-badge')[0]
-        .classList.remove('width-full');
-    }
+    // if (
+    //   typeof document !== 'undefined' &&
+    //   document.getElementsByClassName('grecaptcha-badge').length
+    // ) {
+    //   document
+    //     .getElementsByClassName('grecaptcha-badge')[0]
+    //     .classList.remove('width-full');
+    // }
     resetState();
     setIsModalOpen(false);
   }
@@ -517,7 +519,7 @@ export function EditMemberModal({
     );
     setFormValues({ ...formValues, teamAndRoles: newRoles });
   }
-
+ 
   return (
     <>
     {isProcessing && (
@@ -589,6 +591,7 @@ export function EditMemberModal({
                       handleImageChange={handleImageChange}
                       imageUrl={imageUrl}
                       isEditMode={true}
+                      disableEmail={true}
                     />
                   </div>
                   <div className={openTab === 2 ? 'block' : 'hidden'}>
@@ -664,7 +667,7 @@ export function EditMemberModal({
               </div>
             </div>
           ) : (
-            <div className='px-5'>
+            <div>
               <div className="px-8">
                 <span className="font-size-14 text-sm">
                   Please fill out only the fields you would like to change for
@@ -689,8 +692,9 @@ export function EditMemberModal({
                   name="requestorEmail"
                   type="email"
                   label="Requestor Email"
-                  value={formValues?.requestorEmail}
+                  value={userInfo?.email}
                   onChange={handleInputChange}
+                  disabled={userInfo ? true : false}
                   placeholder="Enter your email address"
                   className="custom-grey custom-outline-none border"
                 />
@@ -703,6 +707,7 @@ export function EditMemberModal({
                   imageUrl={imageUrl}
                   isEditMode={true}
                   // emailExists={emailExists}
+                  disableEmail={true}
                 />
                 <AddMemberSkillForm
                   formValues={formValues}

@@ -67,7 +67,7 @@ export function MemberProfileHeader({
               </div> 
           ) : null
         }
-        {userInfo?.id && (
+        {userInfo?.uid && (
           <div className="mr-2 mt-1 flex items-center text-sm text-slate-600">
             {location ? (
               <>
@@ -98,7 +98,7 @@ export function MemberProfileHeader({
       {(userInfo.uid === member.id ||
         (userInfo.roles?.length > 0 &&
           userInfo.roles.includes('DIRECTORYADMIN'))) && (
-        <AskToEditCard profileType="member" member={member} />
+        <AskToEditCard profileType="member" member={member} userInfo={userInfo} />
       )}
     </div>
   );
