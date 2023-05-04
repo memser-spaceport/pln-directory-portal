@@ -60,7 +60,11 @@ export class AuthService {
         code: code,
         grant_type: 'authorization_code',
       });
-    } catch (e) {
+
+    } catch (error) {
+      if (error.response) {
+        throw new HttpException(error?.response?.data?.message, error?.response?.status ?? 400)
+      }
       throw new UnauthorizedException();
     }
 
@@ -69,7 +73,7 @@ export class AuthService {
       const decoded: any = jwt_decode(idToken);
       const userEmail = decoded.email;
       const idFromAuth = decoded.sub;
-      console.log(userEmail, idFromAuth);
+
       // Search by external id. If user found, send the user details with tokens
       let foundUser: any = await this.prismaService.member.findUnique({
         where: { externalId: idFromAuth },
@@ -96,7 +100,6 @@ export class AuthService {
         where: { email: userEmail },
         include: { image: true, memberRoles: true },
       });
-      console.log(foundUser);
       if (foundUser) {
         await this.prismaService.member.update({
           where: { email: userEmail },
@@ -115,9 +118,8 @@ export class AuthService {
         };
       }
     } catch (e) {
-      throw new BadRequestException(
-        'Something unexpected Happened. Please try again later'
-      );
+      console.error(e)
+      throw new UnauthorizedException();
     }
 
     // If no user found for externalid and for email then throw forbidden error

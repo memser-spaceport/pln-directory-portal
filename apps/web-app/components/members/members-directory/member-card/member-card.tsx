@@ -9,7 +9,7 @@ import { DirectoryCardHeader } from '../../../shared/directory/directory-card/di
 interface MemberCardProps {
   isGrid?: boolean;
   member: IMember;
-  loggedInMember: IMember;
+  loggedInMember: any;
 }
 
 export function MemberCard({
@@ -76,7 +76,7 @@ export function MemberCard({
             {role}
           </div>
         </div>
-        {loggedInMember?.id && (
+        {loggedInMember?.uid && (
           <div
             className={`${isGrid ? 'mt-2 justify-center' : 'mt-1'}
               flex items-center text-sm text-slate-600`}

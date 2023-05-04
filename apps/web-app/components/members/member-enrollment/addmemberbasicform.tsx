@@ -63,7 +63,7 @@ export default function AddMemberBasicForm(props) {
         </span>
       )}
 
-      {isEditMode && <div className="pt-5">
+      {/* {isEditMode && <div className="pt-5">
         <Switch
           label="Open For Work"
           customClassName="font-bold text-black"
@@ -71,7 +71,7 @@ export default function AddMemberBasicForm(props) {
           onChange={(v) => onChange({target: {name: 'openForWork', value: v}})}
         />
 
-      </div>}
+      </div>} */}
       <div className="pt-5">
         <InputField
           name="plnStartDate"

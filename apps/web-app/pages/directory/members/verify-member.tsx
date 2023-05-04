@@ -34,12 +34,14 @@ VerifyMember.getLayout = function getLayout(page: ReactElement) {
 export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
   ctx
 ) => {
-  const { query, res } = ctx;
-  const { state, code } = query;
+  const { query } = ctx;
+  const { state, code, error } = query;
   const cookies = nookies.get(ctx);
   // validating state which we gave to auth service to get auth code.
   if (cookies.state && cookies.state != state) {
-    destroyCookie(null, 'state');
+    destroyCookie(null, 'state', {
+      path: '/',
+    });
     return {
       redirect: {
         permanent: false,
@@ -47,14 +49,41 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
       },
     };
   }
+  destroyCookie(null, 'state', {
+    path: '/',
+  });
+
+  if (error?.length > 0) {
+    setCookie(ctx, 'error', 'true' , {
+      maxAge: Math.round((Date.now() + (60 * 1))/1000),
+      path: '/',
+    });
+    return {
+      redirect: {
+        permanent: false,
+        destination: '/directory/members',
+      }
+    };
+  }
   const authResp = await getAccessToken(code);
-  if (authResp.status === 401 || authResp.status === 403) {
+  if (authResp.status === 403) {
     setCookie(ctx, 'verified', 'false' , {
       maxAge: Math.round((Date.now() + (60 * 10))/1000),
       path: '/',
       // httpOnly: true,
       // secure: true,
       // sameSite: 'strict',
+    });
+    return {
+      redirect: {
+        permanent: false,
+        destination: '/directory/members',
+      },
+    };
+  } else if(authResp.status === 400 || authResp.status === 500 ) {
+    setCookie(ctx, 'error', 'true' , {
+      maxAge: Math.round((Date.now() + (60 * 1))/1000),
+      path: '/',
     });
     return {
       redirect: {

@@ -54,7 +54,7 @@ export function VerifyEmailModal({
                     <p className="mt-4">Verify Membership</p>
                   </Dialog.Title>
                   <div className="text-sm/5 mt-3">
-                    Email doesn't match our membership email in the directory.
+                    Email doesn't match a membership email in the directory.
                     Please contact our support at{' '}
                     <span className="font-bold"> supportmail@protocol.ai </span>{' '}
                     for assistance or try to{' '}
@@ -63,7 +63,7 @@ export function VerifyEmailModal({
                       className="cursor-pointer font-bold italic underline"
                     >
                       {' '}
-                      sign in{' '}
+                      login{' '}
                     </span>
                     again.
                   </div>

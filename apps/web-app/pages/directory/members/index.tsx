@@ -42,7 +42,7 @@ export default function Members({
   members,
   filtersValues,
   verified,
-  userInfo,
+  userInfo
 }: MembersProps) {
   const [isOpen, setIsModalOpen] = useState(false);
   const { selectedViewType } = useViewType();
@@ -61,25 +61,36 @@ export default function Members({
 
   useEffect(() => {
    const isVerified = Cookies.get('verified');
+   const error = Cookies.get('error');
    if(isVerified === 'true') {
-    toast.success('Your account has been verified', {
-      position: 'top-right',
-      autoClose: 5000,
-      hideProgressBar: false,
-      closeOnClick: true,
-      pauseOnHover: true,
-      draggable: true,
-      progress: undefined,
-      theme: 'dark',
-      icon: <SuccessIcon />,
-      onClose: () => {
-        // router.push('/directory/members/');
-      },
-    });
+      toast.success('Your account has been verified', {
+        position: 'top-right',
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: 'dark',
+        icon: <SuccessIcon />
+      });
    } else if (isVerified === 'false') {
       setIsModalOpen(true);
    }
-   Cookies.remove('verified')
+   if (error === "true") {
+      toast.error('Sign in attempt failed. Please try again later.', {
+        position: 'top-right',
+        autoClose: 5000,
+        hideProgressBar: true,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: 'dark',
+      });
+   }
+   Cookies.remove('error');
+   Cookies.remove('verified');
   }, [])
 
   return (

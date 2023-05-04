@@ -97,27 +97,44 @@ export const parseMember = (member: TMemberResponse): IMember => {
 
 export function maskMemberDetails(member) {
   // Mask Member details when user is not logged In (when accessToken not available in cookie).
-    member.email = member.email
-      ? maskEmail(member.email)
-      : member.email
-    member.githubHandle = member.githubHandle
-      ? maskText(member.githubHandle)
-      : member.githubHandle;
+  member.email = member.email
+    ? maskEmail(member.email)
+    : member.email
+  member.githubHandle = member.githubHandle
+    ? maskText(member.githubHandle)
+    : member.githubHandle;
 
-    member.discordHandle = member.discordHandle
-      ? maskText(member.discordHandle)
-      : member.discordHandle;
-    member.twitter = member.twitter
-      ? maskText(member.twitter)
-      : member.twitter;
+  member.discordHandle = member.discordHandle
+    ? maskText(member.discordHandle)
+    : member.discordHandle;
+  member.twitter = member.twitter
+    ? maskText(member.twitter)
+    : member.twitter;
   return member
 }
 
 export function maskEmail(email: string): string {
-  const [username, domain] = email.split('@');
-  const maskedUsername = username.slice(0, 3) + '*'.repeat(username.length - 3);
-  const maskedDomain = domain.replace(/^(.{2}).+(.{2}\..+)$/, '$1****$2');
-  return `${maskedUsername}@${maskedDomain}`;
+  const maskedEmail = email.replace(/([^@\.])/g, "*").split('');
+  let previous = "";
+  let counter = 0;
+  for (let i = 0; i < maskedEmail.length; i++) {
+    if ((counter > 3 && counter < 6) || counter == 0 || (counter > 1 && (email[i + 1] == "." || email[i + 1] == "@"))) {
+      maskedEmail[i] = email[i];
+    }
+    if (email[i - 1] == "." || email[i - 1] == "@") {
+      counter = 0;
+    }
+
+    if (email[i + 1] == "." || email[i + 1] == "@") {
+      i++;
+      counter = -1;
+    }
+    counter++;
+
+
+    previous = email[i];
+  }
+  return maskedEmail.join('');
 }
 
 export function maskText(text) {
@@ -178,7 +195,7 @@ export const parseTeamMember = (
  **/
 export const getMemberFromCookie = (
   res?
-): { isUserLoggedIn: boolean; member? } => {
+): { isUserLoggedIn: boolean; member?} => {
   const { member, refreshToken } = nookies.get(res);
   if (member && member.length) {
     const memberDetails: IMember = JSON.parse(member);
