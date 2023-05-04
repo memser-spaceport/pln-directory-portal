@@ -17,7 +17,7 @@ interface AutocompleteProps {
   placeholder?: string;
   excludeValues?: string[];
   onSelectOption: (option: IDropdownOption) => void;
-  debounceCall: (searchTerm: string | undefined) => void;
+  debounceCall: (searchTerm: string | undefined) => Promise<IDropdownOption[]>;
 }
 
 export function Autocomplete({
