@@ -91,6 +91,7 @@ export default function Members({
    }
    Cookies.remove('error');
    Cookies.remove('verified');
+   Cookies.remove('state');
   }, [])
 
   return (
