@@ -13,6 +13,7 @@ export default function AddMemberBasicForm(props) {
             imageUrl={props.imageUrl}
             maxSize={4}
             onImageChange={props.handleImageChange}
+            resetFile={props.resetFile}
           />
         </div>
         <div className="namefield inputfield">

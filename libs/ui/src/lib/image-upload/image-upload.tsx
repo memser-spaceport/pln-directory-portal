@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { ReactComponent as CameraIcon } from '../../assets/icons/cameraicon.svg';
 
@@ -10,6 +10,7 @@ type Props = {
   maxSize: number; // Size in MB
   previewImageShape?: Shape;
   disabled?: boolean;
+  resetFile?: boolean;
 };
 
 function bytesToSize(bytes: number) {
@@ -26,6 +27,7 @@ export function ProfileImageUpload({
   maxSize,
   previewImageShape = 'circle',
   disabled = false,
+  resetFile
 }: Props) {
   const [, setImage] = useState<File | null>(null);
   const [uploadError, setError] = useState('');
@@ -53,6 +55,12 @@ export function ProfileImageUpload({
     }
   };
 
+  useEffect(()=> {
+    if (resetFile) {
+      setError('');
+    }
+  }, [resetFile]);
+  
   return (
     <>
       <div
