@@ -39,9 +39,6 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
   const cookies = nookies.get(ctx);
   // validating state which we gave to auth service to get auth code.
   if (cookies.state && cookies.state != state) {
-    destroyCookie(null, 'state', {
-      path: '/',
-    });
     return {
       redirect: {
         permanent: false,
@@ -49,13 +46,9 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
       },
     };
   }
-  destroyCookie(null, 'state', {
-    path: '/',
-  });
-
+  // it will trigger when we get error from auth service. 
   if (error?.length > 0) {
     setCookie(ctx, 'error', 'true' , {
-      maxAge: Math.round((Date.now() + (60 * 1))/1000),
       path: '/',
     });
     return {
@@ -68,11 +61,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
   const authResp = await getAccessToken(code);
   if (authResp.status === 403) {
     setCookie(ctx, 'verified', 'false' , {
-      maxAge: Math.round((Date.now() + (60 * 10))/1000),
       path: '/',
-      // httpOnly: true,
-      // secure: true,
-      // sameSite: 'strict',
     });
     return {
       redirect: {
@@ -99,35 +88,20 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
     const refreshTokenExpiry = decodeToken(refreshToken);
     setCookie(ctx, 'authToken', JSON.stringify(accessToken), {
       maxAge: calculateExpiry(accessTokenExpiry.exp),
-      path: '/',
-      // httpOnly: true,
-      // secure: true,
-      // sameSite: 'strict',
+      path: '/'
     });
     setCookie(ctx, 'refreshToken', JSON.stringify(refreshToken), {
       maxAge: calculateExpiry(refreshTokenExpiry.exp),
-      path: '/',
-      // httpOnly: true,
-      // secure: true,
-      // sameSite: 'strict',
+      path: '/'
     });
     setCookie(ctx, 'userInfo', JSON.stringify(userInfo), {
       maxAge: calculateExpiry(accessTokenExpiry.exp),
-      path: '/',
-      // httpOnly: true,
-      // secure: true,
-      // sameSite: 'strict',
+      path: '/'
     });
-
     setCookie(ctx, 'verified', 'true' , {
-      maxAge: Math.round((Date.now() + (60 * 10))/1000),
-      path: '/',
-      // httpOnly: true,
-      // secure: true,
-      // sameSite: 'strict',
+      path: '/'
     });
   }
-
   return {
     redirect: {
       permanent: false,

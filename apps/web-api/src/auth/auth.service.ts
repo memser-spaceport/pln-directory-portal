@@ -42,32 +42,14 @@ export class AuthService {
           grant_type: 'refresh_token',
         }
       );
-      return {
-        accessToken: result.data.access_token,
-        refreshToken: result.data.refresh_token,
-      };
+      return this.getUserInfo(result);
     } catch (e) {
       console.error(e);
       throw new UnauthorizedException();
     }
   }
 
-  async getToken(code) {
-    // Get user token
-    let result: any;
-    try {
-      result = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
-        code: code,
-        grant_type: 'authorization_code',
-      });
-
-    } catch (error) {
-      if (error.response) {
-        throw new HttpException(error?.response?.data?.message, error?.response?.status ?? 400)
-      }
-      throw new UnauthorizedException();
-    }
-
+  async getUserInfo(result) {
     try {
       const idToken = result.data.id_token;
       const decoded: any = jwt_decode(idToken);
@@ -124,5 +106,24 @@ export class AuthService {
 
     // If no user found for externalid and for email then throw forbidden error
     throw new ForbiddenException();
+  }
+
+  async getToken(code) {
+    // Get user token
+    let result: any;
+    try {
+      result = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
+        code: code,
+        grant_type: 'authorization_code',
+      });
+
+    } catch (error) {
+      if (error.response) {
+        throw new HttpException(error?.response?.data?.message, error?.response?.status ?? 400)
+      }
+      throw new UnauthorizedException();
+    }
+
+    return this.getUserInfo(result);
   }
 }

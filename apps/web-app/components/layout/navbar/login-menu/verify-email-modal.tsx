@@ -49,10 +49,10 @@ export function VerifyEmailModal({
                 <Dialog.Panel className="relative w-full max-w-2xl transform rounded-md bg-white p-8 text-left align-middle shadow-xl transition-all">
                   <Dialog.Title
                     as="h2"
-                    className="text-2xl font-bold leading-6"
+                    className="text-2xl flex font-bold leading-6"
                   >
                     <FailedIcon />
-                    <p className="mt-4">Verify Membership</p>
+                    <p className="my-auto ml-2">Verify Membership</p>
                   </Dialog.Title>
                   <div className="text-sm/5 mt-3">
                     Email doesn't match a membership email in the directory.
@@ -64,7 +64,7 @@ export function VerifyEmailModal({
                       className="cursor-pointer font-bold italic underline"
                     >
                       {' '}
-                      login{' '}
+                      log in{'  '}
                     </span>
                     again.
                   </div>

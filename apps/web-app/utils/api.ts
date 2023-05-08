@@ -2,32 +2,71 @@ import axios from 'axios';
 import nookies from 'nookies';
 import { setCookie } from 'nookies';
 import { decodeToken, calculateExpiry } from '../utils/services/auth';
+
 // Create an Axios instance with default configuration
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_WEB_API_BASE_URL,
 });
 
-// Add an interceptor for the getToken request to set the cookie
+// Get Csrf token from server and add it in every post request.
+// An interceptor to get authToken from cookie and set it to every request header.
 api.interceptors.request.use(async (config) => {
-  if (config.method !== 'get') {
-    try {
+  try {
+    if (config.method != "get") {
       const res = await axios.get(
         `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/token`
       );
       config.withCredentials = true;
       config.headers['csrf-token'] = res.data.token;
-      let { authToken } = nookies.get();
-      if (authToken && authToken.length > 0) {
-        config.headers['Authorization'] = `Bearer ${authToken}`.replace(
-          /"/g,
-          ''
-        );
-      }
-      return config;
-    } catch (error) {
-      return Promise.reject(error.message);
     }
-  } else {
+    const { authToken } = nookies.get();
+    if (authToken && authToken.length > 0) {
+      config.headers['Authorization'] = `Bearer ${authToken}`.replace(
+        /"/g,
+        ''
+      );
+    } else {
+      let { refreshToken } = nookies.get();
+      refreshToken = refreshToken.replace(
+        /"/g,
+        ''
+      );
+      // Make a call to renew access token using refresh token.
+      if (refreshToken && refreshToken.length > 0) {
+        return renewAccessToken(refreshToken)
+          .then((data) => {
+            const { accessToken, refreshToken, userInfo } = data;
+            if (accessToken && refreshToken) {
+              const access_token = decodeToken(accessToken);
+              const refresh_token = decodeToken(refreshToken);
+
+              setCookie(null, 'authToken', JSON.stringify(accessToken), {
+                maxAge: calculateExpiry(access_token.exp),
+                path: '/'
+              });
+              setCookie(null, 'refreshToken', JSON.stringify(refreshToken), {
+                maxAge: calculateExpiry(refresh_token.exp),
+                path: '/'
+              });
+              setCookie(null, 'userInfo', JSON.stringify(userInfo), {
+                maxAge: calculateExpiry(access_token.exp),
+                path: '/'
+              });
+
+              config.headers['Authorization'] = `Bearer ${accessToken}`.replace(
+                /"/g,
+                ''
+              );
+            } 
+            return config;
+          }).catch((error) => {
+            return config;
+          });
+      }
+    }
+    return config;
+  } catch (error) {
+    console.log(error);
     return config;
   }
 });
@@ -41,27 +80,40 @@ api.interceptors.response.use(
     const originalRequest = error.config;
     if (error.response.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      const { refreshToken } = nookies.get();
+      let { refreshToken } = nookies.get();
+      refreshToken = refreshToken.replace(
+        /"/g,
+        ''
+      );
       // Make a call to renew access token
       return renewAccessToken(refreshToken)
-        .then((newAccessToken) => {
-          // Update the access token and retry the original request
-          const accessToken = decodeToken(newAccessToken);
-          setCookie(null, 'authToken', JSON.stringify(newAccessToken), {
-            maxAge: calculateExpiry(accessToken.exp),
-            path: '/',
-            // secure: true,
-            // sameSite: 'strict',
+      .then((data) => {
+        const { accessToken, refreshToken, userInfo } = data;
+        if (accessToken && refreshToken) {
+          const access_token = decodeToken(accessToken);
+          const refresh_token = decodeToken(refreshToken);
+
+          setCookie(null, 'authToken', JSON.stringify(accessToken), {
+            maxAge: calculateExpiry(access_token.exp),
+            path: '/'
+          });
+          setCookie(null, 'refreshToken', JSON.stringify(refreshToken), {
+            maxAge: calculateExpiry(refresh_token.exp),
+            path: '/'
+          });
+          setCookie(null, 'userInfo', JSON.stringify(userInfo), {
+            maxAge: calculateExpiry(access_token.exp),
+            path: '/'
           });
           originalRequest.headers.Authorization =
-            `Bearer ${newAccessToken}`.replace(/"/g, '');
+            `Bearer ${accessToken}`.replace(/"/g, '');
           return axios(originalRequest);
-        })
+        }})
         .catch((error) => {
+          window.location.href="/directory/members";
           return Promise.reject(error);
         });
     }
-    return Promise.reject(error);
   }
 );
 
@@ -90,13 +142,13 @@ function getCsrfTokenFromResponseCookie(cookieHeader) {
 function renewAccessToken(refreshToken) {
   // Make an API call to your server to get a new access token using refreshToken
   return fetch(
-    `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}v1/auth/token/refresh`,
+    `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/auth/token/refresh`,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ refreshToken }),
+      body: JSON.stringify({ token : refreshToken }),
     }
   )
     .then((response) => {
@@ -107,7 +159,7 @@ function renewAccessToken(refreshToken) {
     })
     .then((data) => {
       // Return the new access token
-      return data.accessToken;
+      return data;
     });
 }
 
