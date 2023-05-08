@@ -180,6 +180,7 @@ export function EditMemberModal({
   });
   const [isPendingRequestModalOpen, setIsPendingRequestModalOpen] =
     useState(false);
+  const [reset, setReset] = useState(false);
   const router = useRouter();
 
   const divRef = useRef<HTMLDivElement>(null);
@@ -253,6 +254,7 @@ export function EditMemberModal({
       setErrors([]);
       setBasicErrors([]);
       setSkillErrors([]);
+      setReset(true);
       Promise.all([fetchMember(id), fetchSkills(), fetchTeams()])
         .then((data) => {
           const member = data[0];
@@ -301,6 +303,7 @@ export function EditMemberModal({
           setImageUrl(member.image?.url ?? '');
           setFormValues(formValues);
           setDropDownValues({ skillValues: data[1], teamNames: data[2] });
+          setReset(false);
         })
         .catch((err) => {
           toast(err?.message);
@@ -592,6 +595,7 @@ export function EditMemberModal({
                       imageUrl={imageUrl}
                       isEditMode={true}
                       disableEmail={true}
+                      resetFile={reset}
                     />
                   </div>
                   <div className={openTab === 2 ? 'block' : 'hidden'}>
