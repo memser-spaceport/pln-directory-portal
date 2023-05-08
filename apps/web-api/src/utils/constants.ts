@@ -16,6 +16,7 @@ export const ALLOWED_CORS_ORIGINS = {
     /staging.plnetwork.io/,
     /dev-auth-admin.plnetwork.io/,
     /dev-auth-app.plnetwork.io/,
+    /dev-analytics.plnetwork.io/,
     /staging-admin.plnetwork.io/,
   ],
   [APP_ENV.STAGING]: [
@@ -24,6 +25,7 @@ export const ALLOWED_CORS_ORIGINS = {
     /staging.plnetwork.io/,
     /dev-auth-admin.plnetwork.io/,
     /dev-auth-app.plnetwork.io/,
+    /dev-analytics.plnetwork.io/,
     /staging-admin.plnetwork.io/,
   ],
   [APP_ENV.PRODUCTION]: [
