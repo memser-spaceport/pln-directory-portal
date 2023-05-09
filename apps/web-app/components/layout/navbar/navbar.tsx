@@ -11,6 +11,7 @@ import { Menu as AppMenu } from './menu/menu';
 import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/protocol-labs-network-logo-horizontal-black.svg';
 // import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 import Cookies from 'js-cookie'
+import { setCookie } from 'nookies';
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
 type INavbarProbs = {
@@ -32,16 +33,30 @@ const settingMenu: ISettingMenu[] = [
     label: 'Account Settings',
     url: `/directory/members/:memberId/accountSettings`,
     eventCode: '',
+    onClick: () => {
+      if (!Cookies.get('refreshToken')) {
+        setCookie(null, "logout", "user-logged-out", {
+          path: '/',
+          maxAge:  (Math.floor(Date.now() / 1000) + 20)
+        });
+        window.location.href="/directory/members";
+      }
+    }
   },
   {
     icon: ArrowNarrowRightIcon,
     label: 'Logout',
-    url: '/directory/members',
+    url: '/',
     eventCode: '',
     onClick: () => {
       Cookies.remove('authToken')
       Cookies.remove('refreshToken')
       Cookies.remove('userInfo')
+      setCookie(null, "logout", "true", {
+        path: '/',
+        maxAge:  (Math.floor(Date.now() / 1000) + 60)
+      });
+      window.location.href="/directory/members";
     },
   },
 ];
@@ -71,9 +86,9 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
         }}
       > */}
         {isUserLoggedIn ? (
-          <div className="flex h-14 w-full justify-end space-x-4">
+          <div className="flex h-14 w-full justify-end">
             {userInfo.name && (
-              <div className="my-auto font-medium text-slate-600">
+              <div className="my-auto font-medium text-slate-600 mr-2">
                 {' '}
                 Welcome {userInfo.name}{' '}
               </div>
@@ -87,7 +102,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
             ) : (
               <UserIcon className="h-full w-14 fill-white" />
             )}
-            <Menu as="div" className="relative ml-2 w-16">
+            <Menu as="div" className="relative ml-2 w-16 ml-2">
               {({ open }) => (
                 <>
                   <Menu.Button onClick={() => !open} className="h-full w-full">

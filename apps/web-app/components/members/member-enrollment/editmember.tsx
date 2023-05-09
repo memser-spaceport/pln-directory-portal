@@ -8,7 +8,10 @@ import {
   Fragment,
   useRef,
 } from 'react';
+import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
+import { setCookie } from 'nookies';
+import { toast } from 'react-toastify';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
@@ -27,9 +30,7 @@ import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-member.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { requestPendingCheck } from '../../../utils/services/members';
-import { toast } from 'react-toastify';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
-import Cookies from 'js-cookie';
 interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -448,17 +449,22 @@ export function EditMemberModal({
           // captchaToken,
         };
         if (isProfileSettings) {
+          const userInfoFromCookie = Cookies.get('userInfo');
+          if (!userInfoFromCookie) {
+            setCookie(null, "logout", "user-logged-out", {
+              path: '/',
+              maxAge:  (Math.floor(Date.now() / 1000) + 20)
+            });
+            window.location.href = "/directory/members"
+            return false;
+          }
           const res = await requestPendingCheck(values.email);
           if (res?.isRequestPending) {
             setIsPendingRequestModalOpen(true);
             return false;
           }
         }
-        await api.post(`/v1/participants-request`, data, {
-          headers: {
-            'Authorization': `Bearer ${Cookies.get('authToken')}`
-          }
-        }).then((response) => {
+        await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);
         });
       } catch (err) {

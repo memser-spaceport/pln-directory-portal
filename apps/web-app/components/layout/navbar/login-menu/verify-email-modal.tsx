@@ -64,9 +64,9 @@ export function VerifyEmailModal({
                       className="cursor-pointer font-bold italic underline"
                     >
                       {' '}
-                      log in{'  '}
+                      log in
                     </span>
-                    again.
+                    {' '} again.
                   </div>
                   <div className="w-100 mt-6 flex justify-end">
                     <button

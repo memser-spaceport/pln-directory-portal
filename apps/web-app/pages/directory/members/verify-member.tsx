@@ -1,5 +1,5 @@
 import { GetServerSideProps } from 'next';
-import nookies, { destroyCookie } from 'nookies';
+import nookies from 'nookies';
 import { setCookie } from 'nookies';
 import { ReactElement } from 'react';
 import { LoadingIndicator } from '../../../components/shared/loading-indicator/loading-indicator';
@@ -70,7 +70,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
       },
     };
   } else if(authResp.status === 400 || authResp.status === 500 ) {
-    setCookie(ctx, 'error', 'true' , {
+    setCookie(ctx, 'verified', 'false' , {
       maxAge: Math.round((Date.now() + (60 * 1))/1000),
       path: '/',
     });
