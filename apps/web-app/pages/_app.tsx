@@ -9,6 +9,8 @@ import type { ReactElement } from 'react';
 import { ReactNode } from 'react';
 import { useFathom } from '../hooks/plugins/use-fathom.hook';
 import { DEFAULT_SEO } from '../seo.config';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import './styles.css';
 
 /* eslint-disable-next-line @typescript-eslint/ban-types */
@@ -34,6 +36,14 @@ export default function CustomApp({
     <>
       <DefaultSeo {...DEFAULT_SEO} />
       <Component {...pageProps} />
+      <ToastContainer
+        position="top-right"
+        theme="dark"
+        bodyClassName="text-sm"
+        className="!top-20"
+        toastClassName="!rounded-md !bg-[#1E293B]"
+        progressClassName="!bg-[#30C593]"
+      />
     </>
   );
 }

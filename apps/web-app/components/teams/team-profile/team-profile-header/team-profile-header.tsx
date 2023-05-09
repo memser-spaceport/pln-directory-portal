@@ -35,8 +35,14 @@ export function TeamProfileHeader({
           <UserGroupIcon className="w-22 h-22 mt-2 fill-white" />
         )}
       </div>
-      <div className="space-y-4">
-        <h1 className="pt-1 text-2xl font-bold">{name}</h1>
+      <div className="space-y-2 max-w-md">
+        <Tooltip
+          asChild
+          trigger={
+            <h1 className="pt-1 text-2xl font-bold truncate">{name}</h1>
+          }
+          content={name}
+        />
         <div>
           {industryTags?.length ? (
             <TagsGroup items={industryTags.map((tag) => tag.title)} />

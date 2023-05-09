@@ -1,8 +1,9 @@
 import { ArrowSmRightIcon, CalendarIcon } from '@heroicons/react/outline';
 import { AnchorLink } from '@protocol-labs-network/ui';
 import { trackGoal } from 'fathom-client';
+import Cookies from 'js-cookie';
+import { useRouter } from 'next/router';
 import { FATHOM_EVENTS } from '../../../../constants';
-import { IMember } from '../../../../utils/members.types';
 import { authenticate } from '../../../../utils/services/auth';
 
 type MemberProfileOfficeHoursProps = {
@@ -15,12 +16,18 @@ const LEARN_MORE_URL =
 
 export function MemberProfileOfficeHours({
   url,
-  userInfo,
+  userInfo
 }: MemberProfileOfficeHoursProps) {
   const loginAsUserCode = FATHOM_EVENTS.directory.loginAsUser;
-  const handleOpenModal = () => {
-    authenticate();
-    trackGoal(loginAsUserCode, 0);
+  const router = useRouter();
+  const handleOnClick = () => {
+    if (Cookies.get("userInfo")) {
+      Cookies.set('page_params', 'user_logged_in', { expires: 60, path: '/' });
+      router.reload();
+    } else {
+      authenticate();
+      trackGoal(loginAsUserCode, 0);
+    }
   };
   return (
     <div className="mt-6 rounded-xl bg-slate-50 p-4">
@@ -60,7 +67,7 @@ export function MemberProfileOfficeHours({
           (url ?
             <>
               <button
-                onClick={handleOpenModal}
+                onClick={handleOnClick}
                 className="shadow-request-button rounded-lg border border-slate-300 bg-white px-6 py-2.5 text-sm font-medium hover:shadow-on-hover hover:text-slate-600 on-focus active:border-blue-600 active:ring-2"
               >
                 Login to Schedule

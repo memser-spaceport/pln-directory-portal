@@ -8,11 +8,14 @@ import {
   Fragment,
   useRef,
 } from 'react';
+import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
+import { toast } from 'react-toastify';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
 import { ValidationErrorMessages } from '../../../components/shared/account-setttings/validation-error-message';
+import { PAGE_ROUTES } from '../../../constants';
 import { RequestPending } from '../../shared/request-pending/request-pending';
 import { IFormValues } from '../../../utils/members.types';
 import Modal from '../../layout/navbar/modal/modal';
@@ -27,9 +30,7 @@ import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-member.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { requestPendingCheck } from '../../../utils/services/members';
-import { toast } from 'react-toastify';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
-import Cookies from 'js-cookie';
 interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -51,14 +52,14 @@ function validateBasicForm(formValues, imageUrl, isProfileSettings) {
   if (!imageUrl) {
     errors.push('Please upload a profile image');
   }
-  if (!isProfileSettings) {
-    if (
-      !formValues.requestorEmail?.trim() ||
-      !formValues.requestorEmail?.match(emailRE)
-    ) {
-      errors.push('Please add valid Requestor Email.');
-    }
-  }
+  // if (!isProfileSettings) {
+  //   if (
+  //     !formValues.requestorEmail?.trim() ||
+  //     !formValues.requestorEmail?.match(emailRE)
+  //   ) {
+  //     errors.push('Please add valid Requestor Email.');
+  //   }
+  // }
   return errors;
 }
 
@@ -447,18 +448,20 @@ export function EditMemberModal({
           },
           // captchaToken,
         };
-        if (isProfileSettings) {
+        // if (isProfileSettings) {
+          const userInfoFromCookie = Cookies.get('userInfo');
+          if (!userInfoFromCookie) {
+            Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
+            router.push(PAGE_ROUTES.MEMBERS);
+            return false;
+          }
           const res = await requestPendingCheck(values.email);
           if (res?.isRequestPending) {
             setIsPendingRequestModalOpen(true);
             return false;
           }
-        }
-        await api.post(`/v1/participants-request`, data, {
-          headers: {
-            'Authorization': `Bearer ${Cookies.get('authToken')}`
-          }
-        }).then((response) => {
+        // }
+        await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);
         });
       } catch (err) {
@@ -535,7 +538,7 @@ export function EditMemberModal({
       {isProfileSettings ? (
         <div className="h-full w-full">
           <div className="mx-auto mb-40 h-full w-2/4 px-5">
-            <h1 className="text-2xl font-bold">Profile Settings</h1>
+            <h1 className="text-2xl font-bold">Account Settings</h1>
             {!saveCompleted && (
               <div className="mt-3 flex h-10 w-full w-3/5  justify-start text-slate-400">
                 <button
@@ -626,10 +629,10 @@ export function EditMemberModal({
                 {getSubmitOrNextButton(handleSubmit, isProcessing)}
               </div>
               <div className="float-right mx-5">
-								{getResetButton(()=>{
-								   handleReset()
-								})}
-							</div>
+		{getResetButton(()=>{
+		   handleReset()
+		})}
+	      </div>
             </div>
           )}
           <RequestPending

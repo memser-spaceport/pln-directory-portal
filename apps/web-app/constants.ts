@@ -98,3 +98,14 @@ export const ENROLLMENT_TYPE = {
   MEMBER: 'MEMBER',
   TEAM: 'TEAM',
 };
+
+export const LOGIN_MSG = 'Your account has been verified';
+export const LOGIN_FAILED_MSG = 'Sign in attempt failed. Please try again later.'
+export const LOGOUT_MSG = 'You have been logged out successfully.';
+export const RETRY_LOGIN_MSG = 'Please login and try again.';
+export const LOGGED_IN_MSG = 'You are already logged in';
+export const SCHEDULE_MEETING_MSG = ' please proceed to schedule a meeting.'
+export const PAGE_ROUTES = {
+  MEMBERS:'/directory/members',
+  TEAMS: '/directory/teams'
+}

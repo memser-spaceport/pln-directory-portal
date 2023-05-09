@@ -4,8 +4,11 @@ import {
 } from '@protocol-labs-network/members/data-access';
 import { getTeams } from '@protocol-labs-network/teams/data-access';
 import { Breadcrumb } from '@protocol-labs-network/ui';
+import Cookies from 'js-cookie';
 import { NextSeo } from 'next-seo';
-import { ReactElement } from 'react';
+import { ReactElement, useEffect } from 'react';
+import { toast } from 'react-toastify';
+import { LOGGED_IN_MSG, SCHEDULE_MEETING_MSG } from '../../../constants';
 import { MemberProfileDetails } from '../../../components/members/member-profile/member-profile-details/member-profile-details';
 import { MemberProfileHeader } from '../../../components/members/member-profile/member-profile-header/member-profile-header';
 import { MemberProfileOfficeHours } from '../../../components/members/member-profile/member-profile-office-hours/member-profile-office-hours';
@@ -42,6 +45,16 @@ export default function Member({
   const description = member.mainTeam
     ? `${member.mainTeam.role} at ${member.mainTeam.name}`
     : 'Contributor';
+  
+  useEffect(() => {
+    const params = Cookies.get('page_params');
+    if(params === "user_logged_in") {
+      toast.info(LOGGED_IN_MSG + ', '+ SCHEDULE_MEETING_MSG , {
+        hideProgressBar: true
+      })
+    }
+    Cookies.remove('page_params');
+  }, []);
 
   return (
     <>
@@ -59,7 +72,7 @@ export default function Member({
             member={member}
             userInfo={userInfo}
           />
-          <MemberProfileDetails {...member} />
+          <MemberProfileDetails member={member} userInfo={userInfo} />
           <MemberProfileOfficeHours
             url={member.officeHours}
             userInfo={userInfo}

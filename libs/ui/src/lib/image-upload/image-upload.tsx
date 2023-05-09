@@ -87,6 +87,7 @@ export function ProfileImageUpload({
           className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
           onChange={handleImageChange}
           disabled={disabled}
+          title=""
         />
       </div>
       <span className="absolute pt-1 text-xs text-rose-600">{uploadError}</span>

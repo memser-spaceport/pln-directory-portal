@@ -2,11 +2,14 @@ import {
   getMembers,
   getMembersFilters,
 } from '@protocol-labs-network/members/data-access';
+import Cookies from 'js-cookie';
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
 import { NextSeo } from 'next-seo';
+import nookies, { destroyCookie } from 'nookies';
 import { ReactElement, useEffect, useState } from 'react';
-import { ToastContainer, toast } from 'react-toastify';
+import { toast } from 'react-toastify';
+import { LOGIN_MSG, LOGIN_FAILED_MSG, LOGOUT_MSG, RETRY_LOGIN_MSG , PAGE_ROUTES, LOGGED_IN_MSG} from '../../../constants';
 import { LoadingOverlay } from '../../../components/layout/loading-overlay/loading-overlay';
 import { MembersDirectoryFilters } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters';
 import { IMembersFiltersValues } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters.types';
@@ -25,10 +28,6 @@ import {
   getMembersOptionsFromQuery,
 } from '../../../utils/members.utils';
 import { ReactComponent as SuccessIcon } from '../../../public/assets/images/icons/success.svg';
-import 'react-toastify/dist/ReactToastify.css';
-import Cookies from 'js-cookie';
-import { destroyCookie } from 'nookies';
-import nookies from 'nookies'
 
 type MembersProps = {
   members: IMember[];
@@ -56,42 +55,38 @@ export default function Members({
     'officeHoursOnly',
     'includeFriends',
   ];
-
+  
   useDirectoryFiltersFathomLogger('members', filterProperties);
 
   useEffect(() => {
-   const isVerified = Cookies.get('verified');
-   const error = Cookies.get('error');
-   if(isVerified === 'true') {
-      toast.success('Your account has been verified', {
-        position: 'top-right',
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-        theme: 'dark',
+    Cookies.remove('state');
+    const isVerified = Cookies.get('verified');
+    const params = Cookies.get('page_params');
+    if(isVerified === 'true') {
+      toast.success(LOGIN_MSG, {
         icon: <SuccessIcon />
       });
-   } else if (isVerified === 'false') {
+    } else if (isVerified === 'false') {
       setIsModalOpen(true);
-   }
-   if (error === "true") {
-      toast.error('Sign in attempt failed. Please try again later.', {
-        position: 'top-right',
-        autoClose: 5000,
+    } else if (params === "auth_error") {
+      toast.error(LOGIN_FAILED_MSG, {
         hideProgressBar: true,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-        theme: 'dark',
       });
-   }
-   Cookies.remove('error');
-   Cookies.remove('verified');
-   Cookies.remove('state');
+    } else if (params === "logout") {
+      toast.info(LOGOUT_MSG, {
+        icon: <SuccessIcon />
+      });
+    } else if (params === "user_logged_out") {
+      toast.info(RETRY_LOGIN_MSG, {
+        hideProgressBar: true
+      });
+    } else if(params === "user_logged_in") {
+      toast.info(LOGGED_IN_MSG + '.', {
+        hideProgressBar: true
+      })
+    }
+    Cookies.remove('page_params');
+    Cookies.remove('verified');
   }, [])
 
   return (
@@ -131,14 +126,8 @@ export default function Members({
         isOpen={isOpen}
         setIsModalOpen={(isOpen) => {
           setIsModalOpen(isOpen);
-          router.push('/directory/members/');
+          router.push(PAGE_ROUTES.MEMBERS);
         }}
-      />
-      <ToastContainer
-        bodyClassName="text-sm"
-        className="!top-20"
-        toastClassName="!rounded-md !bg-[#1E293B]"
-        progressClassName="!bg-[#30C593]"
       />
     </>
   );
@@ -159,7 +148,7 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) 
   const { verified } = query;
   const isMaskingRequired = req?.cookies?.authToken ? false : true
   const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
-  const isUserLoggedIn = req?.cookies?.authToken &&  req?.cookies?.userInfo ? true : false
+  const isUserLoggedIn = req?.cookies?.authToken &&  req?.cookies?.userInfo ? true : false;
   const optionsFromQuery = getMembersOptionsFromQuery(query);
   const listOptions = getMembersListOptions(optionsFromQuery);
   const [membersResponse, filtersValues] = await Promise.all([

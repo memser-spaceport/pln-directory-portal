@@ -1,16 +1,24 @@
 import { trackGoal } from 'fathom-client';
+import Cookies from 'js-cookie';
+import { useRouter } from 'next/router';
 import React, { useState } from 'react';
 import { FATHOM_EVENTS } from '../../../../constants';
-import { LoginModal } from './login-modal';
-import { ForgotEmailModal } from './forgot-email-modal';
+// import { LoginModal } from './login-modal';
+// import { ForgotEmailModal } from './forgot-email-modal';
 import { authenticate } from '../../../../utils/services/auth';
 export function Login() {
   const loginAsUserCode = FATHOM_EVENTS.directory.loginAsUser;
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [isForgotEmailModalOpen, setIsForgotEmailModalOpen] = useState(false);
+  const router = useRouter();
+  // const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  // const [isForgotEmailModalOpen, setIsForgotEmailModalOpen] = useState(false);
   const handleOpenModal = () => {
-    authenticate();
-    trackGoal(loginAsUserCode, 0);
+    if (Cookies.get("userInfo")) {
+      Cookies.set('page_params', 'user_logged_in', { expires: 60, path: '/' });
+      router.push("/directory/members");
+    } else {
+      authenticate();
+      trackGoal(loginAsUserCode, 0);
+    }
   };
   return (
     <>
@@ -20,7 +28,7 @@ export function Login() {
       >
         Login
       </button>
-      <LoginModal
+      {/* <LoginModal
         isOpen={isLoginModalOpen}
         setIsModalOpen={setIsLoginModalOpen}
         setIsForgotEmailModalOpen={setIsForgotEmailModalOpen}
@@ -28,7 +36,7 @@ export function Login() {
       <ForgotEmailModal
         isOpen={isForgotEmailModalOpen}
         setIsModalOpen={setIsForgotEmailModalOpen}
-      />
+      /> */}
     </>
   );
 }

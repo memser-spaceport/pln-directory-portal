@@ -6,8 +6,8 @@ export function DirectoryLayout({ children }) {
   return (
     <>
       <Navbar
-        isUserLoggedIn={childrens?.[1].props.isUserLoggedIn}
-        userInfo={childrens?.[1].props.userInfo || {}}
+        isUserLoggedIn={childrens?.[1]?.props?.isUserLoggedIn}
+        userInfo={childrens?.[1]?.props?.userInfo || {}}
       />
       <main className="min-w-[1272px] pt-20">{children}</main>
     </>

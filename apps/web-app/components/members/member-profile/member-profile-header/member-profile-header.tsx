@@ -22,7 +22,7 @@ export function MemberProfileHeader({
   return (
     <div className="relative flex space-x-4">
       <div
-        className={`relative h-20 w-20 mt-1 shrink-0 overflow-hidden rounded-full border border-slate-200 ${
+        className={`relative h-24 w-24 shrink-0 overflow-hidden rounded-full border border-slate-200 ${
           image ? 'bg-white' : 'bg-slate-200'
         }`}
       >
@@ -36,11 +36,17 @@ export function MemberProfileHeader({
             objectPosition="center"
           />
         ) : (
-          <UserIcon className="w-22 h-22 mt-2 fill-white" />
+          <UserIcon className="w-24 h-24 fill-white" />
         )}
       </div>
-      <div>
-        <h1 className="mt-0.5 text-2xl font-bold">{name}</h1>
+      <div className='max-w-2xl'>
+        <Tooltip
+          asChild
+          trigger={
+            <h1 className="mt-0.5 text-2xl font-bold truncate">{name}</h1>
+          }
+          content={name}
+        />
         <div className="flex items-center">
           <div className="max-w-sm overflow-hidden text-ellipsis whitespace-nowrap font-medium">
             {mainTeam?.name}
@@ -68,11 +74,11 @@ export function MemberProfileHeader({
           ) : null
         }
         {userInfo?.uid && (
-          <div className="mr-2 mt-1 flex items-center text-sm text-slate-600">
+          <div className="mr-2 flex items-center text-sm text-slate-600">
             {location ? (
               <>
-                <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0 fill-slate-400" />
-                <span className="line-clamp-1">{location}</span>
+                <LocationMarkerIcon className="mr-0.5 h-4 w-4 flex-shrink-0 fill-slate-400" />
+                <span className="line-clamp-1 pt-0.5">{location}</span>
               </>
             ) : (
               '-'

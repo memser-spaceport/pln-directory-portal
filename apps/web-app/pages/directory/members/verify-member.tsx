@@ -1,8 +1,9 @@
 import { GetServerSideProps } from 'next';
-import nookies, { destroyCookie } from 'nookies';
+import nookies from 'nookies';
 import { setCookie } from 'nookies';
 import { ReactElement } from 'react';
 import { LoadingIndicator } from '../../../components/shared/loading-indicator/loading-indicator';
+import { PAGE_ROUTES } from '../../../constants';
 import {
   getAccessToken,
   decodeToken,
@@ -42,19 +43,20 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
     return {
       redirect: {
         permanent: false,
-        destination: '/directory/members?verified=false',
+        destination: PAGE_ROUTES.MEMBERS,
       },
     };
   }
   // it will trigger when we get error from auth service. 
   if (error?.length > 0) {
-    setCookie(ctx, 'error', 'true' , {
+    setCookie(ctx, 'page_params', 'auth_error' , {
+      maxAge: Math.round((Date.now() + (60 * 1))/1000),
       path: '/',
     });
     return {
       redirect: {
         permanent: false,
-        destination: '/directory/members',
+        destination: PAGE_ROUTES.MEMBERS,
       }
     };
   }
@@ -66,18 +68,18 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
     return {
       redirect: {
         permanent: false,
-        destination: '/directory/members',
+        destination: PAGE_ROUTES.MEMBERS,
       },
     };
   } else if(authResp.status === 400 || authResp.status === 500 ) {
-    setCookie(ctx, 'error', 'true' , {
+    setCookie(ctx, 'verified', 'false' , {
       maxAge: Math.round((Date.now() + (60 * 1))/1000),
       path: '/',
     });
     return {
       redirect: {
         permanent: false,
-        destination: '/directory/members',
+        destination: PAGE_ROUTES.MEMBERS,
       },
     };
   }
@@ -105,7 +107,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
   return {
     redirect: {
       permanent: false,
-      destination: '/directory/members',
+      destination: PAGE_ROUTES.MEMBERS,
     },
   };
 };

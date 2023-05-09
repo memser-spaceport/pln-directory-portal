@@ -1,11 +1,12 @@
 import {
-  getMember,
-  getMemberUIDByAirtableId,
+  getMember
 } from '@protocol-labs-network/members/data-access';
 import { ReactElement } from 'react';
 import { Breadcrumb } from '@protocol-labs-network/ui';
 import { NextSeo } from 'next-seo';
+import { setCookie }from 'nookies';
 import { EditMemberModal } from '../../../../components/members/member-enrollment/editmember';
+import { PAGE_ROUTES } from '../../../../constants';
 import { useProfileBreadcrumb } from '../../../../hooks/profile/use-profile-breadcrumb.hook';
 import { DirectoryLayout } from '../../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../../seo.config';
@@ -51,18 +52,34 @@ AccountSettings.getLayout = function getLayout(page: ReactElement) {
   return <DirectoryLayout>{page}</DirectoryLayout>;
 };
 
-export const getServerSideProps = async ({ query, res, req }) => {
+export const getServerSideProps = async (ctx) => {
+  const { query, res, req } = ctx;
   const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
   const isUserLoggedIn = req?.cookies?.authToken &&  req?.cookies?.userInfo ? true : false;
-  const { id, backLink = '/directory/members' } = query as {
+  const { id, backLink = PAGE_ROUTES.MEMBERS } = query as {
     id: string;
     backLink: string;
   };
-  if (userInfo?.uid != id) {
+
+  if(!userInfo?.uid) {
+    setCookie(ctx, "page_params", "user-logged-out", {
+      path: '/',
+      maxAge:  (Math.floor(Date.now() / 1000) + 60)
+    });
     return {
-      notFound: true,
+      redirect: {
+        permanent: false,
+        destination: PAGE_ROUTES.MEMBERS,
+      },
     };
-  }
+  } else if (userInfo?.uid != id) {
+    return {
+      redirect: {
+        permanent: false,
+        destination: PAGE_ROUTES.MEMBERS,
+      },
+    };
+  } 
 
   const memberResponse = await getMember(id, {
     with: 'image,skills,location',

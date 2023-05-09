@@ -4,13 +4,13 @@ import { CogIcon, ArrowNarrowRightIcon } from '@heroicons/react/outline';
 import { ArrowIcon } from '@protocol-labs-network/ui';
 import { trackGoal } from 'fathom-client';
 import Link from 'next/link';
+import Cookies from 'js-cookie';
 import { forwardRef, Fragment } from 'react';
 import { JoinNetworkMenu } from './join-network-menu/join-network-menu';
 import { Login } from './login-menu/login-menu';
 import { Menu as AppMenu } from './menu/menu';
 import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/protocol-labs-network-logo-horizontal-black.svg';
 // import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
-import Cookies from 'js-cookie'
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
 type INavbarProbs = {
@@ -32,16 +32,24 @@ const settingMenu: ISettingMenu[] = [
     label: 'Account Settings',
     url: `/directory/members/:memberId/accountSettings`,
     eventCode: '',
+    onClick: () => {
+      if (!Cookies.get('refreshToken')) {
+        Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
+        window.location.href="/directory/members";
+      }
+    }
   },
   {
     icon: ArrowNarrowRightIcon,
     label: 'Logout',
-    url: '/directory/members',
+    url: '#',
     eventCode: '',
     onClick: () => {
       Cookies.remove('authToken')
       Cookies.remove('refreshToken')
       Cookies.remove('userInfo')
+      Cookies.set('page_params', 'logout', { expires: 60, path: '/' });
+      window.location.href="/directory/members";
     },
   },
 ];
@@ -71,9 +79,9 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
         }}
       > */}
         {isUserLoggedIn ? (
-          <div className="flex h-14 w-full justify-end space-x-4">
+          <div className="flex h-14 w-full justify-end">
             {userInfo.name && (
-              <div className="my-auto font-medium text-slate-600">
+              <div className="my-auto font-medium text-slate-600 mr-2">
                 {' '}
                 Welcome {userInfo.name}{' '}
               </div>
@@ -87,10 +95,10 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
             ) : (
               <UserIcon className="h-full w-14 fill-white" />
             )}
-            <Menu as="div" className="relative ml-2 w-16">
+            <Menu as="div" className="relative w-16">
               {({ open }) => (
                 <>
-                  <Menu.Button onClick={() => !open} className="h-full w-full">
+                  <Menu.Button onClick={() => !open} className=" ml-4 h-full w-full">
                     <div className="my-auto">
                       <ArrowIcon />
                     </div>
