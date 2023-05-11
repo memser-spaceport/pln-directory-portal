@@ -17,6 +17,7 @@ import { FileEncryptionService } from './utils/file-encryption/file-encryption.s
 import { FileMigrationService } from './utils/file-migration/file-migration.service';
 import { FileUploadService } from './utils/file-upload/file-upload.service';
 import { LocationTransferService } from './utils/location-transfer/location-transfer.service';
+import { ParticipantsRequestService } from './participants-request/participants-request.service';
 
 @Module({
   providers: [
@@ -38,6 +39,7 @@ import { LocationTransferService } from './utils/location-transfer/location-tran
     FileEncryptionService,
     ImagesService,
     ImagesController,
+    ParticipantsRequestService,
   ],
 })
 export class CommandModule {}

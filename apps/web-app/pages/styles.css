@@ -14,7 +14,7 @@
   }
 
   .directory-view-type:first-child > button {
-    @apply rounded-r-none rounded-l-lg;
+    @apply rounded-l-lg rounded-r-none;
   }
   .directory-view-type:last-child > button {
     @apply rounded-l-none rounded-r-lg;
@@ -57,4 +57,109 @@
   .on-focus--link {
     @apply focus-within:shadow-[0_1px_0_#156ff7] focus-within:outline-none focus:shadow-[0_1px_0_#156ff7] focus:outline-none focus-visible:shadow-[0_1px_0_#156ff7] focus-visible:outline-none;
   }
+  .profileImage > div {
+    width: 100px;
+    height: 100px;
+    position: relative;
+    /* top: 10px; */
+  }
+}
+
+.namefield {
+  left: 32px;
+  position: relative;
+  flex-basis: 69%;
+}
+
+.datefield > div:first-of-type {
+  padding-top: 16px;
+}
+
+/* .cityname > div:first-of-type {
+  padding-top: 16px;
+} */
+
+.footerdiv {
+  margin-top: 32px;
+  border-top: solid #e2e8f0 1px;
+  padding-top: 24px;
+  padding-bottom: 32px;
+  padding-left: 44px;
+  padding-right: 44px;
+}
+.cross-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.font-size-13 {
+  font-size: 13px;
+}
+
+.font-size-14 {
+  font-size: 14px;
+}
+
+.font-size-12 {
+  font-size: 12px;
+}
+
+.hint-text > div:first-of-type {
+  padding-top: 16px;
+  font-size: 13px;
+}
+
+.step-line {
+  position: relative;
+  top: 20px;
+  border: 1px solid #156ff7;
+}
+
+.dia {
+  margin-right: auto;
+  min-width: 500px;
+  margin-left: auto;
+  max-width: 500px;
+}
+
+.custom-grey {
+  --tw-border-opacity: 1;
+  border-color: rgb(209 213 219 / var(--tw-border-opacity));
+}
+
+.custom-red {
+  --tw-border-opacity: 1 !important;
+  border-color: rgb(239 68 68 / var(--tw-border-opacity)) !important;
+}
+
+.custom-outline-none:hover {
+  box-shadow: none !important;
+  outline: none !important;
+}
+.custom-outline-none:focus-visible {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+@media screen and (max-width: 576) {
+  .dia {
+    min-width: 500px;
+    margin-top: 1.75rem;
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 500px;
+  }
+}
+
+.grecaptcha-badge {
+  width: 0px !important;
+}
+
+.width-full {
+  width: 256px !important;
+}
+
+.custom-grey {
+  --tw-border-opacity: 1;
+  border-color: rgb(209 213 219 / var(--tw-border-opacity));
 }

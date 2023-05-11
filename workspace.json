@@ -2,6 +2,8 @@
   "version": 2,
   "projects": {
     "airtable": "libs/airtable",
+    "back-office": "apps/back-office",
+    "back-office-e2e": "apps/back-office-e2e",
     "contracts": "libs/contracts",
     "funding-stages-data-access": "libs/funding-stages/data-access",
     "industry-tags-data-access": "libs/industry-tags/data-access",

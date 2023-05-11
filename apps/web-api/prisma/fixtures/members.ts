@@ -39,10 +39,13 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
       githubHandler: faker.internet.userName(name),
       discordHandler: faker.internet.userName(name),
       twitterHandler: faker.internet.userName(name),
+      linkedinHandler: faker.internet.userName(name),
       officeHours: faker.helpers.arrayElement([null, faker.internet.url()]),
+      moreDetails: faker.helpers.arrayElement([null, faker.lorem.paragraph()]),
       plnFriend: faker.datatype.boolean(),
       airtableRecId: `airtable-rec-id-${sequence}`,
       createdAt: faker.date.past(),
+      plnStartDate: faker.date.past(),
       updatedAt: faker.date.recent(),
       locationUid: '',
     };

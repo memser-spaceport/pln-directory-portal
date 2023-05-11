@@ -7,7 +7,7 @@ export const Substack = () => {
     <section className="bg-pln-gradient-01 shadow-drop-shadow rounded-lg p-8 text-white">
       <div className="md:mx-auto md:max-w-[713px]">
         <h3 className="text-2xl font-semibold">Subscribe to our Substack!</h3>
-        <p className="mt-2 mb-4 text-lg text-slate-100">
+        <p className="mb-4 mt-2 text-lg text-slate-100">
           Stay up to date with developments, new programs, and progress from
           other teams in the network.
         </p>

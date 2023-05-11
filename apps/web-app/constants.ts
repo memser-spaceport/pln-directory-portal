@@ -9,6 +9,7 @@ export const FATHOM_EVENTS = {
       launchpad: 'JJPYTSPL',
       mosaia: 'GU0B5FOF',
       events: 'N93YFAXP',
+      ideashub: '4EVLSAXF',
     },
     networkDirectory: '7M1Q65KH',
     labWeek22: {
@@ -91,3 +92,8 @@ export const FATHOM_EVENTS = {
   },
 };
 export const AIRTABLE_REGEX = /^rec[A-Za-z0-9]{14}$/;
+
+export const ENROLLMENT_TYPE = {
+  MEMBER: 'MEMBER',
+  TEAM: 'TEAM',
+};

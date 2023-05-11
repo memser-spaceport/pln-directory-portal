@@ -12,3 +12,7 @@ export * from './lib/input-field/input-field';
 export * from './lib/switch/switch';
 export * from './lib/tag/tag';
 export * from './lib/tooltip/tooltip';
+export * from './lib/image-upload/image-upload';
+export * from './lib/multi-select/multi-select';
+export * from './lib/text-area/text-area';
+export * from './lib/autocomplete/autocomplete';

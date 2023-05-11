@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { faker } from '@faker-js/faker';
 import { Prisma, Team } from '@prisma/client';
 import { Factory } from 'fishery';
@@ -32,7 +33,6 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(
 
     const companyName = faker.helpers.unique(faker.company.name);
     return {
-      id: sequence,
       uid: faker.helpers.slugify(`uid-${companyName.toLowerCase()}`),
       name: companyName,
       logoUid: null,
@@ -44,6 +44,8 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(
         faker.internet.email(),
       ]),
       twitterHandler: faker.name.firstName(),
+      officeHours: faker.name.firstName(),
+      linkedinHandler: faker.name.firstName(),
       shortDescription: faker.helpers.arrayElement([
         null,
         faker.lorem.sentence(),
@@ -52,6 +54,7 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(
         null,
         faker.lorem.paragraph(),
       ]),
+      moreDetails: faker.helpers.arrayElement([null, faker.lorem.paragraph()]),
       plnFriend: faker.datatype.boolean(),
       airtableRecId: `airtable-rec-id-${sequence}`,
       createdAt: faker.date.past(),
