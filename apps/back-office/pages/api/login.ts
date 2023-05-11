@@ -12,7 +12,6 @@ export default async function login(req, res) {
   await api
     .post('/v1/admin/signin', { username: username, password: password })
     .then((response) => {
-      console.log('response>>>>>>', response);
       if (response?.data?.accessToken) {
         // Set the authentication cookie
         const decoded = jwt_decode<DecodedJwtPayload>(
