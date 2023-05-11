@@ -15,7 +15,6 @@ export class AdminService {
     }
     console.log('generating token.....');
     const accessToken = await this.jwtService.getSignedToken();
-    console.log('accessToken token.....', accessToken);
     return { code: 1, accessToken: accessToken };
   }
 }
