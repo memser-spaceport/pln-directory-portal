@@ -37,39 +37,28 @@ export function Index() {
   const router = useRouter();
   async function onSubmit() {
     setIsLoading(true);
-    try {
-      await fetch('/api/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
+    await fetch('/api/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ username, password }),
+    })
+      .then((res) => {
+        if (res.ok) {
+          const backLink = router.query.backlink?.toString() ?? '';
+          router.push(backLink ? backLink : ROUTE_CONSTANTS.PENDING_LIST);
+        } else if (res.status === 401) {
+          setError('Incorrect Username and Password!');
+        }
       })
-        .then((res) => {
-          if (res.ok) {
-            const backLink = router.query.backlink?.toString() ?? '';
-            router.push(backLink ? backLink : ROUTE_CONSTANTS.PENDING_LIST);
-          } else if (res.status === 401) {
-            setError('Incorrect Username and Password!');
-          }
-        })
-        .catch((err) => {
-          console.log('err>>>>', err);
-          setError('Please try again!');
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    } catch (error) {
-      const usernameFromEnv = process.env.USERNAME;
-      const passwordFromEnv = process.env.PASSWORD;
-
-      if (username !== usernameFromEnv || passwordFromEnv !== password) {
-        console.log('Invalid creds in catch---');
-        setError('Invalid creds!');
-      }
-      console.error('error>>>>', error);
-    }
+      .catch((err) => {
+        console.log('err>>>>', err);
+        setError('Please try again!');
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   }
 
   return (
