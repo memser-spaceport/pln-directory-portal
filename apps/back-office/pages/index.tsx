@@ -65,7 +65,7 @@ export function Index() {
       const passwordFromEnv = process.env.PASSWORD;
 
       if (username !== usernameFromEnv || passwordFromEnv !== password) {
-        console.log('Invalid creds in catch');
+        console.log('Invalid creds in catch---');
         setError('Invalid creds!');
       }
       console.error('error>>>>', error);
