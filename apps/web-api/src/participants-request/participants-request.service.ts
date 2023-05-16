@@ -187,7 +187,7 @@ export class ParticipantsRequestService {
     }
 
     await this.slackService.notifyToChannel(slackConfig);
-    await this.redisService.resetAllCache();
+    //await this.redisService.resetAllCache();
     return result;
   }
 
@@ -204,7 +204,7 @@ export class ParticipantsRequestService {
       where: { uid: requestedUid },
       data: { ...formattedData },
     });
-    await this.redisService.resetAllCache();
+    //await this.redisService.resetAllCache();
     return { code: 1, message: 'success' };
   }
 
@@ -219,7 +219,7 @@ export class ParticipantsRequestService {
       where: { uid: uidToReject },
       data: { status: ApprovalStatus.REJECTED },
     });
-    await this.redisService.resetAllCache();
+    //await this.redisService.resetAllCache();
     return { code: 1, message: 'Success' };
   }
 
@@ -328,7 +328,7 @@ export class ParticipantsRequestService {
     slackConfig.requestLabel = 'New Labber Added';
     slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}`;
     await this.slackService.notifyToChannel(slackConfig);
-    await this.redisService.resetAllCache();
+    //await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
@@ -503,7 +503,7 @@ export class ParticipantsRequestService {
     slackConfig.requestLabel = 'Edit Labber Request Completed';
     slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}`;
     await this.slackService.notifyToChannel(slackConfig);
-    await this.redisService.resetAllCache();
+    //await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
@@ -595,7 +595,7 @@ export class ParticipantsRequestService {
     slackConfig.requestLabel = 'New Team Added';
     slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}`;
     await this.slackService.notifyToChannel(slackConfig);
-    await this.redisService.resetAllCache();
+    //await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
@@ -703,7 +703,7 @@ export class ParticipantsRequestService {
     slackConfig.requestLabel = 'Edit Team Request Completed ';
     slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`;
     await this.slackService.notifyToChannel(slackConfig);
-    await this.redisService.resetAllCache();
+    //await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }

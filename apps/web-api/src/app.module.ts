@@ -35,7 +35,7 @@ import { AuthModule } from './auth/auth.module';
       ttl: 1,
       limit: 10,
     }),
-    CacheModule.register<ClientOpts>({
+   /*  CacheModule.register<ClientOpts>({
       store: redisStore,
       url: process.env.REDIS_URL,
       isGlobal: true,
@@ -47,7 +47,7 @@ import { AuthModule } from './auth/auth.module';
             requestCert: true,
           }
         : null,
-    }),
+    }), */
     BullModule.forRoot({
       redis: {
         path: process.env.REDIS_URL,
@@ -77,10 +77,10 @@ import { AuthModule } from './auth/auth.module';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    {
+   /*  {
       provide: APP_INTERCEPTOR,
       useClass: MyCacheInterceptor,
-    },
+    }, */
     {
       provide: APP_INTERCEPTOR,
       useClass: ConcealEntityIDInterceptor,

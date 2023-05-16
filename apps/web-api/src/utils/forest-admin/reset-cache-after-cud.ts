@@ -39,13 +39,13 @@ export async function resetCacheAfterCreateOrUpdateOrDelete(
   // Clear cache after create or update
   for (const currentCollection of collections) {
     currentCollection.addHook('After', 'Create', async () => {
-      await redisCache.reset();
+     // await redisCache.reset();
     });
     currentCollection.addHook('After', 'Update', async () => {
-      await redisCache.reset();
+     // await redisCache.reset();
     });
     currentCollection.addHook('After', 'Delete', async () => {
-      await redisCache.reset();
+     // await redisCache.reset();
     });
   }
 }
