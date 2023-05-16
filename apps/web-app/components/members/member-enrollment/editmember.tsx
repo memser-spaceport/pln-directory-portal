@@ -141,6 +141,7 @@ export function EditMemberModal({
     comments: '',
     teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
     skills: [],
+    openToWork: false,
   });
 
   const divRef = useRef<HTMLDivElement>(null);
@@ -186,6 +187,7 @@ export function EditMemberModal({
             skills: member.skills?.map((item) => {
               return { value: item.uid, label: item.title };
             }),
+            openToWork: member?.openToWork,
           };
           setImageUrl(member.image?.url ?? '');
           setFormValues(formValues);
@@ -223,6 +225,7 @@ export function EditMemberModal({
       comments: '',
       teamAndRoles: [],
       skills: [],
+      openToWork: false,
     });
   }
 
@@ -263,6 +266,7 @@ export function EditMemberModal({
       plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
+      openToWork: formValues.openToWork,
     };
     return formattedData;
   }

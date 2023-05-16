@@ -41,7 +41,7 @@ export function TeamAndRoleGrid(props) {
             name="team"
             className="custom-grey custom-outline-none border"
             required={true}
-            placeholder="Select a Team"
+            placeholder="Select a team"
             selectedOption={{ value: team?.teamUid, label: team?.teamTitle }}
             onSelectOption={handleDropDownChange}
             excludeValues={teamNames}
@@ -55,7 +55,7 @@ export function TeamAndRoleGrid(props) {
             showLabel={false}
             label="Role"
             maxLength={100}
-            placeholder="Enter the Role"
+            placeholder="Enter your title/role"
             className="custom-grey custom-outline-none border"
             onChange={handleInputChange}
             value={team.role}

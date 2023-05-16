@@ -50,9 +50,8 @@ export default function AddMemberSkillForm(props) {
             <InformationCircleIcon />
           </div>
           <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            Select the team(s) that you work for & the title you hold in your
-            team. If your team is not on the list, Please add your team first
-            under Join the network option
+            If you don&apos;t see your team on this list please add your team
+            first by using the “Join Network as a Team” button.
           </span>
         </div>
       </div>
@@ -64,7 +63,7 @@ export default function AddMemberSkillForm(props) {
           disabled={!props.isEditEnabled}
           selectedValues={props.formValues.skills}
           onChange={props.handleDropDownChange}
-          placeholder="Enter the skills"
+          placeholder="Select applicable skills"
           label="Professional Skills"
         />
         <div className="flex pt-3">
@@ -72,7 +71,64 @@ export default function AddMemberSkillForm(props) {
             <InformationCircleIcon />
           </div>
           <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            Share what you do! This will help us connect with others!
+            Sharing your skills help other network members & teams connect with
+            you.
+          </span>
+        </div>
+      </div>
+      <div className="pt-5">
+        <span className="mr-2 text-sm font-bold">Are you open to Work?</span>
+        <div className="flex pt-3">
+          <div className="basis-1/4">
+            <label className="text-[14px] font-medium leading-[24px]">
+              <input
+                type="radio"
+                value="no"
+                name="openToWork"
+                checked={!props.formValues?.openToWork}
+                disabled={!props.isEditEnabled}
+                onChange={(e) => {
+                  const events = {
+                    target: {
+                      value: false,
+                      name: 'openToWork',
+                    },
+                  };
+                  props.onChange(events);
+                }}
+              />
+              <span className="pl-1">No</span>
+            </label>
+          </div>
+          <div className="basis-1/4">
+            <label className="text-[14px] font-medium leading-[24px]">
+              <input
+                type="radio"
+                value="yes"
+                name="openToWork"
+                checked={props.formValues?.openToWork}
+                disabled={!props.isEditEnabled}
+                onChange={(e) => {
+                  const events = {
+                    target: {
+                      value: true,
+                      name: 'openToWork',
+                    },
+                  };
+                  props.onChange(events);
+                }}
+              />
+              <span className="pl-1">Yes</span>
+            </label>
+          </div>
+        </div>
+        <div className="flex pt-3">
+          <div>
+            <InformationCircleIcon />
+          </div>
+          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
+            Enabling this will inform others in the network that you are open to
+            working on other teams & projects.
           </span>
         </div>
       </div>

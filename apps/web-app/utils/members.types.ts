@@ -56,4 +56,18 @@ export interface IFormValues {
   comments: string;
   teamAndRoles: Roles[];
   skills: Skill[];
+  openToWork: boolean;
+}
+
+export interface IGitRepositories {
+  name: string;
+  description: string;
+  url: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface MemberProfileProjectsProps {
+  pinnedRepositories: IGitRepositories[];
+  allRepositories: IGitRepositories[];
 }

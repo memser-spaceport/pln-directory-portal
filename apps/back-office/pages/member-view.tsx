@@ -127,6 +127,7 @@ export default function MemberView(props) {
       plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
+      openToWork: formValues.openToWork,
     };
     delete formattedData.requestorEmail;
     return formattedData;
@@ -438,6 +439,7 @@ export const getServerSideProps = async (context) => {
       skills: requestData.skills?.map((item) => {
         return { value: item.uid, label: item.title };
       }),
+      openToWork: requestData?.openToWork ?? '',
     };
     imageUrl = requestData?.imageUrl ?? '';
 

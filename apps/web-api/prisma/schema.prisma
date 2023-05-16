@@ -63,6 +63,7 @@ model Member {
   location        Location?        @relation(fields: [locationUid], references: [uid])
   locationUid     String?
   teamMemberRoles TeamMemberRole[]
+  openToWork     Boolean          @default(false)
 }
 
 enum ParticipantType {

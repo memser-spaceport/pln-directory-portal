@@ -225,6 +225,7 @@ export class ParticipantsRequestService {
     dataToSave['officeHours'] = dataToProcess.officeHours;
     dataToSave['moreDetails'] = dataToProcess.moreDetails;
     dataToSave['plnStartDate'] = dataToProcess.plnStartDate;
+    dataToSave['openToWork'] = dataToProcess.openToWork;
 
     // Team member roles relational mapping
     dataToSave['teamMemberRoles'] = {
@@ -343,6 +344,7 @@ export class ParticipantsRequestService {
     dataToSave['officeHours'] = dataToProcess.officeHours;
     dataToSave['moreDetails'] = dataToProcess.moreDetails;
     dataToSave['plnStartDate'] = dataToProcess.plnStartDate;
+    dataToSave['openToWork'] = dataToProcess.openToWork;
 
     // Skills relation mapping
     dataToSave['skills'] = {
