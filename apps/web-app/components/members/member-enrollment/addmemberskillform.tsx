@@ -47,9 +47,8 @@ export default function AddMemberSkillForm(props) {
             <InformationCircleIcon className="h-5 w-5" />
           </div>
           <span className="pl-1.5 text-[13px] leading-[18px]  text-[#0F172A] opacity-40">
-            Select the team(s) that you work for & the title you hold in your
-            team. If your team is not on the list, Please add your team first
-            under Join the network option
+            If you don&apos;t see your team on this list please add your team
+            first by using the “Join Network as a Team” button.
           </span>
         </div>
       </div>
@@ -60,7 +59,7 @@ export default function AddMemberSkillForm(props) {
           required={true}
           selectedValues={props.formValues.skills}
           onChange={props.handleDropDownChange}
-          placeholder="Enter the skills"
+          placeholder="Select applicable skills"
           label="Professional Skills"
         />
         <div className="flex pt-3">
@@ -68,7 +67,8 @@ export default function AddMemberSkillForm(props) {
             <InformationCircleIcon className="h-5 w-5" />
           </div>
           <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            Share what you do! This will help us connect with others!
+            Sharing your skills help other network members & teams connect with
+            you.
           </span>
         </div>
       </div>

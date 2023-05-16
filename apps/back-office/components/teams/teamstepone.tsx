@@ -76,9 +76,10 @@ export default function TeamStepOne(props) {
           maxLength={1000}
           disabled={!props.isEditEnabled}
           name="shortDescription"
-          label="Please briefly describe what your team/product/project does"
+          label="Briefly describe what your team/product/project does"
           info="One to two sentences is perfect! Use clear language and minimal jargon."
           className="custom-grey custom-outline-none min-h-[60px] border"
+          placeholder="Enter your short elevator pitch here"
         />
       </div>
 
@@ -93,6 +94,7 @@ export default function TeamStepOne(props) {
           label="Long Description"
           info="Please explain what your team does in a bit more detail. 4-5 sentences will be great!"
           className="custom-grey custom-outline-none min-h-[60px] border"
+          placeholder="Elaborate on your elevator pitch"
         />
       </div>
 
@@ -127,7 +129,7 @@ export default function TeamStepOne(props) {
           onChange={onChange}
           disabled={!props.isEditEnabled}
           label="Team Office Hours"
-          placeholder="Enter address here"
+          placeholder="Enter link here"
           className="custom-grey custom-outline-none border"
         />
         <div className="flex pt-3">

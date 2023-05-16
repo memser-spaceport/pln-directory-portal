@@ -43,7 +43,7 @@ export function Autocomplete({
     if (searchTerm === '') {
       setSearchTerm(selectedOption.label);
     }
-  }, [searchTerm, selectedOption.label]);
+  }, [selectedOption.label]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -73,7 +73,7 @@ export function Autocomplete({
     }, debounceTime);
 
     return () => clearTimeout(getData);
-  }, [debounceCall, debounceTime, searchTerm]);
+  }, [debounceCall, debounceTime, excludeValues, searchTerm]);
 
   const handleUserInput = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.currentTarget?.value);

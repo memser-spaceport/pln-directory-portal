@@ -13,7 +13,7 @@ export default function AddTeamStepTwo(props) {
           options={dropDownValues?.protocol}
           name="technologies"
           selectedValues={values.technologies}
-          placeholder="Select a Protocol"
+          placeholder="Select a Protocol(s)"
           onChange={handleDropDownChange}
           label="Protocol"
         />
@@ -22,7 +22,7 @@ export default function AddTeamStepTwo(props) {
             <InformationCircleIcon />
           </div>
           <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            Does your team/project use any of these protocol?
+            Does your team/project use any of these protocol(s)?
           </span>
         </div>
       </div>
@@ -49,17 +49,6 @@ export default function AddTeamStepTwo(props) {
           onChange={handleDropDownChange}
           label="Membership Source"
         />
-        <div className="flex pt-3">
-          <div>
-            <InformationCircleIcon />
-          </div>
-          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            Core Contributor = a team that is building improvements/additional
-            features for protocols like libp2p, IPFS, IPLD, and Filecoin. A
-            Friend of PL = a team that is using protocols like libp2p, IPFS,
-            IPLD, and Filecoin.
-          </span>
-        </div>
       </div>
 
       <div className="pt-5">
