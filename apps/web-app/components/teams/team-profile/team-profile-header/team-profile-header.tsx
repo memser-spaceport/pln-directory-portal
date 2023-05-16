@@ -81,8 +81,8 @@ export function TeamProfileHeader({
           />
         ) : null}
       </div>
-      {loggedInMember?.roles?.length > 0 &&
-        loggedInMember.roles.includes('DIRECTORYADMIN') && (
+      {(( loggedInMember?.roles?.length > 0 && loggedInMember.roles.includes('DIRECTORYADMIN')) 
+          || (loggedInMember?.leadingTeams?.length > 0 && loggedInMember.leadingTeams.includes(team.id))) && (
           <AskToEditCard profileType="team" team={team} />
         )}
     </div>
