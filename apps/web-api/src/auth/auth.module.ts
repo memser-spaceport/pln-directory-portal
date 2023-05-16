@@ -5,7 +5,7 @@ import { AuthService } from './auth.service';
 import { HttpModule } from '@nestjs/axios';
 import { PrismaService } from '../prisma.service';
 @Module({
-  imports: [CacheModule.register(), HttpModule],
+  imports: [HttpModule],
   controllers: [AuthController],
   providers: [AuthService, PrismaService],
 })

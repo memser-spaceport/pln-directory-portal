@@ -13,7 +13,7 @@ import { AdminController } from './admin.controller';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 
 @Module({
-  imports: [CacheModule.register()],
+  imports: [],
   controllers: [AdminController],
   providers: [
     ParticipantsRequestService,
