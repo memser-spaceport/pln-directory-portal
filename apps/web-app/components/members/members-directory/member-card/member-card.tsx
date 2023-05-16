@@ -30,6 +30,7 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
         isGrid={isGrid}
         isImageRounded
         img={member.image}
+        openToWork={member.openToWork}
         avatarIcon={UserIcon}
         name={member.name}
         teamLead={member.teamLead}

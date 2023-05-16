@@ -14,6 +14,7 @@ export interface IMember {
   teams: IMemberTeam[];
   mainTeam: IMemberTeam | null;
   twitter: string | null;
+  openToWork: boolean;
 }
 
 export interface IMemberTeam {
@@ -68,6 +69,5 @@ export interface IGitRepositories {
 }
 
 export interface MemberProfileProjectsProps {
-  pinnedRepositories: IGitRepositories[];
-  allRepositories: IGitRepositories[];
+  repositories: IGitRepositories[];
 }

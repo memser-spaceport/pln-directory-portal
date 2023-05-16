@@ -21,6 +21,7 @@ export const MemberSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   locationUid: z.string(),
+  openToWork: z.boolean(),
 });
 
 export const ResponseMemberSchema = MemberSchema.omit({ id: true }).strict();

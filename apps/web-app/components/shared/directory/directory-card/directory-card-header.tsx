@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { TeamLeadBadge } from '../../team-lead-badge/team-lead-badge';
+import { ReactComponent as BriefCase } from '../../../../public/assets/images/icons/mdi_briefcase-check.svg';
 
 export interface DirectoryCardHeaderProps {
   isGrid?: boolean;
@@ -8,6 +9,7 @@ export interface DirectoryCardHeaderProps {
   name: string;
   avatarIcon: (props: React.ComponentProps<'svg'>) => JSX.Element;
   teamLead?: boolean;
+  openToWork?: boolean;
 }
 
 export function DirectoryCardHeader({
@@ -17,11 +19,20 @@ export function DirectoryCardHeader({
   name,
   avatarIcon,
   teamLead,
+  openToWork,
 }: DirectoryCardHeaderProps) {
   const Icon = avatarIcon;
 
   return (
     <>
+      {openToWork && (
+        <span className="z-0 flex text-slate-600">
+          <BriefCase />
+          <span className="pl-1 pt-px text-[10px] font-medium leading-[14px] tracking-[0.01em]">
+            OPEN TO WORK
+          </span>
+        </span>
+      )}
       <div
         className={`h-18 w-18 relative shrink-0 border border-slate-200 ${
           isImageRounded ? 'rounded-full' : 'rounded-lg'

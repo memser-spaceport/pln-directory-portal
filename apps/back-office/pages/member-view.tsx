@@ -319,6 +319,7 @@ export default function MemberView(props) {
                   handleDeleteRolesRow={handleDeleteRolesRow}
                   onChange={handleInputChange}
                   isEditEnabled={isEditEnabled}
+                  referenceUid={props.referenceUid}
                 />
                 <MemberSocialForm
                   formValues={formValues}

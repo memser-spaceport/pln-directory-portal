@@ -34,15 +34,13 @@ export const requestPendingCheck = async (email) => {
 
 export const getAllPinned = async (userName) => {
   const key = process.env.NEXT_PUBLIC_GITHUB_API_KEY;
-  console.log('key', key);
-  console.log('userName', userName);
   return await axios
     .post(
       'https://api.github.com/graphql',
       {
         query: `{
-          user(login: ${userName}) {
-            pinnedItems(first: 3, types: REPOSITORY) {
+          user(login: "${userName}") {
+            pinnedItems(first: 10, types: REPOSITORY) {
               nodes {
                 ... on RepositoryInfo {
                   name

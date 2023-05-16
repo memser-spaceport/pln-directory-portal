@@ -76,62 +76,64 @@ export default function AddMemberSkillForm(props) {
           </span>
         </div>
       </div>
-      <div className="pt-5">
-        <span className="mr-2 text-sm font-bold">Are you open to Work?</span>
-        <div className="flex pt-3">
-          <div className="basis-1/4">
-            <label className="text-[14px] font-medium leading-[24px]">
-              <input
-                type="radio"
-                value="no"
-                name="openToWork"
-                checked={!props.formValues?.openToWork}
-                disabled={!props.isEditEnabled}
-                onChange={(e) => {
-                  const events = {
-                    target: {
-                      value: false,
-                      name: 'openToWork',
-                    },
-                  };
-                  props.onChange(events);
-                }}
-              />
-              <span className="pl-1">No</span>
-            </label>
+      {props.referenceUid && (
+        <div className="pt-5">
+          <span className="mr-2 text-sm font-bold">Are you open to Work?</span>
+          <div className="flex pt-3">
+            <div className="basis-1/4">
+              <label className="text-[14px] font-medium leading-[24px]">
+                <input
+                  type="radio"
+                  value="no"
+                  name="openToWork"
+                  checked={!props.formValues?.openToWork}
+                  disabled={!props.isEditEnabled}
+                  onChange={(e) => {
+                    const events = {
+                      target: {
+                        value: false,
+                        name: 'openToWork',
+                      },
+                    };
+                    props.onChange(events);
+                  }}
+                />
+                <span className="pl-1">No</span>
+              </label>
+            </div>
+            <div className="basis-1/4">
+              <label className="text-[14px] font-medium leading-[24px]">
+                <input
+                  type="radio"
+                  value="yes"
+                  name="openToWork"
+                  checked={props.formValues?.openToWork}
+                  disabled={!props.isEditEnabled}
+                  onChange={(e) => {
+                    const events = {
+                      target: {
+                        value: true,
+                        name: 'openToWork',
+                      },
+                    };
+                    props.onChange(events);
+                  }}
+                />
+                <span className="pl-1">Yes</span>
+              </label>
+            </div>
           </div>
-          <div className="basis-1/4">
-            <label className="text-[14px] font-medium leading-[24px]">
-              <input
-                type="radio"
-                value="yes"
-                name="openToWork"
-                checked={props.formValues?.openToWork}
-                disabled={!props.isEditEnabled}
-                onChange={(e) => {
-                  const events = {
-                    target: {
-                      value: true,
-                      name: 'openToWork',
-                    },
-                  };
-                  props.onChange(events);
-                }}
-              />
-              <span className="pl-1">Yes</span>
-            </label>
+          <div className="flex pt-3">
+            <div>
+              <InformationCircleIcon />
+            </div>
+            <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
+              Enabling this will inform others in the network that you are open
+              to working on other teams & projects.
+            </span>
           </div>
         </div>
-        <div className="flex pt-3">
-          <div>
-            <InformationCircleIcon />
-          </div>
-          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            Enabling this will inform others in the network that you are open to
-            working on other teams & projects.
-          </span>
-        </div>
-      </div>
+      )}
     </>
   );
 }

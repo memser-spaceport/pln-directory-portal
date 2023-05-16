@@ -29,16 +29,14 @@ interface MemberProps {
   member: IMember;
   teams: ITeam[];
   backLink: string;
-  pinnedRepositories: IGitRepositories[];
-  allRepositories: IGitRepositories[];
+  repositories: IGitRepositories[];
 }
 
 export default function Member({
   member,
   teams,
   backLink,
-  pinnedRepositories,
-  allRepositories,
+  repositories,
 }: MemberProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
@@ -65,10 +63,7 @@ export default function Member({
           <MemberProfileDetails {...member} />
           <MemberProfileOfficeHours url={member.officeHours} />
           <MemberProfileTeams teams={teams} member={member} />
-          <MemberProfileProjects
-            pinnedRepositories={pinnedRepositories}
-            allRepositories={allRepositories}
-          />
+          <MemberProfileProjects repositories={repositories} />
         </div>
         <div className="w-sidebar shrink-0">
           <AskToEditCard profileType="member" member={member} />
@@ -131,18 +126,14 @@ export const getServerSideProps = async ({ query, res }) => {
     };
   }
 
-  let pinnedRepositories = [];
-  let allRepositories = [];
+  let repositories = [];
 
   if (member?.githubHandle !== '' && member?.githubHandle !== null) {
-    [pinnedRepositories, allRepositories] = await Promise.all([
-      getAllPinned(member?.githubHandle),
-      getAllRepositories(member?.githubHandle),
-    ]);
+    repositories = await getAllPinned(member?.githubHandle);
+    if (!repositories?.length) {
+      repositories = (await getAllRepositories(member?.githubHandle)) ?? [];
+    }
   }
-
-  pinnedRepositories = pinnedRepositories ?? [];
-  allRepositories = allRepositories ?? [];
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
@@ -152,6 +143,6 @@ export const getServerSideProps = async ({ query, res }) => {
   );
 
   return {
-    props: { member, teams, backLink, pinnedRepositories, allRepositories },
+    props: { member, teams, backLink, repositories },
   };
 };
