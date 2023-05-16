@@ -79,6 +79,9 @@
   padding-top: 16px;
 } */
 
+.footerCancelDiv {
+  padding-top: 24px;
+}
 .footerdiv {
   margin-top: 32px;
   border-top: solid #e2e8f0 1px;

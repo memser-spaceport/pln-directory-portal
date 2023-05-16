@@ -210,6 +210,7 @@ export function AddMemberModal({
     comments: '',
     teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
     skills: [],
+    openToWork: false,
   });
 
   const divRef = useRef<HTMLDivElement>(null);
@@ -254,6 +255,7 @@ export function AddMemberModal({
       comments: '',
       teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
       skills: [],
+      openToWork: false,
     });
   }
 
@@ -296,6 +298,7 @@ export function AddMemberModal({
       plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
+      openToWork: formValues.openToWork,
     };
     return formattedData;
   }
