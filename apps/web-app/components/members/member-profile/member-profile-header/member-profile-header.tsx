@@ -2,6 +2,7 @@ import { FlagIcon, LocationMarkerIcon, UserIcon } from '@heroicons/react/solid';
 import { Tooltip } from '@protocol-labs-network/ui';
 import Image from 'next/image';
 import { IMember } from '../../../../utils/members.types';
+import { ReactComponent as BriefCase } from '../../../../public/assets/images/icons/mdi_briefcase-check.svg';
 
 export function MemberProfileHeader({
   image,
@@ -10,6 +11,7 @@ export function MemberProfileHeader({
   location,
   teamLead,
   mainTeam,
+  openToWork,
 }: IMember) {
   const otherTeams = teams
     .filter((team) => team.id !== mainTeam?.id)
@@ -69,8 +71,16 @@ export function MemberProfileHeader({
           )}
         </div>
       </div>
-      {teamLead ? (
-        <div className="flex w-24 items-start justify-end">
+      <div className="w-42 flex items-start justify-end">
+        {openToWork ? (
+          <span className="flex p-3 text-slate-600">
+            <BriefCase />
+            <span className="pl-1 pt-px text-[10px] font-medium leading-[14px] tracking-[0.01em]">
+              OPEN TO WORK
+            </span>
+          </span>
+        ) : null}
+        {teamLead ? (
           <Tooltip
             asChild
             trigger={
@@ -82,8 +92,8 @@ export function MemberProfileHeader({
             }
             content="Team Lead"
           />
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }

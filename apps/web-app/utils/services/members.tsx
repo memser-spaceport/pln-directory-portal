@@ -41,8 +41,8 @@ export const getAllPinned = async (userName) => {
       'https://api.github.com/graphql',
       {
         query: `{
-          user(login: ${userName}) {
-            pinnedItems(first: 3, types: REPOSITORY) {
+          user(login: "${userName}") {
+            pinnedItems(first: 10, types: REPOSITORY) {
               nodes {
                 ... on RepositoryInfo {
                   name

@@ -13,8 +13,7 @@ interface MemberProfileProjectsModalProps extends MemberProfileProjectsProps {
 export function MemberProfileProjectsModal({
   isOpen,
   setIsModalOpen,
-  pinnedRepositories,
-  allRepositories,
+  repositories,
 }: MemberProfileProjectsModalProps) {
   const {
     query: { id },
@@ -29,10 +28,10 @@ export function MemberProfileProjectsModal({
     >
       <div className="p-8">
         <span className="mb-2 mt-6 pb-5 font-bold text-slate-900">
-          {'Projects'} ({allRepositories?.length})
+          {'Projects'} ({repositories?.length})
         </span>
         <div className="rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)] focus-within:outline-none focus:outline-none focus-visible:outline-none">
-          {allRepositories.map((project, i) => {
+          {repositories?.map((project, i) => {
             return (
               <ProfileProjectCard
                 key={`popup ${id}.${project.name}`}

@@ -456,6 +456,7 @@ export function AddMemberModal({
             updateParentRoleValue={updateParentRoleValue}
             handleDeleteRolesRow={handleDeleteRolesRow}
             onChange={handleInputChange}
+            isNewMode={true}
           />
         );
       case 3:
