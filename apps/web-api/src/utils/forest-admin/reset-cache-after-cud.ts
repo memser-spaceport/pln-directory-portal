@@ -22,7 +22,7 @@ export async function resetCacheAfterCreateOrUpdateOrDelete(
   const collections: CollectionCustomizer[] = collection
     ? [collection]
     : dataSource.collections;
-  const redisCache = cacheManager.caching({
+ /*  const redisCache = cacheManager.caching({
     store: redisStore,
     host: process.env.REDIS_HOST,
     url: process.env.REDIS_URL,
@@ -34,7 +34,7 @@ export async function resetCacheAfterCreateOrUpdateOrDelete(
           requestCert: true,
         }
       : null,
-  });
+  }); */
 
   // Clear cache after create or update
   for (const currentCollection of collections) {
