@@ -7980,7 +7980,7 @@ axe-core@^4.3.5:
   resolved "https://registry.yarnpkg.com/axe-core/-/axe-core-4.4.1.tgz#7dbdc25989298f9ad006645cd396782443757413"
   integrity sha512-gd1kmb21kwNuWr6BQz8fv6GNECPBnUasepcoLbekws23NVBLODdsClRZ+bQ8+9Uomf3Sm3+Vwn0oYG9NvwnJCw==
 
-axios@0.27.2:
+axios@0.27.2, axios@^0.27.0:
   version "0.27.2"
   resolved "https://registry.yarnpkg.com/axios/-/axios-0.27.2.tgz#207658cc8621606e586c85db4b41a750e756d972"
   integrity sha512-t+yRIyySRTp/wua5xEr+z1q60QmLq8ABsS5O9Me1AsE5dfKqgnCFzwiCZZ/cGNd1lq4/7akDWMxdhVlucjmnOQ==
@@ -12051,6 +12051,11 @@ fd-slicer@~1.1.0:
   integrity sha1-JcfInLH5B3+IkbvmHY85Dq4lbx4=
   dependencies:
     pend "~1.2.0"
+
+fflate@^0.4.1:
+  version "0.4.8"
+  resolved "https://registry.yarnpkg.com/fflate/-/fflate-0.4.8.tgz#f90b82aefbd8ac174213abb338bd7ef848f0f5ae"
+  integrity sha512-FJqqoDBR00Mdj9ppamLa/Y7vxm+PRmNWA67N846RvsoYVMKB4q3y/de5PA7gUmRMYK/8CMz2GDZQmCRN1wBcWA==
 
 figgy-pudding@^3.5.1:
   version "3.5.2"
@@ -18975,6 +18980,22 @@ postgres-interval@^1.1.0:
   dependencies:
     xtend "^4.0.0"
 
+posthog-js@^1.56.0:
+  version "1.56.0"
+  resolved "https://registry.yarnpkg.com/posthog-js/-/posthog-js-1.56.0.tgz#fea94fead4eb312292f6f7b1407248398cf0cb98"
+  integrity sha512-Ng44eEPYlrvLohxLSGMRoy6xQWrNMI74gEl0vKqgvYIX31bXFsKgZaDsVluPrK+IyG+U2HokIVkrURkDXn7rOQ==
+  dependencies:
+    fflate "^0.4.1"
+    rrweb-snapshot "^1.1.14"
+
+posthog-node@^3.1.1:
+  version "3.1.1"
+  resolved "https://registry.yarnpkg.com/posthog-node/-/posthog-node-3.1.1.tgz#f92c44a871552c9bfb98bf4cc8fd326d36af6cbd"
+  integrity sha512-OUSYcnLHbzvY/dxNsbUGoYuTZz5XNx48BkfiCkOIJZMFvot5VPQ0KWEjX+kzYxEwHeXbjW9plqsOVcYCYfidgg==
+  dependencies:
+    axios "^0.27.0"
+    rusha "^0.8.14"
+
 prebuild-install@^7.1.1:
   version "7.1.1"
   resolved "https://registry.yarnpkg.com/prebuild-install/-/prebuild-install-7.1.1.tgz#de97d5b34a70a0c81334fd24641f2a1702352e45"
@@ -20276,6 +20297,11 @@ rollup@^2.56.2:
   optionalDependencies:
     fsevents "~2.3.2"
 
+rrweb-snapshot@^1.1.14:
+  version "1.1.14"
+  resolved "https://registry.yarnpkg.com/rrweb-snapshot/-/rrweb-snapshot-1.1.14.tgz#9d4d9be54a28a893373428ee4393ec7e5bd83fcc"
+  integrity sha512-eP5pirNjP5+GewQfcOQY4uBiDnpqxNRc65yKPW0eSoU1XamDfc4M8oqpXGMyUyvLyxFDB0q0+DChuxxiU2FXBQ==
+
 rsvp@^4.8.4:
   version "4.8.5"
   resolved "https://registry.yarnpkg.com/rsvp/-/rsvp-4.8.5.tgz#c8f155311d167f68f21e168df71ec5b083113734"
@@ -20299,6 +20325,11 @@ run-queue@^1.0.0, run-queue@^1.0.3:
   integrity sha1-6Eg5bwV9Ij8kOGkkYY4laUFh7Ec=
   dependencies:
     aproba "^1.1.1"
+
+rusha@^0.8.14:
+  version "0.8.14"
+  resolved "https://registry.yarnpkg.com/rusha/-/rusha-0.8.14.tgz#a977d0de9428406138b7bb90d3de5dcd024e2f68"
+  integrity sha512-cLgakCUf6PedEu15t8kbsjnwIFFR2D4RfL+W3iWFJ4iac7z4B0ZI8fxy4R3J956kAI68HclCFGL8MPoUVC3qVA==
 
 rxjs-for-await@0.0.2:
   version "0.0.2"

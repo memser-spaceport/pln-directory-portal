@@ -5,10 +5,13 @@ import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
 import { FATHOM_EVENTS } from '../../../../constants';
 import { authenticate } from '../../../../utils/services/auth';
+import { IMember } from 'apps/web-app/utils/members.types';
+import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 
 type MemberProfileOfficeHoursProps = {
   url?: string;
   userInfo: any;
+  member: IMember
 };
 
 const LEARN_MORE_URL =
@@ -16,10 +19,12 @@ const LEARN_MORE_URL =
 
 export function MemberProfileOfficeHours({
   url,
-  userInfo
+  userInfo,
+  member,
 }: MemberProfileOfficeHoursProps) {
   const loginAsUserCode = FATHOM_EVENTS.directory.loginAsUser;
   const router = useRouter();
+  const analytics = useAppAnalytics()
   const handleOnClick = () => {
     if (Cookies.get("userInfo")) {
       Cookies.set('page_params', 'user_logged_in', { expires: 60, path: '/' });
@@ -28,7 +33,20 @@ export function MemberProfileOfficeHours({
       authenticate();
       trackGoal(loginAsUserCode, 0);
     }
+
+  const handleOpenModal = () => {
+    authenticate();
+    trackGoal(loginAsUserCode, 0);
   };
+
+  const onScheduleMeeting = () => {
+    trackGoal(FATHOM_EVENTS.members.profile.officeHours.scheduleMeeting,0);
+    analytics.captureEvent('office-hours-clicked', {
+      name: member.name,
+      uid: member.id
+    })
+  }
+
   return (
     <div className="mt-6 rounded-xl bg-slate-50 p-4">
       <div className="flex items-center">
@@ -49,12 +67,7 @@ export function MemberProfileOfficeHours({
               <AnchorLink
                 href={url}
                 linkClassName="shadow-request-button rounded-lg border border-slate-300 bg-white px-6 py-2.5 text-sm font-medium hover:shadow-on-hover hover:text-slate-600 on-focus active:border-blue-600 active:ring-2"
-                handleOnClick={() =>
-                  trackGoal(
-                    FATHOM_EVENTS.members.profile.officeHours.scheduleMeeting,
-                    0
-                  )
-                }
+                handleOnClick={onScheduleMeeting}
               >
                 Schedule Meeting
               </AnchorLink>
@@ -75,7 +88,7 @@ export function MemberProfileOfficeHours({
             </>:<></>
           )
         }
-        
+
         <AnchorLink
           href={LEARN_MORE_URL}
           linkClassName="flex items-center text-sm font-semibold group outline-none"

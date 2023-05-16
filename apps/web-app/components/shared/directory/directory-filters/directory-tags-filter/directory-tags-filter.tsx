@@ -4,6 +4,8 @@ import * as Collapsible from '@radix-ui/react-collapsible';
 import { useState } from 'react';
 import { DirectoryFilter } from '../directory-filter/directory-filter';
 import { IFilterTag } from './directory-tags-filter.types';
+import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
+
 
 export interface DirectoryTagsFilterProps {
   title: string;
@@ -21,12 +23,23 @@ export function DirectoryTagsFilter({
   const visibleTags = tags.slice(0, VISIBLE_TAGS_COUNT);
   const collapsibleTags = tags.slice(VISIBLE_TAGS_COUNT);
   const [open, setOpen] = useState(tags.some((tag) => tag.selected));
+  const analytics = useAppAnalytics()
+  const onTagClicked = (tagProps, index) => {
+    if(tagProps.selected === false) {
+      analytics.captureEvent('filter-applied', {
+        name: title,
+        value: tagProps.value,
+        nameAndValue: `${title}-${tagProps.value}`
+      })
+    }
+    onTagToggle(index)
+  }
 
   return (
     <DirectoryFilter title={title}>
       <Collapsible.Root open={open} onOpenChange={setOpen}>
         {visibleTags.map((tag, index) => (
-          <Tag key={index} {...tag} onClick={() => onTagToggle(index)} />
+          <Tag key={index} {...tag} onClick={() => onTagClicked(tag, index)} />
         ))}
         {collapsibleTags.length ? (
           <>

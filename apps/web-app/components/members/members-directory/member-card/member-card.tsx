@@ -5,6 +5,8 @@ import { IMember } from '../../../../utils/members.types';
 import { DirectoryCard } from '../../../shared/directory/directory-card/directory-card';
 import { DirectoryCardFooter } from '../../../shared/directory/directory-card/directory-card-footer';
 import { DirectoryCardHeader } from '../../../shared/directory/directory-card/directory-card-header';
+import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
+
 
 interface MemberCardProps {
   isGrid?: boolean;
@@ -25,11 +27,21 @@ export function MemberCard({
     .map((team) => team.name)
     .sort();
   const role = member.mainTeam?.role || 'Contributor';
+  const analytics = useAppAnalytics()
+
+  const onMemberClicked = () => {
+    analytics.captureEvent('member-clicked', {
+      uid: member.id,
+      name: member.name,
+      backLink: backLink
+    })
+  }
 
   return (
     <DirectoryCard
       isGrid={isGrid}
       cardUrl={`/directory/members/${member.id}?backLink=${backLink}`}
+      handleOnClick={onMemberClicked}
     >
       <DirectoryCardHeader
         isGrid={isGrid}

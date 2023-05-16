@@ -1,7 +1,7 @@
 import { AnchorLink } from '@protocol-labs-network/ui';
 import React from 'react';
 
-export type DirectoryCardProps = { isGrid: boolean; cardUrl: string } & Pick<
+export type DirectoryCardProps = { isGrid: boolean; cardUrl: string,  handleOnClick?:any } & Pick<
   React.ComponentPropsWithoutRef<'div'>,
   'children'
 >;
@@ -10,6 +10,7 @@ export function DirectoryCard({
   isGrid,
   cardUrl,
   children,
+  handleOnClick
 }: DirectoryCardProps) {
   return (
     <div
@@ -17,7 +18,7 @@ export function DirectoryCard({
         isGrid ? 'w-[295px]' : 'w-full'
       } hover:shadow-on-hover relative`}
     >
-      <AnchorLink href={cardUrl} linkClassName="block on-focus">
+      <AnchorLink handleOnClick={handleOnClick} href={cardUrl} linkClassName="block on-focus">
         <div
           className={`flex ${
             isGrid
