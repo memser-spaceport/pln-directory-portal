@@ -1695,7 +1695,7 @@
       },
       {
         "defaultValue": "PENDING",
-        "enums": ["PENDING", "APPROVED", "REJECTED"],
+        "enums": ["PENDING", "APPROVED", "REJECTED", "AUTOAPPROVED"],
         "field": "status",
         "integration": null,
         "inverseOf": null,
