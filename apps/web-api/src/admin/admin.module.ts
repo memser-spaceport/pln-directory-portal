@@ -2,7 +2,6 @@
 import { CacheModule, Module } from '@nestjs/common';
 
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
-import { PrismaService } from '../prisma.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { AwsService } from '../utils/aws/aws.service';
 import { RedisService } from '../utils/redis/redis.service';
@@ -17,7 +16,6 @@ import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
   controllers: [AdminController],
   providers: [
     ParticipantsRequestService,
-    PrismaService,
     LocationTransferService,
     AwsService,
     RedisService,

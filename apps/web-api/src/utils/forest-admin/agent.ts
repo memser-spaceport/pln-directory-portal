@@ -5,7 +5,7 @@ import axios from 'axios';
 import { Readable } from 'stream';
 import { ImagesController } from '../../images/images.controller';
 import { ImagesService } from '../../images/images.service';
-import { PrismaService } from '../../prisma.service';
+import { PrismaService } from '../../shared/prisma.service';
 import { APP_ENV } from '../constants';
 import { FileEncryptionService } from '../file-encryption/file-encryption.service';
 import { FileUploadService } from '../file-upload/file-upload.service';
