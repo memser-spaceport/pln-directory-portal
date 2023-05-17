@@ -129,10 +129,15 @@ export const getServerSideProps = async ({ query, res }) => {
   let repositories = [];
 
   if (member?.githubHandle !== '' && member?.githubHandle !== null) {
-    repositories = await getAllPinned(member?.githubHandle);
-    if (!repositories?.length) {
-      repositories = (await getAllRepositories(member?.githubHandle)) ?? [];
-    }
+    await getAllPinned(member?.githubHandle).then((res) => {
+      if (res && res.length) {
+        repositories = res;
+      } else {
+        getAllRepositories(member?.githubHandle).then((response) => {
+          repositories = response ?? [];
+        });
+      }
+    });
   }
 
   // Cache response data in the browser for 1 minute,
