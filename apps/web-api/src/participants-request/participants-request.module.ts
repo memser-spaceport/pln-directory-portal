@@ -1,6 +1,5 @@
 /* eslint-disable prettier/prettier */
 import { CacheModule, Module } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
 import { AwsService } from '../utils/aws/aws.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { ParticipantsRequestController } from './participants-request.controller';
@@ -14,7 +13,6 @@ import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
   controllers: [ParticipantsRequestController, UniqueIdentifier],
   providers: [
     ParticipantsRequestService,
-    PrismaService,
     LocationTransferService,
     AwsService,
     RedisService,

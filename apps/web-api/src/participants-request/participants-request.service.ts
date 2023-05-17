@@ -1,11 +1,9 @@
 /* eslint-disable prettier/prettier */
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ApprovalStatus, ParticipantType } from '@prisma/client';
-import { PrismaService } from '../prisma.service';
+import { PrismaService } from '../shared/prisma.service';
 import { AwsService } from '../utils/aws/aws.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
-import cacheManager from 'cache-manager';
-import redisStore from 'cache-manager-redis-store';
 import { RedisService } from '../utils/redis/redis.service';
 import { SlackService } from '../utils/slack/slack.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';

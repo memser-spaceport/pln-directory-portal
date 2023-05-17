@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { ImagesController } from '../../images/images.controller';
 import { ImagesService } from '../../images/images.service';
-import { PrismaService } from '../../prisma.service';
+import { PrismaService } from '../../shared/prisma.service';
 import { FileEncryptionService } from '../file-encryption/file-encryption.service';
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { hashFileName } from '../hashing';
