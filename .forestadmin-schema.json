@@ -1201,6 +1201,24 @@
       {
         "defaultValue": false,
         "enums": null,
+        "field": "openToWork",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": true,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "Boolean",
+        "validations": [
+          {"type": "is present", "message": "Failed validation rule: 'Present'"}
+        ]
+      },
+      {
+        "defaultValue": false,
+        "enums": null,
         "field": "plnFriend",
         "integration": null,
         "inverseOf": null,

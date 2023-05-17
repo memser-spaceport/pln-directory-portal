@@ -9,6 +9,7 @@ import redisStore from 'cache-manager-redis-store';
 import { RedisService } from '../utils/redis/redis.service';
 import { SlackService } from '../utils/slack/slack.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
+import { getRandomId } from '../utils/helper/helper';
 @Injectable()
 export class ParticipantsRequestService {
   constructor(
@@ -288,7 +289,7 @@ export class ParticipantsRequestService {
     await this.awsService.sendEmail('MemberCreated', true, [], {
       memberName: dataToProcess.name,
       memberUid: newMember.uid,
-      adminSiteUrl: `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}`,
+      adminSiteUrl: `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
     });
     await this.awsService.sendEmail(
       'NewMemberSuccess',
@@ -296,11 +297,11 @@ export class ParticipantsRequestService {
       [dataFromDB.requesterEmailId],
       {
         memberName: dataToProcess.name,
-        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}`,
+        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
       }
     );
     slackConfig.requestLabel = 'New Labber Added';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}`;
+    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
@@ -472,11 +473,11 @@ export class ParticipantsRequestService {
       [dataFromDB.requesterEmailId],
       {
         memberName: dataToProcess.name,
-        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}`,
+        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
       }
     );
     slackConfig.requestLabel = 'Edit Labber Request Completed';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}`;
+    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
@@ -556,7 +557,7 @@ export class ParticipantsRequestService {
     await this.awsService.sendEmail('TeamCreated', true, [], {
       teamName: dataToProcess.name,
       teamUid: newTeam.uid,
-      adminSiteUrl: `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}`,
+      adminSiteUrl: `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
     });
     await this.awsService.sendEmail(
       'NewTeamSuccess',
@@ -564,11 +565,11 @@ export class ParticipantsRequestService {
       [dataFromDB.requesterEmailId],
       {
         teamName: dataToProcess.name,
-        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}`,
+        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
       }
     );
     slackConfig.requestLabel = 'New Team Added';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}`;
+    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
@@ -672,11 +673,11 @@ export class ParticipantsRequestService {
       [dataFromDB.requesterEmailId],
       {
         teamName: dataToProcess.name,
-        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`,
+        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
       }
     );
     slackConfig.requestLabel = 'Edit Team Request Completed ';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`;
+    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
