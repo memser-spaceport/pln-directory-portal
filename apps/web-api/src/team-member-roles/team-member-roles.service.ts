@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
-import { PrismaService } from '../prisma.service';
+import { PrismaService } from '../shared/prisma.service';
 import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
 import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schema';
 
