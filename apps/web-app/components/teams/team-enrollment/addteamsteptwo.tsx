@@ -43,7 +43,6 @@ export default function AddTeamStepTwo(props) {
         <MultiSelect
           options={dropDownValues?.membershipSources}
           name="membershipSources"
-          required={true}
           selectedValues={values.membershipSources}
           placeholder="Select the Membership Sources"
           onChange={handleDropDownChange}

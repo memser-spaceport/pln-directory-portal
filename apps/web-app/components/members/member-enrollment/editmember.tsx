@@ -84,13 +84,17 @@ function validateForm(formValues, imageUrl) {
   return errors;
 }
 
-function getSubmitOrNextButton(handleSubmit, isProcessing) {
+function getSubmitOrNextButton(handleSubmit, isProcessing, disableSubmit) {
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
   const submitOrNextButton = (
     <button
-      className={buttonClassName}
-      disabled={isProcessing}
+      className={
+        isProcessing || disableSubmit
+          ? 'shadow-special-button-default inline-flex w-full justify-center rounded-full bg-slate-400 px-6 py-2 text-base font-semibold leading-6 text-white outline-none'
+          : buttonClassName
+      }
+      disabled={isProcessing || disableSubmit}
       onClick={handleSubmit}
     >
       Request Changes
@@ -119,10 +123,11 @@ export function EditMemberModal({
   const [errors, setErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({});
   const [imageUrl, setImageUrl] = useState<string>();
-  // const [emailExists, setEmailExists] = useState<boolean>(false);
+  const [emailExists, setEmailExists] = useState<boolean>(false);
   const [imageChanged, setImageChanged] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
+  const [disableSubmit, setDisableSubmit] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     email: '',
@@ -205,6 +210,8 @@ export function EditMemberModal({
     setDropDownValues({});
     setImageChanged(false);
     setSaveCompleted(false);
+    setEmailExists(false);
+    setDisableSubmit(false);
     setIsProcessing(false);
     setImageUrl('');
     setFormValues({
@@ -271,6 +278,24 @@ export function EditMemberModal({
     return formattedData;
   }
 
+  function onEmailBlur(event: ChangeEvent<HTMLInputElement>) {
+    const data = {
+      uniqueIdentifier: event.target.value?.trim(),
+      participantType: ENROLLMENT_TYPE.MEMBER,
+      uid: id,
+    };
+    api
+      .post(`/v1/participants-request/unique-identifier`, data)
+      .then((response) => {
+        setDisableSubmit(false);
+        response?.data &&
+        (response.data?.isUniqueIdentifierExist ||
+          response.data?.isRequestPending)
+          ? setEmailExists(true)
+          : setEmailExists(false);
+      });
+  }
+
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
@@ -280,7 +305,7 @@ export function EditMemberModal({
       //   console.log('Execute recaptcha not yet available');
       //   return;
       // }
-      if (errors?.length > 0) {
+      if (errors?.length > 0 || emailExists) {
         const element1 = divRef.current;
         if (element1) {
           element1.scrollTo({ top: 0, behavior: 'smooth' });
@@ -462,7 +487,9 @@ export function EditMemberModal({
                 onChange={handleInputChange}
                 handleImageChange={handleImageChange}
                 imageUrl={imageUrl}
-                disableEmail={true}
+                emailExists={emailExists}
+                onEmailBlur={onEmailBlur}
+                setDisableNext={setDisableSubmit}
               />
               <AddMemberSkillForm
                 formValues={formValues}
@@ -484,7 +511,11 @@ export function EditMemberModal({
                 {getCancelOrBackButton(handleModalClose)}
               </div>
               <div className="float-right">
-                {getSubmitOrNextButton(handleSubmit, isProcessing)}
+                {getSubmitOrNextButton(
+                  handleSubmit,
+                  isProcessing,
+                  disableSubmit
+                )}
               </div>
             </div>
           </div>

@@ -8,6 +8,9 @@ import APP_CONSTANTS, {
 import { toast } from 'react-toastify';
 
 export function FooterButtons(props) {
+  const saveButtonClassName = props.disableSave
+    ? 'shadow-special-button-default inline-flex w-full justify-center rounded-full bg-slate-400 px-6 py-2 text-base font-semibold leading-6 text-white outline-none'
+    : 'on-focus leading-3.5 text-md mb-2 mr-2 flex items-center rounded-full border border-blue-600 bg-blue-600 px-4 py-3 text-left font-medium text-white last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full';
   async function handleAprroveOrReject(
     id,
     type,
@@ -71,10 +74,7 @@ export function FooterButtons(props) {
               <span>Edit details</span>
             </button>
           ) : (
-            <button
-              className="on-focus leading-3.5 text-md mb-2 mr-2 flex items-center rounded-full border border-blue-600 bg-blue-600 px-4 py-3 text-left font-medium text-white last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full"
-              onClick={props.saveChanges}
-            >
+            <button className={saveButtonClassName} onClick={props.saveChanges}>
               <span>Save Changes</span>
             </button>
           )}
@@ -83,9 +83,9 @@ export function FooterButtons(props) {
           <div className="flex items-end space-x-3">
             <div>
               <button
-                className={`on-focus leading-3.5 text-md mb-2 mr-2 flex items-center rounded-full border border-slate-300 bg-[#D65229] px-4 py-2 text-left font-medium text-white last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full ${
+                className={`on-focus leading-3.5 text-md mb-2 mr-2 flex items-center rounded-full border border-slate-300 px-4 py-2 text-left font-medium text-white last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full ${
                   props.isEditEnabled && 'bg-slate-400'
-                }`}
+                } ${!props.isEditEnabled && ' bg-[#D65229]'}`}
                 disabled={props.isEditEnabled}
                 onClick={() =>
                   handleAprroveOrReject(
