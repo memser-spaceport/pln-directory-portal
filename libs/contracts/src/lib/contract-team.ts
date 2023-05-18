@@ -27,4 +27,13 @@ export const apiTeam = contract.router({
     },
     summary: 'Get a team',
   },
+  modifyTeam: {
+    method: 'PUT',
+    path: `${getAPIVersionAsPath('1')}/teams/:uid`,
+    body: contract.body<any>(),
+    responses: {
+      200: contract.response<any>(),
+    },
+    summary: 'Modify a team',
+  },
 });

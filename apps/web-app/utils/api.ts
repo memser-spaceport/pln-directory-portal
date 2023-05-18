@@ -6,9 +6,7 @@ import { decodeToken, calculateExpiry } from '../utils/services/auth';
 
 
 // Ignore auth to urls
-const authIgnoreURLS = ["/v1/auth/token", "/v1/participants-request", 
-                        "/v1/participants-request/unique-identifier", 
-                        "/v1/images"];
+const authIgnoreURLS = ["/v1/auth/token", "/v1/participants-request/unique-identifier"];
 
 // Create an Axios instance with default configuration
 const api = axios.create({
@@ -70,9 +68,6 @@ api.interceptors.request.use(async (config) => {
         }).catch((error) => {
           return config;
         });
-    } else {
-      Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
-      window.location.href="/directory/members";
     }
     return config;
   } catch (error) {
@@ -91,39 +86,44 @@ api.interceptors.response.use(
     if (error.response.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       let { refreshToken } = nookies.get();
-      refreshToken = refreshToken.replace(
-        /"/g,
-        ''
-      );
-      // Make a call to renew access token
-      return renewAccessToken(refreshToken)
-      .then((data) => {
-        const { accessToken, refreshToken, userInfo } = data;
-        if (accessToken && refreshToken) {
-          const access_token = decodeToken(accessToken);
-          const refresh_token = decodeToken(refreshToken);
+      if(refreshToken && refreshToken.length > 0 ) {
+        refreshToken = refreshToken.replace(
+          /"/g,
+          ''
+        );
+        // Make a call to renew access token
+        return renewAccessToken(refreshToken)
+        .then((data) => {
+          const { accessToken, refreshToken, userInfo } = data;
+          if (accessToken && refreshToken) {
+            const access_token = decodeToken(accessToken);
+            const refresh_token = decodeToken(refreshToken);
 
-          setCookie(null, 'authToken', JSON.stringify(accessToken), {
-            maxAge: calculateExpiry(access_token.exp),
-            path: '/'
+            setCookie(null, 'authToken', JSON.stringify(accessToken), {
+              maxAge: calculateExpiry(access_token.exp),
+              path: '/'
+            });
+            setCookie(null, 'refreshToken', JSON.stringify(refreshToken), {
+              maxAge: calculateExpiry(refresh_token.exp),
+              path: '/'
+            });
+            setCookie(null, 'userInfo', JSON.stringify(userInfo), {
+              maxAge: calculateExpiry(access_token.exp),
+              path: '/'
+            });
+            originalRequest.headers.Authorization =
+              `Bearer ${accessToken}`.replace(/"/g, '');
+            return axios(originalRequest);
+          }})
+          .catch((error) => {
+            Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
+            window.location.href="/directory/members";
+            return Promise.reject(error);
           });
-          setCookie(null, 'refreshToken', JSON.stringify(refreshToken), {
-            maxAge: calculateExpiry(refresh_token.exp),
-            path: '/'
-          });
-          setCookie(null, 'userInfo', JSON.stringify(userInfo), {
-            maxAge: calculateExpiry(access_token.exp),
-            path: '/'
-          });
-          originalRequest.headers.Authorization =
-            `Bearer ${accessToken}`.replace(/"/g, '');
-          return axios(originalRequest);
-        }})
-        .catch((error) => {
-          Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
-          window.location.href="/directory/members";
-          return Promise.reject(error);
-        });
+      }  else {
+        Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
+        window.location.href="/directory/members";
+      }   
     }
   }
 );

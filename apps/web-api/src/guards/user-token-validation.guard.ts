@@ -26,16 +26,10 @@ export class UserTokenValidation implements CanActivate {
       );
       if (
         validationResult?.data?.active &&
-        validationResult?.data?.sub &&
-        validationResult?.data?.email
+        validationResult?.data?.sub
       ) {
         request['userExternaId'] = validationResult.data.sub;
         request['userEmail'] = validationResult.data.email;
-        console.log(
-          'values set',
-          validationResult.data.sub,
-          validationResult.data.email
-        );
       } else {
         throw new UnauthorizedException()
       }

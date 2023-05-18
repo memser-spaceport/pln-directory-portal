@@ -5,23 +5,21 @@ import { ReactElement } from 'react';
 import { Breadcrumb } from '@protocol-labs-network/ui';
 import { NextSeo } from 'next-seo';
 import { setCookie }from 'nookies';
-import { EditMemberModal } from '../../../../components/members/member-enrollment/editmember';
-import { PAGE_ROUTES } from '../../../../constants';
-import { useProfileBreadcrumb } from '../../../../hooks/profile/use-profile-breadcrumb.hook';
-import { DirectoryLayout } from '../../../../layouts/directory-layout';
-import { DIRECTORY_SEO } from '../../../../seo.config';
-import { parseMember } from '../../../../utils/members.utils';
-import { IMember } from '../../../../utils/members.types';
+import { EditMemberModal } from '../../../components/members/member-enrollment/editmember';
+import { PAGE_ROUTES } from '../../../constants';
+import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcrumb.hook';
+import { DirectoryLayout } from '../../../layouts/directory-layout';
+import { DIRECTORY_SEO } from '../../../seo.config';
+import { parseMember } from '../../../utils/members.utils';
+import { IMember } from '../../../utils/members.types';
 
 interface IAccountSettingsProp {
-  id: string;
   backLink: string;
   userInfo: any;
   member: IMember;
 }
 
 export default function AccountSettings({
-  id,
   backLink,
   userInfo,
   member
@@ -40,7 +38,7 @@ export default function AccountSettings({
         <EditMemberModal
           isOpen={false}
           setIsModalOpen={() => {}}
-          id={id}
+          id={userInfo.uid}
           isProfileSettings={true}
         />
       </div>
@@ -56,8 +54,7 @@ export const getServerSideProps = async (ctx) => {
   const { query, res, req } = ctx;
   const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
   const isUserLoggedIn = req?.cookies?.authToken &&  req?.cookies?.userInfo ? true : false;
-  const { id, backLink = PAGE_ROUTES.MEMBERS } = query as {
-    id: string;
+  const { backLink = PAGE_ROUTES.MEMBERS } = query as {
     backLink: string;
   };
 
@@ -72,16 +69,9 @@ export const getServerSideProps = async (ctx) => {
         destination: PAGE_ROUTES.MEMBERS,
       },
     };
-  } else if (userInfo?.uid != id) {
-    return {
-      redirect: {
-        permanent: false,
-        destination: PAGE_ROUTES.MEMBERS,
-      },
-    };
   } 
-
-  const memberResponse = await getMember(id, {
+  
+  const memberResponse = await getMember(userInfo?.uid, {
     with: 'image,skills,location',
   });
   
@@ -103,6 +93,6 @@ export const getServerSideProps = async (ctx) => {
   );
 
   return {
-    props: { backLink, id, isUserLoggedIn, userInfo, member},
+    props: { backLink, isUserLoggedIn, userInfo, member},
   };
 };

@@ -61,14 +61,14 @@ export class ParticipantsRequestService {
     return result;
   }
 
-  async findMemberByExternalIdAndEmail(userExternalId, userEmail) {
+  async findMemberByExternalId(userExternalId) {
     const foundMember = await this.prisma.member.findFirst({
       where: {
-        externalId: userExternalId,
-        email: userEmail
+        externalId: userExternalId
       },
       include: {
-        memberRoles: true
+        memberRoles: true,
+        teamMemberRoles: true
       }
     })
 
@@ -82,8 +82,10 @@ export class ParticipantsRequestService {
     const formattedMemberDetails =  {
       ...foundMember,
       isDirectoryAdmin,
-      roleNames
-      }
+      roleNames,
+      leadingTeams: foundMember.teamMemberRoles.filter((role) => role.teamLead)
+        .map(role => role.teamUid)
+    }
 
     return formattedMemberDetails
   }
@@ -122,7 +124,7 @@ export class ParticipantsRequestService {
     }
   }
 
-  async addRequest(requestData) {
+  async addRequest(requestData, disableNotification=false) {
     const uniqueIdentifier =
       requestData.participantType === 'TEAM'
         ? requestData.newData.name
@@ -178,15 +180,17 @@ export class ParticipantsRequestService {
     ) {
       slackConfig.requestLabel = 'Edit Team Request';
       slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`;
-      await this.awsService.sendEmail('EditTeamRequest', true, [], {
-        teamName: result.newData.name,
-        teamUid: result.referenceUid,
-        requesterEmailId: requestData.requesterEmailId,
-        adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,
-      });
+      if (!disableNotification)
+        await this.awsService.sendEmail('EditTeamRequest', true, [], {
+          teamName: result.newData.name,
+          teamUid: result.referenceUid,
+          requesterEmailId: requestData.requesterEmailId,
+          adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,
+        });
     }
-
-    await this.slackService.notifyToChannel(slackConfig);
+    
+    if (!disableNotification) 
+      await this.slackService.notifyToChannel(slackConfig);
     //await this.redisService.resetAllCache();
     return result;
   }
@@ -600,7 +604,7 @@ export class ParticipantsRequestService {
     return { code: 1, message: 'Success' };
   }
 
-  async processTeamEditRequest(uidToEdit) {
+  async processTeamEditRequest(uidToEdit, disableNotification=false, isAutoApproval=false) {
     const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
       where: { uid: uidToEdit },
     });
@@ -685,24 +689,26 @@ export class ParticipantsRequestService {
       // Updating status
       await tx.participantsRequest.update({
         where: { uid: uidToEdit },
-        data: { status: ApprovalStatus.APPROVED },
+        data: { status: isAutoApproval ? ApprovalStatus.AUTOAPPROVED: ApprovalStatus.APPROVED },
       });
     });
-    await this.awsService.sendEmail('TeamEditRequestCompleted', true, [], {
-      teamName: dataToProcess.name,
-    });
-    await this.awsService.sendEmail(
-      'EditTeamSuccess',
-      false,
-      [dataFromDB.requesterEmailId],
-      {
+    if (!disableNotification) {
+      await this.awsService.sendEmail('TeamEditRequestCompleted', true, [], {
         teamName: dataToProcess.name,
-        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`,
-      }
-    );
-    slackConfig.requestLabel = 'Edit Team Request Completed ';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`;
-    await this.slackService.notifyToChannel(slackConfig);
+      });
+      await this.awsService.sendEmail(
+        'EditTeamSuccess',
+        false,
+        [dataFromDB.requesterEmailId],
+        {
+          teamName: dataToProcess.name,
+          teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`,
+        }
+      );
+      slackConfig.requestLabel = 'Edit Team Request Completed ';
+      slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`;
+      await this.slackService.notifyToChannel(slackConfig);
+    }
     //await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
