@@ -60,19 +60,27 @@ export class ParticipantsRequestService {
     return result;
   }
 
-  async findDuplicates(uniqueIdentifier, participantType) {
+  async findDuplicates(uniqueIdentifier, participantType, uid, requestId) {
     const itemInRequest = await this.prisma.participantsRequest.findMany({
       where: {
         AND: {
           uniqueIdentifier: uniqueIdentifier,
           status: ApprovalStatus.PENDING,
         },
+        NOT: {
+          uid: requestId,
+        },
       },
     });
     if (itemInRequest.length === 0) {
       if (participantType === 'TEAM') {
         const teamResult = await this.prisma.team.findMany({
-          where: { name: uniqueIdentifier },
+          where: {
+            name: uniqueIdentifier,
+            NOT: {
+              uid: uid,
+            },
+          },
         });
         if (teamResult.length > 0) {
           return { isRequestPending: false, isUniqueIdentifierExist: true };
@@ -81,7 +89,12 @@ export class ParticipantsRequestService {
         }
       } else {
         const memResult = await this.prisma.member.findMany({
-          where: { email: uniqueIdentifier },
+          where: {
+            email: uniqueIdentifier,
+            NOT: {
+              uid: uid,
+            },
+          },
         });
         if (memResult.length > 0) {
           return { isRequestPending: false, isUniqueIdentifierExist: true };
@@ -287,7 +300,9 @@ export class ParticipantsRequestService {
     await this.awsService.sendEmail('MemberCreated', true, [], {
       memberName: dataToProcess.name,
       memberUid: newMember.uid,
-      adminSiteUrl: `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
+      adminSiteUrl: `${process.env.WEB_UI_BASE_URL}/members/${
+        newMember.uid
+      }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
     });
     await this.awsService.sendEmail(
       'NewMemberSuccess',
@@ -295,11 +310,15 @@ export class ParticipantsRequestService {
       [dataFromDB.requesterEmailId],
       {
         memberName: dataToProcess.name,
-        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
+        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${
+          newMember.uid
+        }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
       }
     );
     slackConfig.requestLabel = 'New Labber Added';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
+    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${
+      newMember.uid
+    }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
@@ -471,11 +490,15 @@ export class ParticipantsRequestService {
       [dataFromDB.requesterEmailId],
       {
         memberName: dataToProcess.name,
-        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
+        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${
+          dataFromDB.referenceUid
+        }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
       }
     );
     slackConfig.requestLabel = 'Edit Labber Request Completed';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
+    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${
+      dataFromDB.referenceUid
+    }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
@@ -555,7 +578,9 @@ export class ParticipantsRequestService {
     await this.awsService.sendEmail('TeamCreated', true, [], {
       teamName: dataToProcess.name,
       teamUid: newTeam.uid,
-      adminSiteUrl: `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
+      adminSiteUrl: `${process.env.WEB_UI_BASE_URL}/teams/${
+        newTeam.uid
+      }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
     });
     await this.awsService.sendEmail(
       'NewTeamSuccess',
@@ -563,11 +588,15 @@ export class ParticipantsRequestService {
       [dataFromDB.requesterEmailId],
       {
         teamName: dataToProcess.name,
-        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
+        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${
+          newTeam.uid
+        }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
       }
     );
     slackConfig.requestLabel = 'New Team Added';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
+    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${
+      newTeam.uid
+    }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
@@ -671,11 +700,15 @@ export class ParticipantsRequestService {
       [dataFromDB.requesterEmailId],
       {
         teamName: dataToProcess.name,
-        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
+        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${
+          existingData.uid
+        }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
       }
     );
     slackConfig.requestLabel = 'Edit Team Request Completed ';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
+    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${
+      existingData.uid
+    }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();

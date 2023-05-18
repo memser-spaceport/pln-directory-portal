@@ -53,9 +53,6 @@ function validateProjectDetailForm(formValues) {
   if (!formValues.fundingStage?.value) {
     errors.push('Please add Funding Stage');
   }
-  if (!formValues.membershipSources.length) {
-    errors.push('Please add Membership Source(s)');
-  }
   if (!formValues.industryTags.length) {
     errors.push('Please add IndustryTags');
   }
@@ -103,6 +100,8 @@ export default function TeamView(props) {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [isEditEnabled, setIsEditEnabled] = useState<boolean>(false);
+  const [disableSave, setDisableSave] = useState<boolean>(false);
+  const [nameExists, setNameExists] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
   const {
     setIsOpenRequest,
@@ -155,12 +154,31 @@ export default function TeamView(props) {
     return formattedValue;
   }
 
+  function onNameBlur(event: ChangeEvent<HTMLInputElement>) {
+    const data = {
+      uniqueIdentifier: event.target.value?.trim(),
+      participantType: ENROLLMENT_TYPE.TEAM,
+      uid: props.referenceUid,
+      requestId: props.id,
+    };
+    api
+      .post(`/v1/participants-request/unique-identifier`, data)
+      .then((response) => {
+        setDisableSave(false);
+        response?.data &&
+        (response.data?.isUniqueIdentifierExist ||
+          response.data?.isRequestPending)
+          ? setNameExists(true)
+          : setNameExists(false);
+      });
+  }
+
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
       setErrors([]);
       const errors = validateForm(formValues, imageUrl);
-      if (errors?.length > 0) {
+      if (errors?.length > 0 || nameExists) {
         setErrors(errors);
         return false;
       }
@@ -217,7 +235,7 @@ export default function TeamView(props) {
         setIsProcessing(false);
       }
     },
-    [formValues, imageUrl, imageChanged]
+    [formValues, imageUrl, imageChanged, nameExists]
   );
 
   function handleInputChange(
@@ -280,6 +298,9 @@ export default function TeamView(props) {
                     handleImageChange={handleImageChange}
                     imageUrl={imageUrl}
                     isEditEnabled={isEditEnabled}
+                    onNameBlur={onNameBlur}
+                    nameExists={nameExists}
+                    setDisableNext={setDisableSave}
                   />
                   <TeamStepTwo
                     formValues={formValues}
@@ -303,6 +324,7 @@ export default function TeamView(props) {
       {props.status === APP_CONSTANTS.PENDING_LABEL && (
         <FooterButtons
           isEditEnabled={isEditEnabled}
+          disableSave={disableSave}
           setIsEditEnabled={setIsEditEnabled}
           id={props.id}
           type={ENROLLMENT_TYPE.TEAM}

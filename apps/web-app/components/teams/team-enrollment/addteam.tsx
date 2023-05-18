@@ -67,9 +67,6 @@ function validateProjectDetailForm(formValues) {
   if (!formValues.fundingStage?.value) {
     errors.push('Please add Funding Stage');
   }
-  if (!formValues.membershipSources.length) {
-    errors.push('Please add Membership Source(s)');
-  }
   if (!formValues.industryTags.length) {
     errors.push('Please add Industry Tags');
   }
@@ -339,7 +336,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
 
   function onNameBlur(event: ChangeEvent<HTMLInputElement>) {
     const data = {
-      uniqueIdentifier: event.target.value,
+      uniqueIdentifier: event.target.value?.trim(),
       participantType: ENROLLMENT_TYPE.TEAM,
     };
     api

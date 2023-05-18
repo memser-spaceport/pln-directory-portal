@@ -12,7 +12,9 @@ export class UniqueIdentifier {
   async findDuplicates(@Body() body) {
     const result = await this.participantsRequestService.findDuplicates(
       body.uniqueIdentifier,
-      body.participantType
+      body.participantType,
+      body.uid,
+      body.requestId
     );
     return result;
   }
