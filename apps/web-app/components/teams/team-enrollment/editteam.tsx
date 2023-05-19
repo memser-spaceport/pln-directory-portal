@@ -7,6 +7,7 @@ import {
   useCallback,
   useRef,
 } from 'react';
+import Cookies from 'js-cookie';
 import AddTeamStepOne from './addteamstepone';
 import AddTeamStepTwo from './addteamsteptwo';
 import AddTeamStepThree from './addteamstepthree';
@@ -204,6 +205,12 @@ export function EditTeamModal({
             blog: team.blog,
             officeHours: team.officeHours,
           };
+          // set requestor email
+          const userInfoFromCookie = Cookies.get('userInfo');
+          if(userInfoFromCookie) {
+            const parsedUserInfo = JSON.parse(userInfoFromCookie);
+            formValues['requestorEmail'] = parsedUserInfo.email;
+          }
           setFormValues(formValues);
           setImageUrl(team.logo?.url ?? '');
           setDropDownValues({
@@ -307,7 +314,6 @@ export function EditTeamModal({
         setErrors(errors);
         return false;
       }
-      const requestorEmail = formValues.requestorEmail?.trim();
       const values = formatData();
       try {
         // const captchaToken = await executeRecaptcha();
@@ -333,7 +339,6 @@ export function EditTeamModal({
         const data = {
           participantType: ENROLLMENT_TYPE.TEAM,
           referenceUid: id,
-          requesterEmailId: requestorEmail,
           uniqueIdentifier: values.name,
           newData: {
             ...values,
@@ -342,9 +347,11 @@ export function EditTeamModal({
           },
           // captchaToken,
         };
-        await api.post(`/v1/participants-request`, data).then((response) => {
-          setSaveCompleted(true);
-        });
+        await api.put(`/v1/teams/${id}`, data)
+          .then((res) => {
+            if (res.status === 200 && res.statusText === "OK")
+              setSaveCompleted(true);
+          });
       } catch (err) {
         toast(err?.message);
         console.log('error', err);
@@ -394,11 +401,8 @@ export function EditTeamModal({
         >
           {saveCompleted ? (
             <div>
-              <div className="mb-3 text-center text-2xl font-bold">
-                Thank you for submitting
-              </div>
-              <div className="text-md mb-3 text-center">
-                Our team will review your request shortly & get back
+              <div className="mb-3 text-center text-xl font-bold">
+                Your changes has been saved successfully.
               </div>
               <div className="text-center">
                 <button
@@ -437,6 +441,7 @@ export function EditTeamModal({
                   handleImageChange={handleImageChange}
                   imageUrl={imageUrl}
                   disableName={true}
+                  disableEmail={true}
                 />
                 <AddTeamStepTwo
                   formValues={formValues}

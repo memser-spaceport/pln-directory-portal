@@ -2,12 +2,11 @@ import api from '../api';
 import { setCookie } from 'nookies';
 import * as jwt from 'jsonwebtoken';
 
-export const decodeToken = (token: string) => {
+export const decodeToken = (token: string):any => {
   return jwt.decode(token);
 };
 
 export const calculateExpiry = (tokenExpiry) => {
-  console.log(Date.now());
   const exp = tokenExpiry - Date.now() / 1000;
   return exp;
 };

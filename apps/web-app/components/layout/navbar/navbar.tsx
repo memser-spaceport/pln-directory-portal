@@ -3,6 +3,7 @@ import { UserIcon } from '@heroicons/react/solid';
 import { CogIcon, ArrowNarrowRightIcon } from '@heroicons/react/outline';
 import { ArrowIcon } from '@protocol-labs-network/ui';
 import { trackGoal } from 'fathom-client';
+import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Cookies from 'js-cookie';
 import { forwardRef, Fragment } from 'react';
@@ -10,6 +11,7 @@ import { JoinNetworkMenu } from './join-network-menu/join-network-menu';
 import { Login } from './login-menu/login-menu';
 import { Menu as AppMenu } from './menu/menu';
 import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/protocol-labs-network-logo-horizontal-black.svg';
+import { PAGE_ROUTES } from '../../../constants';
 // import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
@@ -26,35 +28,35 @@ type ISettingMenu = {
   onClick?: () => void;
 };
 
-const settingMenu: ISettingMenu[] = [
-  {
-    icon: CogIcon,
-    label: 'Account Settings',
-    url: `/directory/members/:memberId/accountSettings`,
-    eventCode: '',
-    onClick: () => {
-      if (!Cookies.get('refreshToken')) {
-        Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
-        window.location.href="/directory/members";
-      }
-    }
-  },
-  {
-    icon: ArrowNarrowRightIcon,
-    label: 'Logout',
-    url: '#',
-    eventCode: '',
-    onClick: () => {
-      Cookies.remove('authToken')
-      Cookies.remove('refreshToken')
-      Cookies.remove('userInfo')
-      Cookies.set('page_params', 'logout', { expires: 60, path: '/' });
-      window.location.href="/directory/members";
-    },
-  },
-];
-
 export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
+  const router = useRouter();
+  const settingMenu: ISettingMenu[] = [
+    {
+      icon: CogIcon,
+      label: 'Account Settings',
+      url: `/directory/members/accountSettings`,
+      eventCode: '',
+      onClick: () => {
+        if (!Cookies.get('refreshToken')) {
+          Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
+          router.push(PAGE_ROUTES.MEMBERS);
+        }
+      }
+    },
+    {
+      icon: ArrowNarrowRightIcon,
+      label: 'Logout',
+      url: '#',
+      eventCode: '',
+      onClick: () => {
+        Cookies.remove('authToken')
+        Cookies.remove('refreshToken')
+        Cookies.remove('userInfo')
+        Cookies.set('page_params', 'logout', { expires: 60, path: '/' });
+        router.push(PAGE_ROUTES.MEMBERS);
+      },
+    },
+  ];
   return (
     <nav className="navbar top-0 h-20 justify-between pl-12 only-of-type:shadow-[0_1px_4px_0_#e2e8f0]">
       <div className="flex items-center space-x-5">
@@ -122,11 +124,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
                           <Menu.Item key={option.label}>
                             {(active) => (
                               <OptionLink
-                                href={
-                                  option.label === 'Account Settings'
-                                    ? `/directory/members/${userInfo.uid}/accountSettings`
-                                    : option.url
-                                }
+                                href={option.url}
                                 onClick={
                                   option.onClick ? option.onClick : () => {}
                                 }

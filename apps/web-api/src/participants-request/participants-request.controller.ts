@@ -46,7 +46,6 @@ export class ParticipantsRequestController {
   }
 
   @Post()
-  @UseGuards()
   @UseGuards(UserTokenValidation)
   async addRequest(@Body() body, @Req() req) {
     const postData = body;
@@ -71,7 +70,7 @@ export class ParticipantsRequestController {
     }
 
     if(referenceUid) {
-      const requestorDetails = await this.participantsRequestService.findMemberByExternalIdAndEmail(req.userExternaId, req.userEmail);
+      const requestorDetails = await this.participantsRequestService.findMemberByExternalId(req.userExternaId);
       if(!requestorDetails) {
         throw new UnauthorizedException()
       }

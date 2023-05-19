@@ -86,6 +86,7 @@ enum ApprovalStatus {
   PENDING
   APPROVED
   REJECTED
+  AUTOAPPROVED
 }
 
 model ParticipantsRequest {
