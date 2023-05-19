@@ -10,6 +10,8 @@ import { ReactNode } from 'react';
 import { useFathom } from '../hooks/plugins/use-fathom.hook';
 import { DEFAULT_SEO } from '../seo.config';
 import './styles.css';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 /* eslint-disable-next-line @typescript-eslint/ban-types */
 export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
@@ -34,6 +36,7 @@ export default function CustomApp({
     <>
       <DefaultSeo {...DEFAULT_SEO} />
       <Component {...pageProps} />
+      <ToastContainer position="bottom-right" />
     </>
   );
 }

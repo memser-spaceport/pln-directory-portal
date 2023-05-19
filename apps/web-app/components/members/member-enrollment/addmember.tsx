@@ -224,7 +224,6 @@ export function AddMemberModal({
         )
         .catch((err) => {
           toast(err?.message);
-          console.log('error', err);
         });
     }
   }, [isOpen]);
@@ -359,19 +358,22 @@ export function AddMemberModal({
           // captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
-          if (
-            typeof document !== 'undefined' &&
-            document.getElementsByClassName('grecaptcha-badge').length
-          ) {
-            document
-              .getElementsByClassName('grecaptcha-badge')[0]
-              .classList.add('w-0');
-          }
+          // if (
+          //   typeof document !== 'undefined' &&
+          //   document.getElementsByClassName('grecaptcha-badge').length
+          // ) {
+          //   document
+          //     .getElementsByClassName('grecaptcha-badge')[0]
+          //     .classList.add('w-0');
+          // }
           setSaveCompleted(true);
         });
       } catch (err) {
-        toast(err?.message);
-        console.log('error', err);
+        if (err.response.status === 400) {
+          toast(err?.response?.data?.message);
+        } else {
+          toast(err?.message);
+        }
       } finally {
         setIsProcessing(false);
       }

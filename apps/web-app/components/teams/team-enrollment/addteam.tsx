@@ -405,8 +405,11 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
           setSaveCompleted(true);
         });
       } catch (err) {
-        toast(err?.message);
-        console.log('error', err);
+        if (err.response.status === 400) {
+          toast(err?.response?.data?.message);
+        } else {
+          toast(err?.message);
+        }
       } finally {
         setIsProcessing(false);
       }

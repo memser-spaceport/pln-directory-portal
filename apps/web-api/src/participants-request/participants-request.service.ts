@@ -210,17 +210,6 @@ export class ParticipantsRequestService {
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
       return { code: -1, message: 'Request already Processed' };
     }
-
-    const result = await this.findDuplicates(
-      dataFromDB.uniqueIdentifier,
-      'MEMBER',
-      dataFromDB.referenceUid,
-      uidToApprove
-    );
-    if (result && result.isUniqueIdentifierExist) {
-      throw new BadRequestException('Member email already exists');
-    }
-
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
     const slackConfig = {
@@ -335,15 +324,6 @@ export class ParticipantsRequestService {
     });
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
       return { code: -1, message: 'Request already Processed' };
-    }
-    const result = await this.findDuplicates(
-      dataFromDB.uniqueIdentifier,
-      'MEMBER',
-      dataFromDB.referenceUid,
-      uidToEdit
-    );
-    if (result && result.isUniqueIdentifierExist) {
-      throw new BadRequestException('Member email already exists');
     }
 
     const existingData: any = await this.prisma.member.findUnique({
@@ -525,15 +505,6 @@ export class ParticipantsRequestService {
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
       return { code: -1, message: 'Request already Processed' };
     }
-    const result = await this.findDuplicates(
-      dataFromDB.uniqueIdentifier,
-      'TEAM',
-      dataFromDB.referenceUid,
-      uidToApprove
-    );
-    if (result && result.isUniqueIdentifierExist) {
-      throw new BadRequestException('Team name already exists');
-    }
 
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
@@ -632,15 +603,6 @@ export class ParticipantsRequestService {
     });
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
       return { code: -1, message: 'Request already Processed' };
-    }
-    const result = await this.findDuplicates(
-      dataFromDB.uniqueIdentifier,
-      'TEAM',
-      dataFromDB.referenceUid,
-      uidToEdit
-    );
-    if (result && result.isUniqueIdentifierExist) {
-      throw new BadRequestException('Team name already exists');
     }
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
