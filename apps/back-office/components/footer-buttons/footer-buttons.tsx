@@ -74,7 +74,11 @@ export function FooterButtons(props) {
               <span>Edit details</span>
             </button>
           ) : (
-            <button className={saveButtonClassName} onClick={props.saveChanges}>
+            <button
+              className={saveButtonClassName}
+              disabled={props.disableSave}
+              onClick={props.saveChanges}
+            >
               <span>Save Changes</span>
             </button>
           )}

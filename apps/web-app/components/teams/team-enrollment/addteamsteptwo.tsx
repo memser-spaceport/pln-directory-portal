@@ -13,7 +13,7 @@ export default function AddTeamStepTwo(props) {
           options={dropDownValues?.protocol}
           name="technologies"
           selectedValues={values.technologies}
-          placeholder="Select a Protocol(s)"
+          placeholder="Select Protocol(s)"
           onChange={handleDropDownChange}
           label="Protocol"
         />

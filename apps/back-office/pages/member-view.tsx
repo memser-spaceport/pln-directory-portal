@@ -156,12 +156,16 @@ export default function MemberView(props) {
 
   const handleSubmit = useCallback(
     async (e) => {
+      if (emailExists) {
+        toast('Email already exists');
+        return;
+      }
       setIsLoading(true);
       e.preventDefault();
       setErrors([]);
       const errors = validateForm(formValues, imageUrl);
 
-      if (errors?.length > 0 || emailExists) {
+      if (errors?.length > 0) {
         setErrors(errors);
         setIsLoading(false);
         return false;

@@ -22,7 +22,7 @@ export function MemberProfileProjects({
             onClick={() => setIsModalOpen(true)}
             className="float-right cursor-pointer text-blue-500"
           >
-            see all
+            See all
           </span>
         )}
       </h3>
