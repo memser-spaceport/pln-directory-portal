@@ -166,3 +166,7 @@
   --tw-border-opacity: 1;
   border-color: rgb(209 213 219 / var(--tw-border-opacity));
 }
+
+.Toastify__toast {
+  z-index: 99999;
+}

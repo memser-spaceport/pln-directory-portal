@@ -176,9 +176,13 @@ export default function TeamView(props) {
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
+      if (nameExists) {
+        toast('Name already exists');
+        return;
+      }
       setErrors([]);
       const errors = validateForm(formValues, imageUrl);
-      if (errors?.length > 0 || nameExists) {
+      if (errors?.length > 0) {
         setErrors(errors);
         return false;
       }

@@ -224,7 +224,6 @@ export function AddMemberModal({
         )
         .catch((err) => {
           toast(err?.message);
-          console.log('error', err);
         });
     }
   }, [isOpen]);
@@ -359,19 +358,22 @@ export function AddMemberModal({
           // captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
-          if (
-            typeof document !== 'undefined' &&
-            document.getElementsByClassName('grecaptcha-badge').length
-          ) {
-            document
-              .getElementsByClassName('grecaptcha-badge')[0]
-              .classList.add('w-0');
-          }
+          // if (
+          //   typeof document !== 'undefined' &&
+          //   document.getElementsByClassName('grecaptcha-badge').length
+          // ) {
+          //   document
+          //     .getElementsByClassName('grecaptcha-badge')[0]
+          //     .classList.add('w-0');
+          // }
           setSaveCompleted(true);
         });
       } catch (err) {
-        toast(err?.message);
-        console.log('error', err);
+        if (err.response.status === 400) {
+          toast(err?.response?.data?.message);
+        } else {
+          toast(err?.message);
+        }
       } finally {
         setIsProcessing(false);
       }
@@ -506,7 +508,7 @@ export function AddMemberModal({
                 className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
                 onClick={() => handleModalClose()}
               >
-                Return to home
+                Close
               </button>
             </div>
           </div>

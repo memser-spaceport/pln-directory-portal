@@ -48,7 +48,7 @@ export default function AddMemberSkillForm(props) {
           </div>
           <span className="pl-1.5 text-[13px] leading-[18px]  text-[#0F172A] opacity-40">
             If you don&apos;t see your team on this list please add your team
-            first by using the “Join Network as a Team” button.
+            first by using &apos;Join the network&apos; - &apos;As a Team&apos;
           </span>
         </div>
       </div>

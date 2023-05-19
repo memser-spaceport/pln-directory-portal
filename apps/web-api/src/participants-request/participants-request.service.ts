@@ -61,41 +61,35 @@ export class ParticipantsRequestService {
   }
 
   async findDuplicates(uniqueIdentifier, participantType, uid, requestId) {
-    const itemInRequest = await this.prisma.participantsRequest.findMany({
+    let itemInRequest = await this.prisma.participantsRequest.findMany({
       where: {
         AND: {
           uniqueIdentifier: uniqueIdentifier,
           status: ApprovalStatus.PENDING,
         },
-        NOT: {
-          uid: requestId,
-        },
       },
     });
+    itemInRequest = itemInRequest?.filter((item) => item.uid !== requestId);
     if (itemInRequest.length === 0) {
       if (participantType === 'TEAM') {
-        const teamResult = await this.prisma.team.findMany({
+        let teamResult = await this.prisma.team.findMany({
           where: {
             name: uniqueIdentifier,
-            NOT: {
-              uid: uid,
-            },
           },
         });
+        teamResult = teamResult?.filter((item) => item.uid !== uid);
         if (teamResult.length > 0) {
           return { isRequestPending: false, isUniqueIdentifierExist: true };
         } else {
           return { isRequestPending: false, isUniqueIdentifierExist: false };
         }
       } else {
-        const memResult = await this.prisma.member.findMany({
+        let memResult = await this.prisma.member.findMany({
           where: {
             email: uniqueIdentifier,
-            NOT: {
-              uid: uid,
-            },
           },
         });
+        memResult = memResult?.filter((item) => item.uid !== uid);
         if (memResult.length > 0) {
           return { isRequestPending: false, isUniqueIdentifierExist: true };
         } else {
@@ -184,7 +178,6 @@ export class ParticipantsRequestService {
     delete formattedData.uid;
     delete formattedData.status;
     delete formattedData.participantType;
-    console.log(formattedData, requestedUid);
     await this.prisma.participantsRequest.update({
       where: { uid: requestedUid },
       data: { ...formattedData },
@@ -217,7 +210,6 @@ export class ParticipantsRequestService {
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
       return { code: -1, message: 'Request already Processed' };
     }
-
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
     const slackConfig = {
@@ -333,6 +325,7 @@ export class ParticipantsRequestService {
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
       return { code: -1, message: 'Request already Processed' };
     }
+
     const existingData: any = await this.prisma.member.findUnique({
       where: { uid: dataFromDB.referenceUid },
       include: {
@@ -512,6 +505,7 @@ export class ParticipantsRequestService {
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
       return { code: -1, message: 'Request already Processed' };
     }
+
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
     const slackConfig = {
