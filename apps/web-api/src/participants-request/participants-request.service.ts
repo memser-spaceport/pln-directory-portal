@@ -111,7 +111,7 @@ export class ParticipantsRequestService {
     const slackConfig = {
       requestLabel: '',
       url: '',
-      name: requestData.newData.name,
+      name: requestData.newData.oldTeamName ?? requestData.newData.name,
     };
     const result: any = await this.prisma.participantsRequest.create({
       data: { ...postData },
@@ -157,7 +157,7 @@ export class ParticipantsRequestService {
       slackConfig.requestLabel = 'Edit Team Request';
       slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`;
       await this.awsService.sendEmail('EditTeamRequest', true, [], {
-        teamName: result.newData.name,
+        teamName: result.newData.oldTeamName ?? result.newData.name,
         teamUid: result.referenceUid,
         requesterEmailId: requestData.requesterEmailId,
         adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,

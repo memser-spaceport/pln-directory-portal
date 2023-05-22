@@ -132,6 +132,7 @@ export function EditTeamModal({
   setIsModalOpen,
   id,
 }: EditTeamModalProps) {
+  const [teamName, setTeamName] = useState('');
   const [errors, setErrors] = useState([]);
   const [imageUrl, setImageUrl] = useState<string>();
   const [imageChanged, setImageChanged] = useState<boolean>(false);
@@ -208,6 +209,7 @@ export function EditTeamModal({
             officeHours: team.officeHours,
           };
           setFormValues(formValues);
+          setTeamName(team.name);
           setImageUrl(team.logo?.url ?? '');
           setDropDownValues({
             membershipSources: data[1],
@@ -289,6 +291,7 @@ export function EditTeamModal({
       industryTags: formattedTags,
       membershipSources: formattedMembershipSource,
       technologies: formattedtechnologies,
+      oldTeamName: teamName,
     };
     delete formattedValue.requestorEmail;
     return formattedValue;
