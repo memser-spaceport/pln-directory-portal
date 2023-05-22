@@ -63,10 +63,9 @@ export class ParticipantsRequestService {
   async findDuplicates(uniqueIdentifier, participantType, uid, requestId) {
     let itemInRequest = await this.prisma.participantsRequest.findMany({
       where: {
-        AND: {
-          uniqueIdentifier: uniqueIdentifier,
-          status: ApprovalStatus.PENDING,
-        },
+        participantType,
+        status: ApprovalStatus.PENDING,
+        OR: [{ referenceUid: uid }, { uniqueIdentifier }],
       },
     });
     itemInRequest = itemInRequest?.filter((item) => item.uid !== requestId);

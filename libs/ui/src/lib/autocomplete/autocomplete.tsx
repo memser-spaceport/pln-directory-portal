@@ -38,6 +38,9 @@ export function Autocomplete({
     useState<IDropdownOption>(selectedOption);
   const [isExpanded, setIsExpanded] = useState(false);
   const dropdownOptionsRef = useRef<HTMLDivElement>(null);
+  const excludeList = excludeValues?.filter(
+    (item) => item !== selectedValue.value
+  );
 
   useMemo(() => {
     if (searchTerm === '') {
@@ -66,14 +69,14 @@ export function Autocomplete({
     const getData = setTimeout(() => {
       debounceCall(searchTerm).then((res: IDropdownOption[]) => {
         const availableTeams = res?.filter((item) =>
-          excludeValues?.every((filterItem) => filterItem !== item.value)
+          excludeList?.every((filterItem) => filterItem !== item.value)
         );
         setFilteredOptions(availableTeams);
       });
     }, debounceTime);
 
     return () => clearTimeout(getData);
-  }, [debounceCall, debounceTime, excludeValues, searchTerm]);
+  }, [debounceCall, debounceTime, excludeList, searchTerm]);
 
   const handleUserInput = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.currentTarget?.value);
