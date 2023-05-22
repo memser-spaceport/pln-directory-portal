@@ -15,7 +15,7 @@ import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
 import { ValidationErrorMessages } from '../../../components/shared/account-setttings/validation-error-message';
-import { PAGE_ROUTES } from '../../../constants';
+import { MSG_CONSTANTS, PAGE_ROUTES, SETTINGS_CONSTANTS } from '../../../constants';
 import { RequestPending } from '../../shared/request-pending/request-pending';
 import { IFormValues } from '../../../utils/members.types';
 import Modal from '../../layout/navbar/modal/modal';
@@ -36,7 +36,7 @@ interface EditMemberModalProps {
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
   id: string;
   isProfileSettings?: boolean;
-  userInfo?:any;
+  userInfo?: any;
 }
 
 function validateBasicForm(formValues, imageUrl, isProfileSettings) {
@@ -102,16 +102,16 @@ function validateForm(formValues, imageUrl, isProfileSettings) {
   };
 }
 
-function getSubmitOrNextButton(handleSubmit, isProcessing) {
+function getSubmitOrNextButton(handleSubmit, isProcessing, isProfileSettings) {
   const buttonClassName =
-    'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
+    `${isProfileSettings ? 'bg-[#156FF7]' : 'bg-gradient-to-r from-[#427DFF] to-[#44D5BB]'} shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]`;
   const submitOrNextButton = (
     <button
       className={buttonClassName}
       disabled={isProcessing}
       onClick={handleSubmit}
     >
-      Request Changes
+      {isProfileSettings ? 'Save Changes' : 'Request Changes'}
     </button>
   );
   return submitOrNextButton;
@@ -234,7 +234,7 @@ export function EditMemberModal({
           };
           // set requestor email
           const userInfoFromCookie = Cookies.get('userInfo');
-          if(userInfoFromCookie) {
+          if (userInfoFromCookie) {
             const parsedUserInfo = JSON.parse(userInfoFromCookie);
             formValues['requestorEmail'] = parsedUserInfo.email;
           }
@@ -250,7 +250,13 @@ export function EditMemberModal({
     }
   }, [isOpen, id]);
 
-  function handleReset(){
+  useEffect(() => {
+    if (saveCompleted) {
+      toast(MSG_CONSTANTS.MEMBER_UPDATE_MESSAGE)
+    }
+  }, [saveCompleted]);
+
+  function handleReset() {
     if (isProfileSettings) {
       setErrors([]);
       setBasicErrors([]);
@@ -296,7 +302,7 @@ export function EditMemberModal({
           };
           // set requestor email
           const userInfoFromCookie = Cookies.get('userInfo');
-          if(userInfoFromCookie) {
+          if (userInfoFromCookie) {
             const parsedUserInfo = JSON.parse(userInfoFromCookie);
             formValues['requestorEmail'] = parsedUserInfo.email;
           }
@@ -448,7 +454,7 @@ export function EditMemberModal({
           },
           // captchaToken,
         };
-        // if (isProfileSettings) {
+        if (!isProfileSettings) {
           const userInfoFromCookie = Cookies.get('userInfo');
           if (!userInfoFromCookie) {
             Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
@@ -460,7 +466,7 @@ export function EditMemberModal({
             setIsPendingRequestModalOpen(true);
             return false;
           }
-        // }
+        }
         await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);
         });
@@ -525,10 +531,10 @@ export function EditMemberModal({
     );
     setFormValues({ ...formValues, teamAndRoles: newRoles });
   }
- 
+
   return (
     <>
-    {isProcessing && (
+      {isProcessing && (
         <div
           className={`pointer-events-none fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
         >
@@ -537,32 +543,28 @@ export function EditMemberModal({
       )}
       {isProfileSettings ? (
         <div className="h-full w-full">
-          <div className="mx-auto mb-40 h-full w-2/4 px-5">
-            <h1 className="text-2xl font-bold">Account Settings</h1>
-            {!saveCompleted && (
+          <div className="mx-auto mb-40 h-full">
+            {(
               <div className="mt-3 flex h-10 w-full w-3/5  justify-start text-slate-400">
                 <button
-                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
-                    openTab == 1 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
-                  } ${ basicErrors?.length > 0 && openTab == 1 ? 'border-b-[#DD2C5A] text-[#DD2C5A]': basicErrors?.length > 0? 'text-[#DD2C5A]' : ''}`}
+                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 1 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                    } ${basicErrors?.length > 0 && openTab == 1 ? 'border-b-[#DD2C5A] text-[#DD2C5A]' : basicErrors?.length > 0 ? 'text-[#DD2C5A]' : ''}`}
                   onClick={() => setOpenTab(1)}
                 >
                   {' '}
                   Basic{' '}
                 </button>
                 <button
-                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
-                    openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
-                  } ${ skillErrors?.length > 0 && openTab == 2 ? 'border-b-[#DD2C5A] text-[#DD2C5A]': skillErrors?.length > 0? 'text-[#DD2C5A]' : ''}`}
+                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                    } ${skillErrors?.length > 0 && openTab == 2 ? 'border-b-[#DD2C5A] text-[#DD2C5A]' : skillErrors?.length > 0 ? 'text-[#DD2C5A]' : ''}`}
                   onClick={() => setOpenTab(2)}
                 >
                   {' '}
                   Skills
                 </button>
                 <button
-                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
-                    openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
-                  }`}
+                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                    }`}
                   onClick={() => setOpenTab(3)}
                 >
                   {' '}
@@ -571,24 +573,7 @@ export function EditMemberModal({
               </div>
             )}
             <div className="mt-3 w-full rounded-md border bg-white  px-6 py-10">
-              {saveCompleted ? (
-                <div>
-                  <div className="mb-3 text-center text-2xl font-bold">
-                    Thank you for submitting
-                  </div>
-                  <div className="text-md mb-3 text-center">
-                    Our team will review your request shortly & get back
-                  </div>
-                  <div className="text-center">
-                    <button
-                      className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
-                      onClick={returnToHome}
-                    >
-                      Return to home
-                    </button>
-                  </div>
-                </div>
-              ) : (
+              {(
                 <Fragment>
                   <div className={openTab === 1 ? 'block' : 'hidden'}>
                     <AddMemberBasicForm
@@ -624,29 +609,38 @@ export function EditMemberModal({
             </div>
           </div>
           {!saveCompleted && (
-            <div className="footerdiv fixed bottom-0 w-full bg-white px-8">
+            <div className="footerdiv fixed bottom-0 px-8 fixed inset-x-0 bottom-0 bg-white h-[80px]">
               <div className="float-right">
-                {getSubmitOrNextButton(handleSubmit, isProcessing)}
+                {getSubmitOrNextButton(handleSubmit, isProcessing, isProfileSettings)}
               </div>
-              <div className="float-right mx-5">
+              {/* <div className="float-right mx-5">
 		{getResetButton(()=>{
 		   handleReset()
 		})}
-	      </div>
+	      </div> */}
             </div>
           )}
-          <RequestPending
-            isOpen={isPendingRequestModalOpen}
-            setIsModalOpen={setIsPendingRequestModalOpen}
-          />
-          <ValidationErrorMessages
-            isOpen={isErrorPopupOpen}
-            setIsModalOpen={() => {setIsErrorPopupOpen(false)}}
-            errors={{
-              basic: basicErrors,
-              skills: skillErrors
-            }}
-          />
+          {
+            !isProfileSettings && (
+              <RequestPending
+                isOpen={isPendingRequestModalOpen}
+                setIsModalOpen={setIsPendingRequestModalOpen}
+              />
+            )
+          }
+          {
+            isProfileSettings && (
+              <ValidationErrorMessages
+                isOpen={isErrorPopupOpen}
+                setIsModalOpen={() => { setIsErrorPopupOpen(false) }}
+                from={'member'}
+                errors={{
+                  basic: basicErrors,
+                  skills: skillErrors
+                }}
+              />
+            )
+          }
         </div>
       ) : (
         <Modal
@@ -654,7 +648,7 @@ export function EditMemberModal({
           onClose={() => handleModalClose()}
           enableFooter={false}
           image={<TextImage />}
-        modalRef={divRef}
+          modalRef={divRef}
         >
           {saveCompleted ? (
             <div>
@@ -736,7 +730,7 @@ export function EditMemberModal({
                   {getCancelOrBackButton(handleModalClose)}
                 </div>
                 <div className="float-right">
-                  {getSubmitOrNextButton(handleSubmit, isProcessing)}
+                  {getSubmitOrNextButton(handleSubmit, isProcessing, isProfileSettings)}
                 </div>
               </div>
             </div>

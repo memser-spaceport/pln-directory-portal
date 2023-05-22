@@ -12,18 +12,20 @@ export default function AddMemberStepOne(props) {
 
   return (
     <>
-      <div className="pt-5">
-        <InputField
-          required
-          name="requestorEmail"
-          type="email"
-          label="Requestor Email"
-          value={values?.requestorEmail}
-          onChange={onChange}
-          placeholder="Enter your email address"
-          className="custom-grey custom-outline-none border"
-        />
-      </div>
+      {!props?.fromSettings && (
+        <div className="pt-5">
+          <InputField
+            required
+            name="requestorEmail"
+            type="email"
+            label="Requestor Email"
+            value={values?.requestorEmail}
+            onChange={onChange}
+            placeholder="Enter your email address"
+            className="custom-grey custom-outline-none border"
+          />
+        </div>
+      )}
       <div className="flex pt-5">
         <div className="">
           <ProfileImageUpload

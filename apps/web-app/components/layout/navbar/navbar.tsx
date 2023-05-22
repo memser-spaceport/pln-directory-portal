@@ -34,7 +34,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
     {
       icon: CogIcon,
       label: 'Account Settings',
-      url: `/directory/members/accountSettings`,
+      url: `/directory/account-settings`,
       eventCode: '',
       onClick: () => {
         if (!Cookies.get('refreshToken')) {

@@ -109,3 +109,23 @@ export const PAGE_ROUTES = {
   MEMBERS:'/directory/members',
   TEAMS: '/directory/teams'
 }
+
+export const SETTINGS_CONSTANTS = {
+  PROFILE_SETTINGS: 'Profile Settings',
+  TEAM_SETTINGS: 'Team Settings',
+  ACCOUNT_SETTINGS: 'ACCOUNT SETTINGS'
+}
+
+export const TAB_CONSTANTS = {
+  BASIC: 'BASIC',
+  SKILLS: 'SKILLS',
+  SOCIAL: 'SOCIAL',
+  PROJECT_DETAILS: 'PROJECT DETAILS'
+}
+
+export const MSG_CONSTANTS = {
+  TEAM_UPDATE_MESSAGE:'Team settings updated!',
+  MEMBER_UPDATE_MESSAGE: 'Profile settings updated!'
+}
+
+export const ADMIN_ROLE = 'DIRECTORYADMIN';
