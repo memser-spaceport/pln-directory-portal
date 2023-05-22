@@ -23,6 +23,7 @@ import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-member.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
+import orderBy from 'lodash/orderBy';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditMemberModalProps {
@@ -158,8 +159,9 @@ export function EditMemberModal({
       Promise.all([fetchMember(id), fetchSkills(), fetchTeams()])
         .then((data) => {
           const member = data[0];
+          console.log('member detaillllllllllllllll', member);
           let counter = 1;
-          const teamAndRoles =
+          let teamAndRoles =
             member.teamMemberRoles?.length &&
             member.teamMemberRoles.map((item) => {
               return {
@@ -167,8 +169,15 @@ export function EditMemberModal({
                 teamUid: item?.team?.uid,
                 teamTitle: item?.team?.name,
                 rowId: counter++,
+                mainTeam: item.mainTeam,
               };
             });
+          teamAndRoles = orderBy(
+            teamAndRoles,
+            ['mainTeam', 'teamTitle'],
+            ['desc', 'asc']
+          );
+
           const formValues = {
             name: member.name,
             email: member.email,
@@ -194,6 +203,7 @@ export function EditMemberModal({
             }),
             openToWork: member?.openToWork,
           };
+          console.log('teamAndRoles', formValues);
           setImageUrl(member.image?.url ?? '');
           setFormValues(formValues);
           setDropDownValues({ skillValues: data[1], teamNames: data[2] });
