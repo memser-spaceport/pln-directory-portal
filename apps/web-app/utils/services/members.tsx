@@ -13,11 +13,12 @@ export const fetchMember = async (id) => {
   }
 };
 
-export const requestPendingCheck = async (email) => {
+export const requestPendingCheck = async (email, id) => {
   try {
     const data = {
       uniqueIdentifier: email,
       participantType: ENROLLMENT_TYPE.MEMBER,
+      uid: id,
     };
 
     const response = await api.post(
@@ -66,7 +67,6 @@ export const getAllPinned = async (userName) => {
 };
 
 export const getAllRepositories = async (userName) => {
-  console.log('userName', userName);
   return await axios
     .get(`https://api.github.com/users/${userName}/repos`)
     .then((v) => {
@@ -81,5 +81,5 @@ export const getAllRepositories = async (userName) => {
       });
       return repoArray;
     })
-    .catch((e) => console.log(e));
+    .catch((e) => console.log(e.message));
 };
