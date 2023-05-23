@@ -4,6 +4,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  InternalServerErrorException,
   Param,
   Patch,
   Post,
@@ -75,12 +76,25 @@ export class ParticipantsRequestController {
         throw new UnauthorizedException()
       }
       if(!requestorDetails.isDirectoryAdmin && (referenceUid !== requestorDetails.uid)) {
-        console.log(requestorDetails, 'in edit exception')
         throw new ForbiddenException()
       }
     }
-
-    const result = await this.participantsRequestService.addRequest(postData);
+    let result;
+    if(referenceUid && participantType === ParticipantType.MEMBER.toString()){
+      result = await this.participantsRequestService.addRequest(postData, true);
+      if (result?.uid) {
+        result = await this.participantsRequestService.processMemberEditRequest(
+          result.uid,
+          true,  // disable the notification 
+          true // enable the auto approval
+        );
+      } else {
+        throw new InternalServerErrorException();
+      }
+    }
+    else{
+      result = await this.participantsRequestService.addRequest(postData);
+    }
     return result;
   }
 }

@@ -132,6 +132,21 @@ export class ParticipantsRequestService {
     const postData = { ...requestData, uniqueIdentifier };
     requestData[uniqueIdentifier] = uniqueIdentifier;
 
+    if(requestData.participantType === ParticipantType.MEMBER.toString()){
+      const { city, country, region } = postData.newData;
+      if (city || country || region) {
+        const result: any = await this.locationTransferService.fetchLocation(
+          city,
+          country,
+          null,
+          region,
+          null
+        );
+        if (!result || !result?.location) {
+          throw new BadRequestException('Invalid Location info');
+        }
+      }
+    }
     const slackConfig = {
       requestLabel: '',
       url: '',
@@ -337,7 +352,7 @@ export class ParticipantsRequestService {
     return { code: 1, message: 'Success' };
   }
 
-  async processMemberEditRequest(uidToEdit) {
+  async processMemberEditRequest(uidToEdit, disableNotification=false, isAutoApproval=false) {
     // Get
     const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
       where: { uid: uidToEdit },
@@ -414,6 +429,9 @@ export class ParticipantsRequestService {
         throw new BadRequestException('Invalid Location info');
       }
     }
+    else{
+      dataToSave['location'] = { connect: { uid: '' } };
+    }
 
     // Team member roles relational mapping
     const oldTeamUids = [...existingData.teamMemberRoles].map((t) => t.teamUid);
@@ -489,24 +507,26 @@ export class ParticipantsRequestService {
       // Updating status
       await tx.participantsRequest.update({
         where: { uid: uidToEdit },
-        data: { status: ApprovalStatus.APPROVED },
+        data: { status: isAutoApproval ? ApprovalStatus.AUTOAPPROVED:ApprovalStatus.APPROVED },
       });
     });
-    await this.awsService.sendEmail('MemberEditRequestCompleted', true, [], {
-      memberName: dataToProcess.name,
-    });
-    await this.awsService.sendEmail(
-      'EditMemberSuccess',
-      false,
-      [dataFromDB.requesterEmailId],
-      {
+    if(!disableNotification){
+      await this.awsService.sendEmail('MemberEditRequestCompleted', true, [], {
         memberName: dataToProcess.name,
-        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}`,
-      }
-    );
-    slackConfig.requestLabel = 'Edit Labber Request Completed';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}`;
-    await this.slackService.notifyToChannel(slackConfig);
+      });
+      await this.awsService.sendEmail(
+        'EditMemberSuccess',
+        false,
+        [dataFromDB.requesterEmailId],
+        {
+          memberName: dataToProcess.name,
+          memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}`,
+        }
+      );
+      slackConfig.requestLabel = 'Edit Labber Request Completed';
+      slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}`;
+      await this.slackService.notifyToChannel(slackConfig);
+    }
     //await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
