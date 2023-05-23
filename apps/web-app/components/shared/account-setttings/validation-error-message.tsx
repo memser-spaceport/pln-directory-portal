@@ -5,16 +5,15 @@ import { ReactComponent as FailedIcon } from '../../../public/assets/images/icon
 interface IValidationErrorMessages {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
-  errors: {
-    basic: any[];
-    skills: any[];
-  }
+  errors: any,
+  from:string
 }
 
 export function ValidationErrorMessages({
   isOpen,
   setIsModalOpen,
-  errors
+  errors,
+  from
 }: IValidationErrorMessages) {
   const handleModalClose = () => {
     setIsModalOpen(false);
@@ -58,7 +57,9 @@ export function ValidationErrorMessages({
                     <FailedIcon />
                     <p className="mt-4">Validation Error</p>
                   </Dialog.Title>
-                  { errors?.basic?.length>0 && <div className="w-full text-base mt-2 font-semibold"> Basic </div>}
+                 {
+                  from === 'member' ? (<>
+                   { errors?.basic?.length>0 && <div className="w-full text-base mt-2 font-semibold"> Basic </div>}
                     <div className="w-full rounded-lg bg-white px-5 py-2">
                       <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
                         {errors?.basic?.map((item, index) => (
@@ -74,6 +75,34 @@ export function ValidationErrorMessages({
                       ))}
                     </ul>
                   </div>
+                  </>):(<>
+                    { errors?.basic?.length>0 && <div className="w-full text-base mt-2 font-semibold"> Basic </div>}
+                    <div className="w-full rounded-lg bg-white px-5 py-2">
+                      <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
+                        {errors?.basic?.map((item, index) => (
+                        <li key={index}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  { errors?.project?.length > 0 &&  <div className="w-full text-base mt-2 font-semibold"> Project Details </div>}
+                  <div className="w-full rounded-lg bg-white px-5 py-2">
+                    <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
+                      {errors?.project?.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  { errors?.social?.length > 0 &&  <div className="w-full text-base mt-2 font-semibold"> Social </div>}
+                  <div className="w-full rounded-lg bg-white px-5 py-2">
+                    <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
+                      {errors?.social?.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  </>)
+                 }
+                 
                   <div className="w-100 mt-6 flex justify-end">
                     <button
                       type="button"

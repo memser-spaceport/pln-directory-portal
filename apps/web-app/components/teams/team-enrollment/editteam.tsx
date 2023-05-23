@@ -21,16 +21,18 @@ import {
 import { fetchTeam } from '../../../utils/services/teams';
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
-import { ENROLLMENT_TYPE } from '../../../constants';
+import { ENROLLMENT_TYPE, MSG_CONSTANTS, TAB_CONSTANTS } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-team.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
+import { ValidationErrorMessages } from '../../shared/account-setttings/validation-error-message';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditTeamModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
   id: string;
+  fromSettings?: boolean;
 }
 
 function validateBasicForm(formValues, imageUrl) {
@@ -41,7 +43,7 @@ function validateBasicForm(formValues, imageUrl) {
     !formValues.requestorEmail?.trim() ||
     !formValues.requestorEmail?.match(emailRE)
   ) {
-    errors.push('Please add a valid Requestor email');
+    //errors.push('Please add a valid Requestor email');
   }
   if (!formValues.name?.trim()) {
     errors.push('Please add Team Name');
@@ -97,19 +99,24 @@ function validateForm(formValues, imageUrl) {
   if (socialFormErrors.length) {
     errors = [...errors, ...socialFormErrors];
   }
-  return errors;
+  return {
+    errors,
+    basicFormErrors,
+    projectDetailFormErrors,
+    socialFormErrors
+  };
 }
 
-function getSubmitOrNextButton(handleSubmit, isProcessing) {
+function getSubmitOrNextButton(handleSubmit, isProcessing, fromSettings) {
   const buttonClassName =
-    'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
+    `${fromSettings ? 'bg-[#156FF7] ':'bg-gradient-to-r from-[#427DFF] to-[#44D5BB] '}shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]`;
   const submitOrNextButton = (
     <button
       className={buttonClassName}
       disabled={isProcessing}
       onClick={handleSubmit}
     >
-      Request Changes
+      {fromSettings ? 'Save Changes' : 'Request Changes'}
     </button>
   );
   return submitOrNextButton;
@@ -131,13 +138,19 @@ export function EditTeamModal({
   isOpen,
   setIsModalOpen,
   id,
+  fromSettings = false
 }: EditTeamModalProps) {
   const [errors, setErrors] = useState([]);
+  const [basicErrors, setBasicErrors] = useState([]);
+  const [projectErrors, seProjecttErrors] = useState([]);
+  const [socialErrors, setSocialErrors] = useState([]);
   const [imageUrl, setImageUrl] = useState<string>();
   const [imageChanged, setImageChanged] = useState<boolean>(false);
   const [dropDownValues, setDropDownValues] = useState({});
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
+  const [openTab, setOpenTab] = useState(1);
+  const [isErrorPopupOpen, setIsErrorPopupOpen] = useState(false);
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     requestorEmail: '',
@@ -161,6 +174,9 @@ export function EditTeamModal({
   // const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
+    if(saveCompleted){
+      toast(MSG_CONSTANTS.TEAM_UPDATE_MESSAGE)
+    }
     const divElement = document.getElementById('myDiv') as HTMLDivElement;
     if (divElement) {
       divElement.setAttribute('tabIndex', '0');
@@ -169,6 +185,9 @@ export function EditTeamModal({
   }, [saveCompleted, errors]);
 
   useEffect(() => {
+    if(fromSettings){
+      resetState();
+    }
     if (isOpen) {
       Promise.all([
         fetchTeam(id),
@@ -229,6 +248,9 @@ export function EditTeamModal({
 
   function resetState() {
     setErrors([]);
+    setBasicErrors([]);
+    seProjecttErrors([]);
+    setSocialErrors([]);
     setDropDownValues({});
     setImageChanged(false);
     setSaveCompleted(false);
@@ -304,7 +326,14 @@ export function EditTeamModal({
       //   return;
       // }
       setErrors([]);
-      const errors = validateForm(formValues, imageUrl);
+      setBasicErrors([]);
+      seProjecttErrors([]);
+      setSocialErrors([]);
+      const { errors,
+        basicFormErrors,
+        projectDetailFormErrors,
+        socialFormErrors
+      } = validateForm(formValues, imageUrl);
       if (errors?.length > 0) {
         const element1 = divRef.current;
         if (element1) {
@@ -312,6 +341,10 @@ export function EditTeamModal({
           // element1.scrollTop = 0;
         }
         setErrors(errors);
+        setBasicErrors(basicFormErrors);
+        seProjecttErrors(projectDetailFormErrors);
+        setSocialErrors(socialFormErrors);
+        setIsErrorPopupOpen(true);
         return false;
       }
       const values = formatData();
@@ -382,6 +415,111 @@ export function EditTeamModal({
     setFormValues({ ...formValues, [name]: selectedOption });
   }
 
+  function saveCompletedTemplate() {
+    return (
+      <div>
+        <div className="mb-3 text-center text-2xl font-bold">
+          Thank you for submitting
+        </div>
+        <div className="text-md mb-3 text-center">
+          Our team will review your request shortly & get back
+        </div>
+        <div className="text-center">
+          <button
+            className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
+            onClick={() => handleModalClose()}
+          >
+            Return to home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  function beforeSaveTemplate() {
+    return (
+      <div>
+        <div className={`px-11 ${fromSettings ? 'bg-white  mt-[24px] pt-[24px] rounded-t-[8px]' : ''} `}>
+          <span className="font-size-14 text-sm">
+            Please fill out only the fields you would like to change for
+            this member. If there is something you want to change that is
+            not available, please leave a detailed explanation in
+            &quot;Additional Notes&quot;. If you don&apos;t want to change
+            a field, leave it blank.
+          </span>
+        </div>
+
+        {(errors?.length > 0 && !fromSettings)  && (
+          <div className="w-full rounded-lg bg-white p-5 ">
+            <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
+              {errors.map((item, index) => (
+                <li key={index}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div className={`overflow-y-auto px-11 ${fromSettings ? 'bg-white rounded-[8px] pb-[24px] mb-[90px]' : ''}`}>
+          <div className={(openTab === 1 || !fromSettings) ? 'block' : 'hidden'}>
+            <AddTeamStepOne
+              formValues={formValues}
+              handleInputChange={handleInputChange}
+              handleDropDownChange={handleDropDownChange}
+              handleImageChange={handleImageChange}
+              imageUrl={imageUrl}
+              disableName={true}
+              fromSettings={true}
+            />
+          </div>
+          <div className={(openTab === 2 || !fromSettings) ? 'block' : 'hidden'}>
+            <AddTeamStepTwo
+              formValues={formValues}
+              dropDownValues={dropDownValues}
+              handleInputChange={handleInputChange}
+              handleDropDownChange={handleDropDownChange}
+            />
+          </div>
+          <div className={(openTab === 3 || !fromSettings) ? 'block' : 'hidden'}>
+            <AddTeamStepThree
+              formValues={formValues}
+              handleInputChange={handleInputChange}
+              handleDropDownChange={handleDropDownChange}
+            />
+          </div>
+        </div>
+        {
+          (
+            <div className={`footerdiv flow-root w-full ${fromSettings ? 'fixed inset-x-0 bottom-0 bg-white h-[80px]' : ''}`}>
+              {
+                !fromSettings && (
+                  <div className="float-left">
+                    {getCancelOrBackButton(handleModalClose)}
+                  </div>
+                )
+              }
+              <div className="float-right">
+                {getSubmitOrNextButton(handleSubmit, isProcessing, fromSettings)}
+              </div>
+            </div>
+          )
+        }
+        {
+         (
+            <ValidationErrorMessages
+            isOpen={isErrorPopupOpen}
+            from={'team'}
+            setIsModalOpen={() => {setIsErrorPopupOpen(false)}}
+            errors={{
+              basic: basicErrors,
+              project: projectErrors,
+              social:socialErrors
+            }}
+          />
+          )
+        }
+      </div >
+    );
+  }
+
   return (
     <>
       {isProcessing && (
@@ -392,81 +530,56 @@ export function EditTeamModal({
         </div>
       )}
       <div id="myDiv">
-        <Modal
-          isOpen={isOpen}
-          onClose={handleModalClose}
-          enableFooter={false}
-          image={<TextImage />}
-          modalRef={divRef}
-        >
-          {saveCompleted ? (
-            <div>
-              <div className="mb-3 text-center text-xl font-bold">
-                Your changes has been saved successfully.
-              </div>
-              <div className="text-center">
+        {
+          fromSettings ? (<>
+            {(
+              <div className="mt-3 flex h-10 w-full w-3/5  justify-start text-slate-400">
                 <button
-                  className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
-                  onClick={() => handleModalClose()}
+                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 1 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                    } ${basicErrors?.length > 0 && openTab == 1 ? 'border-b-[#DD2C5A] text-[#DD2C5A]' : basicErrors?.length > 0 ? 'text-[#DD2C5A]' : ''}`}
+                  onClick={() => setOpenTab(1)}
                 >
-                  Return to home
+                  {' '}
+                  {TAB_CONSTANTS.BASIC}{' '}
+                </button>
+                <button
+                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                    } ${projectErrors?.length > 0 && openTab == 2 ? 'border-b-[#DD2C5A] text-[#DD2C5A]' : projectErrors?.length > 0 ? 'text-[#DD2C5A]' : ''}`}
+                  onClick={() => setOpenTab(2)}
+                >
+                  {' '}
+                  {TAB_CONSTANTS.PROJECT_DETAILS}
+                </button>
+                <button
+                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                    } ${socialErrors?.length > 0 && openTab == 3 ? 'border-b-[#DD2C5A] text-[#DD2C5A]' : socialErrors?.length > 0 ? 'text-[#DD2C5A]' : ''}`}
+                  onClick={() => setOpenTab(3)}
+                >
+                  {' '}
+                  {TAB_CONSTANTS.SOCIAL}{' '}
                 </button>
               </div>
-            </div>
-          ) : (
-            <div>
-              <div className="px-11">
-                <span className="font-size-14 text-sm">
-                  Please fill out only the fields you would like to change for
-                  this member. If there is something you want to change that is
-                  not available, please leave a detailed explanation in
-                  &quot;Additional Notes&quot;. If you don&apos;t want to change
-                  a field, leave it blank.
-                </span>
-              </div>
-              {errors?.length > 0 && (
-                <div className="w-full rounded-lg bg-white p-5 ">
-                  <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
-                    {errors.map((item, index) => (
-                      <li key={index}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <div className="overflow-y-auto px-11">
-                <AddTeamStepOne
-                  formValues={formValues}
-                  handleInputChange={handleInputChange}
-                  handleDropDownChange={handleDropDownChange}
-                  handleImageChange={handleImageChange}
-                  imageUrl={imageUrl}
-                  disableName={true}
-                  disableEmail={true}
-                />
-                <AddTeamStepTwo
-                  formValues={formValues}
-                  dropDownValues={dropDownValues}
-                  handleInputChange={handleInputChange}
-                  handleDropDownChange={handleDropDownChange}
-                />
-                <AddTeamStepThree
-                  formValues={formValues}
-                  handleInputChange={handleInputChange}
-                  handleDropDownChange={handleDropDownChange}
-                />
-              </div>
-              <div className="footerdiv flow-root w-full">
-                <div className="float-left">
-                  {getCancelOrBackButton(handleModalClose)}
-                </div>
-                <div className="float-right">
-                  {getSubmitOrNextButton(handleSubmit, isProcessing)}
-                </div>
-              </div>
-            </div>
-          )}
-        </Modal>
-      </div>
+            )}
+            {(
+              beforeSaveTemplate()
+            )
+            }
+          </>)
+            : (<Modal
+              isOpen={isOpen}
+              onClose={handleModalClose}
+              enableFooter={false}
+              image={<TextImage />}
+              modalRef={divRef}
+            >
+              {saveCompleted ? saveCompletedTemplate() : (
+                beforeSaveTemplate()
+              )
+              }
+            </Modal >)
+        }
+
+      </div >
     </>
   );
 }
