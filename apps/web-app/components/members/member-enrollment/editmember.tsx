@@ -159,24 +159,25 @@ export function EditMemberModal({
       Promise.all([fetchMember(id), fetchSkills(), fetchTeams()])
         .then((data) => {
           const member = data[0];
-          console.log('member detaillllllllllllllll', member);
           let counter = 1;
-          let teamAndRoles =
-            member.teamMemberRoles?.length &&
-            member.teamMemberRoles.map((item) => {
-              return {
-                role: item.role,
-                teamUid: item?.team?.uid,
-                teamTitle: item?.team?.name,
-                rowId: counter++,
-                mainTeam: item.mainTeam,
-              };
-            });
+          let teamAndRoles = member.teamMemberRoles?.length
+            ? member.teamMemberRoles
+            : [];
           teamAndRoles = orderBy(
             teamAndRoles,
-            ['mainTeam', 'teamTitle'],
+            ['mainTeam', 'team.name'],
             ['desc', 'asc']
           );
+
+          teamAndRoles = teamAndRoles.map((item) => {
+            return {
+              role: item.role,
+              teamUid: item?.team?.uid,
+              teamTitle: item?.team?.name,
+              rowId: counter++,
+              mainTeam: item.mainTeam,
+            };
+          });
 
           const formValues = {
             name: member.name,
@@ -203,7 +204,6 @@ export function EditMemberModal({
             }),
             openToWork: member?.openToWork,
           };
-          console.log('teamAndRoles', formValues);
           setImageUrl(member.image?.url ?? '');
           setFormValues(formValues);
           setDropDownValues({ skillValues: data[1], teamNames: data[2] });
