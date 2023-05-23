@@ -36,9 +36,6 @@ function validateBasicForm(formValues, imageUrl) {
   if (!formValues.name?.trim()) {
     errors.push('Please add Team Name');
   }
-  if (!imageUrl) {
-    errors.push('Please add your team logo');
-  }
   if (!formValues.shortDescription?.trim()) {
     errors.push('Please add a Description');
   }
@@ -257,6 +254,11 @@ export default function TeamView(props) {
     setImageChanged(true);
   };
 
+  const onRemoveImage = () => {
+    setFormValues({ ...formValues, logoFile: null });
+    setImageUrl('');
+  };
+
   function handleDropDownChange(selectedOption, name) {
     setFormValues({ ...formValues, [name]: selectedOption });
   }
@@ -305,6 +307,7 @@ export default function TeamView(props) {
                     onNameBlur={onNameBlur}
                     nameExists={nameExists}
                     setDisableNext={setDisableSave}
+                    onRemoveImage={onRemoveImage}
                   />
                   <TeamStepTwo
                     formValues={formValues}

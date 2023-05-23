@@ -1,4 +1,5 @@
 import { InputField, ProfileImageUpload } from '@protocol-labs-network/ui';
+import { UserIcon } from '@heroicons/react/solid';
 import { ReactComponent as InformationCircleIcon } from '../../public/assets/icons/info_icon.svg';
 
 export default function AddMemberBasicForm(props) {
@@ -13,6 +14,8 @@ export default function AddMemberBasicForm(props) {
             imageUrl={props.imageUrl}
             maxSize={4}
             onImageChange={props.handleImageChange}
+            avatarIcon={UserIcon}
+            enableHover={props.isEditEnabled ? true : false}
             disabled={!props.isEditEnabled}
           />
         </div>
@@ -31,6 +34,15 @@ export default function AddMemberBasicForm(props) {
           />
         </div>
       </div>
+
+      {props.imageUrl && props.isEditEnabled && (
+        <span
+          onClick={props.onRemoveImage}
+          className="cursor-pointer pt-5 pl-2 text-xs text-blue-600"
+        >
+          Remove Image
+        </span>
+      )}
 
       <div className="flex pt-3">
         <div>

@@ -45,9 +45,6 @@ function validateBasicForm(formValues, imageUrl) {
   if (!formValues.name?.trim()) {
     errors.push('Please add Team Name');
   }
-  if (!imageUrl) {
-    errors.push('Please add your team logo');
-  }
   if (!formValues.shortDescription?.trim()) {
     errors.push('Please add a Description');
   }
@@ -132,7 +129,6 @@ export function EditTeamModal({
   setIsModalOpen,
   id,
 }: EditTeamModalProps) {
-  const [teamName, setTeamName] = useState('');
   const [errors, setErrors] = useState([]);
   const [imageUrl, setImageUrl] = useState<string>();
   const [imageChanged, setImageChanged] = useState<boolean>(false);
@@ -209,7 +205,6 @@ export function EditTeamModal({
             officeHours: team.officeHours,
           };
           setFormValues(formValues);
-          setTeamName(team.name);
           setImageUrl(team.logo?.url ?? '');
           setDropDownValues({
             membershipSources: data[1],
@@ -291,7 +286,6 @@ export function EditTeamModal({
       industryTags: formattedTags,
       membershipSources: formattedMembershipSource,
       technologies: formattedtechnologies,
-      oldTeamName: teamName,
     };
     delete formattedValue.requestorEmail;
     return formattedValue;
@@ -400,6 +394,11 @@ export function EditTeamModal({
     setImageChanged(true);
   };
 
+  const onRemoveImage = () => {
+    setFormValues({ ...formValues, logoFile: null });
+    setImageUrl('');
+  };
+
   function handleDropDownChange(selectedOption, name) {
     setFormValues({ ...formValues, [name]: selectedOption });
   }
@@ -468,6 +467,8 @@ export function EditTeamModal({
                   onNameBlur={onNameBlur}
                   nameExists={nameExists}
                   setDisableNext={setDisableSubmit}
+                  isEditMode={true}
+                  onRemoveImage={onRemoveImage}
                 />
                 <AddTeamStepTwo
                   formValues={formValues}

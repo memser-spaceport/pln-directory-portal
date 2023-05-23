@@ -50,9 +50,6 @@ function validateBasicForm(formValues) {
   if (!formValues.name.trim()) {
     errors.push('Please add Team Name');
   }
-  if (!formValues.logoFile) {
-    errors.push('Please add your team logo');
-  }
   if (!formValues.shortDescription?.trim()) {
     errors.push('Please add a Description');
   }
@@ -432,6 +429,11 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     setFormValues({ ...formValues, logoFile: file });
   };
 
+  const onRemoveImage = () => {
+    setFormValues({ ...formValues, logoFile: null });
+    setImageUrl('');
+  };
+
   function handleDropDownChange(selectedOption, name) {
     setFormValues({ ...formValues, [name]: selectedOption });
   }
@@ -449,6 +451,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
             imageUrl={imageUrl}
             nameExists={nameExists}
             setDisableNext={setDisableNext}
+            onRemoveImage={onRemoveImage}
           />
         );
       case 2:
