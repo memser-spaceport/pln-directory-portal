@@ -42,9 +42,6 @@ function validateBasicForm(formValues, imageUrl) {
   if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
     errors.push('Please add valid Email');
   }
-  if (!imageUrl) {
-    errors.push('Please upload a profile image');
-  }
   if (
     !formValues.requestorEmail?.trim() ||
     !formValues.requestorEmail?.match(emailRE)
@@ -196,9 +193,9 @@ export function EditMemberModal({
             githubHandler: member.githubHandler,
             officeHours: member.officeHours,
             comments: '',
-            teamAndRoles: teamAndRoles || [
-              { teamUid: '', teamTitle: '', role: '', rowId: 1 },
-            ],
+            teamAndRoles: teamAndRoles.length
+              ? teamAndRoles
+              : [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
             skills: member.skills?.map((item) => {
               return { value: item.uid, label: item.title };
             }),
@@ -422,6 +419,11 @@ export function EditMemberModal({
     setImageChanged(true);
   };
 
+  const onRemoveImage = () => {
+    setFormValues({ ...formValues, imageFile: null });
+    setImageUrl('');
+  };
+
   function handleDeleteRolesRow(rowId) {
     const newRoles = formValues.teamAndRoles.filter(
       (item) => item.rowId != rowId
@@ -503,6 +505,8 @@ export function EditMemberModal({
                 emailExists={emailExists}
                 onEmailBlur={onEmailBlur}
                 setDisableNext={setDisableSubmit}
+                isEditMode={true}
+                onRemoveImage={onRemoveImage}
               />
               <AddMemberSkillForm
                 formValues={formValues}

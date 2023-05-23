@@ -29,9 +29,6 @@ function validateBasicForm(formValues, imageUrl) {
   if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
     errors.push('Please add valid Email');
   }
-  if (!imageUrl) {
-    errors.push('Please upload a profile image');
-  }
   if (
     !formValues.requestorEmail?.trim() ||
     !formValues.requestorEmail?.match(emailRE)
@@ -274,6 +271,11 @@ export default function MemberView(props) {
     setImageChanged(true);
   };
 
+  const onRemoveImage = () => {
+    setFormValues({ ...formValues, imageFile: null });
+    setImageUrl('');
+  };
+
   function handleDeleteRolesRow(rowId) {
     const newRoles = formValues.teamAndRoles.filter(
       (item) => item.rowId != rowId
@@ -336,6 +338,7 @@ export default function MemberView(props) {
                   emailExists={emailExists}
                   onEmailBlur={onEmailBlur}
                   setDisableNext={setDisableSave}
+                  onRemoveImage={onRemoveImage}
                 />
                 <MemberSkillForm
                   formValues={formValues}

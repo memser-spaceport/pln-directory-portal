@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { ReactComponent as CameraIcon } from '../../assets/icons/cameraicon.svg';
+import { CameraIcon as Camera } from '@heroicons/react/solid';
 
 type Shape = 'circle' | 'square';
 
@@ -10,6 +11,8 @@ type Props = {
   maxSize: number; // Size in MB
   previewImageShape?: Shape;
   disabled?: boolean;
+  enableHover?: boolean;
+  avatarIcon?: React.ReactNode;
 };
 
 function bytesToSize(bytes: number) {
@@ -26,9 +29,12 @@ export function ProfileImageUpload({
   maxSize,
   previewImageShape = 'circle',
   disabled = false,
+  enableHover = true,
+  avatarIcon: AvatarIcon,
 }: Props) {
   const [, setImage] = useState<File | null>(null);
   const [uploadError, setError] = useState('');
+  const [isHovered, setIsHovered] = useState(false);
   const previewClassName =
     previewImageShape === 'circle' ? 'rounded-full' : 'rounded-xl';
 
@@ -53,18 +59,46 @@ export function ProfileImageUpload({
     }
   };
 
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+  };
+
+  const divProps = {
+    className: `relative h-24 w-24 overflow-hidden border-4 border-gray-300 ${previewClassName}`,
+    ...(enableHover && { onMouseLeave: handleMouseLeave }), // Conditionally add onMouseLeave prop
+    ...(enableHover && { onMouseEnter: handleMouseEnter }), // Conditionally add onMouseEnter prop
+  };
+
   return (
     <>
-      <div
-        className={`relative h-24 w-24 overflow-hidden border-4 border-gray-300 ${previewClassName}`}
-      >
+      <div {...divProps}>
         {imageUrl ? (
-          <Image
-            src={imageUrl}
-            alt="Profile Image"
-            layout="fill"
-            objectFit="cover"
-          />
+          <div className="flex h-full w-full flex-col items-center justify-center">
+            <Image
+              src={imageUrl}
+              alt="Profile Image"
+              layout="fill"
+              objectFit="cover"
+            />
+            {isHovered && (
+              <div className="absolute flex h-full w-full flex-col items-center justify-center bg-white opacity-70">
+                <CameraIcon className="fill-black-500 h-10 w-10" />
+              </div>
+            )}
+          </div>
+        ) : AvatarIcon ? (
+          <div className="flex h-full w-full flex-col items-center justify-center bg-gray-100">
+            <AvatarIcon className="w-22 h-22 bg-gray-200 fill-white" />
+            {isHovered && (
+              <div className="absolute flex h-full w-full flex-col items-center justify-center bg-white opacity-50">
+                <CameraIcon className="fill-black-500 h-10 w-10" />
+              </div>
+            )}
+          </div>
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center bg-gray-100">
             <CameraIcon />

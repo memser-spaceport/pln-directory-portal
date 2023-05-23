@@ -4,6 +4,7 @@ import {
   ProfileImageUpload,
   TextArea,
 } from '@protocol-labs-network/ui';
+import { UserGroupIcon } from '@heroicons/react/solid';
 import { ReactComponent as InformationCircleIcon } from '../../public/assets/icons/info_icon.svg';
 
 export default function TeamStepOne(props) {
@@ -31,6 +32,8 @@ export default function TeamStepOne(props) {
             imageUrl={props.imageUrl}
             maxSize={4}
             previewImageShape="square"
+            enableHover={props.isEditEnabled ? true : false}
+            avatarIcon={UserGroupIcon}
             onImageChange={props.handleImageChange}
             disabled={!props.isEditEnabled}
           />
@@ -58,6 +61,15 @@ export default function TeamStepOne(props) {
           )}
         </div>
       </div>
+
+      {props.imageUrl && props.isEditEnabled && (
+        <span
+          onClick={props.onRemoveImage}
+          className="cursor-pointer pt-5 pl-2 text-xs text-blue-600"
+        >
+          Remove Image
+        </span>
+      )}
 
       <div className="flex pt-3">
         <div>

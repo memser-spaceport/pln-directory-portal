@@ -46,9 +46,6 @@ function validateBasicForm(formValues) {
   if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
     errors.push('Please add valid Email');
   }
-  if (!formValues.imageFile) {
-    errors.push('Please upload a profile image');
-  }
   return errors;
 }
 
@@ -426,6 +423,11 @@ export function AddMemberModal({
     reader.onload = () => setImageUrl(reader.result as string);
   };
 
+  const onRemoveImage = () => {
+    setFormValues({ ...formValues, imageFile: null });
+    setImageUrl('');
+  };
+
   function handleDeleteRolesRow(rowId) {
     const newRoles = formValues.teamAndRoles.filter(
       (item) => item.rowId != rowId
@@ -445,6 +447,7 @@ export function AddMemberModal({
             emailExists={emailExists}
             onEmailBlur={onEmailBlur}
             setDisableNext={setDisableNext}
+            onRemoveImage={onRemoveImage}
           />
         );
       case 2:

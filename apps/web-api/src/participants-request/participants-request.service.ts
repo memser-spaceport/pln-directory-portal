@@ -108,10 +108,22 @@ export class ParticipantsRequestService {
     const postData = { ...requestData, uniqueIdentifier };
     requestData[uniqueIdentifier] = uniqueIdentifier;
 
+    let existingData: any;
+    if (requestData.referenceUid) {
+      existingData =
+        requestData.participantType === 'TEAM'
+          ? await this.prisma.team.findUnique({
+              where: { uid: requestData.referenceUid },
+            })
+          : await this.prisma.member.findUnique({
+              where: { uid: requestData.referenceUid },
+            });
+    }
+
     const slackConfig = {
       requestLabel: '',
       url: '',
-      name: requestData.newData.oldTeamName ?? requestData.newData.name,
+      name: requestData.newData.name,
     };
     const result: any = await this.prisma.participantsRequest.create({
       data: { ...postData },
@@ -134,7 +146,7 @@ export class ParticipantsRequestService {
       slackConfig.requestLabel = 'Edit Labber Request';
       slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`;
       await this.awsService.sendEmail('EditMemberRequest', true, [], {
-        memberName: result.newData.name,
+        memberName: existingData.name,
         requestUid: result.uid,
         requesterEmailId: requestData.requesterEmailId,
         adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`,
@@ -157,7 +169,7 @@ export class ParticipantsRequestService {
       slackConfig.requestLabel = 'Edit Team Request';
       slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`;
       await this.awsService.sendEmail('EditTeamRequest', true, [], {
-        teamName: result.newData.oldTeamName ?? result.newData.name,
+        teamName: existingData.name,
         teamUid: result.referenceUid,
         requesterEmailId: requestData.requesterEmailId,
         adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,
