@@ -7,15 +7,10 @@ import { ADMIN_ROLE, PAGE_ROUTES, SETTINGS_CONSTANTS } from "apps/web-app/consta
 import { useProfileBreadcrumb } from "apps/web-app/hooks/profile/use-profile-breadcrumb.hook";
 import { DirectoryLayout } from "apps/web-app/layouts/directory-layout";
 import { DIRECTORY_SEO } from "apps/web-app/seo.config";
-import { fetchTeams, fetchTeamsForAutocomplete } from "apps/web-app/utils/services/dropdown-service";
-import { getTeamsListOptions, getTeamsOptionsFromQuery, parseTeam } from "apps/web-app/utils/teams.utils";
+import { fetchTeamsForAutocomplete } from "apps/web-app/utils/services/dropdown-service";
 import { NextSeo } from "next-seo";
 import { setCookie } from "nookies";
 import { ReactElement, useState } from "react";
-import { Body } from '@nestjs/common';
-import { ITeam } from "apps/web-app/utils/teams.types";
-import { teamMemberRoles } from '../../../web-api/prisma/fixtures/team-member-roles';
-import { parseMember } from "apps/web-app/utils/members.utils";
 
 export default function Settings({
     backLink,

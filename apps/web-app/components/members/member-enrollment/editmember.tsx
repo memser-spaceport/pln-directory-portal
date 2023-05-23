@@ -613,11 +613,11 @@ export function EditMemberModal({
               <div className="float-right">
                 {getSubmitOrNextButton(handleSubmit, isProcessing, isProfileSettings)}
               </div>
-              {/* <div className="float-right mx-5">
-		{getResetButton(()=>{
-		   handleReset()
-		})}
-	      </div> */}
+              <div className="float-right mx-5">
+                {getResetButton(() => {
+                  handleReset()
+                })}
+              </div>
             </div>
           )}
           {

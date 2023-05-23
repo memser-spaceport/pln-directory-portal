@@ -529,7 +529,7 @@ export function EditTeamModal({
           <LoadingIndicator />
         </div>
       )}
-      <div id="myDiv">
+      <div id="myDiv" className='outline-0'>
         {
           fromSettings ? (<>
             {(
@@ -543,7 +543,7 @@ export function EditTeamModal({
                   {TAB_CONSTANTS.BASIC}{' '}
                 </button>
                 <button
-                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                  className={`w-1/4 border-b-4 border-transparent w-auto text-base font-medium ${openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
                     } ${projectErrors?.length > 0 && openTab == 2 ? 'border-b-[#DD2C5A] text-[#DD2C5A]' : projectErrors?.length > 0 ? 'text-[#DD2C5A]' : ''}`}
                   onClick={() => setOpenTab(2)}
                 >
@@ -551,7 +551,7 @@ export function EditTeamModal({
                   {TAB_CONSTANTS.PROJECT_DETAILS}
                 </button>
                 <button
-                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                  className={`w-1/4 border-b-4  border-transparent text-base font-medium ${openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
                     } ${socialErrors?.length > 0 && openTab == 3 ? 'border-b-[#DD2C5A] text-[#DD2C5A]' : socialErrors?.length > 0 ? 'text-[#DD2C5A]' : ''}`}
                   onClick={() => setOpenTab(3)}
                 >
