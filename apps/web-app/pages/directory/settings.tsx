@@ -7,7 +7,7 @@ import { ADMIN_ROLE, PAGE_ROUTES, SETTINGS_CONSTANTS } from "apps/web-app/consta
 import { useProfileBreadcrumb } from "apps/web-app/hooks/profile/use-profile-breadcrumb.hook";
 import { DirectoryLayout } from "apps/web-app/layouts/directory-layout";
 import { DIRECTORY_SEO } from "apps/web-app/seo.config";
-import { fetchTeams, fetchTeamsForAutocomplete, fetchTeamsWithLogoForAutocomplete } from "apps/web-app/utils/services/dropdown-service";
+import { fetchTeams, fetchTeamsForAutocomplete } from "apps/web-app/utils/services/dropdown-service";
 import { getTeamsListOptions, getTeamsOptionsFromQuery, parseTeam } from "apps/web-app/utils/teams.utils";
 import { NextSeo } from "next-seo";
 import { setCookie } from "nookies";
