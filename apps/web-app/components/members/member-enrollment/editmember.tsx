@@ -552,7 +552,7 @@ export function EditMemberModal({
                   onClick={() => setOpenTab(1)}
                 >
                   {' '}
-                  Basic{' '}
+                  BASIC{' '}
                 </button>
                 <button
                   className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
@@ -560,7 +560,7 @@ export function EditMemberModal({
                   onClick={() => setOpenTab(2)}
                 >
                   {' '}
-                  Skills
+                  SKILLS
                 </button>
                 <button
                   className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
@@ -568,7 +568,7 @@ export function EditMemberModal({
                   onClick={() => setOpenTab(3)}
                 >
                   {' '}
-                  Social{' '}
+                  SOCIAL{' '}
                 </button>
               </div>
             )}
