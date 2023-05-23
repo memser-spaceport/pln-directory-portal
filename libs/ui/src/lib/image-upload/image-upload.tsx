@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { ReactComponent as CameraIcon } from '../../assets/icons/cameraicon.svg';
-import { CameraIcon as Camera } from '@heroicons/react/solid';
 
 type Shape = 'circle' | 'square';
 
@@ -12,7 +11,7 @@ type Props = {
   previewImageShape?: Shape;
   disabled?: boolean;
   enableHover?: boolean;
-  avatarIcon?: React.ReactNode;
+  avatarIcon?: (props: React.ComponentProps<'svg'>) => JSX.Element;
 };
 
 function bytesToSize(bytes: number) {
