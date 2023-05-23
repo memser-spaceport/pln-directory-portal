@@ -34,7 +34,11 @@ export class MembersService {
         memberRoles: true,
         teamMemberRoles: {
           include: {
-            team: true,
+            team: {
+              include: {
+                logo: true
+              }
+            },
           },
         },
       },

@@ -33,8 +33,8 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
   const settingMenu: ISettingMenu[] = [
     {
       icon: CogIcon,
-      label: 'Account Settings',
-      url: `/directory/account-settings`,
+      label: 'Settings',
+      url: `/directory/settings`,
       eventCode: '',
       onClick: () => {
         if (!Cookies.get('refreshToken')) {
