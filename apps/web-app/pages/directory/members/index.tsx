@@ -28,6 +28,7 @@ import {
   getMembersOptionsFromQuery,
 } from '../../../utils/members.utils';
 import { ReactComponent as SuccessIcon } from '../../../public/assets/images/icons/success.svg';
+import EmailOtpVerificationModal from '../../../components/auth/email-otp-verification-modal';
 
 type MembersProps = {
   members: IMember[];
@@ -55,7 +56,7 @@ export default function Members({
     'officeHoursOnly',
     'includeFriends',
   ];
-  
+
   useDirectoryFiltersFathomLogger('members', filterProperties);
 
   useEffect(() => {
@@ -129,6 +130,7 @@ export default function Members({
           router.push(PAGE_ROUTES.MEMBERS);
         }}
       />
+    <EmailOtpVerificationModal/>
     </>
   );
 }
