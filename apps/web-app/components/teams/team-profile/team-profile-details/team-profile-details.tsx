@@ -9,6 +9,7 @@ export function TeamProfileDetails({
   contactMethod,
   longDescription,
   shortDescription,
+  linkedinHandle,
 }: ITeam) {
   return (
     <>
@@ -44,6 +45,22 @@ export function TeamProfileDetails({
                 </div>
               }
               content={twitter}
+            />
+          ) : (
+            '-'
+          )}
+        </div>
+        <div className="flex flex-1 flex-col items-start">
+          <h2 className="detail-label">LinkedIn</h2>
+          {linkedinHandle ? (
+            <Tooltip
+              asChild
+              trigger={
+                <div>
+                  <ProfileSocialLink url={linkedinHandle} type="linkedin" />
+                </div>
+              }
+              content={linkedinHandle}
             />
           ) : (
             '-'

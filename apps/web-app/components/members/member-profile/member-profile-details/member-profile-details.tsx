@@ -9,6 +9,7 @@ export function MemberProfileDetails({
   twitter,
   discordHandle,
   githubHandle,
+  linkedinHandle,
 }: IMember) {
   return (
     <>
@@ -77,6 +78,22 @@ export function MemberProfileDetails({
                 </div>
               }
               content={githubHandle}
+            />
+          ) : (
+            '-'
+          )}
+        </div>
+        <div className="flex w-1/4 flex-col items-start">
+          <h2 className="detail-label">LinkedIn</h2>
+          {linkedinHandle ? (
+            <Tooltip
+              asChild
+              trigger={
+                <div>
+                  <ProfileSocialLink url={linkedinHandle} type="linkedin" />
+                </div>
+              }
+              content={linkedinHandle}
             />
           ) : (
             '-'

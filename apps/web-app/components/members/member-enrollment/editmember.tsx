@@ -411,17 +411,17 @@ export function EditMemberModal({
     setFormValues({ ...formValues, [name]: selectedOption });
   }
 
-  const handleImageChange = (file: File) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => setImageUrl(reader.result as string);
-    setFormValues({ ...formValues, imageFile: file });
-    setImageChanged(true);
-  };
-
-  const onRemoveImage = () => {
-    setFormValues({ ...formValues, imageFile: null });
-    setImageUrl('');
+  const handleImageChange = (file: File | null) => {
+    if (file) {
+      const imageFile = file;
+      setFormValues({ ...formValues, imageFile: imageFile });
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => setImageUrl(reader.result as string);
+    } else {
+      setFormValues({ ...formValues, imageFile: null });
+      setImageUrl('');
+    }
   };
 
   function handleDeleteRolesRow(rowId) {
@@ -506,7 +506,6 @@ export function EditMemberModal({
                 onEmailBlur={onEmailBlur}
                 setDisableNext={setDisableSubmit}
                 isEditMode={true}
-                onRemoveImage={onRemoveImage}
               />
               <AddMemberSkillForm
                 formValues={formValues}

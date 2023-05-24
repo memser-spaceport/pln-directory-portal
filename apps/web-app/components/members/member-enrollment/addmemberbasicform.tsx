@@ -13,7 +13,6 @@ export default function AddMemberBasicForm(props) {
           <ProfileImageUpload
             imageUrl={props.imageUrl}
             maxSize={4}
-            enableHover={props.isEditMode ? true : false}
             avatarIcon={props.isEditMode && UserIcon}
             onImageChange={props.handleImageChange}
           />
@@ -32,16 +31,6 @@ export default function AddMemberBasicForm(props) {
           />
         </div>
       </div>
-
-      {props.imageUrl && (
-        <span
-          onClick={props.onRemoveImage}
-          className="cursor-pointer pt-5 pl-2 text-xs text-blue-600"
-        >
-          Remove Image
-        </span>
-      )}
-
       <div className="flex pt-5">
         <div>
           <InformationCircleIcon />
@@ -51,7 +40,6 @@ export default function AddMemberBasicForm(props) {
           4MB.
         </span>
       </div>
-
       <div className="inputfield pt-5">
         <InputField
           required
@@ -68,13 +56,11 @@ export default function AddMemberBasicForm(props) {
           className="custom-grey custom-outline-none border"
         />
       </div>
-
       {props.emailExists && (
         <span className="pt-3 text-xs text-rose-600">
           Email already exists!
         </span>
       )}
-
       <div className="pt-5">
         <InputField
           name="plnStartDate"
@@ -86,7 +72,6 @@ export default function AddMemberBasicForm(props) {
           className="custom-grey custom-outline-none border"
         />
       </div>
-
       <div className="inputfield pt-5">
         <InputField
           name="city"
@@ -108,7 +93,6 @@ export default function AddMemberBasicForm(props) {
           </span>
         </div>
       </div>
-
       <div className="flex pt-5">
         <div className="inputfield w-[50%] pr-6">
           <InputField
