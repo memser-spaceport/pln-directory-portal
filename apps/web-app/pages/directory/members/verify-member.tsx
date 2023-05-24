@@ -47,8 +47,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
       },
     };
   }
-  console.log('Error occured while getting the authcode', error);
-  // it will trigger when we get error from auth service. 
+  // it will trigger when we get error from auth service.
   if (error?.length > 0) {
     setCookie(ctx, 'page_params', 'auth_error' , {
       maxAge: Math.round((Date.now() + (60 * 1))/1000),
@@ -85,7 +84,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
     };
   }
   // Set access token, refresh token, member Info in cookie.
-  const { accessToken, refreshToken, userInfo } = authResp.data;
+  const { accessToken, refreshToken, userInfo, notificationToken, idToken } = authResp.data;
   if (accessToken && refreshToken && userInfo) {
     const accessTokenExpiry = decodeToken(accessToken);
     const refreshTokenExpiry = decodeToken(refreshToken);
@@ -102,6 +101,28 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
       path: '/'
     });
     setCookie(ctx, 'verified', 'true' , {
+      path: '/'
+    });
+  } else if (notificationToken && accessToken && refreshToken) {
+    const accessTokenExpiry = decodeToken(accessToken);
+    const refreshTokenExpiry = decodeToken(refreshToken);
+    const notificationTokenExpiry = decodeToken(notificationToken);
+
+    setCookie(ctx, 'authToken', accessToken, {
+      maxAge: calculateExpiry(accessTokenExpiry.exp),
+      path: '/'
+    });
+    setCookie(ctx, 'idToken', idToken, {
+      maxAge: calculateExpiry(accessTokenExpiry.exp),
+      path: '/'
+    });
+    setCookie(ctx, 'refreshToken', refreshToken, {
+      maxAge: calculateExpiry(refreshTokenExpiry.exp),
+      path: '/'
+    });
+
+    setCookie(ctx, 'notificationToken', notificationToken, {
+      maxAge: calculateExpiry(notificationTokenExpiry.exp),
       path: '/'
     });
   }

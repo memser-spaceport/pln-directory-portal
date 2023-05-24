@@ -26,7 +26,7 @@ export const authenticate = async () => {
       maxAge: 60 * 1000,
     });
     const redirectURL = `${location.protocol + '//' + location.host}/directory/members/verify-member`;
-    window.location.href = `${process.env.AUTH_API_URL}/auth?redirect_uri=${redirectURL}&state=${state}`;
+    window.location.href = `${process.env.AUTH_API_URL}/auth?redirect_uri=${redirectURL}&state=${state}&scope=openid profile&client_id=${process.env.NEXT_PUBLIC_AUTH_APP_CLIENT_ID}`;
   } catch (error) {
     console.error(error);
   }

@@ -56,6 +56,25 @@ export class AuthService {
       const userEmail = decoded.email;
       const idFromAuth = decoded.sub;
 
+      // If email id is not available in id token, then user needs to enter and validate email id in ui
+      // Get client token.. for client to access email validation
+      if (!userEmail) {
+        const response = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
+          "client_id": process.env.AUTH_APP_CLIENT_ID,
+          "client_secret": process.env.AUTH_APP_CLIENT_SECRET,
+          "grant_type": "client_credentials",
+          "grantTypes": ["client_credentials", "authorization_code", "refresh_token"]
+        })
+        const notificationToken = response.data;
+        return {
+          notificationToken: notificationToken.access_token,
+          accessToken: result.data.access_token,
+          refreshToken: result.data.refresh_token,
+          idToken
+        }
+      }
+
+
       // Search by external id. If user found, send the user details with tokens
       let foundUser: any = await this.prismaService.member.findUnique({
         where: { externalId: idFromAuth },
@@ -71,7 +90,7 @@ export class AuthService {
             uid: foundUser.uid,
             roles: foundUser.memberRoles.map((r) => r.name),
             leadingTeams: foundUser.teamMemberRoles.filter((role) => role.teamLead)
-            .map(role => role.teamUid)
+              .map(role => role.teamUid)
           },
           accessToken: result.data.access_token,
           refreshToken: result.data.refresh_token,
@@ -97,7 +116,7 @@ export class AuthService {
             uid: foundUser.uid,
             roles: foundUser.memberRoles.map((r) => r.name),
             leadingTeams: foundUser.teamMemberRoles.filter((role) => role.teamLead)
-            .map(role => role.teamUid)
+              .map(role => role.teamUid)
           },
           accessToken: result.data.access_token,
           refreshToken: result.data.refresh_token,
@@ -117,6 +136,9 @@ export class AuthService {
     let result: any;
     try {
       result = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
+        client_id: process.env.AUTH_APP_CLIENT_ID,
+        client_secret: process.env.AUTH_APP_CLIENT_SECRET,
+        redirect_uri: 'http://localhost:4200/directory/members/verify-member',
         code: code,
         grant_type: 'authorization_code',
       });
@@ -129,5 +151,75 @@ export class AuthService {
     }
 
     return this.getUserInfo(result);
+  }
+
+  async getUserInfoByEmail(userEmail) {
+    const foundUser: any = await this.prismaService.member.findUnique({
+      where: { email: userEmail },
+      include: { image: true, memberRoles: true, teamMemberRoles: true },
+    });
+    if (foundUser) {
+      return {
+        name: foundUser.name,
+        email: foundUser.email,
+        profileImageUrl: foundUser.image?.url,
+        uid: foundUser.uid,
+        roles: foundUser.memberRoles?.map((r) => r.name),
+        leadingTeams: foundUser.teamMemberRoles?.filter((role) => role.teamLead)
+          .map(role => role.teamUid)
+      }
+    }
+
+    return null
+  }
+
+  async linkEmailWithAccount(email, accessToken, notificationToken) {
+    try {
+      await axios.put(`${process.env.AUTH_API_URL}/auth/account`, { token: accessToken, email: email }, {
+        headers: {
+          Authorization: `Bearer ${notificationToken}`
+        }
+      })
+    } catch (error) {
+      if (error.response) {
+        throw new HttpException(error?.response?.data?.message, error?.response?.status)
+      }
+      throw new UnauthorizedException();
+    }
+  }
+
+  async verifyEmailOtp(otp, otpToken, notificationToken) {
+    const payload = {
+      code: otp,
+      token: otpToken,
+    }
+    const header = {
+      headers: {
+        Authorization: `Bearer ${notificationToken}`
+      }
+    }
+    const verifyOtpResult = await axios.post(`${process.env.AUTH_API_URL}/mfa/otp/verify`, payload, header)
+    return verifyOtpResult?.data?.valid ? true : false;
+  }
+
+  async sendEmailOtpForVerification(email, notificationToken) {
+    try {
+      const payload = {
+        recipientAddress: email,
+        notificationType: 'EMAIL',
+      }
+      const header = {
+        headers: {
+          Authorization: `Bearer ${notificationToken}`
+        }
+      }
+      const sendOtpResult = await axios.post(`${process.env.AUTH_API_URL}/mfa/otp`, payload, header);
+      return sendOtpResult.data;
+    } catch (error) {
+      if (error.response) {
+        throw new HttpException(error?.response?.data?.message, error?.response?.status)
+      }
+      throw new UnauthorizedException();
+    }
   }
 }
