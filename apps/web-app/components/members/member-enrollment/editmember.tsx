@@ -413,13 +413,13 @@ export function EditMemberModal({
 
   const handleImageChange = (file: File | null) => {
     if (file) {
-      const imageFile = file;
-      setFormValues({ ...formValues, imageFile: imageFile });
+      setFormValues({ ...formValues, imageFile: file });
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => setImageUrl(reader.result as string);
+      setImageChanged(true);
     } else {
-      setFormValues({ ...formValues, imageFile: null });
+      setFormValues({ ...formValues, imageFile: null, imageUid: '' });
       setImageUrl('');
     }
   };
