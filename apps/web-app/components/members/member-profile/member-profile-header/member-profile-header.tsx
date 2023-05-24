@@ -75,7 +75,7 @@ export function MemberProfileHeader({
         {openToWork ? (
           <span className="flex p-3 text-slate-600">
             <BriefCase />
-            <span className="pl-1 pt-px text-[10px] font-medium leading-[14px] tracking-[0.01em]">
+            <span className="pl-1 pt-px text-[13px] font-medium leading-[14px] tracking-[0.01em]">
               OPEN TO WORK
             </span>
           </span>

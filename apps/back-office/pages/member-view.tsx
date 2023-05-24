@@ -271,11 +271,6 @@ export default function MemberView(props) {
     setImageChanged(true);
   };
 
-  const onRemoveImage = () => {
-    setFormValues({ ...formValues, imageFile: null });
-    setImageUrl('');
-  };
-
   function handleDeleteRolesRow(rowId) {
     const newRoles = formValues.teamAndRoles.filter(
       (item) => item.rowId != rowId
@@ -338,7 +333,6 @@ export default function MemberView(props) {
                   emailExists={emailExists}
                   onEmailBlur={onEmailBlur}
                   setDisableNext={setDisableSave}
-                  onRemoveImage={onRemoveImage}
                 />
                 <MemberSkillForm
                   formValues={formValues}

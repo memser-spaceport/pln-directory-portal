@@ -415,17 +415,17 @@ export function AddMemberModal({
     setFormValues({ ...formValues, [name]: selectedOption });
   }
 
-  const handleImageChange = (file: File) => {
-    const imageFile = file;
-    setFormValues({ ...formValues, imageFile: imageFile });
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => setImageUrl(reader.result as string);
-  };
-
-  const onRemoveImage = () => {
-    setFormValues({ ...formValues, imageFile: null });
-    setImageUrl('');
+  const handleImageChange = (file: File | null) => {
+    if (file) {
+      const imageFile = file;
+      setFormValues({ ...formValues, imageFile: imageFile });
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => setImageUrl(reader.result as string);
+    } else {
+      setFormValues({ ...formValues, imageFile: null });
+      setImageUrl('');
+    }
   };
 
   function handleDeleteRolesRow(rowId) {
@@ -447,7 +447,6 @@ export function AddMemberModal({
             emailExists={emailExists}
             onEmailBlur={onEmailBlur}
             setDisableNext={setDisableNext}
-            onRemoveImage={onRemoveImage}
           />
         );
       case 2:

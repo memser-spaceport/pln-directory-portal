@@ -394,11 +394,6 @@ export function EditTeamModal({
     setImageChanged(true);
   };
 
-  const onRemoveImage = () => {
-    setFormValues({ ...formValues, logoFile: null });
-    setImageUrl('');
-  };
-
   function handleDropDownChange(selectedOption, name) {
     setFormValues({ ...formValues, [name]: selectedOption });
   }
@@ -468,7 +463,6 @@ export function EditTeamModal({
                   nameExists={nameExists}
                   setDisableNext={setDisableSubmit}
                   isEditMode={true}
-                  onRemoveImage={onRemoveImage}
                 />
                 <AddTeamStepTwo
                   formValues={formValues}

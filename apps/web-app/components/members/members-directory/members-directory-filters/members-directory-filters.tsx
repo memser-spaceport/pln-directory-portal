@@ -1,6 +1,7 @@
 import { CountryFilter } from '../../../../components/members/members-directory/members-directory-filters/country-filter/country-filter';
 import { MetroAreaFilter } from '../../../../components/members/members-directory/members-directory-filters/metro-area-filter/metro-area-filter';
 import { OfficeHoursFilter } from '../../../../components/members/members-directory/members-directory-filters/office-hours-filter/office-hours-filter';
+import { OpenToWorkFilter } from '../../../../components/members/members-directory/members-directory-filters/open-to-work-filter/open-to-work-filter';
 import { RegionFilter } from '../../../../components/members/members-directory/members-directory-filters/region-filter/region-filter';
 import { SkillsFilter } from '../../../../components/members/members-directory/members-directory-filters/skills-filter/skills-filter';
 import { DirectoryFilters } from '../../../shared/directory/directory-filters/directory-filters';
@@ -20,6 +21,7 @@ export function MembersDirectoryFilters({
     <DirectoryFilters filterProperties={filterProperties}>
       <div className="space-y-4">
         <OfficeHoursFilter />
+        <OpenToWorkFilter />
         <FriendOfPLNFilter />
       </div>
       <div className="my-5 h-px bg-slate-200" />

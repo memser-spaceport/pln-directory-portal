@@ -15,6 +15,7 @@ export interface IMember {
   mainTeam: IMemberTeam | null;
   twitter: string | null;
   openToWork: boolean;
+  linkedinHandle: string | null;
 }
 
 export interface IMemberTeam {

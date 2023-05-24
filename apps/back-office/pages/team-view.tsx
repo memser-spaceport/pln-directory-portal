@@ -254,11 +254,6 @@ export default function TeamView(props) {
     setImageChanged(true);
   };
 
-  const onRemoveImage = () => {
-    setFormValues({ ...formValues, logoFile: null });
-    setImageUrl('');
-  };
-
   function handleDropDownChange(selectedOption, name) {
     setFormValues({ ...formValues, [name]: selectedOption });
   }
@@ -307,7 +302,6 @@ export default function TeamView(props) {
                     onNameBlur={onNameBlur}
                     nameExists={nameExists}
                     setDisableNext={setDisableSave}
-                    onRemoveImage={onRemoveImage}
                   />
                   <TeamStepTwo
                     formValues={formValues}
