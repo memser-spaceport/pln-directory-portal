@@ -6,6 +6,7 @@ import { debounce } from 'lodash';
 interface IDropdownOption {
   label: string;
   value?: string;
+  logo?: string;
 }
 
 interface AutocompleteProps {
@@ -117,7 +118,10 @@ export function Autocomplete({
   return (
     <div onBlur={() => checkValidData()}>
       <div className="flex">
+        {/* <div className='inline-block'><img src='https://loremflickr.com/640/480/animals' width={30} height={30}></img></div> */}
+        {console.log(selectedValue.logo)}
         <InputField
+          icon={selectedValue.logo ? selectedValue.logo : undefined}
           label={'te'}
           className={`mt-[12px] flex cursor-pointer items-center justify-between rounded-md border border-gray-300 bg-white py-2 px-6 focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
           type="text"

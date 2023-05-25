@@ -1,7 +1,7 @@
 import { PencilAltIcon } from '@heroicons/react/outline';
 import { trackGoal } from 'fathom-client';
-import { useState } from 'react';
-import { FATHOM_EVENTS } from '../../../../constants';
+import { useEffect, useState } from 'react';
+import { FATHOM_EVENTS, SETTINGS_CONSTANTS } from '../../../../constants';
 import { EditMemberModal } from '../../../members/member-enrollment/editmember';
 import { EditTeamModal } from '../../../teams/team-enrollment/editteam';
 import { RequestPending } from '../../request-pending/request-pending';
@@ -10,6 +10,7 @@ import { editTeamRequestPendingCheck } from '../../../../utils/services/teams';
 import { IMember } from '../../../../utils/members.types';
 import { ITeam } from '../../../../utils/teams.types';
 import { ReactComponent as EditIcon } from '/public/assets/images/icons/edit.svg';
+import { Router, useRouter } from 'next/router';
 // import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 
 type TAskToEditProfileType = 'team' | 'member';
@@ -45,6 +46,8 @@ export function AskToEditCard({
   const [isPendingRequestModalOpen, setIsPendingRequestModalOpen] =
     useState(false);
 
+  const router = useRouter();
+
   const handleOpenEditModal = async () => {
     // if (
     //   typeof document !== 'undefined' &&
@@ -64,6 +67,21 @@ export function AskToEditCard({
       setIsMemberModalOpen(true);
     }
   };
+
+  const redirectToSettings = () => {
+    let query = {};
+    console.log(profileType)
+    if(profileType === SETTINGS_CONSTANTS.TEAM){
+      query = { id: team.id, name: team.name, logo: team.logo, from: SETTINGS_CONSTANTS.TEAM };
+    }else if(profileType === SETTINGS_CONSTANTS.MEMBER){
+      console.log(member)
+      query = { id: member.id, name: member.name, logo: member.image, from: SETTINGS_CONSTANTS.MEMBER };
+    }
+    router.push({
+      pathname: '/directory/settings',
+      query
+    }, '/directory/settings');
+  }
 
   return (
     <div className="absolute top-5 right-1">
@@ -92,7 +110,7 @@ export function AskToEditCard({
       <button
         id="edit-detail"
         className="flex text-base font-semibold text-[#156FF7]"
-        onClick={() => handleOpenEditModal()}
+        onClick={() => redirectToSettings()}
       >
         <EditIcon className="m-1" />{' '}
         {profileType === 'member' ? 'Edit Profile' : 'Edit Team'}

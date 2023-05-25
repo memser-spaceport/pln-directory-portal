@@ -9,7 +9,7 @@ import { NextSeo } from 'next-seo';
 import nookies, { destroyCookie } from 'nookies';
 import { ReactElement, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import { LOGIN_MSG, LOGIN_FAILED_MSG, LOGOUT_MSG, RETRY_LOGIN_MSG , PAGE_ROUTES, LOGGED_IN_MSG} from '../../../constants';
+import { LOGIN_MSG, LOGIN_FAILED_MSG, LOGOUT_MSG, RETRY_LOGIN_MSG , PAGE_ROUTES, LOGGED_IN_MSG, SOMETHING_WENT_WRONG} from '../../../constants';
 import { LoadingOverlay } from '../../../components/layout/loading-overlay/loading-overlay';
 import { MembersDirectoryFilters } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters';
 import { IMembersFiltersValues } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters.types';
@@ -69,22 +69,29 @@ export default function Members({
       });
     } else if (isVerified === 'false') {
       setIsModalOpen(true);
-    } else if (params === "auth_error") {
-      toast.error(LOGIN_FAILED_MSG, {
-        hideProgressBar: true,
-      });
-    } else if (params === "logout") {
-      toast.info(LOGOUT_MSG, {
-        icon: <SuccessIcon />
-      });
-    } else if (params === "user_logged_out") {
-      toast.info(RETRY_LOGIN_MSG, {
-        hideProgressBar: true
-      });
-    } else if(params === "user_logged_in") {
-      toast.info(LOGGED_IN_MSG + '.', {
-        hideProgressBar: true
-      })
+    } 
+    switch (params) {
+      case "auth_error":
+        toast.error(LOGIN_FAILED_MSG, {
+          hideProgressBar: true,
+        });
+      case "logout":
+        toast.info(LOGOUT_MSG, {
+          icon: <SuccessIcon />
+        });
+      case "user_logged_out":
+        toast.info(RETRY_LOGIN_MSG, {
+          hideProgressBar: true
+        });
+      case "user_logged_in":
+        toast.info(LOGGED_IN_MSG + '.', {
+          hideProgressBar: true
+        });
+      case "server_error":
+        toast.info(SOMETHING_WENT_WRONG, {
+          hideProgressBar: true
+        });
+      default:
     }
     Cookies.remove('page_params');
     Cookies.remove('verified');

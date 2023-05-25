@@ -71,8 +71,8 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
         destination: PAGE_ROUTES.MEMBERS,
       },
     };
-  } else if(authResp.status === 400 || authResp.status === 500 ) {
-    setCookie(ctx, 'verified', 'false' , {
+  } else if(authResp.status === 400 || authResp.status === 500 || authResp.status === 404 ) {
+    setCookie(ctx, 'page_params', 'server_error' , {
       maxAge: Math.round((Date.now() + (60 * 1))/1000),
       path: '/',
     });

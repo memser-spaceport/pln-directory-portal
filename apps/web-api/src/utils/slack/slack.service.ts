@@ -21,7 +21,6 @@ export class SlackService {
         },
       });
       const slackData = slackResponse.data;
-      console.log(slackData);
     } catch (e) {
       console.error(e);
     }

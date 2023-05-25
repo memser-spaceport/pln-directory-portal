@@ -187,6 +187,7 @@ export function EditTeamModal({
   useEffect(() => {
     if(fromSettings){
       resetState();
+      setOpenTab(1);
     }
     if (isOpen) {
       Promise.all([

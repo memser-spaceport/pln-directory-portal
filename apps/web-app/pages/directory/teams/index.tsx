@@ -94,6 +94,7 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
   const isUserLoggedIn = req?.cookies?.authToken &&  req?.cookies?.userInfo ? true : false
   const optionsFromQuery = getTeamsOptionsFromQuery(query);
   const listOptions = getTeamsListOptions(optionsFromQuery);
+  // console.log(listOptions)
   const [teamsResponse, filtersValues] = await Promise.all([
     getTeams(listOptions),
     getTeamsFilters(optionsFromQuery),

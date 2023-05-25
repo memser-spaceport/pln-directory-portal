@@ -50,11 +50,11 @@ export const getTeamsFilters = async (options: TTeamListOptions) => {
     getTeamsFiltersValues(options),
   ]);
 
-  console.log(
-    'valuesByFilter, availableValuesByFilter>>>>',
-    valuesByFilter,
-    availableValuesByFilter
-  );
+  // console.log(
+  //   'valuesByFilter, availableValuesByFilter>>>>',
+  //   valuesByFilter,
+  //   availableValuesByFilter
+  // );
 
   if (valuesByFilter.status !== 200 || availableValuesByFilter.status !== 200) {
     const emptyFilters = {

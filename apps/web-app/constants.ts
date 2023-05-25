@@ -104,6 +104,7 @@ export const LOGIN_FAILED_MSG = 'Sign in attempt failed. Please try again later.
 export const LOGOUT_MSG = 'You have been logged out successfully.';
 export const RETRY_LOGIN_MSG = 'Please login and try again.';
 export const LOGGED_IN_MSG = 'You are already logged in';
+export const SOMETHING_WENT_WRONG = 'Something went wrong. please try again';
 export const SCHEDULE_MEETING_MSG = ' please proceed to schedule a meeting.'
 export const PAGE_ROUTES = {
   MEMBERS:'/directory/members',
@@ -112,8 +113,11 @@ export const PAGE_ROUTES = {
 
 export const SETTINGS_CONSTANTS = {
   PROFILE_SETTINGS: 'Profile Settings',
-  TEAM_SETTINGS: 'Team Settings',
-  ACCOUNT_SETTINGS: 'ACCOUNT SETTINGS'
+  TEAM_SETTINGS: 'Manage Teams',
+  MEMBER_SETTINGS: 'Manage Members',
+  ACCOUNT_SETTINGS: 'ACCOUNT SETTINGS',
+  TEAM: 'team',
+  MEMBER: 'member'
 }
 
 export const TAB_CONSTANTS = {

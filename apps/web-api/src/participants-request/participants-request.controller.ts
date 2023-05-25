@@ -34,7 +34,6 @@ export class ParticipantsRequestController {
   @Get()
   @NoCache()
   async findAll(@Query() query) {
-    console.log(query);
     const result = await this.participantsRequestService.getAll(query);
     return result;
   }
