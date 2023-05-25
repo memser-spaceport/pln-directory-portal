@@ -7,7 +7,8 @@ import EmailSubmissionForm from "./email-submission-form";
 import OtpSubmissionForm from "./otp-submission-form";
 import { calculateExpiry, decodeToken } from "../../utils/services/auth";
 import ErrorBox from "./error-box";
-
+import { toast } from "react-toastify";
+import { ReactComponent as SuccessIcon } from '../../public/assets/images/icons/success.svg';
 function EmailOtpVerificationModal() {
     const [showDialog, setDialogStatus] = useState(false);
     const [verificationStep, setVerificationStep] = useState(1)
@@ -52,6 +53,8 @@ function EmailOtpVerificationModal() {
                     Cookies.remove('notificationToken')
                     Cookies.remove('uniqueEmailVerifyToken')
                     localStorage.clear()
+                    setDialogStatus(false);
+                    localStorage.setItem('otp-verify', 'success')
                     window.location.reload()
                 } else if (!data?.valid) {
                     localStorage.setItem('otp-attempts', `${Number(otpVerifyAttempts) + 1}`)
@@ -147,11 +150,10 @@ function EmailOtpVerificationModal() {
                 if (error?.response?.status === 400 && error?.response?.data?.message === 'Email id doesnt exist') {
                     setErrorMessage("The entered email doesn't match an email in the directory records. Please try again or contact support ")
                 } else if (error?.response?.status === 400 && error?.response?.data?.message === 'Notification Token missing') {
-                    setErrorMessage("Request is invalid. Please try logging in again or contact our support for futher assistance")
-                    setVerificationStep(3);
+                    goToError("Request is invalid. Please try logging in again or contact our support for futher assistance")
                 }
                 else {
-                    goToError('Unexpected error happened. Please try logging in again')
+                    setErrorMessage('Unexpected error happened. Please try again')
                 }
             })
             .finally(() => setLoaderStatus(false))
@@ -200,6 +202,7 @@ function EmailOtpVerificationModal() {
 
     useEffect(() => {
         const notificationToken = Cookies.get('notificationToken');
+        const otpVerify = localStorage.getItem('otp-verify')
         if (notificationToken) {
             if (localStorage.getItem('otp-verification-step') === '2') {
                 setVerificationStep(2)
@@ -209,6 +212,14 @@ function EmailOtpVerificationModal() {
         } else {
             clearAllSavedSessionItems()
         }
+
+        if(otpVerify) {
+            toast.success("Your account has been verified", {
+                icon: <SuccessIcon />
+              });
+              localStorage.removeItem('otp-verify')
+        }
+
     }, [])
 
     useEffect(() => {
