@@ -123,7 +123,9 @@ export class ParticipantsRequestService {
     const slackConfig = {
       requestLabel: '',
       url: '',
-      name: requestData.newData.name,
+      name: requestData.referenceUid
+        ? existingData.name
+        : requestData.newData.name,
     };
     const result: any = await this.prisma.participantsRequest.create({
       data: { ...postData },
