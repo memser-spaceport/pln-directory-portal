@@ -79,14 +79,14 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (
     member = memberResponse?.map((data) => {
       return {
         id: data.uid,
-        name: data.newData.name,
+        name: data.newData.oldName ?? data.newData.name,
         status: data.status,
       };
     });
     team = teamResponse?.map((data) => {
       return {
         id: data.uid,
-        name: data.newData.oldTeamName ?? data.newData.name,
+        name: data.newData.oldName ?? data.newData.name,
         status: data.status,
       };
     });

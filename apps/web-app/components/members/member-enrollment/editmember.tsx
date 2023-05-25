@@ -119,6 +119,7 @@ export function EditMemberModal({
   id,
 }: EditMemberModalProps) {
   const [errors, setErrors] = useState([]);
+  const [name, setName] = useState('');
   const [dropDownValues, setDropDownValues] = useState({});
   const [imageUrl, setImageUrl] = useState<string>();
   const [emailExists, setEmailExists] = useState<boolean>(false);
@@ -203,6 +204,7 @@ export function EditMemberModal({
           };
           setImageUrl(member.image?.url ?? '');
           setFormValues(formValues);
+          setName(member.name);
           setDropDownValues({ skillValues: data[1], teamNames: data[2] });
         })
         .catch((err) => {
@@ -216,6 +218,7 @@ export function EditMemberModal({
     setErrors([]);
     setDropDownValues({});
     setImageChanged(false);
+    setName('');
     setSaveCompleted(false);
     setEmailExists(false);
     setDisableSubmit(false);
@@ -281,6 +284,7 @@ export function EditMemberModal({
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
+      oldName: name,
     };
     return formattedData;
   }
