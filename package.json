@@ -24,6 +24,8 @@
   },
   "dependencies": {
     "@abitia/zod-dto": "^0.4.0",
+    "@babel/helper-create-regexp-features-plugin": "^7.21.8",
+    "@babel/helper-remap-async-to-generator": "^7.18.9",
     "@faker-js/faker": "^7.5.0",
     "@fontsource/inter": "^4.5.11",
     "@forestadmin/agent": "^1.4.14",
