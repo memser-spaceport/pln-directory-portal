@@ -21,12 +21,12 @@ import { MembersModule } from './members/members.module';
 import { MembershipSourcesModule } from './membership-sources/membership-sources.module';
 import { ContentTypeMiddleware } from './middlewares/content-type.middleware';
 import { ParticipantsRequestModule } from './participants-request/participants-request.module';
-import { PrismaService } from './prisma.service';
 import { SkillsModule } from './skills/skills.module';
 import { TeamsModule } from './teams/teams.module';
 import { TechnologiesModule } from './technologies/technologies.module';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
+import { SharedModule } from './shared/shared.module';
 
 @Module({
   controllers: [AppController],
@@ -70,9 +70,9 @@ import { AuthModule } from './auth/auth.module';
     ParticipantsRequestModule,
     AdminModule,
     AuthModule,
+    SharedModule,
   ],
   providers: [
-    PrismaService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

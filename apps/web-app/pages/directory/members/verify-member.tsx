@@ -47,6 +47,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
       },
     };
   }
+  console.log('Error occured while getting the authcode', error);
   // it will trigger when we get error from auth service. 
   if (error?.length > 0) {
     setCookie(ctx, 'page_params', 'auth_error' , {

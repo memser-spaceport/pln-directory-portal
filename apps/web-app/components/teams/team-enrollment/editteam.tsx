@@ -48,9 +48,6 @@ function validateBasicForm(formValues, imageUrl) {
   if (!formValues.name?.trim()) {
     errors.push('Please add Team Name');
   }
-  if (!imageUrl) {
-    errors.push('Please add your team logo');
-  }
   if (!formValues.shortDescription?.trim()) {
     errors.push('Please add a Description');
   }
@@ -64,9 +61,6 @@ function validateProjectDetailForm(formValues) {
   const errors = [];
   if (!formValues.fundingStage?.value) {
     errors.push('Please add Funding Stage');
-  }
-  if (!formValues.membershipSources.length) {
-    errors.push('Please add Membership Source(s)');
   }
   if (!formValues.industryTags.length) {
     errors.push('Please add IndustryTags');
@@ -107,13 +101,17 @@ function validateForm(formValues, imageUrl) {
   };
 }
 
-function getSubmitOrNextButton(handleSubmit, isProcessing, fromSettings) {
+function getSubmitOrNextButton(handleSubmit, isProcessing, fromSettings, disableSubmit) {
   const buttonClassName =
-    `${fromSettings ? 'bg-[#156FF7] ':'bg-gradient-to-r from-[#427DFF] to-[#44D5BB] '}shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]`;
+    'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
   const submitOrNextButton = (
     <button
-      className={buttonClassName}
-      disabled={isProcessing}
+      className={
+        isProcessing || disableSubmit
+          ? 'shadow-special-button-default inline-flex w-full justify-center rounded-full bg-slate-400 px-6 py-2 text-base font-semibold leading-6 text-white outline-none'
+          : buttonClassName
+      }
+      disabled={isProcessing || disableSubmit}
       onClick={handleSubmit}
     >
       {fromSettings ? 'Save Changes' : 'Request Changes'}
@@ -151,6 +149,8 @@ export function EditTeamModal({
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [openTab, setOpenTab] = useState(1);
   const [isErrorPopupOpen, setIsErrorPopupOpen] = useState(false);
+  const [disableSubmit, setDisableSubmit] = useState<boolean>(false);
+  const [nameExists, setNameExists] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     requestorEmail: '',
@@ -254,6 +254,9 @@ export function EditTeamModal({
     setDropDownValues({});
     setImageChanged(false);
     setSaveCompleted(false);
+    setDropDownValues({});
+    setDisableSubmit(false);
+    setNameExists(false);
     setIsProcessing(false);
     setFormValues({
       name: '',
@@ -318,6 +321,24 @@ export function EditTeamModal({
     return formattedValue;
   }
 
+  function onNameBlur(event: ChangeEvent<HTMLInputElement>) {
+    const data = {
+      uniqueIdentifier: event.target.value?.trim(),
+      participantType: ENROLLMENT_TYPE.TEAM,
+      uid: id,
+    };
+    api
+      .post(`/v1/participants-request/unique-identifier`, data)
+      .then((response) => {
+        setDisableSubmit(false);
+        response?.data &&
+        (response.data?.isUniqueIdentifierExist ||
+          response.data?.isRequestPending)
+          ? setNameExists(true)
+          : setNameExists(false);
+      });
+  }
+
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
@@ -334,7 +355,7 @@ export function EditTeamModal({
         projectDetailFormErrors,
         socialFormErrors
       } = validateForm(formValues, imageUrl);
-      if (errors?.length > 0) {
+      if (errors?.length > 0 || nameExists) {
         const element1 = divRef.current;
         if (element1) {
           element1.scrollTo({ top: 0, behavior: 'smooth' });
@@ -393,7 +414,7 @@ export function EditTeamModal({
       }
     },
     // [executeRecaptcha, formValues, imageUrl, imageChanged, id]
-    [formValues, imageUrl, isProcessing, imageChanged, id]
+    [formValues, imageUrl, isProcessing, imageChanged, id, nameExists]
   );
 
   function handleInputChange(
@@ -409,6 +430,11 @@ export function EditTeamModal({
     reader.onload = () => setImageUrl(reader.result as string);
     setFormValues({ ...formValues, logoFile: file });
     setImageChanged(true);
+  };
+
+  const onRemoveImage = () => {
+    setFormValues({ ...formValues, logoFile: null });
+    setImageUrl('');
   };
 
   function handleDropDownChange(selectedOption, name) {
@@ -497,7 +523,7 @@ export function EditTeamModal({
                 )
               }
               <div className="float-right">
-                {getSubmitOrNextButton(handleSubmit, isProcessing, fromSettings)}
+                {getSubmitOrNextButton(handleSubmit, isProcessing, fromSettings, disableSubmit)}
               </div>
             </div>
           )
@@ -529,7 +555,7 @@ export function EditTeamModal({
           <LoadingIndicator />
         </div>
       )}
-      <div id="myDiv">
+      <div id="myDiv" className='outline-0'>
         {
           fromSettings ? (<>
             {(
@@ -543,7 +569,7 @@ export function EditTeamModal({
                   {TAB_CONSTANTS.BASIC}{' '}
                 </button>
                 <button
-                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                  className={`w-1/4 border-b-4 border-transparent w-auto text-base font-medium ${openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
                     } ${projectErrors?.length > 0 && openTab == 2 ? 'border-b-[#DD2C5A] text-[#DD2C5A]' : projectErrors?.length > 0 ? 'text-[#DD2C5A]' : ''}`}
                   onClick={() => setOpenTab(2)}
                 >
@@ -551,7 +577,7 @@ export function EditTeamModal({
                   {TAB_CONSTANTS.PROJECT_DETAILS}
                 </button>
                 <button
-                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                  className={`w-1/4 border-b-4  border-transparent text-base font-medium ${openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
                     } ${socialErrors?.length > 0 && openTab == 3 ? 'border-b-[#DD2C5A] text-[#DD2C5A]' : socialErrors?.length > 0 ? 'text-[#DD2C5A]' : ''}`}
                   onClick={() => setOpenTab(3)}
                 >

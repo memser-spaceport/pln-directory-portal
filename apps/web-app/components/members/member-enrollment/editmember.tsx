@@ -10,7 +10,6 @@ import {
 } from 'react';
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
-import { toast } from 'react-toastify';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
@@ -29,8 +28,11 @@ import api from '../../../utils/api';
 import { ENROLLMENT_TYPE } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-member.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
+import { toast } from 'react-toastify';
+import orderBy from 'lodash/orderBy';
 import { requestPendingCheck } from '../../../utils/services/members';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+
 interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -49,17 +51,6 @@ function validateBasicForm(formValues, imageUrl, isProfileSettings) {
   if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
     errors.push('Please add valid Email');
   }
-  if (!imageUrl) {
-    errors.push('Please upload a profile image');
-  }
-  // if (!isProfileSettings) {
-  //   if (
-  //     !formValues.requestorEmail?.trim() ||
-  //     !formValues.requestorEmail?.match(emailRE)
-  //   ) {
-  //     errors.push('Please add valid Requestor Email.');
-  //   }
-  // }
   return errors;
 }
 
@@ -102,13 +93,17 @@ function validateForm(formValues, imageUrl, isProfileSettings) {
   };
 }
 
-function getSubmitOrNextButton(handleSubmit, isProcessing, isProfileSettings) {
+function getSubmitOrNextButton(handleSubmit, isProcessing, isProfileSettings, disableSubmit) {
   const buttonClassName =
     `${isProfileSettings ? 'bg-[#156FF7]' : 'bg-gradient-to-r from-[#427DFF] to-[#44D5BB]'} shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]`;
   const submitOrNextButton = (
     <button
-      className={buttonClassName}
-      disabled={isProcessing}
+      className={
+        isProcessing || disableSubmit
+          ? 'shadow-special-button-default inline-flex w-full justify-center rounded-full bg-slate-400 px-6 py-2 text-base font-semibold leading-6 text-white outline-none'
+          : buttonClassName
+      }
+      disabled={isProcessing || disableSubmit}
       onClick={handleSubmit}
     >
       {isProfileSettings ? 'Save Changes' : 'Request Changes'}
@@ -155,14 +150,15 @@ export function EditMemberModal({
   const [skillErrors, setSkillErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({});
   const [imageUrl, setImageUrl] = useState<string>();
-  // const [emailExists, setEmailExists] = useState<boolean>(false);
+  const [emailExists, setEmailExists] = useState<boolean>(false);
   const [imageChanged, setImageChanged] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
+  const [disableSubmit, setDisableSubmit] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     email: '',
-    openForWork: false,
+    openToWork: false,
     requestorEmail: '',
     imageUid: '',
     imageFile: null,
@@ -210,7 +206,7 @@ export function EditMemberModal({
           const formValues = {
             name: member.name,
             email: member.email,
-            openForWork: member.openForWork ?? false,
+            openToWork: member.openForWork ?? false,
             imageUid: member.imageUid,
             imageFile: null,
             plnStartDate: new Date(member.plnStartDate).toLocaleDateString(
@@ -299,6 +295,7 @@ export function EditMemberModal({
             skills: member.skills?.map((item) => {
               return { value: item.uid, label: item.title };
             }),
+            openToWork: member.openToWork
           };
           // set requestor email
           const userInfoFromCookie = Cookies.get('userInfo');
@@ -327,6 +324,7 @@ export function EditMemberModal({
     setImageChanged(false);
     setSaveCompleted(false);
     setIsProcessing(false);
+    setDisableSubmit(false);
     setImageUrl('');
     setFormValues({
       name: '',
@@ -346,6 +344,7 @@ export function EditMemberModal({
       comments: '',
       teamAndRoles: [],
       skills: [],
+      openToWork: false,
     });
   }
 
@@ -390,8 +389,27 @@ export function EditMemberModal({
       plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
+      openToWork: formValues.openToWork,
     };
     return formattedData;
+  }
+
+  function onEmailBlur(event: ChangeEvent<HTMLInputElement>) {
+    const data = {
+      uniqueIdentifier: event.target.value?.trim(),
+      participantType: ENROLLMENT_TYPE.MEMBER,
+      uid: id,
+    };
+    api
+      .post(`/v1/participants-request/unique-identifier`, data)
+      .then((response) => {
+        setDisableSubmit(false);
+        response?.data &&
+        (response.data?.isUniqueIdentifierExist ||
+          response.data?.isRequestPending)
+          ? setEmailExists(true)
+          : setEmailExists(false);
+      });
   }
 
   const handleSubmit = useCallback(
@@ -403,7 +421,7 @@ export function EditMemberModal({
       //   console.log('Execute recaptcha not yet available');
       //   return;
       // }
-      if (errors?.length > 0) {
+      if (errors?.length > 0 || emailExists) {
         const element1 = divRef.current;
         if (element1) {
           element1.scrollTo({ top: 0, behavior: 'smooth' });
@@ -427,7 +445,7 @@ export function EditMemberModal({
           formData.append('file', values.imageFile);
           const config = {
             headers: {
-              'contentsetIsProcessing-type': 'multipart/form-data',
+              'content-type': 'multipart/form-data',
             },
           };
           image = await api
@@ -438,7 +456,7 @@ export function EditMemberModal({
         }
 
         delete values?.imageFile;
-        //delete values?.requestorEmail;
+        delete values?.requestorEmail;
 
         const data = {
           participantType: ENROLLMENT_TYPE.MEMBER,
@@ -461,7 +479,7 @@ export function EditMemberModal({
             router.push(PAGE_ROUTES.MEMBERS);
             return false;
           }
-          const res = await requestPendingCheck(values.email);
+          const res = await requestPendingCheck(values.email, id);
           if (res?.isRequestPending) {
             setIsPendingRequestModalOpen(true);
             return false;
@@ -471,14 +489,17 @@ export function EditMemberModal({
           setSaveCompleted(true);
         });
       } catch (err) {
-        toast(err?.message);
-        console.log('error', err);
+        if (err.response.status === 400) {
+          toast(err?.response?.data?.message);
+        } else {
+          toast(err?.message);
+        }
       } finally {
         setIsProcessing(false);
       }
     },
     // [executeRecaptcha, formValues, imageUrl, imageChanged]
-    [formValues, imageUrl, imageChanged]
+    [formValues, imageUrl, imageChanged, emailExists]
   );
 
   function handleAddNewRole() {
@@ -525,6 +546,11 @@ export function EditMemberModal({
     setImageChanged(true);
   };
 
+  const onRemoveImage = () => {
+    setFormValues({ ...formValues, imageFile: null });
+    setImageUrl('');
+  };
+
   function handleDeleteRolesRow(rowId) {
     const newRoles = formValues.teamAndRoles.filter(
       (item) => item.rowId != rowId
@@ -552,7 +578,7 @@ export function EditMemberModal({
                   onClick={() => setOpenTab(1)}
                 >
                   {' '}
-                  Basic{' '}
+                  BASIC{' '}
                 </button>
                 <button
                   className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
@@ -560,7 +586,7 @@ export function EditMemberModal({
                   onClick={() => setOpenTab(2)}
                 >
                   {' '}
-                  Skills
+                  SKILLS
                 </button>
                 <button
                   className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
@@ -568,7 +594,7 @@ export function EditMemberModal({
                   onClick={() => setOpenTab(3)}
                 >
                   {' '}
-                  Social{' '}
+                  SOCIAL{' '}
                 </button>
               </div>
             )}
@@ -583,7 +609,9 @@ export function EditMemberModal({
                       imageUrl={imageUrl}
                       isEditMode={true}
                       disableEmail={true}
+                      setDisableNext={setDisableSubmit}
                       resetFile={reset}
+                      onRemoveImage={onRemoveImage}
                     />
                   </div>
                   <div className={openTab === 2 ? 'block' : 'hidden'}>
@@ -611,13 +639,13 @@ export function EditMemberModal({
           {!saveCompleted && (
             <div className="footerdiv fixed bottom-0 px-8 fixed inset-x-0 bottom-0 bg-white h-[80px]">
               <div className="float-right">
-                {getSubmitOrNextButton(handleSubmit, isProcessing, isProfileSettings)}
+                {getSubmitOrNextButton(handleSubmit, isProcessing, isProfileSettings, disableSubmit)}
               </div>
-              {/* <div className="float-right mx-5">
-		{getResetButton(()=>{
-		   handleReset()
-		})}
-	      </div> */}
+              <div className="float-right mx-5">
+                {getResetButton(() => {
+                  handleReset()
+                })}
+              </div>
             </div>
           )}
           {
@@ -707,8 +735,10 @@ export function EditMemberModal({
                   handleImageChange={handleImageChange}
                   imageUrl={imageUrl}
                   isEditMode={true}
+                  setDisableNext={setDisableSubmit}
                   // emailExists={emailExists}
                   disableEmail={true}
+                  onRemoveImage={onRemoveImage}
                 />
                 <AddMemberSkillForm
                   formValues={formValues}
@@ -730,7 +760,7 @@ export function EditMemberModal({
                   {getCancelOrBackButton(handleModalClose)}
                 </div>
                 <div className="float-right">
-                  {getSubmitOrNextButton(handleSubmit, isProcessing, isProfileSettings)}
+                  {getSubmitOrNextButton(handleSubmit, isProcessing, isProfileSettings, disableSubmit)}
                 </div>
               </div>
             </div>

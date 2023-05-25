@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import * as path from 'path';
 import { z } from 'zod';
-import { PrismaService } from '../prisma.service';
+import { PrismaService } from '../shared/prisma.service';
 import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
 import { hashFileName } from '../utils/hashing';
@@ -34,7 +34,11 @@ export class MembersService {
         memberRoles: true,
         teamMemberRoles: {
           include: {
-            team: true,
+            team: {
+              include: {
+                logo: true
+              }
+            },
           },
         },
       },

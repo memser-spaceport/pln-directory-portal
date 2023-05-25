@@ -46,26 +46,22 @@ export function AskToEditCard({
     useState(false);
 
   const handleOpenEditModal = async () => {
-    if (
-      typeof document !== 'undefined' &&
-      document.getElementsByClassName('grecaptcha-badge').length
-    ) {
-      document
-        .getElementsByClassName('grecaptcha-badge')[0]
-        .classList.add('width-full');
-    }
+    // if (
+    //   typeof document !== 'undefined' &&
+    //   document.getElementsByClassName('grecaptcha-badge').length
+    // ) {
+    //   document
+    //     .getElementsByClassName('grecaptcha-badge')[0]
+    //     .classList.add('width-full');
+    // }
     urlList[profileType].eventCode &&
       trackGoal(urlList[profileType].eventCode, 0);
     if (profileType == 'team') {
-      const res = await editTeamRequestPendingCheck(team.name);
-      res?.isRequestPending
-        ? setIsPendingRequestModalOpen(true)
-        : setIsTeamModalOpen(true);
+      // const res = await editTeamRequestPendingCheck(team.name, team.id);
+      setIsTeamModalOpen(true);
     } else {
-      const res = await requestPendingCheck(member.email);
-      res?.isRequestPending
-        ? setIsPendingRequestModalOpen(true)
-        : setIsMemberModalOpen(true);
+      // const res = await requestPendingCheck(member.email, member.id);
+      setIsMemberModalOpen(true);
     }
   };
 
@@ -80,7 +76,7 @@ export function AskToEditCard({
       <p className="mb-6 mt-4 text-base leading-6">
         As a community, help Teams and Members stay updated with their
         information.
-      </p> */}
+      </p>
       {/* <Link href={urlList[profileType].url}>
         <a
           target="_blank"

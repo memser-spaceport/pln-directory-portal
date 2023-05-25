@@ -58,7 +58,7 @@ model Member {
   plnStartDate    DateTime?        @default(now())
   airtableRecId   String?          @unique
   externalId      String?          @unique
-  openForWork     Boolean?         @default(false)
+  openToWork     Boolean?         @default(false)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   skills          Skill[]

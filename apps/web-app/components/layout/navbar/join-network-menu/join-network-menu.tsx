@@ -38,16 +38,15 @@ export function JoinNetworkMenu() {
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const {captureEvent}  = useAppAnalytics()
-
   const handleOpenModal = (label: string) => {
-    if (
-      typeof document !== 'undefined' &&
-      document.getElementsByClassName('grecaptcha-badge').length
-    ) {
-      document
-        .getElementsByClassName('grecaptcha-badge')[0]
-        .classList.add('width-full');
-    }
+    // if (
+    //   typeof document !== 'undefined' &&
+    //   document.getElementsByClassName('grecaptcha-badge').length
+    // ) {
+    //   document
+    //     .getElementsByClassName('grecaptcha-badge')[0]
+    //     .classList.add('width-full');
+    // }
     label.includes('Member')
       ? setIsMemberModalOpen(true)
       : setIsTeamModalOpen(true);

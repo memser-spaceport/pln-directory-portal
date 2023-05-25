@@ -12,6 +12,7 @@ import {
   Query,
   Req,
   UnauthorizedException,
+  BadRequestException,
   UseGuards,
 } from '@nestjs/common';
 import { ApprovalStatus, ParticipantType } from '@prisma/client';
@@ -78,6 +79,23 @@ export class ParticipantsRequestController {
       if(!requestorDetails.isDirectoryAdmin && (referenceUid !== requestorDetails.uid)) {
         throw new ForbiddenException()
       }
+    }
+      const checkDuplicate = await this.participantsRequestService.findDuplicates(
+      postData?.uniqueIdentifier,
+      participantType,
+      referenceUid,
+      ''
+    );
+    if (
+      checkDuplicate &&
+      (checkDuplicate.isUniqueIdentifierExist ||
+        checkDuplicate.isRequestPending)
+    ) {
+      const text =
+        participantType === ParticipantType.MEMBER
+          ? 'Member email'
+          : 'Team name';
+      throw new BadRequestException(`${text} already exists`);
     }
     let result;
     if(referenceUid && participantType === ParticipantType.MEMBER.toString()){

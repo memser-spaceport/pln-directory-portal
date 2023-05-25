@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { prisma } from 'apps/web-api/prisma/__mocks__';
-import { PrismaService } from '../../prisma.service';
+import { PrismaService } from '../../shared/prisma.service';
 import './__mocks__/location-transfer.mocks';
 import { LocationTransferService } from './location-transfer.service';
 

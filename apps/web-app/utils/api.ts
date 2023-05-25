@@ -124,7 +124,10 @@ api.interceptors.response.use(
         Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
         window.location.href="/directory/members";
       }   
+    }else{
+      throw error;
     }
+    
   }
 );
 

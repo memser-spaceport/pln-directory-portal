@@ -4,6 +4,7 @@ import {
   ProfileImageUpload,
   TextArea,
 } from '@protocol-labs-network/ui';
+import { UserGroupIcon } from '@heroicons/react/solid';
 import { ReactComponent as InformationCircleIcon } from '../../public/assets/icons/info_icon.svg';
 
 export default function TeamStepOne(props) {
@@ -31,6 +32,8 @@ export default function TeamStepOne(props) {
             imageUrl={props.imageUrl}
             maxSize={4}
             previewImageShape="square"
+            enableHover={props.isEditEnabled ? true : false}
+            avatarIcon={UserGroupIcon}
             onImageChange={props.handleImageChange}
             disabled={!props.isEditEnabled}
           />
@@ -41,9 +44,10 @@ export default function TeamStepOne(props) {
             value={values?.name}
             onChange={onChange}
             maxLength={150}
-            disabled={true}
+            disabled={!props.isEditEnabled}
             onBlur={props.onNameBlur && props.onNameBlur}
             name="name"
+            onKeyDown={() => props?.setDisableNext(true)}
             label="What is your organization, company, or team name?"
             placeholder="Enter name here"
             className="custom-grey custom-outline-none border"
@@ -57,6 +61,15 @@ export default function TeamStepOne(props) {
           )}
         </div>
       </div>
+
+      {props.imageUrl && props.isEditEnabled && (
+        <span
+          onClick={props.onRemoveImage}
+          className="cursor-pointer pt-5 pl-2 text-xs text-blue-600"
+        >
+          Remove Image
+        </span>
+      )}
 
       <div className="flex pt-3">
         <div>
@@ -76,9 +89,10 @@ export default function TeamStepOne(props) {
           maxLength={1000}
           disabled={!props.isEditEnabled}
           name="shortDescription"
-          label="Please briefly describe what your team/product/project does"
+          label="Briefly describe what your team/product/project does"
           info="One to two sentences is perfect! Use clear language and minimal jargon."
           className="custom-grey custom-outline-none min-h-[60px] border"
+          placeholder="Enter your short elevator pitch here"
         />
       </div>
 
@@ -93,6 +107,7 @@ export default function TeamStepOne(props) {
           label="Long Description"
           info="Please explain what your team does in a bit more detail. 4-5 sentences will be great!"
           className="custom-grey custom-outline-none min-h-[60px] border"
+          placeholder="Elaborate on your elevator pitch"
         />
       </div>
 
@@ -127,7 +142,7 @@ export default function TeamStepOne(props) {
           onChange={onChange}
           disabled={!props.isEditEnabled}
           label="Team Office Hours"
-          placeholder="Enter address here"
+          placeholder="Enter link here"
           className="custom-grey custom-outline-none border"
         />
         <div className="flex pt-3">

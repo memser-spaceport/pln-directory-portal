@@ -1,4 +1,5 @@
 import { InputField, ProfileImageUpload } from '@protocol-labs-network/ui';
+import { UserIcon } from '@heroicons/react/solid';
 import { ReactComponent as InformationCircleIcon } from '../../public/assets/icons/info_icon.svg';
 
 export default function AddMemberBasicForm(props) {
@@ -13,6 +14,8 @@ export default function AddMemberBasicForm(props) {
             imageUrl={props.imageUrl}
             maxSize={4}
             onImageChange={props.handleImageChange}
+            avatarIcon={UserIcon}
+            enableHover={props.isEditEnabled ? true : false}
             disabled={!props.isEditEnabled}
           />
         </div>
@@ -32,6 +35,15 @@ export default function AddMemberBasicForm(props) {
         </div>
       </div>
 
+      {props.imageUrl && props.isEditEnabled && (
+        <span
+          onClick={props.onRemoveImage}
+          className="cursor-pointer pt-5 pl-2 text-xs text-blue-600"
+        >
+          Remove Image
+        </span>
+      )}
+
       <div className="flex pt-3">
         <div>
           <InformationCircleIcon />
@@ -50,7 +62,8 @@ export default function AddMemberBasicForm(props) {
           label="Email"
           maxLength={255}
           value={values?.email}
-          disabled={true}
+          onKeyDown={() => props?.setDisableNext(true)}
+          disabled={!props.isEditEnabled}
           onChange={onChange}
           onBlur={props.onEmailBlur && props.onEmailBlur}
           placeholder="Enter your email address"
@@ -72,18 +85,9 @@ export default function AddMemberBasicForm(props) {
           onKeyDown={(e) => e.preventDefault()}
           value={values?.plnStartDate}
           disabled={!props.isEditEnabled}
-          label="PLN Start Date"
+          label="PLN Join Date"
           className="custom-grey custom-outline-none border"
         />
-        <div className="flex pt-3">
-          <div>
-            <InformationCircleIcon />
-          </div>
-          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            What date did your team join the PLN? If you don&apos;t know, pick
-            today.
-          </span>
-        </div>
       </div>
 
       <div className="inputfield cityname pt-5">
@@ -95,7 +99,7 @@ export default function AddMemberBasicForm(props) {
           pattern="^[a-zA-Z\s]*$"
           maxLength={100}
           onChange={onChange}
-          placeholder="Enter your city name"
+          placeholder="Enter your city"
           className="custom-grey custom-outline-none border"
         />
         <div className="flex pt-3">
@@ -103,8 +107,8 @@ export default function AddMemberBasicForm(props) {
             <InformationCircleIcon />
           </div>
           <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            Please share your location so we can be sure to invite you to in
-            person events in your area!
+            Please share location details to receive invitations for the network
+            events happening in your area.
           </span>
         </div>
       </div>

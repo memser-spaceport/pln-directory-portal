@@ -17,6 +17,7 @@ export interface IMember {
   twitter: string | null;
   roles?: string[];
   leadingTeams?: string[];
+  openToWork?: boolean;  
 }
 
 export interface IMemberTeam {
@@ -45,7 +46,6 @@ export interface IFormValues {
   name: string;
   email: string;
   requestorEmail?: string;
-  openForWork?: boolean;
   imageUid: string;
   imageFile: File;
   plnStartDate: string;
@@ -60,4 +60,17 @@ export interface IFormValues {
   comments: string;
   teamAndRoles: Roles[];
   skills: Skill[];
+  openToWork: boolean;
+}
+
+export interface IGitRepositories {
+  name: string;
+  description: string;
+  url: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface MemberProfileProjectsProps {
+  repositories: IGitRepositories[];
 }

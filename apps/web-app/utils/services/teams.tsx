@@ -12,11 +12,12 @@ export const fetchTeam = async (id) => {
   }
 };
 
-export const editTeamRequestPendingCheck = async (name) => {
+export const editTeamRequestPendingCheck = async (name, id) => {
   try {
     const data = {
       uniqueIdentifier: name,
       participantType: ENROLLMENT_TYPE.TEAM,
+      uid: id,
     };
 
     const response = await api.post(
