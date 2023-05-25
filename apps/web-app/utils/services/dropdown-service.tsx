@@ -1,7 +1,4 @@
 import api from '../api';
-import { getTeamsListOptions, getTeamsOptionsFromQuery, parseTeam } from '../teams.utils';
-import { ITeam } from '../teams.types';
-import { getTeams } from '@protocol-labs-network/teams/data-access';
 
 export const fetchSkills = async () => {
   try {
@@ -42,12 +39,12 @@ export const fetchMembershipSources = async () => {
   }
 };
 
-export const fetchProtocol = async () => {
+export const fetchTeamsForAutocomplete = async (searchTerm) => {
   try {
-    const response = await api.get(`/v1/technologies`);
+    const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}`);
     if (response.data) {
       return response.data.map((item) => {
-        return { value: item.uid, label: item.title };
+        return { value: item.uid, label: item.name };
       });
     }
   } catch (error) {
@@ -55,9 +52,9 @@ export const fetchProtocol = async () => {
   }
 };
 
-export const fetchFundingStages = async () => {
+export const fetchProtocol = async () => {
   try {
-    const response = await api.get(`/v1/funding-stages`);
+    const response = await api.get(`/v1/technologies`);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
@@ -81,12 +78,12 @@ export const fetchIndustryTags = async () => {
   }
 };
 
-export const fetchTeamsForAutocomplete = async (searchTerm) => {
+export const fetchFundingStages = async () => {
   try {
-    const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}`);
+    const response = await api.get(`/v1/funding-stages`);
     if (response.data) {
       return response.data.map((item) => {
-        return { value: item.uid, label: item.name };
+        return { value: item.uid, label: item.title };
       });
     }
   } catch (error) {
@@ -94,17 +91,3 @@ export const fetchTeamsForAutocomplete = async (searchTerm) => {
   }
 };
 
-// export const fetchTeamsWithLogoForAutocomplete = async (searchTerm) => {
-//   try {
-//     const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}&logo=true`);
-//     if (response.data) {
-//       return response.data.map((item) => {
-//         console.log(item)
-//         return { value: item.uid, label: item.name };
-//       });
-//     }
-//   } catch (error) {
-//     console.error(error);
-//   }
-  
-// };

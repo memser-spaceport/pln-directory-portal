@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ImagesController } from '../images/images.controller';
 import { ImagesService } from '../images/images.service';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
-import { PrismaService } from '../prisma.service';
 import { AwsService } from '../utils/aws/aws.service';
 import { FileEncryptionService } from '../utils/file-encryption/file-encryption.service';
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
@@ -18,7 +17,6 @@ import { TeamsService } from './teams.service';
   controllers: [TeamsController],
   providers: [
     TeamsService,
-    PrismaService,
     FileMigrationService,
     ImagesController,
     ImagesService,

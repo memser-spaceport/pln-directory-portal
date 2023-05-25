@@ -36,9 +36,6 @@ function validateBasicForm(formValues, imageUrl) {
   if (!formValues.name?.trim()) {
     errors.push('Please add Team Name');
   }
-  if (!imageUrl) {
-    errors.push('Please add your team logo');
-  }
   if (!formValues.shortDescription?.trim()) {
     errors.push('Please add a Description');
   }
@@ -52,9 +49,6 @@ function validateProjectDetailForm(formValues) {
   const errors = [];
   if (!formValues.fundingStage?.value) {
     errors.push('Please add Funding Stage');
-  }
-  if (!formValues.membershipSources.length) {
-    errors.push('Please add Membership Source(s)');
   }
   if (!formValues.industryTags.length) {
     errors.push('Please add IndustryTags');
@@ -103,6 +97,8 @@ export default function TeamView(props) {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [isEditEnabled, setIsEditEnabled] = useState<boolean>(false);
+  const [disableSave, setDisableSave] = useState<boolean>(false);
+  const [nameExists, setNameExists] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
   const {
     setIsOpenRequest,
@@ -155,9 +151,32 @@ export default function TeamView(props) {
     return formattedValue;
   }
 
+  function onNameBlur(event: ChangeEvent<HTMLInputElement>) {
+    const data = {
+      uniqueIdentifier: event.target.value?.trim(),
+      participantType: ENROLLMENT_TYPE.TEAM,
+      uid: props.referenceUid,
+      requestId: props.id,
+    };
+    api
+      .post(`/v1/participants-request/unique-identifier`, data)
+      .then((response) => {
+        setDisableSave(false);
+        response?.data &&
+        (response.data?.isUniqueIdentifierExist ||
+          response.data?.isRequestPending)
+          ? setNameExists(true)
+          : setNameExists(false);
+      });
+  }
+
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
+      if (nameExists) {
+        toast('Name already exists');
+        return;
+      }
       setErrors([]);
       const errors = validateForm(formValues, imageUrl);
       if (errors?.length > 0) {
@@ -217,7 +236,7 @@ export default function TeamView(props) {
         setIsProcessing(false);
       }
     },
-    [formValues, imageUrl, imageChanged]
+    [formValues, imageUrl, imageChanged, nameExists]
   );
 
   function handleInputChange(
@@ -235,12 +254,20 @@ export default function TeamView(props) {
     setImageChanged(true);
   };
 
+  const onRemoveImage = () => {
+    setFormValues({ ...formValues, logoFile: null });
+    setImageUrl('');
+  };
+
   function handleDropDownChange(selectedOption, name) {
     setFormValues({ ...formValues, [name]: selectedOption });
   }
 
   function redirectToList() {
-    const route = props.backLink;
+    const route =
+      props.status === APP_CONSTANTS.PENDING_LABEL
+        ? ROUTE_CONSTANTS.PENDING_LIST
+        : ROUTE_CONSTANTS.CLOSED_LIST;
     router.push({
       pathname: route,
     });
@@ -277,6 +304,10 @@ export default function TeamView(props) {
                     handleImageChange={handleImageChange}
                     imageUrl={imageUrl}
                     isEditEnabled={isEditEnabled}
+                    onNameBlur={onNameBlur}
+                    nameExists={nameExists}
+                    setDisableNext={setDisableSave}
+                    onRemoveImage={onRemoveImage}
                   />
                   <TeamStepTwo
                     formValues={formValues}
@@ -300,6 +331,7 @@ export default function TeamView(props) {
       {props.status === APP_CONSTANTS.PENDING_LABEL && (
         <FooterButtons
           isEditEnabled={isEditEnabled}
+          disableSave={disableSave}
           setIsEditEnabled={setIsEditEnabled}
           id={props.id}
           type={ENROLLMENT_TYPE.TEAM}

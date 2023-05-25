@@ -4,6 +4,7 @@ import {
   ProfileImageUpload,
   TextArea,
 } from '@protocol-labs-network/ui';
+import { UserGroupIcon } from '@heroicons/react/solid';
 import { ReactComponent as InformationCircleIcon } from '../../../public/assets/images/icons/info_icon.svg';
 
 export default function AddMemberStepOne(props) {
@@ -12,25 +13,25 @@ export default function AddMemberStepOne(props) {
 
   return (
     <>
-      {!props?.fromSettings && (
-        <div className="pt-5">
-          <InputField
-            required
-            name="requestorEmail"
-            type="email"
-            label="Requestor Email"
-            value={values?.requestorEmail}
-            onChange={onChange}
-            placeholder="Enter your email address"
-            className="custom-grey custom-outline-none border"
-          />
-        </div>
-      )}
+      <div className="pt-5">
+        <InputField
+          required
+          name="requestorEmail"
+          type="email"
+          label="Requestor Email"
+          value={values?.requestorEmail}
+          onChange={onChange}
+          placeholder="Enter your email address"
+          className="custom-grey custom-outline-none border"
+        />
+      </div>
       <div className="flex pt-5">
         <div className="">
           <ProfileImageUpload
             imageUrl={props.imageUrl}
             maxSize={4}
+            enableHover={props.isEditMode ? true : false}
+            avatarIcon={props.isEditMode && UserGroupIcon}
             previewImageShape="square"
             onImageChange={props.handleImageChange}
           />
@@ -59,6 +60,15 @@ export default function AddMemberStepOne(props) {
         </div>
       </div>
 
+      {props.imageUrl && (
+        <span
+          onClick={props.onRemoveImage}
+          className="cursor-pointer pt-5 pl-2 text-xs text-blue-600"
+        >
+          Remove Image
+        </span>
+      )}
+
       <div className="flex pt-5">
         <div>
           <InformationCircleIcon />
@@ -76,9 +86,10 @@ export default function AddMemberStepOne(props) {
           onChange={onChange}
           maxLength={1000}
           name="shortDescription"
-          label="Please briefly describe what your team/product/project does"
+          label="Briefly describe what your team/product/project does"
           info="One to two sentences is perfect! Use clear language and minimal jargon."
           className="custom-grey custom-outline-none min-h-[60px] border"
+          placeholder="Enter your short elevator pitch here"
         />
       </div>
 
@@ -92,6 +103,7 @@ export default function AddMemberStepOne(props) {
           label="Long Description"
           info="Please explain what your team does in a bit more detail. 4-5 sentences will be great!"
           className="custom-grey custom-outline-none min-h-[60px] border"
+          placeholder="Elaborate on your elevator pitch"
         />
       </div>
 
@@ -125,7 +137,7 @@ export default function AddMemberStepOne(props) {
           maxLength={300}
           onChange={onChange}
           label="Team Office Hours"
-          placeholder="Enter address here"
+          placeholder="Enter link here"
           className="custom-grey custom-outline-none border"
         />
         <div className="flex pt-3">

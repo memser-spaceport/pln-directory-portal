@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException, ForbiddenException, InternalServerEr
 import { Prisma, ParticipantType } from '@prisma/client';
 import * as path from 'path';
 import { z } from 'zod';
-import { PrismaService } from '../prisma.service';
+import { PrismaService } from '../shared/prisma.service';
 import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schema';
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';

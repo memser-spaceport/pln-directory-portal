@@ -29,9 +29,6 @@ function validateBasicForm(formValues, imageUrl) {
   if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
     errors.push('Please add valid Email');
   }
-  if (!imageUrl) {
-    errors.push('Please upload a profile image');
-  }
   if (
     !formValues.requestorEmail?.trim() ||
     !formValues.requestorEmail?.match(emailRE)
@@ -83,6 +80,8 @@ export default function MemberView(props) {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [isEditEnabled, setIsEditEnabled] = useState<boolean>(false);
+  const [emailExists, setEmailExists] = useState<boolean>(false);
+  const [disableSave, setDisableSave] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const {
@@ -127,13 +126,37 @@ export default function MemberView(props) {
       plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
+      openToWork: formValues.openToWork,
     };
     delete formattedData.requestorEmail;
     return formattedData;
   }
 
+  function onEmailBlur(event: ChangeEvent<HTMLInputElement>) {
+    const data = {
+      uniqueIdentifier: event.target.value?.trim(),
+      participantType: ENROLLMENT_TYPE.MEMBER,
+      uid: props.referenceUid,
+      requestId: props.id,
+    };
+    api
+      .post(`/v1/participants-request/unique-identifier`, data)
+      .then((response) => {
+        setDisableSave(false);
+        response?.data &&
+        (response.data?.isUniqueIdentifierExist ||
+          response.data?.isRequestPending)
+          ? setEmailExists(true)
+          : setEmailExists(false);
+      });
+  }
+
   const handleSubmit = useCallback(
     async (e) => {
+      if (emailExists) {
+        toast('Email already exists');
+        return;
+      }
       setIsLoading(true);
       e.preventDefault();
       setErrors([]);
@@ -201,7 +224,7 @@ export default function MemberView(props) {
         setIsLoading(false);
       }
     },
-    [formValues, imageUrl, imageChanged, props.id]
+    [formValues, imageUrl, emailExists, imageChanged, props.plnadmin, props.id]
   );
 
   function handleAddNewRole() {
@@ -246,6 +269,11 @@ export default function MemberView(props) {
     reader.onload = () => setImageUrl(reader.result as string);
     setFormValues({ ...formValues, imageFile: file });
     setImageChanged(true);
+  };
+
+  const onRemoveImage = () => {
+    setFormValues({ ...formValues, imageFile: null });
+    setImageUrl('');
   };
 
   function handleDeleteRolesRow(rowId) {
@@ -307,6 +335,10 @@ export default function MemberView(props) {
                   handleImageChange={handleImageChange}
                   imageUrl={imageUrl}
                   isEditEnabled={isEditEnabled}
+                  emailExists={emailExists}
+                  onEmailBlur={onEmailBlur}
+                  setDisableNext={setDisableSave}
+                  onRemoveImage={onRemoveImage}
                 />
                 <MemberSkillForm
                   formValues={formValues}
@@ -318,6 +350,7 @@ export default function MemberView(props) {
                   handleDeleteRolesRow={handleDeleteRolesRow}
                   onChange={handleInputChange}
                   isEditEnabled={isEditEnabled}
+                  referenceUid={props.referenceUid}
                 />
                 <MemberSocialForm
                   formValues={formValues}
@@ -332,6 +365,7 @@ export default function MemberView(props) {
       {props.status === APP_CONSTANTS.PENDING_LABEL && (
         <FooterButtons
           isEditEnabled={isEditEnabled}
+          disableSave={disableSave}
           setIsEditEnabled={setIsEditEnabled}
           id={props.id}
           type={ENROLLMENT_TYPE.MEMBER}
@@ -438,6 +472,7 @@ export const getServerSideProps = async (context) => {
       skills: requestData.skills?.map((item) => {
         return { value: item.uid, label: item.title };
       }),
+      openToWork: requestData?.openToWork ?? '',
     };
     imageUrl = requestData?.imageUrl ?? '';
 

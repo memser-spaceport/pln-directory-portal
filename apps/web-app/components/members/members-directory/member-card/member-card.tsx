@@ -47,10 +47,10 @@ export function MemberCard({
         isGrid={isGrid}
         isImageRounded
         img={member.image}
+        openToWork={member.openToWork}
         avatarIcon={UserIcon}
         name={member.name}
         teamLead={member.teamLead}
-        isOpenForWork={member.openForWork}
       />
       <div className={isGrid ? '' : 'w-[400px] grow-0'}>
         <h2

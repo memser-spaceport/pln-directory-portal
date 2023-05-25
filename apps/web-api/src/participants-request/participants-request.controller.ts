@@ -11,6 +11,7 @@ import {
   Query,
   Req,
   UnauthorizedException,
+  BadRequestException,
   UseGuards,
 } from '@nestjs/common';
 import { ApprovalStatus, ParticipantType } from '@prisma/client';
@@ -78,6 +79,23 @@ export class ParticipantsRequestController {
         console.log(requestorDetails, 'in edit exception')
         throw new ForbiddenException()
       }
+    }
+    const checkDuplicate = await this.participantsRequestService.findDuplicates(
+      postData?.uniqueIdentifier,
+      participantType,
+      referenceUid,
+      ''
+    );
+    if (
+      checkDuplicate &&
+      (checkDuplicate.isUniqueIdentifierExist ||
+        checkDuplicate.isRequestPending)
+    ) {
+      const text =
+        participantType === ParticipantType.MEMBER
+          ? 'Member email'
+          : 'Team name';
+      throw new BadRequestException(`${text} already exists`);
     }
 
     const result = await this.participantsRequestService.addRequest(postData);

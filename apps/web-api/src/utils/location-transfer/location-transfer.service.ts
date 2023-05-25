@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { IAirtableMember } from '@protocol-labs-network/airtable';
 import axios from 'axios';
-import { PrismaService } from '../../prisma.service';
+import { PrismaService } from '../../shared/prisma.service';
 
 @Injectable()
 export class LocationTransferService {

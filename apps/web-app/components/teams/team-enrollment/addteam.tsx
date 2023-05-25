@@ -50,9 +50,6 @@ function validateBasicForm(formValues) {
   if (!formValues.name.trim()) {
     errors.push('Please add Team Name');
   }
-  if (!formValues.logoFile) {
-    errors.push('Please add your team logo');
-  }
   if (!formValues.shortDescription?.trim()) {
     errors.push('Please add a Description');
   }
@@ -66,9 +63,6 @@ function validateProjectDetailForm(formValues) {
   const errors = [];
   if (!formValues.fundingStage?.value) {
     errors.push('Please add Funding Stage');
-  }
-  if (!formValues.membershipSources.length) {
-    errors.push('Please add Membership Source(s)');
   }
   if (!formValues.industryTags.length) {
     errors.push('Please add Industry Tags');
@@ -339,7 +333,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
 
   function onNameBlur(event: ChangeEvent<HTMLInputElement>) {
     const data = {
-      uniqueIdentifier: event.target.value,
+      uniqueIdentifier: event.target.value?.trim(),
       participantType: ENROLLMENT_TYPE.TEAM,
     };
     api
@@ -408,8 +402,11 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
           setSaveCompleted(true);
         });
       } catch (err) {
-        toast(err?.message);
-        console.log('error', err);
+        if (err.response.status === 400) {
+          toast(err?.response?.data?.message);
+        } else {
+          toast(err?.message);
+        }
       } finally {
         setIsProcessing(false);
       }
@@ -432,6 +429,11 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     setFormValues({ ...formValues, logoFile: file });
   };
 
+  const onRemoveImage = () => {
+    setFormValues({ ...formValues, logoFile: null });
+    setImageUrl('');
+  };
+
   function handleDropDownChange(selectedOption, name) {
     setFormValues({ ...formValues, [name]: selectedOption });
   }
@@ -449,6 +451,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
             imageUrl={imageUrl}
             nameExists={nameExists}
             setDisableNext={setDisableNext}
+            onRemoveImage={onRemoveImage}
           />
         );
       case 2:
@@ -508,7 +511,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
                 className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
                 onClick={() => handleModalClose()}
               >
-                Return to home
+                Close
               </button>
             </div>
           </div>

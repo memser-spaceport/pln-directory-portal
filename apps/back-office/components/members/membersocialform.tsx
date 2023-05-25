@@ -9,7 +9,7 @@ export default function AddMemberSocialForm(props) {
     <>
       <div className="inputfield pt-5">
         <InputField
-          label="LinkedIn URL"
+          label="LinkedIn"
           onChange={onChange}
           name="linkedinHandler"
           maxLength={200}
@@ -22,7 +22,7 @@ export default function AddMemberSocialForm(props) {
 
       <div className="inputfield hint-text pt-5">
         <InputField
-          label="Discord Handle"
+          label="Discord"
           name="discordHandler"
           onChange={onChange}
           maxLength={200}
@@ -45,7 +45,7 @@ export default function AddMemberSocialForm(props) {
       <div className="flex pt-5">
         <div className="inputfield w-[50%] pr-4">
           <InputField
-            label="Twitter Handle"
+            label="Twitter"
             name="twitterHandler"
             onChange={onChange}
             maxLength={200}
@@ -57,7 +57,7 @@ export default function AddMemberSocialForm(props) {
         </div>
         <div className="inputfield w-[50%]">
           <InputField
-            label="Github Handle"
+            label="Github"
             name="githubHandler"
             value={values.githubHandler}
             disabled={!props.isEditEnabled}

@@ -10,9 +10,10 @@ export class AdminService {
     const passwordFromEnv = process.env.ADMIN_PASSWORD;
 
     if (username !== usernameFromEnv || passwordFromEnv !== pass) {
+      console.log('Invalid creds');
       throw new UnauthorizedException();
     }
-
+    console.log('generating token.....');
     const accessToken = await this.jwtService.getSignedToken();
     return { code: 1, accessToken: accessToken };
   }

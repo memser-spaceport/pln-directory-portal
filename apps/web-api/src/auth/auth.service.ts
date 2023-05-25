@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import axios from 'axios';
 import jwt_decode from 'jwt-decode';
-import { PrismaService } from '../prisma.service';
+import { PrismaService } from '../shared/prisma.service';
 @Injectable()
 export class AuthService {
   constructor(private prismaService: PrismaService) {}

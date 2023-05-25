@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { IAirtableIndustryTag } from '@protocol-labs-network/airtable';
-import { PrismaService } from '../prisma.service';
+import { PrismaService } from '../shared/prisma.service';
 
 @Injectable()
 export class IndustryTagsService {

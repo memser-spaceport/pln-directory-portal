@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { AskToEditCard } from '../../../shared/profile/ask-to-edit-card/ask-to-edit-card';
 import { ReactComponent as ExploreIcon } from '../../../../public/assets/images/icons/explore.svg';
 import { IMember } from '../../../../utils/members.types';
+import { ReactComponent as BriefCase } from '../../../../public/assets/images/icons/mdi_briefcase-check.svg';
 
 export function MemberProfileHeader({
   member,
@@ -12,7 +13,7 @@ export function MemberProfileHeader({
   member: IMember;
   userInfo: any;
 }) {
-  const { image, name, teams, location, teamLead, mainTeam, openForWork } = member;
+  const { image, name, teams, location, teamLead, mainTeam, openToWork } = member;
   const otherTeams = teams
     .filter((team) => team.id !== mainTeam?.id)
     .map((team) => team.name)
@@ -66,13 +67,6 @@ export function MemberProfileHeader({
           ) : null}
         </div>
         <p className="line-clamp-1 text-sm">{memberRole}</p>
-        { 
-          openForWork ? (
-              <div className='flex w-32 mt-0.5 text-xs text-[#475569]'>
-                <ExploreIcon/> <div className='ml-1'>OPEN TO WORK</div>
-              </div> 
-          ) : null
-        }
         {userInfo?.uid && (
           <div className="mr-2 flex items-center text-sm text-slate-600">
             {location ? (
@@ -86,26 +80,34 @@ export function MemberProfileHeader({
           </div>
         )}
       </div>
+      <div className="w-42 flex items-start justify-end">
+        {openToWork ? (
+          <span className="flex p-3 text-slate-600">
+            <BriefCase />
+            <span className="pl-1 pt-px text-[10px] font-medium leading-[14px] tracking-[0.01em]">
+              OPEN TO WORK
+            </span>
+          </span>
+        ) : null }
+      </div>
       {teamLead ? (
-        <div className="flex w-20 items-start justify-start">
-          <Tooltip
-            asChild
-            trigger={
-              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 p-2 shadow-[0_1px_2px_rgba(15,23,42,0.16)]">
-                <i className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] not-italic text-white">
-                  <FlagIcon className="h-[9px]" />
-                </i>
-              </span>
-            }
-            content="Team Lead"
-          />
-        </div>
+        <Tooltip
+          asChild
+          trigger={
+            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 p-2 shadow-[0_1px_2px_rgba(15,23,42,0.16)]">
+              <i className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] not-italic text-white">
+                <FlagIcon className="h-[9px]" />
+              </i>
+            </span>
+          }
+          content="Team Lead"
+        />
       ) : null}
       {(userInfo.uid === member.id ||
         (userInfo.roles?.length > 0 &&
           userInfo.roles.includes('DIRECTORYADMIN'))) && (
         <AskToEditCard profileType="member" member={member} userInfo={userInfo} />
       )}
-    </div>
+      </div>
   );
 }
