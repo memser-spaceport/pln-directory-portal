@@ -85,6 +85,7 @@ function validateForm(formValues, imageUrl) {
 }
 
 export default function TeamView(props) {
+  const name = props?.oldName;
   const [errors, setErrors] = useState([]);
   const [imageUrl, setImageUrl] = useState<string>(props?.imageUrl);
   const [imageChanged, setImageChanged] = useState<boolean>(false);
@@ -146,6 +147,7 @@ export default function TeamView(props) {
       industryTags: formattedTags,
       membershipSources: formattedMembershipSource,
       technologies: formattedtechnologies,
+      oldName: name,
     };
     delete formattedValue.requestorEmail;
     return formattedValue;
@@ -375,6 +377,7 @@ export const getServerSideProps = async (context) => {
   let technologies = [];
   let memberList = [];
   let teamList = [];
+  let oldName = '';
   let referenceUid, imageUrl, status;
 
   const [
@@ -403,6 +406,7 @@ export const getServerSideProps = async (context) => {
   ) {
     referenceUid = requestDetailResponse?.data?.referenceUid ?? '';
     const team = requestDetailResponse?.data?.newData;
+    oldName = team?.oldName ?? team?.name;
     status = requestDetailResponse?.data?.status;
     formValues = {
       name: team.name,
@@ -487,6 +491,7 @@ export const getServerSideProps = async (context) => {
       teamList,
       memberList,
       plnadmin,
+      oldName,
     },
   };
 };

@@ -70,6 +70,7 @@ function validateForm(formValues, imageUrl) {
 }
 
 export default function MemberView(props) {
+  const name = props?.oldName;
   const [errors, setErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({
     skillValues: props?.skills,
@@ -127,6 +128,7 @@ export default function MemberView(props) {
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
+      oldName: name,
     };
     delete formattedData.requestorEmail;
     return formattedData;
@@ -405,6 +407,7 @@ export const getServerSideProps = async (context) => {
   let teams, skills, referenceUid, imageUrl, status;
   let memberList = [];
   let teamList = [];
+  let oldName = '';
 
   // Check if provided ID is an Airtable ID, and if so, get the corresponding backend UID
 
@@ -436,6 +439,7 @@ export const getServerSideProps = async (context) => {
     let counter = 1;
     referenceUid = requestDetailResponse?.data?.referenceUid ?? null;
     const requestData = requestDetailResponse?.data?.newData;
+    oldName = requestData?.oldName ?? requestData?.name;
     status = requestDetailResponse?.data?.status;
     const teamAndRoles =
       requestData.teamAndRoles?.length &&
@@ -512,6 +516,7 @@ export const getServerSideProps = async (context) => {
       teamList,
       memberList,
       plnadmin,
+      oldName,
     },
   };
 };
