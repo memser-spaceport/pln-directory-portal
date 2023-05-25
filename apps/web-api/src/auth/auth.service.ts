@@ -38,6 +38,8 @@ export class AuthService {
       const result = await axios.post(
         `${process.env.AUTH_API_URL}/auth/token`,
         {
+          client_id: process.env.AUTH_APP_CLIENT_ID,
+          client_secret: process.env.AUTH_APP_CLIENT_SECRET,
           refresh_token: refreshToken,
           grant_type: 'refresh_token',
         }
