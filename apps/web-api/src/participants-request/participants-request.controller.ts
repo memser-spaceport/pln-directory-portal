@@ -71,7 +71,7 @@ export class ParticipantsRequestController {
     }
 
     if(referenceUid) {
-      const requestorDetails = await this.participantsRequestService.findMemberByExternalId(req.userExternaId);
+      const requestorDetails = await this.participantsRequestService.findMemberByEmail(req.userEmail);
       if(!requestorDetails) {
         throw new UnauthorizedException()
       }

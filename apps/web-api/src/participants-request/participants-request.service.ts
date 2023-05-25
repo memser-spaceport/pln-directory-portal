@@ -60,10 +60,10 @@ export class ParticipantsRequestService {
     return result;
   }
 
-  async findMemberByExternalId(userExternalId) {
-    const foundMember = await this.prisma.member.findFirst({
+  async findMemberByEmail(userEmail) {
+    const foundMember = await this.prisma.member.findUnique({
       where: {
-        externalId: userExternalId
+        email: userEmail
       },
       include: {
         memberRoles: true,

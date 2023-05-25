@@ -160,9 +160,9 @@ export class TeamsService {
     }
   }
 
-  async editTeamParticipantsRequest(participantsRequest, userExternalId) {
+  async editTeamParticipantsRequest(participantsRequest, userEmail) {
     const { referenceUid } = participantsRequest;
-    const requestorDetails = await this.participantsRequestService.findMemberByExternalId(userExternalId);
+    const requestorDetails = await this.participantsRequestService.findMemberByEmail(userEmail);
     if(!requestorDetails) {
       throw new UnauthorizedException();
     }

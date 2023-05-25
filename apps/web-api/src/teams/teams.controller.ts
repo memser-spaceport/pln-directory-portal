@@ -65,6 +65,6 @@ export class TeamsController {
   @UseGuards(UserTokenValidation)
   async updateOne(@Param('id') id, @Body() body, @Req() req) {
     const participantsRequest = body;
-    return await this.teamsService.editTeamParticipantsRequest(participantsRequest, req.userExternaId);
+    return await this.teamsService.editTeamParticipantsRequest(participantsRequest, req.userEmail);
   }
 }
