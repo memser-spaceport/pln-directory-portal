@@ -26,12 +26,12 @@ function validateBasicForm(formValues, imageUrl) {
   if (!formValues.name.trim()) {
     errors.push('Please add your Name');
   }
-  if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
+  if (!formValues.email.trim() || !formValues.email?.trim().match(emailRE)) {
     errors.push('Please add valid Email');
   }
   if (
     !formValues.requestorEmail?.trim() ||
-    !formValues.requestorEmail?.match(emailRE)
+    !formValues.requestorEmail?.trim().match(emailRE)
   ) {
     errors.push('Please add a valid Requestor Email');
   }

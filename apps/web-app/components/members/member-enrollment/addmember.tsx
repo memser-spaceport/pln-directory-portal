@@ -43,7 +43,7 @@ function validateBasicForm(formValues) {
   if (!formValues.name.trim()) {
     errors.push('Please add your Name');
   }
-  if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
+  if (!formValues.email.trim() || !formValues.email?.trim().match(emailRE)) {
     errors.push('Please add valid Email');
   }
   return errors;
