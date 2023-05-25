@@ -335,7 +335,7 @@ export function EditTeamModal({
         // if (!captchaToken) return;
         let image;
         setIsProcessing(true);
-        if (imageChanged) {
+        if (imageChanged && values.logoFile) {
           const formData = new FormData();
           formData.append('file', values.logoFile);
           const config = {

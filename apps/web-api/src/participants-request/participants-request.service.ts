@@ -376,8 +376,10 @@ export class ParticipantsRequestService {
     };
 
     // Image Mapping
-    if (existingData.image.uid !== dataToProcess.imageUid) {
+    if (dataToProcess.imageUid) {
       dataToSave['image'] = { connect: { uid: dataToProcess.imageUid } };
+    } else {
+      dataToSave['image'] = { disconnect: true };
     }
 
     // Unique Location Uid needs to be formulated based on city, country & region using google places api and mapped to member
@@ -659,6 +661,8 @@ export class ParticipantsRequestService {
     // Logo image Mapping
     if (dataToProcess.logoUid) {
       dataToSave['logo'] = { connect: { uid: dataToProcess.logoUid } };
+    } else {
+      dataToSave['logo'] = { disconnect: true };
     }
 
     // Industry Tag Mapping
