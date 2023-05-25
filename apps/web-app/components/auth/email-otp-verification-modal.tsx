@@ -16,7 +16,16 @@ function EmailOtpVerificationModal() {
     const [errorMessage, setErrorMessage] = useState('');
     const [resendInSeconds, setResendInSeconds] = useState(30);
 
+    const setNewTokens = (allTokens) => {
+        const { refresh_token, access_token, } = allTokens;
+        if (refresh_token && access_token) {
+            const accessTokenExpiry = decodeToken(access_token);
+            const refreshTokenExpiry = decodeToken(refresh_token);
+            Cookies.set('authToken', JSON.stringify(access_token), { expires: calculateExpiry(new Date(accessTokenExpiry.exp)) })
+            Cookies.set('refreshToken', JSON.stringify(refresh_token), { expires: calculateExpiry(new Date(refreshTokenExpiry.exp)) })
 
+        }
+    }
 
 
     const onOtpVerify = (otp) => {
@@ -49,6 +58,7 @@ function EmailOtpVerificationModal() {
                 if (data?.userInfo) {
                     const accessTokenExpiry = decodeToken(Cookies.get('authToken'));
                     console.log(data)
+                    setNewTokens(data?.newTokens)
                     Cookies.set('userInfo', JSON.stringify(data?.userInfo), { expires: calculateExpiry(new Date(accessTokenExpiry.exp)) })
                     Cookies.remove('notificationToken')
                     Cookies.remove('uniqueEmailVerifyToken')

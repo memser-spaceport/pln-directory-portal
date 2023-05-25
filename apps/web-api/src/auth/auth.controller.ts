@@ -50,11 +50,11 @@ export class AuthController {
           throw new ForbiddenException('User not found')
         }
 
-        // link the verified email with account
-        await this.authService.linkEmailWithAccount(body.emailId, body.accessToken, body.notificationToken)
+        // link the verified email with account and get new tokens
+        const newTokens = await this.authService.linkEmailWithAccount(body.emailId, body.accessToken, body.notificationToken)
 
         // return userinfo
-        return { valid: true, userInfo: foundUser }
+        return { valid: true, userInfo: foundUser, newTokens }
       }
 
       // Invalid OTP

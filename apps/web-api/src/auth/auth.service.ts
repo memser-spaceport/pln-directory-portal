@@ -177,11 +177,13 @@ export class AuthService {
 
   async linkEmailWithAccount(email, accessToken, notificationToken) {
     try {
-      await axios.put(`${process.env.AUTH_API_URL}/auth/account`, { token: accessToken, email: email }, {
+     const linkResult =  await axios.put(`${process.env.AUTH_API_URL}/auth/account`, { token: accessToken, email: email }, {
         headers: {
           Authorization: `Bearer ${notificationToken}`
         }
       })
+    const newTokens = linkResult.data;
+    return newTokens;
     } catch (error) {
       if (error.response) {
         throw new HttpException(error?.response?.data?.message, error?.response?.status)
