@@ -134,7 +134,7 @@ export function ProfileImageUpload({
             <span>
               <RecycleIcon
                 onClick={(evt) => editFunction(evt)}
-                className="h-8 w-8 cursor-pointer"
+                className="w-8 h-8 cursor-pointer"
               />
             </span>
             {imageUrl && (
