@@ -124,18 +124,18 @@ export function ProfileImageUpload({
           />
         </div>
         {isHovered && (
-          <div className="absolute left-0 top-0 flex h-full w-full items-center justify-center bg-white opacity-70">
+          <div className="absolute left-0 top-0 flex h-full w-full items-center justify-center bg-black bg-opacity-40">
             <span>
               <RecycleIcon
                 onClick={(evt) => editFunction(evt)}
-                className="h-8 w-8"
+                className="h-8 w-8 cursor-pointer"
               />
             </span>
             {imageUrl && (
               <span className="pl-2">
                 <RemoveIcon
                   onClick={(evt) => deleteFunction(evt)}
-                  className="h-8 w-8"
+                  className="h-8 w-8 cursor-pointer"
                 />
               </span>
             )}

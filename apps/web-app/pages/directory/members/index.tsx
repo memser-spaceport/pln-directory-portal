@@ -38,6 +38,7 @@ export default function Members({ members, filtersValues }: MembersProps) {
     'metroArea',
     'officeHoursOnly',
     'includeFriends',
+    'openToWork',
   ];
 
   useDirectoryFiltersFathomLogger('members', filterProperties);
