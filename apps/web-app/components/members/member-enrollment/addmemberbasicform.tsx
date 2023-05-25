@@ -13,7 +13,11 @@ export default function AddMemberBasicForm(props) {
           <ProfileImageUpload
             imageUrl={props.imageUrl}
             maxSize={4}
-            enableHover={props.isEditMode ? true : false}
+            enableHover={
+              props.isEditMode || (!props.isEditMode && props.imageUrl)
+                ? true
+                : false
+            }
             avatarIcon={props.isEditMode && UserIcon}
             onImageChange={props.handleImageChange}
           />
