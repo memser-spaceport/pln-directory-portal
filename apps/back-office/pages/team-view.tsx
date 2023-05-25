@@ -188,7 +188,7 @@ export default function TeamView(props) {
       try {
         let image;
         setIsProcessing(true);
-        if (imageChanged) {
+        if (imageChanged && values.logoFile) {
           const formData = new FormData();
           formData.append('file', values.logoFile);
           const config = {
@@ -275,8 +275,8 @@ export default function TeamView(props) {
 
   return (
     <>
+      {isProcessing && <Loader />}
       <ApprovalLayout>
-        {isProcessing && <Loader />}
         <div className="bg-gray-200">
           <div className="relative m-auto w-[40%]">
             <div

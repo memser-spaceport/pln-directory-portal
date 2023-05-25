@@ -172,7 +172,7 @@ export default function MemberView(props) {
       try {
         let image;
         setIsProcessing(true);
-        if (imageChanged) {
+        if (imageChanged && values.imageFile) {
           const formData = new FormData();
           formData.append('file', values.imageFile);
           const config = {
@@ -295,8 +295,8 @@ export default function MemberView(props) {
 
   return (
     <>
+      {isLoading && <Loader />}
       <ApprovalLayout>
-        {isLoading && <Loader />}
         <div className="bg-gray-200">
           <div className="relative m-auto w-[40%]">
             <div
