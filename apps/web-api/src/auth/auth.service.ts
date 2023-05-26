@@ -141,7 +141,7 @@ export class AuthService {
       result = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
         client_id: process.env.AUTH_APP_CLIENT_ID,
         client_secret: process.env.AUTH_APP_CLIENT_SECRET,
-        redirect_uri: 'http://localhost:4200/directory/members/verify-member',
+        redirect_uri: `${process.env.WEB_UI_BASE_URL}/directory/members/verify-member`,
         code: code,
         grant_type: 'authorization_code',
       });
