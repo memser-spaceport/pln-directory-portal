@@ -1,5 +1,4 @@
 import { ChangeEvent, useEffect, useState } from 'react';
-import styles from './index.module.css';
 import { InputField } from '@protocol-labs-network/ui';
 import { useRouter } from 'next/router';
 import { ReactComponent as Building } from '/public/assets/icons/building.svg';
@@ -49,7 +48,7 @@ export function Index() {
           const backLink = router.query.backlink?.toString() ?? '';
           router.push(backLink ? backLink : ROUTE_CONSTANTS.PENDING_LIST);
         } else if (res.status === 401) {
-          setError('Incorrect Username and Password!');
+          setError('Incorrect Username or Password!');
         }
       })
       .catch((err) => {

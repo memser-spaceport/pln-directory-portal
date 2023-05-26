@@ -280,7 +280,7 @@ export function AddMemberModal({
     });
     const formattedData = {
       ...formValues,
-      name: formValues.name.trim(),
+      name: formValues.name?.replace(/ +(?= )/g, '').trim(),
       email: formValues.email.trim(),
       city: formValues.city?.trim(),
       region: formValues.region?.trim(),
