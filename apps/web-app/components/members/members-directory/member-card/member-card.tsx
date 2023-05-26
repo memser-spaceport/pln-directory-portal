@@ -13,6 +13,7 @@ interface MemberCardProps {
 }
 
 export function MemberCard({ isGrid = true, member }: MemberCardProps) {
+  const isOpenToWorkEnabled = process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK;
   const router = useRouter();
   const backLink = encodeURIComponent(router.asPath);
   const mainTeam = member.mainTeam;
@@ -45,7 +46,7 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
           >
             {member.name}
           </h2>
-          {!isGrid && member.openToWork && (
+          {(isOpenToWorkEnabled === 'true') && !isGrid && member.openToWork && (
             <span className="z-0 flex pl-2 pt-[5px] text-slate-600">
               <BriefCase />
               <span className="pl-1 pt-px text-[10px] font-medium leading-[14px] tracking-[0.01em]">
