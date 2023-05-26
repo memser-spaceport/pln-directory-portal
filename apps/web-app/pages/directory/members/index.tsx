@@ -75,23 +75,29 @@ export default function Members({
         toast.error(LOGIN_FAILED_MSG, {
           hideProgressBar: true,
         });
+        break;
       case "logout":
         toast.info(LOGOUT_MSG, {
           icon: <SuccessIcon />
         });
+        break;
       case "user_logged_out":
         toast.info(RETRY_LOGIN_MSG, {
           hideProgressBar: true
         });
+        break;
       case "user_logged_in":
         toast.info(LOGGED_IN_MSG + '.', {
           hideProgressBar: true
         });
+        break;
       case "server_error":
         toast.info(SOMETHING_WENT_WRONG, {
           hideProgressBar: true
         });
+        break;
       default:
+        break;
     }
     Cookies.remove('page_params');
     Cookies.remove('verified');
