@@ -46,6 +46,7 @@ export async function createMember({ amount }: TestFactorySeederParams) {
       createdAt: new Date(),
       updatedAt: new Date(),
       locationUid: location.uid,
+      openToWork: false,
     };
 
     return industryTag;

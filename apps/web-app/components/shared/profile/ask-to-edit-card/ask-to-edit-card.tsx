@@ -54,12 +54,12 @@ export function AskToEditCard({
     urlList[profileType].eventCode &&
       trackGoal(urlList[profileType].eventCode, 0);
     if (profileType == 'team') {
-      const res = await editTeamRequestPendingCheck(team.name);
+      const res = await editTeamRequestPendingCheck(team.name, team.id);
       res?.isRequestPending
         ? setIsPendingRequestModalOpen(true)
         : setIsTeamModalOpen(true);
     } else {
-      const res = await requestPendingCheck(member.email);
+      const res = await requestPendingCheck(member.email, member.id);
       res?.isRequestPending
         ? setIsPendingRequestModalOpen(true)
         : setIsMemberModalOpen(true);

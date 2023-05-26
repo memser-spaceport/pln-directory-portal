@@ -26,15 +26,12 @@ function validateBasicForm(formValues, imageUrl) {
   if (!formValues.name.trim()) {
     errors.push('Please add your Name');
   }
-  if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
+  if (!formValues.email.trim() || !formValues.email?.trim().match(emailRE)) {
     errors.push('Please add valid Email');
-  }
-  if (!imageUrl) {
-    errors.push('Please upload a profile image');
   }
   if (
     !formValues.requestorEmail?.trim() ||
-    !formValues.requestorEmail?.match(emailRE)
+    !formValues.requestorEmail?.trim().match(emailRE)
   ) {
     errors.push('Please add a valid Requestor Email');
   }
@@ -73,6 +70,7 @@ function validateForm(formValues, imageUrl) {
 }
 
 export default function MemberView(props) {
+  const name = props?.oldName;
   const [errors, setErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({
     skillValues: props?.skills,
@@ -83,6 +81,8 @@ export default function MemberView(props) {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [isEditEnabled, setIsEditEnabled] = useState<boolean>(false);
+  const [emailExists, setEmailExists] = useState<boolean>(false);
+  const [disableSave, setDisableSave] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const {
@@ -113,7 +113,7 @@ export default function MemberView(props) {
     });
     const formattedData = {
       ...formValues,
-      name: formValues.name?.trim(),
+      name: formValues.name?.replace(/ +(?= )/g, '').trim(),
       email: formValues.email?.trim(),
       city: formValues.city?.trim(),
       region: formValues.region?.trim(),
@@ -127,13 +127,38 @@ export default function MemberView(props) {
       plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
+      openToWork: formValues.openToWork,
+      oldName: name,
     };
     delete formattedData.requestorEmail;
     return formattedData;
   }
 
+  function onEmailBlur(event: ChangeEvent<HTMLInputElement>) {
+    const data = {
+      uniqueIdentifier: event.target.value?.trim(),
+      participantType: ENROLLMENT_TYPE.MEMBER,
+      uid: props.referenceUid,
+      requestId: props.id,
+    };
+    api
+      .post(`/v1/participants-request/unique-identifier`, data)
+      .then((response) => {
+        setDisableSave(false);
+        response?.data &&
+        (response.data?.isUniqueIdentifierExist ||
+          response.data?.isRequestPending)
+          ? setEmailExists(true)
+          : setEmailExists(false);
+      });
+  }
+
   const handleSubmit = useCallback(
     async (e) => {
+      if (emailExists) {
+        toast('Email already exists');
+        return;
+      }
       setIsLoading(true);
       e.preventDefault();
       setErrors([]);
@@ -149,7 +174,7 @@ export default function MemberView(props) {
       try {
         let image;
         setIsProcessing(true);
-        if (imageChanged) {
+        if (imageChanged && values.imageFile) {
           const formData = new FormData();
           formData.append('file', values.imageFile);
           const config = {
@@ -201,7 +226,7 @@ export default function MemberView(props) {
         setIsLoading(false);
       }
     },
-    [formValues, imageUrl, imageChanged, props.id]
+    [formValues, imageUrl, emailExists, imageChanged, props.plnadmin, props.id]
   );
 
   function handleAddNewRole() {
@@ -240,12 +265,17 @@ export default function MemberView(props) {
     setFormValues({ ...formValues, [name]: selectedOption });
   }
 
-  const handleImageChange = (file: File) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => setImageUrl(reader.result as string);
-    setFormValues({ ...formValues, imageFile: file });
-    setImageChanged(true);
+  const handleImageChange = (file: File | null) => {
+    if (file) {
+      setFormValues({ ...formValues, imageFile: file });
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => setImageUrl(reader.result as string);
+      setImageChanged(true);
+    } else {
+      setFormValues({ ...formValues, imageFile: null, imageUid: '' });
+      setImageUrl('');
+    }
   };
 
   function handleDeleteRolesRow(rowId) {
@@ -267,8 +297,8 @@ export default function MemberView(props) {
 
   return (
     <>
+      {isLoading && <Loader />}
       <ApprovalLayout>
-        {isLoading && <Loader />}
         <div className="bg-gray-200">
           <div className="relative m-auto w-[40%]">
             <div
@@ -307,6 +337,9 @@ export default function MemberView(props) {
                   handleImageChange={handleImageChange}
                   imageUrl={imageUrl}
                   isEditEnabled={isEditEnabled}
+                  emailExists={emailExists}
+                  onEmailBlur={onEmailBlur}
+                  setDisableNext={setDisableSave}
                 />
                 <MemberSkillForm
                   formValues={formValues}
@@ -318,6 +351,7 @@ export default function MemberView(props) {
                   handleDeleteRolesRow={handleDeleteRolesRow}
                   onChange={handleInputChange}
                   isEditEnabled={isEditEnabled}
+                  referenceUid={props.referenceUid}
                 />
                 <MemberSocialForm
                   formValues={formValues}
@@ -332,6 +366,7 @@ export default function MemberView(props) {
       {props.status === APP_CONSTANTS.PENDING_LABEL && (
         <FooterButtons
           isEditEnabled={isEditEnabled}
+          disableSave={disableSave}
           setIsEditEnabled={setIsEditEnabled}
           id={props.id}
           type={ENROLLMENT_TYPE.MEMBER}
@@ -372,6 +407,7 @@ export const getServerSideProps = async (context) => {
   let teams, skills, referenceUid, imageUrl, status;
   let memberList = [];
   let teamList = [];
+  let oldName = '';
 
   // Check if provided ID is an Airtable ID, and if so, get the corresponding backend UID
 
@@ -403,6 +439,7 @@ export const getServerSideProps = async (context) => {
     let counter = 1;
     referenceUid = requestDetailResponse?.data?.referenceUid ?? null;
     const requestData = requestDetailResponse?.data?.newData;
+    oldName = requestData?.oldName ?? requestData?.name;
     status = requestDetailResponse?.data?.status;
     const teamAndRoles =
       requestData.teamAndRoles?.length &&
@@ -438,6 +475,7 @@ export const getServerSideProps = async (context) => {
       skills: requestData.skills?.map((item) => {
         return { value: item.uid, label: item.title };
       }),
+      openToWork: requestData?.openToWork ?? '',
     };
     imageUrl = requestData?.imageUrl ?? '';
 
@@ -478,6 +516,7 @@ export const getServerSideProps = async (context) => {
       teamList,
       memberList,
       plnadmin,
+      oldName,
     },
   };
 };

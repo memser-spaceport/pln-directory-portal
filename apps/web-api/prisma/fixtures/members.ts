@@ -48,6 +48,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
       plnStartDate: faker.date.past(),
       updatedAt: faker.date.recent(),
       locationUid: '',
+      openToWork: faker.datatype.boolean(),
     };
   }
 );

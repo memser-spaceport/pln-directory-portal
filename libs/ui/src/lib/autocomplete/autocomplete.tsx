@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { InputField } from '../input-field/input-field';
 import { ReactComponent as ArrowDown } from '../../assets/icons/arrow-down-filled.svg';
+import { debounce } from 'lodash';
 
 interface IDropdownOption {
   label: string;
@@ -34,16 +35,20 @@ export function Autocomplete({
 }: AutocompleteProps) {
   const [searchTerm, setSearchTerm] = useState<string>(selectedOption.label);
   const [filteredOptions, setFilteredOptions] = useState<IDropdownOption[]>([]);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [selectedValue, setSelectedValue] =
     useState<IDropdownOption>(selectedOption);
   const [isExpanded, setIsExpanded] = useState(false);
   const dropdownOptionsRef = useRef<HTMLDivElement>(null);
+  const excludeList = excludeValues?.filter(
+    (item) => item !== selectedValue.value
+  );
 
   useMemo(() => {
     if (searchTerm === '') {
       setSearchTerm(selectedOption.label);
     }
-  }, [searchTerm, selectedOption.label]);
+  }, [selectedOption.label]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -62,18 +67,31 @@ export function Autocomplete({
     };
   }, [dropdownOptionsRef]);
 
-  useEffect(() => {
-    const getData = setTimeout(() => {
-      debounceCall(searchTerm).then((res: IDropdownOption[]) => {
-        const availableTeams = res?.filter((item) =>
-          excludeValues?.every((filterItem) => filterItem !== item.value)
-        );
-        setFilteredOptions(availableTeams);
-      });
-    }, debounceTime);
+  // Define the debounced function
+  const debouncedGetData = debounce((searchTerm) => {
+    debounceCall(searchTerm).then((res: IDropdownOption[]) => {
+      const availableTeams = res?.filter((item) =>
+        excludeList?.every((filterItem) => filterItem !== item.value)
+      );
+      setFilteredOptions(availableTeams);
+      setIsProcessing(false);
+    });
+  }, debounceTime);
 
-    return () => clearTimeout(getData);
-  }, [debounceCall, debounceTime, searchTerm]);
+  useEffect(() => {
+    if (isExpanded) {
+      setIsProcessing(true);
+      // Call the debounced function when the searchTerm changes
+      debouncedGetData(searchTerm);
+
+      // Cleanup: Cancel any pending debounced calls
+      return () => {
+        debouncedGetData.cancel();
+      };
+    } else {
+      return;
+    }
+  }, [searchTerm, excludeValues, isExpanded]);
 
   const handleUserInput = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.currentTarget?.value);
@@ -136,6 +154,8 @@ export function Autocomplete({
                   {option.label}
                 </li>
               ))
+            ) : isProcessing ? (
+              <li className="text-gray-500">Searching</li>
             ) : (
               <li className="text-gray-500">No options available</li>
             )}

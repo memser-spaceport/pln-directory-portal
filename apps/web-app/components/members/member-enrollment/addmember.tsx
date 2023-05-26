@@ -43,11 +43,8 @@ function validateBasicForm(formValues) {
   if (!formValues.name.trim()) {
     errors.push('Please add your Name');
   }
-  if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
+  if (!formValues.email.trim() || !formValues.email?.trim().match(emailRE)) {
     errors.push('Please add valid Email');
-  }
-  if (!formValues.imageFile) {
-    errors.push('Please upload a profile image');
   }
   return errors;
 }
@@ -126,7 +123,7 @@ function getSubmitOrNextButton(
         disabled={isProcessing}
         onClick={handleSubmit}
       >
-        Add to Network
+        Request to Join
       </button>
     ) : (
       <button
@@ -210,6 +207,7 @@ export function AddMemberModal({
     comments: '',
     teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
     skills: [],
+    openToWork: false,
   });
 
   const divRef = useRef<HTMLDivElement>(null);
@@ -223,7 +221,6 @@ export function AddMemberModal({
         )
         .catch((err) => {
           toast(err?.message);
-          console.log('error', err);
         });
     }
   }, [isOpen]);
@@ -254,6 +251,7 @@ export function AddMemberModal({
       comments: '',
       teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
       skills: [],
+      openToWork: false,
     });
   }
 
@@ -282,7 +280,7 @@ export function AddMemberModal({
     });
     const formattedData = {
       ...formValues,
-      name: formValues.name.trim(),
+      name: formValues.name?.replace(/ +(?= )/g, '').trim(),
       email: formValues.email.trim(),
       city: formValues.city?.trim(),
       region: formValues.region?.trim(),
@@ -296,13 +294,14 @@ export function AddMemberModal({
       plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
+      openToWork: formValues.openToWork,
     };
     return formattedData;
   }
 
   function onEmailBlur(event: ChangeEvent<HTMLInputElement>) {
     const data = {
-      uniqueIdentifier: event.target.value,
+      uniqueIdentifier: event.target.value?.trim(),
       participantType: ENROLLMENT_TYPE.MEMBER,
     };
     api
@@ -356,19 +355,22 @@ export function AddMemberModal({
           // captchaToken,
         };
         await api.post(`/v1/participants-request`, data).then((response) => {
-          if (
-            typeof document !== 'undefined' &&
-            document.getElementsByClassName('grecaptcha-badge').length
-          ) {
-            document
-              .getElementsByClassName('grecaptcha-badge')[0]
-              .classList.add('w-0');
-          }
+          // if (
+          //   typeof document !== 'undefined' &&
+          //   document.getElementsByClassName('grecaptcha-badge').length
+          // ) {
+          //   document
+          //     .getElementsByClassName('grecaptcha-badge')[0]
+          //     .classList.add('w-0');
+          // }
           setSaveCompleted(true);
         });
       } catch (err) {
-        toast(err?.message);
-        console.log('error', err);
+        if (err.response.status === 400) {
+          toast(err?.response?.data?.message);
+        } else {
+          toast(err?.message);
+        }
       } finally {
         setIsProcessing(false);
       }
@@ -413,12 +415,16 @@ export function AddMemberModal({
     setFormValues({ ...formValues, [name]: selectedOption });
   }
 
-  const handleImageChange = (file: File) => {
-    const imageFile = file;
-    setFormValues({ ...formValues, imageFile: imageFile });
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => setImageUrl(reader.result as string);
+  const handleImageChange = (file: File | null) => {
+    if (file) {
+      setFormValues({ ...formValues, imageFile: file });
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => setImageUrl(reader.result as string);
+    } else {
+      setFormValues({ ...formValues, imageFile: null, imageUid: '' });
+      setImageUrl('');
+    }
   };
 
   function handleDeleteRolesRow(rowId) {
@@ -453,6 +459,7 @@ export function AddMemberModal({
             updateParentRoleValue={updateParentRoleValue}
             handleDeleteRolesRow={handleDeleteRolesRow}
             onChange={handleInputChange}
+            isNewMode={true}
           />
         );
       case 3:
@@ -502,7 +509,7 @@ export function AddMemberModal({
                 className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
                 onClick={() => handleModalClose()}
               >
-                Return to home
+                Close
               </button>
             </div>
           </div>

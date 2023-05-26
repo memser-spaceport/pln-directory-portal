@@ -29,15 +29,12 @@ function validateBasicForm(formValues, imageUrl) {
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   if (
     !formValues.requestorEmail?.trim() ||
-    !formValues.requestorEmail?.match(emailRE)
+    !formValues.requestorEmail?.trim().match(emailRE)
   ) {
     errors.push('Please add a valid Requestor email');
   }
   if (!formValues.name?.trim()) {
     errors.push('Please add Team Name');
-  }
-  if (!imageUrl) {
-    errors.push('Please add your team logo');
   }
   if (!formValues.shortDescription?.trim()) {
     errors.push('Please add a Description');
@@ -52,9 +49,6 @@ function validateProjectDetailForm(formValues) {
   const errors = [];
   if (!formValues.fundingStage?.value) {
     errors.push('Please add Funding Stage');
-  }
-  if (!formValues.membershipSources.length) {
-    errors.push('Please add Membership Source(s)');
   }
   if (!formValues.industryTags.length) {
     errors.push('Please add IndustryTags');
@@ -91,6 +85,7 @@ function validateForm(formValues, imageUrl) {
 }
 
 export default function TeamView(props) {
+  const name = props?.oldName;
   const [errors, setErrors] = useState([]);
   const [imageUrl, setImageUrl] = useState<string>(props?.imageUrl);
   const [imageChanged, setImageChanged] = useState<boolean>(false);
@@ -103,6 +98,8 @@ export default function TeamView(props) {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [isEditEnabled, setIsEditEnabled] = useState<boolean>(false);
+  const [disableSave, setDisableSave] = useState<boolean>(false);
+  const [nameExists, setNameExists] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
   const {
     setIsOpenRequest,
@@ -137,7 +134,7 @@ export default function TeamView(props) {
 
     const formattedValue = {
       ...formValues,
-      name: formValues.name?.trim(),
+      name: formValues.name?.replace(/ +(?= )/g, '').trim(),
       shortDescription: formValues.shortDescription?.trim(),
       longDescription: formValues.longDescription?.trim(),
       website: formValues.website?.trim(),
@@ -150,14 +147,38 @@ export default function TeamView(props) {
       industryTags: formattedTags,
       membershipSources: formattedMembershipSource,
       technologies: formattedtechnologies,
+      oldName: name,
     };
     delete formattedValue.requestorEmail;
     return formattedValue;
   }
 
+  function onNameBlur(event: ChangeEvent<HTMLInputElement>) {
+    const data = {
+      uniqueIdentifier: event.target.value?.trim(),
+      participantType: ENROLLMENT_TYPE.TEAM,
+      uid: props.referenceUid,
+      requestId: props.id,
+    };
+    api
+      .post(`/v1/participants-request/unique-identifier`, data)
+      .then((response) => {
+        setDisableSave(false);
+        response?.data &&
+        (response.data?.isUniqueIdentifierExist ||
+          response.data?.isRequestPending)
+          ? setNameExists(true)
+          : setNameExists(false);
+      });
+  }
+
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
+      if (nameExists) {
+        toast('Name already exists');
+        return;
+      }
       setErrors([]);
       const errors = validateForm(formValues, imageUrl);
       if (errors?.length > 0) {
@@ -169,7 +190,7 @@ export default function TeamView(props) {
       try {
         let image;
         setIsProcessing(true);
-        if (imageChanged) {
+        if (imageChanged && values.logoFile) {
           const formData = new FormData();
           formData.append('file', values.logoFile);
           const config = {
@@ -217,7 +238,7 @@ export default function TeamView(props) {
         setIsProcessing(false);
       }
     },
-    [formValues, imageUrl, imageChanged]
+    [formValues, imageUrl, imageChanged, nameExists]
   );
 
   function handleInputChange(
@@ -227,12 +248,17 @@ export default function TeamView(props) {
     setFormValues({ ...formValues, [name]: value });
   }
 
-  const handleImageChange = (file: File) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => setImageUrl(reader.result as string);
-    setFormValues({ ...formValues, logoFile: file });
-    setImageChanged(true);
+  const handleImageChange = (file: File | null) => {
+    if (file) {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => setImageUrl(reader.result as string);
+      setFormValues({ ...formValues, logoFile: file });
+      setImageChanged(true);
+    } else {
+      setFormValues({ ...formValues, logoFile: null, logoUid: '' });
+      setImageUrl('');
+    }
   };
 
   function handleDropDownChange(selectedOption, name) {
@@ -251,8 +277,8 @@ export default function TeamView(props) {
 
   return (
     <>
+      {isProcessing && <Loader />}
       <ApprovalLayout>
-        {isProcessing && <Loader />}
         <div className="bg-gray-200">
           <div className="relative m-auto w-[40%]">
             <div
@@ -280,6 +306,9 @@ export default function TeamView(props) {
                     handleImageChange={handleImageChange}
                     imageUrl={imageUrl}
                     isEditEnabled={isEditEnabled}
+                    onNameBlur={onNameBlur}
+                    nameExists={nameExists}
+                    setDisableNext={setDisableSave}
                   />
                   <TeamStepTwo
                     formValues={formValues}
@@ -303,6 +332,7 @@ export default function TeamView(props) {
       {props.status === APP_CONSTANTS.PENDING_LABEL && (
         <FooterButtons
           isEditEnabled={isEditEnabled}
+          disableSave={disableSave}
           setIsEditEnabled={setIsEditEnabled}
           id={props.id}
           type={ENROLLMENT_TYPE.TEAM}
@@ -347,6 +377,7 @@ export const getServerSideProps = async (context) => {
   let technologies = [];
   let memberList = [];
   let teamList = [];
+  let oldName = '';
   let referenceUid, imageUrl, status;
 
   const [
@@ -375,6 +406,7 @@ export const getServerSideProps = async (context) => {
   ) {
     referenceUid = requestDetailResponse?.data?.referenceUid ?? '';
     const team = requestDetailResponse?.data?.newData;
+    oldName = team?.oldName ?? team?.name;
     status = requestDetailResponse?.data?.status;
     formValues = {
       name: team.name,
@@ -459,6 +491,7 @@ export const getServerSideProps = async (context) => {
       teamList,
       memberList,
       plnadmin,
+      oldName,
     },
   };
 };

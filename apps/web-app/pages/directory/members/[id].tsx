@@ -10,23 +10,34 @@ import { MemberProfileDetails } from '../../../components/members/member-profile
 import { MemberProfileHeader } from '../../../components/members/member-profile/member-profile-header/member-profile-header';
 import { MemberProfileOfficeHours } from '../../../components/members/member-profile/member-profile-office-hours/member-profile-office-hours';
 import { MemberProfileTeams } from '../../../components/members/member-profile/member-profile-teams';
+import { MemberProfileProjects } from '../../../components/members/member-profile/member-project-details/member-profile-projects';
 import { AskToEditCard } from '../../../components/shared/profile/ask-to-edit-card/ask-to-edit-card';
 import { AIRTABLE_REGEX } from '../../../constants';
 import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcrumb.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
-import { IMember } from '../../../utils/members.types';
+import { IMember, IGitRepositories } from '../../../utils/members.types';
 import { parseMember } from '../../../utils/members.utils';
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
+import {
+  getAllPinned,
+  getAllRepositories,
+} from '../../../utils/services/members';
 
 interface MemberProps {
   member: IMember;
   teams: ITeam[];
   backLink: string;
+  repositories: IGitRepositories[];
 }
 
-export default function Member({ member, teams, backLink }: MemberProps) {
+export default function Member({
+  member,
+  teams,
+  backLink,
+  repositories,
+}: MemberProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
     directoryName: 'Members',
@@ -52,6 +63,7 @@ export default function Member({ member, teams, backLink }: MemberProps) {
           <MemberProfileDetails {...member} />
           <MemberProfileOfficeHours url={member.officeHours} />
           <MemberProfileTeams teams={teams} member={member} />
+          <MemberProfileProjects repositories={repositories} />
         </div>
         <div className="w-sidebar shrink-0">
           <AskToEditCard profileType="member" member={member} />
@@ -114,6 +126,15 @@ export const getServerSideProps = async ({ query, res }) => {
     };
   }
 
+  let repositories = [];
+
+  if (member?.githubHandle !== '' && member?.githubHandle !== null) {
+    repositories = await getAllPinned(member?.githubHandle);
+    if (!repositories?.length) {
+      repositories = (await getAllRepositories(member?.githubHandle)) ?? [];
+    }
+  }
+
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
   res.setHeader(
@@ -122,6 +143,6 @@ export const getServerSideProps = async ({ query, res }) => {
   );
 
   return {
-    props: { member, teams, backLink },
+    props: { member, teams, backLink, repositories },
   };
 };

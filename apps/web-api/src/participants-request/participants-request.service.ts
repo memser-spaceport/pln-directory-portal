@@ -1,14 +1,13 @@
 /* eslint-disable prettier/prettier */
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ApprovalStatus, ParticipantType } from '@prisma/client';
-import { PrismaService } from '../prisma.service';
+import { PrismaService } from '../shared/prisma.service';
 import { AwsService } from '../utils/aws/aws.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
-import cacheManager from 'cache-manager';
-import redisStore from 'cache-manager-redis-store';
 import { RedisService } from '../utils/redis/redis.service';
 import { SlackService } from '../utils/slack/slack.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
+import { getRandomId } from '../utils/helper/helper';
 @Injectable()
 export class ParticipantsRequestService {
   constructor(
@@ -61,29 +60,35 @@ export class ParticipantsRequestService {
     return result;
   }
 
-  async findDuplicates(uniqueIdentifier, participantType) {
-    const itemInRequest = await this.prisma.participantsRequest.findMany({
+  async findDuplicates(uniqueIdentifier, participantType, uid, requestId) {
+    let itemInRequest = await this.prisma.participantsRequest.findMany({
       where: {
-        AND: {
-          uniqueIdentifier: uniqueIdentifier,
-          status: ApprovalStatus.PENDING,
-        },
+        participantType,
+        status: ApprovalStatus.PENDING,
+        OR: [{ referenceUid: uid }, { uniqueIdentifier }],
       },
     });
+    itemInRequest = itemInRequest?.filter((item) => item.uid !== requestId);
     if (itemInRequest.length === 0) {
       if (participantType === 'TEAM') {
-        const teamResult = await this.prisma.team.findMany({
-          where: { name: uniqueIdentifier },
+        let teamResult = await this.prisma.team.findMany({
+          where: {
+            name: uniqueIdentifier,
+          },
         });
+        teamResult = teamResult?.filter((item) => item.uid !== uid);
         if (teamResult.length > 0) {
           return { isRequestPending: false, isUniqueIdentifierExist: true };
         } else {
           return { isRequestPending: false, isUniqueIdentifierExist: false };
         }
       } else {
-        const memResult = await this.prisma.member.findMany({
-          where: { email: uniqueIdentifier },
+        let memResult = await this.prisma.member.findMany({
+          where: {
+            email: uniqueIdentifier,
+          },
         });
+        memResult = memResult?.filter((item) => item.uid !== uid);
         if (memResult.length > 0) {
           return { isRequestPending: false, isUniqueIdentifierExist: true };
         } else {
@@ -103,10 +108,24 @@ export class ParticipantsRequestService {
     const postData = { ...requestData, uniqueIdentifier };
     requestData[uniqueIdentifier] = uniqueIdentifier;
 
+    let existingData: any;
+    if (requestData.referenceUid) {
+      existingData =
+        requestData.participantType === 'TEAM'
+          ? await this.prisma.team.findUnique({
+              where: { uid: requestData.referenceUid },
+            })
+          : await this.prisma.member.findUnique({
+              where: { uid: requestData.referenceUid },
+            });
+    }
+
     const slackConfig = {
       requestLabel: '',
       url: '',
-      name: requestData.newData.name,
+      name: requestData.referenceUid
+        ? existingData.name
+        : requestData.newData.name,
     };
     const result: any = await this.prisma.participantsRequest.create({
       data: { ...postData },
@@ -129,7 +148,7 @@ export class ParticipantsRequestService {
       slackConfig.requestLabel = 'Edit Labber Request';
       slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`;
       await this.awsService.sendEmail('EditMemberRequest', true, [], {
-        memberName: result.newData.name,
+        memberName: existingData.name,
         requestUid: result.uid,
         requesterEmailId: requestData.requesterEmailId,
         adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`,
@@ -152,7 +171,7 @@ export class ParticipantsRequestService {
       slackConfig.requestLabel = 'Edit Team Request';
       slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`;
       await this.awsService.sendEmail('EditTeamRequest', true, [], {
-        teamName: result.newData.name,
+        teamName: existingData.name,
         teamUid: result.referenceUid,
         requesterEmailId: requestData.requesterEmailId,
         adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,
@@ -172,7 +191,6 @@ export class ParticipantsRequestService {
     delete formattedData.uid;
     delete formattedData.status;
     delete formattedData.participantType;
-    console.log(formattedData, requestedUid);
     await this.prisma.participantsRequest.update({
       where: { uid: requestedUid },
       data: { ...formattedData },
@@ -205,7 +223,6 @@ export class ParticipantsRequestService {
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
       return { code: -1, message: 'Request already Processed' };
     }
-
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
     const slackConfig = {
@@ -225,6 +242,7 @@ export class ParticipantsRequestService {
     dataToSave['officeHours'] = dataToProcess.officeHours;
     dataToSave['moreDetails'] = dataToProcess.moreDetails;
     dataToSave['plnStartDate'] = dataToProcess.plnStartDate;
+    dataToSave['openToWork'] = dataToProcess.openToWork;
 
     // Team member roles relational mapping
     dataToSave['teamMemberRoles'] = {
@@ -287,7 +305,9 @@ export class ParticipantsRequestService {
     await this.awsService.sendEmail('MemberCreated', true, [], {
       memberName: dataToProcess.name,
       memberUid: newMember.uid,
-      adminSiteUrl: `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}`,
+      adminSiteUrl: `${process.env.WEB_UI_BASE_URL}/members/${
+        newMember.uid
+      }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
     });
     await this.awsService.sendEmail(
       'NewMemberSuccess',
@@ -295,11 +315,15 @@ export class ParticipantsRequestService {
       [dataFromDB.requesterEmailId],
       {
         memberName: dataToProcess.name,
-        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}`,
+        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${
+          newMember.uid
+        }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
       }
     );
     slackConfig.requestLabel = 'New Labber Added';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${newMember.uid}`;
+    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${
+      newMember.uid
+    }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
@@ -314,6 +338,7 @@ export class ParticipantsRequestService {
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
       return { code: -1, message: 'Request already Processed' };
     }
+
     const existingData: any = await this.prisma.member.findUnique({
       where: { uid: dataFromDB.referenceUid },
       include: {
@@ -343,6 +368,7 @@ export class ParticipantsRequestService {
     dataToSave['officeHours'] = dataToProcess.officeHours;
     dataToSave['moreDetails'] = dataToProcess.moreDetails;
     dataToSave['plnStartDate'] = dataToProcess.plnStartDate;
+    dataToSave['openToWork'] = dataToProcess.openToWork;
 
     // Skills relation mapping
     dataToSave['skills'] = {
@@ -352,8 +378,10 @@ export class ParticipantsRequestService {
     };
 
     // Image Mapping
-    if (existingData.image.uid !== dataToProcess.imageUid) {
+    if (dataToProcess.imageUid) {
       dataToSave['image'] = { connect: { uid: dataToProcess.imageUid } };
+    } else {
+      dataToSave['image'] = { disconnect: true };
     }
 
     // Unique Location Uid needs to be formulated based on city, country & region using google places api and mapped to member
@@ -470,11 +498,15 @@ export class ParticipantsRequestService {
       [dataFromDB.requesterEmailId],
       {
         memberName: dataToProcess.name,
-        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}`,
+        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${
+          dataFromDB.referenceUid
+        }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
       }
     );
     slackConfig.requestLabel = 'Edit Labber Request Completed';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${dataFromDB.referenceUid}`;
+    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${
+      dataFromDB.referenceUid
+    }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
@@ -488,6 +520,7 @@ export class ParticipantsRequestService {
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
       return { code: -1, message: 'Request already Processed' };
     }
+
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
     const slackConfig = {
@@ -554,7 +587,9 @@ export class ParticipantsRequestService {
     await this.awsService.sendEmail('TeamCreated', true, [], {
       teamName: dataToProcess.name,
       teamUid: newTeam.uid,
-      adminSiteUrl: `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}`,
+      adminSiteUrl: `${process.env.WEB_UI_BASE_URL}/teams/${
+        newTeam.uid
+      }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
     });
     await this.awsService.sendEmail(
       'NewTeamSuccess',
@@ -562,11 +597,15 @@ export class ParticipantsRequestService {
       [dataFromDB.requesterEmailId],
       {
         teamName: dataToProcess.name,
-        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}`,
+        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${
+          newTeam.uid
+        }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
       }
     );
     slackConfig.requestLabel = 'New Team Added';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${newTeam.uid}`;
+    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${
+      newTeam.uid
+    }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
@@ -624,6 +663,8 @@ export class ParticipantsRequestService {
     // Logo image Mapping
     if (dataToProcess.logoUid) {
       dataToSave['logo'] = { connect: { uid: dataToProcess.logoUid } };
+    } else {
+      dataToSave['logo'] = { disconnect: true };
     }
 
     // Industry Tag Mapping
@@ -670,11 +711,15 @@ export class ParticipantsRequestService {
       [dataFromDB.requesterEmailId],
       {
         teamName: dataToProcess.name,
-        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`,
+        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${
+          existingData.uid
+        }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
       }
     );
     slackConfig.requestLabel = 'Edit Team Request Completed ';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`;
+    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${
+      existingData.uid
+    }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();

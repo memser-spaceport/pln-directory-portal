@@ -38,15 +38,12 @@ function validateBasicForm(formValues, imageUrl) {
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   if (
     !formValues.requestorEmail?.trim() ||
-    !formValues.requestorEmail?.match(emailRE)
+    !formValues.requestorEmail?.trim().match(emailRE)
   ) {
     errors.push('Please add a valid Requestor email');
   }
   if (!formValues.name?.trim()) {
     errors.push('Please add Team Name');
-  }
-  if (!imageUrl) {
-    errors.push('Please add your team logo');
   }
   if (!formValues.shortDescription?.trim()) {
     errors.push('Please add a Description');
@@ -61,9 +58,6 @@ function validateProjectDetailForm(formValues) {
   const errors = [];
   if (!formValues.fundingStage?.value) {
     errors.push('Please add Funding Stage');
-  }
-  if (!formValues.membershipSources.length) {
-    errors.push('Please add Membership Source(s)');
   }
   if (!formValues.industryTags.length) {
     errors.push('Please add IndustryTags');
@@ -99,13 +93,17 @@ function validateForm(formValues, imageUrl) {
   return errors;
 }
 
-function getSubmitOrNextButton(handleSubmit, isProcessing) {
+function getSubmitOrNextButton(handleSubmit, isProcessing, disableSubmit) {
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
   const submitOrNextButton = (
     <button
-      className={buttonClassName}
-      disabled={isProcessing}
+      className={
+        isProcessing || disableSubmit
+          ? 'shadow-special-button-default inline-flex w-full justify-center rounded-full bg-slate-400 px-6 py-2 text-base font-semibold leading-6 text-white outline-none'
+          : buttonClassName
+      }
+      disabled={isProcessing || disableSubmit}
       onClick={handleSubmit}
     >
       Request Changes
@@ -132,11 +130,14 @@ export function EditTeamModal({
   id,
 }: EditTeamModalProps) {
   const [errors, setErrors] = useState([]);
+  const [name, setName] = useState('');
   const [imageUrl, setImageUrl] = useState<string>();
   const [imageChanged, setImageChanged] = useState<boolean>(false);
   const [dropDownValues, setDropDownValues] = useState({});
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
+  const [disableSubmit, setDisableSubmit] = useState<boolean>(false);
+  const [nameExists, setNameExists] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     requestorEmail: '',
@@ -205,6 +206,7 @@ export function EditTeamModal({
             officeHours: team.officeHours,
           };
           setFormValues(formValues);
+          setName(team.name);
           setImageUrl(team.logo?.url ?? '');
           setDropDownValues({
             membershipSources: data[1],
@@ -225,6 +227,9 @@ export function EditTeamModal({
     setDropDownValues({});
     setImageChanged(false);
     setSaveCompleted(false);
+    setDisableSubmit(false);
+    setNameExists(false);
+    setName('');
     setIsProcessing(false);
     setFormValues({
       name: '',
@@ -271,7 +276,7 @@ export function EditTeamModal({
 
     const formattedValue = {
       ...formValues,
-      name: formValues.name?.trim(),
+      name: formValues.name?.replace(/ +(?= )/g, '').trim(),
       shortDescription: formValues.shortDescription?.trim(),
       longDescription: formValues.longDescription?.trim(),
       website: formValues.website?.trim(),
@@ -284,9 +289,28 @@ export function EditTeamModal({
       industryTags: formattedTags,
       membershipSources: formattedMembershipSource,
       technologies: formattedtechnologies,
+      oldName: name,
     };
     delete formattedValue.requestorEmail;
     return formattedValue;
+  }
+
+  function onNameBlur(event: ChangeEvent<HTMLInputElement>) {
+    const data = {
+      uniqueIdentifier: event.target.value?.trim(),
+      participantType: ENROLLMENT_TYPE.TEAM,
+      uid: id,
+    };
+    api
+      .post(`/v1/participants-request/unique-identifier`, data)
+      .then((response) => {
+        setDisableSubmit(false);
+        response?.data &&
+        (response.data?.isUniqueIdentifierExist ||
+          response.data?.isRequestPending)
+          ? setNameExists(true)
+          : setNameExists(false);
+      });
   }
 
   const handleSubmit = useCallback(
@@ -298,7 +322,7 @@ export function EditTeamModal({
       // }
       setErrors([]);
       const errors = validateForm(formValues, imageUrl);
-      if (errors?.length > 0) {
+      if (errors?.length > 0 || nameExists) {
         const element1 = divRef.current;
         if (element1) {
           element1.scrollTo({ top: 0, behavior: 'smooth' });
@@ -315,7 +339,7 @@ export function EditTeamModal({
         // if (!captchaToken) return;
         let image;
         setIsProcessing(true);
-        if (imageChanged) {
+        if (imageChanged && values.logoFile) {
           const formData = new FormData();
           formData.append('file', values.logoFile);
           const config = {
@@ -346,14 +370,17 @@ export function EditTeamModal({
           setSaveCompleted(true);
         });
       } catch (err) {
-        toast(err?.message);
-        console.log('error', err);
+        if (err.response.status === 400) {
+          toast(err?.response?.data?.message);
+        } else {
+          toast(err?.message);
+        }
       } finally {
         setIsProcessing(false);
       }
     },
     // [executeRecaptcha, formValues, imageUrl, imageChanged, id]
-    [formValues, imageUrl, isProcessing, imageChanged, id]
+    [formValues, imageUrl, isProcessing, imageChanged, id, nameExists]
   );
 
   function handleInputChange(
@@ -363,12 +390,17 @@ export function EditTeamModal({
     setFormValues({ ...formValues, [name]: value });
   }
 
-  const handleImageChange = (file: File) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => setImageUrl(reader.result as string);
-    setFormValues({ ...formValues, logoFile: file });
-    setImageChanged(true);
+  const handleImageChange = (file: File | null) => {
+    if (file) {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => setImageUrl(reader.result as string);
+      setFormValues({ ...formValues, logoFile: file });
+      setImageChanged(true);
+    } else {
+      setFormValues({ ...formValues, logoFile: null, logoUid: '' });
+      setImageUrl('');
+    }
   };
 
   function handleDropDownChange(selectedOption, name) {
@@ -405,7 +437,7 @@ export function EditTeamModal({
                   className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
                   onClick={() => handleModalClose()}
                 >
-                  Return to home
+                  Close
                 </button>
               </div>
             </div>
@@ -436,7 +468,10 @@ export function EditTeamModal({
                   handleDropDownChange={handleDropDownChange}
                   handleImageChange={handleImageChange}
                   imageUrl={imageUrl}
-                  disableName={true}
+                  onNameBlur={onNameBlur}
+                  nameExists={nameExists}
+                  setDisableNext={setDisableSubmit}
+                  isEditMode={true}
                 />
                 <AddTeamStepTwo
                   formValues={formValues}
@@ -455,7 +490,11 @@ export function EditTeamModal({
                   {getCancelOrBackButton(handleModalClose)}
                 </div>
                 <div className="float-right">
-                  {getSubmitOrNextButton(handleSubmit, isProcessing)}
+                  {getSubmitOrNextButton(
+                    handleSubmit,
+                    isProcessing,
+                    disableSubmit
+                  )}
                 </div>
               </div>
             </div>

@@ -51,9 +51,12 @@ const newDataTeamSchema = z.object({
   name: z.string(),
   contactMethod: z.string(),
   industryTags: z.array(industrTagsMappingSchema).nonempty(),
-  membershipSources: z.array(membershipSourcesMappingSchema).nonempty(),
   fundingStage: fundingStageMappingSchema,
   technologies: z.array(TechnologiesMappingSchema),
+  membershipSources: z
+    .array(membershipSourcesMappingSchema)
+    .optional()
+    .nullable(),
   website: z.string().optional().nullable(),
   blog: z.string().optional().nullable(),
   shortDescription: z.string().optional().nullable(),

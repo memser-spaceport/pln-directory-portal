@@ -4,6 +4,7 @@ import {
   ProfileImageUpload,
   TextArea,
 } from '@protocol-labs-network/ui';
+import { UserGroupIcon } from '@heroicons/react/solid';
 import { ReactComponent as InformationCircleIcon } from '../../../public/assets/images/icons/info_icon.svg';
 
 export default function AddMemberStepOne(props) {
@@ -29,6 +30,12 @@ export default function AddMemberStepOne(props) {
           <ProfileImageUpload
             imageUrl={props.imageUrl}
             maxSize={4}
+            enableHover={
+              props.isEditMode || (!props.isEditMode && props.imageUrl)
+                ? true
+                : false
+            }
+            avatarIcon={props.isEditMode && UserGroupIcon}
             previewImageShape="square"
             onImageChange={props.handleImageChange}
           />
@@ -74,10 +81,19 @@ export default function AddMemberStepOne(props) {
           onChange={onChange}
           maxLength={1000}
           name="shortDescription"
-          label="Please briefly describe what your team/product/project does"
-          info="One to two sentences is perfect! Use clear language and minimal jargon."
+          label="Briefly describe what your team/product/project does"
           className="custom-grey custom-outline-none min-h-[60px] border"
+          placeholder="Enter your short elevator pitch here"
         />
+        <div className="flex pt-3">
+          <div>
+            <InformationCircleIcon />
+          </div>
+          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
+            One to two sentences is perfect! Use clear language and minimal
+            jargon.
+          </span>
+        </div>
       </div>
 
       <div className="pt-5">
@@ -88,9 +104,18 @@ export default function AddMemberStepOne(props) {
           maxLength={2000}
           name="longDescription"
           label="Long Description"
-          info="Please explain what your team does in a bit more detail. 4-5 sentences will be great!"
           className="custom-grey custom-outline-none min-h-[60px] border"
+          placeholder="Elaborate on your elevator pitch"
         />
+        <div className="flex pt-3">
+          <div>
+            <InformationCircleIcon />
+          </div>
+          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
+            Please explain what your team does in a bit more detail. 4-5
+            sentences will be great!
+          </span>
+        </div>
       </div>
 
       {/* <div className="px-3 py-4">
@@ -123,7 +148,7 @@ export default function AddMemberStepOne(props) {
           maxLength={300}
           onChange={onChange}
           label="Team Office Hours"
-          placeholder="Enter address here"
+          placeholder="Enter link here"
           className="custom-grey custom-outline-none border"
         />
         <div className="flex pt-3">

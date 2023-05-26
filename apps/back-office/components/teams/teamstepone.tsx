@@ -4,6 +4,7 @@ import {
   ProfileImageUpload,
   TextArea,
 } from '@protocol-labs-network/ui';
+import { UserGroupIcon } from '@heroicons/react/solid';
 import { ReactComponent as InformationCircleIcon } from '../../public/assets/icons/info_icon.svg';
 
 export default function TeamStepOne(props) {
@@ -31,6 +32,8 @@ export default function TeamStepOne(props) {
             imageUrl={props.imageUrl}
             maxSize={4}
             previewImageShape="square"
+            enableHover={props.isEditEnabled ? true : false}
+            avatarIcon={UserGroupIcon}
             onImageChange={props.handleImageChange}
             disabled={!props.isEditEnabled}
           />
@@ -41,9 +44,10 @@ export default function TeamStepOne(props) {
             value={values?.name}
             onChange={onChange}
             maxLength={150}
-            disabled={true}
+            disabled={!props.isEditEnabled}
             onBlur={props.onNameBlur && props.onNameBlur}
             name="name"
+            onKeyDown={() => props?.setDisableNext(true)}
             label="What is your organization, company, or team name?"
             placeholder="Enter name here"
             className="custom-grey custom-outline-none border"
@@ -76,10 +80,19 @@ export default function TeamStepOne(props) {
           maxLength={1000}
           disabled={!props.isEditEnabled}
           name="shortDescription"
-          label="Please briefly describe what your team/product/project does"
-          info="One to two sentences is perfect! Use clear language and minimal jargon."
+          label="Briefly describe what your team/product/project does"
           className="custom-grey custom-outline-none min-h-[60px] border"
+          placeholder="Enter your short elevator pitch here"
         />
+        <div className="flex pt-3">
+          <div>
+            <InformationCircleIcon />
+          </div>
+          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
+            One to two sentences is perfect! Use clear language and minimal
+            jargon.
+          </span>
+        </div>
       </div>
 
       <div className="pt-5">
@@ -91,9 +104,18 @@ export default function TeamStepOne(props) {
           disabled={!props.isEditEnabled}
           name="longDescription"
           label="Long Description"
-          info="Please explain what your team does in a bit more detail. 4-5 sentences will be great!"
           className="custom-grey custom-outline-none min-h-[60px] border"
+          placeholder="Elaborate on your elevator pitch"
         />
+        <div className="flex pt-3">
+          <div>
+            <InformationCircleIcon />
+          </div>
+          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
+            Please explain what your team does in a bit more detail. 4-5
+            sentences will be great!
+          </span>
+        </div>
       </div>
 
       {/* <div className="px-3 py-4">
@@ -127,7 +149,7 @@ export default function TeamStepOne(props) {
           onChange={onChange}
           disabled={!props.isEditEnabled}
           label="Team Office Hours"
-          placeholder="Enter address here"
+          placeholder="Enter link here"
           className="custom-grey custom-outline-none border"
         />
         <div className="flex pt-3">

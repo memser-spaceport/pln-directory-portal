@@ -1,5 +1,6 @@
 /* eslint-disable prettier/prettier */
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -64,6 +65,23 @@ export class ParticipantsRequestController {
       participantType !== ParticipantType.MEMBER.toString()
     ) {
       throw new ForbiddenException();
+    }
+    const checkDuplicate = await this.participantsRequestService.findDuplicates(
+      postData?.uniqueIdentifier,
+      participantType,
+      postData?.referenceUid,
+      ''
+    );
+    if (
+      checkDuplicate &&
+      (checkDuplicate.isUniqueIdentifierExist ||
+        checkDuplicate.isRequestPending)
+    ) {
+      const text =
+        participantType === ParticipantType.MEMBER
+          ? 'Member email'
+          : 'Team name';
+      throw new BadRequestException(`${text} already exists`);
     }
 
     const result = await this.participantsRequestService.addRequest(postData);

@@ -1,4 +1,5 @@
 import { InputField, ProfileImageUpload } from '@protocol-labs-network/ui';
+import { UserIcon } from '@heroicons/react/solid';
 import { ReactComponent as InformationCircleIcon } from '../../../public/assets/images/icons/info_icon.svg';
 
 export default function AddMemberBasicForm(props) {
@@ -12,6 +13,12 @@ export default function AddMemberBasicForm(props) {
           <ProfileImageUpload
             imageUrl={props.imageUrl}
             maxSize={4}
+            enableHover={
+              props.isEditMode || (!props.isEditMode && props.imageUrl)
+                ? true
+                : false
+            }
+            avatarIcon={props.isEditMode && UserIcon}
             onImageChange={props.handleImageChange}
           />
         </div>
@@ -29,7 +36,6 @@ export default function AddMemberBasicForm(props) {
           />
         </div>
       </div>
-
       <div className="flex pt-5">
         <div>
           <InformationCircleIcon />
@@ -39,7 +45,6 @@ export default function AddMemberBasicForm(props) {
           4MB.
         </span>
       </div>
-
       <div className="inputfield pt-5">
         <InputField
           required
@@ -56,13 +61,11 @@ export default function AddMemberBasicForm(props) {
           className="custom-grey custom-outline-none border"
         />
       </div>
-
       {props.emailExists && (
         <span className="pt-3 text-xs text-rose-600">
           Email already exists!
         </span>
       )}
-
       <div className="pt-5">
         <InputField
           name="plnStartDate"
@@ -70,20 +73,10 @@ export default function AddMemberBasicForm(props) {
           onChange={onChange}
           onKeyDown={(e) => e.preventDefault()}
           value={values?.plnStartDate}
-          label="PLN Start Date"
+          label="PLN Join Date"
           className="custom-grey custom-outline-none border"
         />
-        <div className="flex pt-3">
-          <div>
-            <InformationCircleIcon />
-          </div>
-          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            What date did your team join the PLN? If you don&apos;t know, pick
-            today.
-          </span>
-        </div>
       </div>
-
       <div className="inputfield pt-5">
         <InputField
           name="city"
@@ -92,7 +85,7 @@ export default function AddMemberBasicForm(props) {
           pattern="^[a-zA-Z\s]*$"
           maxLength={100}
           onChange={onChange}
-          placeholder="Enter your city name"
+          placeholder="Enter your city"
           className="custom-grey custom-outline-none border"
         />
         <div className="flex pt-3">
@@ -100,12 +93,11 @@ export default function AddMemberBasicForm(props) {
             <InformationCircleIcon />
           </div>
           <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            Please share your location so we can be sure to invite you to in
-            person events in your area!
+            Please share location details to receive invitations for the network
+            events happening in your area.
           </span>
         </div>
       </div>
-
       <div className="flex pt-5">
         <div className="inputfield w-[50%] pr-6">
           <InputField

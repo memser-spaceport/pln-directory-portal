@@ -23,7 +23,7 @@ export default function AddTeamStepThree(props) {
             <InformationCircleIcon />
           </div>
           <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            What is the best way for folks to connect with your team? (e.g.,
+            What is the best way for people to connect with your team? (e.g.,
             team Slack channel, team email address, team Discord server/channel,
             etc.)
           </span>
@@ -54,7 +54,7 @@ export default function AddTeamStepThree(props) {
 
       <div className="inputfield pt-5">
         <InputField
-          label="LinkedIn URL"
+          label="LinkedIn"
           name="linkedinHandler"
           maxLength={200}
           value={values.linkedinHandler}
@@ -65,7 +65,7 @@ export default function AddTeamStepThree(props) {
       </div>
       <div className="inputfield pt-5">
         <InputField
-          label="Twitter Handle"
+          label="Twitter"
           name="twitterHandler"
           maxLength={200}
           value={values.twitterHandler}

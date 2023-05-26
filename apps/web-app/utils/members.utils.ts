@@ -20,6 +20,7 @@ export function getMembersOptionsFromQuery(
     metroArea,
     officeHoursOnly,
     includeFriends,
+    openToWork,
   } = queryParams;
 
   const sortFromQuery = getSortFromQuery(sort?.toString());
@@ -40,6 +41,7 @@ export function getMembersOptionsFromQuery(
       ? { 'location.metroArea__with': stringifyQueryValues(metroArea) }
       : {}),
     ...(includeFriends ? {} : { plnFriend: false }),
+    ...(openToWork ? { openToWork: true } : {}),
     ...(searchBy
       ? { name__istartswith: stringifyQueryValues(searchBy).trim() }
       : {}),
@@ -56,7 +58,7 @@ export function getMembersListOptions(
   return {
     ...options,
     select:
-      'uid,name,image.url,location.metroArea,location.country,location.region,skills.title,teamMemberRoles.teamLead,teamMemberRoles.mainTeam,teamMemberRoles.role,teamMemberRoles.team.name,teamMemberRoles.team.uid',
+      'uid,name,openToWork,image.url,location.metroArea,location.country,location.region,skills.title,teamMemberRoles.teamLead,teamMemberRoles.mainTeam,teamMemberRoles.role,teamMemberRoles.team.name,teamMemberRoles.team.uid',
     pagination: false,
   };
 }
@@ -91,6 +93,8 @@ export const parseMember = (member: TMemberResponse): IMember => {
     teamLead,
     teams,
     mainTeam,
+    openToWork: member.openToWork || false,
+    linkedinHandle: member.linkedinHandler || null,
   };
 };
 

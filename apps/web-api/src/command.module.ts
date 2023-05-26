@@ -7,7 +7,6 @@ import { ImagesService } from './images/images.service';
 import { IndustryCategoriesService } from './industry-categories/industry-categories.service';
 import { IndustryTagsService } from './industry-tags/industry-tags.service';
 import { MembersService } from './members/members.service';
-import { PrismaService } from './prisma.service';
 import { SkillsService } from './skills/skills.service';
 import { TeamMemberRolesService } from './team-member-roles/team-member-roles.service';
 import { TeamsService } from './teams/teams.service';
@@ -22,7 +21,6 @@ import { ParticipantsRequestService } from './participants-request/participants-
 @Module({
   providers: [
     TeamsService,
-    PrismaService,
     SkillsService,
     MembersService,
     AirtableService,
