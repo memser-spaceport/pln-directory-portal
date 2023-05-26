@@ -22,7 +22,7 @@ export function MembersDirectoryFilters({
     <DirectoryFilters filterProperties={filterProperties}>
       <div className="space-y-4">
         <OfficeHoursFilter />
-        {(isOpenToWorkEnabled === 'true') && (<OpenToWorkFilter />)}
+        {isOpenToWorkEnabled === 'true' && <OpenToWorkFilter />}
         <FriendOfPLNFilter />
       </div>
       <div className="my-5 h-px bg-slate-200" />
