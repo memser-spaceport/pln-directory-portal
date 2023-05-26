@@ -17,11 +17,12 @@ export function MembersDirectoryFilters({
   filtersValues,
   filterProperties,
 }: MembersDirectoryFiltersProps) {
+  const isOpenToWorkEnabled = process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK;
   return (
     <DirectoryFilters filterProperties={filterProperties}>
       <div className="space-y-4">
         <OfficeHoursFilter />
-        <OpenToWorkFilter />
+        {(isOpenToWorkEnabled === 'true') && (<OpenToWorkFilter />)}
         <FriendOfPLNFilter />
       </div>
       <div className="my-5 h-px bg-slate-200" />

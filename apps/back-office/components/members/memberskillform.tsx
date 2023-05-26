@@ -14,6 +14,7 @@ export default function AddMemberSkillForm(props) {
   const dropDownValues = props?.dropDownValues;
   // const teamNames = getAvailableTeams(dropDownValues.teamNames, teamAndRoles);
   const teamNames = teamAndRoles.map((item) => item.teamUid);
+  const isOpenToWorkEnabled = process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK;
   return (
     <>
       <div className="pt-5">
@@ -76,7 +77,7 @@ export default function AddMemberSkillForm(props) {
           </span>
         </div>
       </div>
-      {props.referenceUid && (
+      {(isOpenToWorkEnabled === 'true') && props.referenceUid && (
         <div className="pt-5">
           <span className="mr-2 text-sm font-bold">Are you open to Work?</span>
           <div className="flex pt-3">

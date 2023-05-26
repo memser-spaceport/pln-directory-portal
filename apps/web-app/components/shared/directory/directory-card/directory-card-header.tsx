@@ -22,10 +22,10 @@ export function DirectoryCardHeader({
   openToWork,
 }: DirectoryCardHeaderProps) {
   const Icon = avatarIcon;
-
+  const isOpenTOWorkEnabled = process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK;
   return (
     <>
-      {isGrid && openToWork && (
+      {(isOpenTOWorkEnabled === 'true') && isGrid && openToWork && (
         <span className="absolute left-3 top-3 z-0 flex text-slate-600">
           <BriefCase />
           <span className="pl-1 pt-px text-[10px] font-medium leading-[14px] tracking-[0.01em]">
