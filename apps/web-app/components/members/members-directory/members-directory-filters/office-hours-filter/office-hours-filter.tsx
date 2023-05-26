@@ -6,7 +6,7 @@ export function OfficeHoursFilter() {
 
   return (
     <Switch
-      label="Only show Members with Office Hours"
+      label="Only Show Members with Office Hours"
       initialValue={enabled}
       onChange={onSetEnabled}
     />

@@ -123,7 +123,7 @@ function getSubmitOrNextButton(
         disabled={isProcessing}
         onClick={handleSubmit}
       >
-        Add to Network
+        Request to Join
       </button>
     ) : (
       <button

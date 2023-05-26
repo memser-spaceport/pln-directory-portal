@@ -4,6 +4,7 @@ import { MemberProfileProjectsProps } from '../../../../utils/members.types';
 import { ProfileProjectCard } from '../../../shared/profile/profile-cards/profile-project-card';
 import { ReactComponent as project_icon } from '../../../../public/assets/images/icons/project_icon.svg';
 import { MemberProfileProjectsModal } from './member-projects-modal';
+import { ReactComponent as InformationCircleIcon } from '../../../../public/assets/images/icons/info_icon.svg';
 
 export function MemberProfileProjects({
   repositories,
@@ -13,6 +14,10 @@ export function MemberProfileProjects({
   } = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const displayRepos = repositories.slice(0, 3);
+  const seeAllInfoText =
+    repositories?.length > 3
+      ? "Click 'See All' to view all of the public repositories."
+      : '';
   return (
     <>
       <h3 className="mb-2 mt-6 font-medium text-slate-500">
@@ -39,6 +44,17 @@ export function MemberProfileProjects({
             />
           );
         })}
+      </div>
+      <div className="flex pt-2">
+        <div>
+          <InformationCircleIcon />
+        </div>
+        <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
+          Up to 3 pinned project repositories from member&apos;s GitHub profile
+          is displayed by default. This view utilizes the same ordering (if any)
+          as the pinned feature of member&apos;s GitHub profile page.{' '}
+          {seeAllInfoText}
+        </span>
       </div>
       <MemberProfileProjectsModal
         isOpen={isModalOpen}
