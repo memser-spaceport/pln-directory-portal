@@ -313,7 +313,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
 
     const formattedValue = {
       ...formValues,
-      name: formValues.name?.trim(),
+      name: formValues.name?.replace(/ +(?= )/g, '').trim(),
       shortDescription: formValues.shortDescription?.trim(),
       longDescription: formValues.longDescription?.trim(),
       website: formValues.website?.trim(),

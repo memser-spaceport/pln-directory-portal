@@ -94,6 +94,9 @@ export function ProfileImageUpload({
   ) => {
     evt.preventDefault();
     evt.stopPropagation();
+    if (inputRef.current) {
+      inputRef.current.value = '';
+    }
     setImage(null);
     onImageChange(null);
   };
