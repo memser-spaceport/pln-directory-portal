@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
 import axios from 'axios';
@@ -101,7 +102,7 @@ export class AuthService {
 
       // If there is no user available for external id, then find by user by email
       // and then update the external id for that user and send userinfo, tokens
-      let foundUser = await this.prismaService.member.findUnique({
+      const foundUser = await this.prismaService.member.findUnique({
         where: { email: userEmail },
         include: { image: true, memberRoles: true , teamMemberRoles: true },
       });
@@ -193,6 +194,7 @@ export class AuthService {
   }
 
   async verifyEmailOtp(otp, otpToken, notificationToken) {
+   try {
     const payload = {
       code: otp,
       token: otpToken,
@@ -204,6 +206,12 @@ export class AuthService {
     }
     const verifyOtpResult = await axios.post(`${process.env.AUTH_API_URL}/mfa/otp/verify`, payload, header)
     return verifyOtpResult?.data?.valid ? true : false;
+   } catch (error) {
+    if (error.response) {
+      throw new HttpException(error?.response?.data?.message, error?.response?.status)
+    }
+    throw new InternalServerErrorException("Unexpected error");
+   }
   }
 
   async sendEmailOtpForVerification(email, notificationToken) {
@@ -223,7 +231,7 @@ export class AuthService {
       if (error.response) {
         throw new HttpException(error?.response?.data?.message, error?.response?.status)
       }
-      throw new UnauthorizedException();
+      throw new InternalServerErrorException("Unexpected Error");
     }
   }
 }

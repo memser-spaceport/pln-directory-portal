@@ -93,6 +93,8 @@ function OtpSubmissionForm(props) {
   const handleResendClick = () => {
     // Set timer to 60 seconds for example, adjust as needed
     if (onResendOtp) {
+      setErrorMessage('')
+      setOtp(['', '', '', '', '', ''])
       onResendOtp()
     }
   };
@@ -161,9 +163,9 @@ function OtpSubmissionForm(props) {
 
         {/*** Action buttons ***/}
         <div className="evo__body__submit">
-          {showResend && <button onClick={handleResendClick} className="evo__body__submit__resend">Resend passcode</button>}
+          {showResend && <button onClick={handleResendClick} className="evo__body__submit__resend">Resend Code</button>}
           {!showResend && <div className="evo__body__submit__timer">{`Resend passcode in ${formatTime(resendInSeconds)}`}</div>}
-          <button onClick={onOtpSubmit} className="evo__body__submit__btn">Confirm</button>
+          <button onClick={onOtpSubmit} className="evo__body__submit__btn">Verify</button>
         </div>
       </div>
 

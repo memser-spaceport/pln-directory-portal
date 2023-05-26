@@ -4,6 +4,8 @@ import {
   Body,
   Controller,
   ForbiddenException,
+  HttpException,
+  InternalServerErrorException,
   Post,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -60,8 +62,12 @@ export class AuthController {
       // Invalid OTP
       return { valid: false }
 
-    } catch (e) {
-      throw new UnauthorizedException('Unexpected error happened')
+    } catch (error) {
+      if (error.response) {
+        throw new HttpException(error?.response?.data?.message, error?.response?.status)
+      }
+      throw new InternalServerErrorException("Unexpected error");
+
     }
   }
 

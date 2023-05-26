@@ -100,6 +100,7 @@ function EmailOtpVerificationModal() {
 
 
     const onResendOtp = () => {
+        setErrorMessage('')
         const userEmail = localStorage.getItem('otp-verification-email');
         const resendTryCount = localStorage.getItem('resend-try-count');
         const resendMaxTryCount = localStorage.getItem('resend-max-attempts');
@@ -112,7 +113,7 @@ function EmailOtpVerificationModal() {
             if (!resendTryCount) {
                 localStorage.setItem('resend-try-count', "1");
             } else if (resendTryCount && resendTryCount >= resendMaxTryCount) {
-                goToError('You have Exceeded maximum attempts to resend OTP. Please login again to get new otp')
+                goToError('You have Exceeded maximum attempts to resend OTP. Please login again.')
                 return;
             }
             setErrorMessage('')
@@ -129,9 +130,12 @@ function EmailOtpVerificationModal() {
                     setResendTimer()
                 })
                 .catch((e) => {
-                    if(e?.response?.status && e?.response?.message) {
+                    if(e?.response?.status === 400 && e?.response?.message === 'Max attempts reached') {
+                        goToError('You have Exceeded maximum attempts to resend OTP. Please login again.')
+                    } else if (e?.response.status && e?.response?.message) {
                         setErrorMessage(e?.response?.message)
-                    } else {
+                    }
+                    else {
                         goToError('Unexpected error happened. Please try logging in again')
                     }
                 })
@@ -248,8 +252,8 @@ function EmailOtpVerificationModal() {
         {showDialog && <div className="ev">
             <div className="ev__cn">
                 <div className="ev__en__box">
-                    {verificationStep === 1 && <EmailSubmissionForm title="One last step" desc="Please enter the membership email you used to create your directory profile. Don't remember? Contact support supportmail@protocol.ai" validationError={errorMessage} onSendOtp={onEmailSubmitted} onClose={onCloseDialog} />}
-                    {verificationStep === 2 && <OtpSubmissionForm resendInSeconds={resendInSeconds} title="Enter Passcode" desc={`Please enter the passcode send to ${localStorage.getItem('otp-verification-email')}`} validationError={errorMessage} onResendOtp={onResendOtp} onVerifyOtp={onOtpVerify} onClose={onCloseDialog} />}
+                    {verificationStep === 1 && <EmailSubmissionForm title="Verify Email" desc="Please enter the membership email you used to create your directory profile. Don't remember? Contact support supportmail@protocol.ai" validationError={errorMessage} onSendOtp={onEmailSubmitted} onClose={onCloseDialog} />}
+                    {verificationStep === 2 && <OtpSubmissionForm resendInSeconds={resendInSeconds} title="Enter Code" desc={`Please enter the code send to ${localStorage.getItem('otp-verification-email')}`} validationError={errorMessage} onResendOtp={onResendOtp} onVerifyOtp={onOtpVerify} onClose={onCloseDialog} />}
                     {verificationStep === 3 && <ErrorBox onClose={onCloseDialog} desc={errorMessage} />}
                     {isLoaderActive && <div className="ev__loader"><LoadingIndicator /></div>}
                 </div>
