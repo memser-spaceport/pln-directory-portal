@@ -253,7 +253,7 @@ function EmailOtpVerificationModal() {
             <div className="ev__cn">
                 <div className="ev__en__box">
                     {verificationStep === 1 && <EmailSubmissionForm title="Verify Email" desc="Please enter the membership email you used to create your directory profile. Don't remember? Contact support supportmail@protocol.ai" validationError={errorMessage} onSendOtp={onEmailSubmitted} onClose={onCloseDialog} />}
-                    {verificationStep === 2 && <OtpSubmissionForm resendInSeconds={resendInSeconds} title="Enter Code" desc={`Please enter the code send to ${localStorage.getItem('otp-verification-email')}`} validationError={errorMessage} onResendOtp={onResendOtp} onVerifyOtp={onOtpVerify} onClose={onCloseDialog} />}
+                    {verificationStep === 2 && <OtpSubmissionForm resendInSeconds={resendInSeconds} title="Enter Code" desc={`Please enter the code sent to ${localStorage.getItem('otp-verification-email')}`} validationError={errorMessage} onResendOtp={onResendOtp} onVerifyOtp={onOtpVerify} onClose={onCloseDialog} />}
                     {verificationStep === 3 && <ErrorBox onClose={onCloseDialog} desc={errorMessage} />}
                     {isLoaderActive && <div className="ev__loader"><LoadingIndicator /></div>}
                 </div>

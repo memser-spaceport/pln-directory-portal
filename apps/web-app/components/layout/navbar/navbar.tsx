@@ -39,7 +39,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
       onClick: () => {
         if (!Cookies.get('refreshToken')) {
           Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
-          router.push(PAGE_ROUTES.MEMBERS);
+          window.location.href = PAGE_ROUTES.MEMBERS;
         }
       }
     },
@@ -53,7 +53,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
         Cookies.remove('refreshToken')
         Cookies.remove('userInfo')
         Cookies.set('page_params', 'logout', { expires: 60, path: '/' });
-        router.push(PAGE_ROUTES.MEMBERS);
+        window.location.href = PAGE_ROUTES.MEMBERS;
       },
     },
   ];
