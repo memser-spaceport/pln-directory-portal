@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { InputField } from '../input-field/input-field';
 import { ReactComponent as ArrowDown } from '../../assets/icons/arrow-down-filled.svg';
 import { debounce } from 'lodash';
-// import { DiscardChangesPopup } from 'apps/web-app/components/shared/error-message/discard-confirmation';
+import { DiscardChangesPopup } from '../modals/confirmation';
 
 interface IDropdownOption {
   label: string;
@@ -37,7 +37,7 @@ export function Autocomplete({
   placeholder,
   excludeValues = [],
   name,
-  confirmationMessage,
+  confirmationMessage = '',
   validateBeforeChange,
   validationFnBeforeChange
 }: AutocompleteProps) {
@@ -214,7 +214,7 @@ export function Autocomplete({
         </div>
       )}
     </div>
-    {/* <DiscardChangesPopup text={confirmationMessage} isOpen={openValidationPopup} onCloseFn={confirmationOnClose} /> */}
+    <DiscardChangesPopup text={confirmationMessage} isOpen={openValidationPopup} onCloseFn={confirmationOnClose} />
     </>
   );
 }

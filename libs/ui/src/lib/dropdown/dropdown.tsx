@@ -1,7 +1,7 @@
 import { Listbox } from '@headlessui/react';
 import React, { Fragment, useEffect, useState } from 'react';
 import { ArrowIcon } from '../icons/arrow/arrow';
-// import { DiscardChangesPopup } from 'apps/web-app/components/shared/error-message/discard-confirmation';
+import { DiscardChangesPopup } from '../modals/confirmation';
 
 export interface DropdownProps {
   buttonContent?: React.ReactNode;
@@ -38,7 +38,7 @@ export function Dropdown({
   className = '',
   validateBeforeChange = false,
   validationFn,
-  confirmationMessage
+  confirmationMessage = ''
 }: DropdownProps): JSX.Element {
   const [selectedOption, setSelectedOption] = useState(initialOption);
   const [openValidationPopup, setValidationPopup] = useState(false);
@@ -113,9 +113,9 @@ export function Dropdown({
                 <>
                   <div className="text-left leading-6">
                     {selectedOption?.icon &&
-                      (<img src={selectedOption?.icon?.toString()} width={25} height={45} className='inline pr-[4px]'></img>
+                      (<img src={selectedOption?.icon?.toString()} width={25} height={45} className='inline h-6 w-6 rounded-full'></img>
                       )}
-                    {selectedOption?.label}</div>
+                    <span  className={`${'relative width-full'}`}>{selectedOption?.label}</span></div>
                 </>
               ) : (
                 <div className="text-sm text-slate-600 opacity-50">
@@ -158,7 +158,7 @@ export function Dropdown({
                             />
                           )}
                           {(OptionIcon && typeof (OptionIcon) === 'string') && (
-                            <img src={OptionIcon.toString()} width={25} height={45} className='absolute inline inset-y-0 left-2 my-auto h-4 pr-[4px]'></img>
+                            <img src={OptionIcon.toString()} width={25} height={45} className='absolute inline inset-y-0 left-2 my-auto h-4 h-6 w-6 rounded-full'></img>
                           )}
                           {option.label}
                         </div>
@@ -173,7 +173,7 @@ export function Dropdown({
           </div>
         )}
       </Listbox>
-      {/* <DiscardChangesPopup text={confirmationMessage} isOpen={openValidationPopup} onCloseFn={discardChangesOnClose} /> */}
+      <DiscardChangesPopup text={confirmationMessage} isOpen={openValidationPopup} onCloseFn={discardChangesOnClose} />
     </>
   );
 }

@@ -21,11 +21,12 @@ import {
 import { fetchTeam } from '../../../utils/services/teams';
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
-import { ENROLLMENT_TYPE, MSG_CONSTANTS, TAB_CONSTANTS } from '../../../constants';
+import { BTN_LABEL_CONSTANTS, ENROLLMENT_TYPE, MSG_CONSTANTS, TAB_CONSTANTS } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-team.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
 import { ValidationErrorMessages } from '../../shared/account-setttings/validation-error-message';
+import { DiscardChangesPopup } from 'libs/ui/src/lib/modals/confirmation';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditTeamModalProps {
@@ -104,7 +105,7 @@ function validateForm(formValues, imageUrl) {
 
 function getSubmitOrNextButton(handleSubmit, isProcessing, fromSettings, disableSubmit) {
   const buttonClassName =
-    'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]';
+    `${fromSettings ? 'bg-[#156FF7]' : 'bg-gradient-to-r from-[#427DFF] to-[#44D5BB]'} shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]`;
   const submitOrNextButton = (
     <button
       className={
@@ -153,6 +154,8 @@ export function EditTeamModal({
   const [openTab, setOpenTab] = useState(1);
   const [isErrorPopupOpen, setIsErrorPopupOpen] = useState(false);
   const [disableSubmit, setDisableSubmit] = useState<boolean>(false);
+  const [isModified, setModifiedFlag] = useState<boolean>(false);
+  const [openValidationPopup, setOpenValidationPopup] = useState<boolean>(false);
   const [nameExists, setNameExists] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
@@ -193,66 +196,70 @@ export function EditTeamModal({
       setOpenTab(1);
     }
     if (isOpen) {
-      Promise.all([
-        fetchTeam(id),
-        fetchMembershipSources(),
-        fetchFundingStages(),
-        fetchIndustryTags(),
-        fetchProtocol(),
-      ])
-        .then((data) => {
-          const team = data[0];
-          const formValues = {
-            name: team.name,
-            logoUid: team.logoUid,
-            logoFile: null,
-            shortDescription: team.shortDescription,
-            longDescription: team.longDescription,
-            technologies: team.technologies?.map((item) => {
-              return { value: item.uid, label: item.title };
-            }),
-            fundingStage: {
-              value: team.fundingStage?.uid,
-              label: team.fundingStage?.title,
-            },
-            membershipSources: team.membershipSources?.map((item) => {
-              return { value: item.uid, label: item.title };
-            }),
-            industryTags: team.industryTags?.map((item) => {
-              return { value: item.uid, label: item.title };
-            }),
-            contactMethod: team.contactMethod,
-            website: team.website,
-            linkedinHandler: team.linkedinHandler,
-            twitterHandler: team.twitterHandler,
-            blog: team.blog,
-            officeHours: team.officeHours,
-          };
-          // set requestor email
-          const userInfoFromCookie = Cookies.get('userInfo');
-          if(userInfoFromCookie) {
-            const parsedUserInfo = JSON.parse(userInfoFromCookie);
-            formValues['requestorEmail'] = parsedUserInfo.email;
-          }
-          setFormValues(formValues);
-          setName(team.name);
-          setImageUrl(team.logo?.url ?? '');
-          setDropDownValues({
-            membershipSources: data[1],
-            fundingStages: data[2],
-            industryTags: data[3],
-            protocol: data[4],
-          });
-        })
-        .catch((err) => {
-          toast(err?.message);
-          console.error(err);
-        });
+      setTeamDetails();
     }
   }, [isOpen, id]);
 
+  const setTeamDetails = () => {
+    Promise.all([
+      fetchTeam(id),
+      fetchMembershipSources(),
+      fetchFundingStages(),
+      fetchIndustryTags(),
+      fetchProtocol(),
+    ])
+      .then((data) => {
+        const team = data[0];
+        const formValues = {
+          name: team.name,
+          logoUid: team.logoUid,
+          logoFile: null,
+          shortDescription: team.shortDescription,
+          longDescription: team.longDescription,
+          technologies: team.technologies?.map((item) => {
+            return { value: item.uid, label: item.title };
+          }),
+          fundingStage: {
+            value: team.fundingStage?.uid,
+            label: team.fundingStage?.title,
+          },
+          membershipSources: team.membershipSources?.map((item) => {
+            return { value: item.uid, label: item.title };
+          }),
+          industryTags: team.industryTags?.map((item) => {
+            return { value: item.uid, label: item.title };
+          }),
+          contactMethod: team.contactMethod,
+          website: team.website,
+          linkedinHandler: team.linkedinHandler,
+          twitterHandler: team.twitterHandler,
+          blog: team.blog,
+          officeHours: team.officeHours,
+        };
+        // set requestor email
+        const userInfoFromCookie = Cookies.get('userInfo');
+        if(userInfoFromCookie) {
+          const parsedUserInfo = JSON.parse(userInfoFromCookie);
+          formValues['requestorEmail'] = parsedUserInfo.email;
+        }
+        setFormValues(formValues);
+        setImageUrl(team.logo?.url ?? '');
+        setDropDownValues({
+          membershipSources: data[1],
+          fundingStages: data[2],
+          industryTags: data[3],
+          protocol: data[4],
+        });
+      })
+      .catch((err) => {
+        toast(err?.message);
+        console.error(err);
+      });
+  }
+ 
   function resetState() {
     setModified(false);
+    setModifiedFlag(false);
     setErrors([]);
     setBasicErrors([]);
     seProjecttErrors([]);
@@ -414,6 +421,7 @@ export function EditTeamModal({
             if (res.status === 200 && res.statusText === "OK")
               setSaveCompleted(true);
               setModified(false);
+              setModifiedFlag(false);
           });
       } catch (err) {
         toast(err?.message);
@@ -431,6 +439,7 @@ export function EditTeamModal({
   ) {
     const { name, value } = event.target;
     setModified(true);
+    setModifiedFlag(true);
     setFormValues({ ...formValues, [name]: value });
   }
 
@@ -441,6 +450,7 @@ export function EditTeamModal({
     setFormValues({ ...formValues, logoFile: file });
     setImageChanged(true);
     setModified(true);
+    setModifiedFlag(true);
   };
 
   const onRemoveImage = () => {
@@ -471,6 +481,39 @@ export function EditTeamModal({
         </div>
       </div>
     );
+  }
+
+  const getResetButton = (handleReset) => {
+    const resetButton = (
+      <button
+        className="hadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full px-6 py-2 text-base font-semibold leading-6 text-[#156FF7] outline outline-1 outline-[#156FF7] hover:outline-2"
+        onClick={() => handleReset()}
+      >
+        {BTN_LABEL_CONSTANTS.RESET}
+      </button>
+    );
+    return resetButton;
+  }
+
+  const handleReset = () => {
+    if (fromSettings && isModified) {
+      setOpenValidationPopup(true);
+    }
+  }
+
+  const confirmationClose = (flag) => {
+    setOpenValidationPopup(false);
+    if(flag){
+      setErrors([]);
+      setBasicErrors([]);
+      seProjecttErrors([]);
+      setSocialErrors([]);
+      resetState();
+      setTeamDetails();
+      setOpenTab(1);
+      setModified(false);
+      setModifiedFlag(false);
+    }
   }
 
   function beforeSaveTemplate() {
@@ -535,6 +578,11 @@ export function EditTeamModal({
               }
               <div className="float-right">
                 {getSubmitOrNextButton(handleSubmit, isProcessing, fromSettings, disableSubmit)}
+              </div>
+              <div className="float-right mx-5">
+                {getResetButton(() => {
+                  handleReset()
+                })}
               </div>
             </div>
           )
@@ -601,6 +649,8 @@ export function EditTeamModal({
               beforeSaveTemplate()
             )
             }
+           <DiscardChangesPopup text={MSG_CONSTANTS.RESET_CHANGE_CONF_MSG} isOpen={openValidationPopup} onCloseFn={confirmationClose} />
+
           </>)
             : (<Modal
               isOpen={isOpen}

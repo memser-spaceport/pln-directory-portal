@@ -31,6 +31,7 @@ import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicat
 import { toast } from 'react-toastify';
 import orderBy from 'lodash/orderBy';
 import { requestPendingCheck } from '../../../utils/services/members';
+import { DiscardChangesPopup } from 'libs/ui/src/lib/modals/confirmation';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditMemberModalProps {
@@ -166,6 +167,8 @@ export function EditMemberModal({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [disableSubmit, setDisableSubmit] = useState<boolean>(false);
+  const [isModified, setModifiedFlag] = useState<boolean>(false);
+  const [openValidationPopup, setOpenValidationPopup] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     email: '',
@@ -265,8 +268,9 @@ export function EditMemberModal({
     }
   }, [saveCompleted]);
 
-  function handleReset() {
-    if (isProfileSettings) {
+  const confirmationClose = (flag) => {
+    setOpenValidationPopup(false);
+    if (flag) {
       setErrors([]);
       setBasicErrors([]);
       setSkillErrors([]);
@@ -331,6 +335,8 @@ export function EditMemberModal({
           setName(member.name);
           setDropDownValues({ skillValues: data[1], teamNames: data[2] });
           setReset(false);
+          setModified(false);
+          setModifiedFlag(false);
         })
         .catch((err) => {
           toast(err?.message);
@@ -339,8 +345,15 @@ export function EditMemberModal({
     }
   }
 
+  function handleReset() {
+    if (isProfileSettings && isModified) {
+      setOpenValidationPopup(true);
+    }
+  }
+
   function resetState() {
     setModified(false);
+    setModifiedFlag(false);
     setErrors([]);
     setBasicErrors([]);
     setSkillErrors([]);
@@ -514,6 +527,7 @@ export function EditMemberModal({
         await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);
           setModified(false);
+          setModifiedFlag(false);
         });
       } catch (err) {
         if (err.response.status === 400) {
@@ -559,6 +573,7 @@ export function EditMemberModal({
   ) {
     const { name, value } = event.target;
     setModified(true);
+    setModifiedFlag(true);
     setFormValues({ ...formValues, [name]: value });
   }
 
@@ -572,6 +587,7 @@ export function EditMemberModal({
     reader.onload = () => setImageUrl(reader.result as string);
     setFormValues({ ...formValues, imageFile: file });
     setModified(true);
+    setModifiedFlag(true);
     setImageChanged(true);
   };
 
@@ -698,6 +714,8 @@ export function EditMemberModal({
               />
             )
           }
+          <DiscardChangesPopup text={MSG_CONSTANTS.RESET_CHANGE_CONF_MSG} isOpen={openValidationPopup} onCloseFn={confirmationClose} />
+
         </div>
       ) : (
         <Modal
