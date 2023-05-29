@@ -39,6 +39,7 @@ interface EditMemberModalProps {
   id: string;
   isProfileSettings?: boolean;
   userInfo?: any;
+  setModified?: (boolean) => void
 }
 
 function validateBasicForm(formValues, imageUrl, isProfileSettings) {
@@ -149,7 +150,8 @@ export function EditMemberModal({
   setIsModalOpen,
   id,
   isProfileSettings = false,
-  userInfo
+  userInfo,
+  setModified
 }: EditMemberModalProps) {
   const [openTab, setOpenTab] = useState(1);
   const [errors, setErrors] = useState([]);
@@ -338,6 +340,7 @@ export function EditMemberModal({
   }
 
   function resetState() {
+    setModified(false);
     setErrors([]);
     setBasicErrors([]);
     setSkillErrors([]);
@@ -510,6 +513,7 @@ export function EditMemberModal({
         }
         await api.post(`/v1/participants-request`, data).then((response) => {
           setSaveCompleted(true);
+          setModified(false);
         });
       } catch (err) {
         if (err.response.status === 400) {
@@ -554,6 +558,7 @@ export function EditMemberModal({
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) {
     const { name, value } = event.target;
+    setModified(true);
     setFormValues({ ...formValues, [name]: value });
   }
 
@@ -566,6 +571,7 @@ export function EditMemberModal({
     reader.readAsDataURL(file);
     reader.onload = () => setImageUrl(reader.result as string);
     setFormValues({ ...formValues, imageFile: file });
+    setModified(true);
     setImageChanged(true);
   };
 
