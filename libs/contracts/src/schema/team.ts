@@ -26,6 +26,7 @@ export const TeamSchema = z.object({
   createdAt: z.date().or(z.string()),
   updatedAt: z.date().or(z.string()),
   fundingStageUid: z.string().nullish(),
+  linkedinHandler: z.string().nullish(),
 });
 
 export const CreateTeamSchema = TeamSchema.pick({

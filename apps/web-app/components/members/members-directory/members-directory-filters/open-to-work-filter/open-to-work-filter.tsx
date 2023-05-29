@@ -1,12 +1,12 @@
 import { Switch } from '@protocol-labs-network/ui';
 import { useSwitchFilter } from '../../../../../hooks/directory/use-switch-filter.hook';
 
-export function OfficeHoursFilter() {
-  const { enabled, onSetEnabled } = useSwitchFilter('officeHoursOnly');
+export function OpenToWorkFilter() {
+  const { enabled, onSetEnabled } = useSwitchFilter('openToWork');
 
   return (
     <Switch
-      label="Only Show Members with Office Hours"
+      label="Open to Work"
       initialValue={enabled}
       onChange={onSetEnabled}
     />

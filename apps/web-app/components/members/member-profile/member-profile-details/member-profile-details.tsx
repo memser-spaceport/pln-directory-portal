@@ -21,7 +21,8 @@ export function MemberProfileDetails({
     email,
     twitter,
     discordHandle,
-    githubHandle
+    githubHandle,
+    linkedinHandle,
   } = member;
   const loginAsUserCode = FATHOM_EVENTS.directory.loginAsUser;
   const router = useRouter();
@@ -111,6 +112,22 @@ export function MemberProfileDetails({
               '-'
             ))
           }
+        </div>
+        <div className="flex w-1/4 flex-col items-start">
+          <h2 className="detail-label">LinkedIn</h2>
+          {linkedinHandle ? (
+            <Tooltip
+              asChild
+              trigger={
+                <div>
+                  <ProfileSocialLink url={linkedinHandle} type="linkedin" />
+                </div>
+              }
+              content={linkedinHandle}
+            />
+          ) : (
+            '-'
+          )}
         </div>
       </div>
       { !userInfo?.uid && 

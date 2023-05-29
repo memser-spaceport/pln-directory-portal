@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { MouseEvent, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { ReactComponent as CameraIcon } from '../../assets/icons/cameraicon.svg';
+import { ReactComponent as RemoveIcon } from '../../assets/icons/trash_icon.svg';
+import { ReactComponent as RecycleIcon } from '../../assets/icons/recycle.svg';
 
 type Shape = 'circle' | 'square';
 
 type Props = {
   imageUrl?: string;
-  onImageChange: (file: File) => void;
+  onImageChange: (file: File | null) => void;
   maxSize: number; // Size in MB
   previewImageShape?: Shape;
   disabled?: boolean;
@@ -36,6 +38,13 @@ export function ProfileImageUpload({
   const [isHovered, setIsHovered] = useState(false);
   const previewClassName =
     previewImageShape === 'circle' ? 'rounded-full' : 'rounded-xl';
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (enableHover === false) {
+      setIsHovered(false);
+    }
+  }, [enableHover]);
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -72,47 +81,75 @@ export function ProfileImageUpload({
     ...(enableHover && { onMouseEnter: handleMouseEnter }), // Conditionally add onMouseEnter prop
   };
 
+  const editFunction = (
+    evt: MouseEvent<SVGSVGElement, globalThis.MouseEvent>
+  ) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    inputRef.current?.click();
+  };
+
+  const deleteFunction = (
+    evt: MouseEvent<SVGSVGElement, globalThis.MouseEvent>
+  ) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    if (inputRef.current) {
+      inputRef.current.value = '';
+    }
+    setImage(null);
+    onImageChange(null);
+  };
+
   return (
     <>
       <div {...divProps}>
-        {imageUrl ? (
-          <div className="flex h-full w-full flex-col items-center justify-center">
+        <div className="absolute left-0 top-0 flex h-full w-full flex-col items-center justify-center bg-gray-100">
+          {imageUrl ? (
             <Image
               src={imageUrl}
               alt="Profile Image"
               layout="fill"
               objectFit="cover"
             />
-            {isHovered && (
-              <div className="absolute flex h-full w-full flex-col items-center justify-center bg-white opacity-70">
-                <CameraIcon className="fill-black-500 h-10 w-10" />
-              </div>
-            )}
-          </div>
-        ) : AvatarIcon ? (
-          <div className="flex h-full w-full flex-col items-center justify-center bg-gray-100">
+          ) : AvatarIcon ? (
             <AvatarIcon className="w-22 h-22 bg-gray-200 fill-white" />
-            {isHovered && (
-              <div className="absolute flex h-full w-full flex-col items-center justify-center bg-white opacity-50">
-                <CameraIcon className="fill-black-500 h-10 w-10" />
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center bg-gray-100">
-            <CameraIcon />
-            <span className="font-size-12 text-sm text-blue-600">
-              Add Image
+          ) : (
+            <>
+              <CameraIcon />
+              <span className="font-size-12 text-sm text-blue-600">
+                Add Image
+              </span>
+            </>
+          )}
+          <input
+            id="image-upload-input"
+            type="file"
+            ref={inputRef}
+            accept="image/png, image/jpeg"
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            onChange={handleImageChange}
+            disabled={disabled}
+          />
+        </div>
+        {isHovered && (
+          <div className="absolute left-0 top-0 flex h-full w-full items-center justify-center bg-black bg-opacity-40">
+            <span>
+              <RecycleIcon
+                onClick={(evt) => editFunction(evt)}
+                className="h-8 w-8 cursor-pointer"
+              />
             </span>
+            {imageUrl && (
+              <span className="pl-2">
+                <RemoveIcon
+                  onClick={(evt) => deleteFunction(evt)}
+                  className="h-8 w-8 cursor-pointer"
+                />
+              </span>
+            )}
           </div>
         )}
-        <input
-          type="file"
-          accept="image/png, image/jpeg"
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          onChange={handleImageChange}
-          disabled={disabled}
-        />
       </div>
       <span className="absolute pt-1 text-xs text-rose-600">{uploadError}</span>
     </>

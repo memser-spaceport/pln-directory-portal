@@ -29,7 +29,7 @@ function validateBasicForm(formValues, imageUrl) {
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   if (
     !formValues.requestorEmail?.trim() ||
-    !formValues.requestorEmail?.match(emailRE)
+    !formValues.requestorEmail?.trim().match(emailRE)
   ) {
     errors.push('Please add a valid Requestor email');
   }
@@ -85,6 +85,7 @@ function validateForm(formValues, imageUrl) {
 }
 
 export default function TeamView(props) {
+  const name = props?.oldName;
   const [errors, setErrors] = useState([]);
   const [imageUrl, setImageUrl] = useState<string>(props?.imageUrl);
   const [imageChanged, setImageChanged] = useState<boolean>(false);
@@ -133,7 +134,7 @@ export default function TeamView(props) {
 
     const formattedValue = {
       ...formValues,
-      name: formValues.name?.trim(),
+      name: formValues.name?.replace(/ +(?= )/g, '').trim(),
       shortDescription: formValues.shortDescription?.trim(),
       longDescription: formValues.longDescription?.trim(),
       website: formValues.website?.trim(),
@@ -146,6 +147,7 @@ export default function TeamView(props) {
       industryTags: formattedTags,
       membershipSources: formattedMembershipSource,
       technologies: formattedtechnologies,
+      oldName: name,
     };
     delete formattedValue.requestorEmail;
     return formattedValue;
@@ -188,7 +190,7 @@ export default function TeamView(props) {
       try {
         let image;
         setIsProcessing(true);
-        if (imageChanged) {
+        if (imageChanged && values.logoFile) {
           const formData = new FormData();
           formData.append('file', values.logoFile);
           const config = {
@@ -246,17 +248,17 @@ export default function TeamView(props) {
     setFormValues({ ...formValues, [name]: value });
   }
 
-  const handleImageChange = (file: File) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => setImageUrl(reader.result as string);
-    setFormValues({ ...formValues, logoFile: file });
-    setImageChanged(true);
-  };
-
-  const onRemoveImage = () => {
-    setFormValues({ ...formValues, logoFile: null });
-    setImageUrl('');
+  const handleImageChange = (file: File | null) => {
+    if (file) {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => setImageUrl(reader.result as string);
+      setFormValues({ ...formValues, logoFile: file });
+      setImageChanged(true);
+    } else {
+      setFormValues({ ...formValues, logoFile: null, logoUid: '' });
+      setImageUrl('');
+    }
   };
 
   function handleDropDownChange(selectedOption, name) {
@@ -275,8 +277,8 @@ export default function TeamView(props) {
 
   return (
     <>
+      {isProcessing && <Loader />}
       <ApprovalLayout>
-        {isProcessing && <Loader />}
         <div className="bg-gray-200">
           <div className="relative m-auto w-[40%]">
             <div
@@ -307,7 +309,6 @@ export default function TeamView(props) {
                     onNameBlur={onNameBlur}
                     nameExists={nameExists}
                     setDisableNext={setDisableSave}
-                    onRemoveImage={onRemoveImage}
                   />
                   <TeamStepTwo
                     formValues={formValues}
@@ -376,6 +377,7 @@ export const getServerSideProps = async (context) => {
   let technologies = [];
   let memberList = [];
   let teamList = [];
+  let oldName = '';
   let referenceUid, imageUrl, status;
 
   const [
@@ -404,6 +406,7 @@ export const getServerSideProps = async (context) => {
   ) {
     referenceUid = requestDetailResponse?.data?.referenceUid ?? '';
     const team = requestDetailResponse?.data?.newData;
+    oldName = team?.oldName ?? team?.name;
     status = requestDetailResponse?.data?.status;
     formValues = {
       name: team.name,
@@ -488,6 +491,7 @@ export const getServerSideProps = async (context) => {
       teamList,
       memberList,
       plnadmin,
+      oldName,
     },
   };
 };

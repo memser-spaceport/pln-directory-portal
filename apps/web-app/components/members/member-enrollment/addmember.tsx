@@ -43,7 +43,7 @@ function validateBasicForm(formValues) {
   if (!formValues.name.trim()) {
     errors.push('Please add your Name');
   }
-  if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
+  if (!formValues.email.trim() || !formValues.email?.trim().match(emailRE)) {
     errors.push('Please add valid Email');
   }
   return errors;
@@ -123,7 +123,7 @@ function getSubmitOrNextButton(
         disabled={isProcessing}
         onClick={handleSubmit}
       >
-        Add to Network
+        Request to Join
       </button>
     ) : (
       <button
@@ -280,7 +280,7 @@ export function AddMemberModal({
     });
     const formattedData = {
       ...formValues,
-      name: formValues.name.trim(),
+      name: formValues.name?.replace(/ +(?= )/g, '').trim(),
       email: formValues.email.trim(),
       city: formValues.city?.trim(),
       region: formValues.region?.trim(),
@@ -415,17 +415,16 @@ export function AddMemberModal({
     setFormValues({ ...formValues, [name]: selectedOption });
   }
 
-  const handleImageChange = (file: File) => {
-    const imageFile = file;
-    setFormValues({ ...formValues, imageFile: imageFile });
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => setImageUrl(reader.result as string);
-  };
-
-  const onRemoveImage = () => {
-    setFormValues({ ...formValues, imageFile: null });
-    setImageUrl('');
+  const handleImageChange = (file: File | null) => {
+    if (file) {
+      setFormValues({ ...formValues, imageFile: file });
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => setImageUrl(reader.result as string);
+    } else {
+      setFormValues({ ...formValues, imageFile: null, imageUid: '' });
+      setImageUrl('');
+    }
   };
 
   function handleDeleteRolesRow(rowId) {
@@ -447,7 +446,6 @@ export function AddMemberModal({
             emailExists={emailExists}
             onEmailBlur={onEmailBlur}
             setDisableNext={setDisableNext}
-            onRemoveImage={onRemoveImage}
           />
         );
       case 2:

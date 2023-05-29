@@ -14,6 +14,7 @@ export interface ITeam {
   industryTags: TTeamResponse['industryTags'];
   technologies: TTeamResponse['technologies'];
   members: string[];
+  linkedinHandle: string | null;
 }
 
 interface DropDownProps {

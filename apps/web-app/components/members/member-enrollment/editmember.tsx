@@ -49,7 +49,7 @@ function validateBasicForm(formValues, imageUrl, isProfileSettings) {
   if (!formValues.name.trim()) {
     errors.push('Please add your Name');
   }
-  if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
+  if (!formValues.email.trim() || !formValues.email?.trim().match(emailRE)) {
     errors.push('Please add valid Email');
   }
   if (!isProfileSettings) { 
@@ -158,6 +158,7 @@ export function EditMemberModal({
   const [isErrorPopupOpen, setIsErrorPopupOpen] = useState(false);
   const [basicErrors, setBasicErrors] = useState([]);
   const [skillErrors, setSkillErrors] = useState([]);
+  const [name, setName] = useState('');
   const [dropDownValues, setDropDownValues] = useState({});
   const [imageUrl, setImageUrl] = useState<string>();
   const [emailExists, setEmailExists] = useState<boolean>(false);
@@ -327,6 +328,7 @@ export function EditMemberModal({
 
           setImageUrl(member.image?.url ?? '');
           setFormValues(formValues);
+          setName(member.name);
           setDropDownValues({ skillValues: data[1], teamNames: data[2] });
           setReset(false);
         })
@@ -344,6 +346,7 @@ export function EditMemberModal({
     setSkillErrors([]);
     setDropDownValues({});
     setImageChanged(false);
+    setName('');
     setSaveCompleted(false);
     setIsProcessing(false);
     setDisableSubmit(false);
@@ -397,7 +400,7 @@ export function EditMemberModal({
     });
     const formattedData = {
       ...formValues,
-      name: formValues.name.trim(),
+      name: formValues.name?.replace(/ +(?= )/g, '').trim(),
       email: formValues.email.trim(),
       city: formValues.city?.trim(),
       region: formValues.region?.trim(),
@@ -412,6 +415,7 @@ export function EditMemberModal({
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
+      oldName: name,
     };
     return formattedData;
   }
@@ -462,7 +466,7 @@ export function EditMemberModal({
         // if (!captchaToken) return;
         let image;
         setIsProcessing(true);
-        if (imageChanged) {
+        if (imageChanged && values.imageFile) {
           const formData = new FormData();
           formData.append('file', values.imageFile);
           const config = {

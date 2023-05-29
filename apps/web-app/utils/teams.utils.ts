@@ -72,6 +72,7 @@ export const parseTeam = (team: TTeamResponse): ITeam => {
     fundingStage,
     teamMemberRoles,
     contactMethod,
+    linkedinHandler,
   } = team;
 
   const memberIds = teamMemberRoles?.length
@@ -98,5 +99,6 @@ export const parseTeam = (team: TTeamResponse): ITeam => {
     membershipSources: membershipSources || [],
     members: memberIds,
     contactMethod: contactMethod || null,
+    linkedinHandle: linkedinHandler || null,
   };
 };

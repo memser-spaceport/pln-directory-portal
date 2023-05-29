@@ -21,6 +21,7 @@ export function getMembersOptionsFromQuery(
     metroArea,
     officeHoursOnly,
     includeFriends,
+    openToWork,
   } = queryParams;
 
   const sortFromQuery = getSortFromQuery(sort?.toString());
@@ -41,6 +42,7 @@ export function getMembersOptionsFromQuery(
       ? { 'location.metroArea__with': stringifyQueryValues(metroArea) }
       : {}),
     ...(includeFriends ? {} : { plnFriend: false }),
+    ...(openToWork ? { openToWork: true } : {}),
     ...(searchBy
       ? { name__istartswith: stringifyQueryValues(searchBy).trim() }
       : {}),
@@ -93,6 +95,7 @@ export const parseMember = (member: TMemberResponse): IMember => {
     teams,
     mainTeam,
     openToWork: member.openToWork || false,
+    linkedinHandle: member.linkedinHandler || null,
   };
 };
 

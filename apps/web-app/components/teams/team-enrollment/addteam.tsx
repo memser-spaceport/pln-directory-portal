@@ -43,7 +43,7 @@ function validateBasicForm(formValues) {
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   if (
     !formValues.requestorEmail?.trim() ||
-    !formValues.requestorEmail?.match(emailRE)
+    !formValues.requestorEmail?.trim().match(emailRE)
   ) {
     errors.push('Please add a valid Requestor email');
   }
@@ -140,7 +140,7 @@ function getSubmitOrNextButton(
         disabled={isProcessing}
         onClick={handleSubmit}
       >
-        Add to Network
+        Request to Join
       </button>
     ) : (
       <button
@@ -313,7 +313,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
 
     const formattedValue = {
       ...formValues,
-      name: formValues.name?.trim(),
+      name: formValues.name?.replace(/ +(?= )/g, '').trim(),
       shortDescription: formValues.shortDescription?.trim(),
       longDescription: formValues.longDescription?.trim(),
       website: formValues.website?.trim(),
@@ -422,16 +422,16 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     setFormValues({ ...formValues, [name]: value });
   }
 
-  const handleImageChange = (file: File) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => setImageUrl(reader.result as string);
-    setFormValues({ ...formValues, logoFile: file });
-  };
-
-  const onRemoveImage = () => {
-    setFormValues({ ...formValues, logoFile: null });
-    setImageUrl('');
+  const handleImageChange = (file: File | null) => {
+    if (file) {
+      setFormValues({ ...formValues, logoFile: file });
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => setImageUrl(reader.result as string);
+    } else {
+      setFormValues({ ...formValues, logoFile: null, logoUid: '' });
+      setImageUrl('');
+    }
   };
 
   function handleDropDownChange(selectedOption, name) {
@@ -451,7 +451,6 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
             imageUrl={imageUrl}
             nameExists={nameExists}
             setDisableNext={setDisableNext}
-            onRemoveImage={onRemoveImage}
           />
         );
       case 2:

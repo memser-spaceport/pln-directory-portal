@@ -17,7 +17,8 @@ export interface IMember {
   twitter: string | null;
   roles?: string[];
   leadingTeams?: string[];
-  openToWork?: boolean;  
+  openToWork?: boolean;
+  linkedinHandle: string | null;
 }
 
 export interface IMemberTeam {

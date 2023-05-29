@@ -7,6 +7,7 @@ import { DirectoryCardFooter } from '../../../shared/directory/directory-card/di
 import { DirectoryCardHeader } from '../../../shared/directory/directory-card/directory-card-header';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 
+import { ReactComponent as BriefCase } from '../../../../public/assets/images/icons/mdi_briefcase-check.svg';
 
 interface MemberCardProps {
   isGrid?: boolean;
@@ -19,6 +20,7 @@ export function MemberCard({
   member,
   loggedInMember,
 }: MemberCardProps) {
+  const isOpenToWorkEnabled = process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK;
   const router = useRouter();
   const backLink = encodeURIComponent(router.asPath);
   const mainTeam = member.mainTeam;
@@ -53,13 +55,23 @@ export function MemberCard({
         teamLead={member.teamLead}
       />
       <div className={isGrid ? '' : 'w-[400px] grow-0'}>
-        <h2
-          className={`${
-            isGrid ? 'mt-2' : ''
-          } line-clamp-1 text-lg font-semibold`}
-        >
-          {member.name}
-        </h2>
+        <div className={isGrid ? '' : 'flex'}>
+          <h2
+            className={`${
+              isGrid ? 'mt-2' : ''
+            } line-clamp-1 text-lg font-semibold`}
+          >
+            {member.name}
+          </h2>
+          {(isOpenToWorkEnabled === 'true') && !isGrid && member.openToWork && (
+            <span className="z-0 flex pl-2 pt-[5px] text-slate-600">
+              <BriefCase />
+              <span className="pl-1 pt-px text-[10px] font-medium leading-[14px] tracking-[0.01em]">
+                OPEN TO WORK
+              </span>
+            </span>
+          )}
+        </div>
 
         <div
           className={`flex ${

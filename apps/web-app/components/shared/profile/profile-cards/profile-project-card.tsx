@@ -26,11 +26,7 @@ export function ProfileProjectCard({
       <AnchorLink href={url} linkClassName="block on-focus">
         <div className="h-18 flex items-start p-4">
           <div className="relative mr-4 h-10 w-10 shrink-0">
-            <div
-              className={`relative flex h-10 w-10 overflow-hidden ${
-                isImageRounded ? 'rounded-full' : 'rounded-lg'
-              }  ${imageUrl ? '' : 'bg-slate-200'}`}
-            >
+            <div className={`relative flex h-10 w-10 overflow-hidden`}>
               {imageUrl ? (
                 <Image
                   className={isImageRounded ? 'rounded-full' : 'rounded-lg'}

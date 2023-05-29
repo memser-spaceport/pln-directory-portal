@@ -26,12 +26,12 @@ function validateBasicForm(formValues, imageUrl) {
   if (!formValues.name.trim()) {
     errors.push('Please add your Name');
   }
-  if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
+  if (!formValues.email.trim() || !formValues.email?.trim().match(emailRE)) {
     errors.push('Please add valid Email');
   }
   if (
     !formValues.requestorEmail?.trim() ||
-    !formValues.requestorEmail?.match(emailRE)
+    !formValues.requestorEmail?.trim().match(emailRE)
   ) {
     errors.push('Please add a valid Requestor Email');
   }
@@ -70,6 +70,7 @@ function validateForm(formValues, imageUrl) {
 }
 
 export default function MemberView(props) {
+  const name = props?.oldName;
   const [errors, setErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({
     skillValues: props?.skills,
@@ -112,7 +113,7 @@ export default function MemberView(props) {
     });
     const formattedData = {
       ...formValues,
-      name: formValues.name?.trim(),
+      name: formValues.name?.replace(/ +(?= )/g, '').trim(),
       email: formValues.email?.trim(),
       city: formValues.city?.trim(),
       region: formValues.region?.trim(),
@@ -127,6 +128,7 @@ export default function MemberView(props) {
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
+      oldName: name,
     };
     delete formattedData.requestorEmail;
     return formattedData;
@@ -172,7 +174,7 @@ export default function MemberView(props) {
       try {
         let image;
         setIsProcessing(true);
-        if (imageChanged) {
+        if (imageChanged && values.imageFile) {
           const formData = new FormData();
           formData.append('file', values.imageFile);
           const config = {
@@ -263,17 +265,17 @@ export default function MemberView(props) {
     setFormValues({ ...formValues, [name]: selectedOption });
   }
 
-  const handleImageChange = (file: File) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => setImageUrl(reader.result as string);
-    setFormValues({ ...formValues, imageFile: file });
-    setImageChanged(true);
-  };
-
-  const onRemoveImage = () => {
-    setFormValues({ ...formValues, imageFile: null });
-    setImageUrl('');
+  const handleImageChange = (file: File | null) => {
+    if (file) {
+      setFormValues({ ...formValues, imageFile: file });
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => setImageUrl(reader.result as string);
+      setImageChanged(true);
+    } else {
+      setFormValues({ ...formValues, imageFile: null, imageUid: '' });
+      setImageUrl('');
+    }
   };
 
   function handleDeleteRolesRow(rowId) {
@@ -295,8 +297,8 @@ export default function MemberView(props) {
 
   return (
     <>
+      {isLoading && <Loader />}
       <ApprovalLayout>
-        {isLoading && <Loader />}
         <div className="bg-gray-200">
           <div className="relative m-auto w-[40%]">
             <div
@@ -338,7 +340,6 @@ export default function MemberView(props) {
                   emailExists={emailExists}
                   onEmailBlur={onEmailBlur}
                   setDisableNext={setDisableSave}
-                  onRemoveImage={onRemoveImage}
                 />
                 <MemberSkillForm
                   formValues={formValues}
@@ -406,6 +407,7 @@ export const getServerSideProps = async (context) => {
   let teams, skills, referenceUid, imageUrl, status;
   let memberList = [];
   let teamList = [];
+  let oldName = '';
 
   // Check if provided ID is an Airtable ID, and if so, get the corresponding backend UID
 
@@ -437,6 +439,7 @@ export const getServerSideProps = async (context) => {
     let counter = 1;
     referenceUid = requestDetailResponse?.data?.referenceUid ?? null;
     const requestData = requestDetailResponse?.data?.newData;
+    oldName = requestData?.oldName ?? requestData?.name;
     status = requestDetailResponse?.data?.status;
     const teamAndRoles =
       requestData.teamAndRoles?.length &&
@@ -513,6 +516,7 @@ export const getServerSideProps = async (context) => {
       teamList,
       memberList,
       plnadmin,
+      oldName,
     },
   };
 };

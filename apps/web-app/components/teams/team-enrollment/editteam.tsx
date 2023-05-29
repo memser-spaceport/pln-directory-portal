@@ -42,7 +42,7 @@ function validateBasicForm(formValues, imageUrl) {
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   if (
     !formValues.requestorEmail?.trim() ||
-    !formValues.requestorEmail?.match(emailRE)
+    !formValues.requestorEmail?.trim().match(emailRE)
   ) {
     //errors.push('Please add a valid Requestor email');
   }
@@ -144,6 +144,7 @@ export function EditTeamModal({
   const [basicErrors, setBasicErrors] = useState([]);
   const [projectErrors, seProjecttErrors] = useState([]);
   const [socialErrors, setSocialErrors] = useState([]);
+  const [name, setName] = useState('');
   const [imageUrl, setImageUrl] = useState<string>();
   const [imageChanged, setImageChanged] = useState<boolean>(false);
   const [dropDownValues, setDropDownValues] = useState({});
@@ -234,6 +235,7 @@ export function EditTeamModal({
             formValues['requestorEmail'] = parsedUserInfo.email;
           }
           setFormValues(formValues);
+          setName(team.name);
           setImageUrl(team.logo?.url ?? '');
           setDropDownValues({
             membershipSources: data[1],
@@ -261,6 +263,7 @@ export function EditTeamModal({
     setDropDownValues({});
     setDisableSubmit(false);
     setNameExists(false);
+    setName('');
     setIsProcessing(false);
     setFormValues({
       name: '',
@@ -307,7 +310,7 @@ export function EditTeamModal({
 
     const formattedValue = {
       ...formValues,
-      name: formValues.name?.trim(),
+      name: formValues.name?.replace(/ +(?= )/g, '').trim(),
       shortDescription: formValues.shortDescription?.trim(),
       longDescription: formValues.longDescription?.trim(),
       website: formValues.website?.trim(),
@@ -320,6 +323,7 @@ export function EditTeamModal({
       industryTags: formattedTags,
       membershipSources: formattedMembershipSource,
       technologies: formattedtechnologies,
+      oldName: name,
     };
     delete formattedValue.requestorEmail;
     return formattedValue;
@@ -379,7 +383,7 @@ export function EditTeamModal({
         // if (!captchaToken) return;
         let image;
         setIsProcessing(true);
-        if (imageChanged) {
+        if (imageChanged && values.logoFile) {
           const formData = new FormData();
           formData.append('file', values.logoFile);
           const config = {
