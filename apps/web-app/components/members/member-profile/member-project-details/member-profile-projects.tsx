@@ -45,17 +45,6 @@ export function MemberProfileProjects({
           );
         })}
       </div>
-      <div className="flex pt-2">
-        <div>
-          <InformationCircleIcon />
-        </div>
-        <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-          Up to 3 pinned project repositories from member&apos;s GitHub profile
-          is displayed by default. This view utilizes the same ordering (if any)
-          as the pinned feature of member&apos;s GitHub profile page.{' '}
-          {seeAllInfoText}
-        </span>
-      </div>
       <MemberProfileProjectsModal
         isOpen={isModalOpen}
         setIsModalOpen={setIsModalOpen}
