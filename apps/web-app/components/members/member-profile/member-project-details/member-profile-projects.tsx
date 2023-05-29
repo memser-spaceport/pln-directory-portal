@@ -4,7 +4,6 @@ import { MemberProfileProjectsProps } from '../../../../utils/members.types';
 import { ProfileProjectCard } from '../../../shared/profile/profile-cards/profile-project-card';
 import { ReactComponent as project_icon } from '../../../../public/assets/images/icons/project_icon.svg';
 import { MemberProfileProjectsModal } from './member-projects-modal';
-import { ReactComponent as InformationCircleIcon } from '../../../../public/assets/images/icons/info_icon.svg';
 
 export function MemberProfileProjects({
   repositories,
@@ -14,10 +13,6 @@ export function MemberProfileProjects({
   } = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const displayRepos = repositories.slice(0, 3);
-  const seeAllInfoText =
-    repositories?.length > 3
-      ? "Click 'See All' to view all of the public repositories."
-      : '';
   return (
     <>
       <h3 className="mb-2 mt-6 font-medium text-slate-500">
