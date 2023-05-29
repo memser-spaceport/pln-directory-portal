@@ -8,6 +8,7 @@ import { useProfileBreadcrumb } from "apps/web-app/hooks/profile/use-profile-bre
 import { DirectoryLayout } from "apps/web-app/layouts/directory-layout";
 import { DIRECTORY_SEO } from "apps/web-app/seo.config";
 import api from "apps/web-app/utils/api";
+import { DiscardChangesPopup } from "libs/ui/src/lib/modals/confirmation";
 import { NextSeo } from "next-seo";
 import { useRouter } from "next/router";
 import { setCookie } from "nookies";
@@ -23,6 +24,8 @@ export default function Settings({
     const [selectedMember, setSelectedMember] = useState((membersDropdown && membersDropdown.length) ? membersDropdown[0] : null);
     const [isModified, setModified] = useState<boolean>(false);
     const [isModifiedMember, setModifiedMember] = useState<boolean>(false);
+    const [isPflModified, setModifiedProfile] = useState<boolean>(false);
+    const [openValidationPopup, setOpenValidationPopup] = useState<boolean>(false);
 
     const router = useRouter();
 
@@ -70,16 +73,30 @@ export default function Settings({
     breadcrumbItems.push({ label: activeSetting });
 
     const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+    const [targetSettings, setTargetSetting] = useState(SETTINGS_CONSTANTS.PROFILE_SETTINGS);
 
     function handleSettingsMenu(menu) {
+        setTargetSetting(menu);
         if (menu === SETTINGS_CONSTANTS.PROFILE_SETTINGS) {
-            setActiveSetting(SETTINGS_CONSTANTS.PROFILE_SETTINGS);
+            if(beforeChangeMemberValidation() || beforeChangeValidation()){
+                setOpenValidationPopup(true);
+            }else{
+                setActiveSetting(SETTINGS_CONSTANTS.PROFILE_SETTINGS);
+            }
         } else if (menu === SETTINGS_CONSTANTS.TEAM_SETTINGS) {
             // setSelectedTeam(teamsDropdown[0]); //to always set first data
-            setActiveSetting(SETTINGS_CONSTANTS.TEAM_SETTINGS);
+            if (isProfileChanged() || beforeChangeMemberValidation()) {
+                setOpenValidationPopup(true);
+            }else{
+                setActiveSetting(SETTINGS_CONSTANTS.TEAM_SETTINGS);
+            }
         } else if (menu === SETTINGS_CONSTANTS.MEMBER_SETTINGS){
             // setSelectedMember(membersDropdown[0]);
-            setActiveSetting(SETTINGS_CONSTANTS.MEMBER_SETTINGS);
+            if (isProfileChanged() || beforeChangeValidation()) {
+                setOpenValidationPopup(true);
+            }else{
+                setActiveSetting(SETTINGS_CONSTANTS.MEMBER_SETTINGS);
+            }
         }
     }
 
@@ -87,13 +104,17 @@ export default function Settings({
         setSelectedTeam(selectedValue);
     }
 
-    const beforeChangeValidation = (Selected) => {
+    const beforeChangeValidation = (Selected?) => {
         return isModified;
     };
 
-    const beforeChangeMemberValidation = (Selected) => {
+    const beforeChangeMemberValidation = (Selected?) => {
         return isModifiedMember;
     };
+
+    const isProfileChanged = () => {
+        return isPflModified;
+    }
 
     function handleMemberChange(selectedValue) {
         setSelectedMember(selectedValue);
@@ -124,6 +145,107 @@ export default function Settings({
           console.error(error);
         }
     };
+
+    const getAutoCompleteComponent = (name) => {
+        if(name === SETTINGS_CONSTANTS.MEMBER){
+            return (<Autocomplete
+                name={SETTINGS_CONSTANTS.MEMBER}
+                className="custom-grey custom-outline-none border"
+                required={true}
+                placeholder="Select a member"
+                key={selectedMember.label}
+                selectedOption={selectedMember}
+                onSelectOption={handleMemberChange}
+                debounceCall={fetchMembersWithLogoSearchTerm}
+                validateBeforeChange={true}
+                validationFnBeforeChange={beforeChangeMemberValidation}
+                confirmationMessage={MSG_CONSTANTS.MEMBER_CHANGE_CONF_MSG}
+            />);
+        }else if(name === SETTINGS_CONSTANTS.TEAM){
+            return (
+                <Autocomplete
+                    name={SETTINGS_CONSTANTS.TEAM}
+                    className="custom-grey custom-outline-none border"
+                    required={true}
+                    key={selectedTeam.label}
+                    placeholder="Select a team"
+                    selectedOption={selectedTeam}
+                    onSelectOption={handleTeamChange}
+                    debounceCall={fetchTeamsWithLogoSearchTerm}
+                    validateBeforeChange={true}
+                    validationFnBeforeChange={beforeChangeValidation}
+                    confirmationMessage={MSG_CONSTANTS.TEAM_CHANGE_CONF_MSG}
+                />
+            )
+        }
+        
+    }
+
+    const getDropdownComponent = () => {
+        return (<Dropdown
+            name="team"
+            required={true}
+            options={teamsDropdown}
+            initialOption={selectedTeam}
+            onChange={handleTeamChange}
+            placeholder="Select a Team"
+            className="custom-grey custom-outline-none border"
+            value={selectedTeam}
+            validateBeforeChange={true}
+            validationFn={beforeChangeValidation}
+            confirmationMessage={MSG_CONSTANTS.TEAM_CHANGE_CONF_MSG}
+        />);
+    }
+
+    const getTeamComponent = () => {
+        return (
+            <EditTeamModal
+                isOpen={true}
+                setIsModalOpen={setIsTeamModalOpen}
+                id={selectedTeam.value}
+                fromSettings={true}
+                setModified={setModified}
+            />
+        );
+    }
+
+    const getMemberComponent = (settings) => {
+        if (settings === SETTINGS_CONSTANTS.MEMBER_SETTINGS) {
+            return (
+                <EditMemberModal
+                    isOpen={true}
+                    setIsModalOpen={() => { }}
+                    id={selectedMember?.value}
+                    isProfileSettings={true}
+                    setModified={setModifiedMember}
+                />
+            )
+        } else if (settings === SETTINGS_CONSTANTS.PROFILE_SETTINGS){
+            return (
+                <EditMemberModal
+                    isOpen={false}
+                    setIsModalOpen={() => { }}
+                    id={userInfo?.uid}
+                    isProfileSettings={true}
+                    setModified={setModifiedProfile}
+                />
+            );
+        }
+    }
+
+    const confirmationOnProfileClose = (flag:boolean) => {
+        setOpenValidationPopup(false);
+        if(flag){
+            if (activeSetting === SETTINGS_CONSTANTS.PROFILE_SETTINGS) {
+                setModifiedProfile(false);
+            } else if (activeSetting === SETTINGS_CONSTANTS.TEAM_SETTINGS) {
+                setModified(false);
+            } else if (activeSetting === SETTINGS_CONSTANTS.MEMBER_SETTINGS) {
+                setModifiedMember(false);
+            }
+            setActiveSetting(targetSettings);
+        }
+    }
     
 
     function getSettingComponent(userInfo) {
@@ -136,54 +258,24 @@ export default function Settings({
                             <div className="w-[227px] inline-block float-right">
                                 {
                                     (userInfo?.roles?.length && userInfo.roles.includes(ADMIN_ROLE) ?
-                                        (<Autocomplete
-                                            name="team"
-                                            className="custom-grey custom-outline-none border"
-                                            required={true}
-                                            key={selectedTeam.label}
-                                            placeholder="Select a team"
-                                            selectedOption={selectedTeam}
-                                            onSelectOption={handleTeamChange}
-                                            debounceCall={fetchTeamsWithLogoSearchTerm}
-                                            validateBeforeChange={true}
-                                            validationFnBeforeChange={beforeChangeValidation}
-                                            confirmationMessage={MSG_CONSTANTS.TEAM_CHANGE_CONF_MSG}
-                                        />) : <Dropdown
-                                            name="team"
-                                            required={true}
-                                            options={teamsDropdown}
-                                            initialOption={selectedTeam}
-                                            onChange={handleTeamChange}
-                                            placeholder="Select a Team"
-                                            className="custom-grey custom-outline-none border"
-                                            value={selectedTeam}
-                                            validateBeforeChange={true}
-                                            validationFn={beforeChangeValidation}
-                                            confirmationMessage={MSG_CONSTANTS.TEAM_CHANGE_CONF_MSG}
-                                        />
+                                        getAutoCompleteComponent(SETTINGS_CONSTANTS.TEAM) : getDropdownComponent()
                                     )
                                 }
                             </div>
                         </div>
                         {
-                            selectedTeam && <EditTeamModal
-                                isOpen={true}
-                                setIsModalOpen={setIsTeamModalOpen}
-                                id={selectedTeam.value}
-                                fromSettings={true}
-                                setModified={setModified}
-                            />
+                            selectedTeam && getTeamComponent()
                         }
                     </>);
             case SETTINGS_CONSTANTS.PROFILE_SETTINGS:
-                return (<>
-                    <div className="text-[32px] font-bold">{SETTINGS_CONSTANTS.PROFILE_SETTINGS}</div>
-                    <EditMemberModal
-                        isOpen={false}
-                        setIsModalOpen={() => { }}
-                        id={userInfo?.uid}
-                        isProfileSettings={true}
-                    /></>);
+                return (
+                    <>
+                        <div className="text-[32px] font-bold">{SETTINGS_CONSTANTS.PROFILE_SETTINGS}</div>
+                        {
+                            getMemberComponent(SETTINGS_CONSTANTS.PROFILE_SETTINGS)
+                        }
+                    </>
+                );
             case SETTINGS_CONSTANTS.MEMBER_SETTINGS:
                 return (
                     <>
@@ -191,39 +283,21 @@ export default function Settings({
                             <div className="text-[32px] font-bold inline-block">{SETTINGS_CONSTANTS.MEMBER_SETTINGS}</div>
                             <div className="w-[227px] inline-block float-right">
                                 {
-                                        (<Autocomplete
-                                            name="member"
-                                            className="custom-grey custom-outline-none border"
-                                            required={true}
-                                            placeholder="Select a member"
-                                            key={selectedMember.label}
-                                            selectedOption={selectedMember}
-                                            onSelectOption={handleMemberChange}
-                                            debounceCall={fetchMembersWithLogoSearchTerm}
-                                            validateBeforeChange={true}
-                                            validationFnBeforeChange={beforeChangeMemberValidation}
-                                            confirmationMessage={MSG_CONSTANTS.MEMBER_CHANGE_CONF_MSG}
-                                        />) 
+                                    getAutoCompleteComponent(SETTINGS_CONSTANTS.MEMBER)
                                 }
                             </div>
                         </div>
-                        <EditMemberModal
-                            isOpen={true}
-                            setIsModalOpen={()=>{ }}
-                            id={selectedMember?.value}
-                            isProfileSettings={true}
-                            setModified={setModifiedMember}
-                        />
+                        {
+                            getMemberComponent(SETTINGS_CONSTANTS.MEMBER_SETTINGS)
+                        }
                     </>);
             default:
                 return (<>
                     <div className="text-[32px] font-bold">{SETTINGS_CONSTANTS.PROFILE_SETTINGS}</div>
-                    <EditMemberModal
-                        isOpen={false}
-                        setIsModalOpen={() => { }}
-                        id={userInfo?.uid}
-                        isProfileSettings={true}
-                    /></>);
+                    {
+                        getMemberComponent(SETTINGS_CONSTANTS.PROFILE_SETTINGS)
+                    }
+                    </>);
         }
     }
     return (
@@ -262,6 +336,7 @@ export default function Settings({
                         }
                     </div>
                 </div>
+                <DiscardChangesPopup text={MSG_CONSTANTS.PROFILE_CHANGE_CONF_MSG} isOpen={openValidationPopup} onCloseFn={confirmationOnProfileClose} />
             </div>
         </>
     )
@@ -272,7 +347,7 @@ Settings.getLayout = function getLayout(page: ReactElement) {
 };
 
 export const getServerSideProps = async (ctx) => {
-    const { res, req, query } = ctx;
+    const { res, req } = ctx;
     const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
     const isUserLoggedIn = req?.cookies?.authToken && req?.cookies?.userInfo ? true : false;
 
@@ -292,9 +367,8 @@ export const getServerSideProps = async (ctx) => {
 
     let teamsDropdown = [];
     let membersDropdown = [];
-    let memberResponse;
     
-    memberResponse = await getMember(userInfo.uid)
+    const memberResponse = await getMember(userInfo.uid)
     let member;
     if (memberResponse.status === 200) {
         member = memberResponse.body
