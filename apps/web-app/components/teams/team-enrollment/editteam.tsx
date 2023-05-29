@@ -33,7 +33,6 @@ interface EditTeamModalProps {
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
   id: string;
   fromSettings?: boolean;
-  setModified?: (boolean) => void
 }
 
 function validateBasicForm(formValues, imageUrl) {
@@ -137,8 +136,7 @@ export function EditTeamModal({
   isOpen,
   setIsModalOpen,
   id,
-  fromSettings = false,
-  setModified
+  fromSettings = false
 }: EditTeamModalProps) {
   const [errors, setErrors] = useState([]);
   const [basicErrors, setBasicErrors] = useState([]);
@@ -252,7 +250,6 @@ export function EditTeamModal({
   }, [isOpen, id]);
 
   function resetState() {
-    setModified(false);
     setErrors([]);
     setBasicErrors([]);
     seProjecttErrors([]);
@@ -413,7 +410,6 @@ export function EditTeamModal({
           .then((res) => {
             if (res.status === 200 && res.statusText === "OK")
               setSaveCompleted(true);
-              setModified(false);
           });
       } catch (err) {
         toast(err?.message);
@@ -430,7 +426,6 @@ export function EditTeamModal({
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) {
     const { name, value } = event.target;
-    setModified(true);
     setFormValues({ ...formValues, [name]: value });
   }
 
@@ -440,7 +435,6 @@ export function EditTeamModal({
     reader.onload = () => setImageUrl(reader.result as string);
     setFormValues({ ...formValues, logoFile: file });
     setImageChanged(true);
-    setModified(true);
   };
 
   const onRemoveImage = () => {

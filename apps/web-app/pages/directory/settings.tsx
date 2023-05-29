@@ -3,7 +3,7 @@ import { getTeams } from "@protocol-labs-network/teams/data-access";
 import { Autocomplete, Breadcrumb, Dropdown } from "@protocol-labs-network/ui";
 import { EditMemberModal } from "apps/web-app/components/members/member-enrollment/editmember";
 import { EditTeamModal } from "apps/web-app/components/teams/team-enrollment/editteam";
-import { ADMIN_ROLE, MSG_CONSTANTS, PAGE_ROUTES, SETTINGS_CONSTANTS } from "apps/web-app/constants";
+import { ADMIN_ROLE, PAGE_ROUTES, SETTINGS_CONSTANTS } from "apps/web-app/constants";
 import { useProfileBreadcrumb } from "apps/web-app/hooks/profile/use-profile-breadcrumb.hook";
 import { DirectoryLayout } from "apps/web-app/layouts/directory-layout";
 import { DIRECTORY_SEO } from "apps/web-app/seo.config";
@@ -19,34 +19,27 @@ export default function Settings({
     userInfo, teamsDropdown, membersDropdown }) {
 
     const [activeSetting, setActiveSetting] = useState(SETTINGS_CONSTANTS.PROFILE_SETTINGS);
-    const [selectedTeam, setSelectedTeam] = useState((teamsDropdown && teamsDropdown.length) ? teamsDropdown[0] : null);
-    const [selectedMember, setSelectedMember] = useState((membersDropdown && membersDropdown.length) ? membersDropdown[0] : null);
-    const [isModified, setModified] = useState<boolean>(false);
-    const [isModifiedMember, setModifiedMember] = useState<boolean>(false);
-
+    const [selectedTeam, setSelectedTeam] = useState(teamsDropdown.length ? teamsDropdown[0] : null);
+    const [selectedMember, setSelectedMember] = useState(membersDropdown.length ? membersDropdown[0] : null);
     const router = useRouter();
 
     useEffect(() => {
+        console.log(router.query.from)
         if(router.query?.id && router.query?.from){
             if(router.query?.from === SETTINGS_CONSTANTS.TEAM){
                 setActiveSetting(SETTINGS_CONSTANTS.TEAM_SETTINGS);
                 setSelectedTeam({
                     "label": router.query.name,
                     "value": router.query.id,
-                    "logo":  router.query.logo,
                     "icon":  router.query.logo
                 })
             }else if(router.query.from === SETTINGS_CONSTANTS.MEMBER){
-                if(router.query.id === userInfo.uid){
-                    setActiveSetting(SETTINGS_CONSTANTS.PROFILE_SETTINGS);
-                }else{
-                    setActiveSetting(SETTINGS_CONSTANTS.MEMBER_SETTINGS);
-                    setSelectedMember({
-                        "label": router.query.name,
-                        "value": router.query.id,
-                        "logo":  router.query.logo
-                    });
-                }
+                setActiveSetting(SETTINGS_CONSTANTS.MEMBER_SETTINGS);
+                setSelectedMember({
+                    "label": router.query.name,
+                    "value": router.query.id,
+                    "icon":  router.query.logo
+                })
             }
         }
       }, [router.query]);
@@ -75,25 +68,17 @@ export default function Settings({
         if (menu === SETTINGS_CONSTANTS.PROFILE_SETTINGS) {
             setActiveSetting(SETTINGS_CONSTANTS.PROFILE_SETTINGS);
         } else if (menu === SETTINGS_CONSTANTS.TEAM_SETTINGS) {
-            // setSelectedTeam(teamsDropdown[0]); //to always set first data
+            setSelectedTeam(teamsDropdown[0]);
             setActiveSetting(SETTINGS_CONSTANTS.TEAM_SETTINGS);
         } else if (menu === SETTINGS_CONSTANTS.MEMBER_SETTINGS){
-            // setSelectedMember(membersDropdown[0]);
+            setSelectedMember(membersDropdown[0]);
             setActiveSetting(SETTINGS_CONSTANTS.MEMBER_SETTINGS);
         }
     }
 
-    const handleTeamChange = (selectedValue) => {
+    function handleTeamChange(selectedValue) {
         setSelectedTeam(selectedValue);
     }
-
-    const beforeChangeValidation = (Selected) => {
-        return isModified;
-    };
-
-    const beforeChangeMemberValidation = (Selected) => {
-        return isModifiedMember;
-    };
 
     function handleMemberChange(selectedValue) {
         setSelectedMember(selectedValue);
@@ -103,6 +88,7 @@ export default function Settings({
         try {
           const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}&select=uid,name,shortDescription,logo.url,industryTags.title`);
           if (response.data) {
+            console.log(response.data)
             return response.data.map((item) => {
               return { value: item.uid, label: item.name, logo:item?.logo?.url };
             });
@@ -116,6 +102,7 @@ export default function Settings({
         try {
           const response = await api.get(`/v1/members?name__istartswith=${searchTerm}&select=uid,name,image&orderBy=name,asc`);
           if (response.data) {
+            console.log(response.data)
             return response.data.map((item) => {
               return { value: item.uid, label: item.name, logo:item?.image?.url };
             });
@@ -124,7 +111,6 @@ export default function Settings({
           console.error(error);
         }
     };
-    
 
     function getSettingComponent(userInfo) {
         switch (activeSetting) {
@@ -140,14 +126,10 @@ export default function Settings({
                                             name="team"
                                             className="custom-grey custom-outline-none border"
                                             required={true}
-                                            key={selectedTeam.label}
                                             placeholder="Select a team"
                                             selectedOption={selectedTeam}
                                             onSelectOption={handleTeamChange}
                                             debounceCall={fetchTeamsWithLogoSearchTerm}
-                                            validateBeforeChange={true}
-                                            validationFnBeforeChange={beforeChangeValidation}
-                                            confirmationMessage={MSG_CONSTANTS.TEAM_CHANGE_CONF_MSG}
                                         />) : <Dropdown
                                             name="team"
                                             required={true}
@@ -157,23 +139,17 @@ export default function Settings({
                                             placeholder="Select a Team"
                                             className="custom-grey custom-outline-none border"
                                             value={selectedTeam}
-                                            validateBeforeChange={true}
-                                            validationFn={beforeChangeValidation}
-                                            confirmationMessage={MSG_CONSTANTS.TEAM_CHANGE_CONF_MSG}
                                         />
                                     )
                                 }
                             </div>
                         </div>
-                        {
-                            selectedTeam && <EditTeamModal
-                                isOpen={true}
-                                setIsModalOpen={setIsTeamModalOpen}
-                                id={selectedTeam.value}
-                                fromSettings={true}
-                                setModified={setModified}
-                            />
-                        }
+                        <EditTeamModal
+                            isOpen={true}
+                            setIsModalOpen={setIsTeamModalOpen}
+                            id={selectedTeam.value}
+                            fromSettings={true}
+                        />
                     </>);
             case SETTINGS_CONSTANTS.PROFILE_SETTINGS:
                 return (<>
@@ -191,19 +167,26 @@ export default function Settings({
                             <div className="text-[32px] font-bold inline-block">{SETTINGS_CONSTANTS.MEMBER_SETTINGS}</div>
                             <div className="w-[227px] inline-block float-right">
                                 {
+                                    (userInfo?.roles?.length && userInfo.roles.includes(ADMIN_ROLE) ?
                                         (<Autocomplete
                                             name="member"
                                             className="custom-grey custom-outline-none border"
                                             required={true}
                                             placeholder="Select a member"
-                                            key={selectedMember.label}
                                             selectedOption={selectedMember}
                                             onSelectOption={handleMemberChange}
                                             debounceCall={fetchMembersWithLogoSearchTerm}
-                                            validateBeforeChange={true}
-                                            validationFnBeforeChange={beforeChangeMemberValidation}
-                                            confirmationMessage={MSG_CONSTANTS.MEMBER_CHANGE_CONF_MSG}
-                                        />) 
+                                        />) : <Dropdown
+                                            name="member"
+                                            required={true}
+                                            options={membersDropdown}
+                                            initialOption={selectedMember}
+                                            onChange={handleMemberChange}
+                                            placeholder="Select a member"
+                                            className="custom-grey custom-outline-none border"
+                                            value={selectedMember}
+                                        />
+                                    )
                                 }
                             </div>
                         </div>
@@ -212,7 +195,6 @@ export default function Settings({
                             setIsModalOpen={()=>{ }}
                             id={selectedMember?.value}
                             isProfileSettings={true}
-                            setModified={setModifiedMember}
                         />
                     </>);
             default:
@@ -226,6 +208,7 @@ export default function Settings({
                     /></>);
         }
     }
+
     return (
         <>
             <NextSeo {...DIRECTORY_SEO} title={userInfo.name} />
@@ -260,6 +243,7 @@ export default function Settings({
                         {
                             getSettingComponent(userInfo)
                         }
+
                     </div>
                 </div>
             </div>

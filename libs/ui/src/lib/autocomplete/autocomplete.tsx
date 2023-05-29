@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { InputField } from '../input-field/input-field';
 import { ReactComponent as ArrowDown } from '../../assets/icons/arrow-down-filled.svg';
 import { debounce } from 'lodash';
-import { DiscardChangesPopup } from 'apps/web-app/components/shared/error-message/discard-changes-confirmation';
 
 interface IDropdownOption {
   label: string;
@@ -21,9 +20,6 @@ interface AutocompleteProps {
   excludeValues?: string[];
   onSelectOption: (option: IDropdownOption) => void;
   debounceCall: (searchTerm: string | undefined) => Promise<IDropdownOption[]>;
-  confirmationMessage?: string;
-  validateBeforeChange?: boolean;
-  validationFnBeforeChange?: (option: IDropdownOption) => boolean;
 }
 
 export function Autocomplete({
@@ -37,15 +33,10 @@ export function Autocomplete({
   placeholder,
   excludeValues = [],
   name,
-  confirmationMessage,
-  validateBeforeChange,
-  validationFnBeforeChange
 }: AutocompleteProps) {
   const [searchTerm, setSearchTerm] = useState<string>(selectedOption.label);
   const [filteredOptions, setFilteredOptions] = useState<IDropdownOption[]>([]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [openValidationPopup, setValidationPopup] = useState<boolean>(false);
-  const [tempOption, setTempOption] = useState<IDropdownOption>(selectedOption);
   const [selectedValue, setSelectedValue] =
     useState<IDropdownOption>(selectedOption);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -56,9 +47,9 @@ export function Autocomplete({
 
   useMemo(() => {
     if (searchTerm === '') {
-      // setSearchTerm(selectedOption.label);
+      setSearchTerm(selectedOption.label);
     }
-  }, [selectedOption]);
+  }, [selectedOption.label]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -109,57 +100,26 @@ export function Autocomplete({
 
   const checkValidData = () => {
     if (searchTerm?.trim() === '') {
-      // setSelectedValue({ value: '', label: '' });
-      // onSelectOption({ value: '', label: '' });
-
-      setSearchTerm(selectedOption.label);
-      setSelectedValue(selectedOption);
+      setSelectedValue({ value: '', label: '' });
+      onSelectOption({ value: '', label: '' });
     } else {
-      if(selectedValue?.label === ''){
-        setSearchTerm(selectedOption.label);
-      }else{
-
-        setSearchTerm(selectedValue?.label);
-      }
+      setSearchTerm(selectedValue?.label);
     }
   };
 
   const handleOptionClick = (option: IDropdownOption) => {
-    if(validateBeforeChange){
-      if(validationFnBeforeChange){
-        if (validationFnBeforeChange(option)) {
-          setTempOption(option);
-          setValidationPopup(true);
-        } else {
-          changeDropdown(option);
-        }
-      }else{
-        changeDropdown(option);
-      }
-    }else{
-      changeDropdown(option);
-    }
-  };
-
-  const changeDropdown = (option: IDropdownOption) => {
     setSelectedValue(option);
     setSearchTerm(option?.label);
     setIsExpanded(false);
     onSelectOption(option);
     setFilteredOptions([]);
-  }
-
-  const confirmationOnClose = (flag: boolean) => {
-    setValidationPopup(false);
-    if (flag) {
-      changeDropdown(tempOption);
-    }
-  }
+  };
 
   return (
-    <>
     <div onBlur={() => checkValidData()}>
       <div className="flex">
+        {/* <div className='inline-block'><img src='https://loremflickr.com/640/480/animals' width={30} height={30}></img></div> */}
+        {console.log(selectedValue.logo)}
         <InputField
           icon={selectedValue.logo ? selectedValue.logo : undefined}
           label={'te'}
@@ -173,8 +133,7 @@ export function Autocomplete({
           value={searchTerm}
           onClick={() => {
             setIsExpanded(!isExpanded);
-            setSearchTerm('');
-            setSelectedValue({ value: '', label: '' });
+            setSearchTerm(selectedValue.label);
           }}
           onKeyDown={(e) => e.key === 'Tab' && setIsExpanded(false)}
         />
@@ -196,12 +155,7 @@ export function Autocomplete({
                   key={option.value}
                   onClick={() => handleOptionClick(option)}
                 >
-                  <div className='relative'>
-                  {option.logo && (
-                    <img src={option.logo} className='relative inline-block h-6 w-6 rounded-full'></img>
-                  )}
-                  <span className='relative left-[5px]'>{option.label}</span>
-                  </div>
+                  {option.label}
                 </li>
               ))
             ) : isProcessing ? (
@@ -213,7 +167,5 @@ export function Autocomplete({
         </div>
       )}
     </div>
-    <DiscardChangesPopup text={confirmationMessage} isOpen={openValidationPopup} onCloseFn={confirmationOnClose} />
-    </>
   );
 }

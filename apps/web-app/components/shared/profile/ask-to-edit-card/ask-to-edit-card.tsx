@@ -70,9 +70,11 @@ export function AskToEditCard({
 
   const redirectToSettings = () => {
     let query = {};
+    console.log(profileType)
     if(profileType === SETTINGS_CONSTANTS.TEAM){
       query = { id: team.id, name: team.name, logo: team.logo, from: SETTINGS_CONSTANTS.TEAM };
     }else if(profileType === SETTINGS_CONSTANTS.MEMBER){
+      console.log(member)
       query = { id: member.id, name: member.name, logo: member.image, from: SETTINGS_CONSTANTS.MEMBER };
     }
     router.push({

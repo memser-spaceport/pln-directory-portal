@@ -129,9 +129,7 @@ export const TAB_CONSTANTS = {
 
 export const MSG_CONSTANTS = {
   TEAM_UPDATE_MESSAGE:'Team settings updated!',
-  MEMBER_UPDATE_MESSAGE: 'Profile settings updated!',
-  TEAM_CHANGE_CONF_MSG: 'Are you sure you want to discard the changes and navigate to another Team ? The changes you made will be lost !',
-  MEMBER_CHANGE_CONF_MSG: 'Are you sure you want to discard the changes and navigate to another Member ? The changes you made will be lost !'
+  MEMBER_UPDATE_MESSAGE: 'Profile settings updated!'
 }
 
 export const ADMIN_ROLE = 'DIRECTORYADMIN';
