@@ -52,6 +52,14 @@ function validateBasicForm(formValues, imageUrl, isProfileSettings) {
   if (!formValues.email.trim() || !formValues.email?.match(emailRE)) {
     errors.push('Please add valid Email');
   }
+  if (!isProfileSettings) { 
+    if (
+      !formValues.requestorEmail?.trim() ||
+      !formValues.requestorEmail?.match(emailRE)
+    ) {
+      errors.push('Please add a valid Requestor Email');
+    }
+  }
   return errors;
 }
 
@@ -160,7 +168,6 @@ export function EditMemberModal({
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     email: '',
-    openToWork: false,
     requestorEmail: '',
     imageUid: '',
     imageFile: null,
@@ -176,11 +183,14 @@ export function EditMemberModal({
     comments: '',
     teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
     skills: [],
+    openToWork: false,
   });
+  
   const [isPendingRequestModalOpen, setIsPendingRequestModalOpen] =
     useState(false);
   const [reset, setReset] = useState(false);
   const router = useRouter();
+  
 
   const divRef = useRef<HTMLDivElement>(null);
 
@@ -264,16 +274,25 @@ export function EditMemberModal({
         .then((data) => {
           const member = data[0];
           let counter = 1;
-          const teamAndRoles =
-            member.teamMemberRoles?.length &&
-            member.teamMemberRoles.map((item) => {
-              return {
-                role: item.role,
-                teamUid: item?.team?.uid,
-                teamTitle: item?.team?.name,
-                rowId: counter++,
-              };
-            });
+          let teamAndRoles = member.teamMemberRoles?.length
+            ? member.teamMemberRoles
+            : [];
+          teamAndRoles = orderBy(
+            teamAndRoles,
+            ['mainTeam', 'team.name'],
+            ['desc', 'asc']
+          );
+
+          teamAndRoles = teamAndRoles.map((item) => {
+            return {
+              role: item.role,
+              teamUid: item?.team?.uid,
+              teamTitle: item?.team?.name,
+              rowId: counter++,
+              mainTeam: item.mainTeam,
+            };
+          });
+
           const formValues = {
             name: member.name,
             email: member.email,
@@ -768,7 +787,7 @@ export function EditMemberModal({
                 <div className="float-right">
                   {getSubmitOrNextButton(handleSubmit, isProcessing, isProfileSettings, disableSubmit)}
                 </div>
-              </div>
+                feat-directory-auth          </div>
             </div>
           )}
         </Modal>

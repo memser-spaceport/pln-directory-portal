@@ -90,4 +90,3 @@ export const fetchFundingStages = async () => {
     console.error(error);
   }
 };
-

@@ -50,7 +50,7 @@ export class ParticipantsRequestController {
   async addRequest(@Body() body, @Req() req) {
     const postData = body;
     const participantType = body.participantType;
-    const referenceUid = body.referenceUid;
+    const referenceUid = body.referenceUid;ParticipantProcessRequestSchema
 
     if (
       participantType === ParticipantType.MEMBER.toString() &&

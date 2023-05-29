@@ -104,7 +104,6 @@ export function Autocomplete({
   }, [searchTerm, excludeValues, isExpanded]);
 
   const handleUserInput = (event: React.ChangeEvent<HTMLInputElement>) => {
-
     setSearchTerm(event.currentTarget?.value);
   };
 

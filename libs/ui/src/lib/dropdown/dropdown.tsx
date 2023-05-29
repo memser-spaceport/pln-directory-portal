@@ -88,6 +88,10 @@ export function Dropdown({
     }
   }
 
+  useEffect(() => {
+    if (value !== undefined) setSelectedOption(value);
+  }, [setSelectedOption, value]);
+
   return (
     <>
       <Listbox
