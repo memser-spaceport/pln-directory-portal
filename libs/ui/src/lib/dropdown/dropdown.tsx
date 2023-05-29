@@ -1,7 +1,7 @@
 import { Listbox } from '@headlessui/react';
 import React, { Fragment, useEffect, useState } from 'react';
 import { ArrowIcon } from '../icons/arrow/arrow';
-// import { DiscardChangesPopup } from 'apps/web-app/components/shared/error-message/discard-changes-confirmation';
+import { DiscardChangesPopup } from 'apps/web-app/components/shared/error-message/discard-changes-confirmation';
 
 export interface DropdownProps {
   buttonContent?: React.ReactNode;
@@ -173,7 +173,7 @@ export function Dropdown({
           </div>
         )}
       </Listbox>
-      {/* <DiscardChangesPopup text={confirmationMessage} isOpen={openValidationPopup} onCloseFn={discardChangesOnClose} /> */}
+      <DiscardChangesPopup text={confirmationMessage} isOpen={openValidationPopup} onCloseFn={discardChangesOnClose} />
     </>
   );
 }
