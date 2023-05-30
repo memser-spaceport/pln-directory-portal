@@ -226,7 +226,7 @@ export class ParticipantsRequestService {
 
     if (!disableNotification)
       await this.slackService.notifyToChannel(slackConfig);
-    //await this.redisService.resetAllCache();
+    await this.redisService.resetAllCache();
     return result;
   }
 
@@ -242,7 +242,7 @@ export class ParticipantsRequestService {
       where: { uid: requestedUid },
       data: { ...formattedData },
     });
-    //await this.redisService.resetAllCache();
+    await this.redisService.resetAllCache();
     return { code: 1, message: 'success' };
   }
 
@@ -257,7 +257,7 @@ export class ParticipantsRequestService {
       where: { uid: uidToReject },
       data: { status: ApprovalStatus.REJECTED },
     });
-    //await this.redisService.resetAllCache();
+    await this.redisService.resetAllCache();
     return { code: 1, message: 'Success' };
   }
 
@@ -784,7 +784,7 @@ export class ParticipantsRequestService {
       slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`;
       await this.slackService.notifyToChannel(slackConfig);
     }
-    //await this.redisService.resetAllCache();
+    await this.redisService.resetAllCache();
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
