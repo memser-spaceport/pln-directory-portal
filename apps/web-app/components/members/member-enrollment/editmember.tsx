@@ -14,7 +14,11 @@ import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
 import { ValidationErrorMessages } from '../../../components/shared/account-setttings/validation-error-message';
-import { MSG_CONSTANTS, PAGE_ROUTES, SETTINGS_CONSTANTS } from '../../../constants';
+import {
+  MSG_CONSTANTS,
+  PAGE_ROUTES,
+  SETTINGS_CONSTANTS,
+} from '../../../constants';
 import { RequestPending } from '../../shared/request-pending/request-pending';
 import { IFormValues } from '../../../utils/members.types';
 import Modal from '../../layout/navbar/modal/modal';
@@ -40,7 +44,7 @@ interface EditMemberModalProps {
   id: string;
   isProfileSettings?: boolean;
   userInfo?: any;
-  setModified?: (boolean) => void
+  setModified?: (boolean) => void;
 }
 
 function validateBasicForm(formValues, imageUrl, isProfileSettings) {
@@ -53,7 +57,7 @@ function validateBasicForm(formValues, imageUrl, isProfileSettings) {
   if (!formValues.email.trim() || !formValues.email?.trim().match(emailRE)) {
     errors.push('Please add valid Email');
   }
-  if (!isProfileSettings) { 
+  if (!isProfileSettings) {
     if (
       !formValues.requestorEmail?.trim() ||
       !formValues.requestorEmail?.match(emailRE)
@@ -99,13 +103,21 @@ function validateForm(formValues, imageUrl, isProfileSettings) {
   return {
     basicFormErrors,
     skillFormErrors,
-    errors
+    errors,
   };
 }
 
-function getSubmitOrNextButton(handleSubmit, isProcessing, isProfileSettings, disableSubmit) {
-  const buttonClassName =
-    `${isProfileSettings ? 'bg-[#156FF7]' : 'bg-gradient-to-r from-[#427DFF] to-[#44D5BB]'} shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]`;
+function getSubmitOrNextButton(
+  handleSubmit,
+  isProcessing,
+  isProfileSettings,
+  disableSubmit
+) {
+  const buttonClassName = `${
+    isProfileSettings
+      ? 'bg-[#156FF7]'
+      : 'bg-gradient-to-r from-[#427DFF] to-[#44D5BB]'
+  } shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]`;
   const submitOrNextButton = (
     <button
       className={
@@ -152,7 +164,7 @@ export function EditMemberModal({
   id,
   isProfileSettings = false,
   userInfo,
-  setModified
+  setModified,
 }: EditMemberModalProps) {
   const [openTab, setOpenTab] = useState(1);
   const [errors, setErrors] = useState([]);
@@ -168,7 +180,8 @@ export function EditMemberModal({
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [disableSubmit, setDisableSubmit] = useState<boolean>(false);
   const [isModified, setModifiedFlag] = useState<boolean>(false);
-  const [openValidationPopup, setOpenValidationPopup] = useState<boolean>(false);
+  const [openValidationPopup, setOpenValidationPopup] =
+    useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     email: '',
@@ -189,12 +202,11 @@ export function EditMemberModal({
     skills: [],
     openToWork: false,
   });
-  
+
   const [isPendingRequestModalOpen, setIsPendingRequestModalOpen] =
     useState(false);
   const [reset, setReset] = useState(false);
   const router = useRouter();
-  
 
   const divRef = useRef<HTMLDivElement>(null);
 
@@ -264,7 +276,7 @@ export function EditMemberModal({
 
   useEffect(() => {
     if (saveCompleted) {
-      toast(MSG_CONSTANTS.MEMBER_UPDATE_MESSAGE)
+      toast(MSG_CONSTANTS.MEMBER_UPDATE_MESSAGE);
     }
   }, [saveCompleted]);
 
@@ -321,7 +333,7 @@ export function EditMemberModal({
             skills: member.skills?.map((item) => {
               return { value: item.uid, label: item.title };
             }),
-            openToWork: member.openToWork
+            openToWork: member.openToWork,
           };
           // set requestor email
           const userInfoFromCookie = Cookies.get('userInfo');
@@ -343,7 +355,7 @@ export function EditMemberModal({
           console.log('error', err);
         });
     }
-  }
+  };
 
   function handleReset() {
     if (isProfileSettings && isModified) {
@@ -401,7 +413,7 @@ export function EditMemberModal({
 
   const returnToHome = () => {
     router.push('/directory/members');
-  }
+  };
 
   function formatData() {
     const formattedTeamAndRoles = formValues.teamAndRoles.map((item) => {
@@ -455,7 +467,11 @@ export function EditMemberModal({
     async (e) => {
       e.preventDefault();
       setErrors([]);
-      const { basicFormErrors, skillFormErrors, errors } = validateForm(formValues, imageUrl, isProfileSettings);
+      const { basicFormErrors, skillFormErrors, errors } = validateForm(
+        formValues,
+        imageUrl,
+        isProfileSettings
+      );
       // if (!executeRecaptcha) {
       //   console.log('Execute recaptcha not yet available');
       //   return;
@@ -514,7 +530,10 @@ export function EditMemberModal({
         if (!isProfileSettings) {
           const userInfoFromCookie = Cookies.get('userInfo');
           if (!userInfoFromCookie) {
-            Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
+            Cookies.set('page_params', 'user_logged_out', {
+              expires: 60,
+              path: '/',
+            });
             router.push(PAGE_ROUTES.MEMBERS);
             return false;
           }
@@ -615,36 +634,51 @@ export function EditMemberModal({
       {isProfileSettings ? (
         <div className="h-full w-full">
           <div className="mx-auto mb-40 h-full">
-            {(
+            {
               <div className="mt-3 flex h-10 w-full w-3/5  justify-start text-slate-400">
                 <button
-                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 1 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
-                    } ${basicErrors?.length > 0 && openTab == 1 ? 'border-b-[#DD2C5A] text-[#DD2C5A]' : basicErrors?.length > 0 ? 'text-[#DD2C5A]' : ''}`}
+                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
+                    openTab == 1 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                  } ${
+                    basicErrors?.length > 0 && openTab == 1
+                      ? 'border-b-[#DD2C5A] text-[#DD2C5A]'
+                      : basicErrors?.length > 0
+                      ? 'text-[#DD2C5A]'
+                      : ''
+                  }`}
                   onClick={() => setOpenTab(1)}
                 >
                   {' '}
                   BASIC{' '}
                 </button>
                 <button
-                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
-                    } ${skillErrors?.length > 0 && openTab == 2 ? 'border-b-[#DD2C5A] text-[#DD2C5A]' : skillErrors?.length > 0 ? 'text-[#DD2C5A]' : ''}`}
+                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
+                    openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                  } ${
+                    skillErrors?.length > 0 && openTab == 2
+                      ? 'border-b-[#DD2C5A] text-[#DD2C5A]'
+                      : skillErrors?.length > 0
+                      ? 'text-[#DD2C5A]'
+                      : ''
+                  }`}
                   onClick={() => setOpenTab(2)}
                 >
                   {' '}
                   SKILLS
                 </button>
                 <button
-                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
-                    }`}
+                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
+                    openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                  }`}
                   onClick={() => setOpenTab(3)}
                 >
                   {' '}
                   SOCIAL{' '}
                 </button>
               </div>
-            )}
+            }
             <div className="mt-3 w-full rounded-md border bg-white  px-6 py-10">
-              {(
+              {
                 <Fragment>
                   <div className={openTab === 1 ? 'block' : 'hidden'}>
                     <AddMemberBasicForm
@@ -678,44 +712,50 @@ export function EditMemberModal({
                     />
                   </div>
                 </Fragment>
-              )}
+              }
             </div>
           </div>
           {!saveCompleted && (
-            <div className="footerdiv fixed bottom-0 px-8 fixed inset-x-0 bottom-0 bg-white h-[80px]">
+            <div className="footerdiv fixed fixed inset-x-0 bottom-0 bottom-0 h-[80px] bg-white px-8">
               <div className="float-right">
-                {getSubmitOrNextButton(handleSubmit, isProcessing, isProfileSettings, disableSubmit)}
+                {getSubmitOrNextButton(
+                  handleSubmit,
+                  isProcessing,
+                  isProfileSettings,
+                  disableSubmit
+                )}
               </div>
               <div className="float-right mx-5">
                 {getResetButton(() => {
-                  handleReset()
+                  handleReset();
                 })}
               </div>
             </div>
           )}
-          {
-            !isProfileSettings && (
-              <RequestPending
-                isOpen={isPendingRequestModalOpen}
-                setIsModalOpen={setIsPendingRequestModalOpen}
-              />
-            )
-          }
-          {
-            isProfileSettings && (
-              <ValidationErrorMessages
-                isOpen={isErrorPopupOpen}
-                setIsModalOpen={() => { setIsErrorPopupOpen(false) }}
-                from={'member'}
-                errors={{
-                  basic: basicErrors,
-                  skills: skillErrors
-                }}
-              />
-            )
-          }
-          <DiscardChangesPopup text={MSG_CONSTANTS.RESET_CHANGE_CONF_MSG} isOpen={openValidationPopup} onCloseFn={confirmationClose} />
-
+          {!isProfileSettings && (
+            <RequestPending
+              isOpen={isPendingRequestModalOpen}
+              setIsModalOpen={setIsPendingRequestModalOpen}
+            />
+          )}
+          {isProfileSettings && (
+            <ValidationErrorMessages
+              isOpen={isErrorPopupOpen}
+              setIsModalOpen={() => {
+                setIsErrorPopupOpen(false);
+              }}
+              from={'member'}
+              errors={{
+                basic: basicErrors,
+                skills: skillErrors,
+              }}
+            />
+          )}
+          <DiscardChangesPopup
+            text={MSG_CONSTANTS.RESET_CHANGE_CONF_MSG}
+            isOpen={openValidationPopup}
+            onCloseFn={confirmationClose}
+          />
         </div>
       ) : (
         <Modal
@@ -728,10 +768,7 @@ export function EditMemberModal({
           {saveCompleted ? (
             <div>
               <div className="mb-3 text-center text-2xl font-bold">
-                Thank you for submitting
-              </div>
-              <div className="text-md mb-3 text-center">
-                Our team will review your request shortly & get back
+                Your changes has been saved successfully.
               </div>
               <div className="text-center">
                 <button
@@ -807,9 +844,15 @@ export function EditMemberModal({
                   {getCancelOrBackButton(handleModalClose)}
                 </div>
                 <div className="float-right">
-                  {getSubmitOrNextButton(handleSubmit, isProcessing, isProfileSettings, disableSubmit)}
+                  {getSubmitOrNextButton(
+                    handleSubmit,
+                    isProcessing,
+                    isProfileSettings,
+                    disableSubmit
+                  )}
                 </div>
-                feat-directory-auth          </div>
+                feat-directory-auth
+              </div>
             </div>
           )}
         </Modal>

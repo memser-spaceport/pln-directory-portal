@@ -384,7 +384,7 @@ export const getServerSideProps = async (ctx) => {
             const allTeamsResponse = await getTeams({select: 'uid,name,shortDescription,logo.url,industryTags.title'});
             if (allTeamsResponse.status === 200) {
                 teamsDropdown = [];
-                if(allTeamsResponse.body.length){
+                if(allTeamsResponse.body && allTeamsResponse.body.length){
                     teamsDropdown.push(
                     {
                         "label": allTeamsResponse.body[0].name,
@@ -397,7 +397,7 @@ export const getServerSideProps = async (ctx) => {
             const allMembersResponse = await getMembers({select: 'uid,name,image', orderBy:'name,asc'});
             if (allMembersResponse.status === 200) {
                 membersDropdown = [];
-                if(allMembersResponse.body.length){
+                if(allMembersResponse.body && allMembersResponse.body.length){
                     membersDropdown.push(
                     {
                         "label": allMembersResponse.body[0].name,
@@ -412,7 +412,7 @@ export const getServerSideProps = async (ctx) => {
                 const filteredTeam = member.teamMemberRoles.filter(teamObj => {
                     return teamObj?.team?.uid === teamUid
                 });
-                if (filteredTeam.length) {
+                if (filteredTeam && filteredTeam.length) {
                     return {
                         "label": filteredTeam[0].team.name,
                         "value": filteredTeam[0].team.uid,
