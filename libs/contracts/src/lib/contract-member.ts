@@ -27,4 +27,13 @@ export const apiMembers = contract.router({
     },
     summary: 'Get a member',
   },
+  modifyMember: {
+    method: 'PUT',
+    path: `${getAPIVersionAsPath('1')}/member/:uid`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Modify a member',
+  },
 });

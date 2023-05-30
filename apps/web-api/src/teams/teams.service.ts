@@ -163,23 +163,31 @@ export class TeamsService {
   async editTeamParticipantsRequest(participantsRequest, userEmail) {
     const { referenceUid } = participantsRequest;
     const requestorDetails = await this.participantsRequestService.findMemberByEmail(userEmail);
-    if(!requestorDetails) {
+    if (!requestorDetails) {
       throw new UnauthorizedException();
     }
-    if(!requestorDetails.isDirectoryAdmin && !requestorDetails.leadingTeams?.includes(referenceUid)) {
+    if (
+      !requestorDetails.isDirectoryAdmin &&
+      !requestorDetails.leadingTeams?.includes(referenceUid)
+    ) {
       throw new ForbiddenException();
     }
     participantsRequest.requesterEmailId = requestorDetails.email;
-    if (participantsRequest.participantType === ParticipantType.TEAM.toString() &&
-      !ParticipantRequestTeamSchema.safeParse(participantsRequest).success) {
+    if (
+      participantsRequest.participantType === ParticipantType.TEAM.toString() &&
+      !ParticipantRequestTeamSchema.safeParse(participantsRequest).success
+    ) {
       throw new BadRequestException();
     }
-    let result = await this.participantsRequestService.addRequest(participantsRequest, true);
-    if (result?.uid) { 
+    let result = await this.participantsRequestService.addRequest(
+      participantsRequest,
+      true
+    );
+    if (result?.uid) {
       result = await this.participantsRequestService.processTeamEditRequest(
         result.uid,
-        true,  // disable the notification 
-        true   // enable the auto approval
+        true, // disable the notification
+        true // enable the auto approval
       );
     } else {
       throw new InternalServerErrorException();
