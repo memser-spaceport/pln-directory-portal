@@ -17,9 +17,7 @@ import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-f
 import { TeamsService } from './teams.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
-import {
-  ParticipantRequestTeamSchema,
-} from '../../../../libs/contracts/src/schema/participants-request';
+import { ParticipantRequestTeamSchema } from '../../../../libs/contracts/src/schema/participants-request';
 
 const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
@@ -65,6 +63,9 @@ export class TeamsController {
   @UseGuards(UserTokenValidation)
   async updateOne(@Param('id') id, @Body() body, @Req() req) {
     const participantsRequest = body;
-    return await this.teamsService.editTeamParticipantsRequest(participantsRequest, req.userEmail);
+    return await this.teamsService.editTeamParticipantsRequest(
+      participantsRequest,
+      req.userEmail
+    );
   }
 }

@@ -1,18 +1,27 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  InternalServerErrorException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ParticipantType, Prisma } from '@prisma/client';
 import * as path from 'path';
 import { z } from 'zod';
 import { PrismaService } from '../shared/prisma.service';
+import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
 import { hashFileName } from '../utils/hashing';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
+import { ParticipantRequestMemberSchema } from 'libs/contracts/src/schema/participants-request';
 
 @Injectable()
 export class MembersService {
   constructor(
     private prisma: PrismaService,
     private locationTransferService: LocationTransferService,
+    private participantsRequestService: ParticipantsRequestService,
     private fileMigrationService: FileMigrationService
   ) {}
 
@@ -36,8 +45,8 @@ export class MembersService {
           include: {
             team: {
               include: {
-                logo: true
-              }
+                logo: true,
+              },
             },
           },
         },
@@ -131,5 +140,62 @@ export class MembersService {
         },
       });
     }
+  }
+
+  async editMemberParticipantsRequest(participantsRequest, userEmail) {
+    const { referenceUid } = participantsRequest;
+    const requestorDetails =
+      await this.participantsRequestService.findMemberByEmail(userEmail);
+    console.log('requestorDetails', requestorDetails);
+    if (!requestorDetails) {
+      console.log('unauthorized');
+      throw new UnauthorizedException();
+    }
+    if (
+      !requestorDetails.isDirectoryAdmin &&
+      referenceUid !== requestorDetails.uid
+    ) {
+      console.log('inside forbidden');
+      throw new ForbiddenException();
+    }
+    participantsRequest.requesterEmailId = requestorDetails.email;
+    if (
+      participantsRequest.participantType ===
+        ParticipantType.MEMBER.toString() &&
+      !ParticipantRequestMemberSchema.safeParse(participantsRequest).success
+    ) {
+      throw new BadRequestException();
+    }
+    if (
+      participantsRequest.participantType === ParticipantType.MEMBER.toString()
+    ) {
+      const { city, country, region } = participantsRequest.newData;
+      if (city || country || region) {
+        const result: any = await this.locationTransferService.fetchLocation(
+          city,
+          country,
+          null,
+          region,
+          null
+        );
+        if (!result || !result?.location) {
+          throw new BadRequestException('Invalid Location info');
+        }
+      }
+    }
+    let result = await this.participantsRequestService.addRequest(
+      participantsRequest,
+      true
+    );
+    if (result?.uid) {
+      result = await this.participantsRequestService.processMemberEditRequest(
+        result.uid,
+        true, // disable the notification
+        true // enable the auto approval
+      );
+    } else {
+      throw new InternalServerErrorException();
+    }
+    return result;
   }
 }

@@ -1,4 +1,4 @@
-import { Controller, Req } from '@nestjs/common';
+import { Body, Controller, Param, Req, UseGuards } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
@@ -15,6 +15,7 @@ import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { ENABLED_RETRIEVAL_PROFILE } from '../utils/prisma-query-builder/profile/defaults';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { MembersService } from './members.service';
+import { UserTokenValidation } from '../guards/user-token-validation.guard';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
@@ -53,5 +54,16 @@ export class MemberController {
     );
     const builtQuery = builder.build(request.query);
     return this.membersService.findOne(uid, builtQuery);
+  }
+
+  @Api(server.route.modifyMember)
+  @UseGuards(UserTokenValidation)
+  async updateOne(@Param('id') id, @Body() body, @Req() req) {
+    const participantsRequest = body;
+    console.log('participantsRequest', participantsRequest);
+    return await this.membersService.editMemberParticipantsRequest(
+      participantsRequest,
+      req.userEmail
+    );
   }
 }

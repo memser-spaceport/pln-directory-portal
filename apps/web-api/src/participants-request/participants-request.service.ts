@@ -137,7 +137,6 @@ export class ParticipantsRequestService {
         : requestData.newData.email;
     const postData = { ...requestData, uniqueIdentifier };
     requestData[uniqueIdentifier] = uniqueIdentifier;
-
     if (requestData.participantType === ParticipantType.MEMBER.toString()) {
       const { city, country, region } = postData.newData;
       if (city || country || region) {
@@ -189,8 +188,7 @@ export class ParticipantsRequestService {
       });
     } else if (
       result.participantType === ParticipantType.MEMBER.toString() &&
-      result.referenceUid !== null &&
-      !disableNotification
+      result.referenceUid !== null
     ) {
       slackConfig.requestLabel = 'Edit Labber Request';
       slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`;

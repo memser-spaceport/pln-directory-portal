@@ -543,10 +543,12 @@ export function EditMemberModal({
             return false;
           }
         }
-        await api.post(`/v1/participants-request`, data).then((response) => {
-          setSaveCompleted(true);
-          setModified(false);
-          setModifiedFlag(false);
+        await api.put(`/v1/member/${id}`, data).then((response) => {
+          if (response.status === 200 && response.statusText === "OK"){
+            setSaveCompleted(true);
+            setModified(false);
+            setModifiedFlag(false);
+          }
         });
       } catch (err) {
         if (err.response.status === 400) {
