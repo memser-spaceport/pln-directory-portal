@@ -1,17 +1,22 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable, UnauthorizedException, ForbiddenException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import { Prisma, ParticipantType } from '@prisma/client';
 import * as path from 'path';
 import { z } from 'zod';
 import { PrismaService } from '../shared/prisma.service';
 import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schema';
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
+import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { hashFileName } from '../utils/hashing';
+import {
+  ParticipantRequestTeamSchema,
+} from 'libs/contracts/src/schema/participants-request';
 
 @Injectable()
 export class TeamsService {
   constructor(
     private prisma: PrismaService,
-    private fileMigrationService: FileMigrationService
+    private fileMigrationService: FileMigrationService,
+    private participantsRequestService: ParticipantsRequestService
   ) {}
 
   async findAll(queryOptions: Prisma.TeamFindManyArgs) {
@@ -153,5 +158,32 @@ export class TeamsService {
         },
       });
     }
+  }
+
+  async editTeamParticipantsRequest(participantsRequest, userEmail) {
+    const { referenceUid } = participantsRequest;
+    const requestorDetails = await this.participantsRequestService.findMemberByEmail(userEmail);
+    if(!requestorDetails) {
+      throw new UnauthorizedException();
+    }
+    if(!requestorDetails.isDirectoryAdmin && !requestorDetails.leadingTeams?.includes(referenceUid)) {
+      throw new ForbiddenException();
+    }
+    participantsRequest.requesterEmailId = requestorDetails.email;
+    if (participantsRequest.participantType === ParticipantType.TEAM.toString() &&
+      !ParticipantRequestTeamSchema.safeParse(participantsRequest).success) {
+      throw new BadRequestException();
+    }
+    let result = await this.participantsRequestService.addRequest(participantsRequest, true);
+    if (result?.uid) { 
+      result = await this.participantsRequestService.processTeamEditRequest(
+        result.uid,
+        true,  // disable the notification 
+        true   // enable the auto approval
+      );
+    } else {
+      throw new InternalServerErrorException();
+    }
+    return result;
   }
 }

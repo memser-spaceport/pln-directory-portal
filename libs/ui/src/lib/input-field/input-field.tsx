@@ -5,7 +5,7 @@ type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
 export interface InputFieldProps extends React.ComponentProps<'input'> {
   label: string;
-  icon?: HeroIcon;
+  icon?: HeroIcon | string;
   hasClear?: boolean;
   onClear?: () => void;
   required?: boolean;
@@ -61,9 +61,14 @@ export function InputField({
       ) : (
         <span className="sr-only">{label}</span>
       )}
-      {InputIcon ? (
+      {(InputIcon && typeof(InputIcon)!== 'string')? (
         <InputIcon className="stroke-1.5 absolute inset-y-0 left-2 my-auto h-4 w-4 text-slate-600" />
       ) : null}
+      {
+        (InputIcon && typeof (InputIcon) === 'string') ? (
+          <img src={InputIcon.toString()} className='absolute top-5 left-[5px] h-6 w-6 rounded-full'></img>
+        ) : null
+      }
       <input
         {...props}
         type={showPassword ? 'text' : props.type}

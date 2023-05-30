@@ -14,10 +14,11 @@ export const bootstrapTestingApp = async (metadata?: ModuleMetadata) => {
     ...(metadata && { ...metadata }),
   }).compile();
   const app = moduleRef.createNestApplication();
-  const cacheManager = moduleRef.get<Cache>(CACHE_MANAGER);
+  //const cacheManager = moduleRef.get<Cache>(CACHE_MANAGER);
 
   // Load main app config:
   mainConfig(app);
 
-  return { app, cacheManager };
+  // return { app, cacheManager };
+  return { app };
 };

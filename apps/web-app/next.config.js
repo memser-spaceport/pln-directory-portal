@@ -10,6 +10,9 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
  * @type {import('@nrwl/next/plugins/with-nx').WithNxOptions}
  **/
 let nextConfig = {
+  env: {
+    AUTH_API_URL: process.env.AUTH_API_URL
+  },
   nx: {
     // Set this to true if you would like to to use SVGR
     // See: https://github.com/gregberge/svgr

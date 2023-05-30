@@ -11,10 +11,13 @@ export interface IMember {
   officeHours: string | null;
   skills: TMemberResponse['skills'];
   teamLead: boolean;
+  openForWork?: boolean;
   teams: IMemberTeam[];
   mainTeam: IMemberTeam | null;
   twitter: string | null;
-  openToWork: boolean;
+  roles?: string[];
+  leadingTeams?: string[];
+  openToWork?: boolean;
   linkedinHandle: string | null;
 }
 

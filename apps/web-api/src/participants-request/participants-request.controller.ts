@@ -1,27 +1,29 @@
 /* eslint-disable prettier/prettier */
 import {
-  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
   Get,
   Param,
-  Patch,
   Post,
-  Put,
   Query,
   Req,
+  UnauthorizedException,
+  BadRequestException,
   UseGuards,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { ApprovalStatus, ParticipantType } from '@prisma/client';
 import { ParticipantsRequestService } from './participants-request.service';
-import { GoogleRecaptchaGuard } from '../guards/google-recaptcha.guard';
+// import { GoogleRecaptchaGuard } from '../guards/google-recaptcha.guard';
 import {
   ParticipantProcessRequestSchema,
   ParticipantRequestTeamSchema,
   ParticipantRequestMemberSchema,
 } from '../../../../libs/contracts/src/schema/participants-request';
 import { NoCache } from '../decorators/no-cache.decorator';
+// import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
+import { UserTokenValidation } from '../guards/user-token-validation.guard';
 @Controller('v1/participants-request')
 export class ParticipantsRequestController {
   constructor(
@@ -31,7 +33,6 @@ export class ParticipantsRequestController {
   @Get()
   @NoCache()
   async findAll(@Query() query) {
-    console.log(query);
     const result = await this.participantsRequestService.getAll(query);
     return result;
   }
@@ -44,11 +45,11 @@ export class ParticipantsRequestController {
   }
 
   @Post()
-  // @UseGuards(GoogleRecaptchaGuard)
-  async addRequest(@Body() body) {
+  @UseGuards(UserTokenValidation)
+  async addRequest(@Body() body, @Req() req) {
     const postData = body;
     const participantType = body.participantType;
-    // delete postData.captchaToken;
+    const referenceUid = body.referenceUid;ParticipantProcessRequestSchema
 
     if (
       participantType === ParticipantType.MEMBER.toString() &&
@@ -66,10 +67,21 @@ export class ParticipantsRequestController {
     ) {
       throw new ForbiddenException();
     }
+
+    if(referenceUid) {
+      const requestorDetails = await this.participantsRequestService.findMemberByEmail(req.userEmail);
+      if(!requestorDetails) {
+        throw new UnauthorizedException()
+      }
+      if(!requestorDetails.isDirectoryAdmin && (referenceUid !== requestorDetails.uid)) {
+        console.log(requestorDetails, 'in edit exception')
+        throw new ForbiddenException()
+      }
+    }
     const checkDuplicate = await this.participantsRequestService.findDuplicates(
       postData?.uniqueIdentifier,
       participantType,
-      postData?.referenceUid,
+      referenceUid,
       ''
     );
     if (
@@ -83,8 +95,26 @@ export class ParticipantsRequestController {
           : 'Team name';
       throw new BadRequestException(`${text} already exists`);
     }
-
-    const result = await this.participantsRequestService.addRequest(postData);
+    let result;
+    if(referenceUid && participantType === ParticipantType.MEMBER.toString()){
+      console.log('req', req);
+      postData.requesterEmailId = req.userEmail;
+      console.log('postData', postData);
+      result = await this.participantsRequestService.addRequest(postData, true);
+      console.log('result', result);
+      if (result?.uid) {
+        result = await this.participantsRequestService.processMemberEditRequest(
+          result.uid,
+          true,  // disable the notification 
+          true // enable the auto approval
+        );
+      } else {
+        throw new InternalServerErrorException();
+      }
+    }
+    else{
+      result = await this.participantsRequestService.addRequest(postData);
+    }
     return result;
   }
 }

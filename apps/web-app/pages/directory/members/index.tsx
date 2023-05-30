@@ -2,9 +2,14 @@ import {
   getMembers,
   getMembersFilters,
 } from '@protocol-labs-network/members/data-access';
+import Cookies from 'js-cookie';
 import { GetServerSideProps } from 'next';
+import { useRouter } from 'next/router';
 import { NextSeo } from 'next-seo';
-import { ReactElement } from 'react';
+import nookies, { destroyCookie } from 'nookies';
+import { ReactElement, useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
+import { LOGIN_MSG, LOGIN_FAILED_MSG, LOGOUT_MSG, RETRY_LOGIN_MSG , PAGE_ROUTES, LOGGED_IN_MSG, SOMETHING_WENT_WRONG} from '../../../constants';
 import { LoadingOverlay } from '../../../components/layout/loading-overlay/loading-overlay';
 import { MembersDirectoryFilters } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters';
 import { IMembersFiltersValues } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters.types';
@@ -16,20 +21,32 @@ import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-dire
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember } from '../../../utils/members.types';
-import { parseMember } from '../../../utils/members.utils';
-
+import { parseMember, maskMemberDetails } from '../../../utils/members.utils';
+import { VerifyEmailModal } from '../../../components/layout/navbar/login-menu/verify-email-modal';
 import {
   getMembersListOptions,
   getMembersOptionsFromQuery,
 } from '../../../utils/members.utils';
+import { ReactComponent as SuccessIcon } from '../../../public/assets/images/icons/success.svg';
+import EmailOtpVerificationModal from '../../../components/auth/email-otp-verification-modal';
 
 type MembersProps = {
   members: IMember[];
   filtersValues: IMembersFiltersValues;
+  isUserLoggedIn: boolean;
+  userInfo: any,
+  verified: boolean;
 };
 
-export default function Members({ members, filtersValues }: MembersProps) {
+export default function Members({
+  members,
+  filtersValues,
+  verified,
+  userInfo
+}: MembersProps) {
+  const [isOpen, setIsModalOpen] = useState(false);
   const { selectedViewType } = useViewType();
+  const router = useRouter();
   const isGrid = selectedViewType === 'grid';
   const filterProperties = [
     'skills',
@@ -43,10 +60,53 @@ export default function Members({ members, filtersValues }: MembersProps) {
 
   useDirectoryFiltersFathomLogger('members', filterProperties);
 
+  useEffect(() => {
+    Cookies.remove('state');
+    const isVerified = Cookies.get('verified');
+    const params = Cookies.get('page_params');
+    if(isVerified === 'true') {
+      toast.success(LOGIN_MSG, {
+        icon: <SuccessIcon />
+      });
+    } else if (isVerified === 'false') {
+      setIsModalOpen(true);
+    } 
+    switch (params) {
+      case "auth_error":
+        toast.error(LOGIN_FAILED_MSG, {
+          hideProgressBar: true,
+        });
+        break;
+      case "logout":
+        toast.info(LOGOUT_MSG, {
+          icon: <SuccessIcon />
+        });
+        break;
+      case "user_logged_out":
+        toast.info(RETRY_LOGIN_MSG, {
+          hideProgressBar: true
+        });
+        break;
+      case "user_logged_in":
+        toast.info(LOGGED_IN_MSG + '.', {
+          hideProgressBar: true
+        });
+        break;
+      case "server_error":
+        toast.info(SOMETHING_WENT_WRONG, {
+          hideProgressBar: true
+        });
+        break;
+      default:
+        break;
+    }
+    Cookies.remove('page_params');
+    Cookies.remove('verified');
+  }, [])
+
   return (
     <>
       <NextSeo {...DIRECTORY_SEO} title="Members" />
-
       <LoadingOverlay
         excludeUrlFn={(url) => url.startsWith('/directory/members/')}
       />
@@ -72,10 +132,19 @@ export default function Members({ members, filtersValues }: MembersProps) {
               members={members}
               isGrid={isGrid}
               filterProperties={filterProperties}
+              loggedInMember={userInfo}
             />
           </div>
         </div>
       </section>
+      <VerifyEmailModal
+        isOpen={isOpen}
+        setIsModalOpen={(isOpen) => {
+          setIsModalOpen(isOpen);
+          router.push(PAGE_ROUTES.MEMBERS);
+        }}
+      />
+    <EmailOtpVerificationModal/>
     </>
   );
 }
@@ -84,10 +153,18 @@ Members.getLayout = function getLayout(page: ReactElement) {
   return <DirectoryLayout>{page}</DirectoryLayout>;
 };
 
-export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
-  query,
-  res,
-}) => {
+export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) => {
+  const {
+    query,
+    res,
+    req
+  } = ctx;
+  const testcookies = nookies.get(ctx)
+  destroyCookie(null, 'state');
+  const { verified } = query;
+  const isMaskingRequired = req?.cookies?.authToken ? false : true
+  const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
+  const isUserLoggedIn = req?.cookies?.authToken &&  req?.cookies?.userInfo ? true : false;
   const optionsFromQuery = getMembersOptionsFromQuery(query);
   const listOptions = getMembersListOptions(optionsFromQuery);
   const [membersResponse, filtersValues] = await Promise.all([
@@ -95,7 +172,7 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
     getMembersFilters(optionsFromQuery),
   ]);
 
-  const members: IMember[] =
+  let members: IMember[] =
     membersResponse.status === 200
       ? membersResponse.body.map((member) => parseMember(member))
       : [];
@@ -104,14 +181,30 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async ({
     query
   );
 
+  if(isMaskingRequired) {
+     members = [...members].map(m => maskMemberDetails(m))
+  }
+
+  const letAllCookies = JSON.parse(JSON.stringify(testcookies))
+  const testCookies = JSON.parse(JSON.stringify(req?.cookies))
+
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
   res.setHeader(
     'Cache-Control',
-    'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
+    'no-cache, no-store, max-age=0, must-revalidate'
   );
 
   return {
-    props: { members, filtersValues: parsedFilters },
+    props: {
+      members,
+      filtersValues: parsedFilters,
+      isUserLoggedIn,
+      testCookies,
+      userInfo,
+      letAllCookies,
+      verified:
+        verified === 'true' ? true : verified === 'false' ? false : null,
+    },
   };
 };

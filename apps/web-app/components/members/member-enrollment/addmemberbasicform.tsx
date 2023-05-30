@@ -5,7 +5,6 @@ import { ReactComponent as InformationCircleIcon } from '../../../public/assets/
 export default function AddMemberBasicForm(props) {
   const values = props.formValues;
   const onChange = props.onChange;
-
   return (
     <>
       <div className="flex pt-5">

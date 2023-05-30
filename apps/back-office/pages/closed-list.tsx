@@ -76,7 +76,8 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (
     teamResponse = listData.data.filter(
       (item) =>
         item.participantType === ENROLLMENT_TYPE.TEAM &&
-        item.status !== APP_CONSTANTS.PENDING_LABEL
+        item.status !== APP_CONSTANTS.PENDING_LABEL && 
+        item.status !== APP_CONSTANTS.AUTO_APPROVED_LABEL
     );
     memberResponse = listData.data.filter(
       (item) =>

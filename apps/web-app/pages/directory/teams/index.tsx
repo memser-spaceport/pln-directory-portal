@@ -15,7 +15,9 @@ import { TeamsDirectoryList } from '../../../components/teams/teams-directory/te
 import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-directory-filters-fathom-logger.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
+import { IMember } from '../../../utils/members.types';
 import { ITeam } from '../../../utils/teams.types';
+
 import {
   getTeamsListOptions,
   getTeamsOptionsFromQuery,
@@ -25,6 +27,8 @@ import {
 type TeamsProps = {
   teams: ITeam[];
   filtersValues: ITeamsFiltersValues;
+  isUserLoggedIn: boolean;
+  userInfo: any
 };
 
 export default function Teams({ teams, filtersValues }: TeamsProps) {
@@ -84,9 +88,13 @@ Teams.getLayout = function getLayout(page: ReactElement) {
 export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
   query,
   res,
+  req
 }) => {
+  const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
+  const isUserLoggedIn = req?.cookies?.authToken &&  req?.cookies?.userInfo ? true : false
   const optionsFromQuery = getTeamsOptionsFromQuery(query);
   const listOptions = getTeamsListOptions(optionsFromQuery);
+  // console.log(listOptions)
   const [teamsResponse, filtersValues] = await Promise.all([
     getTeams(listOptions),
     getTeamsFilters(optionsFromQuery),
@@ -105,10 +113,15 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
   res.setHeader(
     'Cache-Control',
-    'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
+    'no-cache, no-store, max-age=0, must-revalidate'
   );
 
   return {
-    props: { teams, filtersValues: parsedFilters },
+    props: {
+      teams,
+      filtersValues: parsedFilters,
+      isUserLoggedIn,
+      userInfo
+    },
   };
 };

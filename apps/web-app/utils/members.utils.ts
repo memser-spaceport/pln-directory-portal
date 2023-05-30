@@ -1,5 +1,6 @@
 import { TMemberResponse } from '@protocol-labs-network/contracts';
 import { TMemberListOptions } from '@protocol-labs-network/members/data-access';
+import nookies from 'nookies';
 import { ParsedUrlQuery } from 'querystring';
 import { getSortFromQuery, stringifyQueryValues } from './list.utils';
 import { IMember } from './members.types';
@@ -31,8 +32,8 @@ export function getMembersOptionsFromQuery(
     ...(skills ? { 'skills.title__with': stringifyQueryValues(skills) } : {}),
     ...(region
       ? {
-          'location.continent__with': stringifyQueryValues(region),
-        }
+        'location.continent__with': stringifyQueryValues(region),
+      }
       : {}),
     ...(country
       ? { 'location.country__with': stringifyQueryValues(country) }
@@ -98,6 +99,56 @@ export const parseMember = (member: TMemberResponse): IMember => {
   };
 };
 
+export function maskMemberDetails(member) {
+  // Mask Member details when user is not logged In (when accessToken not available in cookie).
+  member.email = member.email
+    ? maskEmail(member.email)
+    : member.email
+  member.githubHandle = member.githubHandle
+    ? maskText(member.githubHandle)
+    : member.githubHandle;
+
+  member.discordHandle = member.discordHandle
+    ? maskText(member.discordHandle)
+    : member.discordHandle;
+  member.twitter = member.twitter
+    ? maskText(member.twitter)
+    : member.twitter;
+  return member
+}
+
+export function maskEmail(email: string): string {
+  const maskedEmail = email.replace(/([^@\.])/g, "*").split('');
+  let previous = "";
+  let counter = 0;
+  for (let i = 0; i < maskedEmail.length; i++) {
+    if ((counter > 3 && counter < 6) || counter == 0 || (counter > 1 && (email[i + 1] == "." || email[i + 1] == "@"))) {
+      maskedEmail[i] = email[i];
+    }
+    if (email[i - 1] == "." || email[i - 1] == "@") {
+      counter = 0;
+    }
+
+    if (email[i + 1] == "." || email[i + 1] == "@") {
+      i++;
+      counter = -1;
+    }
+    counter++;
+
+
+    previous = email[i];
+  }
+  return maskedEmail.join('');
+}
+
+export function maskText(text) {
+  return text.replace(
+    /(.{2})(.*)(.{2})/,
+    (match, first, middle, last) =>
+      `${first}${'*'.repeat(middle.length)}${last}`
+  );
+}
+
 /**
  * Parse member location fields values into a location string.
  */
@@ -141,4 +192,30 @@ export const parseTeamMember = (
   };
 
   return parseMember(memberWithoutOtherTeams);
+};
+
+/**
+ * Used to parse member that currently logged in from cookie.
+ **/
+export const getMemberFromCookie = (
+  res?
+): { isUserLoggedIn: boolean; member?} => {
+  const { member, refreshToken } = nookies.get(res);
+  if (member && member.length) {
+    const memberDetails: IMember = JSON.parse(member);
+    memberDetails.id = JSON.parse(member).uid;
+    memberDetails.image = JSON.parse(member).profileImageUrl;
+    return {
+      isUserLoggedIn: true,
+      member: memberDetails,
+    };
+  } else if (refreshToken) {
+    return {
+      isUserLoggedIn: true,
+    };
+  } else {
+    return {
+      isUserLoggedIn: false,
+    };
+  }
 };

@@ -5,14 +5,21 @@ import { IMember } from '../../../../utils/members.types';
 import { DirectoryCard } from '../../../shared/directory/directory-card/directory-card';
 import { DirectoryCardFooter } from '../../../shared/directory/directory-card/directory-card-footer';
 import { DirectoryCardHeader } from '../../../shared/directory/directory-card/directory-card-header';
+import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
+
 import { ReactComponent as BriefCase } from '../../../../public/assets/images/icons/mdi_briefcase-check.svg';
 
 interface MemberCardProps {
   isGrid?: boolean;
   member: IMember;
+  loggedInMember: any;
 }
 
-export function MemberCard({ isGrid = true, member }: MemberCardProps) {
+export function MemberCard({
+  isGrid = true,
+  member,
+  loggedInMember,
+}: MemberCardProps) {
   const isOpenToWorkEnabled = process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK;
   const router = useRouter();
   const backLink = encodeURIComponent(router.asPath);
@@ -22,11 +29,21 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
     .map((team) => team.name)
     .sort();
   const role = member.mainTeam?.role || 'Contributor';
+  const analytics = useAppAnalytics()
+
+  const onMemberClicked = () => {
+    analytics.captureEvent('member-clicked', {
+      uid: member.id,
+      name: member.name,
+      backLink: backLink
+    })
+  }
 
   return (
     <DirectoryCard
       isGrid={isGrid}
       cardUrl={`/directory/members/${member.id}?backLink=${backLink}`}
+      handleOnClick={onMemberClicked}
     >
       <DirectoryCardHeader
         isGrid={isGrid}
@@ -83,20 +100,21 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
             {role}
           </div>
         </div>
-
-        <div
-          className={`${isGrid ? 'mt-2 justify-center' : 'mt-1'}
-            flex items-center text-sm text-slate-600`}
-        >
-          {member.location ? (
-            <>
-              <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0 fill-slate-400" />
-              <span className="line-clamp-1">{member.location}</span>
-            </>
-          ) : (
-            '-'
-          )}
-        </div>
+        {loggedInMember?.uid && (
+          <div
+            className={`${isGrid ? 'mt-2 justify-center' : 'mt-1'}
+              flex items-center text-sm text-slate-600`}
+          >
+            {member.location ? (
+              <>
+                <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0 fill-slate-400" />
+                <span className="line-clamp-1">{member.location}</span>
+              </>
+            ) : (
+              '-'
+            )}
+          </div>
+        )}
       </div>
       <DirectoryCardFooter
         isGrid={isGrid}

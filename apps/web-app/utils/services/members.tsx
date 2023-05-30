@@ -13,6 +13,21 @@ export const fetchMember = async (id) => {
   }
 };
 
+export const fetchMembers = async (query) => {
+  try {
+    const { searchBy } = query;
+    const response = await api.get(
+      `/v1/members?name__istartswith=${searchBy}` +
+        `&select=uid,name,image.url,email&maskMemberEmail=true`
+    );
+    if (response.data) {
+      return response.data;
+    }
+  } catch (error) {
+    console.error(error);
+  }
+};
+
 export const requestPendingCheck = async (email, id) => {
   try {
     const data = {

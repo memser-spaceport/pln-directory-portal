@@ -25,6 +25,7 @@ import { SkillsModule } from './skills/skills.module';
 import { TeamsModule } from './teams/teams.module';
 import { TechnologiesModule } from './technologies/technologies.module';
 import { AdminModule } from './admin/admin.module';
+import { AuthModule } from './auth/auth.module';
 import { SharedModule } from './shared/shared.module';
 
 @Module({
@@ -34,7 +35,7 @@ import { SharedModule } from './shared/shared.module';
       ttl: 1,
       limit: 10,
     }),
-    CacheModule.register<ClientOpts>({
+   /*  CacheModule.register<ClientOpts>({
       store: redisStore,
       url: process.env.REDIS_URL,
       isGlobal: true,
@@ -46,7 +47,7 @@ import { SharedModule } from './shared/shared.module';
             requestCert: true,
           }
         : null,
-    }),
+    }), */
     BullModule.forRoot({
       redis: {
         path: process.env.REDIS_URL,
@@ -68,6 +69,7 @@ import { SharedModule } from './shared/shared.module';
     TechnologiesModule,
     ParticipantsRequestModule,
     AdminModule,
+    AuthModule,
     SharedModule,
   ],
   providers: [
@@ -75,10 +77,10 @@ import { SharedModule } from './shared/shared.module';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    {
+   /*  {
       provide: APP_INTERCEPTOR,
       useClass: MyCacheInterceptor,
-    },
+    }, */
     {
       provide: APP_INTERCEPTOR,
       useClass: ConcealEntityIDInterceptor,

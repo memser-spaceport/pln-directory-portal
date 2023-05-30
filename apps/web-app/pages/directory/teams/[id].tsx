@@ -18,7 +18,9 @@ import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcr
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember } from '../../../utils/members.types';
-import { parseTeamMember } from '../../../utils/members.utils';
+import {
+  parseTeamMember,
+} from '../../../utils/members.utils';
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
 
@@ -26,9 +28,11 @@ interface TeamProps {
   team: ITeam;
   members: IMember[];
   backLink: string;
+  isUserLoggedIn: boolean;
+  userInfo: any;
 }
 
-export default function Team({ team, members, backLink }: TeamProps) {
+export default function Team({ team, members, backLink, userInfo }: TeamProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
     directoryName: 'Teams',
@@ -46,7 +50,7 @@ export default function Team({ team, members, backLink }: TeamProps) {
       <Breadcrumb items={breadcrumbItems} />
       <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-24">
         <div className="card p-7.5 w-full">
-          <TeamProfileHeader {...team} />
+          <TeamProfileHeader team={team} loggedInMember={userInfo} />
           <TeamProfileDetails {...team} />
           {team.fundingStage || team.membershipSources.length ? (
             <TeamProfileFunding {...team} />
@@ -68,7 +72,10 @@ Team.getLayout = function getLayout(page: ReactElement) {
 export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
   query,
   res,
+  req
 }) => {
+  const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
+  const isUserLoggedIn = req?.cookies?.authToken &&  req?.cookies?.userInfo ? true : false
   const { id, backLink = '/directory/teams' } = query as {
     id: string;
     backLink: string;
@@ -127,10 +134,10 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
   // and in the CDN for 5 minutes, while keeping it stale for 7 days.
   res.setHeader(
     'Cache-Control',
-    'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
+    'no-cache, no-store, max-age=0, must-revalidate'
   );
 
   return {
-    props: { team, members, backLink },
+    props: { team, members, backLink, isUserLoggedIn, userInfo },
   };
 };
