@@ -115,7 +115,7 @@ export function MemberProfileDetails({
         </div>
         <div className="flex w-1/4 flex-col items-start">
           <h2 className="detail-label">LinkedIn</h2>
-          {linkedinHandle ? (
+          {userInfo?.uid && (linkedinHandle ? (
             <Tooltip
               asChild
               trigger={
@@ -127,7 +127,7 @@ export function MemberProfileDetails({
             />
           ) : (
             '-'
-          )}
+          ))}
         </div>
       </div>
       { !userInfo?.uid && 
