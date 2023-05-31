@@ -414,11 +414,13 @@ export function EditMemberModal({
   };
 
   function formatData() {
-    const formattedTeamAndRoles = formValues.teamAndRoles.map((item) => {
+    const teamAndRoles = structuredClone(formValues.teamAndRoles)
+    const formattedTeamAndRoles = teamAndRoles.map((item) => {
       delete item.rowId;
       return item;
     });
-    const skills = formValues.skills.map((item) => {
+    const skillValues = structuredClone(formValues.skills)
+    const skills = skillValues.map((item) => {
       return { uid: item?.value, title: item?.label };
     });
     const formattedData = {
