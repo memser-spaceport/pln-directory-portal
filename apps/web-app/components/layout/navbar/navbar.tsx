@@ -12,6 +12,7 @@ import { Login } from './login-menu/login-menu';
 import { Menu as AppMenu } from './menu/menu';
 import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/Logo_PLN_directory.svg';
 import { PAGE_ROUTES } from '../../../constants';
+import Image from 'next/image';
 // import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
@@ -89,12 +90,19 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
               </div>
             )}
             {userInfo.profileImageUrl ? (
-              <img
-                src={userInfo.profileImageUrl}
-                alt=""
-                className="h-full w-14 rounded-full"
-              />
-            ) : (
+              // <img
+              //   src={userInfo.profileImageUrl}
+              //   alt=""
+              //   className="h-full w-14 rounded-full"
+              // />
+            <Image
+              src={userInfo.profileImageUrl}
+              width={56}
+              height={56}
+              alt="Profile Picture"
+              className="h-full w-14 rounded-full"
+            />
+          ) : (
               <UserIcon className="h-full w-14 fill-white" />
             )}
             <Menu as="div" className="relative w-16">
