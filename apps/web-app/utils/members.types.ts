@@ -57,6 +57,7 @@ export interface IFormValues {
   discordHandler: string;
   twitterHandler: string;
   githubHandler: string;
+  telegramHandler: string;
   officeHours: string;
   comments: string;
   teamAndRoles: Roles[];

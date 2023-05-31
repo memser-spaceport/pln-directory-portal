@@ -32,7 +32,7 @@ const fundingStageMappingSchema = z.object({
 const newDataMemberSchema = z.object({
   name: z.string(),
   email: z.string(),
-  plnStartDate: z.string(),
+  plnStartDate: z.string().optional().nullable(),
   teamAndRoles: z.array(teamMappingSchema).nonempty(),
   skills: z.array(skillsMappingSchema).nonempty(),
   city: z.string().optional().nullable(),
@@ -42,9 +42,10 @@ const newDataMemberSchema = z.object({
   discordHandler: z.string().optional().nullable(),
   twitterHandler: z.string().optional().nullable(),
   linkedinHandler: z.string().optional().nullable(),
+  telegramHandler: z.string().optional().nullable(),
   officeHours: z.string().optional().nullable(),
   imageUid: z.string().optional().nullable(),
-  moreDetails: z.string().optional().nullable(),
+  moreDetails: z.string().optional().nullable(), 
 });
 
 const newDataTeamSchema = z.object({
@@ -63,6 +64,7 @@ const newDataTeamSchema = z.object({
   longDescription: z.string().optional().nullable(),
   twitterHandler: z.string().optional().nullable(),
   linkedinHandler: z.string().optional().nullable(),
+  telegramHandler: z.string().optional().nullable(),
   officeHours: z.string().optional().nullable(),
   logoUid: z.string().optional().nullable(),
   moreDetails: z.string().optional().nullable(),

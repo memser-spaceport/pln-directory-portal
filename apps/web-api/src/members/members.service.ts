@@ -146,19 +146,20 @@ export class MembersService {
     const { referenceUid } = participantsRequest;
     const requestorDetails =
       await this.participantsRequestService.findMemberByEmail(userEmail);
-    console.log('requestorDetails', requestorDetails);
     if (!requestorDetails) {
-      console.log('unauthorized');
       throw new UnauthorizedException();
     }
     if (
       !requestorDetails.isDirectoryAdmin &&
       referenceUid !== requestorDetails.uid
     ) {
-      console.log('inside forbidden');
       throw new ForbiddenException();
     }
     participantsRequest.requesterEmailId = requestorDetails.email;
+    console.log(
+      'safe parse',
+      ParticipantRequestMemberSchema.safeParse(participantsRequest)
+    );
     if (
       participantsRequest.participantType ===
         ParticipantType.MEMBER.toString() &&

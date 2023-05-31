@@ -140,6 +140,7 @@ export default function TeamView(props) {
       website: formValues.website?.trim(),
       twitterHandler: formValues.twitterHandler?.trim(),
       linkedinHandler: formValues.linkedinHandler?.trim(),
+      telegramHandler: formValues.telegramHandler?.trim(),
       blog: formValues.blog?.trim(),
       officeHours: formValues.officeHours?.trim(),
       fundingStage: formattedFundingStage,
@@ -433,6 +434,7 @@ export const getServerSideProps = async (context) => {
       website: team.website ?? '',
       linkedinHandler: team.linkedinHandler ?? '',
       twitterHandler: team.twitterHandler ?? '',
+      telegramHandler: team.telegramHandler ?? '',
       blog: team.blog ?? '',
       officeHours: team.officeHours ?? '',
     };

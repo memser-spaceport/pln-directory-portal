@@ -172,6 +172,7 @@ export function EditTeamModal({
     website: '',
     linkedinHandler: '',
     twitterHandler: '',
+    telegramHandler: '',
     blog: '',
     officeHours: '',
   });
@@ -232,6 +233,7 @@ export function EditTeamModal({
           contactMethod: team.contactMethod,
           website: team.website,
           linkedinHandler: team.linkedinHandler,
+          telegramHandler: team.telegramHandler,
           twitterHandler: team.twitterHandler,
           blog: team.blog,
           officeHours: team.officeHours,
@@ -243,6 +245,7 @@ export function EditTeamModal({
           formValues['requestorEmail'] = parsedUserInfo.email;
         }
         setFormValues(formValues);
+        setName(team.name);
         setImageUrl(team.logo?.url ?? '');
         setDropDownValues({
           membershipSources: data[1],
@@ -256,7 +259,7 @@ export function EditTeamModal({
         console.error(err);
       });
   }
- 
+
   function resetState() {
     setModified(false);
     setModifiedFlag(false);
@@ -287,6 +290,7 @@ export function EditTeamModal({
       website: '',
       linkedinHandler: '',
       twitterHandler: '',
+      telegramHandler:'',
       blog: '',
       officeHours: '',
     });
@@ -323,6 +327,7 @@ export function EditTeamModal({
       website: formValues.website?.trim(),
       twitterHandler: formValues.twitterHandler?.trim(),
       linkedinHandler: formValues.linkedinHandler?.trim(),
+      telegramHandler: formValues.telegramHandler?.trim(),
       blog: formValues.blog?.trim(),
       officeHours: formValues.officeHours?.trim(),
       fundingStage: formattedFundingStage,
@@ -444,18 +449,18 @@ export function EditTeamModal({
   }
 
   const handleImageChange = (file: File) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => setImageUrl(reader.result as string);
-    setFormValues({ ...formValues, logoFile: file });
-    setImageChanged(true);
-    setModified(true);
-    setModifiedFlag(true);
-  };
-
-  const onRemoveImage = () => {
-    setFormValues({ ...formValues, logoFile: null });
-    setImageUrl('');
+    if (file) {
+      setFormValues({ ...formValues, logoFile: file });
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => setImageUrl(reader.result as string);
+      setModified(true);
+      setModifiedFlag(true);
+      setImageChanged(true);
+    } else {
+      setFormValues({ ...formValues, logoFile: null, logoUid: '' });
+      setImageUrl('');
+    }
   };
 
   function handleDropDownChange(selectedOption, name) {

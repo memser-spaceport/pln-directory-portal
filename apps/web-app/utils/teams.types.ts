@@ -39,6 +39,7 @@ export interface IFormValues {
   website: string;
   linkedinHandler: string;
   twitterHandler: string;
+  telegramHandler: string;
   blog: string;
   officeHours: string;
 }

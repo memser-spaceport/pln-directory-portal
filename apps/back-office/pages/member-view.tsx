@@ -122,9 +122,12 @@ export default function MemberView(props) {
       discordHandler: formValues.discordHandler?.trim(),
       twitterHandler: formValues.twitterHandler?.trim(),
       githubHandler: formValues.githubHandler?.trim(),
+      telegramHandler: formValues.telegramHandler?.trim(),
       officeHours: formValues.officeHours?.trim(),
       comments: formValues.comments?.trim(),
-      plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
+      plnStartDate: formValues.plnStartDate
+        ? new Date(formValues.plnStartDate)?.toISOString()
+        : null,
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
@@ -456,9 +459,9 @@ export const getServerSideProps = async (context) => {
       email: requestData.email,
       imageUid: requestData.imageUid ?? '',
       imageFile: null,
-      plnStartDate: new Date(requestData.plnStartDate).toLocaleDateString(
-        'af-ZA'
-      ),
+      plnStartDate: requestData.plnStartDate
+        ? new Date(requestData.plnStartDate).toLocaleDateString('af-ZA')
+        : null,
       city: requestData?.city ?? '',
       region: requestData?.region ?? '',
       country: requestData?.country ?? '',
@@ -466,6 +469,7 @@ export const getServerSideProps = async (context) => {
       discordHandler: requestData.discordHandler ?? '',
       twitterHandler: requestData.twitterHandler ?? '',
       githubHandler: requestData.githubHandler ?? '',
+      telegramHandler: requestData.telegramHandler ?? '',
       officeHours: requestData.officeHours ?? '',
       requestorEmail: requestDetailResponse?.data?.requesterEmailId ?? '',
       comments: requestData?.comments ?? '',

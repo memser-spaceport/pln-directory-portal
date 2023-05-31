@@ -38,6 +38,7 @@ export async function createMember({ amount }: TestFactorySeederParams) {
       discordHandler: 'discordHandler',
       twitterHandler: 'twitterHandler',
       linkedinHandler: 'linkedinHandler',
+      telegramHandler: 'telegramHandler',
       moreDetails: 'moreDetails',
       officeHours: 'officeHours',
       plnFriend: true,

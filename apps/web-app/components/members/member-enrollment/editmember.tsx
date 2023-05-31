@@ -14,11 +14,7 @@ import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
 import { ValidationErrorMessages } from '../../../components/shared/account-setttings/validation-error-message';
-import {
-  MSG_CONSTANTS,
-  PAGE_ROUTES,
-  SETTINGS_CONSTANTS,
-} from '../../../constants';
+import { MSG_CONSTANTS, PAGE_ROUTES } from '../../../constants';
 import { RequestPending } from '../../shared/request-pending/request-pending';
 import { IFormValues } from '../../../utils/members.types';
 import Modal from '../../layout/navbar/modal/modal';
@@ -188,7 +184,7 @@ export function EditMemberModal({
     requestorEmail: '',
     imageUid: '',
     imageFile: null,
-    plnStartDate: new Date().toLocaleDateString('af-ZA'),
+    plnStartDate: null,
     city: '',
     region: '',
     country: '',
@@ -196,6 +192,7 @@ export function EditMemberModal({
     discordHandler: '',
     twitterHandler: '',
     githubHandler: '',
+    telegramHandler: '',
     officeHours: '',
     comments: '',
     teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
@@ -234,12 +231,12 @@ export function EditMemberModal({
           const formValues = {
             name: member.name,
             email: member.email,
-            openToWork: member.openForWork ?? false,
+            openToWork: member.openToWork ?? false,
             imageUid: member.imageUid,
             imageFile: null,
-            plnStartDate: new Date(member.plnStartDate).toLocaleDateString(
+            plnStartDate: member.plnStartDate ? new Date(member.plnStartDate).toLocaleDateString(
               'af-ZA'
-            ),
+            ):null,
             city: member.location?.city,
             region: member.location?.region,
             country: member.location?.country,
@@ -247,6 +244,7 @@ export function EditMemberModal({
             discordHandler: member.discordHandler,
             twitterHandler: member.twitterHandler,
             githubHandler: member.githubHandler,
+            telegramHandler: member.telegramHandler,
             officeHours: member.officeHours,
             comments: '',
             teamAndRoles: teamAndRoles || [
@@ -315,9 +313,7 @@ export function EditMemberModal({
             email: member.email,
             imageUid: member.imageUid,
             imageFile: null,
-            plnStartDate: new Date(member.plnStartDate).toLocaleDateString(
-              'af-ZA'
-            ),
+            plnStartDate: null,
             city: member.location?.city,
             region: member.location?.region,
             country: member.location?.country,
@@ -325,6 +321,7 @@ export function EditMemberModal({
             discordHandler: member.discordHandler,
             twitterHandler: member.twitterHandler,
             githubHandler: member.githubHandler,
+            telegramHandler: member.telegramHandler,
             officeHours: member.officeHours,
             comments: '',
             teamAndRoles: teamAndRoles || [
@@ -382,7 +379,7 @@ export function EditMemberModal({
       requestorEmail: '',
       imageUid: '',
       imageFile: null,
-      plnStartDate: new Date().toLocaleDateString('af-ZA'),
+      plnStartDate: null,
       city: '',
       region: '',
       country: '',
@@ -390,6 +387,7 @@ export function EditMemberModal({
       discordHandler: '',
       twitterHandler: '',
       githubHandler: '',
+      telegramHandler: '',
       officeHours: '',
       comments: '',
       teamAndRoles: [],
@@ -434,9 +432,12 @@ export function EditMemberModal({
       discordHandler: formValues.discordHandler?.trim(),
       twitterHandler: formValues.twitterHandler?.trim(),
       githubHandler: formValues.githubHandler?.trim(),
+      telegramHandler: formValues.telegramHandler?.trim(),
       officeHours: formValues.officeHours?.trim(),
       comments: formValues.comments?.trim(),
-      plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
+      plnStartDate:
+        formValues.plnStartDate ?
+        new Date(formValues.plnStartDate)?.toISOString():null,
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
@@ -544,7 +545,7 @@ export function EditMemberModal({
           }
         }
         await api.put(`/v1/member/${id}`, data).then((response) => {
-          if (response.status === 200 && response.statusText === "OK"){
+          if (response.status === 200 && response.statusText === 'OK') {
             setSaveCompleted(true);
             setModified(false);
             setModifiedFlag(false);
@@ -603,18 +604,18 @@ export function EditMemberModal({
   }
 
   const handleImageChange = (file: File) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => setImageUrl(reader.result as string);
-    setFormValues({ ...formValues, imageFile: file });
-    setModified(true);
-    setModifiedFlag(true);
-    setImageChanged(true);
-  };
-
-  const onRemoveImage = () => {
-    setFormValues({ ...formValues, imageFile: null });
-    setImageUrl('');
+    if (file) {
+      setFormValues({ ...formValues, imageFile: file });
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => setImageUrl(reader.result as string);
+      setModified(true);
+      setModifiedFlag(true);
+      setImageChanged(true);
+    } else {
+      setFormValues({ ...formValues, imageFile: null, imageUid: '' });
+      setImageUrl('');
+    }
   };
 
   function handleDeleteRolesRow(rowId) {
@@ -692,7 +693,6 @@ export function EditMemberModal({
                       disableEmail={true}
                       setDisableNext={setDisableSubmit}
                       resetFile={reset}
-                      onRemoveImage={onRemoveImage}
                     />
                   </div>
                   <div className={openTab === 2 ? 'block' : 'hidden'}>
@@ -717,8 +717,19 @@ export function EditMemberModal({
               }
             </div>
           </div>
-          {!saveCompleted && (
-            <div className="footerdiv fixed fixed inset-x-0 bottom-0 bottom-0 h-[80px] bg-white px-8">
+          {
+            <div
+              className={`footerdiv flow-root w-full ${
+                isProfileSettings
+                  ? 'fixed inset-x-0 bottom-0 h-[80px] bg-white'
+                  : ''
+              }`}
+            >
+              {!isProfileSettings && (
+                <div className="float-left">
+                  {getCancelOrBackButton(handleModalClose)}
+                </div>
+              )}
               <div className="float-right">
                 {getSubmitOrNextButton(
                   handleSubmit,
@@ -733,7 +744,7 @@ export function EditMemberModal({
                 })}
               </div>
             </div>
-          )}
+          }
           {!isProfileSettings && (
             <RequestPending
               isOpen={isPendingRequestModalOpen}
@@ -824,7 +835,6 @@ export function EditMemberModal({
                   setDisableNext={setDisableSubmit}
                   // emailExists={emailExists}
                   disableEmail={true}
-                  onRemoveImage={onRemoveImage}
                 />
                 <AddMemberSkillForm
                   formValues={formValues}
@@ -853,7 +863,6 @@ export function EditMemberModal({
                     disableSubmit
                   )}
                 </div>
-                feat-directory-auth
               </div>
             </div>
           )}

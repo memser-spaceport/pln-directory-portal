@@ -188,7 +188,7 @@ export class ParticipantsRequestService {
       });
     } else if (
       result.participantType === ParticipantType.MEMBER.toString() &&
-      result.referenceUid !== null
+      result.referenceUid !== null && !disableNotification
     ) {
       slackConfig.requestLabel = 'Edit Labber Request';
       slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`;
@@ -286,6 +286,7 @@ export class ParticipantsRequestService {
     dataToSave['discordHandler'] = dataToProcess.discordHandler;
     dataToSave['twitterHandler'] = dataToProcess.twitterHandler;
     dataToSave['linkedinHandler'] = dataToProcess.linkedinHandler;
+    dataToSave['telegramHandler'] = dataToProcess.telegramHandler;
     dataToSave['officeHours'] = dataToProcess.officeHours;
     dataToSave['moreDetails'] = dataToProcess.moreDetails;
     dataToSave['plnStartDate'] = dataToProcess.plnStartDate;
@@ -415,6 +416,7 @@ export class ParticipantsRequestService {
     dataToSave['discordHandler'] = dataToProcess.discordHandler;
     dataToSave['twitterHandler'] = dataToProcess.twitterHandler;
     dataToSave['linkedinHandler'] = dataToProcess.linkedinHandler;
+    dataToSave['telegramHandler'] = dataToProcess.telegramHandler;
     dataToSave['officeHours'] = dataToProcess.officeHours;
     dataToSave['moreDetails'] = dataToProcess.moreDetails;
     dataToSave['plnStartDate'] = dataToProcess.plnStartDate;
@@ -596,6 +598,7 @@ export class ParticipantsRequestService {
     // Non Mandatory Fields
     dataToSave['twitterHandler'] = dataToProcess.twitterHandler;
     dataToSave['linkedinHandler'] = dataToProcess.linkedinHandler;
+    dataToSave['telegramHandler'] = dataToProcess.telegramHandler;
     dataToSave['airtableRecId'] = dataToProcess.airtableRecId;
     dataToSave['blog'] = dataToProcess.blog;
     dataToSave['officeHours'] = dataToProcess.officeHours;
@@ -709,6 +712,7 @@ export class ParticipantsRequestService {
     // Non Mandatory Fields
     dataToSave['twitterHandler'] = dataToProcess.twitterHandler;
     dataToSave['linkedinHandler'] = dataToProcess.linkedinHandler;
+    dataToSave['telegramHandler'] = dataToProcess.telegramHandler;
     dataToSave['airtableRecId'] = dataToProcess.airtableRecId;
     dataToSave['blog'] = dataToProcess.blog;
     dataToSave['officeHours'] = dataToProcess.officeHours;
