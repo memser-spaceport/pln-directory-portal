@@ -60,7 +60,6 @@ export class MemberController {
   @UseGuards(UserTokenValidation)
   async updateOne(@Param('id') id, @Body() body, @Req() req) {
     const participantsRequest = body;
-    console.log('participantsRequest', participantsRequest);
     return await this.membersService.editMemberParticipantsRequest(
       participantsRequest,
       req.userEmail

@@ -65,6 +65,18 @@ export default function AddMemberSocialForm(props) {
         </div>
       </div>
 
+      <div className="inputfield pt-5">
+        <InputField
+          label="Telegram"
+          onChange={onChange}
+          name="telegramHandler"
+          maxLength={200}
+          value={values.telegramHandler}
+          className="custom-grey custom-outline-none border"
+          placeholder="Telegram"
+        />
+      </div>
+
       <div className="inputfield hint-text pt-5">
         <InputField
           label="Office Hours Link"

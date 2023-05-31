@@ -219,6 +219,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     website: '',
     linkedinHandler: '',
     twitterHandler: '',
+    telegramHandler:'',
     blog: '',
     officeHours: '',
   });
@@ -273,6 +274,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       website: '',
       linkedinHandler: '',
       twitterHandler: '',
+      telegramHandler:'',
       blog: '',
       officeHours: '',
     });
@@ -319,6 +321,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       website: formValues.website?.trim(),
       twitterHandler: formValues.twitterHandler?.trim(),
       linkedinHandler: formValues.linkedinHandler?.trim(),
+      telegramHandler: formValues.telegramHandler?.trim(),
       blog: formValues.blog?.trim(),
       officeHours: formValues.officeHours?.trim(),
       fundingStage: formattedFundingStage,

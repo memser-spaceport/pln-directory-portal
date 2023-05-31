@@ -26,6 +26,7 @@ model Team {
   contactMethod     String?
   twitterHandler    String?
   linkedinHandler   String?
+  telegramHandler   String?
   shortDescription  String?
   longDescription   String?
   plnFriend         Boolean            @default(false)
@@ -52,10 +53,11 @@ model Member {
   discordHandler  String?
   twitterHandler  String?
   linkedinHandler String?
+  telegramHandler String?
   officeHours     String?
   moreDetails     String?
   plnFriend       Boolean          @default(false)
-  plnStartDate    DateTime?        @default(now())
+  plnStartDate    DateTime?        
   airtableRecId   String?          @unique
   externalId      String?          @unique
   openToWork     Boolean?         @default(false)
