@@ -5,26 +5,19 @@ import {
   ForbiddenException,
   Get,
   Param,
-  Patch,
   Post,
-  Put,
   Query,
   Req,
-  UnauthorizedException,
-  BadRequestException,
-  UseGuards,
+  BadRequestException
 } from '@nestjs/common';
-import { ApprovalStatus, ParticipantType } from '@prisma/client';
+import { ParticipantType } from '@prisma/client';
 import { ParticipantsRequestService } from './participants-request.service';
 import { GoogleRecaptchaGuard } from '../guards/google-recaptcha.guard';
 import {
-  ParticipantProcessRequestSchema,
   ParticipantRequestTeamSchema,
   ParticipantRequestMemberSchema,
 } from '../../../../libs/contracts/src/schema/participants-request';
 import { NoCache } from '../decorators/no-cache.decorator';
-import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
-import { UserTokenValidation } from '../guards/user-token-validation.guard';
 @Controller('v1/participants-request')
 export class ParticipantsRequestController {
   constructor(
@@ -46,11 +39,10 @@ export class ParticipantsRequestController {
   }
 
   @Post()
-  @UseGuards(UserTokenValidation)
   async addRequest(@Body() body, @Req() req) {
     const postData = body;
     const participantType = body.participantType;
-    const referenceUid = body.referenceUid;ParticipantProcessRequestSchema
+    const referenceUid = body.referenceUid;
 
     if (
       participantType === ParticipantType.MEMBER.toString() &&
@@ -69,16 +61,6 @@ export class ParticipantsRequestController {
       throw new ForbiddenException();
     }
 
-    if(referenceUid) {
-      const requestorDetails = await this.participantsRequestService.findMemberByEmail(req.userEmail);
-      if(!requestorDetails) {
-        throw new UnauthorizedException()
-      }
-      if(!requestorDetails.isDirectoryAdmin && (referenceUid !== requestorDetails.uid)) {
-        console.log(requestorDetails, 'in edit exception')
-        throw new ForbiddenException()
-      }
-    }
     const checkDuplicate = await this.participantsRequestService.findDuplicates(
       postData?.uniqueIdentifier,
       participantType,

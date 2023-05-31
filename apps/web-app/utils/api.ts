@@ -83,7 +83,7 @@ api.interceptors.response.use(
   },
   (error) => {
     const originalRequest = error.config;
-    if (error.response.status === 401 && !originalRequest._retry) {
+    if (error?.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       let { refreshToken } = nookies.get();
       if(refreshToken && refreshToken.length > 0 ) {
@@ -124,10 +124,13 @@ api.interceptors.response.use(
         Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
         window.location.href="/directory/members";
       }   
-    }else{
-      throw error;
-    }
-    
+    } else {
+      if(error?.response?.status === 500) {
+        Cookies.set('page_params', 'server_error', { expires: 60, path: '/' });
+        window.location.href="/directory/members";
+      }
+      return Promise.reject(error);
+    } 
   }
 );
 

@@ -387,7 +387,7 @@ export class ParticipantsRequestService {
     const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
       where: { uid: uidToEdit },
     });
-    if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
+    if (dataFromDB?.status !== ApprovalStatus.PENDING.toString()) {
       return { code: -1, message: 'Request already Processed' };
     }
     const existingData: any = await this.prisma.member.findUnique({

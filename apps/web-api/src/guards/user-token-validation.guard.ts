@@ -2,6 +2,7 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
+  InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
 import axios from 'axios';
@@ -14,12 +15,9 @@ export class UserTokenValidation implements CanActivate {
     try {
       const request = context.switchToHttp().getRequest();
       const token = this.extractTokenFromHeader(request);
-
-      // If no token then no validation required. Return
       if (!token) {
-        return true;
+        throw new UnauthorizedException('Invalid Token');
       }
-
       const validationResult: any = await axios.post(
         `${process.env.AUTH_API_URL}/auth/introspect`,
         { token: token }
@@ -28,13 +26,16 @@ export class UserTokenValidation implements CanActivate {
         validationResult?.data?.active &&
         validationResult?.data?.email
       ) {
-        // request['userExternaId'] = validationResult.data.sub;
         request['userEmail'] = validationResult.data.email;
       } else {
         throw new UnauthorizedException();
       }
-    } catch {
-      throw new UnauthorizedException();
+    } catch(error) {
+      if ( error instanceof UnauthorizedException || error?.response?.status === 400 
+        || error?.response?.status === 401) {
+        throw new UnauthorizedException('Invalid Token');
+      }
+      throw new InternalServerErrorException();  
     }
     return true;
   }
