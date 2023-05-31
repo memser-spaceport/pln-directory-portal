@@ -10,7 +10,7 @@ import { forwardRef, Fragment } from 'react';
 import { JoinNetworkMenu } from './join-network-menu/join-network-menu';
 import { Login } from './login-menu/login-menu';
 import { Menu as AppMenu } from './menu/menu';
-import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/protocol-labs-network-logo-horizontal-black.svg';
+import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/Logo_PLN_directory.svg';
 import { PAGE_ROUTES } from '../../../constants';
 // import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
