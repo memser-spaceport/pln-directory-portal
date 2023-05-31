@@ -552,11 +552,7 @@ export function EditMemberModal({
           }
         });
       } catch (err) {
-        if (err.response.status === 400) {
-          toast(err?.response?.data?.message);
-        } else {
-          toast(err?.message);
-        }
+        console.log('error', err);
       } finally {
         setIsProcessing(false);
       }

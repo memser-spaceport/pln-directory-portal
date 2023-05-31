@@ -184,11 +184,6 @@ export function EditTeamModal({
     if(saveCompleted){
       toast(MSG_CONSTANTS.TEAM_UPDATE_MESSAGE)
     }
-    const divElement = document.getElementById('myDiv') as HTMLDivElement;
-    if (divElement) {
-      divElement.setAttribute('tabIndex', '0');
-      divElement.focus();
-    }
   }, [saveCompleted, errors]);
 
   useEffect(() => {
@@ -429,7 +424,6 @@ export function EditTeamModal({
               setModifiedFlag(false);
           });
       } catch (err) {
-        toast(err?.message);
         console.log('error', err);
       } finally {
         setIsProcessing(false);
@@ -552,6 +546,7 @@ export function EditTeamModal({
               handleImageChange={handleImageChange}
               imageUrl={imageUrl}
               disableName={true}
+              disableRequestorEmail={true}
               fromSettings={true}
             />
           </div>
@@ -619,7 +614,7 @@ export function EditTeamModal({
           <LoadingIndicator />
         </div>
       )}
-      <div id="myDiv" className='outline-0'>
+      <div className='outline-0'>
         {
           fromSettings ? (<>
             {(
