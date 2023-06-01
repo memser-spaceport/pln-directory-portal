@@ -1,6 +1,24 @@
 import api from '../api';
 import { setCookie } from 'nookies';
 import * as jwt from 'jsonwebtoken';
+import { PAGE_ROUTES } from '../../constants';
+import { BroadcastChannel } from 'broadcast-channel';
+
+export const createLogoutChannel = () => {
+  try {
+    const logoutChannel = new BroadcastChannel('logout');
+    return logoutChannel;
+  } catch(err) {
+    console.log(err);
+  }
+};
+
+export const logoutAllTabs = () => {
+  createLogoutChannel().onmessage = async (msg) => {
+    window.location.href = PAGE_ROUTES.MEMBERS;
+    await createLogoutChannel().close();
+  };
+}
 
 export const decodeToken = (token: string):any => {
   return jwt.decode(token);

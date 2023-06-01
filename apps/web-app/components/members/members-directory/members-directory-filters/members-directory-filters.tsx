@@ -11,18 +11,20 @@ import { IMembersFiltersValues } from './members-directory-filters.types';
 export interface MembersDirectoryFiltersProps {
   filtersValues: IMembersFiltersValues;
   filterProperties: string[];
+  userInfo: any;
 }
 
 export function MembersDirectoryFilters({
   filtersValues,
   filterProperties,
+  userInfo
 }: MembersDirectoryFiltersProps) {
-  const isOpenToWorkEnabled = process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK;
+  const isOpenToWorkEnabled = (process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK  === 'true' && userInfo?.uid) ? true : false;
   return (
     <DirectoryFilters filterProperties={filterProperties}>
       <div className="space-y-4">
         <OfficeHoursFilter />
-        {isOpenToWorkEnabled === 'true' && <OpenToWorkFilter />}
+        {isOpenToWorkEnabled && <OpenToWorkFilter />}
         <FriendOfPLNFilter />
       </div>
       <div className="my-5 h-px bg-slate-200" />

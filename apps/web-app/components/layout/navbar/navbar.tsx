@@ -3,6 +3,7 @@ import { UserIcon } from '@heroicons/react/solid';
 import { CogIcon, ArrowNarrowRightIcon } from '@heroicons/react/outline';
 import { ArrowIcon } from '@protocol-labs-network/ui';
 import { trackGoal } from 'fathom-client';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Cookies from 'js-cookie';
@@ -12,7 +13,7 @@ import { Login } from './login-menu/login-menu';
 import { Menu as AppMenu } from './menu/menu';
 import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/Logo_PLN_directory.svg';
 import { PAGE_ROUTES, FATHOM_EVENTS } from '../../../constants';
-import Image from 'next/image';
+import { createLogoutChannel } from '../../../utils/services/auth';
 // import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
@@ -54,6 +55,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
         Cookies.remove('refreshToken')
         Cookies.remove('userInfo')
         Cookies.set('page_params', 'logout', { expires: 60, path: '/' });
+        createLogoutChannel().postMessage('logout');
         window.location.href = PAGE_ROUTES.MEMBERS;
       },
     },

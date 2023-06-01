@@ -20,7 +20,7 @@ export function MemberCard({
   member,
   loggedInMember,
 }: MemberCardProps) {
-  const isOpenToWorkEnabled = process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK;
+  const isOpenToWorkEnabled = (process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK  === 'true' && loggedInMember?.uid) ? true : false;
   const router = useRouter();
   const backLink = encodeURIComponent(router.asPath);
   const mainTeam = member.mainTeam;
@@ -53,6 +53,7 @@ export function MemberCard({
         avatarIcon={UserIcon}
         name={member.name}
         teamLead={member.teamLead}
+        userInfo={loggedInMember}
       />
       <div className={isGrid ? '' : 'w-[400px] grow-0'}>
         <div className={isGrid ? '' : 'flex'}>
@@ -63,11 +64,11 @@ export function MemberCard({
           >
             {member.name}
           </h2>
-          {(isOpenToWorkEnabled === 'true') && !isGrid && member.openToWork && (
+          {(isOpenToWorkEnabled) && !isGrid && member.openToWork && (
             <span className="z-0 flex pl-2 pt-[5px] text-slate-600">
               <BriefCase />
               <span className="pl-1 pt-px text-[10px] font-medium leading-[14px] tracking-[0.01em]">
-                OPEN TO WORK
+                OPEN TO COLLABORATE
               </span>
             </span>
           )}

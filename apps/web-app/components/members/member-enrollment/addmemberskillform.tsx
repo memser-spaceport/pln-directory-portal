@@ -77,7 +77,7 @@ export default function AddMemberSkillForm(props) {
         <>
           <div className="pt-5">
             <div className="flex">
-              <span className="mr-2 text-sm font-bold pr-5">Open to Work?</span>
+              <span className="mr-2 text-sm font-bold pr-5">Open to Collaborate?</span>
               <Switch
                 initialValue={props.formValues.openToWork}
                 onChange={(evt) => {
