@@ -35,7 +35,8 @@ interface EditTeamModalProps {
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
   id: string;
   fromSettings?: boolean;
-  setModified?: (boolean) => void
+  setModified?: (boolean) => void;
+  setImageModified?: (boolean) => void;
 }
 
 function validateBasicForm(formValues, imageUrl) {
@@ -140,7 +141,8 @@ export function EditTeamModal({
   setIsModalOpen,
   id,
   fromSettings = false,
-  setModified
+  setModified,
+  setImageModified
 }: EditTeamModalProps) {
   const [errors, setErrors] = useState([]);
   const [basicErrors, setBasicErrors] = useState([]);
@@ -251,7 +253,9 @@ export function EditTeamModal({
         });
       })
       .catch((err) => {
-        toast(err?.message);
+        toast(err?.message,{
+          type:'error'
+        });
         console.error(err);
       });
   }
@@ -357,78 +361,94 @@ export function EditTeamModal({
 
   const handleSubmit = useCallback(
     async (e) => {
-      e.preventDefault();
-      // if (!executeRecaptcha) {
-      //   console.log('Execute recaptcha not yet available');
-      //   return;
-      // }
-      setErrors([]);
-      setBasicErrors([]);
-      seProjecttErrors([]);
-      setSocialErrors([]);
-      const { errors,
-        basicFormErrors,
-        projectDetailFormErrors,
-        socialFormErrors
-      } = validateForm(formValues, imageUrl);
-      if (errors?.length > 0 || nameExists) {
-        const element1 = divRef.current;
-        if (element1) {
-          element1.scrollTo({ top: 0, behavior: 'smooth' });
-          // element1.scrollTop = 0;
+      if(isModified){
+        setImageModified(false);
+        e.preventDefault();
+        // if (!executeRecaptcha) {
+        //   console.log('Execute recaptcha not yet available');
+        //   return;
+        // }
+        setErrors([]);
+        setBasicErrors([]);
+        seProjecttErrors([]);
+        setSocialErrors([]);
+        const { errors,
+          basicFormErrors,
+          projectDetailFormErrors,
+          socialFormErrors
+        } = validateForm(formValues, imageUrl);
+        if (errors?.length > 0 || nameExists) {
+          const element1 = divRef.current;
+          if (element1) {
+            element1.scrollTo({ top: 0, behavior: 'smooth' });
+            // element1.scrollTop = 0;
+          }
+          setErrors(errors);
+          setBasicErrors(basicFormErrors);
+          seProjecttErrors(projectDetailFormErrors);
+          setSocialErrors(socialFormErrors);
+          setIsErrorPopupOpen(true);
+          return false;
         }
-        setErrors(errors);
-        setBasicErrors(basicFormErrors);
-        seProjecttErrors(projectDetailFormErrors);
-        setSocialErrors(socialFormErrors);
-        setIsErrorPopupOpen(true);
-        return false;
-      }
-      trackGoal(FATHOM_EVENTS.teams.profile.editSave, 0);
-      const values = formatData();
-      try {
-        // const captchaToken = await executeRecaptcha();
-
-        // if (!captchaToken) return;
-        let image;
-        setIsProcessing(true);
-        if (imageChanged && values.logoFile) {
-          const formData = new FormData();
-          formData.append('file', values.logoFile);
-          const config = {
-            headers: {
-              'content-type': 'multipart/form-data',
+        trackGoal(FATHOM_EVENTS.teams.profile.editSave, 0);
+        const values = formatData();
+        try {
+          // const captchaToken = await executeRecaptcha();
+  
+          // if (!captchaToken) return;
+          let image;
+          setIsProcessing(true);
+          if (imageChanged && values.logoFile) {
+            const formData = new FormData();
+            formData.append('file', values.logoFile);
+            const config = {
+              headers: {
+                'content-type': 'multipart/form-data',
+              },
+            };
+            image = await api
+              .post(`/v1/images`, formData, config)
+              .then((response) => {
+                return response?.data?.image;
+              });
+          }
+          delete values?.logoFile;
+          const data = {
+            participantType: ENROLLMENT_TYPE.TEAM,
+            referenceUid: id,
+            uniqueIdentifier: values.name,
+            newData: {
+              ...values,
+              logoUid: image?.uid ?? values.logoUid,
+              logoUrl: image?.url ?? imageUrl,
             },
+            // captchaToken,
           };
-          image = await api
-            .post(`/v1/images`, formData, config)
-            .then((response) => {
-              return response?.data?.image;
+          await api.put(`/v1/teams/${id}`, data)
+            .then((res) => {
+              if (res.status === 200 && res.statusText === "OK")
+                setSaveCompleted(true);
+                if(fromSettings){
+                  setModified(false);
+                  setModifiedFlag(false);
+                  setOpenTab(1);
+                  if(imageChanged){
+                    setImageModified(true);
+                  }
+                }
             });
-        }
-        delete values?.logoFile;
-        const data = {
-          participantType: ENROLLMENT_TYPE.TEAM,
-          referenceUid: id,
-          uniqueIdentifier: values.name,
-          newData: {
-            ...values,
-            logoUid: image?.uid ?? values.logoUid,
-            logoUrl: image?.url ?? imageUrl,
-          },
-          // captchaToken,
-        };
-        await api.put(`/v1/teams/${id}`, data)
-          .then((res) => {
-            if (res.status === 200 && res.statusText === "OK")
-              setSaveCompleted(true);
-              setModified(false);
-              setModifiedFlag(false);
+        } catch (err) {
+          toast(err?.message,{
+            type:'error'
           });
-      } catch (err) {
-        console.log('error', err);
-      } finally {
-        setIsProcessing(false);
+          console.log('error', err);
+        } finally {
+          setIsProcessing(false);
+        }
+      }else{
+        toast(MSG_CONSTANTS.NO_CHANGES_TO_SAVE,{
+          type:'info'
+        });
       }
     },
     // [executeRecaptcha, formValues, imageUrl, imageChanged, id]
@@ -497,8 +517,14 @@ export function EditTeamModal({
   }
 
   const handleReset = () => {
-    if (fromSettings && isModified) {
-      setOpenValidationPopup(true);
+    if (fromSettings) {
+      if(isModified){
+        setOpenValidationPopup(true);
+      }else{
+        toast(MSG_CONSTANTS.NO_CHANGES_TO_RESET,{
+          type:'info'
+        });
+      }
     }
   }
 

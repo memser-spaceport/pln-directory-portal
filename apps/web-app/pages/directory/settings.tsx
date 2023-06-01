@@ -13,6 +13,9 @@ import { useProfileBreadcrumb } from "apps/web-app/hooks/profile/use-profile-bre
 import { DirectoryLayout } from "apps/web-app/layouts/directory-layout";
 import { DIRECTORY_SEO } from "apps/web-app/seo.config";
 import api from "apps/web-app/utils/api";
+import { fetchMember } from "apps/web-app/utils/services/members";
+import { fetchTeam } from "apps/web-app/utils/services/teams";
+import { log } from "console";
 import { DiscardChangesPopup } from "libs/ui/src/lib/modals/confirmation";
 
 
@@ -22,13 +25,64 @@ export default function Settings({
 
     const [activeSetting, setActiveSetting] = useState(SETTINGS_CONSTANTS.PROFILE_SETTINGS);
     const [selectedTeam, setSelectedTeam] = useState((teamsDropdown && teamsDropdown.length) ? teamsDropdown[0] : null);
+    const [teamsDropdownOptions, setteamsDropdown] = useState(teamsDropdown ? teamsDropdown : null);
     const [selectedMember, setSelectedMember] = useState((membersDropdown && membersDropdown.length) ? membersDropdown[0] : null);
     const [isModified, setModified] = useState<boolean>(false);
+    const [isTeamImageModified, setTeamImageModified] = useState<boolean>(false);
     const [isModifiedMember, setModifiedMember] = useState<boolean>(false);
     const [isPflModified, setModifiedProfile] = useState<boolean>(false);
     const [openValidationPopup, setOpenValidationPopup] = useState<boolean>(false);
 
     const router = useRouter();
+
+    useEffect(() => {
+        if (isTeamImageModified) {
+            if(userInfo?.roles.length && userInfo?.roles.includes(ADMIN_ROLE)){
+                updateTeamAutocomplete();
+            } else if (userInfo?.leadingTeams?.length) {
+                updateDropdown();
+            }
+        }
+
+    }, [isTeamImageModified]);
+
+    const updateTeamAutocomplete = () => {
+        setSelectedTeam({ label: '', value: '' })
+        fetchTeam(selectedTeam.value).then(data => {
+            setSelectedTeam({
+                "label": data.name,
+                "value": data.uid,
+                "logo": data?.logo?.url
+            });
+        });
+    }
+
+    const updateDropdown = () => {
+        fetchMember(userInfo.uid).then((data) => {
+            if (userInfo?.leadingTeams?.length) {
+                const teamsDropdownValues = userInfo?.leadingTeams?.map(teamUid => {
+                    const filteredTeam = data.teamMemberRoles.filter(teamObj => {
+                        return teamObj?.team?.uid === teamUid
+                    });
+                    if (filteredTeam && filteredTeam.length) {
+                        if(selectedTeam.value === filteredTeam[0].team.uid){
+                            setSelectedTeam({
+                                "label": filteredTeam[0].team.name,
+                                "value": filteredTeam[0].team.uid,
+                                "icon": filteredTeam[0]?.team?.logo?.url
+                            })
+                        }
+                        return {
+                            "label": filteredTeam[0].team.name,
+                            "value": filteredTeam[0].team.uid,
+                            "icon": filteredTeam[0]?.team?.logo?.url
+                        }
+                    }
+                });
+                setteamsDropdown(teamsDropdownValues);
+            }
+        })
+    }
 
     useEffect(() => {
         if(router.query?.id && router.query?.from){
@@ -189,7 +243,7 @@ export default function Settings({
         return (<Dropdown
             name="team"
             required={true}
-            options={teamsDropdown}
+            options={teamsDropdownOptions}
             initialOption={selectedTeam}
             onChange={handleTeamChange}
             placeholder="Select a Team"
@@ -209,6 +263,7 @@ export default function Settings({
                 id={selectedTeam.value}
                 fromSettings={true}
                 setModified={setModified}
+                setImageModified={setTeamImageModified}
             />
         );
     }
@@ -312,7 +367,7 @@ export default function Settings({
                 <div className="grid grid-cols-4 pt-24 gap-x-8">
                     <div className="col-span-1">
                         {
-                            (teamsDropdown && (<div className="relative float-right top-[15px]">
+                            (teamsDropdownOptions && (<div className="relative float-right top-[15px]">
                                 <div className="font-semibold text-[13px] opacity-40 pb-[8px]">
                                     {SETTINGS_CONSTANTS.ACCOUNT_SETTINGS}
                                 </div>

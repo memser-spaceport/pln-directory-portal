@@ -264,7 +264,9 @@ export function EditMemberModal({
           setDropDownValues({ skillValues: data[1], teamNames: data[2] });
         })
         .catch((err) => {
-          toast(err?.message);
+          toast(err?.message,{
+            type:'error'
+          });
           console.log('error', err);
         });
     }
@@ -346,15 +348,23 @@ export function EditMemberModal({
           setModifiedFlag(false);
         })
         .catch((err) => {
-          toast(err?.message);
+          toast(err?.message,{
+            type:'error'
+          });
           console.log('error', err);
         });
     }
   };
 
   function handleReset() {
-    if (isProfileSettings && isModified) {
-      setOpenValidationPopup(true);
+    if (isProfileSettings) {
+      if(isModified){
+        setOpenValidationPopup(true);
+      }else{
+        toast(MSG_CONSTANTS.NO_CHANGES_TO_RESET,{
+          type:'info'
+        });
+      }
     }
   }
 
@@ -467,95 +477,112 @@ export function EditMemberModal({
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
-      setErrors([]);
-      const { basicFormErrors, skillFormErrors, errors } = validateForm(
-        formValues,
-        imageUrl,
-        isProfileSettings
-      );
-      // if (!executeRecaptcha) {
-      //   console.log('Execute recaptcha not yet available');
-      //   return;
-      // }
-      if (errors?.length > 0 || emailExists) {
-        const element1 = divRef.current;
-        if (element1) {
-          element1.scrollTo({ top: 0, behavior: 'smooth' });
-          // element1.scrollTop = 0;
+      if(isModified){
+        setErrors([]);
+        const { basicFormErrors, skillFormErrors, errors } = validateForm(
+          formValues,
+          imageUrl,
+          isProfileSettings
+        );
+        // if (!executeRecaptcha) {
+        //   console.log('Execute recaptcha not yet available');
+        //   return;
+        // }
+        if (errors?.length > 0 || emailExists) {
+          const element1 = divRef.current;
+          if (element1) {
+            element1.scrollTo({ top: 0, behavior: 'smooth' });
+            // element1.scrollTop = 0;
+          }
+          setErrors(errors);
+          setBasicErrors(basicFormErrors);
+          setSkillErrors(skillFormErrors);
+          setIsErrorPopupOpen(true);
+          return false;
         }
-        setErrors(errors);
-        setBasicErrors(basicFormErrors);
-        setSkillErrors(skillFormErrors);
-        setIsErrorPopupOpen(true);
-        return false;
-      }
-      trackGoal(FATHOM_EVENTS.members.profile.editSave, 0);
-      const values = formatData();
-      try {
-        // const captchaToken = await executeRecaptcha();
-
-        // if (!captchaToken) return;
-        let image;
-        setIsProcessing(true);
-        if (imageChanged && values.imageFile) {
-          const formData = new FormData();
-          formData.append('file', values.imageFile);
-          const config = {
-            headers: {
-              'content-type': 'multipart/form-data',
+        trackGoal(FATHOM_EVENTS.teams.profile.editSave, 0);
+        const values = formatData();
+        try {
+          // const captchaToken = await executeRecaptcha();
+  
+          // if (!captchaToken) return;
+          let image;
+          setIsProcessing(true);
+          if (imageChanged && values.imageFile) {
+            const formData = new FormData();
+            formData.append('file', values.imageFile);
+            const config = {
+              headers: {
+                'content-type': 'multipart/form-data',
+              },
+            };
+            image = await api
+              .post(`/v1/images`, formData, config)
+              .then((response) => {
+                return response?.data?.image;
+              });
+          }
+  
+          delete values?.imageFile;
+          delete values?.requestorEmail;
+  
+          const data = {
+            participantType: ENROLLMENT_TYPE.MEMBER,
+            referenceUid: id,
+            requesterEmailId: isProfileSettings
+              ? values.email
+              : values.requestorEmail,
+            uniqueIdentifier: values.email,
+            newData: {
+              ...values,
+              imageUid: image?.uid ?? values.imageUid,
+              imageUrl: image?.url ?? imageUrl,
             },
+            // captchaToken,
           };
-          image = await api
-            .post(`/v1/images`, formData, config)
-            .then((response) => {
-              return response?.data?.image;
+          if (!isProfileSettings) {
+            const userInfoFromCookie = Cookies.get('userInfo');
+            if (!userInfoFromCookie) {
+              Cookies.set('page_params', 'user_logged_out', {
+                expires: 60,
+                path: '/',
+              });
+              router.push(PAGE_ROUTES.MEMBERS);
+              return false;
+            }
+            const res = await requestPendingCheck(values.email, id);
+            if (res?.isRequestPending) {
+              setIsPendingRequestModalOpen(true);
+              return false;
+            }
+          }
+          await api.put(`/v1/member/${id}`, data).then((response) => {
+            if (response.status === 200 && response.statusText === 'OK') {
+              setSaveCompleted(true);
+              setModified(false);
+              setModifiedFlag(false);
+              setOpenTab(1);
+              setBasicErrors([]),
+              setSkillErrors([]);
+            }
+          });
+        } catch (err) {
+          if (err.response.status === 400) {
+            toast(err?.response?.data?.message,{
+              type:'error'
             });
-        }
-
-        delete values?.imageFile;
-        delete values?.requestorEmail;
-
-        const data = {
-          participantType: ENROLLMENT_TYPE.MEMBER,
-          referenceUid: id,
-          requesterEmailId: isProfileSettings
-            ? values.email
-            : values.requestorEmail,
-          uniqueIdentifier: values.email,
-          newData: {
-            ...values,
-            imageUid: image?.uid ?? values.imageUid,
-            imageUrl: image?.url ?? imageUrl,
-          },
-          // captchaToken,
-        };
-        if (!isProfileSettings) {
-          const userInfoFromCookie = Cookies.get('userInfo');
-          if (!userInfoFromCookie) {
-            Cookies.set('page_params', 'user_logged_out', {
-              expires: 60,
-              path: '/',
+          } else {
+            toast(err?.message,{
+              type:'error'
             });
-            router.push(PAGE_ROUTES.MEMBERS);
-            return false;
           }
-          const res = await requestPendingCheck(values.email, id);
-          if (res?.isRequestPending) {
-            setIsPendingRequestModalOpen(true);
-            return false;
-          }
+        } finally {
+          setIsProcessing(false);
         }
-        await api.put(`/v1/member/${id}`, data).then((response) => {
-          if (response.status === 200 && response.statusText === 'OK') {
-            setSaveCompleted(true);
-            setModified(false);
-            setModifiedFlag(false);
-          }
+      }else{
+        toast(MSG_CONSTANTS.NO_CHANGES_TO_SAVE,{
+          type:'info'
         });
-      } catch (err) {
-        console.log('error', err);
-      } finally {
-        setIsProcessing(false);
       }
     },
     // [executeRecaptcha, formValues, imageUrl, imageChanged]
