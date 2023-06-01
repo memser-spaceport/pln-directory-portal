@@ -6,7 +6,7 @@ export function OpenToWorkFilter() {
 
   return (
     <Switch
-      label="Open to Work"
+      label="Open to Collaborate"
       initialValue={enabled}
       onChange={onSetEnabled}
     />

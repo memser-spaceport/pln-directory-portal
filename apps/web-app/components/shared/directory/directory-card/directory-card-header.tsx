@@ -10,6 +10,7 @@ export interface DirectoryCardHeaderProps {
   avatarIcon: (props: React.ComponentProps<'svg'>) => JSX.Element;
   teamLead?: boolean;
   openToWork?: boolean;
+  userInfo?: any;
 }
 
 export function DirectoryCardHeader({
@@ -20,12 +21,13 @@ export function DirectoryCardHeader({
   avatarIcon,
   teamLead,
   openToWork,
+  userInfo
 }: DirectoryCardHeaderProps) {
   const Icon = avatarIcon;
-  const isOpenTOWorkEnabled = process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK;
+  const isOpenTOWorkEnabled = (process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK  === 'true' && userInfo?.uid) ? true : false;
   return (
     <>
-      {(isOpenTOWorkEnabled === 'true') && isGrid && openToWork && (
+      {(isOpenTOWorkEnabled) && isGrid && openToWork && (
         <span className="absolute left-3 top-3 z-0 flex text-slate-600">
           <BriefCase />
           <span className="pl-1 pt-px text-[10px] font-medium leading-[14px] tracking-[0.01em]">

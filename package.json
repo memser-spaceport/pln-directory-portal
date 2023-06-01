@@ -57,6 +57,7 @@
     "autoprefixer": "^10.4.4",
     "aws-sdk": "^2.1347.0",
     "axios": "^1.3.4",
+    "broadcast-channel": "5.1.0",
     "bull": "^4.9.0",
     "cache-manager": "^4.1.0",
     "cache-manager-redis-store": "^2.0.0",

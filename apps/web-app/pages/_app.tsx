@@ -14,6 +14,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import './styles.css';
 import { useRouter } from 'next/router';
 import posthog from 'posthog-js';
+import { logoutAllTabs } from '../utils/services/auth';
 
 // Check that PostHog is client-side (used to handle Next.js SSR)
 if (typeof window !== 'undefined') {
@@ -47,7 +48,7 @@ export default function CustomApp({
     // Track page views
     const handleRouteChange = () => posthog?.capture('$pageview')
     router.events.on('routeChangeComplete', handleRouteChange)
-
+    logoutAllTabs();
     return () => {
       router.events.off('routeChangeComplete', handleRouteChange)
     }

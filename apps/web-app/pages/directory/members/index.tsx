@@ -116,6 +116,7 @@ export default function Members({
           <MembersDirectoryFilters
             filtersValues={filtersValues}
             filterProperties={filterProperties}
+            userInfo={userInfo}
           />
         </div>
 

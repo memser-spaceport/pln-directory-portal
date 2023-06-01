@@ -69,13 +69,13 @@ export default function Settings({
                             setSelectedTeam({
                                 "label": filteredTeam[0].team.name,
                                 "value": filteredTeam[0].team.uid,
-                                "icon": filteredTeam[0]?.team?.logo?.url
+                                "icon": filteredTeam[0]?.team?.logo?.url ?? null
                             })
                         }
                         return {
                             "label": filteredTeam[0].team.name,
                             "value": filteredTeam[0].team.uid,
-                            "icon": filteredTeam[0]?.team?.logo?.url
+                            "icon": filteredTeam[0]?.team?.logo?.url  ?? null
                         }
                     }
                 });
@@ -91,8 +91,8 @@ export default function Settings({
                 setSelectedTeam({
                     "label": router.query.name,
                     "value": router.query.id,
-                    "logo":  router.query.logo,
-                    "icon":  router.query.logo
+                    "logo":  router.query.logo ?? null,
+                    "icon":  router.query.logo ?? null
                 })
             }else if(router.query.from === SETTINGS_CONSTANTS.MEMBER){
                 if(router.query.id === userInfo.uid){
@@ -102,7 +102,7 @@ export default function Settings({
                     setSelectedMember({
                         "label": router.query.name,
                         "value": router.query.id,
-                        "logo":  router.query.logo
+                        "logo":  router.query.logo ?? null
                     });
                 }
             }
@@ -448,7 +448,7 @@ export const getServerSideProps = async (ctx) => {
                     {
                         "label": allTeamsResponse.body[0].name,
                         "value": allTeamsResponse.body[0].uid,
-                        "logo":allTeamsResponse.body[0]?.logo?.url
+                        "logo":allTeamsResponse.body[0]?.logo?.url ?? null
                     }
                     );
                 }
@@ -461,7 +461,7 @@ export const getServerSideProps = async (ctx) => {
                     {
                         "label": allMembersResponse.body[0].name,
                         "value": allMembersResponse.body[0].uid,
-                        "logo":allMembersResponse.body[0]?.image?.url
+                        "logo":allMembersResponse.body[0]?.image?.url ?? null
                     }
                     );
                 }
@@ -475,7 +475,7 @@ export const getServerSideProps = async (ctx) => {
                     return {
                         "label": filteredTeam[0].team.name,
                         "value": filteredTeam[0].team.uid,
-                        "icon": filteredTeam[0]?.team?.logo?.url
+                        "icon": filteredTeam[0]?.team?.logo?.url ?? null
                     }
                 }
             });

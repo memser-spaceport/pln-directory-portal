@@ -109,9 +109,8 @@ export function ProfileImageUpload({
             <Image
               src={imageUrl}
               alt="Profile Image"
-              width={90}
-              height={90}
-              className="h-full w-14 rounded-full"
+              width={95}
+              height={95}
             />
           ) : AvatarIcon ? (
             <AvatarIcon className="w-22 h-22 bg-gray-200 fill-white" />

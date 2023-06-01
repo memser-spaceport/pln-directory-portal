@@ -269,7 +269,6 @@ export function EditTeamModal({
     setSocialErrors([]);
     setDropDownValues({});
     setImageChanged(false);
-    setSaveCompleted(false);
     setDropDownValues({});
     setDisableSubmit(false);
     setNameExists(false);
@@ -470,17 +469,19 @@ export function EditTeamModal({
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => setImageUrl(reader.result as string);
-      setModified(true);
-      setModifiedFlag(true);
-      setImageChanged(true);
     } else {
       setFormValues({ ...formValues, logoFile: null, logoUid: '' });
       setImageUrl('');
     }
+    setModified(true);
+    setModifiedFlag(true);
+    setImageChanged(true);
   };
 
   function handleDropDownChange(selectedOption, name) {
     setFormValues({ ...formValues, [name]: selectedOption });
+    setModified(true);
+    setModifiedFlag(true);
   }
 
   function saveCompletedTemplate() {

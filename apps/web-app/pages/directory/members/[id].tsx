@@ -86,7 +86,10 @@ export default function Member({
             member={member}
           />
           <MemberProfileTeams teams={teams} member={member} />
-          <MemberProfileProjects repositories={repositories} />
+          { 
+            userInfo?.uid &&
+            <MemberProfileProjects repositories={repositories} />
+          }
         </div>
         {/* <div className="w-sidebar shrink-0">
           <AskToEditCard profileType="member" member={member} />
