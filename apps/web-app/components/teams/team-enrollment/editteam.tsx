@@ -7,6 +7,7 @@ import {
   useCallback,
   useRef,
 } from 'react';
+import { trackGoal } from 'fathom-client';
 import Cookies from 'js-cookie';
 import AddTeamStepOne from './addteamstepone';
 import AddTeamStepTwo from './addteamsteptwo';
@@ -21,7 +22,7 @@ import {
 import { fetchTeam } from '../../../utils/services/teams';
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
-import { BTN_LABEL_CONSTANTS, ENROLLMENT_TYPE, MSG_CONSTANTS, TAB_CONSTANTS } from '../../../constants';
+import { BTN_LABEL_CONSTANTS, ENROLLMENT_TYPE, MSG_CONSTANTS, TAB_CONSTANTS, FATHOM_EVENTS } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-team.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
@@ -383,6 +384,7 @@ export function EditTeamModal({
         setIsErrorPopupOpen(true);
         return false;
       }
+      trackGoal(FATHOM_EVENTS.teams.profile.editSave, 0);
       const values = formatData();
       try {
         // const captchaToken = await executeRecaptcha();

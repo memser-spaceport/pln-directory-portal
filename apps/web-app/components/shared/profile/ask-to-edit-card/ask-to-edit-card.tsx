@@ -75,6 +75,7 @@ export function AskToEditCard({
     }else if(profileType === SETTINGS_CONSTANTS.MEMBER){
       query = { id: member.id, name: member.name, logo: member.image, from: SETTINGS_CONSTANTS.MEMBER };
     }
+    trackGoal(urlList[profileType].eventCode, 0);
     router.push({
       pathname: '/directory/settings',
       query

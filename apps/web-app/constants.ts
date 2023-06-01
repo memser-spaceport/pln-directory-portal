@@ -41,8 +41,17 @@ export const FATHOM_EVENTS = {
     },
     joinNetwork: 'HUGDIQDP',
     joinNetworkAsMember: 'KJLW2EYZ',
+    joinNetworkAsMemberSave: 'IO16NLIO',
     joinNetworkAsTeam: 'GWGBBAHB',
+    joinNetworkAsTeamSave: '2PK35OAO',
     loginAsUser: 'ZUADLQRM',
+    logout:'BV1DRX0M',
+    settings: 'DTOAIRCK',
+    settingCategory:{
+      profile: 'WSSLPD6W',
+      member: 'XO85CR3A',
+      team: '2DSHVFY4',
+    }
   },
   members: {
     directory: {
@@ -64,6 +73,7 @@ export const FATHOM_EVENTS = {
     },
     profile: {
       requestToEdit: 'RI7BOPLV',
+      editSave: 'MO5HZEUS',
       officeHours: {
         scheduleMeeting: 'EKX8QTJD',
         learnMore: 'QWTLEVVB',
@@ -89,6 +99,7 @@ export const FATHOM_EVENTS = {
     },
     profile: {
       requestToEdit: 'GHBT5VFH',
+      editSave: 'GZ6LFEDJ',
     },
   },
 };

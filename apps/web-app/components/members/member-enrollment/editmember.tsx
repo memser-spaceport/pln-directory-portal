@@ -8,13 +8,14 @@ import {
   Fragment,
   useRef,
 } from 'react';
+import { trackGoal } from 'fathom-client';
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
 import { ValidationErrorMessages } from '../../../components/shared/account-setttings/validation-error-message';
-import { MSG_CONSTANTS, PAGE_ROUTES } from '../../../constants';
+import { MSG_CONSTANTS, PAGE_ROUTES, FATHOM_EVENTS } from '../../../constants';
 import { RequestPending } from '../../shared/request-pending/request-pending';
 import { IFormValues } from '../../../utils/members.types';
 import Modal from '../../layout/navbar/modal/modal';
@@ -217,14 +218,11 @@ export function EditMemberModal({
           let counter = 1;
           const teamAndRoles =
             member.teamMemberRoles?.length &&
-            member.teamMemberRoles.map((team) => {
-              const teamName =
-                data[2]?.filter((item) => item.value == team.teamUid)?.[0]
-                  ?.label ?? '';
+            member.teamMemberRoles.map((item) => {
               return {
-                role: team.role,
-                teamUid: team.teamUid,
-                teamTitle: teamName,
+                role: item.role,
+                teamUid: item?.team?.uid,
+                teamTitle: item?.team?.name,
                 rowId: counter++,
               };
             });
@@ -270,7 +268,7 @@ export function EditMemberModal({
           console.log('error', err);
         });
     }
-  }, [isOpen, id]);
+  }, [isOpen, id, isProfileSettings]);
 
   useEffect(() => {
     if (saveCompleted) {
@@ -491,6 +489,7 @@ export function EditMemberModal({
         setIsErrorPopupOpen(true);
         return false;
       }
+      trackGoal(FATHOM_EVENTS.members.profile.editSave, 0);
       const values = formatData();
       try {
         // const captchaToken = await executeRecaptcha();

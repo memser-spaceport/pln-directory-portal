@@ -1,18 +1,19 @@
 import { getMember, getMembers } from "@protocol-labs-network/members/data-access";
 import { getTeams } from "@protocol-labs-network/teams/data-access";
 import { Autocomplete, Breadcrumb, Dropdown } from "@protocol-labs-network/ui";
+import { trackGoal } from 'fathom-client';
+import { NextSeo } from "next-seo";
+import { useRouter } from "next/router";
+import { setCookie } from "nookies";
+import { ReactElement, useEffect, useState } from "react";
 import { EditMemberModal } from "apps/web-app/components/members/member-enrollment/editmember";
 import { EditTeamModal } from "apps/web-app/components/teams/team-enrollment/editteam";
-import { ADMIN_ROLE, MSG_CONSTANTS, PAGE_ROUTES, SETTINGS_CONSTANTS } from "apps/web-app/constants";
+import { ADMIN_ROLE, MSG_CONSTANTS, PAGE_ROUTES, SETTINGS_CONSTANTS, FATHOM_EVENTS } from "apps/web-app/constants";
 import { useProfileBreadcrumb } from "apps/web-app/hooks/profile/use-profile-breadcrumb.hook";
 import { DirectoryLayout } from "apps/web-app/layouts/directory-layout";
 import { DIRECTORY_SEO } from "apps/web-app/seo.config";
 import api from "apps/web-app/utils/api";
 import { DiscardChangesPopup } from "libs/ui/src/lib/modals/confirmation";
-import { NextSeo } from "next-seo";
-import { useRouter } from "next/router";
-import { setCookie } from "nookies";
-import { ReactElement, useEffect, useState } from "react";
 
 
 export default function Settings({
@@ -81,6 +82,7 @@ export default function Settings({
             if(beforeChangeMemberValidation() || beforeChangeValidation()){
                 setOpenValidationPopup(true);
             }else{
+                trackGoal(FATHOM_EVENTS.directory.settingCategory.profile, 0);
                 setActiveSetting(SETTINGS_CONSTANTS.PROFILE_SETTINGS);
             }
         } else if (menu === SETTINGS_CONSTANTS.TEAM_SETTINGS) {
@@ -88,6 +90,7 @@ export default function Settings({
             if (isProfileChanged() || beforeChangeMemberValidation()) {
                 setOpenValidationPopup(true);
             }else{
+                trackGoal(FATHOM_EVENTS.directory.settingCategory.team, 0);
                 setActiveSetting(SETTINGS_CONSTANTS.TEAM_SETTINGS);
             }
         } else if (menu === SETTINGS_CONSTANTS.MEMBER_SETTINGS){
@@ -95,6 +98,7 @@ export default function Settings({
             if (isProfileChanged() || beforeChangeValidation()) {
                 setOpenValidationPopup(true);
             }else{
+                trackGoal(FATHOM_EVENTS.directory.settingCategory.member, 0);
                 setActiveSetting(SETTINGS_CONSTANTS.MEMBER_SETTINGS);
             }
         }
@@ -214,7 +218,7 @@ export default function Settings({
             return (
                 <EditMemberModal
                     isOpen={true}
-                    setIsModalOpen={() => { }}
+                    setIsModalOpen={() => null}
                     id={selectedMember?.value}
                     isProfileSettings={true}
                     setModified={setModifiedMember}
@@ -224,7 +228,7 @@ export default function Settings({
             return (
                 <EditMemberModal
                     isOpen={false}
-                    setIsModalOpen={() => { }}
+                    setIsModalOpen={() => null}
                     id={userInfo?.uid}
                     isProfileSettings={true}
                     setModified={setModifiedProfile}

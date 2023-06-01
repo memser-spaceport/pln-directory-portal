@@ -7,6 +7,7 @@ import {
   useCallback,
   useRef,
 } from 'react';
+import { trackGoal } from 'fathom-client';
 import AddTeamStepOne from './addteamstepone';
 import AddTeamStepTwo from './addteamsteptwo';
 import AddTeamStepThree from './addteamstepthree';
@@ -20,7 +21,7 @@ import {
 } from '../../../utils/services/dropdown-service';
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
-import { ENROLLMENT_TYPE } from '../../../constants';
+import { ENROLLMENT_TYPE, FATHOM_EVENTS } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/create-team.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
@@ -354,7 +355,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
-
+      trackGoal(FATHOM_EVENTS.directory.joinNetworkAsTeamSave, 0);
       // if (!executeRecaptcha) {
       //   console.log('Execute recaptcha not yet available');
       //   return;
