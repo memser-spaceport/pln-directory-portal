@@ -11,7 +11,7 @@ import { JoinNetworkMenu } from './join-network-menu/join-network-menu';
 import { Login } from './login-menu/login-menu';
 import { Menu as AppMenu } from './menu/menu';
 import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/Logo_PLN_directory.svg';
-import { PAGE_ROUTES } from '../../../constants';
+import { PAGE_ROUTES, FATHOM_EVENTS } from '../../../constants';
 import Image from 'next/image';
 // import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
@@ -36,7 +36,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
       icon: CogIcon,
       label: 'Settings',
       url: `/directory/settings`,
-      eventCode: '',
+      eventCode:  FATHOM_EVENTS.directory.settings,
       onClick: () => {
         if (!Cookies.get('refreshToken')) {
           Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
@@ -48,7 +48,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
       icon: ArrowNarrowRightIcon,
       label: 'Logout',
       url: '#',
-      eventCode: '',
+      eventCode: FATHOM_EVENTS.directory.logout,
       onClick: () => {
         Cookies.remove('authToken')
         Cookies.remove('refreshToken')

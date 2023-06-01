@@ -7,6 +7,7 @@ import {
   useCallback,
   useRef,
 } from 'react';
+import { trackGoal } from 'fathom-client';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
@@ -19,7 +20,7 @@ import {
 } from '../../../utils/services/dropdown-service';
 
 import api from '../../../utils/api';
-import { ENROLLMENT_TYPE } from '../../../constants';
+import { ENROLLMENT_TYPE, FATHOM_EVENTS } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/create-member.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
@@ -324,6 +325,7 @@ export function AddMemberModal({
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
+      trackGoal(FATHOM_EVENTS.directory.joinNetworkAsMemberSave, 0);
       // if (!executeRecaptcha) {
       //   console.log('Execute recaptcha not yet available');
       //   return;
