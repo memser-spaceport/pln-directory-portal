@@ -377,7 +377,6 @@ export function EditMemberModal({
     setDropDownValues({});
     setImageChanged(false);
     setName('');
-    setSaveCompleted(false);
     setIsProcessing(false);
     setDisableSubmit(false);
     setImageUrl('');
@@ -597,6 +596,9 @@ export function EditMemberModal({
         : Math.max(...newRoles.map((item) => item.rowId + 1));
     newRoles.push({ teamUid: '', teamTitle: '', role: '', rowId: counter });
     setFormValues({ ...formValues, teamAndRoles: newRoles });
+    setSaveCompleted(false);
+    setModified(true);
+    setModifiedFlag(true);
   }
 
   function updateParentTeamValue(teamUid, teamTitle, rowId) {
@@ -605,6 +607,9 @@ export function EditMemberModal({
     newTeamAndRoles[index].teamUid = teamUid;
     newTeamAndRoles[index].teamTitle = teamTitle;
     setFormValues({ ...formValues, teamAndRoles: newTeamAndRoles });
+    setSaveCompleted(false);
+    setModified(true);
+    setModifiedFlag(true);
   }
 
   function updateParentRoleValue(role, rowId) {
@@ -612,19 +617,25 @@ export function EditMemberModal({
     const index = newTeamAndRoles.findIndex((item) => item.rowId == rowId);
     newTeamAndRoles[index].role = role;
     setFormValues({ ...formValues, teamAndRoles: newTeamAndRoles });
+    setSaveCompleted(false);
+    setModified(true);
+    setModifiedFlag(true);
   }
 
   function handleInputChange(
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) {
     const { name, value } = event.target;
+    setFormValues({ ...formValues, [name]: value });
+    setSaveCompleted(false);
     setModified(true);
     setModifiedFlag(true);
-    setFormValues({ ...formValues, [name]: value });
   }
 
   function handleDropDownChange(selectedOption, name) {
     setFormValues({ ...formValues, [name]: selectedOption });
+    setModified(true);
+    setModifiedFlag(true);
   }
 
   const handleImageChange = (file: File) => {
@@ -633,13 +644,13 @@ export function EditMemberModal({
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => setImageUrl(reader.result as string);
-      setModified(true);
-      setModifiedFlag(true);
-      setImageChanged(true);
     } else {
       setFormValues({ ...formValues, imageFile: null, imageUid: '' });
       setImageUrl('');
     }
+    setModified(true);
+    setModifiedFlag(true);
+    setImageChanged(true);
   };
 
   function handleDeleteRolesRow(rowId) {
@@ -647,6 +658,9 @@ export function EditMemberModal({
       (item) => item.rowId != rowId
     );
     setFormValues({ ...formValues, teamAndRoles: newRoles });
+    setSaveCompleted(false);
+    setModified(true);
+    setModifiedFlag(true);
   }
 
   return (
