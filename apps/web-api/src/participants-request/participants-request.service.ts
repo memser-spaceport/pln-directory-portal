@@ -153,24 +153,10 @@ export class ParticipantsRequestService {
       }
     }
 
-    let existingData: any;
-    if (requestData.referenceUid) {
-      existingData =
-        requestData.participantType === 'TEAM'
-          ? await this.prisma.team.findUnique({
-              where: { uid: requestData.referenceUid },
-            })
-          : await this.prisma.member.findUnique({
-              where: { uid: requestData.referenceUid },
-            });
-    }
-
     const slackConfig = {
       requestLabel: '',
       url: '',
-      name: requestData.referenceUid
-        ? existingData.name
-        : requestData.newData.name,
+      name: requestData.newData.name,
     };
     const result: any = await this.prisma.participantsRequest.create({
       data: { ...postData },
@@ -193,7 +179,7 @@ export class ParticipantsRequestService {
       slackConfig.requestLabel = 'Edit Labber Request';
       slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`;
       await this.awsService.sendEmail('EditMemberRequest', true, [], {
-        memberName: existingData.name,
+        memberName: result.newData.name,
         requestUid: result.uid,
         requesterEmailId: requestData.requesterEmailId,
         adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`,

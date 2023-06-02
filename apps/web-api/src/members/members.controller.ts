@@ -41,7 +41,7 @@ export class MemberController {
   @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
   @ApiOkResponseFromZod(ResponseMemberWithRelationsSchema)
   @ApiQueryFromZod(MemberDetailQueryParams)
-  findOne(
+  async findOne(
     @Req() request: Request,
     @ApiDecorator() { params: { uid } }: RouteShape['getMember']
   ) {
@@ -53,7 +53,12 @@ export class MemberController {
       ENABLED_RETRIEVAL_PROFILE
     );
     const builtQuery = builder.build(request.query);
-    return this.membersService.findOne(uid, builtQuery);
+    const member = await this.membersService.findOne(uid, builtQuery);
+    const repositories = await this.membersService.getRepositories(
+      member?.githubHandler
+    );
+    const memberResponse = { ...member, repositories };
+    return memberResponse;
   }
 
   @Api(server.route.modifyMember)

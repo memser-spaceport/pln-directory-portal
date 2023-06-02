@@ -19,6 +19,7 @@ export interface IMember {
   leadingTeams?: string[];
   openToWork?: boolean;
   linkedinHandle: string | null;
+  repositories: IGitRepositories[] | [];
 }
 
 export interface IMemberTeam {
