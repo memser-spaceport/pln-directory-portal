@@ -67,7 +67,7 @@ export default function Member({
 
       <Breadcrumb items={breadcrumbItems} />
 
-      <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-24">
+      <section className="space-x-7.5 mx-auto mb-10 flex max-w-6xl px-10 pt-24">
         <div className="card p-7.5 w-full">
           <MemberProfileHeader
             member={member}
@@ -88,9 +88,6 @@ export default function Member({
         {/* <div className="w-sidebar shrink-0">
           <AskToEditCard profileType="member" member={member} />
         </div> */}
-        <div className="w-sidebar shrink-0">
-          <AskToEditCard profileType="member" member={member} />
-        </div>
       </section>
     </>
   );
