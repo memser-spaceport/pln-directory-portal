@@ -6,6 +6,14 @@ import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseSkillSchema } from './skill';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
 
+export const GitHubRepositorySchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  url: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 export const MemberSchema = z.object({
   id: z.number().int(),
   uid: z.string(),
@@ -23,6 +31,7 @@ export const MemberSchema = z.object({
   locationUid: z.string(),
   openToWork: z.boolean(),
   linkedinHandler: z.string().nullish(),
+  repositories: GitHubRepositorySchema.array().optional(),
 });
 
 export const ResponseMemberSchema = MemberSchema.omit({ id: true }).strict();
@@ -33,6 +42,7 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   skills: ResponseSkillSchema.array().optional(),
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
 });
+
 
 export const CreateMemberSchema = MemberSchema.pick({
   name: true,

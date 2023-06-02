@@ -217,7 +217,7 @@ export function EditMemberModal({
           const member = data[0];
           let counter = 1;
           const teamAndRoles =
-            member.teamMemberRoles?.length &&
+            member?.teamMemberRoles?.length &&
             member.teamMemberRoles.map((item) => {
               return {
                 role: item.role,
@@ -289,7 +289,7 @@ export function EditMemberModal({
         .then((data) => {
           const member = data[0];
           let counter = 1;
-          let teamAndRoles = member.teamMemberRoles?.length
+          let teamAndRoles = member?.teamMemberRoles?.length
             ? member.teamMemberRoles
             : [];
           teamAndRoles = orderBy(

@@ -15,6 +15,7 @@ import { FileMigrationService } from '../utils/file-migration/file-migration.ser
 import { hashFileName } from '../utils/hashing';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { ParticipantRequestMemberSchema } from 'libs/contracts/src/schema/participants-request';
+import axios from 'axios';
 
 @Injectable()
 export class MembersService {
@@ -140,6 +141,58 @@ export class MembersService {
         },
       });
     }
+  }
+
+  async getRepositories(githubHandle) {
+    let repositories = [];
+    repositories = await axios
+      .post(
+        'https://api.github.com/graphql',
+        {
+          query: `{
+          user(login: "${githubHandle}") {
+            pinnedItems(first: 10, types: REPOSITORY) {
+              nodes {
+                ... on RepositoryInfo {
+                  name
+                  description
+                  url
+                  createdAt
+                  updatedAt
+                }
+              }
+            }
+          }
+        }`,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_GITHUB_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+      .then((v) => v.data.data.user?.pinnedItems?.nodes)
+      .catch((e) => console.log(e));
+
+    if (!repositories?.length) {
+      repositories = await axios
+        .get(`https://api.github.com/users/${githubHandle}/repos`)
+        .then((v) => {
+          const repoArray = v.data.map((item) => {
+            return {
+              name: item.name,
+              description: item.description,
+              url: item.html_url,
+              createdAt: item.created_at,
+              updatedAt: item.updated_at,
+            };
+          });
+          return repoArray;
+        })
+        .catch((e) => console.log(e.message));
+    }
+    return repositories;
   }
 
   async editMemberParticipantsRequest(participantsRequest, userEmail) {

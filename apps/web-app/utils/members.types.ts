@@ -1,5 +1,12 @@
 import { TMemberResponse } from '@protocol-labs-network/contracts';
 
+export interface IGitRepositories {
+  name?: string;
+  description?: string;
+  url?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 export interface IMember {
   discordHandle: string | null;
   email: string | null;
@@ -19,6 +26,7 @@ export interface IMember {
   leadingTeams?: string[];
   openToWork?: boolean;
   linkedinHandle: string | null;
+  repositories: IGitRepositories[];
 }
 
 export interface IMemberTeam {
@@ -63,14 +71,6 @@ export interface IFormValues {
   teamAndRoles: Roles[];
   skills: Skill[];
   openToWork: boolean;
-}
-
-export interface IGitRepositories {
-  name: string;
-  description: string;
-  url: string;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 export interface MemberProfileProjectsProps {

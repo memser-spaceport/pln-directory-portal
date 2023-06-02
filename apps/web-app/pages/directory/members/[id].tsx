@@ -23,10 +23,6 @@ import { IMember , IGitRepositories } from '../../../utils/members.types';
 import { parseMember, maskMemberDetails } from '../../../utils/members.utils';
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
-import {
-  getAllPinned,
-  getAllRepositories,
-} from '../../../utils/services/members';
 
 interface MemberProps {
   member: IMember;
@@ -34,7 +30,6 @@ interface MemberProps {
   backLink: string;
   isUserLoggedIn: boolean;
   userInfo: any;
-  repositories: IGitRepositories[];
 }
 
 export default function Member({
@@ -42,7 +37,6 @@ export default function Member({
   teams,
   backLink,
   userInfo,
-  repositories,
 }: MemberProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
@@ -88,7 +82,7 @@ export default function Member({
           <MemberProfileTeams teams={teams} member={member} />
           { 
             userInfo?.uid &&
-            <MemberProfileProjects repositories={repositories} />
+            <MemberProfileProjects repositories={member?.repositories} />
           }
         </div>
         {/* <div className="w-sidebar shrink-0">
@@ -158,15 +152,6 @@ export const getServerSideProps = async ({ query, res, req }) => {
   if(isMaskingRequired) {
     member = maskMemberDetails({...member});
   }
-  
-  let repositories = [];
-
-  if (member?.githubHandle !== '' && member?.githubHandle !== null) {
-    repositories = await getAllPinned(member?.githubHandle);
-    if (!repositories?.length) {
-      repositories = (await getAllRepositories(member?.githubHandle)) ?? [];
-    }
-  }
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
@@ -176,6 +161,6 @@ export const getServerSideProps = async ({ query, res, req }) => {
   );
 
   return {
-    props: { member, teams, backLink, isUserLoggedIn, userInfo, repositories }
+    props: { member, teams, backLink, isUserLoggedIn, userInfo }
   };
 };

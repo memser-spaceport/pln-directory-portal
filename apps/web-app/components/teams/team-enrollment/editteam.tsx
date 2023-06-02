@@ -574,7 +574,6 @@ export function EditTeamModal({
               handleDropDownChange={handleDropDownChange}
               handleImageChange={handleImageChange}
               imageUrl={imageUrl}
-              disableName={true}
               disableRequestorEmail={true}
               fromSettings={true}
             />
