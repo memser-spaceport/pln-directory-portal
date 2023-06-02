@@ -13,7 +13,7 @@ export function MemberProfileProjects({
     query: { id },
   } = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const displayRepos = repositories.slice(0, 3);
+  const displayRepos = repositories?.slice(0, 3) ?? [];
   // const seeAllInfoText =
   //   repositories?.length > 3
   //     ? "Click 'See All' to view all of the public repositories."
@@ -32,7 +32,7 @@ export function MemberProfileProjects({
         )}
       </h3>
       <div className="max-h-96 overflow-y-auto rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)] focus-within:outline-none focus:outline-none focus-visible:outline-none">
-        {displayRepos.map((project, i) => {
+        {displayRepos?.map((project, i) => {
           return (
             <ProfileProjectCard
               key={`${id}.${project.name}`}

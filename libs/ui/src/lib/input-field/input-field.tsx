@@ -73,7 +73,7 @@ export function InputField({
         {...props}
         type={showPassword ? 'text' : props.type}
         className={`mt-[12px] block w-full rounded-lg bg-white text-sm leading-6 text-slate-900  shadow-slate-300 transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-600 placeholder:opacity-50
-        ${icon ? 'pl-8' : 'pl-3'} ${hasClear ? 'pr-6' : 'pr-3'} on-focus
+        ${icon ? 'pl-8' : 'pl-3'} ${hasClear && props.type !== 'date' ? 'pr-6' : 'pr-2'} on-focus
         h-10 leading-10 disabled:bg-slate-100 ${
           props.className
         } ${requiredIndicator}`}
@@ -92,7 +92,7 @@ export function InputField({
 
       {hasClear ? (
         <button
-          className={`absolute inset-y-0 right-0 pr-2 ${
+          className={`absolute inset-y-0 top-9 ${props.type === 'date' ? 'right-8' : 'right-0 pr-2'} ${
             inputValue ? '' : 'hidden'
           }`}
           onClick={handleClear}
