@@ -96,7 +96,7 @@ export const parseMember = (member: TMemberResponse): IMember => {
     mainTeam,
     openToWork: member.openToWork || false,
     linkedinHandle: member.linkedinHandler || null,
-    repositories: member.repositories,
+    repositories: member.repositories ?? [],
   };
 };
 
