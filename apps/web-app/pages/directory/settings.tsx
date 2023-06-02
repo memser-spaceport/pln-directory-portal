@@ -418,7 +418,7 @@ export const getServerSideProps = async (ctx) => {
         return {
             redirect: {
                 permanent: false,
-                destination: PAGE_ROUTES.MEMBERS,
+                destination: PAGE_ROUTES.TEAMS,
             },
         };
     }

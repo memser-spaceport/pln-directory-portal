@@ -8,8 +8,7 @@ import { useRouter } from 'next/router';
 import { NextSeo } from 'next-seo';
 import nookies, { destroyCookie } from 'nookies';
 import { ReactElement, useEffect, useState } from 'react';
-import { toast } from 'react-toastify';
-import { LOGIN_MSG, LOGIN_FAILED_MSG, LOGOUT_MSG, RETRY_LOGIN_MSG , PAGE_ROUTES, LOGGED_IN_MSG, SOMETHING_WENT_WRONG} from '../../../constants';
+import { PAGE_ROUTES } from '../../../constants';
 import { LoadingOverlay } from '../../../components/layout/loading-overlay/loading-overlay';
 import { MembersDirectoryFilters } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters';
 import { IMembersFiltersValues } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters.types';
@@ -27,8 +26,10 @@ import {
   getMembersListOptions,
   getMembersOptionsFromQuery,
 } from '../../../utils/members.utils';
-import { ReactComponent as SuccessIcon } from '../../../public/assets/images/icons/success.svg';
 import EmailOtpVerificationModal from '../../../components/auth/email-otp-verification-modal';
+import { toast } from 'react-toastify';
+import { LOGIN_MSG } from '../../../constants';
+import { ReactComponent as SuccessIcon } from '../../../public/assets/images/icons/success.svg';
 
 type MembersProps = {
   members: IMember[];
@@ -61,9 +62,7 @@ export default function Members({
   useDirectoryFiltersFathomLogger('members', filterProperties);
 
   useEffect(() => {
-    Cookies.remove('state');
     const isVerified = Cookies.get('verified');
-    const params = Cookies.get('page_params');
     if(isVerified === 'true') {
       toast.success(LOGIN_MSG, {
         icon: <SuccessIcon />
@@ -71,36 +70,6 @@ export default function Members({
     } else if (isVerified === 'false') {
       setIsModalOpen(true);
     } 
-    switch (params) {
-      case "auth_error":
-        toast.error(LOGIN_FAILED_MSG, {
-          hideProgressBar: true,
-        });
-        break;
-      case "logout":
-        toast.info(LOGOUT_MSG, {
-          icon: <SuccessIcon />
-        });
-        break;
-      case "user_logged_out":
-        toast.info(RETRY_LOGIN_MSG, {
-          hideProgressBar: true
-        });
-        break;
-      case "user_logged_in":
-        toast.info(LOGGED_IN_MSG + '.', {
-          hideProgressBar: true
-        });
-        break;
-      case "server_error":
-        toast.info(SOMETHING_WENT_WRONG, {
-          hideProgressBar: true
-        });
-        break;
-      default:
-        break;
-    }
-    Cookies.remove('page_params');
     Cookies.remove('verified');
   }, [])
 

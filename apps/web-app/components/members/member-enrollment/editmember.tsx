@@ -528,9 +528,6 @@ export function EditMemberModal({
           const data = {
             participantType: ENROLLMENT_TYPE.MEMBER,
             referenceUid: id,
-            requesterEmailId: isProfileSettings
-              ? values.email
-              : values.requestorEmail,
             uniqueIdentifier: values.email,
             newData: {
               ...values,
@@ -546,7 +543,7 @@ export function EditMemberModal({
                 expires: 60,
                 path: '/',
               });
-              router.push(PAGE_ROUTES.MEMBERS);
+              router.push(PAGE_ROUTES.TEAMS);
               return false;
             }
             const res = await requestPendingCheck(values.email, id);

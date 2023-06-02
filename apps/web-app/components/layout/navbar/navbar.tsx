@@ -41,7 +41,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
       onClick: () => {
         if (!Cookies.get('refreshToken')) {
           Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
-          window.location.href = PAGE_ROUTES.MEMBERS;
+          window.location.href = PAGE_ROUTES.TEAMS;
         }
       }
     },
@@ -56,7 +56,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
         Cookies.remove('userInfo')
         Cookies.set('page_params', 'logout', { expires: 60, path: '/' });
         createLogoutChannel().postMessage('logout');
-        window.location.href = PAGE_ROUTES.MEMBERS;
+        window.location.href = PAGE_ROUTES.TEAMS;
       },
     },
   ];
