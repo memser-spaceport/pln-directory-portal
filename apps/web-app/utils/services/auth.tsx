@@ -15,7 +15,7 @@ export const createLogoutChannel = () => {
 
 export const logoutAllTabs = () => {
   createLogoutChannel().onmessage = async (msg) => {
-    window.location.href = PAGE_ROUTES.MEMBERS;
+    window.location.href = PAGE_ROUTES.TEAMS;
     await createLogoutChannel().close();
   };
 }

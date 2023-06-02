@@ -43,7 +43,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
     return {
       redirect: {
         permanent: false,
-        destination: PAGE_ROUTES.MEMBERS,
+        destination: PAGE_ROUTES.TEAMS,
       },
     };
   }
@@ -56,7 +56,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
     return {
       redirect: {
         permanent: false,
-        destination: PAGE_ROUTES.MEMBERS,
+        destination: PAGE_ROUTES.TEAMS,
       }
     };
   }
@@ -79,7 +79,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
     return {
       redirect: {
         permanent: false,
-        destination: PAGE_ROUTES.MEMBERS,
+        destination: PAGE_ROUTES.TEAMS,
       },
     };
   }

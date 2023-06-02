@@ -83,7 +83,7 @@ export function AskToEditCard({
   }
 
   return (
-    <div className="absolute top-5 right-1">
+    <div>
       {/* <h3 className="flex items-center text-lg font-semibold">
         <span className="mr-3 flex h-7 w-7 items-center justify-center rounded border-[0.5px] border-slate-200 bg-slate-100">
           <PencilAltIcon className="stroke-1.5 h-4 w-4" />
