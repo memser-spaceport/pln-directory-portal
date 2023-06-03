@@ -187,7 +187,7 @@ export function EditTeamModal({
     if(saveCompleted){
       toast(MSG_CONSTANTS.TEAM_UPDATE_MESSAGE)
     }
-  }, [saveCompleted, errors]);
+  }, [saveCompleted]);
 
   useEffect(() => {
     if(fromSettings){
@@ -362,6 +362,7 @@ export function EditTeamModal({
     async (e) => {
       if(isModified){
         setImageModified(false);
+        setSaveCompleted(false);
         e.preventDefault();
         // if (!executeRecaptcha) {
         //   console.log('Execute recaptcha not yet available');
@@ -550,7 +551,7 @@ export function EditTeamModal({
         <div className={`px-11 ${fromSettings ? 'bg-white  mt-[24px] pt-[24px] rounded-t-[8px]' : ''} `}>
           <span className="font-size-14 text-sm">
             Please fill out only the fields you would like to change for
-            this member. If there is something you want to change that is
+            this team. If there is something you want to change that is
             not available, please leave a detailed explanation in
             &quot;Additional Notes&quot;. If you don&apos;t want to change
             a field, leave it blank.
@@ -574,6 +575,7 @@ export function EditTeamModal({
               handleDropDownChange={handleDropDownChange}
               handleImageChange={handleImageChange}
               imageUrl={imageUrl}
+              isEditMode={true}
               disableRequestorEmail={true}
               fromSettings={true}
             />

@@ -29,6 +29,7 @@ export default function Settings({
     const [selectedMember, setSelectedMember] = useState(memberSelected ? memberSelected : (membersDropdown && membersDropdown.length) ? membersDropdown[0] : null);
     const [isModified, setModified] = useState<boolean>(false);
     const [isTeamImageModified, setTeamImageModified] = useState<boolean>(false);
+    const [isMemberImageModified, setMemberImageModified] = useState<boolean>(false);
     const [isModifiedMember, setModifiedMember] = useState<boolean>(false);
     const [isPflModified, setModifiedProfile] = useState<boolean>(false);
     const [openValidationPopup, setOpenValidationPopup] = useState<boolean>(false);
@@ -46,6 +47,16 @@ export default function Settings({
 
     }, [isTeamImageModified]);
 
+    useEffect(() => {
+        if (isMemberImageModified) {
+            if(userInfo?.roles.length && userInfo?.roles.includes(ADMIN_ROLE)){
+                updateMemberAutocomplete();
+            }
+        }
+
+    }, [isMemberImageModified]);
+
+
     const updateTeamAutocomplete = () => {
         setSelectedTeam({ label: '', value: '' })
         fetchTeam(selectedTeam.value).then(data => {
@@ -53,6 +64,17 @@ export default function Settings({
                 "label": data.name,
                 "value": data.uid,
                 "logo": data?.logo?.url
+            });
+        });
+    }
+
+    const updateMemberAutocomplete = () => {
+        setSelectedMember({ label: '', value: '' })
+        fetchMember(selectedMember.value).then(data => {
+            setSelectedMember({
+                "label": data.name,
+                "value": data.uid,
+                "logo": data?.image?.url
             });
         });
     }
@@ -277,6 +299,7 @@ export default function Settings({
                     id={selectedMember?.value}
                     isProfileSettings={true}
                     setModified={setModifiedMember}
+                    setImageModified={setMemberImageModified}
                 />
             )
         } else if (settings === SETTINGS_CONSTANTS.PROFILE_SETTINGS){
