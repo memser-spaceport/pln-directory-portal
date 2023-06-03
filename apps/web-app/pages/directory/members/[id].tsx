@@ -19,7 +19,7 @@ import { AIRTABLE_REGEX } from '../../../constants';
 import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcrumb.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
-import { IMember , IGitRepositories } from '../../../utils/members.types';
+import { IMember, IGitRepositories } from '../../../utils/members.types';
 import { parseMember, maskMemberDetails } from '../../../utils/members.utils';
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
@@ -27,6 +27,7 @@ import {
   getAllPinned,
   getAllRepositories,
 } from '../../../utils/services/members';
+import { MemberProfileLoginStrip } from '../../../components/members/member-profile/member-profile-login-strip/member-profile-login-strip';
 
 interface MemberProps {
   member: IMember;
@@ -52,13 +53,13 @@ export default function Member({
   const description = member.mainTeam
     ? `${member.mainTeam.role} at ${member.mainTeam.name}`
     : 'Contributor';
-  
+
   useEffect(() => {
     const params = Cookies.get('page_params');
-    if(params === "user_logged_in") {
-      toast.info(LOGGED_IN_MSG + ', '+ SCHEDULE_MEETING_MSG , {
-        hideProgressBar: true
-      })
+    if (params === 'user_logged_in') {
+      toast.info(LOGGED_IN_MSG + ', ' + SCHEDULE_MEETING_MSG, {
+        hideProgressBar: true,
+      });
     }
     Cookies.remove('page_params');
   }, []);
@@ -74,22 +75,26 @@ export default function Member({
       <Breadcrumb items={breadcrumbItems} />
 
       <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-24">
-        <div className="card p-7.5 w-full">
-          <MemberProfileHeader
-            member={member}
-            userInfo={userInfo}
-          />
-          <MemberProfileDetails member={member} userInfo={userInfo} />
-          <MemberProfileOfficeHours
-            url={member.officeHours}
-            userInfo={userInfo}
-            member={member}
-          />
-          <MemberProfileTeams teams={teams} member={member} />
-          { 
-            userInfo?.uid &&
-            <MemberProfileProjects repositories={repositories} />
-          }
+        <div>
+          <MemberProfileLoginStrip member={member} userInfo={userInfo} />
+
+          <div className="shadow-card--slate-900 p-7.5 w-full rounded-b-xl bg-white text-sm">
+            <MemberProfileHeader member={member} userInfo={userInfo} />
+            <MemberProfileDetails member={member} userInfo={userInfo} />
+            <MemberProfileOfficeHours
+              url={member.officeHours}
+              userInfo={userInfo}
+              member={member}
+            />
+            <MemberProfileTeams teams={teams} member={member} />
+            {userInfo?.uid && (
+              <MemberProfileProjects
+                repositories={repositories}
+                userInfo={userInfo}
+                member={member}
+              />
+            )}
+          </div>
         </div>
         {/* <div className="w-sidebar shrink-0">
           <AskToEditCard profileType="member" member={member} />
@@ -107,9 +112,12 @@ Member.getLayout = function getLayout(page: ReactElement) {
 };
 
 export const getServerSideProps = async ({ query, res, req }) => {
-  const isMaskingRequired = req?.cookies?.authToken ? false : true
-  const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
-  const isUserLoggedIn = req?.cookies?.userInfo && req?.cookies?.authToken ? true : false
+  const isMaskingRequired = req?.cookies?.authToken ? false : true;
+  const userInfo = req?.cookies?.userInfo
+    ? JSON.parse(req?.cookies?.userInfo)
+    : {};
+  const isUserLoggedIn =
+    req?.cookies?.userInfo && req?.cookies?.authToken ? true : false;
   const { id, backLink = '/directory/members' } = query as {
     id: string;
     backLink: string;
@@ -158,10 +166,10 @@ export const getServerSideProps = async ({ query, res, req }) => {
     };
   }
 
-  if(isMaskingRequired) {
-    member = maskMemberDetails({...member});
+  if (isMaskingRequired) {
+    member = maskMemberDetails({ ...member });
   }
-  
+
   let repositories = [];
 
   if (member?.githubHandle !== '' && member?.githubHandle !== null) {
@@ -179,6 +187,6 @@ export const getServerSideProps = async ({ query, res, req }) => {
   );
 
   return {
-    props: { member, teams, backLink, isUserLoggedIn, userInfo, repositories }
+    props: { member, teams, backLink, isUserLoggedIn, userInfo, repositories },
   };
 };
