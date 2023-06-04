@@ -16,7 +16,7 @@ export function TeamProfileHeader({
 }) {
   const { logo, name, industryTags, technologies } = team;
   return (
-    <div className="relative flex space-x-4">
+    <div className="relative flex space-x-4 w-full">
       <div
         className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-slate-200 ${
           logo ? 'bg-white' : 'bg-slate-200'
@@ -35,7 +35,7 @@ export function TeamProfileHeader({
           <UserGroupIcon className="w-22 h-22 mt-2 fill-white" />
         )}
       </div>
-      <div className="space-y-2 max-w-md">
+      <div className="space-y-2 w-2/4 max-w-2xl">
         <Tooltip
           asChild
           trigger={
@@ -83,8 +83,10 @@ export function TeamProfileHeader({
       </div>
       {(( loggedInMember?.roles?.length > 0 && loggedInMember.roles.includes('DIRECTORYADMIN')) 
           || (loggedInMember?.leadingTeams?.length > 0 && loggedInMember.leadingTeams.includes(team.id))) && (
-          <AskToEditCard profileType="team" team={team} />
-        )}
+          <div className="flex justify-end w-1/4 mt-2">   
+            <AskToEditCard profileType="team" team={team} />
+          </div> 
+          )}
     </div>
   );
 }

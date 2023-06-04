@@ -72,6 +72,7 @@ export default function AddMemberBasicForm(props) {
           onChange={onChange}
           onKeyDown={(e) => e.preventDefault()}
           value={values?.plnStartDate}
+          hasClear={true}
           label="PLN Join Date"
           className="custom-grey custom-outline-none border"
         />

@@ -21,12 +21,12 @@ import { DiscardChangesPopup } from "libs/ui/src/lib/modals/confirmation";
 
 export default function Settings({
     backLink,
-    userInfo, teamsDropdown, membersDropdown }) {
+    userInfo, teamsDropdown, membersDropdown, teamSelected, memberSelected, settingCategory }) {
 
-    const [activeSetting, setActiveSetting] = useState(SETTINGS_CONSTANTS.PROFILE_SETTINGS);
-    const [selectedTeam, setSelectedTeam] = useState((teamsDropdown && teamsDropdown.length) ? teamsDropdown[0] : null);
+    const [activeSetting, setActiveSetting] = useState(settingCategory ?? SETTINGS_CONSTANTS.PROFILE_SETTINGS);
+    const [selectedTeam, setSelectedTeam] = useState(teamSelected ? teamSelected : (teamsDropdown && teamsDropdown.length) ? teamsDropdown[0] : null);
     const [teamsDropdownOptions, setteamsDropdown] = useState(teamsDropdown ? teamsDropdown : null);
-    const [selectedMember, setSelectedMember] = useState((membersDropdown && membersDropdown.length) ? membersDropdown[0] : null);
+    const [selectedMember, setSelectedMember] = useState(memberSelected ? memberSelected : (membersDropdown && membersDropdown.length) ? membersDropdown[0] : null);
     const [isModified, setModified] = useState<boolean>(false);
     const [isTeamImageModified, setTeamImageModified] = useState<boolean>(false);
     const [isModifiedMember, setModifiedMember] = useState<boolean>(false);
@@ -61,7 +61,7 @@ export default function Settings({
         fetchMember(userInfo.uid).then((data) => {
             if (userInfo?.leadingTeams?.length) {
                 const teamsDropdownValues = userInfo?.leadingTeams?.map(teamUid => {
-                    const filteredTeam = data.teamMemberRoles.filter(teamObj => {
+                    const filteredTeam = data?.teamMemberRoles.filter(teamObj => {
                         return teamObj?.team?.uid === teamUid
                     });
                     if (filteredTeam && filteredTeam.length) {
@@ -84,30 +84,30 @@ export default function Settings({
         })
     }
 
-    useEffect(() => {
-        if(router.query?.id && router.query?.from){
-            if(router.query?.from === SETTINGS_CONSTANTS.TEAM){
-                setActiveSetting(SETTINGS_CONSTANTS.TEAM_SETTINGS);
-                setSelectedTeam({
-                    "label": router.query.name,
-                    "value": router.query.id,
-                    "logo":  router.query.logo ?? null,
-                    "icon":  router.query.logo ?? null
-                })
-            }else if(router.query.from === SETTINGS_CONSTANTS.MEMBER){
-                if(router.query.id === userInfo.uid){
-                    setActiveSetting(SETTINGS_CONSTANTS.PROFILE_SETTINGS);
-                }else{
-                    setActiveSetting(SETTINGS_CONSTANTS.MEMBER_SETTINGS);
-                    setSelectedMember({
-                        "label": router.query.name,
-                        "value": router.query.id,
-                        "logo":  router.query.logo ?? null
-                    });
-                }
-            }
-        }
-      }, [router.query]);
+    // useEffect(() => {
+    //     if(router.query?.id && router.query?.from){
+    //         if(router.query?.from === SETTINGS_CONSTANTS.TEAM){
+    //             setActiveSetting(SETTINGS_CONSTANTS.TEAM_SETTINGS);
+    //             setSelectedTeam({
+    //                 "label": router.query.name,
+    //                 "value": router.query.id,
+    //                 "logo":  router.query.logo,
+    //                 "icon":  router.query.logo
+    //             })
+    //         }else if(router.query.from === SETTINGS_CONSTANTS.MEMBER){
+    //             if(router.query.id === userInfo.uid){
+    //                 setActiveSetting(SETTINGS_CONSTANTS.PROFILE_SETTINGS);
+    //             }else{
+    //                 setActiveSetting(SETTINGS_CONSTANTS.MEMBER_SETTINGS);
+    //                 setSelectedMember({
+    //                     "label": router.query.name,
+    //                     "value": router.query.id,
+    //                     "logo":  router.query.logo
+    //                 });
+    //             }
+    //         }
+    //     }
+    //   }, [router.query]);
 
     const { breadcrumbItems } = useProfileBreadcrumb({
         backLink,
@@ -406,9 +406,35 @@ Settings.getLayout = function getLayout(page: ReactElement) {
 };
 
 export const getServerSideProps = async (ctx) => {
-    const { res, req } = ctx;
+    const { res, req, query } = ctx;
+    let memberSelected=null;
+    let teamSelected=null;
+    let settingCategory='';
     const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
     const isUserLoggedIn = req?.cookies?.authToken && req?.cookies?.userInfo ? true : false;
+
+    if(query?.id && query?.from){
+        if(query?.from === SETTINGS_CONSTANTS.TEAM){
+            settingCategory = (SETTINGS_CONSTANTS.TEAM_SETTINGS);
+            teamSelected = ({
+                "label": query.name,
+                "value": query.id,
+                "logo":  query.logo ?? null,
+                "icon":  query.logo ?? null
+            })
+        }else if(query.from === SETTINGS_CONSTANTS.MEMBER){
+            if(query.id === userInfo.uid){
+                settingCategory = (SETTINGS_CONSTANTS.PROFILE_SETTINGS);
+            }else{
+                settingCategory = (SETTINGS_CONSTANTS.MEMBER_SETTINGS);
+                memberSelected = {
+                    "label": query.name,
+                    "value": query.id,
+                    "logo":  query.logo ?? null
+                };
+            }
+        }
+    }
 
     if (!userInfo?.uid) {
         setCookie(ctx, "page_params", "user-logged-out", {
@@ -418,7 +444,7 @@ export const getServerSideProps = async (ctx) => {
         return {
             redirect: {
                 permanent: false,
-                destination: PAGE_ROUTES.MEMBERS,
+                destination: PAGE_ROUTES.TEAMS,
             },
         };
     }
@@ -468,7 +494,7 @@ export const getServerSideProps = async (ctx) => {
             }
         } else if (userInfo?.leadingTeams?.length) {
             teamsDropdown = userInfo?.leadingTeams?.map(teamUid => {
-                const filteredTeam = member.teamMemberRoles.filter(teamObj => {
+                const filteredTeam = member?.teamMemberRoles.filter(teamObj => {
                     return teamObj?.team?.uid === teamUid
                 });
                 if (filteredTeam && filteredTeam.length) {
@@ -491,6 +517,6 @@ export const getServerSideProps = async (ctx) => {
     );
 
     return {
-        props: { isUserLoggedIn, userInfo, teamsDropdown , membersDropdown },
+        props: { isUserLoggedIn, userInfo, teamsDropdown , membersDropdown, teamSelected, memberSelected, settingCategory },
     };
 };

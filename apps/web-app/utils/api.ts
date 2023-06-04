@@ -117,17 +117,17 @@ api.interceptors.response.use(
           }})
           .catch((error) => {
             Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
-            window.location.href="/directory/members";
+            window.location.href="/directory/teams";
             return Promise.reject(error);
           });
       }  else {
         Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
-        window.location.href="/directory/members";
+        window.location.href="/directory/teams";
       }   
     } else {
       if(error?.response?.status === 500) {
         Cookies.set('page_params', 'server_error', { expires: 60, path: '/' });
-        window.location.href="/directory/members";
+        window.location.href="/directory/teams";
       }
       return Promise.reject(error);
     } 

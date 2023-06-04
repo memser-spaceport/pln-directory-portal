@@ -217,7 +217,7 @@ export function EditMemberModal({
           const member = data[0];
           let counter = 1;
           const teamAndRoles =
-            member.teamMemberRoles?.length &&
+            member?.teamMemberRoles?.length &&
             member.teamMemberRoles.map((item) => {
               return {
                 role: item.role,
@@ -289,7 +289,7 @@ export function EditMemberModal({
         .then((data) => {
           const member = data[0];
           let counter = 1;
-          let teamAndRoles = member.teamMemberRoles?.length
+          let teamAndRoles = member?.teamMemberRoles?.length
             ? member.teamMemberRoles
             : [];
           teamAndRoles = orderBy(
@@ -528,9 +528,6 @@ export function EditMemberModal({
           const data = {
             participantType: ENROLLMENT_TYPE.MEMBER,
             referenceUid: id,
-            requesterEmailId: isProfileSettings
-              ? values.email
-              : values.requestorEmail,
             uniqueIdentifier: values.email,
             newData: {
               ...values,
@@ -546,7 +543,7 @@ export function EditMemberModal({
                 expires: 60,
                 path: '/',
               });
-              router.push(PAGE_ROUTES.MEMBERS);
+              router.push(PAGE_ROUTES.TEAMS);
               return false;
             }
             const res = await requestPendingCheck(values.email, id);

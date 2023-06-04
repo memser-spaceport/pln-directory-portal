@@ -55,9 +55,9 @@ export function Autocomplete({
   );
 
   useMemo(() => {
-    if (searchTerm === '') {
+    // if (searchTerm === '') {
       setSearchTerm(selectedOption.label);
-    }
+    // }
   }, [selectedOption]);
 
   useEffect(() => {

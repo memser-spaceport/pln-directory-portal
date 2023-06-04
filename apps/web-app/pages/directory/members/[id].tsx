@@ -23,11 +23,8 @@ import { IMember, IGitRepositories } from '../../../utils/members.types';
 import { parseMember, maskMemberDetails } from '../../../utils/members.utils';
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
-import {
-  getAllPinned,
-  getAllRepositories,
-} from '../../../utils/services/members';
 import { MemberProfileLoginStrip } from '../../../components/members/member-profile/member-profile-login-strip/member-profile-login-strip';
+
 
 interface MemberProps {
   member: IMember;
@@ -35,7 +32,6 @@ interface MemberProps {
   backLink: string;
   isUserLoggedIn: boolean;
   userInfo: any;
-  repositories: IGitRepositories[];
 }
 
 export default function Member({
@@ -43,7 +39,6 @@ export default function Member({
   teams,
   backLink,
   userInfo,
-  repositories,
 }: MemberProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
@@ -89,7 +84,7 @@ export default function Member({
             <MemberProfileTeams teams={teams} member={member} />
             {userInfo?.uid && (
               <MemberProfileProjects
-                repositories={repositories}
+                repositories={member?.repositories}
                 userInfo={userInfo}
                 member={member}
               />
@@ -99,9 +94,6 @@ export default function Member({
         {/* <div className="w-sidebar shrink-0">
           <AskToEditCard profileType="member" member={member} />
         </div> */}
-        <div className="w-sidebar shrink-0">
-          <AskToEditCard profileType="member" member={member} />
-        </div>
       </section>
     </>
   );
@@ -170,15 +162,6 @@ export const getServerSideProps = async ({ query, res, req }) => {
     member = maskMemberDetails({ ...member });
   }
 
-  let repositories = [];
-
-  if (member?.githubHandle !== '' && member?.githubHandle !== null) {
-    repositories = await getAllPinned(member?.githubHandle);
-    if (!repositories?.length) {
-      repositories = (await getAllRepositories(member?.githubHandle)) ?? [];
-    }
-  }
-
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
   res.setHeader(
@@ -187,6 +170,6 @@ export const getServerSideProps = async ({ query, res, req }) => {
   );
 
   return {
-    props: { member, teams, backLink, isUserLoggedIn, userInfo, repositories },
+    props: { member, teams, backLink, isUserLoggedIn, userInfo }
   };
 };
