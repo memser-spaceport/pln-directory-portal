@@ -313,7 +313,9 @@ export function EditMemberModal({
             email: member.email,
             imageUid: member.imageUid,
             imageFile: null,
-            plnStartDate: null,
+            plnStartDate: member.plnStartDate ? new Date(member.plnStartDate).toLocaleDateString(
+              'af-ZA'
+            ):null,
             city: member.location?.city,
             region: member.location?.region,
             country: member.location?.country,
