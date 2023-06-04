@@ -52,65 +52,70 @@ export class AuthService {
     }
   }
 
+  async getClientToken() {
+    const response = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
+      "client_id": process.env.AUTH_APP_CLIENT_ID,
+      "client_secret": process.env.AUTH_APP_CLIENT_SECRET,
+      "grant_type": "client_credentials",
+      "grantTypes": ["client_credentials", "authorization_code", "refresh_token"]
+    })
+
+    return response.data.access_token;
+  }
+
   async getUserInfo(result) {
     try {
       const idToken = result.data.id_token;
       const decoded: any = jwt_decode(idToken);
       const userEmail = decoded.email;
-      // const idFromAuth = decoded.sub;
+       const idFromAuth = decoded.sub;
 
       // If email id is not available in id token, then user needs to enter and validate email id in ui
       // Get client token.. for client to access email validation
       if (!userEmail) {
-        const response = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
-          "client_id": process.env.AUTH_APP_CLIENT_ID,
-          "client_secret": process.env.AUTH_APP_CLIENT_SECRET,
-          "grant_type": "client_credentials",
-          "grantTypes": ["client_credentials", "authorization_code", "refresh_token"]
-        })
-        const notificationToken = response.data;
+         const clientToken = await this.getClientToken()
         return {
-          notificationToken: notificationToken.access_token,
           accessToken: result.data.access_token,
           refreshToken: result.data.refresh_token,
+          clientToken,
           idToken
         }
       }
 
 
-      // Search by external id. If user found, send the user details with tokens
-      // let foundUser: any = await this.prismaService.member.findUnique({
-      //   where: { externalId: idFromAuth },
-      //   include: { image: true, memberRoles: true, teamMemberRoles: true },
-      // });
+     // Search by external id. If user found, send the user details with tokens
+      let foundUser: any = await this.prismaService.member.findUnique({
+        where: { externalId: idFromAuth },
+        include: { image: true, memberRoles: true, teamMemberRoles: true },
+      });
 
-      // if (foundUser) {
-      //   return {
-      //     userInfo: {
-      //       name: foundUser.name,
-      //       email: foundUser?.email,
-      //       profileImageUrl: foundUser?.image?.url,
-      //       uid: foundUser.uid,
-      //       roles: foundUser.memberRoles.map((r) => r.name),
-      //       leadingTeams: foundUser.teamMemberRoles.filter((role) => role.teamLead)
-      //       .map(role => role.teamUid)
-      //     },
-      //     accessToken: result.data.access_token,
-      //     refreshToken: result.data.refresh_token,
-      //   };
-      // }
+      if (foundUser) {
+        return {
+          userInfo: {
+            name: foundUser.name,
+            email: foundUser?.email,
+            profileImageUrl: foundUser?.image?.url,
+            uid: foundUser.uid,
+            roles: foundUser.memberRoles.map((r) => r.name),
+            leadingTeams: foundUser.teamMemberRoles.filter((role) => role.teamLead)
+            .map(role => role.teamUid)
+          },
+          accessToken: result.data.access_token,
+          refreshToken: result.data.refresh_token,
+        };
+      }
 
       // If there is no user available for external id, then find by user by email
       // and then update the external id for that user and send userinfo, tokens
-      const foundUser = await this.prismaService.member.findUnique({
+      foundUser = await this.prismaService.member.findUnique({
         where: { email: userEmail },
         include: { image: true, memberRoles: true , teamMemberRoles: true },
       });
       if (foundUser) {
-        // await this.prismaService.member.update({
-        //   where: { email: userEmail },
-        //   data: { externalId: idFromAuth },
-        // });
+         await this.prismaService.member.update({
+           where: { email: userEmail },
+          data: { externalId: idFromAuth },
+         });
         return {
           userInfo: {
             name: foundUser.name,
@@ -156,6 +161,19 @@ export class AuthService {
     return this.getUserInfo(result);
   }
 
+  async findUserInSystemByEmail(userEmail) {
+      const existingUser = await this.getUserInfoByEmail(userEmail);
+      if(existingUser) {
+        return existingUser
+      }
+
+      const requestedUser = await this.prismaService.participantsRequest.findFirst({
+        where: {uniqueIdentifier: userEmail, status: "PENDING", referenceUid: null}
+      })
+
+      return requestedUser;
+  }
+
   async getUserInfoByEmail(userEmail) {
     const foundUser: any = await this.prismaService.member.findUnique({
       where: { email: userEmail },
@@ -172,15 +190,42 @@ export class AuthService {
           .map(role => role.teamUid)
       }
     }
-
     return null
   }
 
-  async linkEmailWithAccount(email, accessToken, notificationToken) {
+  async updateEmailAndLinkAccount(oldEmail, newEmail, accessToken, clientToken) {
+    let newTokens;
+    let updatedUser;
+    await this.prismaService.$transaction(async (tx) => {
+      // Update new email
+      updatedUser = await this.prismaService.member.update({
+        where: {email: oldEmail},
+        data: {email: newEmail},
+        include: { image: true, memberRoles: true, teamMemberRoles: true },
+      })
+
+      // Link new email to auth account
+      newTokens = await this.linkEmailWithAccount(newEmail, accessToken, clientToken)
+    })
+    return {
+      newTokens,
+      userInfo: {
+        name: updatedUser.name,
+        email: updatedUser.email,
+        profileImageUrl: updatedUser.image?.url,
+        uid: updatedUser.uid,
+        roles: updatedUser.memberRoles?.map((r) => r.name),
+        leadingTeams: updatedUser.teamMemberRoles?.filter((role) => role.teamLead)
+          .map(role => role.teamUid)
+      }
+    };
+  }
+
+  async linkEmailWithAccount(email, accessToken, clientToken) {
     try {
-     const linkResult =  await axios.put(`${process.env.AUTH_API_URL}/auth/account`, { token: accessToken, email: email }, {
+     const linkResult =  await axios.put(`${process.env.AUTH_API_URL}/admin/auth/account`, { token: accessToken, email: email }, {
         headers: {
-          Authorization: `Bearer ${notificationToken}`
+          Authorization: `Bearer ${clientToken}`
         }
       })
     const newTokens = linkResult.data;
@@ -193,28 +238,21 @@ export class AuthService {
     }
   }
 
-  async verifyEmailOtp(otp, otpToken, notificationToken) {
-   try {
-    const payload = {
-      code: otp,
-      token: otpToken,
+  async verifyEmailOtp(otp, otpToken, clientToken) {
+   const payload = {
+    code: otp,
+    token: otpToken,
+  }
+  const header = {
+    headers: {
+      Authorization: `Bearer ${clientToken}`
     }
-    const header = {
-      headers: {
-        Authorization: `Bearer ${notificationToken}`
-      }
-    }
-    const verifyOtpResult = await axios.post(`${process.env.AUTH_API_URL}/mfa/otp/verify`, payload, header)
-    return verifyOtpResult?.data?.valid ? true : false;
-   } catch (error) {
-    if (error.response) {
-      throw new HttpException(error?.response?.data?.message, error?.response?.status)
-    }
-    throw new InternalServerErrorException("Unexpected error");
-   }
+  }
+  const verifyOtpResult = await axios.post(`${process.env.AUTH_API_URL}/mfa/otp/verify`, payload, header)
+  return verifyOtpResult?.data
   }
 
-  async sendEmailOtpForVerification(email, notificationToken) {
+  async sendEmailOtpForVerification(email, clientToken) {
     try {
       const payload = {
         recipientAddress: email,
@@ -222,7 +260,7 @@ export class AuthService {
       }
       const header = {
         headers: {
-          Authorization: `Bearer ${notificationToken}`
+          Authorization: `Bearer ${clientToken}`
         }
       }
       const sendOtpResult = await axios.post(`${process.env.AUTH_API_URL}/mfa/otp`, payload, header);

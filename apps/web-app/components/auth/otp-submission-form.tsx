@@ -16,11 +16,11 @@ function OtpSubmissionForm(props) {
   const inputRefs = useRef([]);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const onOtpSubmit = (e) => {
+  const onOtpSubmit = async (e) => {
     e.preventDefault();
     if (isOtpValid()) {
       if (onVerifyOtp) {
-        onVerifyOtp(otp)
+       await onVerifyOtp(otp)
       }
     } else {
       console.log('here in invalid')
@@ -90,12 +90,13 @@ function OtpSubmissionForm(props) {
     return otp.join('').length === 6;
   };
 
-  const handleResendClick = () => {
+  const handleResendClick = async (e) => {
+    e.preventDefault()
     // Set timer to 60 seconds for example, adjust as needed
     if (onResendOtp) {
       setErrorMessage('')
       setOtp(['', '', '', '', '', ''])
-      onResendOtp()
+      await onResendOtp()
     }
   };
 
@@ -136,7 +137,7 @@ function OtpSubmissionForm(props) {
         <div className="evo__header__desc"><p className="evo__header__desc__text">{desc}</p></div>
       </div>
 
-      <div onSubmit={onOtpSubmit} className="evo__body">
+      <form onSubmit={onOtpSubmit} className="evo__body">
         {/*** OTP ***/}
         <div className="evo__body__otp">
           {otp.map((digit, index) => (
@@ -167,7 +168,7 @@ function OtpSubmissionForm(props) {
           {!showResend && <div className="evo__body__submit__timer">{`Resend passcode in ${formatTime(resendInSeconds)}`}</div>}
           <button onClick={onOtpSubmit} className="evo__body__submit__btn">Verify</button>
         </div>
-      </div>
+      </form>
 
 
     </div>

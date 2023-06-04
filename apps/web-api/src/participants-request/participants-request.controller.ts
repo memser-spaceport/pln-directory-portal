@@ -48,17 +48,17 @@ export class ParticipantsRequestController {
       participantType === ParticipantType.MEMBER.toString() &&
       !ParticipantRequestMemberSchema.safeParse(postData).success
     ) {
-      throw new ForbiddenException();
+      throw new BadRequestException("Validation failed")
     } else if (
       participantType === ParticipantType.TEAM.toString() &&
       !ParticipantRequestTeamSchema.safeParse(postData).success
     ) {
-      throw new ForbiddenException();
+      throw new BadRequestException("Validation failed")
     } else if (
       participantType !== ParticipantType.TEAM.toString() &&
       participantType !== ParticipantType.MEMBER.toString()
     ) {
-      throw new ForbiddenException();
+      throw new BadRequestException("Validation failed")
     }
 
     const checkDuplicate = await this.participantsRequestService.findDuplicates(

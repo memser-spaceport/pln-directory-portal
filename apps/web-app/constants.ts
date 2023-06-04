@@ -154,3 +154,17 @@ export const BTN_LABEL_CONSTANTS = {
 }
 
 export const ADMIN_ROLE = 'DIRECTORYADMIN';
+export const EMAIL_OTP_CONSTANTS = {
+  INITIAL_LOGIN: {
+    sendEmailTitle: "Verify Email",
+    sendEmailDesc: "Please enter the membership email you used to create your directory profile. Don't remember? Contact support supportmail@protocol.ai",
+    verifyOtpTitle: "Enter Code",
+    verifyOtpDesc: "Please enter the code sent to"
+  },
+  CHANGE_EMAIL: {
+    sendEmailTitle: "Enter New Email",
+    sendEmailDesc: "",
+    verifyOtpTitle: "Enter Code",
+    verifyOtpDesc: "Please enter the code sent to"
+  }
+}

@@ -8,6 +8,7 @@ import { RedisService } from '../utils/redis/redis.service';
 import { SlackService } from '../utils/slack/slack.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { getRandomId } from '../utils/helper/helper';
+import axios from 'axios';
 @Injectable()
 export class ParticipantsRequestService {
   constructor(
@@ -263,6 +264,7 @@ export class ParticipantsRequestService {
       url: '',
       name: dataToProcess.name,
     };
+
     // Mandatory fields
     dataToSave['name'] = dataToProcess.name;
     dataToSave['email'] = dataToProcess.email;
@@ -393,6 +395,14 @@ export class ParticipantsRequestService {
       name: dataToProcess.name,
     };
 
+    const isEmailChange = existingData.email !== dataFromDB.email ? true: false;
+    if(isEmailChange) {
+      // foundUser = await this.prisma.member.findUnique({where: {email: dataFromDB.email}});
+     // if(foundUser) {
+      //  throw new BadRequestException("Invalid email")
+     // }
+    }
+
     // Mandatory fields
     dataToSave['name'] = dataToProcess.name;
     dataToSave['email'] = dataToProcess.email;
@@ -522,6 +532,27 @@ export class ParticipantsRequestService {
         where: { uid: dataFromDB.referenceUid },
         data: { ...dataToSave },
       });
+
+      if(isEmailChange) {
+        const response = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
+          "client_id": process.env.AUTH_APP_CLIENT_ID,
+          "client_secret": process.env.AUTH_APP_CLIENT_SECRET,
+          "grant_type": "client_credentials",
+          "grantTypes": ["client_credentials", "authorization_code", "refresh_token"]
+        })
+
+        const clientToken =  response.data.access_token;
+        const headers = {
+          Authorization: `Bearer ${clientToken}`
+        }
+        const authPayload = {
+          email: dataToSave.email,
+          existingEmail: existingData.email,
+          accountId: existingData.externalId
+        }
+         await axios.put(`${process.env.AUTH_API_URL}/admin/auth/account/email`, authPayload, {headers: headers}
+        )
+      }
 
       // Updating status
       await tx.participantsRequest.update({

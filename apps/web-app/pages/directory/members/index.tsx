@@ -69,7 +69,7 @@ export default function Members({
       });
     } else if (isVerified === 'false') {
       setIsModalOpen(true);
-    } 
+    }
     Cookies.remove('verified');
   }, [])
 
@@ -114,7 +114,6 @@ export default function Members({
           router.push(PAGE_ROUTES.MEMBERS);
         }}
       />
-    <EmailOtpVerificationModal/>
     </>
   );
 }
