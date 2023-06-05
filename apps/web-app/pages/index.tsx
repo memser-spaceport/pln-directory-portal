@@ -9,14 +9,18 @@ import { Mission } from '../components/portal/sections/mission/mission';
 import { Projects } from '../components/portal/sections/projects/projects';
 import { Substack } from '../components/portal/sections/substack/substack';
 import { PortalLayout } from '../layouts/portal-layout';
+import { NetworkSpotlight } from '../components/portal/sections/spotlight/network-spotlight';
+import api from '../utils/api';
+import { NW_SPOTLIGHT_CONSTANTS } from '../constants';
 
-export default function Index() {
+export default function Index({videoDetails,playlistDetails}) {
   return (
     <div>
       <Mission />
       <PortalDivider />
       <div className="bg-white px-6 py-24 md:px-16 md:py-[120px]">
         <div className="mx-auto max-w-[1110px]">
+          <NetworkSpotlight videoDetails={videoDetails} playlistDetails={playlistDetails} />
           <Directory />
         </div>
       </div>
@@ -48,7 +52,34 @@ Index.getLayout = function getLayout(page: ReactElement) {
   return <PortalLayout>{page}</PortalLayout>;
 };
 
+const getVideoDetails = async () => {
+  try {
+    const videoDetails = await api.get(NW_SPOTLIGHT_CONSTANTS.VIDEO_URL);
+    if (videoDetails.status === 200) {
+      return videoDetails.data;
+    } else {
+      return null;
+    }
+  } catch (err) {
+    return null;
+  }
+}
+
+const getPlaylistVideoDetails = async () => {
+  try {
+    const playlistDetails = await api.get(NW_SPOTLIGHT_CONSTANTS.PLAYLIST_URL);
+    if (playlistDetails.status === 200) {
+      return playlistDetails.data;
+    } else {
+      return null;
+    }
+  } catch (err) {
+    return null;
+  }
+}
+
 export const getServerSideProps: GetServerSideProps = async () => {
+  let [videoDetails, playlistDetails] = await Promise.all([getVideoDetails(), getPlaylistVideoDetails()]);
   return process.env.NEXT_PUBLIC_HIDE_NETWORK_PORTAL
     ? {
         redirect: {
@@ -56,5 +87,5 @@ export const getServerSideProps: GetServerSideProps = async () => {
           destination: '/directory/teams',
         },
       }
-    : { props: {} };
+    : { props: { videoDetails , playlistDetails } };
 };
