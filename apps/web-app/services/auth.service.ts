@@ -26,6 +26,6 @@ export const linkEmail = async (payload) => {
 }
 
 export const getClientToken = async (token) => {
-    const result = await axios.get(`http://localhost:3001/v1/auth/clienttoken`, {headers: {Authorization: `Bearer ${token}`}})
+    const result = await axios.get(`${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/auth/clienttoken`, {headers: {Authorization: `Bearer ${token}`}})
     return result.data;
 }
