@@ -110,13 +110,15 @@ export const ENROLLMENT_TYPE = {
   TEAM: 'TEAM',
 };
 
+
 export const LOGIN_MSG = 'Your account has been verified';
-export const LOGIN_FAILED_MSG = 'Sign in attempt failed. Please try again later.'
-export const LOGOUT_MSG = 'You have been logged out successfully.';
-export const RETRY_LOGIN_MSG = 'Please login and try again.';
+export const LOGIN_FAILED_MSG = 'Login attempt failed.Please try again'
+export const LOGOUT_MSG = 'You have been logged out successfully';
+export const RETRY_LOGIN_MSG = 'Please login and try again';
 export const LOGGED_IN_MSG = 'You are already logged in';
-export const SOMETHING_WENT_WRONG = 'Something went wrong. please try again';
-export const SCHEDULE_MEETING_MSG = ' please proceed to schedule a meeting.'
+export const SOMETHING_WENT_WRONG = 'Something went wrong.Please try again';
+export const SCHEDULE_MEETING_MSG = 'Please proceed to schedule a meeting'
+
 export const PAGE_ROUTES = {
   MEMBERS:'/directory/members',
   TEAMS: '/directory/teams'
@@ -139,14 +141,14 @@ export const TAB_CONSTANTS = {
 }
 
 export const MSG_CONSTANTS = {
-  TEAM_UPDATE_MESSAGE:'Team settings updated !',
-  MEMBER_UPDATE_MESSAGE: 'Profile settings updated !',
-  TEAM_CHANGE_CONF_MSG: 'Are you sure you want to discard the changes and navigate to another Team ? The changes you made will be lost !',
-  MEMBER_CHANGE_CONF_MSG: 'Are you sure you want to discard the changes and navigate to another Member ? The changes you made will be lost !',
-  PROFILE_CHANGE_CONF_MSG: 'Are you sure you want to discard the Profile changes and navigate to another Setting ? The changes you made will be lost !',
-  RESET_CHANGE_CONF_MSG: 'Are you sure you want to discard the changes ? The changes you made will be lost !',
-  NO_CHANGES_TO_RESET: 'No changes to reset !',
-  NO_CHANGES_TO_SAVE: 'No changes to save !'
+  TEAM_UPDATE_MESSAGE:'Changes have been updated',
+  MEMBER_UPDATE_MESSAGE: 'Changes have been updated',
+  TEAM_CHANGE_CONF_MSG: 'Do you want to save the changes before you proceed ?',
+  MEMBER_CHANGE_CONF_MSG: 'Do you want to save the changes before you proceed ?',
+  PROFILE_CHANGE_CONF_MSG: 'Do you want to save the changes before you proceed ?',
+  RESET_CHANGE_CONF_MSG: 'Do you want to save the changes before you proceed ?',
+  NO_CHANGES_TO_RESET: 'No changes made to reset',
+  NO_CHANGES_TO_SAVE: 'No changes made to save.',
 }
 
 export const BTN_LABEL_CONSTANTS = {

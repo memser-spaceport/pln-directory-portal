@@ -76,8 +76,7 @@ export default function AddMemberSkillForm(props) {
       {isOpenToWorkEnabled === 'true' && !props.isNewMode && (
         <>
           <div className="pt-5">
-            <div className="flex">
-              <span className="mr-2 text-sm font-bold pr-5">Open to Collaborate?</span>
+            <div className="flex gap-3.5">
               <Switch
                 initialValue={props.formValues.openToWork}
                 onChange={(evt) => {
@@ -85,16 +84,19 @@ export default function AddMemberSkillForm(props) {
                     target: {
                       value: evt,
                       name: 'openToWork',
-                    }
-                  }
+                    },
+                  };
                   props.onChange(events);
                 }}
               />
+              <span className="mr-2 pr-5 text-sm font-bold">
+                Are you open to collaborate?
+              </span>
             </div>
           </div>
           <div className="flex pt-3">
             <div>
-              <InformationCircleIcon className="h-5 w-5"/>
+              <InformationCircleIcon className="h-5 w-5" />
             </div>
             <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
               Inform others in the network that you are open to working on new

@@ -1,3 +1,4 @@
+import { LockClosedIcon } from '@heroicons/react/outline';
 import { FATHOM_EVENTS } from '../../../../../web-app/constants';
 import { IMember } from '../../../../../web-app/utils/members.types';
 import { authenticate } from '../../../../../web-app/utils/services/auth';
@@ -28,8 +29,23 @@ export function MemberProfileLoginStrip({
     <>
       {!userInfo?.uid && (
         <div className="shadow-card--slate-900 w-full rounded-t-xl bg-blue-100 p-2.5">
-          <div className="flex justify-center">
-            <p className="text-xs font-bold leading-5">
+          <div className="flex items-center justify-center gap-1">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="blue"
+              className="h-5 w-5"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+              />
+            </svg>
+
+            <p className="items-center text-xs font-bold leading-5">
               You are viewing {member?.name} limited profile.{' '}
               <span
                 className="cursor-pointer text-blue-700"

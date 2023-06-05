@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { TeamLeadBadge } from '../../team-lead-badge/team-lead-badge';
 import { ReactComponent as BriefCase } from '../../../../public/assets/images/icons/mdi_briefcase-check.svg';
+import { OpenToWorkBadge } from '../../open-to-work-badge/open-to-work-badge';
 
 export interface DirectoryCardHeaderProps {
   isGrid?: boolean;
@@ -21,20 +22,15 @@ export function DirectoryCardHeader({
   avatarIcon,
   teamLead,
   openToWork,
-  userInfo
+  userInfo,
 }: DirectoryCardHeaderProps) {
   const Icon = avatarIcon;
-  const isOpenTOWorkEnabled = (process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK  === 'true' && userInfo?.uid) ? true : false;
+  const isOpenTOWorkEnabled =
+    process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK === 'true' && userInfo?.uid
+      ? true
+      : false;
   return (
     <>
-      {(isOpenTOWorkEnabled) && isGrid && openToWork && (
-        <span className="absolute left-3 top-3 z-0 flex text-slate-600">
-          <BriefCase />
-          <span className="pl-1 pt-px text-[10px] font-medium leading-[14px] tracking-[0.01em]">
-            OPEN TO WORK
-          </span>
-        </span>
-      )}
       <div
         className={`h-18 w-18 relative shrink-0 border border-slate-200 ${
           isImageRounded ? 'rounded-full' : 'rounded-lg'
@@ -51,6 +47,11 @@ export function DirectoryCardHeader({
           />
         ) : (
           <Icon className="w-22 h-22 mt-2 fill-white" />
+        )}
+        {isOpenTOWorkEnabled && isGrid && openToWork && (
+          <div className="absolute left-0 right-0 bottom-[-20px] z-10  w-full">
+            <OpenToWorkBadge size="5" />
+          </div>
         )}
         {teamLead ? (
           <div className="absolute right-1 top-0 z-10">
