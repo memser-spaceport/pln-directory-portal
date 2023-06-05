@@ -150,7 +150,21 @@ export const MSG_CONSTANTS = {
 }
 
 export const BTN_LABEL_CONSTANTS = {
-  RESET: 'Reset'
+  RESET: 'Reset',
+  READ_ARTICLE: 'Read Article',
+  PLAY_VIDEO: 'Play Video',
+  VIEW_PLAYLIST: 'View Playlist'
+}
+
+export const NW_SPOTLIGHT_CONSTANTS = {
+  HEADING:'Network Spotlight',
+  BLOG_URL:'https://protocol.ai/blog/web3-trends-2023-top-3-exciting-projects-at-protocol-labs/',
+  BLOG_TITLE: 'Web3 Trends 2023: 3 Exciting Projects at Protocol Labs',
+  VIDEO: 'Video',
+  VIDEO_URL:'https://www.googleapis.com/youtube/v3/videos?key=AIzaSyCvn2zMiYOTq83AC8WNLL8CcmbTl9Pl53c&part=snippet&id=r-nU_MI2lV4',
+  SERIES: 'Series',
+  PLAYLIST_URL:'https://youtube.googleapis.com/youtube/v3/playlists?part=snippet%2CcontentDetails%2Cstatus&id=PLxkRVyHG0CI8MzS7657PjygNxvCGmMm-Y&key=AIzaSyCvn2zMiYOTq83AC8WNLL8CcmbTl9Pl53c',
+  YOUTUBE_PLAYLIST:'https://www.youtube.com/watch?v=4zIVSo935rs&list=PLxkRVyHG0CI8MzS7657PjygNxvCGmMm-Y'
 }
 
 export const ADMIN_ROLE = 'DIRECTORYADMIN';
