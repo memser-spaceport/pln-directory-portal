@@ -19,7 +19,7 @@ function EmailSubmissionForm(props) {
         }
     }
 
-    const onEmailSubmitted = (e) => {
+    const onEmailSubmitted = async (e) => {
         e.preventDefault();
         const emailValue = inputRef.current.value.trim();
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -28,7 +28,7 @@ function EmailSubmissionForm(props) {
             return
         }
         if(onSendOtp) {
-            onSendOtp(emailValue)
+            await onSendOtp(emailValue)
         }
     }
 

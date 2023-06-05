@@ -32,7 +32,10 @@ import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicat
 import { toast } from 'react-toastify';
 import orderBy from 'lodash/orderBy';
 import { requestPendingCheck } from '../../../utils/services/members';
-import { DiscardChangesPopup } from 'libs/ui/src/lib/modals/confirmation';
+import { DiscardChangesPopup } from '../../../../../libs/ui/src/lib/modals/confirmation';
+import { getClientToken } from '../../../services/auth.service';
+import { calculateExpiry, decodeToken } from '../../../utils/services/auth';
+import ChangeEmailModal from '../../auth/change-email-modal';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditMemberModalProps {
@@ -40,6 +43,7 @@ interface EditMemberModalProps {
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
   id: string;
   isProfileSettings?: boolean;
+  isUserProfile?: boolean;
   userInfo?: any;
   setModified?: (boolean) => void;
   setImageModified?: (boolean) => void;
@@ -52,7 +56,7 @@ function validateBasicForm(formValues, imageUrl, isProfileSettings) {
   if (!formValues.name.trim()) {
     errors.push('Please add your Name');
   }
-  if (!formValues.email.trim() || !formValues.email?.trim().match(emailRE)) {
+  if (!formValues?.email?.trim() || !formValues.email?.trim().match(emailRE)) {
     errors.push('Please add valid Email');
   }
   if (!isProfileSettings) {
@@ -162,6 +166,7 @@ export function EditMemberModal({
   id,
   isProfileSettings = false,
   userInfo,
+  isUserProfile = false,
   setModified,
   setImageModified
 }: EditMemberModalProps) {
@@ -181,6 +186,9 @@ export function EditMemberModal({
   const [isModified, setModifiedFlag] = useState<boolean>(false);
   const [openValidationPopup, setOpenValidationPopup] =
     useState<boolean>(false);
+  const [isEmailEditActive, setEmailEditStatus] =
+    useState<boolean>(false);
+  const [currentEmail, setCurrentEmail] = useState()
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     email: '',
@@ -210,6 +218,40 @@ export function EditMemberModal({
 
   const divRef = useRef<HTMLDivElement>(null);
 
+  const onCancelEmailChange = () => {
+    setEmailEditStatus(false);
+    handleInputChange({
+      target: {name: 'email', value: currentEmail}
+    })
+
+  }
+
+  const onNewEmailInputChange = (newEmailValue) => {
+    console.log(newEmailValue)
+    setFormValues(v => v["email"] = newEmailValue);
+  }
+
+  const onEmailChange = () => {
+    if(isUserProfile) {
+      const authToken = Cookies.get('authToken')
+      const formattedJson = JSON.parse(authToken)
+      //setIsProcessing(true)
+      getClientToken(formattedJson)
+       .then(d => {
+        const clientTokenExpiry = decodeToken(d);
+        console.log(clientTokenExpiry, 'setting cookie')
+        Cookies.set('clientAccessToken', d, {expires: new Date(clientTokenExpiry.exp * 1000)})
+        console.log( new Date(clientTokenExpiry.exp * 1000))
+        console.log(clientTokenExpiry, 'setting completed')
+        setEmailEditStatus(true)
+       })
+       .catch(e => console.error(e))
+      // .finally(() =>  setIsProcessing(false))
+    } else {
+        setEmailEditStatus(true)
+    }
+  }
+
   // const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
@@ -228,6 +270,7 @@ export function EditMemberModal({
                 rowId: counter++,
               };
             });
+          setCurrentEmail(member.email)
           const formValues = {
             name: member.name,
             email: member.email,
@@ -362,6 +405,7 @@ export function EditMemberModal({
 
   function handleReset() {
     if (isProfileSettings) {
+      setEmailEditStatus(false)
       if(isModified){
         setOpenValidationPopup(true);
       }else{
@@ -511,7 +555,7 @@ export function EditMemberModal({
         const values = formatData();
         try {
           // const captchaToken = await executeRecaptcha();
-  
+
           // if (!captchaToken) return;
           let image;
           setIsProcessing(true);
@@ -529,10 +573,10 @@ export function EditMemberModal({
                 return response?.data?.image;
               });
           }
-  
+
           delete values?.imageFile;
           delete values?.requestorEmail;
-  
+
           const data = {
             participantType: ENROLLMENT_TYPE.MEMBER,
             referenceUid: id,
@@ -571,6 +615,7 @@ export function EditMemberModal({
               if(imageChanged && setImageModified){
                 setImageModified(true);
               }
+              setEmailEditStatus(false);
             }
           });
         } catch (err) {
@@ -631,7 +676,7 @@ export function EditMemberModal({
   }
 
   function handleInputChange(
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    event
   ) {
     const { name, value } = event.target;
     setFormValues({ ...formValues, [name]: value });
@@ -681,6 +726,7 @@ export function EditMemberModal({
         </div>
       )}
       {isProfileSettings ? (
+        <>
         <div className="h-full w-full">
           <div className="mx-auto mb-40 h-full">
             {
@@ -739,6 +785,13 @@ export function EditMemberModal({
                       disableEmail={true}
                       setDisableNext={setDisableSubmit}
                       resetFile={reset}
+                      isEmailEditActive={isEmailEditActive}
+                      onNewEmailInputChange={onNewEmailInputChange}
+                      currentEmail={currentEmail}
+                      onCancelEmailChange={onCancelEmailChange}
+                      isUserProfile={isUserProfile}
+                      isProfileSettings={isProfileSettings}
+                      onEmailChange={onEmailChange}
                     />
                   </div>
                   <div className={openTab === 2 ? 'block' : 'hidden'}>
@@ -816,6 +869,8 @@ export function EditMemberModal({
             onCloseFn={confirmationClose}
           />
         </div>
+        {(isEmailEditActive && isUserProfile) && <ChangeEmailModal onClose={() => setEmailEditStatus(false)}/>}
+        </>
       ) : (
         <Modal
           isOpen={isOpen}
@@ -881,6 +936,11 @@ export function EditMemberModal({
                   setDisableNext={setDisableSubmit}
                   // emailExists={emailExists}
                   disableEmail={true}
+                  isEmailEditActive={isEmailEditActive}
+                  onCancelEmailChange={onCancelEmailChange}
+                  isUserProfile={isUserProfile}
+                  isProfileSettings={isProfileSettings}
+                  onEmailChange={onEmailChange}
                 />
                 <AddMemberSkillForm
                   formValues={formValues}

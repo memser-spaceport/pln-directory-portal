@@ -84,7 +84,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
     };
   }
   // Set access token, refresh token, member Info in cookie.
-  const { accessToken, refreshToken, userInfo, notificationToken, idToken } = authResp.data;
+  const { accessToken, refreshToken, userInfo, clientToken, idToken } = authResp.data;
   if (accessToken && refreshToken && userInfo) {
     const accessTokenExpiry = decodeToken(accessToken);
     const refreshTokenExpiry = decodeToken(refreshToken);
@@ -103,10 +103,10 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
     setCookie(ctx, 'verified', 'true' , {
       path: '/'
     });
-  } else if (notificationToken && accessToken && refreshToken) {
+  } else if (clientToken && accessToken && refreshToken) {
     const accessTokenExpiry = decodeToken(accessToken);
     const refreshTokenExpiry = decodeToken(refreshToken);
-    const notificationTokenExpiry = decodeToken(notificationToken);
+    const clientTokenExpiry = decodeToken(clientToken);
 
     setCookie(ctx, 'authToken', accessToken, {
       maxAge: calculateExpiry(accessTokenExpiry.exp),
@@ -121,8 +121,8 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
       path: '/'
     });
 
-    setCookie(ctx, 'notificationToken', notificationToken, {
-      maxAge: calculateExpiry(notificationTokenExpiry.exp),
+    setCookie(ctx, 'clientToken', clientToken, {
+      maxAge: calculateExpiry(clientTokenExpiry.exp),
       path: '/'
     });
   }

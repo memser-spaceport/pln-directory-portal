@@ -263,7 +263,7 @@ export default function Settings({
                 />
             )
         }
-        
+
     }
 
     const getDropdownComponent = () => {
@@ -303,6 +303,7 @@ export default function Settings({
                     setIsModalOpen={() => null}
                     id={selectedMember?.value}
                     isProfileSettings={true}
+                    isUserProfile={false}
                     setModified={setModifiedMember}
                     setImageModified={setMemberImageModified}
                 />
@@ -314,6 +315,7 @@ export default function Settings({
                     setIsModalOpen={() => null}
                     id={userInfo?.uid}
                     isProfileSettings={true}
+                    isUserProfile={true}
                     setModified={setModifiedProfile}
                 />
             );
@@ -333,7 +335,7 @@ export default function Settings({
             setActiveSetting(targetSettings);
         }
     }
-    
+
 
     function getSettingComponent(userInfo) {
         switch (activeSetting) {
@@ -480,7 +482,7 @@ export const getServerSideProps = async (ctx) => {
 
     let teamsDropdown = [];
     let membersDropdown = [];
-    
+
     const memberResponse = await getMember(userInfo.uid)
     let member;
     if (memberResponse.status === 200) {
