@@ -614,6 +614,7 @@ export function EditMemberModal({
               if(imageChanged && setImageModified){
                 setImageModified(true);
               }
+              setEmailEditStatus(false);
             }
           });
         } catch (err) {

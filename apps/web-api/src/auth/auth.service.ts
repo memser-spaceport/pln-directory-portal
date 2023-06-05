@@ -11,9 +11,10 @@ import {
 import axios from 'axios';
 import jwt_decode from 'jwt-decode';
 import { PrismaService } from '../shared/prisma.service';
+import { RedisService } from '../utils/redis/redis.service';
 @Injectable()
 export class AuthService {
-  constructor(private prismaService: PrismaService) {}
+  constructor(private prismaService: PrismaService, private redisService: RedisService) {}
 
   async findUniqueMemberAndGetInfo(query) {
     const foundUser: any = await this.prismaService.member.findUnique({
@@ -207,6 +208,8 @@ export class AuthService {
       // Link new email to auth account
       newTokens = await this.linkEmailWithAccount(newEmail, accessToken, clientToken)
     })
+
+    await this.redisService.resetAllCache()
     return {
       newTokens,
       userInfo: {

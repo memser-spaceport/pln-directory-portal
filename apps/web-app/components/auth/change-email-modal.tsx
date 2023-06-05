@@ -111,7 +111,6 @@ function ChangeEmailModal(props) {
             const uniqueEmailVerifyToken = d.token;
             Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 60 * 60 * 1000) })
             localStorage.setItem('otp-verification-email', email);
-            localStorage.setItem('change-email-step', '2');
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
             setVerificationStep(2);
             setResendTimer();
@@ -166,13 +165,7 @@ function ChangeEmailModal(props) {
         Cookies.remove('uniqueEmailVerifyToken')
         localStorage.removeItem('resend-expiry');
         localStorage.removeItem('otp-verification-email');
-        localStorage.removeItem('change-email-step');
     }
-
-
-    useEffect(() => {
-       // clearAllOtpSessionVaribles()
-    }, [])
 
     useEffect(() => {
         let countdown;
