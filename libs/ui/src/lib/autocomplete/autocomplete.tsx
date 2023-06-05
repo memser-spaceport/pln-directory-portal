@@ -79,18 +79,23 @@ export function Autocomplete({
 
   // Define the debounced function
   const debouncedGetData = debounce((searchTerm) => {
+    console.log("TestTest",debounceTime);
+    
     debounceCall(searchTerm).then((res: IDropdownOption[]) => {
       const availableTeams = res?.filter((item) =>
         excludeList?.every((filterItem) => filterItem !== item.value)
       );
       setFilteredOptions(availableTeams);
-      setIsProcessing(false);
+      // if(availableTeams.length){
+        setIsProcessing(false);
+      // }
     });
   }, debounceTime);
 
   useEffect(() => {
     if (isExpanded) {
       setIsProcessing(true);
+      
       // Call the debounced function when the searchTerm changes
       debouncedGetData(searchTerm);
 
@@ -101,7 +106,7 @@ export function Autocomplete({
     } else {
       return;
     }
-  }, [searchTerm, excludeValues, isExpanded]);
+  }, [searchTerm, isExpanded]);
 
   const handleUserInput = (event: React.ChangeEvent<HTMLInputElement>) => {
 
@@ -175,7 +180,7 @@ export function Autocomplete({
           onClick={() => {
             setIsExpanded(!isExpanded);
             setSearchTerm('');
-            setSelectedValue({ value: '', label: '' });
+            setSelectedValue({ value: '', label: '' ,logo:''});
           }}
           onKeyDown={(e) => e.key === 'Tab' && setIsExpanded(false)}
         />
@@ -205,11 +210,11 @@ export function Autocomplete({
                   </div>
                 </li>
               ))
-            ) : isProcessing ? (
+            ) : (isProcessing ? (
               <li className="text-gray-500">Searching</li>
             ) : (
               <li className="text-gray-500">No options available</li>
-            )}
+            ))}
           </ul>
         </div>
       )}

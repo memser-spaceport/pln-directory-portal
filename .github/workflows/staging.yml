@@ -17,9 +17,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check if there are new commits on `develop` branch
-        id: check-new-commits
-        run: echo "NEW_COMMITS=$(git rev-list --count origin/staging..origin/develop)" >> $GITHUB_OUTPUT
+      # - name: Check if there are new commits on `develop` branch
+      #   id: check-new-commits
+      #   run: echo "NEW_COMMITS=$(git rev-list --count origin/staging..origin/develop)" >> $GITHUB_OUTPUT
 
   rebase:
     runs-on: ubuntu-20.04
