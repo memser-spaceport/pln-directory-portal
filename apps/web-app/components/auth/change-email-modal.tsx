@@ -1,23 +1,23 @@
 
 import { useEffect, useState } from "react"
 import Cookies from 'js-cookie';
-import { sendEmailVerificationOtp, validateEmailOtp } from "../../services/auth.service";
+import { sendEmailVerificationOtp, sendOtpForEmailChange, validateEmailOtp, verifyOtpForChangeEmail } from "../../services/auth.service";
 import { LoadingIndicator } from "../shared/loading-indicator/loading-indicator";
 import EmailSubmissionForm from "./email-submission-form";
 import OtpSubmissionForm from "./otp-submission-form";
 import { calculateExpiry, decodeToken } from "../../utils/services/auth";
 import ErrorBox from "./error-box";
-import { toast } from "react-toastify";
-import { ReactComponent as SuccessIcon } from '../../public/assets/images/icons/success.svg';
 import { EMAIL_OTP_CONSTANTS } from "../../constants";
-function EmailOtpVerificationModal() {
+function ChangeEmailModal(props) {
     // States
-    const [showDialog, setDialogStatus] = useState(false);
     const [verificationStep, setVerificationStep] = useState(1)
     const [isLoaderActive, setLoaderStatus] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [resendInSeconds, setResendInSeconds] = useState(30);
 
+    // Variables
+    const onClose = props.onClose
+    const textConstants = EMAIL_OTP_CONSTANTS['CHANGE_EMAIL'];
 
     const setNewTokensAndUserInfo = (allTokens, userInfo) => {
         const { refresh_token, access_token, } = allTokens;
@@ -37,19 +37,20 @@ function EmailOtpVerificationModal() {
             const otpPayload = {
                 otp: otp.join(''),
                 otpToken: Cookies.get('uniqueEmailVerifyToken'),
-                clientToken: Cookies.get('clientToken'),
+                clientToken: Cookies.get('clientAccessToken'),
                 accessToken: Cookies.get('idToken'),
                 emailId: localStorage.getItem('otp-verification-email')
             }
-
+            const accessToken = Cookies.get('authToken');
             setLoaderStatus(true)
-            const data = await validateEmailOtp(otpPayload)
+            const headers = {Authorization: `Bearer ${JSON.parse(accessToken)}`}
+            const data = await verifyOtpForChangeEmail(otpPayload, headers)
             setLoaderStatus(false)
             if (data?.userInfo) {
                 setNewTokensAndUserInfo(data?.newTokens, data?.userInfo)
                 clearAllOtpSessionVaribles()
-                setDialogStatus(false);
-                localStorage.setItem('otp-verify', 'success')
+                onClose(false);
+
                 window.location.reload()
             } else if (!data?.valid) {
                 setErrorMessage('Invalid OTP. Please enter valid otp sent to your email or try resending OTP.')
@@ -64,18 +65,19 @@ function EmailOtpVerificationModal() {
 
     const onResendOtp = async () => {
         setErrorMessage('')
-        const email = localStorage.getItem('otp-verification-email');
-        const clientToken = Cookies.get('clientToken');
-        if (!clientToken || !email) {
+        const newEmail = localStorage.getItem('otp-verification-email');
+        const accessToken = Cookies.get('authToken');
+        const clientToken = Cookies.get('clientAccessToken');
+        if (!clientToken || !newEmail) {
             goToError('Invalid attempt. Please login and try again');
             return;
         }
 
-
         try {
             setLoaderStatus(true)
-            const otpPayload = { email, clientToken }
-            const d = await sendEmailVerificationOtp(otpPayload);
+            const otpPayload = {newEmail,clientToken}
+            const headers = {Authorization: `Bearer ${JSON.parse(accessToken)}`}
+            const d = await sendOtpForEmailChange(otpPayload, headers);
             setLoaderStatus(false)
 
             // Reset resend timer and set unique token for verification
@@ -94,20 +96,21 @@ function EmailOtpVerificationModal() {
 
     const onEmailSubmitted = async (email) => {
         try {
-            const clientToken = Cookies.get('clientToken');
+            const clientToken = Cookies.get('clientAccessToken');
+            const accessToken = Cookies.get('authToken');
             if (!clientToken) {
                 goToError('Invalid attempt. Please login and try again');
                 return;
             }
-            const otpPayload = { email, clientToken }
+            const otpPayload = { newEmail: email, clientToken }
+            const headers = {Authorization: `Bearer ${JSON.parse(accessToken)}`}
             setErrorMessage('')
             setLoaderStatus(true)
-            const d = await sendEmailVerificationOtp(otpPayload);
+            const d = await sendOtpForEmailChange(otpPayload, headers);
             setLoaderStatus(false)
             const uniqueEmailVerifyToken = d.token;
             Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 60 * 60 * 1000) })
             localStorage.setItem('otp-verification-email', email);
-            localStorage.setItem('otp-verification-step', '2');
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
             setVerificationStep(2);
             setResendTimer();
@@ -139,14 +142,16 @@ function EmailOtpVerificationModal() {
         }
     }
 
+
     const onCloseDialog = () => {
-        clearAllAuthCookies()
         clearAllOtpSessionVaribles()
-        setDialogStatus(false)
+
+        if(onClose) {
+            onClose()
+        }
     }
 
     const goToError = (errorMessage) => {
-        clearAllAuthCookies()
         clearAllOtpSessionVaribles()
         setErrorMessage(errorMessage);
         setVerificationStep(3);
@@ -161,40 +166,11 @@ function EmailOtpVerificationModal() {
     }
 
     const clearAllOtpSessionVaribles = () => {
-        Cookies.remove('clientToken')
+        Cookies.remove('clientAccessToken')
         Cookies.remove('uniqueEmailVerifyToken')
         localStorage.removeItem('resend-expiry');
         localStorage.removeItem('otp-verification-email');
-        localStorage.removeItem('otp-verification-step');
     }
-
-    const clearAllAuthCookies = () => {
-        Cookies.remove('idToken')
-        Cookies.remove('authToken')
-        Cookies.remove('refreshToken')
-        Cookies.remove('userInfo')
-    }
-
-    useEffect(() => {
-        const clientToken = Cookies.get('clientToken');
-        const otpVerify = localStorage.getItem('otp-verify')
-        if (clientToken) {
-            if (localStorage.getItem('otp-verification-step') === '2') {
-                setVerificationStep(2)
-                setResendTimer()
-            }
-            setDialogStatus(true)
-        } else {
-            clearAllOtpSessionVaribles()
-        }
-
-        if (otpVerify) {
-            toast.success("Your account has been verified", {
-                icon: <SuccessIcon />
-            });
-            localStorage.removeItem('otp-verify')
-        }
-    }, [])
 
     useEffect(() => {
         let countdown;
@@ -204,26 +180,27 @@ function EmailOtpVerificationModal() {
             }, 1000);
         }
         return () => clearInterval(countdown);
+
     }, [resendInSeconds]);
 
 
     return <>
 
-        {showDialog && <div className="ev">
+        <div className="ev">
             <div className="ev__cn">
                 <div className="ev__en__box">
-                    {verificationStep === 1 && <EmailSubmissionForm title="Verify Email" desc="Please enter the membership email you used to create your directory profile. Don't remember? Contact support supportmail@protocol.ai" validationError={errorMessage} onSendOtp={onEmailSubmitted} onClose={onCloseDialog} />}
-                    {verificationStep === 2 && <OtpSubmissionForm resendInSeconds={resendInSeconds} title="Enter Code" desc={`Please enter the code sent to ${localStorage.getItem('otp-verification-email')}`} validationError={errorMessage} onResendOtp={onResendOtp} onVerifyOtp={onOtpVerify} onClose={onCloseDialog} />}
+                    {verificationStep === 1 && <EmailSubmissionForm title={textConstants.sendEmailTitle} desc={textConstants.sendEmailDesc} validationError={errorMessage} onSendOtp={onEmailSubmitted} onClose={onCloseDialog} />}
+                    {verificationStep === 2 && <OtpSubmissionForm resendInSeconds={resendInSeconds} title={textConstants.verifyOtpTitle} desc={`${textConstants.verifyOtpDesc} ${localStorage.getItem('otp-verification-email')}`} validationError={errorMessage} onResendOtp={onResendOtp} onVerifyOtp={onOtpVerify} onClose={onCloseDialog} />}
                     {verificationStep === 3 && <ErrorBox onClose={onCloseDialog} desc={errorMessage} />}
                     {isLoaderActive && <div className="ev__loader"><LoadingIndicator /></div>}
                 </div>
             </div>
-        </div>}
+        </div>
 
         <style jsx>
             {
                 `
-                .ev {position: fixed; top:0; z-index: 50; right:0; left:0; width: 100vw; height: 100vh; background: rgb(0,0,0,0.5);}
+                .ev {position: fixed; top:0; z-index: 2000; right:0; left:0; width: 100vw; height: 100vh; background: rgb(0,0,0,0.5);}
                 .ev__cn {width: 100%; height: 100%; display: flex; position: relative; align-items: center; justify-content: center;}
                 .ev__loader {position: absolute; background: rgb(255,255,255, 0.7); display: flex; align-items: center; justify-content: center; z-index:52; width: 100%; height: 100%; top:0; right:0; left:0;}
                 .ev__en__box {width:fit-content; height:fit-content; position: relative;}
@@ -234,4 +211,4 @@ function EmailOtpVerificationModal() {
     </>
 }
 
-export default EmailOtpVerificationModal
+export default ChangeEmailModal

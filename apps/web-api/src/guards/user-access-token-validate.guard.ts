@@ -9,34 +9,36 @@ import {
 import axios from 'axios';
 
 @Injectable()
-export class UserAuthValidateGuard implements CanActivate {
+export class UserAccessTokenValidateGuard implements CanActivate {
   constructor() {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const token = this.extractTokenFromHeader(request);
-    if (!token && request.method !== 'GET') {
-      throw new UnauthorizedException();
+
+    // If no token throw Exception
+    if (!token) {
+      throw new UnauthorizedException('Unauthorized Access');
     }
 
-    if (!token && request.method === 'GET') {
-      return true;
-    }
-
+    // If token validation fails throw Exception
     try {
       const validationResult: any = await axios.post(
-        `${process.env.AUTH_API_URL}/auth/validate`,
+        `${process.env.AUTH_API_URL}/auth/introspect`,
         { token: token }
       );
-
-      if (!validationResult?.data?.isTokenValid && request.method !== 'GET') {
-        throw new UnauthorizedException();
+      if (!validationResult?.data?.active) {
+        throw new UnauthorizedException('Invalid Token');
       }
 
-      if (validationResult?.data?.isTokenValid) {
-        request['isUserLoggedIn'] = true;
+      // If user email is available in token set it in request. No Validation error if no email.
+      if (validationResult?.data?.email) {
+        request['userEmail'] = validationResult.data.email;
+        request['userUid'] = validationResult.data.sub;
+        request['userAccessToken'] = token
       }
     } catch (error) {
+      // If known error, handle it
       if (error?.response?.data?.message && error?.response?.status) {
         throw new HttpException(
           error?.response?.data?.message,

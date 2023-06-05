@@ -18,6 +18,7 @@ import posthog from 'posthog-js';
 import { logoutAllTabs } from '../utils/services/auth';
 
 import { LOGIN_FAILED_MSG, LOGOUT_MSG, RETRY_LOGIN_MSG, LOGGED_IN_MSG, SOMETHING_WENT_WRONG } from '../constants';
+import EmailOtpVerificationModal from '../components/auth/email-otp-verification-modal';
 
 // Check that PostHog is client-side (used to handle Next.js SSR)
 if (typeof window !== 'undefined') {
@@ -104,6 +105,7 @@ export default function CustomApp({
         toastClassName="!rounded-md !bg-[#1E293B]"
         progressClassName="!bg-[#30C593]"
       />
+      <EmailOtpVerificationModal/>
     </>
   );
 }

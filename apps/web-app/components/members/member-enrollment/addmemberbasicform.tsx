@@ -1,10 +1,13 @@
-import { InputField, ProfileImageUpload } from '@protocol-labs-network/ui';
+import { InputField, ProfileImageUpload, ConfirmInputField } from '@protocol-labs-network/ui';
 import { UserIcon } from '@heroicons/react/solid';
 import { ReactComponent as InformationCircleIcon } from '../../../public/assets/images/icons/info_icon.svg';
 
 export default function AddMemberBasicForm(props) {
   const values = props.formValues;
   const onChange = props.onChange;
+  const onNewEmailInputChange = props.onNewEmailInputChange;
+  const currentEmail = props.currentEmail;
+  const isCurrentMailBoxNeeded = props.isProfileSettings ? props.isUserProfile ? true: props.isEmailEditActive ? false : true : true
   return (
     <>
       <div className="flex pt-5">
@@ -44,7 +47,7 @@ export default function AddMemberBasicForm(props) {
           4MB.
         </span>
       </div>
-      <div className="inputfield pt-5">
+       { isCurrentMailBoxNeeded && <div className="inputfield relative pt-5">
         <InputField
           required
           name="email"
@@ -59,7 +62,14 @@ export default function AddMemberBasicForm(props) {
           placeholder="Enter your email address"
           className="custom-grey custom-outline-none border"
         />
-      </div>
+        <p onClick={props.onEmailChange} className='absolute top-[20px] text-sm font-semibold cursor-pointer text-[#156FF7] right-0'>Change Email</p>
+      </div>}
+      { (props.isEmailEditActive && props.isProfileSettings && !props.isUserProfile) &&
+      <div className="flex pt-5 relative">
+        <ConfirmInputField  name="email" currentEmail={currentEmail}  onChange={onChange}  pattern="^[a-zA-Z\s]*$"
+          type="email" label='Enter New Email' className="custom-grey custom-outline-none border"/>
+           <p onClick={props.onCancelEmailChange} className='absolute top-[20px] text-sm font-semibold cursor-pointer text-[#156FF7] right-0'>Cancel</p>
+      </div> }
       {props.emailExists && (
         <span className="pt-3 text-xs text-rose-600">
           Email already exists!
