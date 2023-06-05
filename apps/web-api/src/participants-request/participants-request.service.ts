@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ApprovalStatus, ParticipantType } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AwsService } from '../utils/aws/aws.service';
@@ -396,11 +396,11 @@ export class ParticipantsRequestService {
       name: dataToProcess.name,
     };
 
-    const isEmailChange = existingData.email !== dataFromDB.email ? true: false;
+    const isEmailChange = existingData.email !== dataToProcess.email ? true: false;
     if(isEmailChange) {
       const memberRoles = existingData.memberRoles.map(v => v.name)
-      if(memberRoles.includes("DIRECTORYADMIN")) {
-          throw new UnauthorizedException("Invalid access")
+      if(!memberRoles.includes("DIRECTORYADMIN")) {
+          throw new ForbiddenException("Invalid access")
       }
     }
 

@@ -48,8 +48,10 @@ export class AuthService {
       );
       return this.getUserInfo(result);
     } catch (e) {
-      console.error(e);
-      throw new UnauthorizedException();
+      if(e?.response?.data?.message, e?.response?.status) {
+        throw new HttpException("Request failed. Please try again later", e?.response?.status)
+      }
+      throw new InternalServerErrorException();
     }
   }
 
@@ -133,7 +135,10 @@ export class AuthService {
       }
     } catch (e) {
       console.error(e)
-      throw new UnauthorizedException();
+      if(e?.response?.data?.message && e?.response?.status) {
+        throw new HttpException(e?.response?.status, e?.response?.data?.message)
+      }
+      throw new InternalServerErrorException();
     }
 
     // If no user found for externalid and for email then throw forbidden error
@@ -237,7 +242,7 @@ export class AuthService {
       if (error.response) {
         throw new HttpException(error?.response?.data?.message, error?.response?.status)
       }
-      throw new UnauthorizedException();
+      throw new InternalServerErrorException();
     }
   }
 

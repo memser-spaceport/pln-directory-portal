@@ -1,7 +1,9 @@
 import {
   CanActivate,
   ExecutionContext,
+  HttpException,
   Injectable,
+  InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
 import axios from 'axios';
@@ -34,8 +36,16 @@ export class UserAuthValidateGuard implements CanActivate {
       if (validationResult?.data?.isTokenValid) {
         request['isUserLoggedIn'] = true;
       }
-    } catch {
-      throw new UnauthorizedException();
+    } catch (error) {
+      if (error?.response?.data?.message && error?.response?.status) {
+        throw new HttpException(
+          error?.response?.data?.message,
+          error?.response?.status
+        );
+      } else if (error?.response?.message && error?.status) {
+        throw new HttpException(error?.response?.message, error?.status);
+      }
+      throw new InternalServerErrorException('Unexpected Error');
     }
     return true;
   }
