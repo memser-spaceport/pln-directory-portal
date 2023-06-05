@@ -398,12 +398,11 @@ export class ParticipantsRequestService {
 
     const isEmailChange = existingData.email !== dataToProcess.email ? true: false;
     if(isEmailChange) {
-      const memberRoles = existingData.memberRoles.map(v => v.name)
+     /*  const memberRoles = existingData.memberRoles.map(v => v.name)
       if(!memberRoles.includes("DIRECTORYADMIN")) {
           throw new ForbiddenException("Invalid access")
-      }
+      } */
     }
-
     // Mandatory fields
     dataToSave['name'] = dataToProcess.name;
     dataToSave['email'] = dataToProcess.email;
@@ -535,24 +534,28 @@ export class ParticipantsRequestService {
       });
 
       if(isEmailChange) {
-        const response = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
-          "client_id": process.env.AUTH_APP_CLIENT_ID,
-          "client_secret": process.env.AUTH_APP_CLIENT_SECRET,
-          "grant_type": "client_credentials",
-          "grantTypes": ["client_credentials", "authorization_code", "refresh_token"]
-        })
+        try {
+          const response = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
+            "client_id": process.env.AUTH_APP_CLIENT_ID,
+            "client_secret": process.env.AUTH_APP_CLIENT_SECRET,
+            "grant_type": "client_credentials",
+            "grantTypes": ["client_credentials", "authorization_code", "refresh_token"]
+          })
 
-        const clientToken =  response.data.access_token;
-        const headers = {
-          Authorization: `Bearer ${clientToken}`
+          const clientToken =  response.data.access_token;
+          const headers = {
+            Authorization: `Bearer ${clientToken}`
+          }
+          const authPayload = {
+            email: dataToSave.email,
+            existingEmail: existingData.email,
+            accountId: existingData.externalId
+          }
+           await axios.put(`${process.env.AUTH_API_URL}/admin/auth/account/email`, authPayload, {headers: headers})
+        } catch (e) {
+          throw e
+
         }
-        const authPayload = {
-          email: dataToSave.email,
-          existingEmail: existingData.email,
-          accountId: existingData.externalId
-        }
-         await axios.put(`${process.env.AUTH_API_URL}/admin/auth/account/email`, authPayload, {headers: headers}
-        )
       }
 
       // Updating status
