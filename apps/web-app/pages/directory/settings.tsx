@@ -15,7 +15,6 @@ import { DIRECTORY_SEO } from "apps/web-app/seo.config";
 import api from "apps/web-app/utils/api";
 import { fetchMember } from "apps/web-app/utils/services/members";
 import { fetchTeam } from "apps/web-app/utils/services/teams";
-import { log } from "console";
 import { DiscardChangesPopup } from "libs/ui/src/lib/modals/confirmation";
 
 
@@ -63,7 +62,7 @@ export default function Settings({
             setSelectedTeam({
                 "label": data.name,
                 "value": data.uid,
-                "logo": data?.logo?.url
+                "logo": data?.logo?.url ?? null
             });
         });
     }
@@ -210,7 +209,7 @@ export default function Settings({
           const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}&select=uid,name,shortDescription,logo.url,industryTags.title`);
           if (response.data) {
             return response.data.map((item) => {
-              return { value: item.uid, label: item.name, logo:item?.logo?.url };
+              return { value: item.uid, label: item.name, logo:item?.logo?.url ? item.logo.url: null };
             });
           }
         } catch (error) {
@@ -223,7 +222,7 @@ export default function Settings({
           const response = await api.get(`/v1/members?name__istartswith=${searchTerm}&select=uid,name,image&orderBy=name,asc`);
           if (response.data) {
             return response.data.map((item) => {
-              return { value: item.uid, label: item.name, logo:item?.image?.url };
+              return { value: item.uid, label: item.name, logo:item?.image?.url ? item.image.url: null };
             });
           }
         } catch (error) {

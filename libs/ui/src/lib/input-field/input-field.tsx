@@ -1,4 +1,5 @@
 import { EyeIcon, EyeOffIcon, XIcon } from '@heroicons/react/outline';
+import { UserIcon, UserGroupIcon } from '@heroicons/react/solid';
 import React, { useEffect, useState } from 'react';
 
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
@@ -12,6 +13,7 @@ export interface InputFieldProps extends React.ComponentProps<'input'> {
   showLabel?: boolean;
   value?: string;
   error?: string;
+  dropDownType?: string;
 }
 
 export function InputField({
@@ -24,6 +26,7 @@ export function InputField({
   showLabel = true,
   value,
   error,
+  dropDownType,
   ...props
 }: InputFieldProps) {
   const [inputValue, setInputValue] = useState(value);
@@ -61,6 +64,8 @@ export function InputField({
       ) : (
         <span className="sr-only">{label}</span>
       )}
+      { dropDownType === 'member' && !InputIcon ? (<UserIcon className="bg-gray-200 fill-white absolute top-5 left-[5px] h-6 w-6 rounded-full"/>):null}
+      { dropDownType === 'team' && !InputIcon ? (<UserGroupIcon className="bg-gray-200 fill-white absolute top-5 left-[5px] h-6 w-6 rounded-full"/>):null}
       {(InputIcon && typeof(InputIcon)!== 'string')? (
         <InputIcon className="stroke-1.5 absolute inset-y-0 left-2 my-auto h-4 w-4 text-slate-600" />
       ) : null}
@@ -73,7 +78,7 @@ export function InputField({
         {...props}
         type={showPassword ? 'text' : props.type}
         className={`mt-[12px] block w-full rounded-lg bg-white text-sm leading-6 text-slate-900  shadow-slate-300 transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-600 placeholder:opacity-50
-        ${icon ? 'pl-8' : 'pl-3'} ${hasClear && props.type !== 'date' ? 'pr-6' : 'pr-2'} on-focus
+        ${(icon || dropDownType === 'member' || dropDownType === 'team') ? 'pl-9' : 'pl-3'} ${hasClear && props.type !== 'date' ? 'pr-6' : 'pr-2'} on-focus
         h-10 leading-10 disabled:bg-slate-100 ${
           props.className
         } ${requiredIndicator}`}

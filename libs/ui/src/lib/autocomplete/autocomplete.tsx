@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { UserIcon, UserGroupIcon } from '@heroicons/react/solid';
 import { InputField } from '../input-field/input-field';
 import { ReactComponent as ArrowDown } from '../../assets/icons/arrow-down-filled.svg';
 import { debounce } from 'lodash';
@@ -7,7 +8,7 @@ import { DiscardChangesPopup } from '../modals/confirmation';
 interface IDropdownOption {
   label: string;
   value?: string;
-  logo?: string;
+  logo?: string | any;
 }
 
 interface AutocompleteProps {
@@ -53,7 +54,8 @@ export function Autocomplete({
   const excludeList = excludeValues?.filter(
     (item) => item !== selectedValue.value
   );
-
+  const memberDefaultIcon = (name === 'member') ? <UserIcon className="bg-gray-200 fill-white relative inline-block h-6 w-6 rounded-full"/> : null;
+  const teamDefaultIcon = (name === 'team') ? <UserGroupIcon className="bg-gray-200 fill-white relative inline-block h-6 w-6 rounded-full"/> : null; 
   useMemo(() => {
     // if (searchTerm === '') {
       setSearchTerm(selectedOption.label);
@@ -177,6 +179,7 @@ export function Autocomplete({
           placeholder={placeholder}
           required={required}
           value={searchTerm}
+          dropDownType={name}
           onClick={() => {
             setIsExpanded(!isExpanded);
             setSearchTerm('');
@@ -202,10 +205,13 @@ export function Autocomplete({
                   key={option.value}
                   onClick={() => handleOptionClick(option)}
                 >
-                  <div className='relative'>
+                  <div className='relative truncate'>
                   {option.logo && (
                     <img src={option.logo} className='relative inline-block h-6 w-6 rounded-full'></img>
-                  )}
+                    )
+                  }
+                  { option.logo === null && memberDefaultIcon }
+                  { option.logo === null && teamDefaultIcon }
                   <span className='relative left-[5px]'>{option.label}</span>
                   </div>
                 </li>

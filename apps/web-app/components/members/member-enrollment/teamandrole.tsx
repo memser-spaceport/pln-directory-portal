@@ -34,7 +34,6 @@ export function TeamAndRoleGrid(props) {
       <div className="flex flex-row">
         <div className="basis-6/12">
           <Autocomplete
-            name="team"
             className="custom-grey custom-outline-none border"
             required={true}
             placeholder="Select a team"
