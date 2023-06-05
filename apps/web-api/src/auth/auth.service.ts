@@ -242,37 +242,83 @@ export class AuthService {
   }
 
   async verifyEmailOtp(otp, otpToken, clientToken) {
-   const payload = {
-    code: otp,
-    token: otpToken,
+    const payload = {
+      code: otp,
+      token: otpToken,
+    }
+    const header = {
+      headers: {
+        Authorization: `Bearer ${clientToken}`
+      }
+    }
+    const verifyOtpResult = await axios.post(`${process.env.AUTH_API_URL}/mfa/otp/verify`, payload, header)
+    return verifyOtpResult?.data
   }
-  const header = {
-    headers: {
-      Authorization: `Bearer ${clientToken}`
+
+
+  async handleAxiosError(statusCode, errorMessage) {
+    if(statusCode === 401) {
+      if(errorMessage === "Unauthorized") {
+        throw new UnauthorizedException("Unauthorized Request. Please login again and try")
+      } else {
+        throw new UnauthorizedException("Invalid Request. Please login again and try")
+      }
+    } else if (statusCode === 400) {
+      throw new BadRequestException("Invalid request. Please try again or contact support")
     }
   }
-  const verifyOtpResult = await axios.post(`${process.env.AUTH_API_URL}/mfa/otp/verify`, payload, header)
-  return verifyOtpResult?.data
+
+  async handleAuthErrors(statusCode, errorMessage, errorCode) {
+    if(statusCode === 401) {
+      if(errorMessage === "Unauthorized") {
+        throw new UnauthorizedException("Unauthorized Request. Please login again and try")
+      } else {
+        throw new UnauthorizedException("Invalid Request. Please login again and try")
+      }
+    } else if (statusCode === 400) {
+      if(errorCode === "EOTP005") {
+        throw new BadRequestException("Invalid OTP. Please enter valid otp sent to your email")
+      } else if (errorCode === "EOTP003"){
+        throw new UnauthorizedException("Maximum OTP attempts reached. Please login again and try")
+      } else if (errorMessage === "Validation failed") {
+        throw new BadRequestException("Invalid request. Please try again or contact support")
+      } else {
+        throw new BadRequestException("Invalid request. Please try again or contact support")
+      }
+    }
+  }
+
+  handleErrors = (error) => {
+    if(error?.response?.statusCode && error?.response?.message) {
+      throw new HttpException(error?.response?.message, error?.response?.statusCode)
+     } else if (error?.response?.data && error?.response?.status) {
+        if(error?.response?.status === 401) {
+          throw new UnauthorizedException("Unauthorized")
+        }
+         else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP005') {
+          throw new UnauthorizedException("Unauthorized")
+        } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP003') {
+          throw new ForbiddenException("MAX_OTP_ATTEMPTS_REACHED")
+        }
+        else {
+          throw new InternalServerErrorException("Unexpected error. Please try again")
+        }
+     } else {
+      throw new InternalServerErrorException("Unexpected error. Please try again")
+     }
   }
 
   async sendEmailOtpForVerification(email, clientToken) {
-    try {
-      const payload = {
-        recipientAddress: email,
-        notificationType: 'EMAIL',
-      }
-      const header = {
-        headers: {
-          Authorization: `Bearer ${clientToken}`
-        }
-      }
-      const sendOtpResult = await axios.post(`${process.env.AUTH_API_URL}/mfa/otp`, payload, header);
-      return sendOtpResult.data;
-    } catch (error) {
-      if (error.response) {
-        throw new HttpException(error?.response?.data?.message, error?.response?.status)
-      }
-      throw new InternalServerErrorException("Unexpected Error");
+    const payload = {
+      recipientAddress: email,
+      notificationType: 'EMAIL',
     }
+    const header = {
+      headers: {
+        Authorization: `Bearer ${clientToken}`
+      }
+    }
+    const sendOtpResult = await axios.post(`${process.env.AUTH_API_URL}/mfa/otp`, payload, header);
+    return sendOtpResult.data;
   }
 }

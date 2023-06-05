@@ -15,7 +15,7 @@ export function ConfirmInputField({
 }: ConfirmInputFieldProps) {
   const inputOneRef = useRef() as any;
   const inputTwoRef = useRef() as any;
-  const [isMatching, setMatchingState] = useState(false)
+  const [isMatching, setMatchingState] = useState(true)
   const [isDuplicate, setIsDuplicate] = useState(false)
 
   const onInputChanges = () => {
@@ -49,6 +49,7 @@ export function ConfirmInputField({
         {...props}
         type="text"
         ref={inputOneRef}
+        placeholder='Enter your new email'
         className={`mt-[12px] block w-full rounded-lg bg-white text-sm leading-6 text-slate-900  shadow-slate-300 transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-600 placeholder:opacity-50 pl-3 pr-3 on-focus h-10 leading-10 disabled:bg-slate-100  ${props.className}`}
         onChange={onInputChanges}
 
@@ -58,11 +59,12 @@ export function ConfirmInputField({
         {...props}
         type="text"
         ref={inputTwoRef}
+        placeholder='Confirm your new email'
         className={`mt-[12px] block w-full rounded-lg bg-white text-sm leading-6 text-slate-900  shadow-slate-300 transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-600 placeholder:opacity-50 pl-3 pr-3 on-focus h-10 leading-10 disabled:bg-slate-100  ${props.className}`}
         onChange={onInputChanges}
 
       />
-       {(!isMatching && !isDuplicate && inputOneRef.current.value.trim() !== '' && inputTwoRef.current.value.trim() !== '') && <span className="text-[red] text-xs">Emails do not match</span>}
+       {(!isMatching && !isDuplicate) && <span className="text-[red] text-xs">Emails do not match</span>}
        {(isDuplicate) && <span className="text-[red] text-xs">New email and old email cannot be same</span>}
     </label>
   );

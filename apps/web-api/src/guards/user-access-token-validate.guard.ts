@@ -27,7 +27,6 @@ export class UserAccessTokenValidateGuard implements CanActivate {
         `${process.env.AUTH_API_URL}/auth/introspect`,
         { token: token }
       );
-        console.log(validationResult)
       if (!validationResult?.data?.active) {
         throw new UnauthorizedException('Invalid Token');
       }

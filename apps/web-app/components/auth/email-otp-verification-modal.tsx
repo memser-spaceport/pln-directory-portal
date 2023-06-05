@@ -120,18 +120,22 @@ function EmailOtpVerificationModal() {
     }
 
     const handleServerErrors = (statusCode, messageCode) => {
-        if (statusCode === 400 && messageCode === 'Code expired') {
-            setErrorMessage('Code Expired. Please try resending code and enter again')
-        } else if (statusCode === 400 && messageCode === 'Max attempts reached') {
-            goToError('You have Exceeded maximum otp attempts. Please login again to reset otp attempts')
-        } else if (statusCode === 400 && messageCode === 'Email id doesnt exist') {
-            setErrorMessage("The entered email doesn't match an email in the directory records. Please try again or contact support ")
-        } else if (statusCode === 400 && messageCode === 'client token is valid') {
-            setErrorMessage("Request is invalid. Please try logging in again or contact our support for futher assistance")
-        } else if (statusCode && messageCode) {
-            setErrorMessage(messageCode)
+        if(statusCode === 401 || statusCode === 403) {
+            if(messageCode === "MAX_OTP_ATTEMPTS_REACHED") {
+                goToError("Maximum otp attempts reached. Please try logging again")
+            } else if(messageCode) {
+                goToError(messageCode)
+            } else {
+                goToError("Invalid Request. Please try again or contact support")
+            }
+        } else if (statusCode === 400) {
+             if(messageCode) {
+                setErrorMessage(messageCode)
+            } else {
+                setErrorMessage("Invalid Request. Please try again or contact support")
+            }
         } else {
-            goToError('Unexpected error happened. Please try logging in again')
+            setErrorMessage("Unexpected error. please try again or contact support")
         }
     }
 

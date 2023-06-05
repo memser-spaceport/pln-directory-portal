@@ -405,6 +405,7 @@ export function EditMemberModal({
 
   function handleReset() {
     if (isProfileSettings) {
+      setEmailEditStatus(false)
       if(isModified){
         setOpenValidationPopup(true);
       }else{

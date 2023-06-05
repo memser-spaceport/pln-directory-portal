@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ApprovalStatus, ParticipantType } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AwsService } from '../utils/aws/aws.service';
@@ -385,6 +385,7 @@ export class ParticipantsRequestService {
         location: true,
         skills: true,
         teamMemberRoles: true,
+        memberRoles: true
       },
     });
     const dataToProcess = dataFromDB?.newData;
@@ -397,10 +398,10 @@ export class ParticipantsRequestService {
 
     const isEmailChange = existingData.email !== dataFromDB.email ? true: false;
     if(isEmailChange) {
-      // foundUser = await this.prisma.member.findUnique({where: {email: dataFromDB.email}});
-     // if(foundUser) {
-      //  throw new BadRequestException("Invalid email")
-     // }
+      const memberRoles = existingData.memberRoles.map(v => v.name)
+      if(memberRoles.includes("DIRECTORYADMIN")) {
+          throw new UnauthorizedException("Invalid access")
+      }
     }
 
     // Mandatory fields

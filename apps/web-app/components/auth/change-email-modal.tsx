@@ -50,7 +50,7 @@ function ChangeEmailModal(props) {
                 setNewTokensAndUserInfo(data?.newTokens, data?.userInfo)
                 clearAllOtpSessionVaribles()
                 onClose(false);
-                localStorage.setItem('otp-verify', 'success')
+
                 window.location.reload()
             } else if (!data?.valid) {
                 setErrorMessage('Invalid OTP. Please enter valid otp sent to your email or try resending OTP.')
@@ -123,20 +123,25 @@ function ChangeEmailModal(props) {
     }
 
     const handleServerErrors = (statusCode, messageCode) => {
-        if(statusCode === 400 && messageCode === 'Code expired') {
-            setErrorMessage('Code Expired. Please try resending code and enter again')
-        } else if (statusCode === 400 && messageCode === 'Max attempts reached') {
-            goToError('You have Exceeded maximum otp attempts. Please login again to reset otp attempts')
-        } else if (statusCode === 400 && messageCode === 'Email id doesnt exist') {
-            setErrorMessage("The entered email doesn't match an email in the directory records. Please try again or contact support ")
-        } else if (statusCode === 400 && messageCode === 'client token is valid') {
-            setErrorMessage("Request is invalid. Please try logging in again or contact our support for futher assistance")
-        } else if (statusCode && messageCode) {
-            setErrorMessage(messageCode)
+        if(statusCode === 401 || statusCode === 403) {
+            if(messageCode === "MAX_OTP_ATTEMPTS_REACHED") {
+                goToError("Maximum otp attempts reached. Please try logging again")
+            } else if(messageCode) {
+                goToError(messageCode)
+            } else {
+                goToError("Invalid Request. Please try again or contact support")
+            }
+        } else if (statusCode === 400) {
+             if(messageCode) {
+                setErrorMessage(messageCode)
+            } else {
+                setErrorMessage("Invalid Request. Please try again or contact support")
+            }
         } else {
-            goToError('Unexpected error happened. Please try logging in again')
+            setErrorMessage("Unexpected error. please try again or contact support")
         }
     }
+
 
     const onCloseDialog = () => {
         clearAllOtpSessionVaribles()
@@ -195,7 +200,7 @@ function ChangeEmailModal(props) {
         <style jsx>
             {
                 `
-                .ev {position: fixed; top:0; z-index: 50; right:0; left:0; width: 100vw; height: 100vh; background: rgb(0,0,0,0.5);}
+                .ev {position: fixed; top:0; z-index: 2000; right:0; left:0; width: 100vw; height: 100vh; background: rgb(0,0,0,0.5);}
                 .ev__cn {width: 100%; height: 100%; display: flex; position: relative; align-items: center; justify-content: center;}
                 .ev__loader {position: absolute; background: rgb(255,255,255, 0.7); display: flex; align-items: center; justify-content: center; z-index:52; width: 100%; height: 100%; top:0; right:0; left:0;}
                 .ev__en__box {width:fit-content; height:fit-content; position: relative;}
