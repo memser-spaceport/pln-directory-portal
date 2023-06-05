@@ -231,6 +231,13 @@ export function EditMemberModal({
     setFormValues(v => v["email"] = newEmailValue);
   }
 
+  const onChangeEmailClose = (step) => {
+    setEmailEditStatus(false);
+    if(step === 3) {
+      window.location.reload()
+    }
+  }
+
   const onEmailChange = () => {
     if(isUserProfile) {
       const authToken = Cookies.get('authToken')
@@ -873,7 +880,7 @@ export function EditMemberModal({
             onCloseFn={confirmationClose}
           />
         </div>
-        {(isEmailEditActive && isUserProfile) && <ChangeEmailModal onClose={() => setEmailEditStatus(false)}/>}
+        {(isEmailEditActive && isUserProfile) && <ChangeEmailModal onClose={onChangeEmailClose}/>}
         </>
       ) : (
         <Modal

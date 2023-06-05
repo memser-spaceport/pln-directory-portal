@@ -80,7 +80,7 @@ function EmailOtpVerificationModal() {
 
             // Reset resend timer and set unique token for verification
             const uniqueEmailVerifyToken = d.token;
-            Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 60 * 60 * 1000) })
+            Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 20 * 60 * 1000) })
             console.log(d)
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
             setResendTimer()
@@ -106,7 +106,7 @@ function EmailOtpVerificationModal() {
             const d = await sendEmailVerificationOtp(otpPayload);
             setLoaderStatus(false)
             const uniqueEmailVerifyToken = d.token;
-            Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 60 * 60 * 1000) })
+            Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 20 * 60 * 1000) })
             localStorage.setItem('otp-verification-email', email);
             localStorage.setItem('otp-verification-step', '2');
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
@@ -123,9 +123,9 @@ function EmailOtpVerificationModal() {
     const handleServerErrors = (statusCode, messageCode) => {
         if(statusCode === 401 || statusCode === 403) {
             if(messageCode === "MAX_OTP_ATTEMPTS_REACHED") {
-                goToError("Maximum Otp attempts reached. Please try logging again")
+                goToError("Maximum Otp attempts exceeded. Please login again and try")
             } else if(messageCode === "MAX_RESEND_ATTEMPTS_REACHED") {
-                goToError("Maximum Otp resend attempts reached. Please try logging again")
+                goToError("Maximum Otp resend attempts exceeded. Please login again and try")
             }else if(messageCode) {
                 goToError(messageCode)
             } else {
