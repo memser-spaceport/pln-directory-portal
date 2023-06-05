@@ -2,9 +2,10 @@ import { Menu, Transition } from '@headlessui/react';
 import { UserGroupIcon, UserIcon } from '@heroicons/react/outline';
 import { ArrowIcon } from '@protocol-labs-network/ui';
 import { trackGoal } from 'fathom-client';
+import Cookies from 'js-cookie';
 import Link from 'next/link';
 import React, { forwardRef, Fragment, useState } from 'react';
-import { FATHOM_EVENTS } from '../../../../constants';
+import { FATHOM_EVENTS, PAGE_ROUTES } from '../../../../constants';
 import { AddMemberModal } from '../../../members/member-enrollment/addmember';
 import { AddTeamModal } from '../../../teams/team-enrollment/addteam';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
@@ -60,15 +61,20 @@ export function JoinNetworkMenu() {
   }
 
   const onJoinMenuItemClicked = (label) => {
-    handleOpenModal(label)
-    if(label && label.includes('Member')) {
-      captureEvent('navbar-join-network-menu-item-clicked', {
-          name: 'member'
+    if (Cookies.get('userInfo')) {
+      Cookies.set('page_params', 'user_logged_in', { expires: 60, path: '/' });
+      window.location.href = PAGE_ROUTES.TEAMS;
+    } else {
+      handleOpenModal(label)
+      if(label && label.includes('Member')) {
+        captureEvent('navbar-join-network-menu-item-clicked', {
+            name: 'member'
+        })
+      } else if (label && label.includes('Team')) {
+        captureEvent('navbar-join-network-menu-item-clicked', {
+          name: 'team'
       })
-    } else if (label && label.includes('Team')) {
-      captureEvent('navbar-join-network-menu-item-clicked', {
-        name: 'team'
-    })
+      }
     }
     //
   }

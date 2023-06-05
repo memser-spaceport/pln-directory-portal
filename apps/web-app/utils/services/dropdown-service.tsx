@@ -44,7 +44,7 @@ export const fetchTeamsForAutocomplete = async (searchTerm) => {
     const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}&select=uid,name,shortDescription,logo.url,industryTags.title`);
     if (response.data) {
       return response.data.map((item) => {
-        return { value: item.uid, label: item.name, logo:item?.logo?.url };
+        return { value: item.uid, label: item.name };
       });
     }
   } catch (error) {
