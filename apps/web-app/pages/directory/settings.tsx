@@ -147,7 +147,12 @@ export default function Settings({
         sidemenu = [...sidemenu,SETTINGS_CONSTANTS.TEAM_SETTINGS];
     }
 
-    breadcrumbItems.push({ label: activeSetting });
+    if(activeSetting){
+        breadcrumbItems.push({ label: activeSetting });
+    }else{
+        breadcrumbItems.push({ label: SETTINGS_CONSTANTS.PROFILE_SETTINGS });
+        setActiveSetting(SETTINGS_CONSTANTS.PROFILE_SETTINGS);
+    }
 
     const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
     const [targetSettings, setTargetSetting] = useState(SETTINGS_CONSTANTS.PROFILE_SETTINGS);
