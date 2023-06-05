@@ -188,7 +188,7 @@ export function EditMemberModal({
     useState<boolean>(false);
   const [isEmailEditActive, setEmailEditStatus] =
     useState<boolean>(false);
-  const [currentEmail, setCurrentEmail] = useState()
+  const [currentEmail, setCurrentEmail] = useState("")
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     email: '',
@@ -509,6 +509,7 @@ export function EditMemberModal({
       participantType: ENROLLMENT_TYPE.MEMBER,
       uid: id,
     };
+
     api
       .post(`/v1/participants-request/unique-identifier`, data)
       .then((response) => {
@@ -615,7 +616,10 @@ export function EditMemberModal({
               if(imageChanged && setImageModified){
                 setImageModified(true);
               }
-              setEmailEditStatus(false);
+              if(isEmailEditActive) {
+                setCurrentEmail(formValues.email as any)
+                setEmailEditStatus(false);
+              }
             }
           });
         } catch (err) {

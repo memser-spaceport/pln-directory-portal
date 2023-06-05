@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react"
 import Cookies from 'js-cookie';
-import { sendEmailVerificationOtp, sendOtpForEmailChange, validateEmailOtp, verifyOtpForChangeEmail } from "../../services/auth.service";
+import { resendOtpForEmailChange, sendEmailVerificationOtp, sendOtpForEmailChange, validateEmailOtp, verifyOtpForChangeEmail } from "../../services/auth.service";
 import { LoadingIndicator } from "../shared/loading-indicator/loading-indicator";
 import EmailSubmissionForm from "./email-submission-form";
 import OtpSubmissionForm from "./otp-submission-form";
@@ -34,14 +34,29 @@ function ChangeEmailModal(props) {
     const onOtpVerify = async (otp) => {
         try {
             setErrorMessage('')
+            const otpToken = Cookies.get('uniqueEmailVerifyToken');
+            const newEmail = localStorage.getItem('otp-verification-email');
+            const clientToken = Cookies.get('clientAccessToken')
+            const accessToken = Cookies.get('authToken');
+
+
+
+            if (!clientToken || !newEmail || !accessToken) {
+                goToError('Invalid attempt. Please login and try again');
+                return;
+            }
+
+            if(!otpToken) {
+                goToError("Otp Session expired. Please login and try again")
+            }
             const otpPayload = {
                 otp: otp.join(''),
-                otpToken: Cookies.get('uniqueEmailVerifyToken'),
-                clientToken: Cookies.get('clientAccessToken'),
-                accessToken: Cookies.get('idToken'),
+                otpToken: otpToken,
+                clientToken: clientToken,
+                accessToken: accessToken,
                 emailId: localStorage.getItem('otp-verification-email')
             }
-            const accessToken = Cookies.get('authToken');
+
             setLoaderStatus(true)
             const headers = {Authorization: `Bearer ${JSON.parse(accessToken)}`}
             const data = await verifyOtpForChangeEmail(otpPayload, headers)
@@ -65,24 +80,30 @@ function ChangeEmailModal(props) {
 
     const onResendOtp = async () => {
         setErrorMessage('')
+        const otpToken = Cookies.get('uniqueEmailVerifyToken');
         const newEmail = localStorage.getItem('otp-verification-email');
         const accessToken = Cookies.get('authToken');
         const clientToken = Cookies.get('clientAccessToken');
-        if (!clientToken || !newEmail) {
+        if (!clientToken || !newEmail || !accessToken) {
             goToError('Invalid attempt. Please login and try again');
+            return;
+        }
+
+        if(!otpToken) {
+            goToError("Otp Session expired. Please login and try again");
             return;
         }
 
         try {
             setLoaderStatus(true)
-            const otpPayload = {newEmail,clientToken}
+            const otpPayload = {newEmail,clientToken, otpToken}
             const headers = {Authorization: `Bearer ${JSON.parse(accessToken)}`}
-            const d = await sendOtpForEmailChange(otpPayload, headers);
+            const d = await resendOtpForEmailChange(otpPayload, headers);
             setLoaderStatus(false)
 
             // Reset resend timer and set unique token for verification
             const uniqueEmailVerifyToken = d.token;
-            Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 60 * 60 * 1000) })
+            Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date(d.expiresIn).getTime()) })
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
             setResendTimer()
         } catch (e) {
@@ -109,7 +130,7 @@ function ChangeEmailModal(props) {
             const d = await sendOtpForEmailChange(otpPayload, headers);
             setLoaderStatus(false)
             const uniqueEmailVerifyToken = d.token;
-            Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 60 * 60 * 1000) })
+            Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date(d.expiresIn).getTime()) })
             localStorage.setItem('otp-verification-email', email);
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
             setVerificationStep(2);
@@ -126,13 +147,17 @@ function ChangeEmailModal(props) {
         if(statusCode === 401 || statusCode === 403) {
             if(messageCode === "MAX_OTP_ATTEMPTS_REACHED") {
                 goToError("Maximum otp attempts reached. Please try logging again")
+            } else if(messageCode === "MAX_RESEND_ATTEMPTS_REACHED") {
+                goToError("Maximum otp resend attempts reached. Please try logging again")
             } else if(messageCode) {
                 goToError(messageCode)
             } else {
                 goToError("Invalid Request. Please try again or contact support")
             }
         } else if (statusCode === 400) {
-             if(messageCode) {
+            if(messageCode === "CODE_EXPIRED") {
+                setErrorMessage("Otp expired. Please request for new otp and try again")
+            } else if(messageCode) {
                 setErrorMessage(messageCode)
             } else {
                 setErrorMessage("Invalid Request. Please try again or contact support")

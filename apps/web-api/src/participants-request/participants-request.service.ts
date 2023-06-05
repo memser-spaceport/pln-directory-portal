@@ -553,7 +553,11 @@ export class ParticipantsRequestService {
           }
            await axios.put(`${process.env.AUTH_API_URL}/admin/auth/account/email`, authPayload, {headers: headers})
         } catch (e) {
-          throw e
+          if(e?.response?.data?.message && e?.response.status === 404) {
+
+          } else {
+            throw e;
+          }
 
         }
       }

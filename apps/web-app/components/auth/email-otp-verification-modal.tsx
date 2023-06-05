@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react"
 import Cookies from 'js-cookie';
-import { sendEmailVerificationOtp, validateEmailOtp } from "../../services/auth.service";
+import { resendEmailVerificationOtp, sendEmailVerificationOtp, validateEmailOtp } from "../../services/auth.service";
 import { LoadingIndicator } from "../shared/loading-indicator/loading-indicator";
 import EmailSubmissionForm from "./email-submission-form";
 import OtpSubmissionForm from "./otp-submission-form";
@@ -64,23 +64,24 @@ function EmailOtpVerificationModal() {
 
     const onResendOtp = async () => {
         setErrorMessage('')
+        const otpToken = Cookies.get('uniqueEmailVerifyToken');
         const email = localStorage.getItem('otp-verification-email');
         const clientToken = Cookies.get('clientToken');
-        if (!clientToken || !email) {
+        if (!clientToken || !email || !otpToken) {
             goToError('Invalid attempt. Please login and try again');
             return;
         }
 
-
         try {
             setLoaderStatus(true)
-            const otpPayload = { email, clientToken }
-            const d = await sendEmailVerificationOtp(otpPayload);
+            const otpPayload = { email, clientToken, otpToken }
+            const d = await resendEmailVerificationOtp(otpPayload);
             setLoaderStatus(false)
 
             // Reset resend timer and set unique token for verification
             const uniqueEmailVerifyToken = d.token;
             Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 60 * 60 * 1000) })
+            console.log(d)
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
             setResendTimer()
         } catch (e) {
@@ -122,14 +123,19 @@ function EmailOtpVerificationModal() {
     const handleServerErrors = (statusCode, messageCode) => {
         if(statusCode === 401 || statusCode === 403) {
             if(messageCode === "MAX_OTP_ATTEMPTS_REACHED") {
-                goToError("Maximum otp attempts reached. Please try logging again")
-            } else if(messageCode) {
+                goToError("Maximum Otp attempts reached. Please try logging again")
+            } else if(messageCode === "MAX_RESEND_ATTEMPTS_REACHED") {
+                goToError("Maximum Otp resend attempts reached. Please try logging again")
+            }else if(messageCode) {
                 goToError(messageCode)
             } else {
                 goToError("Invalid Request. Please try again or contact support")
             }
         } else if (statusCode === 400) {
-             if(messageCode) {
+            if(messageCode === "CODE_EXPIRED") {
+                setErrorMessage("Otp expired. Please request for new otp and try again")
+            }
+             else if(messageCode) {
                 setErrorMessage(messageCode)
             } else {
                 setErrorMessage("Invalid Request. Please try again or contact support")
