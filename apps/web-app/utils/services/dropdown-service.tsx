@@ -41,10 +41,10 @@ export const fetchMembershipSources = async () => {
 
 export const fetchTeamsForAutocomplete = async (searchTerm) => {
   try {
-    const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}`);
+    const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}&select=uid,name,shortDescription,logo.url,industryTags.title`);
     if (response.data) {
       return response.data.map((item) => {
-        return { value: item.uid, label: item.name };
+        return { value: item.uid, label: item.name, logo:item?.logo?.url };
       });
     }
   } catch (error) {

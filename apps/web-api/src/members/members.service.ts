@@ -167,7 +167,7 @@ export class MembersService {
         },
         {
           headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_GITHUB_API_KEY}`,
+            Authorization: `Bearer ${process.env.GITHUB_API_KEY}`,
             'Content-Type': 'application/json',
           },
         }

@@ -13,7 +13,7 @@ export default function AddMemberStepOne(props) {
   const disableRequestorEmail = props?.disableRequestorEmail;
   return (
     <>
-      <div className="pt-5">
+      {!disableRequestorEmail && <div className="pt-5">
         <InputField
           required
           name="requestorEmail"
@@ -21,11 +21,10 @@ export default function AddMemberStepOne(props) {
           label="Requestor Email"
           value={values?.requestorEmail}
           onChange={onChange}
-          disabled={disableRequestorEmail}
           placeholder="Enter your email address"
           className="custom-grey custom-outline-none border"
         />
-      </div>
+      </div>}
       <div className="flex pt-5">
         <div className="">
           <ProfileImageUpload
