@@ -160,6 +160,7 @@ export const BTN_LABEL_CONSTANTS = {
 
 export const NW_SPOTLIGHT_CONSTANTS = {
   HEADING:'Network Spotlight',
+  BLOG:'Blog',
   BLOG_URL:'https://protocol.ai/blog/web3-trends-2023-top-3-exciting-projects-at-protocol-labs/',
   BLOG_TITLE: 'Web3 Trends 2023: 3 Exciting Projects at Protocol Labs',
   VIDEO: 'Video',
