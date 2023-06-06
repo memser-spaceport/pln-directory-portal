@@ -180,6 +180,7 @@ export function EditTeamModal({
     officeHours: '',
   });
   const divRef = useRef<HTMLDivElement>(null);
+  const [resetImg, setResetImg] = useState(false); 
 
   // const { executeRecaptcha } = useGoogleReCaptcha();
 
@@ -360,6 +361,7 @@ export function EditTeamModal({
 
   const handleSubmit = useCallback(
     async (e) => {
+      setResetImg(true);
       if(isModified){
         setImageModified(false);
         setSaveCompleted(false);
@@ -462,6 +464,10 @@ export function EditTeamModal({
     setModified(true);
     setModifiedFlag(true);
     setFormValues({ ...formValues, [name]: value });
+  }
+
+  const handleResetImg = () => {
+    setResetImg(false);
   }
 
   const handleImageChange = (file: File) => {
@@ -578,6 +584,8 @@ export function EditTeamModal({
               isEditMode={true}
               disableRequestorEmail={true}
               fromSettings={true}
+              resetImg={resetImg}
+              onResetImg={handleResetImg}
             />
           </div>
           <div className={(openTab === 2 || !fromSettings) ? 'block' : 'hidden'}>

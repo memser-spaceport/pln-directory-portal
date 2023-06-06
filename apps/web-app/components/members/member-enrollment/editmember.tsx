@@ -215,6 +215,7 @@ export function EditMemberModal({
     useState(false);
   const [reset, setReset] = useState(false);
   const router = useRouter();
+  const [resetImg, setResetImg] = useState(false); 
 
   const divRef = useRef<HTMLDivElement>(null);
 
@@ -532,6 +533,7 @@ export function EditMemberModal({
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
+      setResetImg(true);
       if(isModified){
         setImageChanged(false);
         if(setImageModified){
@@ -702,6 +704,10 @@ export function EditMemberModal({
     setModifiedFlag(true);
   }
 
+  const handleResetImg = () => {
+    setResetImg(false);
+  }
+
   const handleImageChange = (file: File) => {
     if (file) {
       setFormValues({ ...formValues, imageFile: file });
@@ -803,6 +809,8 @@ export function EditMemberModal({
                       isUserProfile={isUserProfile}
                       isProfileSettings={isProfileSettings}
                       onEmailChange={onEmailChange}
+                      resetImg={resetImg}
+                      onResetImg={handleResetImg}
                     />
                   </div>
                   <div className={openTab === 2 ? 'block' : 'hidden'}>

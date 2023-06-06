@@ -92,20 +92,15 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
               </div>
             )}
             {userInfo.profileImageUrl ? (
-              // <img
-              //   src={userInfo.profileImageUrl}
-              //   alt=""
-              //   className="h-full w-14 rounded-full"
-              // />
-            <Image
-              src={userInfo.profileImageUrl}
-              width={56}
-              height={56}
-              alt="Profile Picture"
-              className="h-full w-14 rounded-full"
-            />
-          ) : (
-              <UserIcon className="h-full w-14 fill-white" />
+              <Image
+                src={userInfo.profileImageUrl}
+                width={56}
+                height={56}
+                alt="Profile Picture"
+                className="h-full w-14 rounded-full"
+              />
+            ) : (
+              <UserIcon className="h-full w-14 fill-white bg-slate-200 rounded-full" />
             )}
             <Menu as="div" className="relative w-16">
               {({ open }) => (

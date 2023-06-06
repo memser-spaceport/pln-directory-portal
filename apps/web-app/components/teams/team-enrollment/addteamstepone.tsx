@@ -38,6 +38,8 @@ export default function AddMemberStepOne(props) {
             avatarIcon={props.isEditMode && UserGroupIcon}
             previewImageShape="square"
             onImageChange={props.handleImageChange}
+            resetImg={props.resetImg}
+            onResetImg={props.onResetImg}
           />
         </div>
         <div className="namefield inputfield">
