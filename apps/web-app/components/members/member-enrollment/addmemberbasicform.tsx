@@ -47,7 +47,7 @@ export default function AddMemberBasicForm(props) {
           4MB.
         </span>
       </div>
-       { isCurrentMailBoxNeeded && <div className="inputfield relative pt-5">
+      {(!props.isUserProfile && !props.isEmailEditActive) && <div className="inputfield relative pt-5">
         <InputField
           required
           name="email"
@@ -62,7 +62,13 @@ export default function AddMemberBasicForm(props) {
           placeholder="Enter your email address"
           className="custom-grey custom-outline-none border"
         />
-        <p onClick={props.onEmailChange} className='absolute top-[20px] text-sm font-semibold cursor-pointer text-[#156FF7] right-0'>Change Email</p>
+          {(!props.isEmailEditActive && props.isProfileSettings) &&<p onClick={props.onEmailChange} className='absolute top-[20px] text-sm font-semibold cursor-pointer text-[#156FF7] right-0'>Change Email</p>}
+      </div>}
+
+      {props.isUserProfile && <div className="inputfield relative pt-5">
+        <p className='text-sm font-bold'>Email</p>
+        <p className='mt-[12px] text-sm text-slate-900'>{values?.email}</p>
+        {(!props.isEmailEditActive && props.isProfileSettings) &&<p onClick={props.onEmailChange} className='absolute top-[20px] text-sm font-semibold cursor-pointer text-[#156FF7] right-0'>Change Email</p>}
       </div>}
       { (props.isEmailEditActive && props.isProfileSettings && !props.isUserProfile) &&
       <div className="flex pt-5 relative">

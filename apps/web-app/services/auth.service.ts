@@ -5,8 +5,18 @@ export const sendEmailVerificationOtp = async (payload) => {
     return result.data;
 }
 
+export const resendEmailVerificationOtp = async (payload) => {
+    const result = await axios.post(`${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/auth/verification/resend-otp`, payload)
+    return result.data;
+}
+
 export const sendOtpForEmailChange = async (payload, headers) => {
     const result = await axios.post(`${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/auth/change-email/send-otp`, payload, {headers})
+    return result.data;
+}
+
+export const resendOtpForEmailChange = async (payload, headers) => {
+    const result = await axios.post(`${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/auth/change-email/resend-otp`, payload, {headers})
     return result.data;
 }
 
