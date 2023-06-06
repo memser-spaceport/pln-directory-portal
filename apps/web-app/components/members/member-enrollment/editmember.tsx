@@ -188,7 +188,7 @@ export function EditMemberModal({
     useState<boolean>(false);
   const [isEmailEditActive, setEmailEditStatus] =
     useState<boolean>(false);
-  const [currentEmail, setCurrentEmail] = useState()
+  const [currentEmail, setCurrentEmail] = useState("")
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     email: '',
@@ -229,6 +229,13 @@ export function EditMemberModal({
   const onNewEmailInputChange = (newEmailValue) => {
     console.log(newEmailValue)
     setFormValues(v => v["email"] = newEmailValue);
+  }
+
+  const onChangeEmailClose = (step) => {
+    setEmailEditStatus(false);
+    if(step === 3) {
+      window.location.reload()
+    }
   }
 
   const onEmailChange = () => {
@@ -509,6 +516,7 @@ export function EditMemberModal({
       participantType: ENROLLMENT_TYPE.MEMBER,
       uid: id,
     };
+
     api
       .post(`/v1/participants-request/unique-identifier`, data)
       .then((response) => {
@@ -615,7 +623,10 @@ export function EditMemberModal({
               if(imageChanged && setImageModified){
                 setImageModified(true);
               }
-              setEmailEditStatus(false);
+              if(isEmailEditActive) {
+                setCurrentEmail(formValues.email as any)
+                setEmailEditStatus(false);
+              }
             }
           });
         } catch (err) {
@@ -869,7 +880,7 @@ export function EditMemberModal({
             onCloseFn={confirmationClose}
           />
         </div>
-        {(isEmailEditActive && isUserProfile) && <ChangeEmailModal onClose={() => setEmailEditStatus(false)}/>}
+        {(isEmailEditActive && isUserProfile) && <ChangeEmailModal onClose={onChangeEmailClose}/>}
         </>
       ) : (
         <Modal

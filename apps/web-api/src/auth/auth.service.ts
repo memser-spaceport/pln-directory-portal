@@ -273,27 +273,8 @@ export class AuthService {
     }
   }
 
-  async handleAuthErrors(statusCode, errorMessage, errorCode) {
-    if(statusCode === 401) {
-      if(errorMessage === "Unauthorized") {
-        throw new UnauthorizedException("Unauthorized Request. Please login again and try")
-      } else {
-        throw new UnauthorizedException("Invalid Request. Please login again and try")
-      }
-    } else if (statusCode === 400) {
-      if(errorCode === "EOTP005") {
-        throw new BadRequestException("Invalid OTP. Please enter valid otp sent to your email")
-      } else if (errorCode === "EOTP003"){
-        throw new UnauthorizedException("Maximum OTP attempts reached. Please login again and try")
-      } else if (errorMessage === "Validation failed") {
-        throw new BadRequestException("Invalid request. Please try again or contact support")
-      } else {
-        throw new BadRequestException("Invalid request. Please try again or contact support")
-      }
-    }
-  }
-
   handleErrors = (error) => {
+    console.log(error?.response?.statusCode, error?.response?.status, error?.response?.message,error?.response?.data )
     if(error?.response?.statusCode && error?.response?.message) {
       throw new HttpException(error?.response?.message, error?.response?.statusCode)
      } else if (error?.response?.data && error?.response?.status) {
@@ -304,6 +285,10 @@ export class AuthService {
           throw new UnauthorizedException("Unauthorized")
         } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP003') {
           throw new ForbiddenException("MAX_OTP_ATTEMPTS_REACHED")
+        } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP006') {
+          throw new ForbiddenException("MAX_RESEND_ATTEMPTS_REACHED")
+        } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP004') {
+          throw new BadRequestException("CODE_EXPIRED")
         }
         else {
           throw new InternalServerErrorException("Unexpected error. Please try again")
@@ -311,6 +296,19 @@ export class AuthService {
      } else {
       throw new InternalServerErrorException("Unexpected error. Please try again")
      }
+  }
+
+  async resendEmailOtpForVerification(otpToken, clientToken) {
+    const payload = {
+      token: otpToken
+    }
+    const header = {
+      headers: {
+        Authorization: `Bearer ${clientToken}`
+      }
+    }
+    const sendOtpResult = await axios.post(`${process.env.AUTH_API_URL}/mfa/otp/resend`, payload, header);
+    return sendOtpResult.data;
   }
 
   async sendEmailOtpForVerification(email, clientToken) {
