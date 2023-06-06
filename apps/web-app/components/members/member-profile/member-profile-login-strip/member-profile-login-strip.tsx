@@ -46,7 +46,7 @@ export function MemberProfileLoginStrip({
             </svg>
 
             <p className="items-center text-xs font-bold leading-5">
-              You are viewing {member?.name} limited profile.{' '}
+              You are viewing {member?.name.concat("'s")} limited profile.{' '}
               <span
                 className="cursor-pointer text-blue-700"
                 onClick={handleOnClick}
