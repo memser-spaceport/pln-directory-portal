@@ -264,6 +264,8 @@ export function EditMemberModal({
 
   useEffect(() => {
     if (isOpen || isProfileSettings) {
+      resetState();
+      setOpenTab(1);
       Promise.all([fetchMember(id), fetchSkills(), fetchTeams()])
         .then((data) => {
           const member = data[0];

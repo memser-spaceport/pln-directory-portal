@@ -81,7 +81,6 @@ export function Autocomplete({
 
   // Define the debounced function
   const debouncedGetData = debounce((searchTerm) => {
-    console.log("TestTest",debounceTime);
     
     debounceCall(searchTerm).then((res: IDropdownOption[]) => {
       const availableTeams = res?.filter((item) =>
