@@ -10,24 +10,18 @@ import { MissionHelpArea } from './mission-help-area';
 const helpAreas = [
   { icon: <BuildingIcon />, name: 'Initial Building' },
   { icon: <NetworkingIcon />, name: 'Networking' },
-  { icon: <TalentIcon />, name: 'Talent' },
-  { icon: <ResearchIcon />, name: 'Research and Engineering' },
   { icon: <FundingIcon />, name: 'Funding' },
   { icon: <AdoptionIcon />, name: 'Adoption' },
+  { icon: <TalentIcon />, name: 'Talent' },
+  { icon: <ResearchIcon />, name: 'Research & Engineering' },
 ];
 
 export const MissionCard = () => {
   return (
-    <Card styleClassName="bg-white px-9">
-      <h2 className="md:text-lg">
-        Teams in the Protocol Labs Network (PLN) receive support across the
-        entire research and development pipeline. PLN teams get help on:
-      </h2>
-      <div className="mt-8 grid gap-x-10 gap-y-6 font-medium md:mt-7 md:grid-flow-col md:grid-cols-2 md:grid-rows-3 md:text-lg xl:grid-cols-3 xl:grid-rows-2">
-        {helpAreas.map((area, i) => (
-          <MissionHelpArea key={i} areaIcon={area.icon} areaName={area.name} />
-        ))}
-      </div>
-    </Card>
+    <div className="mt-8 grid font-medium md:mt-7 md:grid-cols-6 md:text-lg xl:grid-cols-7 ">
+      {helpAreas.map((area, i) => (
+        <MissionHelpArea key={i} areaIcon={area.icon} areaName={area.name} index={i}/>
+      ))}
+    </div>
   );
 };

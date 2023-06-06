@@ -16,16 +16,15 @@ import { NW_SPOTLIGHT_CONSTANTS } from '../constants';
 export default function Index({videoDetails,playlistDetails}) {
   return (
     <div>
-      <Mission />
+      <Mission videoDetails={videoDetails} playlistDetails={playlistDetails} />
       <PortalDivider />
       <div className="bg-white px-6 py-24 md:px-16 md:py-[120px]">
         <div className="mx-auto max-w-[1110px]">
-          <NetworkSpotlight videoDetails={videoDetails} playlistDetails={playlistDetails} />
           <Directory />
         </div>
       </div>
       <div className="bg-gradient-to-b from-slate-50 to-white">
-        <div className="px-6 py-24 md:px-16 md:py-[152px]">
+        <div className="px-6 py-24 md:px-16 ">
           <div className="mx-auto max-w-[1110px]">
             <div className="mb-[106px] md:mb-[162px]">
               <LabWeek />
