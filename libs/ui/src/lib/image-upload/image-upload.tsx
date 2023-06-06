@@ -140,7 +140,7 @@ export function ProfileImageUpload({
             type="file"
             ref={inputRef}
             accept="image/png, image/jpeg"
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            className={`absolute inset-0 h-full w-full ${!disabled && 'cursor-pointer'} opacity-0`}
             onChange={handleImageChange}
             disabled={disabled}
           />

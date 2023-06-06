@@ -27,10 +27,10 @@ export function MemberProfileProjectsModal({
       enableHeader={false}
     >
       <div className="p-8">
-        <span className="mb-2 mt-6 pb-5 font-bold text-slate-900">
+        <div className="mb-4 mt-6 font-bold text-slate-900">
           {'Projects'} ({repositories?.length})
-        </span>
-        <div className="rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)] focus-within:outline-none focus:outline-none focus-visible:outline-none">
+        </div>
+        <div className="mb-3 rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)] focus-within:outline-none focus:outline-none focus-visible:outline-none github-project-popup overflow-y-auto">
           {repositories?.map((project, i) => {
             return (
               <ProfileProjectCard
@@ -44,8 +44,8 @@ export function MemberProfileProjectsModal({
             );
           })}
         </div>
-        <div className="footerCancelDiv flow-root w-full">
-          <div className="float-right">
+        <div className="pt-[20px] border-t-2 w-full">
+          <div className="flex place-content-center">
             <button
               className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-[90px] w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8] disabled:bg-slate-400"
               onClick={() => setIsModalOpen(false)}

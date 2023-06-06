@@ -170,7 +170,7 @@ export function Autocomplete({
         <InputField
           icon={selectedValue.logo ? selectedValue.logo : undefined}
           label={'te'}
-          className={`mt-[12px] flex cursor-pointer items-center justify-between rounded-md border border-gray-300 bg-white py-2 px-6 focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
+          className={`mt-[12px] flex ${!disabled && 'cursor-pointer'} items-center justify-between rounded-md border border-gray-300 bg-white py-2 px-6 focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
           type="text"
           showLabel={false}
           disabled={disabled}

@@ -110,13 +110,11 @@ export function Dropdown({
               {buttonContent ? (
                 buttonContent
               ) : selectedOption?.label ? (
-                <>
-                  <div className="text-left leading-6 flex">
+                <div className="text-left leading-6 flex">
                     {selectedOption?.icon &&
                       (<img src={selectedOption?.icon?.toString()} width={25} height={45} className='h-6 w-6 rounded-full'></img>
                       )}
                     <span  className={`${'relative width-full'}`}>{selectedOption?.label}</span></div>
-                </>
               ) : (
                 <div className="text-sm text-slate-600 opacity-50">
                   {placeholder}

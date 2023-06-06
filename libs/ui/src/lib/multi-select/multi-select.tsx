@@ -115,7 +115,7 @@ export function MultiSelect({
         </span>
       )}
       <div
-        className={`mt-[12px] flex cursor-pointer items-center justify-between rounded-md border border-gray-300 bg-white py-2 px-1 focus:outline-none focus:ring-2 focus:ring-blue-500 ${requiredIndicator}`}
+        className={`mt-[12px] flex ${!disabled && 'cursor-pointer'} items-center justify-between rounded-md border border-gray-300 bg-white py-2 px-1 focus:outline-none focus:ring-2 focus:ring-blue-500 ${requiredIndicator}`}
         onClick={!disabled ? toggleDropdown : () => null}
       >
         <div className="flex flex-1 flex-wrap pr-4">

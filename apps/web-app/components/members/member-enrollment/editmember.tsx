@@ -175,7 +175,6 @@ export function EditMemberModal({
   const [isErrorPopupOpen, setIsErrorPopupOpen] = useState(false);
   const [basicErrors, setBasicErrors] = useState([]);
   const [skillErrors, setSkillErrors] = useState([]);
-  const [name, setName] = useState('');
   const [dropDownValues, setDropDownValues] = useState({});
   const [imageUrl, setImageUrl] = useState<string>();
   const [emailExists, setEmailExists] = useState<boolean>(false);
@@ -266,6 +265,7 @@ export function EditMemberModal({
     if (isOpen || isProfileSettings) {
       resetState();
       setOpenTab(1);
+      setIsProcessing(true)
       Promise.all([fetchMember(id), fetchSkills(), fetchTeams()])
         .then((data) => {
           const member = data[0];
@@ -317,6 +317,7 @@ export function EditMemberModal({
           setImageUrl(member.image?.url ?? '');
           setFormValues(formValues);
           setDropDownValues({ skillValues: data[1], teamNames: data[2] });
+          setIsProcessing(false);
         })
         .catch((err) => {
           toast(err?.message,{
@@ -363,6 +364,8 @@ export function EditMemberModal({
             };
           });
 
+          console.log('member', member)
+
           const formValues = {
             name: member.name,
             email: member.email,
@@ -395,10 +398,8 @@ export function EditMemberModal({
             const parsedUserInfo = JSON.parse(userInfoFromCookie);
             formValues['requestorEmail'] = parsedUserInfo.email;
           }
-
           setImageUrl(member.image?.url ?? '');
           setFormValues(formValues);
-          setName(member.name);
           setDropDownValues({ skillValues: data[1], teamNames: data[2] });
           setReset(false);
           setModified(false);
@@ -434,7 +435,6 @@ export function EditMemberModal({
     setSkillErrors([]);
     setDropDownValues({});
     setImageChanged(false);
-    setName('');
     setIsProcessing(false);
     setDisableSubmit(false);
     setImageUrl('');
@@ -508,7 +508,6 @@ export function EditMemberModal({
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
-      oldName: name,
     };
     return formattedData;
   }
@@ -694,6 +693,7 @@ export function EditMemberModal({
     event
   ) {
     const { name, value } = event.target;
+    console.log('event', event.target.value);
     setFormValues({ ...formValues, [name]: value });
     setSaveCompleted(false);
     setModified(true);
