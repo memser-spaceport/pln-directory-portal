@@ -60,7 +60,7 @@ export function MemberProfileProjects({
           })}
         </div>
       ) : (
-        <MemberEmptyProject userInfo={userInfo} member={member} />
+        <MemberEmptyProject profileType="member" userInfo={userInfo} member={member} />
       )}
 
       {/* <div className="flex pt-2">

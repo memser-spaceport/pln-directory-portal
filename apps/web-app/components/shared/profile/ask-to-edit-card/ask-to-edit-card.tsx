@@ -19,7 +19,8 @@ interface AskToEditCardProps {
   profileType: TAskToEditProfileType;
   member?: IMember;
   team?: ITeam;
-  userInfo?: any
+  userInfo?: any;
+  from?:string;
 }
 
 const urlList: {
@@ -39,7 +40,8 @@ export function AskToEditCard({
   profileType,
   member,
   team,
-  userInfo
+  userInfo,
+  from
 }: AskToEditCardProps) {
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
@@ -110,9 +112,19 @@ export function AskToEditCard({
         id="edit-detail"
         className="flex text-base font-semibold text-[#156FF7]"
         onClick={() => redirectToSettings()}
-      >
-        <EditIcon className="m-1" />{' '}
-        {profileType === 'member' ? 'Edit Profile' : 'Edit Team'}
+      >{
+        from !="git" ? (
+          <>
+          <EditIcon className="m-1" />{' '}
+          {profileType === 'member' ? 'Edit Profile' : 'Edit Team'}
+          </>
+        ): (
+          <>
+          here
+          </>
+        )
+      }
+      
       </button>
       {/* <GoogleReCaptchaProvider
         reCaptchaKey={process.env.NEXT_PUBLIC_GOOGLE_SITE_KEY}
