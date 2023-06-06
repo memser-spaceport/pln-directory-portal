@@ -3,7 +3,6 @@ import { getTeams } from "@protocol-labs-network/teams/data-access";
 import { Autocomplete, Breadcrumb, Dropdown } from "@protocol-labs-network/ui";
 import { trackGoal } from 'fathom-client';
 import { NextSeo } from "next-seo";
-import { useRouter } from "next/router";
 import { setCookie } from "nookies";
 import { ReactElement, useEffect, useState } from "react";
 import { EditMemberModal } from "apps/web-app/components/members/member-enrollment/editmember";
@@ -32,8 +31,6 @@ export default function Settings({
     const [isModifiedMember, setModifiedMember] = useState<boolean>(false);
     const [isPflModified, setModifiedProfile] = useState<boolean>(false);
     const [openValidationPopup, setOpenValidationPopup] = useState<boolean>(false);
-
-    const router = useRouter();
 
     useEffect(() => {
         if (isTeamImageModified) {
@@ -104,31 +101,6 @@ export default function Settings({
             }
         })
     }
-
-    // useEffect(() => {
-    //     if(router.query?.id && router.query?.from){
-    //         if(router.query?.from === SETTINGS_CONSTANTS.TEAM){
-    //             setActiveSetting(SETTINGS_CONSTANTS.TEAM_SETTINGS);
-    //             setSelectedTeam({
-    //                 "label": router.query.name,
-    //                 "value": router.query.id,
-    //                 "logo":  router.query.logo,
-    //                 "icon":  router.query.logo
-    //             })
-    //         }else if(router.query.from === SETTINGS_CONSTANTS.MEMBER){
-    //             if(router.query.id === userInfo.uid){
-    //                 setActiveSetting(SETTINGS_CONSTANTS.PROFILE_SETTINGS);
-    //             }else{
-    //                 setActiveSetting(SETTINGS_CONSTANTS.MEMBER_SETTINGS);
-    //                 setSelectedMember({
-    //                     "label": router.query.name,
-    //                     "value": router.query.id,
-    //                     "logo":  router.query.logo
-    //                 });
-    //             }
-    //         }
-    //     }
-    //   }, [router.query]);
 
     const { breadcrumbItems } = useProfileBreadcrumb({
         backLink,
