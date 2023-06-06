@@ -78,7 +78,7 @@ export function InputField({
         {...props}
         type={showPassword ? 'text' : props.type}
         className={`mt-[12px] block w-full rounded-lg bg-white text-sm leading-6 text-slate-900  shadow-slate-300 transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-600 placeholder:opacity-50
-        ${(icon || dropDownType === 'member' || dropDownType === 'team') ? 'pl-9' : 'pl-3'} ${hasClear && props.type !== 'date' ? 'pr-6' : 'pr-2'} on-focus
+        ${(icon || dropDownType === 'member' || dropDownType === 'team') ? 'pl-9 truncate !pr-6' : 'pl-3'} ${hasClear && props.type !== 'date' ? 'pr-6' : 'pr-2'} on-focus
         h-10 leading-10 disabled:bg-slate-100 ${
           props.className
         } ${requiredIndicator}`}

@@ -22,6 +22,8 @@ export default function AddMemberBasicForm(props) {
             }
             avatarIcon={props.isEditMode && UserIcon}
             onImageChange={props.handleImageChange}
+            resetImg={props.resetImg}
+            onResetImg={props.onResetImg}
           />
         </div>
         <div className="namefield inputfield">
