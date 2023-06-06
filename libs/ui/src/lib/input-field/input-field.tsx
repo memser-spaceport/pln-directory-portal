@@ -97,7 +97,7 @@ export function InputField({
 
       {hasClear ? (
         <button
-          className={`absolute inset-y-0 top-9 ${props.type === 'date' ? 'right-8' : 'right-0 pr-2'} ${
+          className={`absolute inset-y-0 ${props.type === 'date' ? 'top-9 right-8' : 'right-0 pr-2'} ${
             inputValue ? '' : 'hidden'
           }`}
           onClick={handleClear}
