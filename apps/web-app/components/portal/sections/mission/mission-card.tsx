@@ -12,13 +12,13 @@ const helpAreas = [
   { icon: <NetworkingIcon />, name: 'Networking' },
   { icon: <FundingIcon />, name: 'Funding' },
   { icon: <AdoptionIcon />, name: 'Adoption' },
-  { icon: <TalentIcon />, name: 'Talent' },
   { icon: <ResearchIcon />, name: 'Research & Engineering' },
+  { icon: <TalentIcon />, name: 'Talent' },
 ];
 
 export const MissionCard = () => {
   return (
-    <div className="mt-8 grid font-medium md:mt-7 md:grid-cols-6 md:text-lg xl:grid-cols-7 ">
+    <div className="mt-8 flex font-medium md:mt-7 md:text-lg justify-between ">
       {helpAreas.map((area, i) => (
         <MissionHelpArea key={i} areaIcon={area.icon} areaName={area.name} index={i}/>
       ))}

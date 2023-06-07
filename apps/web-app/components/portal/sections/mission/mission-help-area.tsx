@@ -12,7 +12,7 @@ export const MissionHelpArea = ({
   areaName,
 }: TMissionHelpAreaProps) => {
   return (
-    <div className={`flex items-center gap-x-3 text-left ${index === 5 ? ' col-span-2':''}`}>
+    <div className={`flex items-center gap-x-3 text-left`}>
       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-50">
         {areaIcon}
       </div>

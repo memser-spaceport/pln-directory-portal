@@ -9,7 +9,6 @@ import { Mission } from '../components/portal/sections/mission/mission';
 import { Projects } from '../components/portal/sections/projects/projects';
 import { Substack } from '../components/portal/sections/substack/substack';
 import { PortalLayout } from '../layouts/portal-layout';
-import { NetworkSpotlight } from '../components/portal/sections/spotlight/network-spotlight';
 import api from '../utils/api';
 import { NW_SPOTLIGHT_CONSTANTS } from '../constants';
 
