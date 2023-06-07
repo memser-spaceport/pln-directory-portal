@@ -1,6 +1,7 @@
 import { Transition, Dialog } from "@headlessui/react";
 // import { XCircleIcon } from "@heroicons/react/solid";
 import { Fragment } from "react";
+import { BTN_LABEL_CONSTANTS, SETTINGS_CONSTANTS } from '../../../../../apps/web-app/constants';
 
 interface IDiscardChangesPopupProps {
     text: string;
@@ -52,7 +53,7 @@ export function DiscardChangesPopup({
                                         as="h2"
                                         className="text-xl font-bold leading-6"
                                     >
-                                        <p className="mt-4">Save Changes</p>
+                                        <p className="mt-4">{SETTINGS_CONSTANTS.CONF_TITLE}</p>
                                     </Dialog.Title>
                                     {
                                         (<>
@@ -61,17 +62,17 @@ export function DiscardChangesPopup({
                                             </p>
 
                                             <div>
-                                                <button className={'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-[150px] float-right justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]'}
-                                                    onClick={() => { handleModalClose(false) }}
-                                                >
-                                                    YES
-                                                </button>
-
-                                                <button className={'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-[150px] justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]'}
+                                                <button className={'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus float-right inline-flex w-[150px] justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]'}
 
                                                     onClick={() => { handleModalClose(true) }}
                                                 >
-                                                    NO
+                                                    {BTN_LABEL_CONSTANTS.YES}
+                                                </button>
+
+                                                <button className={'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-[150px] justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]'}
+                                                    onClick={() => { handleModalClose(false) }}
+                                                >
+                                                    {BTN_LABEL_CONSTANTS.NO}
                                                 </button>
                                             </div>
                                         </>)

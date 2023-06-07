@@ -130,7 +130,9 @@ export const SETTINGS_CONSTANTS = {
   MEMBER_SETTINGS: 'Manage Members',
   ACCOUNT_SETTINGS: 'ACCOUNT SETTINGS',
   TEAM: 'team',
-  MEMBER: 'member'
+  MEMBER: 'member',
+  CONF_TITLE: 'Discard Changes',
+  TEAM_HELP_TXT: 'Please update only the fields that you would like to change for this team'
 }
 
 export const TAB_CONSTANTS = {
@@ -143,19 +145,19 @@ export const TAB_CONSTANTS = {
 export const MSG_CONSTANTS = {
   TEAM_UPDATE_MESSAGE:'Changes have been updated',
   MEMBER_UPDATE_MESSAGE: 'Changes have been updated',
-  TEAM_CHANGE_CONF_MSG: 'Do you want to save the changes before you proceed ?',
-  MEMBER_CHANGE_CONF_MSG: 'Do you want to save the changes before you proceed ?',
-  PROFILE_CHANGE_CONF_MSG: 'Do you want to save the changes before you proceed ?',
-  RESET_CHANGE_CONF_MSG: 'Do you want to save the changes before you proceed ?',
+  CHANGE_CONF_MSG: 'Do you want to discard the changes before you proceed ?',
+  RESET_CHANGE_CONF_MSG: 'Do you want to reset the changes ?',
   NO_CHANGES_TO_RESET: 'No changes made to reset',
-  NO_CHANGES_TO_SAVE: 'No changes made to save.',
+  NO_CHANGES_TO_SAVE: 'No changes made to save.'
 }
 
 export const BTN_LABEL_CONSTANTS = {
   RESET: 'Reset',
   READ_ARTICLE: 'Read Article',
   PLAY_VIDEO: 'Play Video',
-  VIEW_PLAYLIST: 'View Playlist'
+  VIEW_PLAYLIST: 'View Playlist',
+  YES: 'Yes',
+  NO: 'No'
 }
 
 export const NW_SPOTLIGHT_CONSTANTS = {

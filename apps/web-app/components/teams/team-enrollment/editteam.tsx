@@ -22,7 +22,7 @@ import {
 import { fetchTeam } from '../../../utils/services/teams';
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
-import { BTN_LABEL_CONSTANTS, ENROLLMENT_TYPE, MSG_CONSTANTS, TAB_CONSTANTS, FATHOM_EVENTS } from '../../../constants';
+import { BTN_LABEL_CONSTANTS, ENROLLMENT_TYPE, MSG_CONSTANTS, TAB_CONSTANTS, FATHOM_EVENTS, SETTINGS_CONSTANTS } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-team.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
@@ -563,11 +563,7 @@ export function EditTeamModal({
       <div>
         <div className={`px-11 ${fromSettings ? 'bg-white  mt-[24px] pt-[24px] rounded-t-[8px]' : ''} `}>
           <span className="font-size-14 text-sm">
-            Please fill out only the fields you would like to change for
-            this team. If there is something you want to change that is
-            not available, please leave a detailed explanation in
-            &quot;Additional Notes&quot;. If you don&apos;t want to change
-            a field, leave it blank.
+            {SETTINGS_CONSTANTS.TEAM_HELP_TXT}
           </span>
         </div>
 
