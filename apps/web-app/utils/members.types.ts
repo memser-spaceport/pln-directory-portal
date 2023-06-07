@@ -26,6 +26,7 @@ export interface IMember {
   leadingTeams?: string[];
   openToWork?: boolean;
   linkedinHandle: string | null;
+  telegramHandle?: string | null;
   repositories: IGitRepositories[];
 }
 

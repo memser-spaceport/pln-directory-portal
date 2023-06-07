@@ -1,5 +1,6 @@
 import { InputField, ProfileImageUpload, ConfirmInputField } from '@protocol-labs-network/ui';
 import { UserIcon } from '@heroicons/react/solid';
+import { ReactComponent as EditIcon } from '/public/assets/images/icons/edit.svg';
 import { ReactComponent as InformationCircleIcon } from '../../../public/assets/images/icons/info_icon.svg';
 
 export default function AddMemberBasicForm(props) {
@@ -65,13 +66,23 @@ export default function AddMemberBasicForm(props) {
           placeholder="Enter your email address"
           className="custom-grey custom-outline-none border"
         />
-          {(!props.isEmailEditActive && props.isProfileSettings) &&<p onClick={props.onEmailChange} className='absolute top-[20px] text-sm font-semibold cursor-pointer text-[#156FF7] right-0'>Change Email</p>}
+          {(!props.isEmailEditActive && props.isProfileSettings) &&
+            <div className='absolute right-0 top-[20px] flex items-center gap-1 cursor-pointer' onClick={props.onEmailChange}>
+              <EditIcon className="m-1" />
+              <p onClick={props.onEmailChange} className=' text-sm font-semibold cursor-pointer text-[#156FF7] right-0'>Edit Email</p>
+            </div>
+          }
       </div>}
 
       {props.isUserProfile && <div className="inputfield relative pt-5">
         <p className='text-sm font-bold'>Email</p>
         <p className='mt-[12px] text-sm text-slate-900'>{values?.email}</p>
-        {(!props.isEmailEditActive && props.isProfileSettings) &&<p onClick={props.onEmailChange} className='absolute top-[20px] text-sm font-semibold cursor-pointer text-[#156FF7] right-0'>Change Email</p>}
+        {(!props.isEmailEditActive && props.isProfileSettings) && 
+        <div className='absolute right-0 top-[20px] flex items-center gap-1 cursor-pointer' onClick={props.onEmailChange}>
+          <EditIcon className="m-1" />
+          <p className='text-sm font-semibold cursor-pointer text-[#156FF7] right-0'>Edit Email</p>
+        </div>
+        }
       </div>}
       { (props.isEmailEditActive && props.isProfileSettings && !props.isUserProfile) &&
       <div className="flex pt-5 relative">

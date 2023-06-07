@@ -71,11 +71,10 @@ export default function Member({
 
       <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-24">
         <div>
-          <MemberProfileLoginStrip member={member} userInfo={userInfo} />
-
+          {!userInfo?.uid && <MemberProfileLoginStrip member={member} userInfo={userInfo} />}
           <div className="shadow-card--slate-900 p-7.5 w-full rounded-b-xl bg-white text-sm">
             <MemberProfileHeader member={member} userInfo={userInfo} />
-            <MemberProfileDetails member={member} userInfo={userInfo} />
+            {userInfo?.uid && <MemberProfileDetails member={member} userInfo={userInfo} />}
             <MemberProfileOfficeHours
               url={member.officeHours}
               userInfo={userInfo}

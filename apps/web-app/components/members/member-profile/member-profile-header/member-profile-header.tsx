@@ -85,7 +85,7 @@ export function MemberProfileHeader({
           </div>
         )}
       </div>
-      <div className="flex w-1/4 justify-end gap-7">
+      <div className="flex w-3/4 justify-end gap-7">
         {(userInfo.uid === member.id ||
           (userInfo.roles?.length > 0 &&
             userInfo.roles.includes('DIRECTORYADMIN'))) && (
