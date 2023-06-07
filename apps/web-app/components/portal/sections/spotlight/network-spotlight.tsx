@@ -28,8 +28,8 @@ export const NetworkSpotlight = ({ videoDetails, playlistDetails }) => {
         <>
             <section className="border p-[24px] rounded-lg bg-white mt-16 ">
                 <p className="font-extrabold text-[24px] leading-[28px] pb-6 text-left">{NW_SPOTLIGHT_CONSTANTS.HEADING}</p>
-                <div className="flex flex-col md:flex-row justify-evenly gap-[16px]">
-                    <div className="w-[350px] h-[328px] border rounded-[8px] bg-[#F1F5F9] p-[20px]">
+                <div className="flex flex-col md:flex-row justify-between gap-[16px]">
+                    <div className="w-[360px] h-[328px] border rounded-[8px] bg-[#F1F5F9] p-[20px]">
                         <div>
                             <div className="absolute rounded-full w-[45px] h-[20px] mt-[8px] text-[12px] font-medium bg-[#156FF7] ml-[8px] z-[1001]">
                                 <span className="relative p-[5px] text-[#FFFFFF]">{NW_SPOTLIGHT_CONSTANTS.BLOG}</span>
@@ -53,7 +53,7 @@ export const NetworkSpotlight = ({ videoDetails, playlistDetails }) => {
                         </div>
                     </div>
                     {
-                        (videoDetails && <div className="w-[350px] h-[328px] border rounded-[8px] bg-[#F1F5F9] p-[20px]">
+                        (videoDetails && <div className="w-[360px] h-[328px] border rounded-[8px] bg-[#F1F5F9] p-[20px]">
 
                             <div className="flex flex-col">
                                 <div className="relative w-[300px] h-[168px]">
@@ -92,7 +92,7 @@ export const NetworkSpotlight = ({ videoDetails, playlistDetails }) => {
                         </div>)
                     }
                     {
-                        (playlistDetails && <div className="w-[350px] h-[328px] border rounded-[8px] bg-[#F1F5F9] p-[20px]">
+                        (playlistDetails && <div className="w-[360px] h-[328px] border rounded-[8px] bg-[#F1F5F9] p-[20px]">
                             <div>
                                 <div className="absolute rounded-full w-[45px] h-[20px] mt-[8px] text-[12px] font-medium bg-[#156FF7] ml-[8px] z-[1001]">
                                     <span className="relative p-[5px] text-[#FFFFFF]">{NW_SPOTLIGHT_CONSTANTS.SERIES}</span>

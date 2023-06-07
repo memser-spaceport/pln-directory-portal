@@ -52,7 +52,7 @@ export function DiscardChangesPopup({
                                         as="h2"
                                         className="text-xl font-bold leading-6"
                                     >
-                                        <p className="mt-4">Save Changes</p>
+                                        <p className="mt-4">Discard Changes</p>
                                     </Dialog.Title>
                                     {
                                         (<>
@@ -61,15 +61,15 @@ export function DiscardChangesPopup({
                                             </p>
 
                                             <div>
-                                                <button className={'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-[150px] float-right justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]'}
-                                                    onClick={() => { handleModalClose(false) }}
+                                                <button className={'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus float-right inline-flex w-[150px] justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]'}
+
+                                                    onClick={() => { handleModalClose(true) }}
                                                 >
                                                     YES
                                                 </button>
 
                                                 <button className={'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-[150px] justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]'}
-
-                                                    onClick={() => { handleModalClose(true) }}
+                                                    onClick={() => { handleModalClose(false) }}
                                                 >
                                                     NO
                                                 </button>

@@ -215,7 +215,7 @@ export default function Settings({
                 debounceCall={fetchMembersWithLogoSearchTerm}
                 validateBeforeChange={true}
                 validationFnBeforeChange={beforeChangeMemberValidation}
-                confirmationMessage={MSG_CONSTANTS.MEMBER_CHANGE_CONF_MSG}
+                confirmationMessage={MSG_CONSTANTS.CHANGE_CONF_MSG}
             />);
         }else if(name === SETTINGS_CONSTANTS.TEAM){
             return (
@@ -230,7 +230,7 @@ export default function Settings({
                     debounceCall={fetchTeamsWithLogoSearchTerm}
                     validateBeforeChange={true}
                     validationFnBeforeChange={beforeChangeValidation}
-                    confirmationMessage={MSG_CONSTANTS.TEAM_CHANGE_CONF_MSG}
+                    confirmationMessage={MSG_CONSTANTS.CHANGE_CONF_MSG}
                 />
             )
         }
@@ -249,7 +249,7 @@ export default function Settings({
             value={selectedTeam}
             validateBeforeChange={true}
             validationFn={beforeChangeValidation}
-            confirmationMessage={MSG_CONSTANTS.TEAM_CHANGE_CONF_MSG}
+            confirmationMessage={MSG_CONSTANTS.CHANGE_CONF_MSG}
         />);
     }
 
@@ -396,7 +396,7 @@ export default function Settings({
                         }
                     </div>
                 </div>
-                <DiscardChangesPopup text={MSG_CONSTANTS.PROFILE_CHANGE_CONF_MSG} isOpen={openValidationPopup} onCloseFn={confirmationOnProfileClose} />
+                <DiscardChangesPopup text={MSG_CONSTANTS.CHANGE_CONF_MSG} isOpen={openValidationPopup} onCloseFn={confirmationOnProfileClose} />
             </div>
         </>
     )

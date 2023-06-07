@@ -1,6 +1,16 @@
 /* eslint-disable prettier/prettier */
-import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { ApprovalStatus, ParticipantType } from '@prisma/client';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import {
+  ApprovalStatus,
+  ParticipantType,
+  Prisma,
+  PrismaClient,
+} from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AwsService } from '../utils/aws/aws.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
@@ -131,7 +141,11 @@ export class ParticipantsRequestService {
     }
   }
 
-  async addRequest(requestData, disableNotification = false) {
+  async addRequest(
+    requestData,
+    disableNotification = false,
+    transactionType: Prisma.TransactionClient | PrismaClient = this.prisma
+  ) {
     const uniqueIdentifier =
       requestData.participantType === 'TEAM'
         ? requestData.newData.name
@@ -159,7 +173,7 @@ export class ParticipantsRequestService {
       url: '',
       name: requestData.newData.name,
     };
-    const result: any = await this.prisma.participantsRequest.create({
+    const result: any = await transactionType.participantsRequest.create({
       data: { ...postData },
     });
     if (
@@ -175,7 +189,8 @@ export class ParticipantsRequestService {
       });
     } else if (
       result.participantType === ParticipantType.MEMBER.toString() &&
-      result.referenceUid !== null && !disableNotification
+      result.referenceUid !== null &&
+      !disableNotification
     ) {
       slackConfig.requestLabel = 'Edit Labber Request';
       slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`;
@@ -369,23 +384,25 @@ export class ParticipantsRequestService {
   async processMemberEditRequest(
     uidToEdit,
     disableNotification = false,
-    isAutoApproval = false
+    isAutoApproval = false,
+    transactionType: Prisma.TransactionClient | PrismaClient = this.prisma
   ) {
     // Get
-    const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
-      where: { uid: uidToEdit },
-    });
+    const dataFromDB: any =
+      await transactionType.participantsRequest.findUnique({
+        where: { uid: uidToEdit },
+      });
     if (dataFromDB?.status !== ApprovalStatus.PENDING.toString()) {
       return { code: -1, message: 'Request already Processed' };
     }
-    const existingData: any = await this.prisma.member.findUnique({
+    const existingData: any = await transactionType.member.findUnique({
       where: { uid: dataFromDB.referenceUid },
       include: {
         image: true,
         location: true,
         skills: true,
         teamMemberRoles: true,
-        memberRoles: true
+        memberRoles: true,
       },
     });
     const dataToProcess = dataFromDB?.newData;
@@ -396,13 +413,6 @@ export class ParticipantsRequestService {
       name: dataToProcess.name,
     };
 
-    const isEmailChange = existingData.email !== dataToProcess.email ? true: false;
-    if(isEmailChange) {
-     /*  const memberRoles = existingData.memberRoles.map(v => v.name)
-      if(!memberRoles.includes("DIRECTORYADMIN")) {
-          throw new ForbiddenException("Invalid access")
-      } */
-    }
     // Mandatory fields
     dataToSave['name'] = dataToProcess.name;
     dataToSave['email'] = dataToProcess.email;
@@ -462,6 +472,65 @@ export class ParticipantsRequestService {
       dataToSave['location'] = { disconnect: true };
     }
 
+    if (transactionType === this.prisma) {
+      await this.prisma.$transaction(async (tx) => {
+        await this.processMemberEditChanges(
+          existingData,
+          dataFromDB,
+          dataToSave,
+          uidToEdit,
+          isAutoApproval,
+          tx
+        );
+      });
+    } else {
+      await this.processMemberEditChanges(
+        existingData,
+        dataFromDB,
+        dataToSave,
+        uidToEdit,
+        isAutoApproval,
+        transactionType
+      );
+    }
+
+    if (!disableNotification) {
+      await this.awsService.sendEmail('MemberEditRequestCompleted', true, [], {
+        memberName: dataToProcess.name,
+      });
+      await this.awsService.sendEmail(
+        'EditMemberSuccess',
+        false,
+        [dataFromDB.requesterEmailId],
+        {
+          memberName: dataToProcess.name,
+          memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${
+            dataFromDB.referenceUid
+          }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
+        }
+      );
+      slackConfig.requestLabel = 'Edit Labber Request Completed';
+      slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${
+        dataFromDB.referenceUid
+      }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
+      await this.slackService.notifyToChannel(slackConfig);
+    }
+    await this.redisService.resetAllCache();
+    await this.forestAdminService.triggerAirtableSync();
+    return { code: 1, message: 'Success' };
+  }
+
+  async processMemberEditChanges(
+    existingData,
+    dataFromDB,
+    dataToSave,
+    uidToEdit,
+    isAutoApproval,
+    tx
+  ) {
+    const dataToProcess = dataFromDB?.newData;
+    const isEmailChange =
+      existingData.email !== dataToProcess.email ? true : false;
     // Team member roles relational mapping
     const oldTeamUids = [...existingData.teamMemberRoles].map((t) => t.teamUid);
     const newTeamUids = [...dataToProcess.teamAndRoles].map((t) => t.teamUid);
@@ -489,113 +558,93 @@ export class ParticipantsRequestService {
       (t) => !oldTeamUids.includes(t.teamUid)
     );
 
-    // Updating All data using transation.
-    await this.prisma.$transaction(async (tx) => {
-      // team-member-role changes
-      const promisesToDelete = teamAndRolesUidsToDelete.map((v) =>
-        tx.teamMemberRole.delete({
-          where: {
-            memberUid_teamUid: {
-              teamUid: v.teamUid,
-              memberUid: dataFromDB.referenceUid,
-            },
-          },
-        })
-      );
-      const promisesToUpdate = teamAndRolesUidsToUpdate.map((v) =>
-        tx.teamMemberRole.update({
-          where: {
-            memberUid_teamUid: {
-              teamUid: v.teamUid,
-              memberUid: dataFromDB.referenceUid,
-            },
-          },
-          data: { role: v.role },
-        })
-      );
-      await Promise.all(promisesToDelete);
-      await Promise.all(promisesToUpdate);
-      await tx.teamMemberRole.createMany({
-        data: teamAndRolesUidsToCreate.map((t) => {
-          return {
-            role: t.role,
-            mainTeam: false,
-            teamLead: false,
-            teamUid: t.teamUid,
+    const promisesToDelete = teamAndRolesUidsToDelete.map((v) =>
+      tx.teamMemberRole.delete({
+        where: {
+          memberUid_teamUid: {
+            teamUid: v.teamUid,
             memberUid: dataFromDB.referenceUid,
-          };
-        }),
-      });
-
-      // Other member Changes
-      await tx.member.update({
-        where: { uid: dataFromDB.referenceUid },
-        data: { ...dataToSave },
-      });
-
-      if(isEmailChange) {
-        try {
-          const response = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
-            "client_id": process.env.AUTH_APP_CLIENT_ID,
-            "client_secret": process.env.AUTH_APP_CLIENT_SECRET,
-            "grant_type": "client_credentials",
-            "grantTypes": ["client_credentials", "authorization_code", "refresh_token"]
-          })
-
-          const clientToken =  response.data.access_token;
-          const headers = {
-            Authorization: `Bearer ${clientToken}`
-          }
-          const authPayload = {
-            email: dataToSave.email,
-            existingEmail: existingData.email,
-            accountId: existingData.externalId
-          }
-           await axios.put(`${process.env.AUTH_API_URL}/admin/auth/account/email`, authPayload, {headers: headers})
-        } catch (e) {
-          if(e?.response?.data?.message && e?.response.status === 404) {
-
-          } else {
-            throw e;
-          }
-
-        }
-      }
-
-      // Updating status
-      await tx.participantsRequest.update({
-        where: { uid: uidToEdit },
-        data: {
-          status: isAutoApproval
-            ? ApprovalStatus.AUTOAPPROVED
-            : ApprovalStatus.APPROVED,
+          },
         },
-      });
+      })
+    );
+    const promisesToUpdate = teamAndRolesUidsToUpdate.map((v) =>
+      tx.teamMemberRole.update({
+        where: {
+          memberUid_teamUid: {
+            teamUid: v.teamUid,
+            memberUid: dataFromDB.referenceUid,
+          },
+        },
+        data: { role: v.role },
+      })
+    );
+    await Promise.all(promisesToDelete);
+    await Promise.all(promisesToUpdate);
+    await tx.teamMemberRole.createMany({
+      data: teamAndRolesUidsToCreate.map((t) => {
+        return {
+          role: t.role,
+          mainTeam: false,
+          teamLead: false,
+          teamUid: t.teamUid,
+          memberUid: dataFromDB.referenceUid,
+        };
+      }),
     });
-    if (!disableNotification) {
-      await this.awsService.sendEmail('MemberEditRequestCompleted', true, [], {
-        memberName: dataToProcess.name,
-      });
-      await this.awsService.sendEmail(
-        'EditMemberSuccess',
-        false,
-        [dataFromDB.requesterEmailId],
+
+    // Other member Changes
+    await tx.member.update({
+      where: { uid: dataFromDB.referenceUid },
+      data: { ...dataToSave },
+    });
+
+    if (isEmailChange) {
+      // try {
+      const response = await axios.post(
+        `${process.env.AUTH_API_URL}/auth/token`,
         {
-          memberName: dataToProcess.name,
-          memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${
-            dataFromDB.referenceUid
-          }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
+          client_id: process.env.AUTH_APP_CLIENT_ID,
+          client_secret: process.env.AUTH_APP_CLIENT_SECRET,
+          grant_type: 'client_credentials',
+          grantTypes: [
+            'client_credentials',
+            'authorization_code',
+            'refresh_token',
+          ],
         }
       );
-      slackConfig.requestLabel = 'Edit Labber Request Completed';
-      slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${
-        dataFromDB.referenceUid
-      }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
-      await this.slackService.notifyToChannel(slackConfig);
+
+      const clientToken = response.data.access_token;
+      const headers = {
+        Authorization: `Bearer ${clientToken}`,
+      };
+      const authPayload = {
+        email: dataToSave.email,
+        existingEmail: existingData.email,
+        accountId: existingData.externalId,
+      };
+      await axios.put(
+        `${process.env.AUTH_API_URL}/admin/auth/account/email`,
+        authPayload,
+        { headers: headers }
+      );
+      // } catch (e) {
+      //   if (e?.response?.data?.message && e?.response.status === 404) {
+      //   } else {
+      //     throw e;
+      //   }
+      // }
     }
-    await this.redisService.resetAllCache();
-    await this.forestAdminService.triggerAirtableSync();
-    return { code: 1, message: 'Success' };
+    // Updating status
+    await tx.participantsRequest.update({
+      where: { uid: uidToEdit },
+      data: {
+        status: isAutoApproval
+          ? ApprovalStatus.AUTOAPPROVED
+          : ApprovalStatus.APPROVED,
+      },
+    });
   }
 
   async processTeamCreateRequest(uidToApprove) {

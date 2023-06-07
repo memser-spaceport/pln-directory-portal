@@ -237,18 +237,27 @@ export class MembersService {
         }
       }
     }
-    let result = await this.participantsRequestService.addRequest(
-      participantsRequest,
-      true
-    );
-    if (result?.uid) {
-      result = await this.participantsRequestService.processMemberEditRequest(
-        result.uid,
-        true, // disable the notification
-        true // enable the auto approval
-      );
-    } else {
-      throw new InternalServerErrorException();
+    let result;
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        result = await this.participantsRequestService.addRequest(
+          participantsRequest,
+          true,
+          tx
+        );
+        if (result?.uid) {
+          await this.participantsRequestService.processMemberEditRequest(
+            result.uid,
+            true, // disable the notification
+            true, // enable the auto approval
+            tx
+          );
+        } else {
+          throw new InternalServerErrorException();
+        }
+      });
+    } catch (error) {
+      throw new BadRequestException('Invalid Data');
     }
     return result;
   }
