@@ -65,7 +65,7 @@ function ChangeEmailModal(props) {
             if (data?.userInfo) {
                 setNewTokensAndUserInfo(data?.newTokens, data?.userInfo)
                 clearAllOtpSessionVaribles()
-                onClose(false);
+                onClose(null, true);
 
                 window.location.reload()
             } else if (!data?.valid) {

@@ -261,17 +261,7 @@ export class AuthService {
   }
 
 
-  async handleAxiosError(statusCode, errorMessage) {
-    if(statusCode === 401) {
-      if(errorMessage === "Unauthorized") {
-        throw new UnauthorizedException("Unauthorized Request. Please login again and try")
-      } else {
-        throw new UnauthorizedException("Invalid Request. Please login again and try")
-      }
-    } else if (statusCode === 400) {
-      throw new BadRequestException("Invalid request. Please try again or contact support")
-    }
-  }
+
 
   handleErrors = (error) => {
     console.log(error?.response?.statusCode, error?.response?.status, error?.response?.message,error?.response?.data )
@@ -280,8 +270,7 @@ export class AuthService {
      } else if (error?.response?.data && error?.response?.status) {
         if(error?.response?.status === 401) {
           throw new UnauthorizedException("Unauthorized")
-        }
-         else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP005') {
+        } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP005') {
           throw new UnauthorizedException("Unauthorized")
         } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP003') {
           throw new ForbiddenException("MAX_OTP_ATTEMPTS_REACHED")

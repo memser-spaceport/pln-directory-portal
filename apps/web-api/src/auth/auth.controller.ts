@@ -5,8 +5,6 @@ import {
   Controller,
   ForbiddenException,
   Get,
-  HttpException,
-  InternalServerErrorException,
   Post,
   Req,
   UseGuards,
@@ -119,19 +117,19 @@ export class AuthController {
 
       // New email cannot be same as old one
       if (body?.newEmail.toLowerCase().trim() === req?.userEmail.toLowerCase().trim()) {
-        throw new BadRequestException("Invalid Email")
+        throw new BadRequestException("New Email cannot be same as old email")
       }
 
       // If current email id doesn't match any email in the members directory.. then throw error
       const oldEmailIdUser = await this.authService.getUserInfoByEmail(req.userEmail);
       if (!oldEmailIdUser) {
-        throw new BadRequestException("Email id doesnt exist")
+        throw new ForbiddenException("Your current email id doesn't match any email in our system. Your email could have been changed/deleted. Please contact support team.")
       }
 
       //If new email id matches user then throw error
       const userMatchingNewEmail = await this.authService.getUserInfoByEmail(body.newEmail);
       if (userMatchingNewEmail) {
-        throw new BadRequestException("Email already exist")
+        throw new BadRequestException("This email is already been taken.")
       }
 
       return await this.authService.sendEmailOtpForVerification(body.newEmail, body.clientToken)
@@ -152,19 +150,19 @@ export class AuthController {
 
       // New email cannot be same as old one
       if (body?.newEmail.toLowerCase().trim() === req?.userEmail.toLowerCase().trim()) {
-        throw new BadRequestException("Invalid Email")
+        throw new BadRequestException("New Email cannot be same as old email")
       }
 
       // If current email id doesn't match any email in the members directory.. then throw error
       const oldEmailIdUser = await this.authService.getUserInfoByEmail(req.userEmail);
       if (!oldEmailIdUser) {
-        throw new BadRequestException("Email id doesnt exist")
+        throw new ForbiddenException("Your current email id doesn't match any email in our system. Your email could have been changed/deleted. Please contact support team.")
       }
 
       //If new email id matches user then throw error
       const userMatchingNewEmail = await this.authService.getUserInfoByEmail(body.newEmail);
       if (userMatchingNewEmail) {
-        throw new BadRequestException("Email already exist")
+        throw new BadRequestException("This email is already been taken.")
       }
 
       return await this.authService.resendEmailOtpForVerification(body.otpToken, body.clientToken)

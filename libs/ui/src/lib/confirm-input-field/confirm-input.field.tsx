@@ -40,6 +40,10 @@ export function ConfirmInputField({
     }
   }
 
+  const handlePaste = (event: any) => {
+    event.preventDefault();
+  };
+
   return (
     <label className="relative block w-full">
         <span className="text-sm font-bold">
@@ -59,6 +63,7 @@ export function ConfirmInputField({
         {...props}
         type="text"
         ref={inputTwoRef}
+        onPaste={handlePaste}
         placeholder='Confirm your new email'
         className={`mt-[12px] block w-full rounded-lg bg-white text-sm leading-6 text-slate-900  shadow-slate-300 transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-600 placeholder:opacity-50 pl-3 pr-3 on-focus h-10 leading-10 disabled:bg-slate-100  ${props.className}`}
         onChange={onInputChanges}
