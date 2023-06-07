@@ -280,40 +280,49 @@ export function EditMemberModal({
       .then((data) => {
         const member = data[0];
         let counter = 1;
-        const teamAndRoles =
-          member?.teamMemberRoles?.length &&
-          member.teamMemberRoles.map((item) => {
-            return {
-              role: item.role,
-              teamUid: item?.team?.uid,
-              teamTitle: item?.team?.name,
-              rowId: counter++,
-            };
-          });
-        setCurrentEmail(member.email);
+
+        let teamAndRoles = member.teamMemberRoles?.length
+        ? member.teamMemberRoles
+        : [];
+      teamAndRoles = orderBy(
+        teamAndRoles,
+        ['mainTeam', 'team.name'],
+        ['desc', 'asc']
+      );
+
+      teamAndRoles = teamAndRoles.map((item) => {
+        return {
+          role: item.role,
+          teamUid: item?.team?.uid,
+          teamTitle: item?.team?.name,
+          rowId: counter++,
+          mainTeam: item.mainTeam,
+        };
+      });
+        setCurrentEmail(member?.email);
         const formValues = {
-          name: member.name,
-          email: member.email,
-          openToWork: member.openToWork ?? false,
-          imageUid: member.imageUid,
+          name: member?.name,
+          email: member?.email,
+          openToWork: member?.openToWork ?? false,
+          imageUid: member?.imageUid,
           imageFile: null,
-          plnStartDate: member.plnStartDate
-            ? new Date(member.plnStartDate).toLocaleDateString('af-ZA')
+          plnStartDate: member?.plnStartDate
+            ? new Date(member?.plnStartDate).toLocaleDateString('af-ZA')
             : null,
-          city: member.location?.city,
-          region: member.location?.region,
-          country: member.location?.country,
-          linkedinHandler: member.linkedinHandler,
-          discordHandler: member.discordHandler,
-          twitterHandler: member.twitterHandler,
-          githubHandler: member.githubHandler,
-          telegramHandler: member.telegramHandler,
-          officeHours: member.officeHours,
+          city: member?.location?.city,
+          region: member?.location?.region,
+          country: member?.location?.country,
+          linkedinHandler: member?.linkedinHandler,
+          discordHandler: member?.discordHandler,
+          twitterHandler: member?.twitterHandler,
+          githubHandler: member?.githubHandler,
+          telegramHandler: member?.telegramHandler,
+          officeHours: member?.officeHours,
           comments: '',
           teamAndRoles: teamAndRoles || [
             { teamUid: '', teamTitle: '', role: '', rowId: 1 },
           ],
-          skills: member.skills?.map((item) => {
+          skills: member?.skills?.map((item) => {
             return { value: item.uid, label: item.title };
           }),
         };
@@ -323,7 +332,7 @@ export function EditMemberModal({
           const parsedUserInfo = JSON.parse(userInfoFromCookie);
           formValues['requestorEmail'] = parsedUserInfo.email;
         }
-        setImageUrl(member.image?.url ?? '');
+        setImageUrl(member?.image?.url ?? '');
         setFormValues(formValues);
         setDropDownValues({ skillValues: data[1], teamNames: data[2] });
         setDataLoaded(true);
@@ -558,7 +567,8 @@ export function EditMemberModal({
               setModified(false);
               setModifiedFlag(false);
               setOpenTab(1);
-              setBasicErrors([]), setSkillErrors([]);
+              setBasicErrors([]);
+              setSkillErrors([]);
               if (imageChanged && setImageModified) {
                 setImageModified(true);
               }
@@ -569,6 +579,7 @@ export function EditMemberModal({
             }
           });
         } catch (err) {
+          console.log('err', err);
           if (err.response.status === 400) {
             toast(err?.response?.data?.message, {
               type: 'error',
@@ -579,6 +590,8 @@ export function EditMemberModal({
             });
           }
         } finally {
+          setModified(false);
+          setModifiedFlag(false);
           setIsProcessing(false);
         }
       } else {
@@ -588,7 +601,7 @@ export function EditMemberModal({
       }
     },
     // [executeRecaptcha, formValues, imageUrl, imageChanged]
-    [formValues, imageUrl, imageChanged, emailExists]
+    [formValues, imageUrl, imageChanged, emailExists, isModified]
   );
 
   function handleAddNewRole() {
