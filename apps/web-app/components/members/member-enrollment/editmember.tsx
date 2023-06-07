@@ -168,7 +168,7 @@ export function EditMemberModal({
   userInfo,
   isUserProfile = false,
   setModified,
-  setImageModified
+  setImageModified,
 }: EditMemberModalProps) {
   const [openTab, setOpenTab] = useState(1);
   const [errors, setErrors] = useState([]);
@@ -182,12 +182,12 @@ export function EditMemberModal({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [disableSubmit, setDisableSubmit] = useState<boolean>(false);
+  const [dataLoaded, setDataLoaded] = useState<boolean>(false);
   const [isModified, setModifiedFlag] = useState<boolean>(false);
   const [openValidationPopup, setOpenValidationPopup] =
     useState<boolean>(false);
-  const [isEmailEditActive, setEmailEditStatus] =
-    useState<boolean>(false);
-  const [currentEmail, setCurrentEmail] = useState("")
+  const [isEmailEditActive, setEmailEditStatus] = useState<boolean>(false);
+  const [currentEmail, setCurrentEmail] = useState('');
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     email: '',
@@ -214,50 +214,48 @@ export function EditMemberModal({
     useState(false);
   const [reset, setReset] = useState(false);
   const router = useRouter();
-  const [resetImg, setResetImg] = useState(false); 
+  const [resetImg, setResetImg] = useState(false);
 
   const divRef = useRef<HTMLDivElement>(null);
 
   const onCancelEmailChange = () => {
     setEmailEditStatus(false);
     handleInputChange({
-      target: {name: 'email', value: currentEmail}
-    })
-
-  }
+      target: { name: 'email', value: currentEmail },
+    });
+  };
 
   const onNewEmailInputChange = (newEmailValue) => {
-    console.log(newEmailValue)
-    setFormValues(v => v["email"] = newEmailValue);
-  }
+    console.log(newEmailValue);
+    setFormValues((v) => (v['email'] = newEmailValue));
+  };
 
   const onChangeEmailClose = (step) => {
     setEmailEditStatus(false);
-    if(step === 3) {
-      window.location.reload()
+    if (step === 3) {
+      window.location.reload();
     }
-  }
+  };
 
   const onEmailChange = () => {
-    if(isUserProfile) {
-      const authToken = Cookies.get('authToken')
-      const formattedJson = JSON.parse(authToken)
+    if (isUserProfile) {
+      const authToken = Cookies.get('authToken');
+      const formattedJson = JSON.parse(authToken);
       //setIsProcessing(true)
       getClientToken(formattedJson)
-       .then(d => {
-        const clientTokenExpiry = decodeToken(d);
-        console.log(clientTokenExpiry, 'setting cookie')
-        Cookies.set('clientAccessToken', d, {expires: new Date(clientTokenExpiry.exp * 1000)})
-        console.log( new Date(clientTokenExpiry.exp * 1000))
-        console.log(clientTokenExpiry, 'setting completed')
-        setEmailEditStatus(true)
-       })
-       .catch(e => console.error(e))
+        .then((d) => {
+          const clientTokenExpiry = decodeToken(d);
+          Cookies.set('clientAccessToken', d, {
+            expires: new Date(clientTokenExpiry.exp * 1000),
+          });
+          setEmailEditStatus(true);
+        })
+        .catch((e) => console.error(e));
       // .finally(() =>  setIsProcessing(false))
     } else {
-        setEmailEditStatus(true)
+      setEmailEditStatus(true);
     }
-  }
+  };
 
   // const { executeRecaptcha } = useGoogleReCaptcha();
 
@@ -265,66 +263,7 @@ export function EditMemberModal({
     if (isOpen || isProfileSettings) {
       resetState();
       setOpenTab(1);
-      setIsProcessing(true)
-      Promise.all([fetchMember(id), fetchSkills(), fetchTeams()])
-        .then((data) => {
-          const member = data[0];
-          let counter = 1;
-          const teamAndRoles =
-            member?.teamMemberRoles?.length &&
-            member.teamMemberRoles.map((item) => {
-              return {
-                role: item.role,
-                teamUid: item?.team?.uid,
-                teamTitle: item?.team?.name,
-                rowId: counter++,
-              };
-            });
-          setCurrentEmail(member.email)
-          const formValues = {
-            name: member.name,
-            email: member.email,
-            openToWork: member.openToWork ?? false,
-            imageUid: member.imageUid,
-            imageFile: null,
-            plnStartDate: member.plnStartDate ? new Date(member.plnStartDate).toLocaleDateString(
-              'af-ZA'
-            ):null,
-            city: member.location?.city,
-            region: member.location?.region,
-            country: member.location?.country,
-            linkedinHandler: member.linkedinHandler,
-            discordHandler: member.discordHandler,
-            twitterHandler: member.twitterHandler,
-            githubHandler: member.githubHandler,
-            telegramHandler: member.telegramHandler,
-            officeHours: member.officeHours,
-            comments: '',
-            teamAndRoles: teamAndRoles || [
-              { teamUid: '', teamTitle: '', role: '', rowId: 1 },
-            ],
-            skills: member.skills?.map((item) => {
-              return { value: item.uid, label: item.title };
-            }),
-          };
-          // set requestor email
-          const userInfoFromCookie = Cookies.get('userInfo');
-          if (userInfoFromCookie) {
-            const parsedUserInfo = JSON.parse(userInfoFromCookie);
-            formValues['requestorEmail'] = parsedUserInfo.email;
-          }
-
-          setImageUrl(member.image?.url ?? '');
-          setFormValues(formValues);
-          setDropDownValues({ skillValues: data[1], teamNames: data[2] });
-          setIsProcessing(false);
-        })
-        .catch((err) => {
-          toast(err?.message,{
-            type:'error'
-          });
-          console.log('error', err);
-        });
+      getMemberDetails();
     }
   }, [isOpen, id, isProfileSettings]);
 
@@ -334,94 +273,92 @@ export function EditMemberModal({
     }
   }, [saveCompleted]);
 
+  const getMemberDetails = () => {
+    setIsProcessing(true);
+    setDataLoaded(false);
+    Promise.all([fetchMember(id), fetchSkills(), fetchTeams()])
+      .then((data) => {
+        const member = data[0];
+        let counter = 1;
+        const teamAndRoles =
+          member?.teamMemberRoles?.length &&
+          member.teamMemberRoles.map((item) => {
+            return {
+              role: item.role,
+              teamUid: item?.team?.uid,
+              teamTitle: item?.team?.name,
+              rowId: counter++,
+            };
+          });
+        setCurrentEmail(member.email);
+        const formValues = {
+          name: member.name,
+          email: member.email,
+          openToWork: member.openToWork ?? false,
+          imageUid: member.imageUid,
+          imageFile: null,
+          plnStartDate: member.plnStartDate
+            ? new Date(member.plnStartDate).toLocaleDateString('af-ZA')
+            : null,
+          city: member.location?.city,
+          region: member.location?.region,
+          country: member.location?.country,
+          linkedinHandler: member.linkedinHandler,
+          discordHandler: member.discordHandler,
+          twitterHandler: member.twitterHandler,
+          githubHandler: member.githubHandler,
+          telegramHandler: member.telegramHandler,
+          officeHours: member.officeHours,
+          comments: '',
+          teamAndRoles: teamAndRoles || [
+            { teamUid: '', teamTitle: '', role: '', rowId: 1 },
+          ],
+          skills: member.skills?.map((item) => {
+            return { value: item.uid, label: item.title };
+          }),
+        };
+        // set requestor email
+        const userInfoFromCookie = Cookies.get('userInfo');
+        if (userInfoFromCookie) {
+          const parsedUserInfo = JSON.parse(userInfoFromCookie);
+          formValues['requestorEmail'] = parsedUserInfo.email;
+        }
+        setImageUrl(member.image?.url ?? '');
+        setFormValues(formValues);
+        setDropDownValues({ skillValues: data[1], teamNames: data[2] });
+        setDataLoaded(true);
+      })
+      .catch((err) => {
+        toast(err?.message, {
+          type: 'error',
+        });
+        console.log('error', err);
+      })
+      .finally(() => {
+        setIsProcessing(false);
+      });
+  };
+
   const confirmationClose = (flag) => {
     setOpenValidationPopup(false);
     if (flag) {
       setErrors([]);
       setBasicErrors([]);
       setSkillErrors([]);
-      setReset(true);
-      Promise.all([fetchMember(id), fetchSkills(), fetchTeams()])
-        .then((data) => {
-          const member = data[0];
-          let counter = 1;
-          let teamAndRoles = member?.teamMemberRoles?.length
-            ? member.teamMemberRoles
-            : [];
-          teamAndRoles = orderBy(
-            teamAndRoles,
-            ['mainTeam', 'team.name'],
-            ['desc', 'asc']
-          );
-
-          teamAndRoles = teamAndRoles.map((item) => {
-            return {
-              role: item.role,
-              teamUid: item?.team?.uid,
-              teamTitle: item?.team?.name,
-              rowId: counter++,
-              mainTeam: item.mainTeam,
-            };
-          });
-
-          console.log('member', member)
-
-          const formValues = {
-            name: member.name,
-            email: member.email,
-            imageUid: member.imageUid,
-            imageFile: null,
-            plnStartDate: member.plnStartDate ? new Date(member.plnStartDate).toLocaleDateString(
-              'af-ZA'
-            ):null,
-            city: member.location?.city,
-            region: member.location?.region,
-            country: member.location?.country,
-            linkedinHandler: member.linkedinHandler,
-            discordHandler: member.discordHandler,
-            twitterHandler: member.twitterHandler,
-            githubHandler: member.githubHandler,
-            telegramHandler: member.telegramHandler,
-            officeHours: member.officeHours,
-            comments: '',
-            teamAndRoles: teamAndRoles || [
-              { teamUid: '', teamTitle: '', role: '', rowId: 1 },
-            ],
-            skills: member.skills?.map((item) => {
-              return { value: item.uid, label: item.title };
-            }),
-            openToWork: member.openToWork,
-          };
-          // set requestor email
-          const userInfoFromCookie = Cookies.get('userInfo');
-          if (userInfoFromCookie) {
-            const parsedUserInfo = JSON.parse(userInfoFromCookie);
-            formValues['requestorEmail'] = parsedUserInfo.email;
-          }
-          setImageUrl(member.image?.url ?? '');
-          setFormValues(formValues);
-          setDropDownValues({ skillValues: data[1], teamNames: data[2] });
-          setReset(false);
-          setModified(false);
-          setModifiedFlag(false);
-        })
-        .catch((err) => {
-          toast(err?.message,{
-            type:'error'
-          });
-          console.log('error', err);
-        });
+      getMemberDetails();
+      setModified(false);
+      setModifiedFlag(false);
     }
   };
 
   function handleReset() {
     if (isProfileSettings) {
-      setEmailEditStatus(false)
-      if(isModified){
+      setEmailEditStatus(false);
+      if (isModified) {
         setOpenValidationPopup(true);
-      }else{
-        toast(MSG_CONSTANTS.NO_CHANGES_TO_RESET,{
-          type:'info'
+      } else {
+        toast(MSG_CONSTANTS.NO_CHANGES_TO_RESET, {
+          type: 'info',
         });
       }
     }
@@ -479,12 +416,12 @@ export function EditMemberModal({
   };
 
   function formatData() {
-    const teamAndRoles = structuredClone(formValues.teamAndRoles)
+    const teamAndRoles = structuredClone(formValues.teamAndRoles);
     const formattedTeamAndRoles = teamAndRoles.map((item) => {
       delete item.rowId;
       return item;
     });
-    const skillValues = structuredClone(formValues.skills)
+    const skillValues = structuredClone(formValues.skills);
     const skills = skillValues.map((item) => {
       return { uid: item?.value, title: item?.label };
     });
@@ -502,9 +439,9 @@ export function EditMemberModal({
       telegramHandler: formValues.telegramHandler?.trim(),
       officeHours: formValues.officeHours?.trim(),
       comments: formValues.comments?.trim(),
-      plnStartDate:
-        formValues.plnStartDate ?
-        new Date(formValues.plnStartDate)?.toISOString():null,
+      plnStartDate: formValues.plnStartDate
+        ? new Date(formValues.plnStartDate)?.toISOString()
+        : null,
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
@@ -535,9 +472,9 @@ export function EditMemberModal({
     async (e) => {
       e.preventDefault();
       setResetImg(true);
-      if(isModified){
+      if (isModified) {
         setImageChanged(false);
-        if(setImageModified){
+        if (setImageModified) {
           setImageModified(false);
         }
         setErrors([]);
@@ -621,33 +558,32 @@ export function EditMemberModal({
               setModified(false);
               setModifiedFlag(false);
               setOpenTab(1);
-              setBasicErrors([]),
-              setSkillErrors([]);
-              if(imageChanged && setImageModified){
+              setBasicErrors([]), setSkillErrors([]);
+              if (imageChanged && setImageModified) {
                 setImageModified(true);
               }
-              if(isEmailEditActive) {
-                setCurrentEmail(formValues.email as any)
+              if (isEmailEditActive) {
+                setCurrentEmail(formValues.email as any);
                 setEmailEditStatus(false);
               }
             }
           });
         } catch (err) {
           if (err.response.status === 400) {
-            toast(err?.response?.data?.message,{
-              type:'error'
+            toast(err?.response?.data?.message, {
+              type: 'error',
             });
           } else {
-            toast(err?.message,{
-              type:'error'
+            toast(err?.message, {
+              type: 'error',
             });
           }
         } finally {
           setIsProcessing(false);
         }
-      }else{
-        toast(MSG_CONSTANTS.NO_CHANGES_TO_SAVE,{
-          type:'info'
+      } else {
+        toast(MSG_CONSTANTS.NO_CHANGES_TO_SAVE, {
+          type: 'info',
         });
       }
     },
@@ -689,9 +625,7 @@ export function EditMemberModal({
     setModifiedFlag(true);
   }
 
-  function handleInputChange(
-    event
-  ) {
+  function handleInputChange(event) {
     const { name, value } = event.target;
     console.log('event', event.target.value);
     setFormValues({ ...formValues, [name]: value });
@@ -708,7 +642,7 @@ export function EditMemberModal({
 
   const handleResetImg = () => {
     setResetImg(false);
-  }
+  };
 
   const handleImageChange = (file: File) => {
     if (file) {
@@ -746,151 +680,154 @@ export function EditMemberModal({
       )}
       {isProfileSettings ? (
         <>
-        <div className="h-full w-full">
-          <div className="mx-auto mb-40 h-full">
+          <div className="h-full w-full">
+            <div className="mx-auto mb-40 h-full">
+              {
+                <div className="mt-3 flex h-10 w-full w-3/5  justify-start text-slate-400">
+                  <button
+                    className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
+                      openTab == 1 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                    } ${
+                      basicErrors?.length > 0 && openTab == 1
+                        ? 'border-b-[#DD2C5A] text-[#DD2C5A]'
+                        : basicErrors?.length > 0
+                        ? 'text-[#DD2C5A]'
+                        : ''
+                    }`}
+                    onClick={() => setOpenTab(1)}
+                  >
+                    {' '}
+                    BASIC{' '}
+                  </button>
+                  <button
+                    className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
+                      openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                    } ${
+                      skillErrors?.length > 0 && openTab == 2
+                        ? 'border-b-[#DD2C5A] text-[#DD2C5A]'
+                        : skillErrors?.length > 0
+                        ? 'text-[#DD2C5A]'
+                        : ''
+                    }`}
+                    onClick={() => setOpenTab(2)}
+                  >
+                    {' '}
+                    SKILLS
+                  </button>
+                  <button
+                    className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
+                      openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                    }`}
+                    onClick={() => setOpenTab(3)}
+                  >
+                    {' '}
+                    SOCIAL{' '}
+                  </button>
+                </div>
+              }
+              <div className="mt-3 w-full rounded-md border bg-white  px-6 py-10">
+                {
+                  <Fragment>
+                    <div className={openTab === 1 ? 'block' : 'hidden'}>
+                      <AddMemberBasicForm
+                        formValues={formValues}
+                        onChange={handleInputChange}
+                        handleImageChange={handleImageChange}
+                        imageUrl={imageUrl}
+                        isEditMode={true}
+                        disableEmail={true}
+                        setDisableNext={setDisableSubmit}
+                        resetFile={reset}
+                        isEmailEditActive={isEmailEditActive}
+                        onNewEmailInputChange={onNewEmailInputChange}
+                        currentEmail={currentEmail}
+                        onCancelEmailChange={onCancelEmailChange}
+                        isUserProfile={isUserProfile}
+                        isProfileSettings={isProfileSettings}
+                        onEmailChange={onEmailChange}
+                        resetImg={resetImg}
+                        onResetImg={handleResetImg}
+                        dataLoaded={dataLoaded}
+                      />
+                    </div>
+                    <div className={openTab === 2 ? 'block' : 'hidden'}>
+                      <AddMemberSkillForm
+                        formValues={formValues}
+                        dropDownValues={dropDownValues}
+                        handleDropDownChange={handleDropDownChange}
+                        handleAddNewRole={handleAddNewRole}
+                        updateParentTeamValue={updateParentTeamValue}
+                        updateParentRoleValue={updateParentRoleValue}
+                        handleDeleteRolesRow={handleDeleteRolesRow}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    <div className={openTab === 3 ? 'block' : 'hidden'}>
+                      <AddMemberSocialForm
+                        formValues={formValues}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                  </Fragment>
+                }
+              </div>
+            </div>
             {
-              <div className="mt-3 flex h-10 w-full w-3/5  justify-start text-slate-400">
-                <button
-                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
-                    openTab == 1 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
-                  } ${
-                    basicErrors?.length > 0 && openTab == 1
-                      ? 'border-b-[#DD2C5A] text-[#DD2C5A]'
-                      : basicErrors?.length > 0
-                      ? 'text-[#DD2C5A]'
-                      : ''
-                  }`}
-                  onClick={() => setOpenTab(1)}
-                >
-                  {' '}
-                  BASIC{' '}
-                </button>
-                <button
-                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
-                    openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
-                  } ${
-                    skillErrors?.length > 0 && openTab == 2
-                      ? 'border-b-[#DD2C5A] text-[#DD2C5A]'
-                      : skillErrors?.length > 0
-                      ? 'text-[#DD2C5A]'
-                      : ''
-                  }`}
-                  onClick={() => setOpenTab(2)}
-                >
-                  {' '}
-                  SKILLS
-                </button>
-                <button
-                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
-                    openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
-                  }`}
-                  onClick={() => setOpenTab(3)}
-                >
-                  {' '}
-                  SOCIAL{' '}
-                </button>
+              <div
+                className={`footerdiv flow-root w-full ${
+                  isProfileSettings
+                    ? 'fixed inset-x-0 bottom-0 h-[80px] bg-white'
+                    : ''
+                }`}
+              >
+                {!isProfileSettings && (
+                  <div className="float-left">
+                    {getCancelOrBackButton(handleModalClose)}
+                  </div>
+                )}
+                <div className="float-right">
+                  {getSubmitOrNextButton(
+                    handleSubmit,
+                    isProcessing,
+                    isProfileSettings,
+                    disableSubmit
+                  )}
+                </div>
+                <div className="float-right mx-5">
+                  {getResetButton(() => {
+                    handleReset();
+                  })}
+                </div>
               </div>
             }
-            <div className="mt-3 w-full rounded-md border bg-white  px-6 py-10">
-              {
-                <Fragment>
-                  <div className={openTab === 1 ? 'block' : 'hidden'}>
-                    <AddMemberBasicForm
-                      formValues={formValues}
-                      onChange={handleInputChange}
-                      handleImageChange={handleImageChange}
-                      imageUrl={imageUrl}
-                      isEditMode={true}
-                      disableEmail={true}
-                      setDisableNext={setDisableSubmit}
-                      resetFile={reset}
-                      isEmailEditActive={isEmailEditActive}
-                      onNewEmailInputChange={onNewEmailInputChange}
-                      currentEmail={currentEmail}
-                      onCancelEmailChange={onCancelEmailChange}
-                      isUserProfile={isUserProfile}
-                      isProfileSettings={isProfileSettings}
-                      onEmailChange={onEmailChange}
-                      resetImg={resetImg}
-                      onResetImg={handleResetImg}
-                    />
-                  </div>
-                  <div className={openTab === 2 ? 'block' : 'hidden'}>
-                    <AddMemberSkillForm
-                      formValues={formValues}
-                      dropDownValues={dropDownValues}
-                      handleDropDownChange={handleDropDownChange}
-                      handleAddNewRole={handleAddNewRole}
-                      updateParentTeamValue={updateParentTeamValue}
-                      updateParentRoleValue={updateParentRoleValue}
-                      handleDeleteRolesRow={handleDeleteRolesRow}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  <div className={openTab === 3 ? 'block' : 'hidden'}>
-                    <AddMemberSocialForm
-                      formValues={formValues}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                </Fragment>
-              }
-            </div>
+            {!isProfileSettings && (
+              <RequestPending
+                isOpen={isPendingRequestModalOpen}
+                setIsModalOpen={setIsPendingRequestModalOpen}
+              />
+            )}
+            {isProfileSettings && (
+              <ValidationErrorMessages
+                isOpen={isErrorPopupOpen}
+                setIsModalOpen={() => {
+                  setIsErrorPopupOpen(false);
+                }}
+                from={'member'}
+                errors={{
+                  basic: basicErrors,
+                  skills: skillErrors,
+                }}
+              />
+            )}
+            <DiscardChangesPopup
+              text={MSG_CONSTANTS.RESET_CHANGE_CONF_MSG}
+              isOpen={openValidationPopup}
+              onCloseFn={confirmationClose}
+            />
           </div>
-          {
-            <div
-              className={`footerdiv flow-root w-full ${
-                isProfileSettings
-                  ? 'fixed inset-x-0 bottom-0 h-[80px] bg-white'
-                  : ''
-              }`}
-            >
-              {!isProfileSettings && (
-                <div className="float-left">
-                  {getCancelOrBackButton(handleModalClose)}
-                </div>
-              )}
-              <div className="float-right">
-                {getSubmitOrNextButton(
-                  handleSubmit,
-                  isProcessing,
-                  isProfileSettings,
-                  disableSubmit
-                )}
-              </div>
-              <div className="float-right mx-5">
-                {getResetButton(() => {
-                  handleReset();
-                })}
-              </div>
-            </div>
-          }
-          {!isProfileSettings && (
-            <RequestPending
-              isOpen={isPendingRequestModalOpen}
-              setIsModalOpen={setIsPendingRequestModalOpen}
-            />
+          {isEmailEditActive && isUserProfile && (
+            <ChangeEmailModal onClose={onChangeEmailClose} />
           )}
-          {isProfileSettings && (
-            <ValidationErrorMessages
-              isOpen={isErrorPopupOpen}
-              setIsModalOpen={() => {
-                setIsErrorPopupOpen(false);
-              }}
-              from={'member'}
-              errors={{
-                basic: basicErrors,
-                skills: skillErrors,
-              }}
-            />
-          )}
-          <DiscardChangesPopup
-            text={MSG_CONSTANTS.RESET_CHANGE_CONF_MSG}
-            isOpen={openValidationPopup}
-            onCloseFn={confirmationClose}
-          />
-        </div>
-        {(isEmailEditActive && isUserProfile) && <ChangeEmailModal onClose={onChangeEmailClose}/>}
         </>
       ) : (
         <Modal

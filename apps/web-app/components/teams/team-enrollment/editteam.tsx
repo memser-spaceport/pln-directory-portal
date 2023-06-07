@@ -160,6 +160,7 @@ export function EditTeamModal({
   const [isModified, setModifiedFlag] = useState<boolean>(false);
   const [openValidationPopup, setOpenValidationPopup] = useState<boolean>(false);
   const [nameExists, setNameExists] = useState<boolean>(false);
+  const [dataLoaded, setDataLoaded] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
     requestorEmail: '',
@@ -201,6 +202,8 @@ export function EditTeamModal({
   }, [isOpen, id]);
 
   const setTeamDetails = () => {
+    setIsProcessing(true);
+    setDataLoaded(false);
     Promise.all([
       fetchTeam(id),
       fetchMembershipSources(),
@@ -252,12 +255,16 @@ export function EditTeamModal({
           industryTags: data[3],
           protocol: data[4],
         });
+        setDataLoaded(true);
       })
       .catch((err) => {
         toast(err?.message,{
           type:'error'
         });
         console.error(err);
+      }) 
+      .finally(() => {
+        setIsProcessing(false);
       });
   }
 
@@ -586,6 +593,7 @@ export function EditTeamModal({
               fromSettings={true}
               resetImg={resetImg}
               onResetImg={handleResetImg}
+              dataLoaded={dataLoaded}
             />
           </div>
           <div className={(openTab === 2 || !fromSettings) ? 'block' : 'hidden'}>

@@ -10,6 +10,7 @@ import { ReactComponent as InformationCircleIcon } from '../../../public/assets/
 export default function AddMemberStepOne(props) {
   const values = props?.formValues;
   const onChange = props?.handleInputChange;
+  const requiredFlag = props?.isEditMode ? props?.dataLoaded ? true : false :true;
   const disableRequestorEmail = props?.disableRequestorEmail;
   return (
     <>
@@ -44,7 +45,7 @@ export default function AddMemberStepOne(props) {
         </div>
         <div className="namefield inputfield">
           <InputField
-            required
+            required={requiredFlag}
             value={values?.name}
             onChange={onChange}
             maxLength={150}
@@ -78,7 +79,7 @@ export default function AddMemberStepOne(props) {
 
       <div className="pt-5">
         <TextArea
-          required
+          required={requiredFlag}
           value={values?.shortDescription}
           onChange={onChange}
           maxLength={1000}
@@ -100,7 +101,7 @@ export default function AddMemberStepOne(props) {
 
       <div className="pt-5">
         <TextArea
-          required
+          required={requiredFlag}
           value={values?.longDescription}
           onChange={onChange}
           maxLength={2000}
