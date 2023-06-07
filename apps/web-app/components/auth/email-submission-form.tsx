@@ -22,7 +22,7 @@ function EmailSubmissionForm(props) {
     const onEmailSubmitted = async (e) => {
         e.preventDefault();
         const emailValue = inputRef.current.value.trim();
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const emailRegex = /^(([^<>()[\].,;:\s@"]+(\.[^<>()[\].,;:\s@"]+)*)|(".+"))@(([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})$/;
         if(!emailRegex.test(emailValue)) {
             setErrorMessage('Please enter valid email')
             return
