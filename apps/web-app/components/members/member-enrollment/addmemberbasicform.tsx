@@ -6,6 +6,7 @@ export default function AddMemberBasicForm(props) {
   const values = props.formValues;
   const onChange = props.onChange;
   const onNewEmailInputChange = props.onNewEmailInputChange;
+  const requiredFlag = props?.isEditMode ? props?.dataLoaded ? true : false :true;
   const currentEmail = props.currentEmail;
   const isCurrentMailBoxNeeded = props.isProfileSettings ? props.isUserProfile ? true: props.isEmailEditActive ? false : true : true
   return (
@@ -28,7 +29,7 @@ export default function AddMemberBasicForm(props) {
         </div>
         <div className="namefield inputfield">
           <InputField
-            required={true}
+            required={requiredFlag}
             name="name"
             label="Name"
             pattern="^[a-zA-Z\s]*$"
@@ -51,7 +52,7 @@ export default function AddMemberBasicForm(props) {
       </div>
       {(!props.isUserProfile && !props.isEmailEditActive) && <div className="inputfield relative pt-5">
         <InputField
-          required
+          required={requiredFlag}
           name="email"
           type="email"
           label="Email"
