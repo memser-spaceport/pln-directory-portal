@@ -36,6 +36,8 @@ export default function TeamStepOne(props) {
             avatarIcon={UserGroupIcon}
             onImageChange={props.handleImageChange}
             disabled={!props.isEditEnabled}
+            resetImg={props.resetImg}
+            onResetImg={props.onResetImg}
           />
         </div>
         <div className="w-full">
