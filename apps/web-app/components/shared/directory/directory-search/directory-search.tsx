@@ -32,7 +32,7 @@ export function DirectorySearch({
         showLabel={false}
         icon={SearchIcon}
         placeholder={placeholder}
-        defaultValue={searchTerm}
+        value={searchTerm}
         onKeyUp={(event) => {
           if (event.key === 'Enter' || event.keyCode === 13) {
             pushQuery(event.currentTarget.value);
