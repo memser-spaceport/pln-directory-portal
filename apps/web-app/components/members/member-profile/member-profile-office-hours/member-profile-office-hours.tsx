@@ -3,10 +3,10 @@ import { AnchorLink, Tooltip } from '@protocol-labs-network/ui';
 import { trackGoal } from 'fathom-client';
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
-import { FATHOM_EVENTS } from '../../../../constants';
+import { FATHOM_EVENTS, OFFICE_HOURS_MSG } from '../../../../constants';
 import { authenticate } from '../../../../utils/services/auth';
-import { IMember } from 'apps/web-app/utils/members.types';
-import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
+import { IMember } from '../../../../../web-app/utils/members.types';
+import useAppAnalytics from '../../../../../web-app/hooks/shared/use-app-analytics';
 
 type MemberProfileOfficeHoursProps = {
   url?: string;
@@ -54,7 +54,7 @@ export function MemberProfileOfficeHours({
         {!userInfo.uid ? (
           
           <p className="text-sm font-normal flex items-center gap-2">
-            Schedule a one on one office hours discussion with <span>
+            {OFFICE_HOURS_MSG} <span>
             <Tooltip
                 asChild
                 trigger={

@@ -44,46 +44,73 @@ export function MemberProfileDetails({
           <>
             {/* Linked-In */}
             {linkedinHandle && (
-              <SocialProfile handle={linkedinHandle} type="linkedin" logo={linkedInLogo} height={23} width={23}
+              <SocialProfile
+                handle={linkedinHandle}
+                type="linkedin"
+                logo={linkedInLogo}
+                height={23}
+                width={23}
               />
             )}
 
             {/* Twitter */}
             {twitter && (
-              <SocialProfile handle={twitter} type="twitter" logo={twitterLogo} height={23} width={23}
+              <SocialProfile
+                handle={twitter}
+                type="twitter"
+                logo={twitterLogo}
+                height={23}
+                width={23}
               />
             )}
 
             {/* Discord */}
-            <div className="flex h-9 w-40 items-center gap-2 rounded bg-[#F1F5F9] px-3 font-medium">
-              <img src={discordLogo} alt="discord" height={23} width={23} />
-              {
-                discordHandle && (
-                  <Tooltip
-                    asChild
-                    trigger={
-                      <span className="line-clamp-1 break-all">
-                        {discordHandle}
-                      </span>
-                    }
-                    content={discordHandle}
-                  />
-                )}
-            </div>
+            {discordHandle && (
+              <div className="flex h-9 w-40 items-center gap-2 rounded bg-[#F1F5F9] px-3 font-medium">
+                <img src={discordLogo} alt="discord" height={23} width={23} />
+                <Tooltip
+                  asChild
+                  trigger={
+                    <span className="line-clamp-1 break-all">
+                      {discordHandle}
+                    </span>
+                  }
+                  content={discordHandle}
+                />
+              </div>
+            )}
 
             {/* Telegram */}
             {telegramHandle && (
-              <SocialProfile handle={telegramHandle} type="telegram" logo={telegramLogo} height={23} width={23}/>
+              <SocialProfile
+                handle={telegramHandle}
+                type="telegram"
+                logo={telegramLogo}
+                height={23}
+                width={23}
+              />
             )}
 
             {/* Email */}
             {email && (
-              <SocialProfile handle={email} type="email" logo={emailLogo} height={30} width={30}/>
+              <SocialProfile
+                handle={email}
+                type="email"
+                logo={emailLogo}
+                height={30}
+                width={30}
+              />
             )}
 
             {/* GitHub */}
-            {!githubHandle && (
-              <SocialProfile handle={githubHandle} type="github" logo={gitLogo} height={20} width={20}/>
+            {githubHandle && (
+              <SocialProfile
+                handle={githubHandle}
+                type="github"
+                logo={gitLogo}
+                height={20}
+                width={20}
+              />
             )}
           </>
         )}
