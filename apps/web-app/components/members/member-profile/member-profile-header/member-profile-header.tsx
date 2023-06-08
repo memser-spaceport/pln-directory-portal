@@ -45,11 +45,11 @@ export function MemberProfileHeader({
           <UserIcon className="h-24 w-24 fill-white" />
         )}
       </div>
-      <div className="w-3/4 max-w-2xl">
+      <div className="w-[200px] max-w-2xl">
         <Tooltip
           asChild
           trigger={
-            <h1 className="mt-0.5 truncate text-2xl font-bold">{name}</h1>
+            <h1 className="select-none mt-0.5 truncate text-2xl font-bold">{name}</h1>
           }
           content={name}
         />
@@ -85,7 +85,7 @@ export function MemberProfileHeader({
           </div>
         )}
       </div>
-      <div className="flex w-1/4 justify-end gap-7">
+      <div className="flex w-3/4 justify-end gap-7">
         {(userInfo.uid === member.id ||
           (userInfo.roles?.length > 0 &&
             userInfo.roles.includes('DIRECTORYADMIN'))) && (

@@ -87,6 +87,7 @@ export const parseMember = (member: TMemberResponse): IMember => {
     image: member.image?.url || null,
     githubHandle: member.githubHandler || null,
     discordHandle: member.discordHandler || null,
+    telegramHandle: member.telegramHandler || null,
     twitter: member.twitterHandler || null,
     officeHours: member.officeHours || null,
     location,

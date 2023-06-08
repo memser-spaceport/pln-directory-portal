@@ -1,6 +1,6 @@
 import { UserGroupIcon } from '@heroicons/react/solid';
 import { Tooltip } from '@protocol-labs-network/ui';
-import { IMember } from 'apps/web-app/utils/members.types';
+import { IMember } from '../../../../../web-app/utils/members.types';
 import Image from 'next/image';
 import { AskToEditCard } from '../../../shared/profile/ask-to-edit-card/ask-to-edit-card';
 import { ITeam } from '../../../../utils/teams.types';
@@ -39,7 +39,7 @@ export function TeamProfileHeader({
         <Tooltip
           asChild
           trigger={
-            <h1 className="pt-1 text-2xl font-bold truncate">{name}</h1>
+            <h1 className="select-none w-[200px] pt-1 text-2xl font-bold truncate">{name}</h1>
           }
           content={name}
         />

@@ -253,7 +253,7 @@ export class ParticipantsRequestService {
       where: { uid: uidToReject },
     });
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      return { code: -1, message: 'Request already Processed' };
+      throw new BadRequestException("Request already processed")
     }
     await this.prisma.participantsRequest.update({
       where: { uid: uidToReject },
@@ -270,7 +270,7 @@ export class ParticipantsRequestService {
     });
 
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      return { code: -1, message: 'Request already Processed' };
+      throw new BadRequestException("Request already processed");
     }
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
@@ -393,7 +393,7 @@ export class ParticipantsRequestService {
         where: { uid: uidToEdit },
       });
     if (dataFromDB?.status !== ApprovalStatus.PENDING.toString()) {
-      return { code: -1, message: 'Request already Processed' };
+      throw new BadRequestException("Request already processed")
     }
     const existingData: any = await transactionType.member.findUnique({
       where: { uid: dataFromDB.referenceUid },
@@ -413,6 +413,13 @@ export class ParticipantsRequestService {
       name: dataToProcess.name,
     };
 
+    const isEmailChange = existingData.email !== dataToProcess.email ? true: false;
+    if(isEmailChange) {
+      const foundUser: any = transactionType.member.findUnique({where: {email: dataToProcess.email}});
+      if(foundUser && foundUser.email) {
+        throw new BadRequestException("Email already exist")
+      }
+    }
     // Mandatory fields
     dataToSave['name'] = dataToProcess.name;
     dataToSave['email'] = dataToProcess.email;
@@ -529,8 +536,8 @@ export class ParticipantsRequestService {
     tx
   ) {
     const dataToProcess = dataFromDB?.newData;
-    const isEmailChange =
-      existingData.email !== dataToProcess.email ? true : false;
+    const isEmailChange = existingData.email !== dataToProcess.email ? true : false;
+    const isExternalIdAvailable = existingData.externalId ? true : false;
     // Team member roles relational mapping
     const oldTeamUids = [...existingData.teamMemberRoles].map((t) => t.teamUid);
     const newTeamUids = [...dataToProcess.teamAndRoles].map((t) => t.teamUid);
@@ -599,7 +606,7 @@ export class ParticipantsRequestService {
       data: { ...dataToSave },
     });
 
-    if (isEmailChange) {
+    if (isEmailChange && isExternalIdAvailable) {
       // try {
       const response = await axios.post(
         `${process.env.AUTH_API_URL}/auth/token`,
@@ -622,10 +629,10 @@ export class ParticipantsRequestService {
       const authPayload = {
         email: dataToSave.email,
         existingEmail: existingData.email,
-        accountId: existingData.externalId,
+        userId: existingData.externalId,
       };
-      await axios.put(
-        `${process.env.AUTH_API_URL}/admin/auth/account/email`,
+      await axios.patch(
+        `${process.env.AUTH_API_URL}/admin/accounts/email`,
         authPayload,
         { headers: headers }
       );
@@ -652,7 +659,7 @@ export class ParticipantsRequestService {
       where: { uid: uidToApprove },
     });
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      return { code: -1, message: 'Request already Processed' };
+      throw new BadRequestException("Request already processed")
     }
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
@@ -755,7 +762,7 @@ export class ParticipantsRequestService {
       where: { uid: uidToEdit },
     });
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      return { code: -1, message: 'Request already Processed' };
+      throw new BadRequestException("Request already processed")
     }
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};

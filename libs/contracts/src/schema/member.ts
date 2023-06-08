@@ -23,6 +23,7 @@ export const MemberSchema = z.object({
   githubHandler: z.string().nullish(),
   discordHandler: z.string().nullish(),
   twitterHandler: z.string().nullish(),
+  telegramHandler: z.string().nullish(),
   officeHours: z.string().nullish(),
   airtableRecId: z.string().nullish(),
   plnFriend: z.boolean(),

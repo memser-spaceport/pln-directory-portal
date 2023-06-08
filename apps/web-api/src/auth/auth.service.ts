@@ -70,6 +70,7 @@ export class AuthService {
     try {
       const idToken = result.data.id_token;
       const decoded: any = jwt_decode(idToken);
+      console.log('decoded values', decoded)
       const userEmail = decoded.email;
        const idFromAuth = decoded.sub;
 
@@ -167,19 +168,6 @@ export class AuthService {
     return this.getUserInfo(result);
   }
 
-  async findUserInSystemByEmail(userEmail) {
-      const existingUser = await this.getUserInfoByEmail(userEmail);
-      if(existingUser) {
-        return existingUser
-      }
-
-      const requestedUser = await this.prismaService.participantsRequest.findFirst({
-        where: {uniqueIdentifier: userEmail, status: "PENDING", referenceUid: null}
-      })
-
-      return requestedUser;
-  }
-
   async getUserInfoByEmail(userEmail) {
     const foundUser: any = await this.prismaService.member.findUnique({
       where: { email: userEmail },
@@ -203,15 +191,22 @@ export class AuthService {
     let newTokens;
     let updatedUser;
     await this.prismaService.$transaction(async (tx) => {
+
       // Update new email
-      updatedUser = await this.prismaService.member.update({
+      updatedUser = await tx.member.update({
         where: {email: oldEmail},
         data: {email: newEmail},
         include: { image: true, memberRoles: true, teamMemberRoles: true },
       })
 
       // Link new email to auth account
-      newTokens = await this.linkEmailWithAccount(newEmail, accessToken, clientToken)
+     // newTokens = await this.linkEmailWithAccount(newEmail, accessToken, clientToken)
+     const linkResult =  await axios.patch(`${process.env.AUTH_API_URL}/admin/accounts/email`, { email: newEmail, existingEmail: oldEmail, userId: updatedUser.externalId }, {
+      headers: {
+        Authorization: `Bearer ${clientToken}`
+      }
+    })
+   newTokens = linkResult.data;
     })
 
     await this.redisService.resetAllCache()
@@ -231,12 +226,21 @@ export class AuthService {
 
   async linkEmailWithAccount(email, accessToken, clientToken) {
     try {
-     const linkResult =  await axios.put(`${process.env.AUTH_API_URL}/admin/auth/account`, { token: accessToken, email: email }, {
+     const linkResult =  await axios.put(`${process.env.AUTH_API_URL}/admin/accounts`, { token: accessToken, email: email }, {
         headers: {
           Authorization: `Bearer ${clientToken}`
         }
       })
     const newTokens = linkResult.data;
+    const idToken = newTokens.id_token;
+    const decoded: any = jwt_decode(idToken);
+    const userExternalId = decoded.sub;
+
+      await this.prismaService.member.update({
+        where: {email: email},
+        data: {externalId: userExternalId}
+      })
+
     return newTokens;
     } catch (error) {
       if (error.response) {
@@ -261,17 +265,7 @@ export class AuthService {
   }
 
 
-  async handleAxiosError(statusCode, errorMessage) {
-    if(statusCode === 401) {
-      if(errorMessage === "Unauthorized") {
-        throw new UnauthorizedException("Unauthorized Request. Please login again and try")
-      } else {
-        throw new UnauthorizedException("Invalid Request. Please login again and try")
-      }
-    } else if (statusCode === 400) {
-      throw new BadRequestException("Invalid request. Please try again or contact support")
-    }
-  }
+
 
   handleErrors = (error) => {
     console.log(error?.response?.statusCode, error?.response?.status, error?.response?.message,error?.response?.data )
@@ -280,8 +274,7 @@ export class AuthService {
      } else if (error?.response?.data && error?.response?.status) {
         if(error?.response?.status === 401) {
           throw new UnauthorizedException("Unauthorized")
-        }
-         else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP005') {
+        } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP005') {
           throw new UnauthorizedException("Unauthorized")
         } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP003') {
           throw new ForbiddenException("MAX_OTP_ATTEMPTS_REACHED")
@@ -290,6 +283,7 @@ export class AuthService {
         } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP004') {
           throw new BadRequestException("CODE_EXPIRED")
         }
+        // EOTP002
         else {
           throw new InternalServerErrorException("Unexpected error. Please try again")
         }
