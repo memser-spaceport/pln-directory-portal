@@ -369,6 +369,7 @@ export function EditMemberModal({
 
   function handleReset() {
     if (isProfileSettings) {
+      setResetImg(true);
       setEmailEditStatus(false);
       if (isModified) {
         setOpenValidationPopup(true);
