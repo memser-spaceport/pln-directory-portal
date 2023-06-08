@@ -32,19 +32,24 @@ export function DirectoryCardHeader({
   return (
     <>
       <div
-        className={`h-18 w-18 relative shrink-0 border border-slate-200 ${
-          isImageRounded ? 'rounded-full' : 'rounded-lg'
-        } ${isGrid ? 'mx-auto' : ''} ${img ? 'bg-white' : 'bg-slate-200'}`}
+        className={`h-18 w-18 relative shrink-0 border border-slate-200 ${isImageRounded ? 'rounded-full' : 'rounded-lg'
+          } ${isGrid ? 'mx-auto' : ''} ${img ? 'bg-white' : 'bg-slate-200'}`}
       >
         {img ? (
-          <Image
+          isImageRounded ? (<Image
             className={isImageRounded ? 'rounded-full' : 'rounded-lg'}
             alt={`${name} img`}
             src={img}
+            width={95}
+            height={95}
+          />) : (<Image
+            className={'rounded-lg'}
+            alt={`${name} img`}
+            src={img}
             layout="fill"
-            objectFit={isImageRounded ? 'cover' : 'contain'}
+            objectFit={'contain'}
             objectPosition="center"
-          />
+          />)
         ) : (
           <Icon className="w-22 h-22 mt-2 fill-white" />
         )}

@@ -22,7 +22,7 @@ export const NetworkSpotlight = ({ videoDetails, playlistDetails }) => {
     }
 
     const openPlaylist = () => {
-        window.open(NW_SPOTLIGHT_CONSTANTS.YOUTUBE_PLAYLIST, '_blank')
+        window.open(NW_SPOTLIGHT_CONSTANTS.YOUTUBE_PLAYLIST, '_blank');
     }
     return (
         <>
@@ -31,7 +31,7 @@ export const NetworkSpotlight = ({ videoDetails, playlistDetails }) => {
                 <div className="flex flex-col md:flex-row justify-between gap-[16px]">
                     <div className="w-[360px] h-[328px] border rounded-[8px] bg-[#F1F5F9] p-[20px]">
                         <div>
-                            <div className="absolute rounded-full w-[45px] h-[20px] mt-[8px] text-[12px] font-medium bg-[#156FF7] ml-[8px] z-[1001]">
+                            <div className="absolute rounded-full w-[45px] h-[20px] mt-[8px] text-[12px] font-medium bg-[#156FF7] ml-[15px] z-[1001]">
                                 <span className="relative p-[5px] text-[#FFFFFF]">{NW_SPOTLIGHT_CONSTANTS.BLOG}</span>
                             </div>
                             <Image
@@ -94,7 +94,7 @@ export const NetworkSpotlight = ({ videoDetails, playlistDetails }) => {
                     {
                         (playlistDetails && <div className="w-[360px] h-[328px] border rounded-[8px] bg-[#F1F5F9] p-[20px]">
                             <div>
-                                <div className="absolute rounded-full w-[45px] h-[20px] mt-[8px] text-[12px] font-medium bg-[#156FF7] ml-[8px] z-[1001]">
+                                <div className="absolute rounded-full w-[45px] h-[20px] mt-[8px] text-[12px] font-medium bg-[#156FF7] ml-[15px] z-[1001]">
                                     <span className="relative p-[5px] text-[#FFFFFF]">{NW_SPOTLIGHT_CONSTANTS.SERIES}</span>
                                 </div>
                                 <Image
