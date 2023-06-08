@@ -43,26 +43,22 @@ export function MemberProfileDetails({
         {userInfo.uid && (
           <>
             {/* Linked-In */}
-            {linkedinHandle ? (
+            {linkedinHandle && (
               <SocialProfile handle={linkedinHandle} type="linkedin" logo={linkedInLogo} height={23} width={23}
               />
-            ) : (
-              '-'
             )}
 
             {/* Twitter */}
-            {twitter ? (
+            {twitter && (
               <SocialProfile handle={twitter} type="twitter" logo={twitterLogo} height={23} width={23}
               />
-            ) : (
-              '-'
             )}
 
             {/* Discord */}
             <div className="flex h-9 w-40 items-center gap-2 rounded bg-[#F1F5F9] px-3 font-medium">
               <img src={discordLogo} alt="discord" height={23} width={23} />
-              {userInfo?.uid &&
-                (discordHandle ? (
+              {
+                discordHandle && (
                   <Tooltip
                     asChild
                     trigger={
@@ -72,30 +68,22 @@ export function MemberProfileDetails({
                     }
                     content={discordHandle}
                   />
-                ) : (
-                  '-'
-                ))}
+                )}
             </div>
 
             {/* Telegram */}
-            {telegramHandle ? (
+            {telegramHandle && (
               <SocialProfile handle={telegramHandle} type="telegram" logo={telegramLogo} height={23} width={23}/>
-            ) : (
-              '-'
             )}
 
             {/* Email */}
-            {email ? (
+            {email && (
               <SocialProfile handle={email} type="email" logo={emailLogo} height={30} width={30}/>
-            ) : (
-              '-'
             )}
 
             {/* GitHub */}
-            {githubHandle ? (
+            {!githubHandle && (
               <SocialProfile handle={githubHandle} type="github" logo={gitLogo} height={20} width={20}/>
-            ) : (
-              '-'
             )}
           </>
         )}

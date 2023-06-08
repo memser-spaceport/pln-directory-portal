@@ -16,29 +16,39 @@ export function TeamProfileDetails({
 }: ITeam) {
   return (
     <>
-      <div className="mt-6 flex space-x-6">
+      <h3 className=" mt-6 font-medium text-slate-500">Contact Details</h3>
+      <div className="mt-3 flex gap-3 ">
         {/* Website */}
-        {website ? (
-          <SocialProfile handle={website} type="website" logo={websiteLogo} height={24} width={24}
+        {website && (
+          <SocialProfile
+            handle={website}
+            type="website"
+            logo={websiteLogo}
+            height={30}
+            width={30}
           />
-        ) : (
-          '-'
         )}
 
         {/* Twitter */}
-        {twitter ? (
-              <SocialProfile handle={twitter} type="twitter" logo={twitterLogo} height={23} width={23}
+        {twitter && (
+          <SocialProfile
+            handle={twitter}
+            type="twitter"
+            logo={twitterLogo}
+            height={23}
+            width={23}
           />
-        ) : (
-          '-'
         )}
 
         {/* Linked-In */}
-        {linkedinHandle ? (
-          <SocialProfile handle={linkedinHandle} type="linkedin" logo={linkedInLogo} height={23} width={23}
+        {linkedinHandle && (
+          <SocialProfile
+            handle={linkedinHandle}
+            type="linkedin"
+            logo={linkedInLogo}
+            height={23}
+            width={23}
           />
-        ) : (
-          '-'
         )}
 
         {/* Contact details */}

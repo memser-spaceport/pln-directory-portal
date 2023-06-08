@@ -1,8 +1,7 @@
 import { Tooltip } from '@protocol-labs-network/ui';
 import { useIsEmail } from '../../../../../hooks/shared/use-is-email.hook';
 import { ProfileSocialLink } from '../../../../shared/profile/profile-social-link/profile-social-link';
-import emailLogo from '/public/assets/images/icons/email-contact-logo.svg';
-
+import contactLogo from '/public/assets/images/icons/team-contact-logo.svg';
 
 type TContactMethodProps = {
   contactMethod?: string;
@@ -21,7 +20,9 @@ export function ContactMethod({ contactMethod }: TContactMethodProps) {
             <div>
               <ProfileSocialLink
                 url={contactMethod}
-                logo={emailLogo}
+                logo={contactLogo}
+                height={30}
+                width={30}
                 type={profileSocialLinkType}
               />
             </div>

@@ -1,4 +1,8 @@
-import { InputField, ProfileImageUpload, ConfirmInputField } from '@protocol-labs-network/ui';
+import {
+  InputField,
+  ProfileImageUpload,
+  ConfirmInputField,
+} from '@protocol-labs-network/ui';
 import { UserIcon } from '@heroicons/react/solid';
 import { ReactComponent as EditIcon } from '/public/assets/images/icons/edit.svg';
 import { ReactComponent as InformationCircleIcon } from '../../../public/assets/images/icons/info_icon.svg';
@@ -7,9 +11,34 @@ export default function AddMemberBasicForm(props) {
   const values = props.formValues;
   const onChange = props.onChange;
   const onNewEmailInputChange = props.onNewEmailInputChange;
-  const requiredFlag = props?.isEditMode ? props?.dataLoaded ? true : false :true;
+  const requiredFlag = props?.isEditMode
+    ? props?.dataLoaded
+      ? true
+      : false
+    : true;
   const currentEmail = props.currentEmail;
-  const isCurrentMailBoxNeeded = props.isProfileSettings ? props.isUserProfile ? true: props.isEmailEditActive ? false : true : true
+  const isCurrentMailBoxNeeded = props.isProfileSettings
+    ? props.isUserProfile
+      ? true
+      : props.isEmailEditActive
+      ? false
+      : true
+    : true;
+
+  const editEmail = () => {
+    return (
+
+      <div
+      className="absolute right-0 top-[20px] flex cursor-pointer items-center gap-1"
+      onClick={props.onEmailChange}
+    >
+      <EditIcon className="m-1" />
+      <p className="right-0 cursor-pointer text-sm font-semibold text-[#156FF7]">
+        Edit Email
+      </p>
+    </div>
+    );
+  };
   return (
     <>
       <div className="flex pt-5">
@@ -51,45 +80,54 @@ export default function AddMemberBasicForm(props) {
           4MB.
         </span>
       </div>
-      {(!props.isUserProfile && !props.isEmailEditActive) && <div className="inputfield relative pt-5">
-        <InputField
-          required={requiredFlag}
-          name="email"
-          type="email"
-          label="Email"
-          maxLength={255}
-          value={values?.email}
-          onKeyDown={() => props?.setDisableNext(true)}
-          disabled={props.disableEmail ? props.disableEmail : false}
-          onChange={onChange}
-          onBlur={props.onEmailBlur && props.onEmailBlur}
-          placeholder="Enter your email address"
-          className="custom-grey custom-outline-none border"
-        />
-          {(!props.isEmailEditActive && props.isProfileSettings) &&
-            <div className='absolute right-0 top-[20px] flex items-center gap-1 cursor-pointer' onClick={props.onEmailChange}>
-              <EditIcon className="m-1" />
-              <p onClick={props.onEmailChange} className=' text-sm font-semibold cursor-pointer text-[#156FF7] right-0'>Edit Email</p>
-            </div>
-          }
-      </div>}
-
-      {props.isUserProfile && <div className="inputfield relative pt-5">
-        <p className='text-sm font-bold'>Email</p>
-        <p className='mt-[12px] text-sm text-slate-900'>{values?.email}</p>
-        {(!props.isEmailEditActive && props.isProfileSettings) && 
-        <div className='absolute right-0 top-[20px] flex items-center gap-1 cursor-pointer' onClick={props.onEmailChange}>
-          <EditIcon className="m-1" />
-          <p className='text-sm font-semibold cursor-pointer text-[#156FF7] right-0'>Edit Email</p>
+      {!props.isUserProfile && !props.isEmailEditActive && (
+        <div className="inputfield relative pt-5">
+          <InputField
+            required={requiredFlag}
+            name="email"
+            type="email"
+            label="Email"
+            maxLength={255}
+            value={values?.email}
+            onKeyDown={() => props?.setDisableNext(true)}
+            disabled={props.disableEmail ? props.disableEmail : false}
+            onChange={onChange}
+            onBlur={props.onEmailBlur && props.onEmailBlur}
+            placeholder="Enter your email address"
+            className="custom-grey custom-outline-none border"
+          />
+          {!props.isEmailEditActive && props.isProfileSettings && editEmail()}
         </div>
-        }
-      </div>}
-      { (props.isEmailEditActive && props.isProfileSettings && !props.isUserProfile) &&
-      <div className="flex pt-5 relative">
-        <ConfirmInputField  name="email" currentEmail={currentEmail}  onChange={onChange}  pattern="^[a-zA-Z\s]*$"
-          type="email" label='Enter New Email' className="custom-grey custom-outline-none border"/>
-           <p onClick={props.onCancelEmailChange} className='absolute top-[20px] text-sm font-semibold cursor-pointer text-[#156FF7] right-0'>Cancel</p>
-      </div> }
+      )}
+
+      {props.isUserProfile && (
+        <div className="inputfield relative pt-5">
+          <p className="text-sm font-bold">Email</p>
+          <p className="mt-[12px] text-sm text-slate-900">{values?.email}</p>
+          {!props.isEmailEditActive && props.isProfileSettings && editEmail()}
+        </div>
+      )}
+      {props.isEmailEditActive &&
+        props.isProfileSettings &&
+        !props.isUserProfile && (
+          <div className="relative flex pt-5">
+            <ConfirmInputField
+              name="email"
+              currentEmail={currentEmail}
+              onChange={onChange}
+              pattern="^[a-zA-Z\s]*$"
+              type="email"
+              label="Enter New Email"
+              className="custom-grey custom-outline-none border"
+            />
+            <p
+              onClick={props.onCancelEmailChange}
+              className="absolute top-[20px] right-0 cursor-pointer text-sm font-semibold text-[#156FF7]"
+            >
+              Cancel
+            </p>
+          </div>
+        )}
       {props.emailExists && (
         <span className="pt-3 text-xs text-rose-600">
           Email already exists!
