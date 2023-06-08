@@ -182,3 +182,8 @@
 .github-project-popup{
   max-height: calc(100vh - 380px);
 }
+
+nextjs-portal {
+  display
+  : none;
+}

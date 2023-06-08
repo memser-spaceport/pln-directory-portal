@@ -1,6 +1,8 @@
 import { Navbar } from '../components/layout/navbar/navbar';
 import posthog from 'posthog-js'
 import { PostHogProvider } from 'posthog-js/react'
+import ErrorBoundary from '../components/shared/error-boundary/ErrorBoundary';
+
 
 // Check that PostHog is client-side (used to handle Next.js SSR)
 if (typeof window !== 'undefined') {
@@ -17,14 +19,14 @@ export function DirectoryLayout({ children }) {
   // Second children is acutual page element.
   const childrens = children.props.children;
   return (
-    <>
+    <ErrorBoundary>
       <PostHogProvider client={posthog}>
-      <Navbar
-        isUserLoggedIn={childrens?.[1]?.props?.isUserLoggedIn}
-        userInfo={childrens?.[1]?.props?.userInfo || {}}
-      />
-      <main className="min-w-[1272px] pt-20">{children}</main>
+        <Navbar
+          isUserLoggedIn={childrens?.[1]?.props?.isUserLoggedIn}
+          userInfo={childrens?.[1]?.props?.userInfo || {}}
+        />
+        <main className="min-w-[1272px] pt-20">{children}</main>
       </PostHogProvider>
-    </>
+    </ErrorBoundary>
   );
 }

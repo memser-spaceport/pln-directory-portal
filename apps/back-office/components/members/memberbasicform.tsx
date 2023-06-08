@@ -17,6 +17,8 @@ export default function AddMemberBasicForm(props) {
             avatarIcon={UserIcon}
             enableHover={props.isEditEnabled ? true : false}
             disabled={!props.isEditEnabled}
+            resetImg={props.resetImg}
+            onResetImg={props.onResetImg}
           />
         </div>
         <div className="w-full">

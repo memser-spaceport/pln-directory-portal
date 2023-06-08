@@ -447,10 +447,10 @@ export function EditTeamModal({
                 }
             });
         } catch (err) {
-          toast(err?.message,{
-            type:'error'
-          });
-          console.log('error', err);
+          // toast(err?.message,{
+          //   type:'error'
+          // });
+          // console.log('error', err);
         } finally {
           setIsProcessing(false);
         }
@@ -589,7 +589,6 @@ export function EditTeamModal({
               fromSettings={true}
               resetImg={resetImg}
               onResetImg={handleResetImg}
-              dataLoaded={dataLoaded}
             />
           </div>
           <div className={(openTab === 2 || !fromSettings) ? 'block' : 'hidden'}>

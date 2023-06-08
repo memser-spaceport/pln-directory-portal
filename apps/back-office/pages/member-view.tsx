@@ -85,6 +85,7 @@ export default function MemberView(props) {
   const [disableSave, setDisableSave] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [resetImg, setResetImg] = useState(false); 
   const {
     setIsOpenRequest,
     setMemberList,
@@ -101,6 +102,10 @@ export default function MemberView(props) {
   useEffect(() => {
     setDropDownValues({ skillValues: props?.skills, teamNames: props?.teams });
   }, [props]);
+  
+  const handleResetImg = () => {
+    setResetImg(false);
+  }
 
   function formatData() {
     const teamAndRoles = structuredClone(formValues.teamAndRoles);
@@ -220,6 +225,7 @@ export default function MemberView(props) {
           .then((response) => {
             setSaveCompleted(true);
             setIsEditEnabled(false);
+            setResetImg(true);
           });
       } catch (err) {
         toast(err?.message);
@@ -343,6 +349,8 @@ export default function MemberView(props) {
                   emailExists={emailExists}
                   onEmailBlur={onEmailBlur}
                   setDisableNext={setDisableSave}
+                  resetImg={resetImg}
+                  onResetImg={handleResetImg}
                 />
                 <MemberSkillForm
                   formValues={formValues}

@@ -3,7 +3,9 @@ import Cookies from 'js-cookie';
 import nookies from 'nookies';
 import { setCookie } from 'nookies';
 import { decodeToken, calculateExpiry } from '../utils/services/auth';
-
+import { toast } from 'react-toastify';
+import { createLogoutChannel } from '../utils/services/auth';
+import { PAGE_ROUTES , FORBIDDEN_ERR_MSG, BAD_REQUEST_ERR_MSG, NETWORK_ERR_MSG, SOMETHING_WENT_WRONG } from '../constants';
 
 // Ignore auth to urls
 const authIgnoreURLS = ["/v1/auth/token", "/v1/participants-request/unique-identifier"];
@@ -82,55 +84,32 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    const originalRequest = error.config;
-    if (error?.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      let { refreshToken } = nookies.get();
-      if(refreshToken && refreshToken.length > 0 ) {
-        refreshToken = refreshToken.replace(
-          /"/g,
-          ''
-        );
-        // Make a call to renew access token
-        return renewAccessToken(refreshToken)
-        .then((data) => {
-          const { accessToken, refreshToken, userInfo } = data;
-          if (accessToken && refreshToken) {
-            const access_token = decodeToken(accessToken);
-            const refresh_token = decodeToken(refreshToken);
-
-            setCookie(null, 'authToken', JSON.stringify(accessToken), {
-              maxAge: calculateExpiry(access_token.exp),
-              path: '/'
-            });
-            setCookie(null, 'refreshToken', JSON.stringify(refreshToken), {
-              maxAge: calculateExpiry(refresh_token.exp),
-              path: '/'
-            });
-            setCookie(null, 'userInfo', JSON.stringify(userInfo), {
-              maxAge: calculateExpiry(access_token.exp),
-              path: '/'
-            });
-            originalRequest.headers.Authorization =
-              `Bearer ${accessToken}`.replace(/"/g, '');
-            return axios(originalRequest);
-          }})
-          .catch((error) => {
-            Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
-            window.location.href="/directory/teams";
-            return Promise.reject(error);
-          });
-      }  else {
+    const { response } = error;
+    let msg = SOMETHING_WENT_WRONG;
+    if (response) {
+      if (response.status === 401) {
+        Cookies.remove('authToken');
+        Cookies.remove('refreshToken');
+        Cookies.remove('userInfo');
+        createLogoutChannel().postMessage('logout');
         Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
-        window.location.href="/directory/teams";
-      }   
-    } else {
-      if(error?.response?.status === 500) {
-        Cookies.set('page_params', 'server_error', { expires: 60, path: '/' });
-        window.location.href="/directory/teams";
-      }
-      return Promise.reject(error);
-    } 
+        window.location.href = PAGE_ROUTES.TEAMS;
+      } else if (response.status === 403) {
+        msg = response?.data?.message ? response?.data?.message : FORBIDDEN_ERR_MSG;
+      } else if (response.status === 400) {
+        msg = response?.data?.message ? response?.data?.message : BAD_REQUEST_ERR_MSG;
+      } else if (response.status === 404) {
+        msg = NETWORK_ERR_MSG;
+      } 
+    } else if (error.request) {
+      msg = SOMETHING_WENT_WRONG;
+    }
+    if (response?.status != 401) { 
+      toast.info(msg, {
+        hideProgressBar: true
+      });
+    }
+    return Promise.reject(error);
   }
 );
 
@@ -141,10 +120,6 @@ axios.interceptors.response.use(
       response.headers['set-cookie']
     );
     return response;
-  },
-  function (error) {
-    // This function will run for every error response.
-    return Promise.reject(error);
   }
 );
 
