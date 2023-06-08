@@ -20,7 +20,7 @@ export function ProfileSocialLink({ url, type, logo, height, width }: ProfileSoc
       data-testid="profile-social-link"
       className="flex h-9 w-40 cursor-pointer items-center gap-2 rounded bg-[#F1F5F9] px-3 font-medium"
     >
-      <img src={logo} alt="twitter" height={height} width={width} />
+      <img src={logo} alt={type} height={height} width={width} />
       <p className="on-focus--link line-clamp-1 break-all text-left text-base hover:text-slate-700">
         {url}
       </p>
