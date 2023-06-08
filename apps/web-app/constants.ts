@@ -121,6 +121,7 @@ export const SCHEDULE_MEETING_MSG = 'Please proceed to schedule a meeting';
 export const FORBIDDEN_ERR_MSG = 'You are not allowed to do this.';
 export const BAD_REQUEST_ERR_MSG = 'Bad Request.';
 export const NETWORK_ERR_MSG = 'Network error. please try again';
+export const OFFICE_HOURS_MSG = "Schedule a one on one office hours discussion with"
 
 export const PAGE_ROUTES = {
   MEMBERS:'/directory/members',
