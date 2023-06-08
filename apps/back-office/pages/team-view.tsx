@@ -101,6 +101,7 @@ export default function TeamView(props) {
   const [disableSave, setDisableSave] = useState<boolean>(false);
   const [nameExists, setNameExists] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
+  const [resetImg, setResetImg] = useState(false); 
   const {
     setIsOpenRequest,
     setMemberList,
@@ -113,6 +114,10 @@ export default function TeamView(props) {
   setTeamList(props.teamList);
   setShowMenu(false);
   setIsOpenRequest(props.status === APP_CONSTANTS.PENDING_LABEL ? true : false);
+
+  const handleResetImg = () => {
+    setResetImg(false);
+  }
 
   function formatData() {
     const formattedTags = formValues.industryTags.map((item) => {
@@ -231,6 +236,7 @@ export default function TeamView(props) {
           .then((response) => {
             setSaveCompleted(true);
             setIsEditEnabled(false);
+            setResetImg(true);
           });
       } catch (err) {
         toast(err?.message);
@@ -310,6 +316,8 @@ export default function TeamView(props) {
                     onNameBlur={onNameBlur}
                     nameExists={nameExists}
                     setDisableNext={setDisableSave}
+                    resetImg={resetImg}
+                    onResetImg={handleResetImg}
                   />
                   <TeamStepTwo
                     formValues={formValues}

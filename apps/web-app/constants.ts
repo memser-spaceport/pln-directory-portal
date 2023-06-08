@@ -117,7 +117,10 @@ export const LOGOUT_MSG = 'You have been logged out successfully';
 export const RETRY_LOGIN_MSG = 'Please login and try again';
 export const LOGGED_IN_MSG = 'You are already logged in';
 export const SOMETHING_WENT_WRONG = 'Something went wrong.Please try again';
-export const SCHEDULE_MEETING_MSG = 'Please proceed to schedule a meeting'
+export const SCHEDULE_MEETING_MSG = 'Please proceed to schedule a meeting';
+export const FORBIDDEN_ERR_MSG = 'You are not allowed to do this.';
+export const BAD_REQUEST_ERR_MSG = 'Bad Request.';
+export const NETWORK_ERR_MSG = 'Network error. please try again';
 
 export const PAGE_ROUTES = {
   MEMBERS:'/directory/members',

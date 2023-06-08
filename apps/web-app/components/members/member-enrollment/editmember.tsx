@@ -579,16 +579,15 @@ export function EditMemberModal({
             }
           });
         } catch (err) {
-          console.log('err', err);
-          if (err.response.status === 400) {
-            toast(err?.response?.data?.message, {
-              type: 'error',
-            });
-          } else {
-            toast(err?.message, {
-              type: 'error',
-            });
-          }
+          // if (err?.response?.status === 400) {
+          //   toast(err?.response?.data?.message, {
+          //     type: 'error',
+          //   });
+          // } else {
+          //   toast(err?.message, {
+          //     type: 'error',
+          //   });
+          // }
         } finally {
           setModified(false);
           setModifiedFlag(false);
