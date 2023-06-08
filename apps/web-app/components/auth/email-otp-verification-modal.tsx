@@ -52,6 +52,7 @@ function EmailOtpVerificationModal() {
                 localStorage.setItem('otp-verify', 'success')
                 window.location.reload()
             } else if (!data?.valid) {
+                setResendInSeconds(30);
                 setErrorMessage('Invalid OTP. Please enter valid otp sent to your email or try resending OTP.')
             }
         } catch (e) {
@@ -81,9 +82,9 @@ function EmailOtpVerificationModal() {
             // Reset resend timer and set unique token for verification
             const uniqueEmailVerifyToken = d.token;
             Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 20 * 60 * 1000) })
-            console.log(d)
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
-            setResendTimer()
+            //setResendTimer()
+            setResendInSeconds(30)
         } catch (e) {
             setLoaderStatus(false)
             handleServerErrors(e?.response?.status, e?.response?.data?.message)
@@ -111,7 +112,8 @@ function EmailOtpVerificationModal() {
             localStorage.setItem('otp-verification-step', '2');
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
             setVerificationStep(2);
-            setResendTimer();
+            //setResendTimer();
+            setResendInSeconds(30)
 
         } catch (error) {
             console.error(error)
@@ -187,7 +189,8 @@ function EmailOtpVerificationModal() {
         if (clientToken) {
             if (localStorage.getItem('otp-verification-step') === '2') {
                 setVerificationStep(2)
-                setResendTimer()
+                //setResendTimer()
+                setResendInSeconds(30)
             }
             setDialogStatus(true)
         } else {

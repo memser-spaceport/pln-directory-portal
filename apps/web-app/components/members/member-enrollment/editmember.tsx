@@ -37,7 +37,7 @@ import { getClientToken } from '../../../services/auth.service';
 import { calculateExpiry, decodeToken } from '../../../utils/services/auth';
 import ChangeEmailModal from '../../auth/change-email-modal';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
-
+import { ReactComponent as SuccessIcon } from '../../../public/assets/images/icons/success.svg';
 interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -226,31 +226,38 @@ export function EditMemberModal({
   };
 
   const onNewEmailInputChange = (newEmailValue) => {
-    console.log(newEmailValue);
     setFormValues((v) => (v['email'] = newEmailValue));
   };
 
-  const onChangeEmailClose = (step) => {
+  const onChangeEmailClose = (step, showToaster) => {
     setEmailEditStatus(false);
-    if (step === 3) {
+    if(step && step === 3) {
       window.location.reload();
+      return;
+    }
+
+    if(showToaster) {
+      toast.success("Your email has been changed successfully", {
+        icon: <SuccessIcon />
+    });
     }
   };
 
   const onEmailChange = () => {
-    if (isUserProfile) {
+    if(isUserProfile) {
       const authToken = Cookies.get('authToken');
-      const formattedJson = JSON.parse(authToken);
+      if(!authToken) {
+        return;
+      }
+      const formattedJson = JSON.parse(authToken)
       //setIsProcessing(true)
       getClientToken(formattedJson)
-        .then((d) => {
-          const clientTokenExpiry = decodeToken(d);
-          Cookies.set('clientAccessToken', d, {
-            expires: new Date(clientTokenExpiry.exp * 1000),
-          });
-          setEmailEditStatus(true);
-        })
-        .catch((e) => console.error(e));
+       .then(d => {
+        const clientTokenExpiry = decodeToken(d);
+        Cookies.set('clientAccessToken', d, {expires: new Date(clientTokenExpiry.exp * 1000)})
+        setEmailEditStatus(true)
+       })
+       .catch(e => console.error(e))
       // .finally(() =>  setIsProcessing(false))
     } else {
       setEmailEditStatus(true);
@@ -639,7 +646,6 @@ export function EditMemberModal({
 
   function handleInputChange(event) {
     const { name, value } = event.target;
-    console.log('event', event.target.value);
     setFormValues({ ...formValues, [name]: value });
     setSaveCompleted(false);
     setModified(true);

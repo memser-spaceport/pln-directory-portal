@@ -23,7 +23,6 @@ function OtpSubmissionForm(props) {
        await onVerifyOtp(otp)
       }
     } else {
-      console.log('here in invalid')
       setErrorMessage('Please enter valid 6 digits OTP');
     }
   }
@@ -81,7 +80,6 @@ function OtpSubmissionForm(props) {
       setOtp(newOtp);
       setErrorMessage('');
     } else {
-      console.log('here')
       setErrorMessage('Please enter valid 6 digits OTP');
     }
   };

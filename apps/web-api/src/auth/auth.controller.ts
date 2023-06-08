@@ -5,8 +5,6 @@ import {
   Controller,
   ForbiddenException,
   Get,
-  HttpException,
-  InternalServerErrorException,
   Post,
   Req,
   UseGuards,
@@ -29,7 +27,7 @@ export class AuthController {
       }
 
       if (!body?.clientToken) {
-        throw new BadRequestException("Invalid Request")
+        throw new ForbiddenException("Invalid Request. Please login and try again")
       }
 
       // If email id doesn't match any email in the members directory.. then throw error
@@ -54,7 +52,7 @@ export class AuthController {
       }
 
       if (!body?.clientToken) {
-        throw new BadRequestException("Invalid Request")
+        throw new ForbiddenException("Invalid Request. Please login and try again")
       }
 
       // If email id doesn't match any email in the members directory.. then throw error
@@ -79,7 +77,7 @@ export class AuthController {
       }
 
       if (!body?.otpToken || !body?.clientToken) {
-        throw new BadRequestException("Invalid payload")
+        throw new ForbiddenException("Invalid Request. Please login and try again")
       }
 
       // Verify if OTP is valid
@@ -89,7 +87,7 @@ export class AuthController {
       if (verificationResult.valid) {
         const foundUser = await this.authService.getUserInfoByEmail(verificationResult.recipient);
         if (!foundUser) {
-          throw new ForbiddenException('User not found')
+          throw new ForbiddenException('Invalid request. Please login again and try')
         }
 
         // if user found by email... then link the verified email with account and get new tokens
@@ -113,25 +111,29 @@ export class AuthController {
   async sendOtpForEmailChange(@Body() body, @Req() req) {
     try {
       // If required params not available throw error
-      if (!body?.newEmail || !body?.clientToken || !req?.userEmail) {
+      if (!body?.newEmail || !req?.userEmail) {
         throw new BadRequestException("Validation failed")
+      }
+
+      if (!body?.clientToken) {
+        throw new ForbiddenException("Invalid Request. Please login and try again")
       }
 
       // New email cannot be same as old one
       if (body?.newEmail.toLowerCase().trim() === req?.userEmail.toLowerCase().trim()) {
-        throw new BadRequestException("Invalid Email")
+        throw new BadRequestException("New Email cannot be same as old email")
       }
 
       // If current email id doesn't match any email in the members directory.. then throw error
       const oldEmailIdUser = await this.authService.getUserInfoByEmail(req.userEmail);
       if (!oldEmailIdUser) {
-        throw new BadRequestException("Email id doesnt exist")
+        throw new ForbiddenException("Your email seems to have been updated recently. Please login and try again")
       }
 
       //If new email id matches user then throw error
       const userMatchingNewEmail = await this.authService.getUserInfoByEmail(body.newEmail);
       if (userMatchingNewEmail) {
-        throw new BadRequestException("Email already exist")
+        throw new BadRequestException("Above email id is already used. Please try again with different email id.")
       }
 
       return await this.authService.sendEmailOtpForVerification(body.newEmail, body.clientToken)
@@ -146,25 +148,29 @@ export class AuthController {
   async resendOtpForEmailChange(@Body() body, @Req() req) {
     try {
       // If required params not available throw error
-      if (!body?.newEmail || !body?.clientToken || !req?.userEmail) {
+      if (!body?.newEmail || !req?.userEmail) {
         throw new BadRequestException("Validation failed")
+      }
+
+      if (!body?.clientToken) {
+        throw new ForbiddenException("Invalid Request. Please login and try again")
       }
 
       // New email cannot be same as old one
       if (body?.newEmail.toLowerCase().trim() === req?.userEmail.toLowerCase().trim()) {
-        throw new BadRequestException("Invalid Email")
+        throw new BadRequestException("New Email cannot be same as old email")
       }
 
       // If current email id doesn't match any email in the members directory.. then throw error
       const oldEmailIdUser = await this.authService.getUserInfoByEmail(req.userEmail);
       if (!oldEmailIdUser) {
-        throw new BadRequestException("Email id doesnt exist")
+        throw new ForbiddenException("Your email seems to have been updated recently. Please login and try again")
       }
 
       //If new email id matches user then throw error
       const userMatchingNewEmail = await this.authService.getUserInfoByEmail(body.newEmail);
       if (userMatchingNewEmail) {
-        throw new BadRequestException("Email already exist")
+        throw new BadRequestException("Above email id is already used. Please try again with different email id.")
       }
 
       return await this.authService.resendEmailOtpForVerification(body.otpToken, body.clientToken)
