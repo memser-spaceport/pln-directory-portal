@@ -72,10 +72,10 @@ function validateBasicForm(formValues, imageUrl, isProfileSettings) {
 
 function validateSkillForm(formValues) {
   const errors = [];
-  if (!formValues.teamAndRoles.length) {
+  if (!formValues?.teamAndRoles.length) {
     errors.push('Please add your Team and Role details');
   } else {
-    const missingValues = formValues.teamAndRoles.filter(
+    const missingValues = formValues?.teamAndRoles.filter(
       (item) => item.teamUid == '' || item.role == ''
     );
     if (missingValues.length) {
@@ -281,7 +281,7 @@ export function EditMemberModal({
         const member = data[0];
         let counter = 1;
 
-        let teamAndRoles = member.teamMemberRoles?.length
+        let teamAndRoles = member?.teamMemberRoles?.length
         ? member.teamMemberRoles
         : [];
       teamAndRoles = orderBy(
@@ -290,7 +290,7 @@ export function EditMemberModal({
         ['desc', 'asc']
       );
 
-      teamAndRoles = teamAndRoles.map((item) => {
+      teamAndRoles = teamAndRoles?.map((item) => {
         return {
           role: item.role,
           teamUid: item?.team?.uid,
@@ -425,8 +425,8 @@ export function EditMemberModal({
   };
 
   function formatData() {
-    const teamAndRoles = structuredClone(formValues.teamAndRoles);
-    const formattedTeamAndRoles = teamAndRoles.map((item) => {
+    const teamAndRoles = structuredClone(formValues?.teamAndRoles);
+    const formattedTeamAndRoles = teamAndRoles?.map((item) => {
       delete item.rowId;
       return item;
     });
@@ -446,7 +446,7 @@ export function EditMemberModal({
       twitterHandler: formValues.twitterHandler?.trim(),
       githubHandler: formValues.githubHandler?.trim(),
       telegramHandler: formValues.telegramHandler?.trim(),
-      officeHours: formValues.officeHours?.trim(),
+      officeHours: formValues.officeHours?.trim() ?? null,
       comments: formValues.comments?.trim(),
       plnStartDate: formValues.plnStartDate
         ? new Date(formValues.plnStartDate)?.toISOString()
@@ -604,7 +604,7 @@ export function EditMemberModal({
   );
 
   function handleAddNewRole() {
-    const newRoles = formValues.teamAndRoles;
+    const newRoles = formValues?.teamAndRoles;
     const counter =
       newRoles.length == 0
         ? 1
@@ -617,7 +617,7 @@ export function EditMemberModal({
   }
 
   function updateParentTeamValue(teamUid, teamTitle, rowId) {
-    const newTeamAndRoles = formValues.teamAndRoles;
+    const newTeamAndRoles = formValues?.teamAndRoles;
     const index = newTeamAndRoles.findIndex((item) => item.rowId == rowId);
     newTeamAndRoles[index].teamUid = teamUid;
     newTeamAndRoles[index].teamTitle = teamTitle;
@@ -628,7 +628,7 @@ export function EditMemberModal({
   }
 
   function updateParentRoleValue(role, rowId) {
-    const newTeamAndRoles = formValues.teamAndRoles;
+    const newTeamAndRoles = formValues?.teamAndRoles;
     const index = newTeamAndRoles.findIndex((item) => item.rowId == rowId);
     newTeamAndRoles[index].role = role;
     setFormValues({ ...formValues, teamAndRoles: newTeamAndRoles });
