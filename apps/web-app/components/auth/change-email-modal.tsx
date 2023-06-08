@@ -69,6 +69,7 @@ function ChangeEmailModal(props) {
 
                 window.location.reload()
             } else if (!data?.valid) {
+                setResendInSeconds(30);
                 setErrorMessage('Invalid OTP. Please enter valid otp sent to your email or try resending OTP.')
             }
         } catch (e) {
@@ -106,7 +107,8 @@ function ChangeEmailModal(props) {
             const uniqueEmailVerifyToken = d.token;
             Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime()  + 20 * 60 * 1000) })
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
-            setResendTimer()
+           // setResendTimer()
+           setResendInSeconds(30)
         } catch (e) {
             setLoaderStatus(false)
             handleServerErrors(e?.response?.status, e?.response?.data?.message)
@@ -135,7 +137,8 @@ function ChangeEmailModal(props) {
             localStorage.setItem('otp-verification-email', email);
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
             setVerificationStep(2);
-            setResendTimer();
+            //setResendTimer();
+            setResendInSeconds(30)
 
         } catch (error) {
             console.error(error)
