@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
@@ -257,7 +258,16 @@ export class MembersService {
         }
       });
     } catch (error) {
-      throw new BadRequestException('Invalid Data');
+      if (error?.response?.statusCode && error?.response?.message) {
+        throw new HttpException(
+          error?.response?.message,
+          error?.response?.statusCode
+        )
+      } else if (error?.response?.data && error?.response?.status) {
+        throw new UnauthorizedException('Unauthorized');
+      } else {
+        throw new BadRequestException('Invalid Data');
+      }
     }
     return result;
   }
