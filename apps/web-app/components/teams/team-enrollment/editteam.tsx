@@ -531,6 +531,7 @@ export function EditTeamModal({
 
   const handleReset = () => {
     if (fromSettings) {
+      setResetImg(true);
       if(isModified){
         setOpenValidationPopup(true);
       }else{
