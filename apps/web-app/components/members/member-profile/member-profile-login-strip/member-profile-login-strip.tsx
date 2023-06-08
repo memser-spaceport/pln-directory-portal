@@ -27,7 +27,6 @@ export function MemberProfileLoginStrip({
   };
   return (
     <>
-      {!userInfo?.uid && (
         <div className="shadow-card--slate-900 w-full rounded-t-xl bg-blue-100 p-2.5">
           <div className="flex items-center justify-center gap-1">
             <svg
@@ -53,11 +52,10 @@ export function MemberProfileLoginStrip({
               >
                 Login
               </span>{' '}
-              to access details such as social profiles, projects & office hours
+              to access details such as social profiles, projects & office hours.
             </p>
           </div>
         </div>
-      )}
     </>
   );
 }

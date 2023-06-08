@@ -25,7 +25,6 @@ import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
 import { MemberProfileLoginStrip } from '../../../components/members/member-profile/member-profile-login-strip/member-profile-login-strip';
 
-
 interface MemberProps {
   member: IMember;
   teams: ITeam[];
@@ -70,12 +69,15 @@ export default function Member({
       <Breadcrumb items={breadcrumbItems} />
 
       <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-24">
-        <div>
-          <MemberProfileLoginStrip member={member} userInfo={userInfo} />
-
+        <div className=''>
+          {!userInfo?.uid && (
+            <MemberProfileLoginStrip member={member} userInfo={userInfo} />
+          )}
           <div className="shadow-card--slate-900 p-7.5 w-full rounded-b-xl bg-white text-sm">
             <MemberProfileHeader member={member} userInfo={userInfo} />
-            <MemberProfileDetails member={member} userInfo={userInfo} />
+            {userInfo?.uid && (
+              <MemberProfileDetails member={member} userInfo={userInfo} />
+            )}
             <MemberProfileOfficeHours
               url={member.officeHours}
               userInfo={userInfo}
@@ -170,6 +172,6 @@ export const getServerSideProps = async ({ query, res, req }) => {
   );
 
   return {
-    props: { member, teams, backLink, isUserLoggedIn, userInfo }
+    props: { member, teams, backLink, isUserLoggedIn, userInfo },
   };
 };
