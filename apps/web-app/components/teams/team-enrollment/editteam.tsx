@@ -387,10 +387,8 @@ export function EditTeamModal({
           socialFormErrors
         } = validateForm(formValues, imageUrl);
         if (errors?.length > 0 || nameExists) {
-          const element1 = divRef.current;
-          if (element1) {
-            element1.scrollTo({ top: 0, behavior: 'smooth' });
-            // element1.scrollTop = 0;
+          if (nameExists) {
+            basicFormErrors.push('Name already exists');
           }
           setErrors(errors);
           setBasicErrors(basicFormErrors);
@@ -588,7 +586,11 @@ export function EditTeamModal({
               disableRequestorEmail={true}
               fromSettings={true}
               resetImg={resetImg}
+              onNameBlur={onNameBlur}
+              nameExists={nameExists}
               onResetImg={handleResetImg}
+              dataLoaded={dataLoaded}
+              setDisableNext={setDisableSubmit}
             />
           </div>
           <div className={(openTab === 2 || !fromSettings) ? 'block' : 'hidden'}>
