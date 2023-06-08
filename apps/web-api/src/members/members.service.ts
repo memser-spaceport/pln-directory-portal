@@ -263,8 +263,6 @@ export class MembersService {
           error?.response?.message,
           error?.response?.statusCode
         )
-      } else if (error?.response?.data && error?.response?.status) {
-        throw new UnauthorizedException('Unauthorized');
       } else {
         throw new BadRequestException('Invalid Data');
       }

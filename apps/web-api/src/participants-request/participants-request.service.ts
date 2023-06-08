@@ -416,7 +416,8 @@ export class ParticipantsRequestService {
     const isEmailChange = existingData.email !== dataToProcess.email ? true: false;
     if(isEmailChange) {
       const foundUser: any = transactionType.member.findUnique({where: {email: dataToProcess.email}});
-      if(foundUser) {
+      if(foundUser && foundUser.email) {
+        console.log(foundUser, "new foud ")
         throw new BadRequestException("Email already exist")
       }
     }
@@ -607,6 +608,7 @@ export class ParticipantsRequestService {
     });
 
     if (isEmailChange && isExternalIdAvailable) {
+      console.log("trying linkkkk", existingData.externalId)
       // try {
       const response = await axios.post(
         `${process.env.AUTH_API_URL}/auth/token`,
@@ -629,10 +631,10 @@ export class ParticipantsRequestService {
       const authPayload = {
         email: dataToSave.email,
         existingEmail: existingData.email,
-        accountId: existingData.externalId,
+        userId: existingData.externalId,
       };
-      await axios.put(
-        `${process.env.AUTH_API_URL}/admin/auth/account/email`,
+      await axios.patch(
+        `${process.env.AUTH_API_URL}/admin/accounts/email`,
         authPayload,
         { headers: headers }
       );
