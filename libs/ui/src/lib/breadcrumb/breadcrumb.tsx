@@ -31,7 +31,7 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
         return (
           <div
             className={`${
-              isLastItem ? 'font-medium text-slate-900' : 'text-slate-600'
+              isLastItem ? 'flex font-medium text-slate-900' : 'flex text-slate-600'
             }`}
             key={item.label}
             {...ariaCurrent}
@@ -46,7 +46,9 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
                 </a>
               </Link>
             ) : (
-              item.label
+              <p className='max-w-[150px] truncate'>
+              {item.label}
+              </p>
             )}
             {isLastItem ? null : <span className="mx-4 text-slate-400">/</span>}
           </div>

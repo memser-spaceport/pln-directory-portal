@@ -1,7 +1,7 @@
 import { Menu, Transition } from '@headlessui/react';
 import { UserIcon } from '@heroicons/react/solid';
 import { CogIcon, ArrowNarrowRightIcon } from '@heroicons/react/outline';
-import { ArrowIcon } from '@protocol-labs-network/ui';
+import { ArrowIcon, Tooltip } from '@protocol-labs-network/ui';
 import { trackGoal } from 'fathom-client';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -86,9 +86,14 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
         {isUserLoggedIn ? (
           <div className="flex h-14 w-full justify-end">
             {userInfo.name && (
-              <div className="my-auto font-medium text-slate-600 mr-2">
-                {' '}
-                Welcome {userInfo.name}{' '}
+              <div className="w-[200px] select-none my-auto flex items-center gap-2 font-medium text-slate-600 mr-2">
+                <span>Welcome</span> 
+                <Tooltip asChild
+                trigger={
+                <p className="select-none  truncate">{userInfo?.name}</p>
+              }
+              content={userInfo?.name}
+              />
               </div>
             )}
             {userInfo.profileImageUrl ? (
