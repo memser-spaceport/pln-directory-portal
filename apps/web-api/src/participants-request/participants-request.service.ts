@@ -417,7 +417,6 @@ export class ParticipantsRequestService {
     if(isEmailChange) {
       const foundUser: any = transactionType.member.findUnique({where: {email: dataToProcess.email}});
       if(foundUser && foundUser.email) {
-        console.log(foundUser, "new foud ")
         throw new BadRequestException("Email already exist")
       }
     }
@@ -608,7 +607,6 @@ export class ParticipantsRequestService {
     });
 
     if (isEmailChange && isExternalIdAvailable) {
-      console.log("trying linkkkk", existingData.externalId)
       // try {
       const response = await axios.post(
         `${process.env.AUTH_API_URL}/auth/token`,

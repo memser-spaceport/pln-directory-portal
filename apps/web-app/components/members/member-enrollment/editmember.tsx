@@ -226,7 +226,6 @@ export function EditMemberModal({
   };
 
   const onNewEmailInputChange = (newEmailValue) => {
-    console.log(newEmailValue);
     setFormValues((v) => (v['email'] = newEmailValue));
   };
 
@@ -647,7 +646,6 @@ export function EditMemberModal({
 
   function handleInputChange(event) {
     const { name, value } = event.target;
-    console.log('event', event.target.value);
     setFormValues({ ...formValues, [name]: value });
     setSaveCompleted(false);
     setModified(true);

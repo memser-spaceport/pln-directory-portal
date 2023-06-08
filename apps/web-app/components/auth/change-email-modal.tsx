@@ -39,8 +39,6 @@ function ChangeEmailModal(props) {
             const clientToken = Cookies.get('clientAccessToken')
             const accessToken = Cookies.get('authToken');
 
-            console.log(otpToken, newEmail, clientToken, accessToken)
-
             if (!clientToken || !newEmail || !accessToken) {
                 goToError('Invalid attempt. Please login and try again');
                 return;

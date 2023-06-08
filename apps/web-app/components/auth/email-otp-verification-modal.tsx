@@ -82,7 +82,6 @@ function EmailOtpVerificationModal() {
             // Reset resend timer and set unique token for verification
             const uniqueEmailVerifyToken = d.token;
             Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 20 * 60 * 1000) })
-            console.log(d)
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
             //setResendTimer()
             setResendInSeconds(30)
