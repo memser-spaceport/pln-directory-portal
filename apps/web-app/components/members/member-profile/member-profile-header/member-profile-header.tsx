@@ -49,13 +49,21 @@ export function MemberProfileHeader({
         <Tooltip
           asChild
           trigger={
-            <h1 className="select-none mt-0.5 truncate text-2xl font-bold">{name}</h1>
+            <h1 className="mt-0.5 select-none truncate text-2xl font-bold">
+              {name}
+            </h1>
           }
           content={name}
         />
         <div className="flex items-center">
-          <div className="max-w-sm overflow-hidden text-ellipsis whitespace-nowrap font-medium">
-            {mainTeam?.name}
+          <div className="max-w-[150px] overflow-hidden truncate text-ellipsis whitespace-nowrap font-medium">
+            <Tooltip
+              asChild
+              trigger={
+                <p className="mt-0.5 select-none truncate">{mainTeam?.name}</p>
+              }
+              content={mainTeam?.name}
+            />
           </div>
           {otherTeams.length ? (
             <Tooltip
