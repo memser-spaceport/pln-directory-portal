@@ -120,7 +120,7 @@ function Modal({
                   headerStyleClass="h-10"
                 />
               )}
-              <div className="mt-40">{children}</div>
+              <div className={enableHeader ? 'mt-40' : 'mt-20'}>{children}</div>
               {enableFooter && <ModalFooter onClose={onClose} />}
             </div>
           </Transition.Child>

@@ -35,7 +35,7 @@ export function OpenToWorkBadge({ size }: IOpenToWorkBadgeProps) {
           </i>
         }
         triggerClassName="on-focus"
-        content="Open To Work"
+        content="Open To Collaborate"
       />
       <style>
         {`

@@ -26,14 +26,14 @@ export default function Settings({
     const [teamsDropdownOptions, setteamsDropdown] = useState(teamsDropdown ? teamsDropdown : null);
     const [selectedMember, setSelectedMember] = useState(memberSelected ? memberSelected : (membersDropdown && membersDropdown.length) ? membersDropdown[0] : null);
     const [isModified, setModified] = useState<boolean>(false);
-    const [isTeamImageModified, setTeamImageModified] = useState<boolean>(false);
-    const [isMemberImageModified, setMemberImageModified] = useState<boolean>(false);
+    const [refreshTeamAutocomplete, setRefreshTeamAutocomplete] = useState<boolean>(false);
+    const [refreshMemberAutocomplete, setRefreshMemberAutocomplete] = useState<boolean>(false);
     const [isModifiedMember, setModifiedMember] = useState<boolean>(false);
     const [isPflModified, setModifiedProfile] = useState<boolean>(false);
     const [openValidationPopup, setOpenValidationPopup] = useState<boolean>(false);
 
     useEffect(() => {
-        if (isTeamImageModified) {
+        if (refreshTeamAutocomplete) {
             if(userInfo?.roles.length && userInfo?.roles.includes(ADMIN_ROLE)){
                 updateTeamAutocomplete();
             } else if (userInfo?.leadingTeams?.length) {
@@ -41,16 +41,16 @@ export default function Settings({
             }
         }
 
-    }, [isTeamImageModified]);
+    }, [refreshTeamAutocomplete]);
 
     useEffect(() => {
-        if (isMemberImageModified) {
+        if (refreshMemberAutocomplete) {
             if(userInfo?.roles.length && userInfo?.roles.includes(ADMIN_ROLE)){
                 updateMemberAutocomplete();
             }
         }
 
-    }, [isMemberImageModified]);
+    }, [refreshMemberAutocomplete]);
 
 
     const updateTeamAutocomplete = () => {
@@ -65,8 +65,8 @@ export default function Settings({
     }
 
     const updateMemberAutocomplete = () => {
-        setSelectedMember({ label: '', value: '' })
         fetchMember(selectedMember.value).then(data => {
+            setSelectedMember({ label: '', value: '' })
             setSelectedMember({
                 "label": data.name,
                 "value": data.uid,
@@ -261,7 +261,7 @@ export default function Settings({
                 id={selectedTeam.value}
                 fromSettings={true}
                 setModified={setModified}
-                setImageModified={setTeamImageModified}
+                setRefreshTeamAutocomplete={setRefreshTeamAutocomplete}
             />
         );
     }
@@ -276,7 +276,7 @@ export default function Settings({
                     isProfileSettings={true}
                     isUserProfile={false}
                     setModified={setModifiedMember}
-                    setImageModified={setMemberImageModified}
+                    setRefreshMemberAutocomplete={setRefreshMemberAutocomplete}
                 />
             )
         } else if (settings === SETTINGS_CONSTANTS.PROFILE_SETTINGS){

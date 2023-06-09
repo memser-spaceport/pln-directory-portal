@@ -2,7 +2,7 @@ import api from '../api';
 
 export const fetchSkills = async () => {
   try {
-    const response = await api.get(`/v1/skills`);
+    const response = await api.get(`/v1/skills?pagination=false`);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
@@ -28,7 +28,7 @@ export const fetchTeams = async () => {
 
 export const fetchMembershipSources = async () => {
   try {
-    const response = await api.get(`/v1/membership-sources`);
+    const response = await api.get(`/v1/membership-sources?pagination=false`);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
@@ -41,7 +41,7 @@ export const fetchMembershipSources = async () => {
 
 export const fetchTeamsForAutocomplete = async (searchTerm) => {
   try {
-    const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}&select=uid,name,shortDescription,logo.url,industryTags.title`);
+    const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}&select=uid,name,shortDescription,logo.url,industryTags.title&pagination=false`);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.name };
@@ -54,7 +54,7 @@ export const fetchTeamsForAutocomplete = async (searchTerm) => {
 
 export const fetchProtocol = async () => {
   try {
-    const response = await api.get(`/v1/technologies`);
+    const response = await api.get(`/v1/technologies?pagination=false`);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
@@ -67,7 +67,7 @@ export const fetchProtocol = async () => {
 
 export const fetchIndustryTags = async () => {
   try {
-    const response = await api.get(`/v1/industry-tags`);
+    const response = await api.get(`/v1/industry-tags?pagination=false`);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };

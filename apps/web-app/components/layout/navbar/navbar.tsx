@@ -90,7 +90,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
                 <span>Welcome</span> 
                 <Tooltip asChild
                 trigger={
-                <p className="select-none  truncate">{userInfo?.name}</p>
+                <p className="select-none truncate">{userInfo?.name}</p>
               }
               content={userInfo?.name}
               />
