@@ -199,6 +199,17 @@ export class AuthService {
         include: { image: true, memberRoles: true, teamMemberRoles: true },
       })
 
+      await tx.participantsRequest.create({
+        data: {
+          status: 'AUTOAPPROVED',
+          requesterEmailId: oldEmail,
+          referenceUid: updatedUser.uid,
+          uniqueIdentifier: oldEmail,
+          participantType: 'MEMBER',
+          newData: {oldEmail: oldEmail, newEmail: newEmail}
+        }
+      })
+
       // Link new email to auth account
      // newTokens = await this.linkEmailWithAccount(newEmail, accessToken, clientToken)
      const linkResult =  await axios.patch(`${process.env.AUTH_API_URL}/admin/accounts/email`, { email: newEmail, existingEmail: oldEmail, userId: updatedUser.externalId, deleteAndReplace: true }, {

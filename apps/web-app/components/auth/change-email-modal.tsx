@@ -63,7 +63,8 @@ function ChangeEmailModal(props) {
             if (data?.userInfo) {
                 setNewTokensAndUserInfo(data?.newTokens, data?.userInfo)
                 clearAllOtpSessionVaribles()
-                onClose(null, true);
+                onClose(null);
+                Cookies.set('page_params', 'email_changed', { expires: 60, path: '/' });
                 window.location.reload()
             } else if (!data?.valid) {
                 setResendInSeconds(30);

@@ -17,7 +17,7 @@ import { useRouter } from 'next/router';
 import posthog from 'posthog-js';
 import { logoutAllTabs } from '../utils/services/auth';
 
-import { LOGIN_FAILED_MSG, LOGOUT_MSG, RETRY_LOGIN_MSG, LOGGED_IN_MSG, SOMETHING_WENT_WRONG } from '../constants';
+import { LOGIN_FAILED_MSG, LOGOUT_MSG, RETRY_LOGIN_MSG, LOGGED_IN_MSG, SOMETHING_WENT_WRONG, EMAIL_CHANGED } from '../constants';
 import EmailOtpVerificationModal from '../components/auth/email-otp-verification-modal';
 
 // Check that PostHog is client-side (used to handle Next.js SSR)
@@ -78,6 +78,11 @@ export default function CustomApp({
         break;
       case "server_error":
         toast.info(SOMETHING_WENT_WRONG, {
+          hideProgressBar: true
+        });
+        break;
+      case "email_changed":
+        toast.info(EMAIL_CHANGED, {
           hideProgressBar: true
         });
         break;

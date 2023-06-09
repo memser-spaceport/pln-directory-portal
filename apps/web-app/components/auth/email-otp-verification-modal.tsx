@@ -54,7 +54,7 @@ function EmailOtpVerificationModal() {
                 window.location.reload()
             } else if (!data?.valid) {
                 setResendInSeconds(30);
-                setErrorMessage('Invalid OTP. Please enter valid otp sent to your email or try resending OTP.')
+                setErrorMessage('Invalid OTP. Please enter valid OTP sent to your email or try resending OTP.')
             }
         } catch (e) {
             setLoaderStatus(false)
@@ -126,9 +126,9 @@ function EmailOtpVerificationModal() {
     const handleServerErrors = (statusCode, messageCode) => {
         if(statusCode === 401 || statusCode === 403) {
             if(messageCode === "MAX_OTP_ATTEMPTS_REACHED") {
-                goToError("Maximum Otp attempts exceeded. Please login again and try")
+                goToError("Maximum OTP attempts exceeded. Please login again and try")
             } else if(messageCode === "MAX_RESEND_ATTEMPTS_REACHED") {
-                goToError("Maximum Otp resend attempts exceeded. Please login again and try")
+                goToError("Maximum OTP resend attempts exceeded. Please login again and try")
             } else if(messageCode === 'ACCOUNT_ALREADY_LINKED') {
                 goToError("Account is already linked. Please login and try again")
             } else if(messageCode) {
