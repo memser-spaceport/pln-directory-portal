@@ -49,11 +49,12 @@ function EmailOtpVerificationModal() {
                 setNewTokensAndUserInfo(data?.newTokens, data?.userInfo)
                 clearAllOtpSessionVaribles()
                 setDialogStatus(false);
+                localStorage.removeItem('otp-verification-email');
                 localStorage.setItem('otp-verify', 'success')
                 window.location.reload()
             } else if (!data?.valid) {
                 setResendInSeconds(30);
-                setErrorMessage('Invalid OTP. Please enter valid otp sent to your email or try resending OTP.')
+                setErrorMessage('Invalid OTP. Please enter valid OTP sent to your email or try resending OTP.')
             }
         } catch (e) {
             setLoaderStatus(false)
@@ -125,17 +126,19 @@ function EmailOtpVerificationModal() {
     const handleServerErrors = (statusCode, messageCode) => {
         if(statusCode === 401 || statusCode === 403) {
             if(messageCode === "MAX_OTP_ATTEMPTS_REACHED") {
-                goToError("Maximum Otp attempts exceeded. Please login again and try")
+                goToError("Maximum OTP attempts exceeded. Please login again and try")
             } else if(messageCode === "MAX_RESEND_ATTEMPTS_REACHED") {
-                goToError("Maximum Otp resend attempts exceeded. Please login again and try")
-            }else if(messageCode) {
+                goToError("Maximum OTP resend attempts exceeded. Please login again and try")
+            } else if(messageCode === 'ACCOUNT_ALREADY_LINKED') {
+                goToError("Account is already linked. Please login and try again")
+            } else if(messageCode) {
                 goToError(messageCode)
             } else {
                 goToError("Invalid Request. Please try again or contact support")
             }
         } else if (statusCode === 400) {
             if(messageCode === "CODE_EXPIRED") {
-                setErrorMessage("Otp expired. Please request for new otp and try again")
+                setErrorMessage("OTP expired. Please request for new OTP and try again")
             }
              else if(messageCode) {
                 setErrorMessage(messageCode)
@@ -171,8 +174,8 @@ function EmailOtpVerificationModal() {
     const clearAllOtpSessionVaribles = () => {
         Cookies.remove('clientToken')
         Cookies.remove('uniqueEmailVerifyToken')
+        Cookies.remove('show-email-verification-box')
         localStorage.removeItem('resend-expiry');
-        localStorage.removeItem('otp-verification-email');
         localStorage.removeItem('otp-verification-step');
     }
 
@@ -184,17 +187,22 @@ function EmailOtpVerificationModal() {
     }
 
     useEffect(() => {
-        const clientToken = Cookies.get('clientToken');
+        const verifyBox = Cookies.get('show-email-verification-box');
         const otpVerify = localStorage.getItem('otp-verify')
-        if (clientToken) {
+        if (verifyBox) {
             if (localStorage.getItem('otp-verification-step') === '2') {
                 setVerificationStep(2)
                 //setResendTimer()
                 setResendInSeconds(30)
             }
+            Cookies.remove('show-email-verification-box')
             setDialogStatus(true)
         } else {
-            clearAllOtpSessionVaribles()
+            clearAllOtpSessionVaribles();
+            const userInfo = Cookies.get('userInfo');
+            if(!userInfo) {
+                clearAllAuthCookies();
+            }
         }
 
         if (otpVerify) {
@@ -215,7 +223,6 @@ function EmailOtpVerificationModal() {
         return () => clearInterval(countdown);
     }, [resendInSeconds]);
 
-
     return <>
 
         {showDialog && <div className="ev">
@@ -232,7 +239,7 @@ function EmailOtpVerificationModal() {
         <style jsx>
             {
                 `
-                .ev {position: fixed; top:0; z-index: 50; right:0; left:0; width: 100vw; height: 100vh; background: rgb(0,0,0,0.5);}
+                .ev {position: fixed; top:0; z-index: 50; right:0; left:0; width: 100vw; height: 100vh; background: rgb(0,0,0,0.8);}
                 .ev__cn {width: 100%; height: 100%; display: flex; position: relative; align-items: center; justify-content: center;}
                 .ev__loader {position: absolute; background: rgb(255,255,255, 0.7); display: flex; align-items: center; justify-content: center; z-index:52; width: 100%; height: 100%; top:0; right:0; left:0;}
                 .ev__en__box {width:fit-content; height:fit-content; position: relative;}

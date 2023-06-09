@@ -45,7 +45,7 @@ function ChangeEmailModal(props) {
             }
 
             if(!otpToken) {
-                goToError("Otp Session expired. Please login and try again");
+                goToError("OTP Session expired. Please login and try again");
                 return;
             }
             const otpPayload = {
@@ -63,12 +63,12 @@ function ChangeEmailModal(props) {
             if (data?.userInfo) {
                 setNewTokensAndUserInfo(data?.newTokens, data?.userInfo)
                 clearAllOtpSessionVaribles()
-                onClose(null, true);
-
+                onClose(null);
+                Cookies.set('page_params', 'email_changed', { expires: 60, path: '/' });
                 window.location.reload()
             } else if (!data?.valid) {
                 setResendInSeconds(30);
-                setErrorMessage('Invalid OTP. Please enter valid otp sent to your email or try resending OTP.')
+                setErrorMessage('Invalid OTP. Please enter valid OTP sent to your email or try resending OTP.')
             }
         } catch (e) {
             setLoaderStatus(false)
@@ -148,9 +148,9 @@ function ChangeEmailModal(props) {
     const handleServerErrors = (statusCode, messageCode) => {
         if(statusCode === 401 || statusCode === 403) {
             if(messageCode === "MAX_OTP_ATTEMPTS_REACHED") {
-                goToError("Maximum otp attempts exceeded. Please login again and try")
+                goToError("Maximum OTP attempts exceeded. Please login again and try")
             } else if(messageCode === "MAX_RESEND_ATTEMPTS_REACHED") {
-                goToError("Maximum otp resend attempts exceeded. Please login again and try")
+                goToError("Maximum OTP resend attempts exceeded. Please login again and try")
             } else if(messageCode) {
                 goToError(messageCode)
             } else {
@@ -158,7 +158,7 @@ function ChangeEmailModal(props) {
             }
         } else if (statusCode === 400) {
             if(messageCode === "CODE_EXPIRED") {
-                setErrorMessage("Otp expired. Please request for new otp and try again")
+                setErrorMessage("OTP expired. Please request for new OTP and try again")
             } else if(messageCode) {
                 setErrorMessage(messageCode)
             } else {
@@ -235,7 +235,7 @@ function ChangeEmailModal(props) {
         <style jsx>
             {
                 `
-                .ev {position: fixed; top:0; z-index: 2000; right:0; left:0; width: 100vw; height: 100vh; background: rgb(0,0,0,0.5);}
+                .ev {position: fixed; top:0; z-index: 2000; right:0; left:0; width: 100vw; height: 100vh; background: rgb(0,0,0,0.8);}
                 .ev__cn {width: 100%; height: 100%; display: flex; position: relative; align-items: center; justify-content: center;}
                 .ev__loader {position: absolute; background: rgb(255,255,255, 0.7); display: flex; align-items: center; justify-content: center; z-index:52; width: 100%; height: 100%; top:0; right:0; left:0;}
                 .ev__en__box {width:fit-content; height:fit-content; position: relative;}

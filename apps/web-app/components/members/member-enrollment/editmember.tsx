@@ -230,18 +230,13 @@ export function EditMemberModal({
     setFormValues((v) => (v['email'] = newEmailValue));
   };
 
-  const onChangeEmailClose = (step, showToaster) => {
+  const onChangeEmailClose = (step) => {
     setEmailEditStatus(false);
     if(step && step === 3) {
       window.location.reload();
       return;
     }
 
-    if(showToaster) {
-      toast.success("Your email has been changed successfully", {
-        icon: <SuccessIcon />
-    });
-    }
   };
 
   const onEmailChange = () => {
@@ -693,6 +688,10 @@ export function EditMemberModal({
     setModified(true);
     setModifiedFlag(true);
   }
+
+  useEffect(() => {
+    setEmailEditStatus(false)
+  }, [isUserProfile, id])
 
   return (
     <>
