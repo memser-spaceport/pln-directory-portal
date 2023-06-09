@@ -20,6 +20,7 @@ import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-dire
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember } from '../../../utils/members.types';
+import { renewAndStoreNewAccessToken, convertCookiesToJson } from '../../../utils/services/auth';
 import { parseMember, maskMemberDetails } from '../../../utils/members.utils';
 import { VerifyEmailModal } from '../../../components/layout/navbar/login-menu/verify-email-modal';
 import {
@@ -128,12 +129,18 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) 
     res,
     req
   } = ctx;
-  const testcookies = nookies.get(ctx)
+  let cookies = req?.cookies;
+  if (!cookies?.authToken) {
+    await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
+    if (ctx.res.getHeader('Set-Cookie')) 
+      cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
+  }
   destroyCookie(null, 'state');
   const { verified } = query;
-  const isMaskingRequired = req?.cookies?.authToken ? false : true
-  const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
-  const isUserLoggedIn = req?.cookies?.authToken &&  req?.cookies?.userInfo ? true : false;
+  const isMaskingRequired = cookies?.authToken ? false : true
+  const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
+  const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
+  
   const optionsFromQuery = getMembersOptionsFromQuery(query);
   const listOptions = getMembersListOptions(optionsFromQuery);
   const [membersResponse, filtersValues] = await Promise.all([
@@ -154,9 +161,6 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) 
      members = [...members].map(m => maskMemberDetails(m))
   }
 
-  const letAllCookies = JSON.parse(JSON.stringify(testcookies))
-  const testCookies = JSON.parse(JSON.stringify(req?.cookies))
-
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
   res.setHeader(
@@ -169,9 +173,7 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) 
       members,
       filtersValues: parsedFilters,
       isUserLoggedIn,
-      testCookies,
       userInfo,
-      letAllCookies,
       verified:
         verified === 'true' ? true : verified === 'false' ? false : null,
     },
