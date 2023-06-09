@@ -363,7 +363,7 @@ export default function Settings({
     return (
         <>
             <NextSeo {...DIRECTORY_SEO} title={userInfo.name} />
-            <Breadcrumb items={breadcrumbItems} />
+            <Breadcrumb items={breadcrumbItems} width={150} />
             <div className="w-full h-full">
                 <div className="grid grid-cols-4 pt-24 gap-x-8">
                     <div className="col-span-1">
