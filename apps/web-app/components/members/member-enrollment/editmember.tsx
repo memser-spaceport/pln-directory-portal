@@ -284,6 +284,7 @@ export function EditMemberModal({
   const getMemberDetails = () => {
     setIsProcessing(true);
     setDataLoaded(false);
+    setEmailEditStatus(false);
     Promise.all([fetchMember(id), fetchSkills(), fetchTeams()])
       .then((data) => {
         const member = data[0];
@@ -371,7 +372,7 @@ export function EditMemberModal({
   function handleReset() {
     if (isProfileSettings) {
       setResetImg(true);
-      setEmailEditStatus(false);
+      // setEmailEditStatus(false);
       if (isModified) {
         setOpenValidationPopup(true);
       } else {

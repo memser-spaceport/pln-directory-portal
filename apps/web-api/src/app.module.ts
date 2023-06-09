@@ -37,7 +37,7 @@ import { SharedModule } from './shared/shared.module';
     }),
    CacheModule.register<ClientOpts>({
       store: redisStore,
-      url: process.env.REDIS_URL,
+      url: process.env.REDIS_TLS_URL,
       isGlobal: true,
       ttl: 86400, // 1 day in seconds
       max: 100, // maximum number of items in cache
@@ -50,7 +50,7 @@ import { SharedModule } from './shared/shared.module';
     }),
     BullModule.forRoot({
       redis: {
-        path: process.env.REDIS_URL,
+        path: process.env.REDIS_TLS_URL,
         tls: {
           rejectUnauthorized: false,
           requestCert: true,

@@ -48,8 +48,7 @@ export function MemberProfileDetails({
                 handle={linkedinHandle}
                 type="linkedin"
                 logo={linkedInLogo}
-                height={23}
-                width={23}
+
               />
             )}
 
@@ -59,15 +58,14 @@ export function MemberProfileDetails({
                 handle={twitter}
                 type="twitter"
                 logo={twitterLogo}
-                height={23}
-                width={23}
+   
               />
             )}
 
             {/* Discord */}
             {discordHandle && (
-              <div className="flex h-9 w-40 items-center gap-2 rounded bg-[#F1F5F9] px-3 font-medium">
-                <img src={discordLogo} alt="discord" height={23} width={23} />
+              <div className="flex h-9 w-[130px] items-center gap-2 rounded bg-[#F1F5F9] px-3 font-medium">
+                <img src={discordLogo} alt="discord"/>
                 <Tooltip
                   asChild
                   trigger={
@@ -86,8 +84,7 @@ export function MemberProfileDetails({
                 handle={telegramHandle}
                 type="telegram"
                 logo={telegramLogo}
-                height={23}
-                width={23}
+      
               />
             )}
 
@@ -97,8 +94,7 @@ export function MemberProfileDetails({
                 handle={email}
                 type="email"
                 logo={emailLogo}
-                height={30}
-                width={30}
+              
               />
             )}
 
@@ -108,8 +104,7 @@ export function MemberProfileDetails({
                 handle={githubHandle}
                 type="github"
                 logo={gitLogo}
-                height={20}
-                width={20}
+           
               />
             )}
           </>

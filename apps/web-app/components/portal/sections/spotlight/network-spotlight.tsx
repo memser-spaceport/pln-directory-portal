@@ -56,7 +56,7 @@ export const NetworkSpotlight = ({ videoDetails, playlistDetails }) => {
                         (videoDetails && <div className="w-[360px] h-[328px] border rounded-[8px] bg-[#F1F5F9] p-[20px]">
 
                             <div className="flex flex-col">
-                                <div className="relative h-[168px]">
+                                <div className="relative h-[165px]">
                                     <div className="absolute rounded-full w-[45px] h-[20px] mt-[8px] text-[12px] font-medium bg-[#156FF7] ml-[8px] z-[1001]">
                                         <span className="relative p-[5px] text-[#FFFFFF]">{NW_SPOTLIGHT_CONSTANTS.VIDEO}</span>
                                     </div>
@@ -78,9 +78,9 @@ export const NetworkSpotlight = ({ videoDetails, playlistDetails }) => {
                                     <p className="text-[16px] font-semibold leading-6 text-[#0F172A] youtube-title text-left">{videoDetails['items'][0].snippet.title}</p>
                                 </div>
                                 <div>
-                                    <div className="pt-5 text-left">
+                                    <div className="pt-[25px] text-left">
                                         <button
-                                            className="focus:pln-shadow-01--focus text-left pln-shadow-01 rounded-lg border border-slate-300 bg-white px-6 py-2.5 text-sm font-medium text-slate-900 hover:border-slate-400 focus:border-blue-600"
+                                            className="focus:pln-shadow-01--focus text-left pln-shadow-01 rounded-lg border border-slate-300 bg-white px-6 py-[9px] text-sm font-medium text-slate-900 hover:border-slate-400 focus:border-blue-600"
                                             onClick={openYoutubeVideo}
                                         >
                                             {BTN_LABEL_CONSTANTS.PLAY_VIDEO}

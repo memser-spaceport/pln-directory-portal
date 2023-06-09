@@ -14,6 +14,7 @@ import { DIRECTORY_SEO } from "apps/web-app/seo.config";
 import api from "apps/web-app/utils/api";
 import { fetchMember } from "apps/web-app/utils/services/members";
 import { fetchTeam } from "apps/web-app/utils/services/teams";
+import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../utils/services/auth';
 import { DiscardChangesPopup } from "libs/ui/src/lib/modals/confirmation";
 
 
@@ -363,7 +364,7 @@ export default function Settings({
     return (
         <>
             <NextSeo {...DIRECTORY_SEO} title={userInfo.name} />
-            <Breadcrumb items={breadcrumbItems} />
+            <Breadcrumb items={breadcrumbItems} classname="max-w-[150px] truncate"/>
             <div className="w-full h-full">
                 <div className="grid grid-cols-4 pt-24 gap-x-8">
                     <div className="col-span-1">
@@ -408,12 +409,18 @@ Settings.getLayout = function getLayout(page: ReactElement) {
 
 export const getServerSideProps = async (ctx) => {
     const { res, req, query } = ctx;
+    let cookies = req?.cookies;
+    if (!cookies?.authToken) {
+    await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
+    if (ctx.res.getHeader('Set-Cookie')) 
+        cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
+    }
+    const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
+    const isUserLoggedIn = cookies?.authToken &&  cookies?.userInfo ? true : false;
+    
     let memberSelected=null;
     let teamSelected=null;
     let settingCategory='';
-    const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
-    const isUserLoggedIn = req?.cookies?.authToken && req?.cookies?.userInfo ? true : false;
-
     if(query?.id && query?.from){
         if(query?.from === SETTINGS_CONSTANTS.TEAM){
             settingCategory = (SETTINGS_CONSTANTS.TEAM_SETTINGS);

@@ -95,7 +95,7 @@ export function InputField({
         </div>
       )}
 
-      {hasClear ? (
+      {hasClear && !props.disabled ? (
         <button
           className={`absolute inset-y-0 ${props.type === 'date' ? 'top-9 right-8' : 'right-0 pr-2'} ${
             inputValue ? '' : 'hidden'

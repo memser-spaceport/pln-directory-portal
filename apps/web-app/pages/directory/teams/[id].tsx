@@ -23,6 +23,7 @@ import {
 } from '../../../utils/members.utils';
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
+import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../../utils/services/auth';
 
 interface TeamProps {
   team: ITeam;
@@ -47,7 +48,7 @@ export default function Team({ team, members, backLink, userInfo }: TeamProps) {
         description={team.shortDescription}
       />
 
-      <Breadcrumb items={breadcrumbItems} />
+      <Breadcrumb items={breadcrumbItems} classname="max-w-[150px] truncate"/>
       <section className="space-x-7.5 mx-auto mb-10 flex max-w-6xl px-10 pt-24">
         <div className="card p-7.5 w-full">
           <TeamProfileHeader team={team} loggedInMember={userInfo} />
@@ -69,13 +70,20 @@ Team.getLayout = function getLayout(page: ReactElement) {
   return <DirectoryLayout>{page}</DirectoryLayout>;
 };
 
-export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
-  query,
-  res,
-  req
-}) => {
-  const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
-  const isUserLoggedIn = req?.cookies?.authToken &&  req?.cookies?.userInfo ? true : false
+export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => {
+  const {
+    query,
+    res,
+    req
+  } = ctx;
+  let cookies = req?.cookies;
+  if (!cookies?.authToken) {
+    await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
+    if (ctx.res.getHeader('Set-Cookie')) 
+      cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
+  }
+  const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
+  const isUserLoggedIn = cookies?.authToken &&  cookies?.userInfo ? true : false;
   const { id, backLink = '/directory/teams' } = query as {
     id: string;
     backLink: string;
