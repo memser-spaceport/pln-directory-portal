@@ -23,6 +23,7 @@ import { IMember, IGitRepositories } from '../../../utils/members.types';
 import { parseMember, maskMemberDetails } from '../../../utils/members.utils';
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
+import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../../utils/services/auth';
 import { MemberProfileLoginStrip } from '../../../components/members/member-profile/member-profile-login-strip/member-profile-login-strip';
 
 interface MemberProps {
@@ -105,13 +106,22 @@ Member.getLayout = function getLayout(page: ReactElement) {
   return <DirectoryLayout>{page}</DirectoryLayout>;
 };
 
-export const getServerSideProps = async ({ query, res, req }) => {
-  const isMaskingRequired = req?.cookies?.authToken ? false : true;
-  const userInfo = req?.cookies?.userInfo
-    ? JSON.parse(req?.cookies?.userInfo)
-    : {};
-  const isUserLoggedIn =
-    req?.cookies?.userInfo && req?.cookies?.authToken ? true : false;
+export const getServerSideProps = async (ctx) => {
+  const {
+    query,
+    res,
+    req
+  } = ctx;
+  
+  let cookies = req?.cookies;
+  if (!cookies?.authToken) {
+    await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
+    if (ctx.res.getHeader('Set-Cookie')) 
+      cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
+  }
+  const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
+  const isUserLoggedIn = cookies?.authToken &&  cookies?.userInfo ? true : false;
+  const isMaskingRequired = cookies?.authToken ? false : true;
   const { id, backLink = '/directory/members' } = query as {
     id: string;
     backLink: string;

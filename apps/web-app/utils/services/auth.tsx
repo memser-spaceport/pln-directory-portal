@@ -1,5 +1,7 @@
-import api from '../api';
+import api, { renewAccessToken } from '../api';
+import Cookies from 'js-cookie';
 import { setCookie } from 'nookies';
+import * as Cookie from 'cookie'
 import * as jwt from 'jsonwebtoken';
 import { PAGE_ROUTES } from '../../constants';
 import { BroadcastChannel } from 'broadcast-channel';
@@ -18,7 +20,19 @@ export const logoutAllTabs = () => {
     window.location.href = PAGE_ROUTES.TEAMS;
     await createLogoutChannel().close();
   };
-}
+};
+
+export const convertCookiesToJson = (cookies) => {
+  const jsonCookies = {};
+  const parsedCookies = cookies.map(cookie => Cookie.parse(cookie));
+  parsedCookies.forEach(cookie => {
+    if (Object.keys(cookie)?.length) {
+      const cookieName = Object.keys(cookie)[0];
+      jsonCookies[cookieName] = cookie[cookieName];
+    }
+  });
+  return jsonCookies;
+};
 
 export const decodeToken = (token: string):any => {
   return jwt.decode(token);
@@ -68,5 +82,38 @@ export const getAccessToken = async (code) => {
   return {
     status: 400,
     data: {}
+  }
+};
+
+export const renewAndStoreNewAccessToken = async (refrshToken, ctx) => {
+  if (refrshToken) {
+    refrshToken = refrshToken.replace(
+      /"/g,
+      ''
+    );
+    const resp = await renewAccessToken(refrshToken);
+    const { accessToken, refreshToken, userInfo } = resp;
+    try {
+      if (accessToken && refreshToken && userInfo) {
+        const access_token = decodeToken(accessToken);
+        const refresh_token = decodeToken(refreshToken);
+        setCookie(ctx, 'authToken', JSON.stringify(accessToken), {
+          maxAge: calculateExpiry(access_token.exp),
+          path: '/'
+        });
+        // ctx.req.cookies.authToken = accessToken;
+        setCookie(ctx, 'refreshToken', JSON.stringify(refreshToken), {
+          maxAge: calculateExpiry(refresh_token.exp),
+          path: '/'
+        });
+        setCookie(ctx, 'userInfo', JSON.stringify(userInfo), {
+          maxAge: calculateExpiry(access_token.exp),
+          path: '/'
+        });
+      }
+    } 
+    catch(err) {
+      console.log(err);
+    }
   }
 };
