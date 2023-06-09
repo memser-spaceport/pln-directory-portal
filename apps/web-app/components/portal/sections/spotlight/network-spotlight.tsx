@@ -31,11 +31,11 @@ export const NetworkSpotlight = ({ videoDetails, playlistDetails }) => {
                 <div className="flex flex-col md:flex-row justify-between gap-[16px]">
                     <div className="w-[360px] h-[328px] border rounded-[8px] bg-[#F1F5F9] p-[20px]">
                         <div>
-                            <div className="absolute rounded-full w-[45px] h-[20px] mt-[8px] text-[12px] font-medium bg-[#156FF7] ml-[15px] z-[1001]">
+                            <div className="absolute rounded-full w-[45px] h-[20px] mt-[8px] text-[12px] font-medium bg-[#156FF7] ml-[8px] z-[1001]">
                                 <span className="relative p-[5px] text-[#FFFFFF]">{NW_SPOTLIGHT_CONSTANTS.BLOG}</span>
                             </div>
                             <Image
-                                width="300"
+                                width="320"
                                 height="160"
                                 src="/assets/images/web3-trends.jpg"
                                 alt="Directory Illustration"
@@ -56,7 +56,7 @@ export const NetworkSpotlight = ({ videoDetails, playlistDetails }) => {
                         (videoDetails && <div className="w-[360px] h-[328px] border rounded-[8px] bg-[#F1F5F9] p-[20px]">
 
                             <div className="flex flex-col">
-                                <div className="relative w-[300px] h-[168px]">
+                                <div className="relative h-[168px]">
                                     <div className="absolute rounded-full w-[45px] h-[20px] mt-[8px] text-[12px] font-medium bg-[#156FF7] ml-[8px] z-[1001]">
                                         <span className="relative p-[5px] text-[#FFFFFF]">{NW_SPOTLIGHT_CONSTANTS.VIDEO}</span>
                                     </div>
@@ -66,8 +66,8 @@ export const NetworkSpotlight = ({ videoDetails, playlistDetails }) => {
                                         <PlayButton className="left-[120px] top-[50px] relative" />
                                     </div>
                                     <Image
-                                        width="300"
-                                        height="160"
+                                        width="340"
+                                        height="173"
                                         src={videoDetails['items'][0].snippet.thumbnails.medium.url}
                                         alt="Directory Illustration"
                                         quality={100}
@@ -94,11 +94,11 @@ export const NetworkSpotlight = ({ videoDetails, playlistDetails }) => {
                     {
                         (playlistDetails && <div className="w-[360px] h-[328px] border rounded-[8px] bg-[#F1F5F9] p-[20px]">
                             <div>
-                                <div className="absolute rounded-full w-[45px] h-[20px] mt-[8px] text-[12px] font-medium bg-[#156FF7] ml-[15px] z-[1001]">
+                                <div className="absolute rounded-full w-[50px] h-[20px] mt-[8px] text-[12px] font-medium bg-[#156FF7] ml-[8px] z-[1001]">
                                     <span className="relative p-[5px] text-[#FFFFFF]">{NW_SPOTLIGHT_CONSTANTS.SERIES}</span>
                                 </div>
                                 <Image
-                                    width="300"
+                                    width="320"
                                     height="160"
                                     src={playlistDetails['items'][0].snippet.thumbnails.medium.url}
                                     alt="Directory Illustration"
