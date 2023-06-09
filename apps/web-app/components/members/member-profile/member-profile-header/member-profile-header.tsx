@@ -37,9 +37,8 @@ export function MemberProfileHeader({
             className="rounded-full"
             alt={`${name} picture`}
             src={image}
-            layout="fill"
-            objectFit="cover"
-            objectPosition="center"
+            width={95}
+            height={95}
           />
         ) : (
           <UserIcon className="h-24 w-24 fill-white" />
