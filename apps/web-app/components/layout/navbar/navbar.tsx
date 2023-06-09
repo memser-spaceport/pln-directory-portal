@@ -86,11 +86,11 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
         {isUserLoggedIn ? (
           <div className="flex h-14 w-full justify-end">
             {userInfo.name && (
-              <div className="max-w-[300px] flex gap-1 my-auto font-medium text-slate-600 mr-2">
+              <div className="max-w-[200px] select-none my-auto flex items-center gap-1 font-medium text-slate-600 mr-2">
                 <span>Welcome</span> 
                 <Tooltip asChild
                 trigger={
-                <p className="select-none truncate">{userInfo?.name}</p>
+                <p className="select-none  truncate">{userInfo?.name}</p>
               }
               content={userInfo?.name}
               />

@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 export interface BreadcrumbProps {
   items: IBreadcrumbItem[];
+  width?: number;
 }
 
 export interface IBreadcrumbItem {
@@ -10,7 +11,7 @@ export interface IBreadcrumbItem {
   href?: string;
 }
 
-export function Breadcrumb({ items }: BreadcrumbProps) {
+export function Breadcrumb({ items, width }: BreadcrumbProps) {
   return (
     <nav
       aria-label="breadcrumb"
@@ -46,7 +47,7 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
                 </a>
               </Link>
             ) : (
-              <p className='max-w-[150px] truncate'>
+              <p className={`${width ? `max-w-[${width}px] truncate` : ''}`}>
               {item.label}
               </p>
             )}

@@ -66,7 +66,7 @@ export default function Member({
         description={description}
       />
 
-      <Breadcrumb items={breadcrumbItems} />
+      <Breadcrumb items={breadcrumbItems} width={150}/>
 
       <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-24">
         <div className=''>
