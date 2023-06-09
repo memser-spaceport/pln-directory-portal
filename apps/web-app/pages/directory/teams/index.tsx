@@ -15,9 +15,8 @@ import { TeamsDirectoryList } from '../../../components/teams/teams-directory/te
 import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-directory-filters-fathom-logger.hook';
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
-import { IMember } from '../../../utils/members.types';
 import { ITeam } from '../../../utils/teams.types';
-
+import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../../utils/services/auth';
 import {
   getTeamsListOptions,
   getTeamsOptionsFromQuery,
@@ -85,13 +84,21 @@ Teams.getLayout = function getLayout(page: ReactElement) {
   return <DirectoryLayout>{page}</DirectoryLayout>;
 };
 
-export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
-  query,
-  res,
-  req
-}) => {
-  const userInfo = req?.cookies?.userInfo ? JSON.parse(req?.cookies?.userInfo) : {};
-  const isUserLoggedIn = req?.cookies?.authToken &&  req?.cookies?.userInfo ? true : false
+export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) => {
+  const {
+    query,
+    res,
+    req
+  } = ctx;
+  let cookies = req?.cookies;
+  if (!cookies?.authToken) {
+    await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
+    if (ctx.res.getHeader('Set-Cookie')) 
+      cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
+  }
+  const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
+  const isUserLoggedIn = cookies?.authToken &&  cookies?.userInfo ? true : false;
+  
   const optionsFromQuery = getTeamsOptionsFromQuery(query);
   const listOptions = getTeamsListOptions(optionsFromQuery);
   const [teamsResponse, filtersValues] = await Promise.all([
