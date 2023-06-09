@@ -84,8 +84,10 @@ function EmailOtpVerificationModal() {
             const uniqueEmailVerifyToken = d.token;
             Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 20 * 60 * 1000) })
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
+
             //setResendTimer()
             setResendInSeconds(30)
+
         } catch (e) {
             setLoaderStatus(false)
             handleServerErrors(e?.response?.status, e?.response?.data?.message)

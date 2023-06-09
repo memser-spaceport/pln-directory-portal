@@ -99,6 +99,7 @@ function handleNextClick(
     setErrors(errors);
     return false;
   }
+  console.log(steps[formStep - 1], 'complteted')
   setFormStep(++formStep);
   setErrors(errors);
   return true;

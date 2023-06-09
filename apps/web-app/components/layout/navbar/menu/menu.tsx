@@ -1,4 +1,5 @@
 import { UserGroupIcon, UserIcon } from '@heroicons/react/solid';
+import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -28,7 +29,7 @@ export function Menu() {
   const analytics = useAppAnalytics()
 
   const onMenuItemClicked = (itemName) => {
-    analytics.captureEvent('navbar-menu-clicked', {
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.NAVBAR_MENU_ITEM_CLICKED, {
       'name': itemName
     })
   }

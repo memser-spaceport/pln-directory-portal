@@ -140,6 +140,15 @@ export const SETTINGS_CONSTANTS = {
   TEAM_HELP_TXT: 'Please update only the fields that you would like to change for this team'
 }
 
+export const APP_ANALYTICS_EVENTS = {
+  NAVBAR_MENU_ITEM_CLICKED: 'navbar-menu-item-clicked',
+  NAVBAR_ACCOUNTMENU_ITEM_CLICKED: 'navbar-accountmenu-item-clicked',
+  MEMBER_OFFICEHOURS_CLICKED: 'member-officehours-clicked',
+  MEMBER_CLICKED: 'member-clicked',
+  TEAM_CLICKED: 'team-clicked',
+  FILTERS_APPLIED: 'filters-applied'
+}
+
 export const TAB_CONSTANTS = {
   BASIC: 'BASIC',
   SKILLS: 'SKILLS',
