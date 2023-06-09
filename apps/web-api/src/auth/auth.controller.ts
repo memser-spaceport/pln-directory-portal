@@ -73,7 +73,7 @@ export class AuthController {
   async verifyOtp(@Body() body, @Req() req) {
     try {
       if (!body?.otp) {
-        throw new BadRequestException("otp is missing")
+        throw new BadRequestException("OTP is missing")
       }
 
       if (!body?.otpToken || !body?.clientToken) {

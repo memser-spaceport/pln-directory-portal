@@ -694,6 +694,10 @@ export function EditMemberModal({
     setModifiedFlag(true);
   }
 
+  useEffect(() => {
+    setEmailEditStatus(false)
+  }, [isUserProfile, id])
+
   return (
     <>
       {isProcessing && (

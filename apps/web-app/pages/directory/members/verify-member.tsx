@@ -125,6 +125,11 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
       maxAge: calculateExpiry(clientTokenExpiry.exp),
       path: '/'
     });
+
+    setCookie(ctx, 'show-email-verification-box', 'true', {
+      maxAge: calculateExpiry(clientTokenExpiry.exp),
+      path: '/'
+    });
   }
   return {
     redirect: {

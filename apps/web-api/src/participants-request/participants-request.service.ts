@@ -630,6 +630,7 @@ export class ParticipantsRequestService {
         email: dataToSave.email,
         existingEmail: existingData.email,
         userId: existingData.externalId,
+        deleteAndReplace: true
       };
       await axios.patch(
         `${process.env.AUTH_API_URL}/admin/accounts/email`,

@@ -201,7 +201,7 @@ export class AuthService {
 
       // Link new email to auth account
      // newTokens = await this.linkEmailWithAccount(newEmail, accessToken, clientToken)
-     const linkResult =  await axios.patch(`${process.env.AUTH_API_URL}/admin/accounts/email`, { email: newEmail, existingEmail: oldEmail, userId: updatedUser.externalId }, {
+     const linkResult =  await axios.patch(`${process.env.AUTH_API_URL}/admin/accounts/email`, { email: newEmail, existingEmail: oldEmail, userId: updatedUser.externalId, deleteAndReplace: true }, {
       headers: {
         Authorization: `Bearer ${clientToken}`
       }
@@ -278,12 +278,14 @@ export class AuthService {
           throw new UnauthorizedException("Unauthorized")
         } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP003') {
           throw new ForbiddenException("MAX_OTP_ATTEMPTS_REACHED")
+        } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EATH010') {
+          throw new ForbiddenException("ACCOUNT_ALREADY_LINKED")
         } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP006') {
           throw new ForbiddenException("MAX_RESEND_ATTEMPTS_REACHED")
         } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP004') {
           throw new BadRequestException("CODE_EXPIRED")
         }
-        // EOTP002
+        // EOTP002, EATH010
         else {
           throw new InternalServerErrorException("Unexpected error. Please try again")
         }
