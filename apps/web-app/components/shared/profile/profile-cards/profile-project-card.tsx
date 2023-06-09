@@ -23,7 +23,7 @@ export function ProfileProjectCard({
 
   return (
     <div className="profile-card group m-[1px]">
-      <AnchorLink href={url} linkClassName="block on-focus">
+      <AnchorLink href={url} linkClassName="block">
         <div className="h-18 flex items-start p-4">
           <div className="relative mr-4 h-10 w-10 shrink-0">
             <div className={`relative flex h-10 w-10 overflow-hidden`}>

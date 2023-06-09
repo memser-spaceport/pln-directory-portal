@@ -142,6 +142,7 @@ export default function AddMemberBasicForm(props) {
           value={values?.plnStartDate}
           hasClear={true}
           label="PLN Join Date"
+          onClear={()=>onChange({target:{name:'plnStartDate', value:''}})}
           className="custom-grey custom-outline-none border"
         />
       </div>

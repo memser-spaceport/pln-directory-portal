@@ -36,7 +36,7 @@ interface EditTeamModalProps {
   id: string;
   fromSettings?: boolean;
   setModified?: (boolean) => void;
-  setImageModified?: (boolean) => void;
+  setRefreshTeamAutocomplete?: (boolean) => void;
 }
 
 function validateBasicForm(formValues, imageUrl) {
@@ -142,7 +142,7 @@ export function EditTeamModal({
   id,
   fromSettings = false,
   setModified,
-  setImageModified
+  setRefreshTeamAutocomplete
 }: EditTeamModalProps) {
   const [errors, setErrors] = useState([]);
   const [basicErrors, setBasicErrors] = useState([]);
@@ -151,6 +151,7 @@ export function EditTeamModal({
   const [name, setName] = useState('');
   const [imageUrl, setImageUrl] = useState<string>();
   const [imageChanged, setImageChanged] = useState<boolean>(false);
+  const [isNameChanged,setNameChanged]= useState<boolean>(false);
   const [dropDownValues, setDropDownValues] = useState({});
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
@@ -273,6 +274,7 @@ export function EditTeamModal({
     setModifiedFlag(false);
     setErrors([]);
     setBasicErrors([]);
+    setNameChanged(false);
     seProjecttErrors([]);
     setSocialErrors([]);
     setDropDownValues({});
@@ -370,7 +372,7 @@ export function EditTeamModal({
     async (e) => {
       setResetImg(true);
       if(isModified){
-        setImageModified(false);
+        setRefreshTeamAutocomplete(false);
         setSaveCompleted(false);
         e.preventDefault();
         // if (!executeRecaptcha) {
@@ -439,8 +441,8 @@ export function EditTeamModal({
                   setModified(false);
                   setModifiedFlag(false);
                   setOpenTab(1);
-                  if(imageChanged){
-                    setImageModified(true);
+                  if(imageChanged || isNameChanged){
+                    setRefreshTeamAutocomplete(true);
                   }
                 }
             });
@@ -466,6 +468,9 @@ export function EditTeamModal({
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) {
     const { name, value } = event.target;
+    if(name==='name'){
+      setNameChanged(true);
+    }
     setModified(true);
     setModifiedFlag(true);
     setFormValues({ ...formValues, [name]: value });

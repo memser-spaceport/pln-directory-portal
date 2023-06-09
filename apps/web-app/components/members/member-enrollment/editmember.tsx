@@ -46,7 +46,7 @@ interface EditMemberModalProps {
   isUserProfile?: boolean;
   userInfo?: any;
   setModified?: (boolean) => void;
-  setImageModified?: (boolean) => void;
+  setRefreshMemberAutocomplete?: (boolean) => void;
 }
 
 function validateBasicForm(formValues, imageUrl, isProfileSettings) {
@@ -168,7 +168,7 @@ export function EditMemberModal({
   userInfo,
   isUserProfile = false,
   setModified,
-  setImageModified,
+  setRefreshMemberAutocomplete,
 }: EditMemberModalProps) {
   const [openTab, setOpenTab] = useState(1);
   const [errors, setErrors] = useState([]);
@@ -179,6 +179,7 @@ export function EditMemberModal({
   const [imageUrl, setImageUrl] = useState<string>();
   const [emailExists, setEmailExists] = useState<boolean>(false);
   const [imageChanged, setImageChanged] = useState<boolean>(false);
+  const [isNameChanged,setNameChanged]= useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [disableSubmit, setDisableSubmit] = useState<boolean>(false);
@@ -389,6 +390,7 @@ export function EditMemberModal({
     setSkillErrors([]);
     setDropDownValues({});
     setImageChanged(false);
+    setNameChanged(false);
     setIsProcessing(false);
     setDisableSubmit(false);
     setImageUrl('');
@@ -491,8 +493,8 @@ export function EditMemberModal({
       setResetImg(true);
       if (isModified) {
         setImageChanged(false);
-        if (setImageModified) {
-          setImageModified(false);
+        if (setRefreshMemberAutocomplete) {
+          setRefreshMemberAutocomplete(false);
         }
         setErrors([]);
         const { basicFormErrors, skillFormErrors, errors } = validateForm(
@@ -577,8 +579,8 @@ export function EditMemberModal({
               setOpenTab(1);
               setBasicErrors([]);
               setSkillErrors([]);
-              if (imageChanged && setImageModified) {
-                setImageModified(true);
+              if ((imageChanged || isNameChanged) && setRefreshMemberAutocomplete) {
+                setRefreshMemberAutocomplete(true);
               }
               if (isEmailEditActive) {
                 setCurrentEmail(formValues.email as any);
@@ -648,6 +650,9 @@ export function EditMemberModal({
   function handleInputChange(event) {
     const { name, value } = event.target;
     setFormValues({ ...formValues, [name]: value });
+    if(name==='name'){
+      setNameChanged(true);
+    }
     setSaveCompleted(false);
     setModified(true);
     setModifiedFlag(true);

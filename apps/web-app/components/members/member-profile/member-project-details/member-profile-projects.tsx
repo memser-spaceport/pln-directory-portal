@@ -37,7 +37,7 @@ export function MemberProfileProjects({
         {repositories?.length > 3 && (
           <span
             onClick={() => setIsModalOpen(true)}
-            className="float-right cursor-pointer text-blue-500"
+            className="float-right cursor-pointer text-blue-500 pr-8"
           >
             See all
           </span>
