@@ -147,6 +147,8 @@ export const APP_ANALYTICS_EVENTS = {
   MEMBER_OFFICEHOURS_CLICKED: 'member-officehours-clicked',
   MEMBER_CLICKED: 'member-clicked',
   MEMBER_JOIN_NETWORK_FORM_STEPS: 'member-join-network-form-steps',
+  MEMBER_GITHUB_PROJECT_VIEW_ALL_CLICKED: '',
+  MEMBER_GITHUB_PROJECT_ITEM_CLICKED: '',
 
   USER_VERIFICATION_INIT: 'user-verification-init',
   USER_VERIFICATION_SEND_OTP: 'user-verification-sendotp',

@@ -112,7 +112,7 @@ function EmailOtpVerificationModal() {
             const otpPayload = { email, clientToken }
             setErrorMessage('')
             setLoaderStatus(true)
-            analytics.captureEvent(APP_ANALYTICS_EVENTS.USER_VERIFICATION_SEND_OTP, {})
+            analytics.captureEvent(APP_ANALYTICS_EVENTS.USER_VERIFICATION_SEND_OTP, {email})
             const d = await sendEmailVerificationOtp(otpPayload);
             setLoaderStatus(false)
             const uniqueEmailVerifyToken = d.token;
