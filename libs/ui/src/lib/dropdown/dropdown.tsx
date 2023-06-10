@@ -2,6 +2,7 @@ import { Listbox } from '@headlessui/react';
 import React, { Fragment, useEffect, useState } from 'react';
 import { ArrowIcon } from '../icons/arrow/arrow';
 import { DiscardChangesPopup } from '../modals/confirmation';
+import { UserGroupIcon } from '@heroicons/react/solid';
 
 export interface DropdownProps {
   buttonContent?: React.ReactNode;
@@ -45,6 +46,8 @@ export function Dropdown({
   const [tempOption, setTempOption] = useState<IDropdownOption>(initialOption);
   const requiredIndicator =
     required && !selectedOption?.value ? 'border custom-red' : '';
+
+  const teamDefaultIcon = (name === 'team') ? <UserGroupIcon className="bg-gray-200 fill-white absolute inline inset-y-0 left-2 my-auto h-6 w-6 rounded-full mr-[4px]" /> : null; 
 
   function onChangeHandler(value: string) {
     const selectedDropdownOption = options.find(
@@ -112,9 +115,10 @@ export function Dropdown({
               ) : selectedOption?.label ? (
                 <div className="text-left leading-6 flex">
                     {selectedOption?.icon &&
-                      (<img src={selectedOption?.icon?.toString()} width={25} height={45} className='h-6 w-6 rounded-full'></img>
+                      (<img src={selectedOption?.icon?.toString()} width={25} height={45} className='h-6 w-6 rounded-full mr-[5px]'></img>
                       )}
-                    <span  className={`${'relative width-full'}`}>{selectedOption?.label}</span></div>
+                    {(selectedOption?.icon === null && name === 'team') && <UserGroupIcon className="bg-gray-200 fill-white inline inset-y-0 left-2 my-auto h-6 w-6 rounded-full mr-[4px]" />}
+                    <span  className={`${'relative'} ${(selectedOption?.icon || (selectedOption?.icon === null && name === 'team')) ? ' w-[153px] text-ellipsis overflow-hidden whitespace-nowrap':' width-full'}`}>{selectedOption?.label}</span></div>
               ) : (
                 <div className="text-sm text-slate-600 opacity-50">
                   {placeholder}
@@ -156,9 +160,11 @@ export function Dropdown({
                             />
                           )}
                           {(OptionIcon && typeof (OptionIcon) === 'string') && (
-                            <img src={OptionIcon.toString()} width={25} height={45} className='absolute inline inset-y-0 left-2 my-auto h-4 h-6 w-6 rounded-full'></img>
+                            <img src={OptionIcon.toString()} width={25} height={45} className='absolute inline inset-y-0 left-2 my-auto h-6 w-6 rounded-full mr-[4px]'></img>
                           )}
-                          {option.label}
+
+                          {(OptionIcon === null && name === 'team') && teamDefaultIcon}
+                          <span className={`relative ${(OptionIcon && typeof (OptionIcon) === 'string' || (OptionIcon === null && name === 'team')) ? 'left-[8px]' : ' '}`}>{option.label}</span>
                         </div>
                       )}
                     </Listbox.Option>
