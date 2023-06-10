@@ -8,6 +8,7 @@ import { DirectoryCardHeader } from '../../../shared/directory/directory-card/di
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 
 import { ReactComponent as BriefCase } from '../../../../public/assets/images/icons/mdi_briefcase-check.svg';
+import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
 
 interface MemberCardProps {
   isGrid?: boolean;
@@ -32,7 +33,7 @@ export function MemberCard({
   const analytics = useAppAnalytics()
 
   const onMemberClicked = () => {
-    analytics.captureEvent('member-clicked', {
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_CLICKED, {
       uid: member.id,
       name: member.name,
       backLink: backLink

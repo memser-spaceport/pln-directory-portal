@@ -5,6 +5,7 @@ import { DirectoryCard } from '../../../shared/directory/directory-card/director
 import { DirectoryCardFooter } from '../../../shared/directory/directory-card/directory-card-footer';
 import { DirectoryCardHeader } from '../../../shared/directory/directory-card/directory-card-header';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
+import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
 
 export interface TeamCardProps {
   team: ITeam;
@@ -18,7 +19,7 @@ export function TeamCard({ team, isGrid = true }: TeamCardProps) {
   const analytics = useAppAnalytics()
 
   const onTeamClicked = () => {
-    analytics.captureEvent('team-clicked', {
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.TEAM_CLICKED, {
       uid: team.id,
       name: team.name,
       backLink: backLink

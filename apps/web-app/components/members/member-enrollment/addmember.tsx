@@ -20,10 +20,11 @@ import {
 } from '../../../utils/services/dropdown-service';
 
 import api from '../../../utils/api';
-import { ENROLLMENT_TYPE, FATHOM_EVENTS } from '../../../constants';
+import { APP_ANALYTICS_EVENTS, ENROLLMENT_TYPE, FATHOM_EVENTS } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/create-member.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
+import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddMemberModalProps {
@@ -87,7 +88,8 @@ function handleNextClick(
   setFormStep,
   setErrors,
   emailExists,
-  divRef
+  divRef,
+  analytics
 ) {
   const errors = validateForm(formValues, formStep);
   const element1 = divRef.current;
@@ -99,6 +101,9 @@ function handleNextClick(
     setErrors(errors);
     return false;
   }
+   analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_JOIN_NETWORK_FORM_STEPS, {
+    'itemName': steps[formStep].name
+  })
   setFormStep(++formStep);
   setErrors(errors);
   return true;
@@ -113,7 +118,8 @@ function getSubmitOrNextButton(
   isProcessing,
   emailExists,
   disableNext,
-  divRef
+  divRef,
+  analytics
 ) {
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8] disabled:bg-slate-400';
@@ -141,7 +147,8 @@ function getSubmitOrNextButton(
             setFormStep,
             setErrors,
             emailExists,
-            divRef
+            divRef,
+            analytics
           )
         }
       >
@@ -214,6 +221,7 @@ export function AddMemberModal({
 
   const divRef = useRef<HTMLDivElement>(null);
   // const { executeRecaptcha } = useGoogleReCaptcha();
+  const analytics = useAppAnalytics()
 
   useEffect(() => {
     if (isOpen) {
@@ -330,6 +338,9 @@ export function AddMemberModal({
       //   console.log('Execute recaptcha not yet available');
       //   return;
       // }
+      analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_JOIN_NETWORK_FORM_STEPS, {
+        'itemName': 'SOCIAL'
+      })
       const values = formatData();
       try {
         // const captchaToken = await executeRecaptcha();
@@ -370,6 +381,9 @@ export function AddMemberModal({
           //     .getElementsByClassName('grecaptcha-badge')[0]
           //     .classList.add('w-0');
           // }
+          analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_JOIN_NETWORK_FORM_STEPS, {
+            'itemName': 'COMPLETED'
+          })
           setSaveCompleted(true);
         });
       } catch (err) {
@@ -552,7 +566,8 @@ export function AddMemberModal({
                   isProcessing,
                   emailExists,
                   disableNext,
-                  divRef
+                  divRef,
+                  analytics
                 )}
               </div>
             </div>
