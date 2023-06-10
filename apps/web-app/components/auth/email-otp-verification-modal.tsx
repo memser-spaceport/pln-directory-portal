@@ -132,7 +132,7 @@ function EmailOtpVerificationModal() {
             } else if(messageCode === "MAX_RESEND_ATTEMPTS_REACHED") {
                 goToError("Maximum OTP resend attempts exceeded. Please login again and try")
             } else if(messageCode === 'ACCOUNT_ALREADY_LINKED') {
-                goToError("Account is already linked. Please login and try again")
+                goToError("Account is already linked to another email.")
             } else if(messageCode) {
                 goToError(messageCode)
             } else {

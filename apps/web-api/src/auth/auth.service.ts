@@ -14,7 +14,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { RedisService } from '../utils/redis/redis.service';
 @Injectable()
 export class AuthService {
-  constructor(private prismaService: PrismaService, private redisService: RedisService) {}
+  constructor(private prismaService: PrismaService, private redisService: RedisService) { }
 
   async findUniqueMemberAndGetInfo(query) {
     const foundUser: any = await this.prismaService.member.findUnique({
@@ -48,7 +48,7 @@ export class AuthService {
       );
       return this.getUserInfo(result);
     } catch (e) {
-      if(e?.response?.data?.message, e?.response?.status) {
+      if (e?.response?.data?.message, e?.response?.status) {
         throw new HttpException("Request failed. Please try again later", e?.response?.status)
       }
       throw new InternalServerErrorException();
@@ -72,12 +72,12 @@ export class AuthService {
       const decoded: any = jwt_decode(idToken);
       console.log('decoded values', decoded)
       const userEmail = decoded.email;
-       const idFromAuth = decoded.sub;
+      const idFromAuth = decoded.sub;
 
       // If email id is not available in id token, then user needs to enter and validate email id in ui
       // Get client token.. for client to access email validation
       if (!userEmail) {
-         const clientToken = await this.getClientToken()
+        const clientToken = await this.getClientToken()
         return {
           accessToken: result.data.access_token,
           refreshToken: result.data.refresh_token,
@@ -87,7 +87,7 @@ export class AuthService {
       }
 
 
-     // Search by external id. If user found, send the user details with tokens
+      // Search by external id. If user found, send the user details with tokens
       let foundUser: any = await this.prismaService.member.findUnique({
         where: { externalId: idFromAuth },
         include: { image: true, memberRoles: true, teamMemberRoles: true },
@@ -102,7 +102,7 @@ export class AuthService {
             uid: foundUser.uid,
             roles: foundUser.memberRoles.map((r) => r.name),
             leadingTeams: foundUser.teamMemberRoles.filter((role) => role.teamLead)
-            .map(role => role.teamUid)
+              .map(role => role.teamUid)
           },
           accessToken: result.data.access_token,
           refreshToken: result.data.refresh_token,
@@ -113,13 +113,13 @@ export class AuthService {
       // and then update the external id for that user and send userinfo, tokens
       foundUser = await this.prismaService.member.findUnique({
         where: { email: userEmail },
-        include: { image: true, memberRoles: true , teamMemberRoles: true },
+        include: { image: true, memberRoles: true, teamMemberRoles: true },
       });
       if (foundUser) {
-         await this.prismaService.member.update({
-           where: { email: userEmail },
+        await this.prismaService.member.update({
+          where: { email: userEmail },
           data: { externalId: idFromAuth },
-         });
+        });
         return {
           userInfo: {
             name: foundUser.name,
@@ -136,7 +136,7 @@ export class AuthService {
       }
     } catch (e) {
       console.error(e)
-      if(e?.response?.data?.message && e?.response?.status) {
+      if (e?.response?.data?.message && e?.response?.status) {
         throw new HttpException(e?.response?.status, e?.response?.data?.message)
       }
       throw new InternalServerErrorException();
@@ -194,8 +194,8 @@ export class AuthService {
 
       // Update new email
       updatedUser = await tx.member.update({
-        where: {email: oldEmail},
-        data: {email: newEmail},
+        where: { email: oldEmail },
+        data: { email: newEmail },
         include: { image: true, memberRoles: true, teamMemberRoles: true },
       })
 
@@ -206,18 +206,18 @@ export class AuthService {
           referenceUid: updatedUser.uid,
           uniqueIdentifier: oldEmail,
           participantType: 'MEMBER',
-          newData: {oldEmail: oldEmail, newEmail: newEmail}
+          newData: { oldEmail: oldEmail, newEmail: newEmail }
         }
       })
 
       // Link new email to auth account
-     // newTokens = await this.linkEmailWithAccount(newEmail, accessToken, clientToken)
-     const linkResult =  await axios.patch(`${process.env.AUTH_API_URL}/admin/accounts/email`, { email: newEmail, existingEmail: oldEmail, userId: updatedUser.externalId, deleteAndReplace: true }, {
-      headers: {
-        Authorization: `Bearer ${clientToken}`
-      }
-    })
-   newTokens = linkResult.data;
+      // newTokens = await this.linkEmailWithAccount(newEmail, accessToken, clientToken)
+      const linkResult = await axios.patch(`${process.env.AUTH_API_URL}/admin/accounts/email`, { email: newEmail, existingEmail: oldEmail, userId: updatedUser.externalId, deleteAndReplace: true }, {
+        headers: {
+          Authorization: `Bearer ${clientToken}`
+        }
+      })
+      newTokens = linkResult.data;
     })
 
     await this.redisService.resetAllCache()
@@ -236,29 +236,21 @@ export class AuthService {
   }
 
   async linkEmailWithAccount(email, accessToken, clientToken) {
-    try {
-     const linkResult =  await axios.put(`${process.env.AUTH_API_URL}/admin/accounts`, { token: accessToken, email: email }, {
-        headers: {
-          Authorization: `Bearer ${clientToken}`
-        }
-      })
+    const linkResult = await axios.put(`${process.env.AUTH_API_URL}/admin/accounts`, { token: accessToken, email: email }, {
+      headers: {
+        Authorization: `Bearer ${clientToken}`
+      }
+    })
     const newTokens = linkResult.data;
     const idToken = newTokens.id_token;
     const decoded: any = jwt_decode(idToken);
     const userExternalId = decoded.sub;
 
-      await this.prismaService.member.update({
-        where: {email: email},
-        data: {externalId: userExternalId}
-      })
-
+    await this.prismaService.member.update({
+      where: { email: email },
+      data: { externalId: userExternalId }
+    })
     return newTokens;
-    } catch (error) {
-      if (error.response) {
-        throw new HttpException(error?.response?.data?.message, error?.response?.status)
-      }
-      throw new InternalServerErrorException();
-    }
   }
 
   async verifyEmailOtp(otp, otpToken, clientToken) {
@@ -279,30 +271,33 @@ export class AuthService {
 
 
   handleErrors = (error) => {
-    console.log(error?.response?.statusCode, error?.response?.status, error?.response?.message,error?.response?.data )
-    if(error?.response?.statusCode && error?.response?.message) {
+    console.log(error?.response?.statusCode, error?.response?.status, error?.response?.message, error?.response?.data)
+    if (error?.response?.statusCode && error?.response?.message) {
       throw new HttpException(error?.response?.message, error?.response?.statusCode)
-     } else if (error?.response?.data && error?.response?.status) {
-        if(error?.response?.status === 401) {
-          throw new UnauthorizedException("Unauthorized")
-        } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP005') {
-          throw new UnauthorizedException("Unauthorized")
-        } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP003') {
-          throw new ForbiddenException("MAX_OTP_ATTEMPTS_REACHED")
-        } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EATH010') {
-          throw new ForbiddenException("ACCOUNT_ALREADY_LINKED")
-        } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP006') {
-          throw new ForbiddenException("MAX_RESEND_ATTEMPTS_REACHED")
-        } else if(error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP004') {
-          throw new BadRequestException("CODE_EXPIRED")
-        }
-        // EOTP002, EATH010
-        else {
-          throw new InternalServerErrorException("Unexpected error. Please try again")
-        }
-     } else {
+    } else if (error?.response?.data && error?.response?.status) {
+      if (error?.response?.status === 401) {
+        throw new UnauthorizedException("Unauthorized")
+      } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP005') {
+        throw new UnauthorizedException("Unauthorized")
+      } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP003') {
+        throw new ForbiddenException("MAX_OTP_ATTEMPTS_REACHED")
+      } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EATH010') {
+        throw new ForbiddenException("ACCOUNT_ALREADY_LINKED")
+      } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EATH002') {
+        throw new ForbiddenException("ACCOUNT_ALREADY_LINKED")
+      } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP006') {
+        throw new ForbiddenException("MAX_RESEND_ATTEMPTS_REACHED")
+      } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP004') {
+        throw new BadRequestException("CODE_EXPIRED")
+      }
+      // EOTP002, EATH010
+      else {
+        console.log(error?.response?.data)
+        throw new InternalServerErrorException("Unexpected error. Please try again")
+      }
+    } else {
       throw new InternalServerErrorException("Unexpected error. Please try again")
-     }
+    }
   }
 
   async resendEmailOtpForVerification(otpToken, clientToken) {
