@@ -415,7 +415,7 @@ export class ParticipantsRequestService {
 
     const isEmailChange = existingData.email !== dataToProcess.email ? true: false;
     if(isEmailChange) {
-      const foundUser: any = transactionType.member.findUnique({where: {email: dataToProcess.email}});
+      const foundUser: any = await transactionType.member.findUnique({where: {email: dataToProcess.email}});
       if(foundUser && foundUser.email) {
         throw new BadRequestException("Email already exist")
       }
