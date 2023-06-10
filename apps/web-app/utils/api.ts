@@ -43,8 +43,10 @@ api.interceptors.request.use(async (config) => {
       );
       // Make a call to renew access token using refresh token.
       return renewAccessToken(refreshToken)
-        .then((data) => {
-          const { accessToken, refreshToken, userInfo } = data;
+        .then((resp) => {
+          const accessToken =  resp?.accessToken;
+          const refreshToken =  resp?.refreshToken;
+          const userInfo = resp?.userInfo;
           if (accessToken && refreshToken) {
             const access_token = decodeToken(accessToken);
             const refresh_token = decodeToken(refreshToken);
@@ -68,13 +70,16 @@ api.interceptors.request.use(async (config) => {
           } 
           return config;
         }).catch((error) => {
-          return config;
+          throw error;
         });
     }
     return config;
   } catch (error) {
-    console.log(error);
-    return config;
+    console.log('Request Interceptor Error Info', error);
+    toast.info(SOMETHING_WENT_WRONG, {
+      hideProgressBar: true
+    });
+    return Promise.reject(error);
   }
 });
 
@@ -134,15 +139,15 @@ function getCsrfTokenFromResponseCookie(cookieHeader) {
 export function renewAccessToken(refreshToken) {
   // Make an API call to your server to get a new access token using refreshToken
   return fetch(
-    `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/auth/token/refresh`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ token : refreshToken }),
-    }
-  )
+      `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/auth/token/refresh`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token : refreshToken }),
+      }
+    )
     .then((response) => {
       if (!response.ok) {
         throw new Error('Failed to get new access token');

@@ -17,7 +17,7 @@ export const createLogoutChannel = () => {
 
 export const logoutAllTabs = () => {
   createLogoutChannel().onmessage = async (msg) => {
-    window.location.href = PAGE_ROUTES.TEAMS;
+    window.location.reload();
     await createLogoutChannel().close();
   };
 };
@@ -91,9 +91,11 @@ export const renewAndStoreNewAccessToken = async (refrshToken, ctx) => {
       /"/g,
       ''
     );
-    const resp = await renewAccessToken(refrshToken);
-    const { accessToken, refreshToken, userInfo } = resp;
     try {
+      const resp = await renewAccessToken(refrshToken);
+      const accessToken =  resp?.accessToken;
+      const refreshToken =  resp?.refreshToken;
+      const userInfo = resp?.userInfo;
       if (accessToken && refreshToken && userInfo) {
         const access_token = decodeToken(accessToken);
         const refresh_token = decodeToken(refreshToken);
@@ -101,7 +103,6 @@ export const renewAndStoreNewAccessToken = async (refrshToken, ctx) => {
           maxAge: calculateExpiry(access_token.exp),
           path: '/'
         });
-        // ctx.req.cookies.authToken = accessToken;
         setCookie(ctx, 'refreshToken', JSON.stringify(refreshToken), {
           maxAge: calculateExpiry(refresh_token.exp),
           path: '/'
@@ -113,7 +114,7 @@ export const renewAndStoreNewAccessToken = async (refrshToken, ctx) => {
       }
     } 
     catch(err) {
-      console.log(err);
+    
     }
   }
 };

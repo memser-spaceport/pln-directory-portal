@@ -56,7 +56,6 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
         Cookies.remove('userInfo')
         Cookies.set('page_params', 'logout', { expires: 60, path: '/' });
         createLogoutChannel().postMessage('logout');
-        window.location.href = PAGE_ROUTES.TEAMS;
       },
     },
   ];
