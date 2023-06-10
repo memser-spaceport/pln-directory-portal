@@ -420,7 +420,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
           setSaveCompleted(true);
         });
       } catch (err) {
-        if (err.response.status === 400) {
+        if (err?.response?.status === 400) {
           toast(err?.response?.data?.message);
         } else {
           toast(err?.message);

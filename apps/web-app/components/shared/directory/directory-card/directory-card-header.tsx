@@ -26,7 +26,7 @@ export function DirectoryCardHeader({
 }: DirectoryCardHeaderProps) {
   const Icon = avatarIcon;
   const isOpenTOWorkEnabled =
-    process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK === 'true' && userInfo?.uid
+    process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK === 'true'
       ? true
       : false;
   return (
@@ -53,8 +53,8 @@ export function DirectoryCardHeader({
         ) : (
           <Icon className="w-22 h-22 mt-2 fill-white" />
         )}
-        {isOpenTOWorkEnabled && isGrid && openToWork && (
-          <div className="absolute left-0 right-0 bottom-[-20px] z-10  w-full">
+        {isOpenTOWorkEnabled && openToWork && (
+          <div className={`absolute ${isGrid ? 'left-0' : 'left-6'} right-0 bottom-[-20px] z-10  w-full`}>
             <OpenToWorkBadge size="5" />
           </div>
         )}
