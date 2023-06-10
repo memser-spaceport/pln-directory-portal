@@ -128,7 +128,7 @@ export default function MemberView(props) {
       twitterHandler: formValues.twitterHandler?.trim(),
       githubHandler: formValues.githubHandler?.trim(),
       telegramHandler: formValues.telegramHandler?.trim(),
-      officeHours: formValues.officeHours?.trim(),
+      officeHours: formValues.officeHours?.trim() === ''? null : formValues.officeHours?.trim(),
       comments: formValues.comments?.trim(),
       plnStartDate: formValues.plnStartDate
         ? new Date(formValues.plnStartDate)?.toISOString()

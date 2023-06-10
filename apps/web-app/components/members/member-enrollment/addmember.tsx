@@ -301,7 +301,7 @@ export function AddMemberModal({
       twitterHandler: formValues.twitterHandler?.trim(),
       githubHandler: formValues.githubHandler?.trim(),
       telegramHandler: formValues.telegramHandler?.trim(),
-      officeHours: formValues.officeHours?.trim() ?? null,
+      officeHours: formValues.officeHours?.trim() === ''? null : formValues.officeHours?.trim(),
       comments: formValues.comments?.trim(),
       plnStartDate: formValues.plnStartDate
         ? new Date(formValues.plnStartDate)?.toISOString()

@@ -76,7 +76,10 @@ export default function AddMemberSkillForm(props) {
       {isOpenToWorkEnabled === 'true' && !props.isNewMode && (
         <>
           <div className="pt-5">
-            <div className="flex gap-3.5">
+            <div className="flex place-content-between">
+              <span className="mr-2 pr-5 text-sm font-bold">
+                Are you open to collaborate?
+              </span>
               <Switch
                 initialValue={props.formValues.openToWork}
                 onChange={(evt) => {
@@ -89,9 +92,6 @@ export default function AddMemberSkillForm(props) {
                   props.onChange(events);
                 }}
               />
-              <span className="mr-2 pr-5 text-sm font-bold">
-                Are you open to collaborate?
-              </span>
             </div>
           </div>
           <div className="flex pt-3">

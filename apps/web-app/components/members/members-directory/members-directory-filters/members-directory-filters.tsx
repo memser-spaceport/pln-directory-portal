@@ -19,7 +19,7 @@ export function MembersDirectoryFilters({
   filterProperties,
   userInfo
 }: MembersDirectoryFiltersProps) {
-  const isOpenToWorkEnabled = (process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK  === 'true' && userInfo?.uid) ? true : false;
+  const isOpenToWorkEnabled = (process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK  === 'true') ? true : false;
   return (
     <DirectoryFilters filterProperties={filterProperties}>
       <div className="space-y-4">

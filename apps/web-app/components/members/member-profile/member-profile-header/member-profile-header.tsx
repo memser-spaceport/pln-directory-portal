@@ -22,7 +22,7 @@ export function MemberProfileHeader({
     .sort();
   const memberRole = mainTeam?.role || 'Contributor';
   const isOpenToWorkEnabled =
-    process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK === 'true' && userInfo?.uid
+    process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK === 'true'
       ? true
       : false;
   return (
