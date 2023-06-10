@@ -1,6 +1,7 @@
 import React from 'react';
-import Link from 'next/link';
-import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/Logo_PLN_directory.svg';
+import Image from 'next/image';
+import { ReactComponent as Thunder } from '/public/assets/images/icons/thunder.svg';
+import { ReactComponent as Error } from '/public/assets/images/icons/error.svg';
 class ErrorBoundary extends React.Component<{}, { hasError: boolean }> {
     constructor(props) {
       super(props);
@@ -21,17 +22,27 @@ class ErrorBoundary extends React.Component<{}, { hasError: boolean }> {
         // You can render any custom fallback UI
         return (
           <div className='h-screen w-full flex flex-col justify-center'>
-            <Link href="/directory">
-              <a className="on-focus w-[150] mx-auto">
-                <ProtocolLabsLogo
-                  title="Protocol Labs Network Directory Beta Black Logo"
-                  width="212"
-                  height="60"
-                />
-              </a>
-            </Link>
-            <div className='text-lg text-center w-80 mx-auto'>Oops! Something went wrong. Please try again.</div>
-            <Link href="/directory"><a className='text-[#156FF7] w-24 mx-auto'> Go to home </a></Link>
+            <div className="mx-auto relative">
+              <Image
+                src='/assets/images/error.png'
+                width={392}
+                height={124}
+                alt="Profile Picture"
+                quality={100}
+                className="relative"
+                >
+              </Image>
+              <Thunder className="absolute w-7 h-7 left-20 top-5"/>
+              <Error className="absolute w-6 h-6 right-20 top-20"/>
+            </div>  
+            <div className='text-3xl text-center w-96 mx-auto font-bold'>Oh snap! Something went wrong!</div>
+            <button
+              onClick={() => {
+                window.location.href='/';
+              }}
+              className="shadow-special-button-default inline-flex w-40 mx-auto mt-4 justify-center rounded-full bg-[#156FF7] px-6 py-2 text-base font-semibold leading-6 text-white outline-none"
+            > Back to home
+            </button>
           </div> 
         );
       }
