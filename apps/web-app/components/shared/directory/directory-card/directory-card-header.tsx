@@ -54,8 +54,8 @@ export function DirectoryCardHeader({
           <Icon className="w-22 h-22 mt-2 fill-white" />
         )}
         {isOpenTOWorkEnabled && openToWork && (
-          <div className={`absolute ${isGrid ? 'left-0' : 'left-6'} right-0 bottom-[-20px] z-10  w-full`}>
-            <OpenToWorkBadge size="5" />
+          <div className={`absolute ${isGrid ? 'left-0' : 'left-6'} right-0 bottom-[-16px] z-10  w-full`}>
+            <OpenToWorkBadge type='CARD' />
           </div>
         )}
         {teamLead ? (

@@ -1,4 +1,11 @@
-import { Injectable, UnauthorizedException, ForbiddenException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ForbiddenException,
+  InternalServerErrorException,
+  BadRequestException,
+  HttpException,
+} from '@nestjs/common';
 import { Prisma, ParticipantType } from '@prisma/client';
 import * as path from 'path';
 import { z } from 'zod';
@@ -7,9 +14,7 @@ import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schem
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { hashFileName } from '../utils/hashing';
-import {
-  ParticipantRequestTeamSchema,
-} from 'libs/contracts/src/schema/participants-request';
+import { ParticipantRequestTeamSchema } from 'libs/contracts/src/schema/participants-request';
 
 @Injectable()
 export class TeamsService {
@@ -162,7 +167,8 @@ export class TeamsService {
 
   async editTeamParticipantsRequest(participantsRequest, userEmail) {
     const { referenceUid } = participantsRequest;
-    const requestorDetails = await this.participantsRequestService.findMemberByEmail(userEmail);
+    const requestorDetails =
+      await this.participantsRequestService.findMemberByEmail(userEmail);
     if (!requestorDetails) {
       throw new UnauthorizedException();
     }
@@ -179,18 +185,34 @@ export class TeamsService {
     ) {
       throw new BadRequestException();
     }
-    let result = await this.participantsRequestService.addRequest(
-      participantsRequest,
-      true
-    );
-    if (result?.uid) {
-      result = await this.participantsRequestService.processTeamEditRequest(
-        result.uid,
-        true, // disable the notification
-        true // enable the auto approval
-      );
-    } else {
-      throw new InternalServerErrorException();
+    let result;
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        result = await this.participantsRequestService.addRequest(
+          participantsRequest,
+          true,
+          tx
+        );
+        if (result?.uid) {
+          result = await this.participantsRequestService.processTeamEditRequest(
+            result.uid,
+            true, // disable the notification
+            true, // enable the auto approval
+            tx
+          );
+        } else {
+          throw new InternalServerErrorException();
+        }
+      });
+    } catch (error) {
+      if (error?.response?.statusCode && error?.response?.message) {
+        throw new HttpException(
+          error?.response?.message,
+          error?.response?.statusCode
+        );
+      } else {
+        throw new BadRequestException('Invalid Data');
+      }
     }
     return result;
   }

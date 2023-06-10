@@ -27,7 +27,7 @@ export function TeamProfileHeader({
             className="rounded"
             alt={`${name} Logo`}
             src={logo}
-            layout="fill"
+            layout="fill"whitespace-nowrap
             objectFit="contain"
             objectPosition="center"
           />
