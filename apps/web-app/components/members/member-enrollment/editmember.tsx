@@ -15,7 +15,7 @@ import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
 import { ValidationErrorMessages } from '../../../components/shared/account-setttings/validation-error-message';
-import { MSG_CONSTANTS, PAGE_ROUTES, FATHOM_EVENTS } from '../../../constants';
+import { MSG_CONSTANTS, PAGE_ROUTES, FATHOM_EVENTS, APP_ANALYTICS_EVENTS } from '../../../constants';
 import { RequestPending } from '../../shared/request-pending/request-pending';
 import { IFormValues } from '../../../utils/members.types';
 import Modal from '../../layout/navbar/modal/modal';
@@ -38,6 +38,7 @@ import { calculateExpiry, decodeToken } from '../../../utils/services/auth';
 import ChangeEmailModal from '../../auth/change-email-modal';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { ReactComponent as SuccessIcon } from '../../../public/assets/images/icons/success.svg';
+import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
 interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -216,6 +217,7 @@ export function EditMemberModal({
   const [reset, setReset] = useState(false);
   const router = useRouter();
   const [resetImg, setResetImg] = useState(false);
+  const analytics = useAppAnalytics()
 
   const divRef = useRef<HTMLDivElement>(null);
 
@@ -452,7 +454,7 @@ export function EditMemberModal({
       twitterHandler: formValues.twitterHandler?.trim(),
       githubHandler: formValues.githubHandler?.trim(),
       telegramHandler: formValues.telegramHandler?.trim(),
-      officeHours: formValues.officeHours?.trim() ?? null,
+      officeHours: formValues.officeHours?.trim() === ''? null : formValues.officeHours?.trim(),
       comments: formValues.comments?.trim(),
       plnStartDate: formValues.plnStartDate
         ? new Date(formValues.plnStartDate)?.toISOString()
@@ -582,6 +584,9 @@ export function EditMemberModal({
                 setCurrentEmail(formValues.email as any);
                 setEmailEditStatus(false);
               }
+              analytics.captureEvent(isUserProfile? APP_ANALYTICS_EVENTS.SETTINGS_USER_PROFILE_EDIT_FORM: APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_PROFILE_EDIT_FORM, {
+                'name': 'COMPLETED'
+              })
             }
           });
         } catch (err) {
@@ -689,9 +694,25 @@ export function EditMemberModal({
     setModifiedFlag(true);
   }
 
+  const onTabClicked = (tab) => {
+    const tabs = ["BASIC", "SKILLS", "SOCIAL"];
+    analytics.captureEvent(isUserProfile? APP_ANALYTICS_EVENTS.SETTINGS_USER_PROFILE_EDIT_FORM: APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_PROFILE_EDIT_FORM, {
+      'name': tabs[tab - 1]
+    })
+    setOpenTab(tab)
+  }
+
   useEffect(() => {
     setEmailEditStatus(false)
+    const tabs = ["BASIC", "SKILLS", "SOCIAL"]
+    analytics.captureEvent(isUserProfile? APP_ANALYTICS_EVENTS.SETTINGS_USER_PROFILE_EDIT_FORM: APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_PROFILE_EDIT_FORM, {
+      'name': tabs[0]
+    })
   }, [isUserProfile, id])
+
+  useEffect(() => {
+
+  }, [])
 
   return (
     <>
@@ -718,7 +739,7 @@ export function EditMemberModal({
                         ? 'text-[#DD2C5A]'
                         : ''
                     }`}
-                    onClick={() => setOpenTab(1)}
+                    onClick={() => onTabClicked(1)}
                   >
                     {' '}
                     BASIC{' '}
@@ -733,7 +754,7 @@ export function EditMemberModal({
                         ? 'text-[#DD2C5A]'
                         : ''
                     }`}
-                    onClick={() => setOpenTab(2)}
+                    onClick={() => onTabClicked(2)}
                   >
                     {' '}
                     SKILLS
@@ -742,7 +763,7 @@ export function EditMemberModal({
                     className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
                       openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
                     }`}
-                    onClick={() => setOpenTab(3)}
+                    onClick={() => onTabClicked(3)}
                   >
                     {' '}
                     SOCIAL{' '}

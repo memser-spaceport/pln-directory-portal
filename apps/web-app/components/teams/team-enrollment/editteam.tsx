@@ -22,12 +22,13 @@ import {
 import { fetchTeam } from '../../../utils/services/teams';
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
-import { BTN_LABEL_CONSTANTS, ENROLLMENT_TYPE, MSG_CONSTANTS, TAB_CONSTANTS, FATHOM_EVENTS, SETTINGS_CONSTANTS } from '../../../constants';
+import { BTN_LABEL_CONSTANTS, ENROLLMENT_TYPE, MSG_CONSTANTS, TAB_CONSTANTS, FATHOM_EVENTS, SETTINGS_CONSTANTS, APP_ANALYTICS_EVENTS } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-team.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
 import { ValidationErrorMessages } from '../../shared/account-setttings/validation-error-message';
 import { DiscardChangesPopup } from 'libs/ui/src/lib/modals/confirmation';
+import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditTeamModalProps {
@@ -182,8 +183,8 @@ export function EditTeamModal({
     officeHours: '',
   });
   const divRef = useRef<HTMLDivElement>(null);
-  const [resetImg, setResetImg] = useState(false); 
-
+  const [resetImg, setResetImg] = useState(false);
+  const analytics = useAppAnalytics()
   // const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
@@ -263,7 +264,7 @@ export function EditTeamModal({
           type:'error'
         });
         console.error(err);
-      }) 
+      })
       .finally(() => {
         setIsProcessing(false);
       });
@@ -403,7 +404,7 @@ export function EditTeamModal({
         const values = formatData();
         try {
           // const captchaToken = await executeRecaptcha();
-  
+
           // if (!captchaToken) return;
           let image;
           setIsProcessing(true);
@@ -437,6 +438,9 @@ export function EditTeamModal({
             .then((res) => {
               if (res.status === 200 && res.statusText === "OK")
                 setSaveCompleted(true);
+                analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_TEAM_PROFILE_EDIT_FORM, {
+                  'itemName': "COMPLETED"
+                })
                 if(fromSettings){
                   setModified(false);
                   setModifiedFlag(false);
@@ -534,6 +538,15 @@ export function EditTeamModal({
     return resetButton;
   }
 
+  const onTabSelected = (tab) => {
+    const allTabs = ["BASIC", "PROJECT DETAILS", "SOCIAL"]
+    setOpenTab(tab)
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_TEAM_PROFILE_EDIT_FORM, {
+      'itemName': allTabs[tab - 1]
+    })
+
+  }
+
   const handleReset = () => {
     if (fromSettings) {
       setResetImg(true);
@@ -561,6 +574,12 @@ export function EditTeamModal({
       setModifiedFlag(false);
     }
   }
+
+  useEffect(() => {
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_TEAM_PROFILE_EDIT_FORM, {
+      'itemName': "BASIC"
+    })
+  }, [])
 
   function beforeSaveTemplate() {
     return (
@@ -671,7 +690,7 @@ export function EditTeamModal({
                 <button
                   className={`w-1/4 border-b-4 border-transparent text-base font-medium ${openTab == 1 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
                     } ${basicErrors?.length > 0 && openTab == 1 ? 'border-b-[#DD2C5A] text-[#DD2C5A]' : basicErrors?.length > 0 ? 'text-[#DD2C5A]' : ''}`}
-                  onClick={() => setOpenTab(1)}
+                  onClick={() => onTabSelected(1)}
                 >
                   {' '}
                   {TAB_CONSTANTS.BASIC}{' '}
@@ -679,7 +698,7 @@ export function EditTeamModal({
                 <button
                   className={`w-1/4 border-b-4 border-transparent w-auto text-base font-medium ${openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
                     } ${projectErrors?.length > 0 && openTab == 2 ? 'border-b-[#DD2C5A] text-[#DD2C5A]' : projectErrors?.length > 0 ? 'text-[#DD2C5A]' : ''}`}
-                  onClick={() => setOpenTab(2)}
+                  onClick={() => onTabSelected(2)}
                 >
                   {' '}
                   {TAB_CONSTANTS.PROJECT_DETAILS}
@@ -687,7 +706,7 @@ export function EditTeamModal({
                 <button
                   className={`w-1/4 border-b-4  border-transparent text-base font-medium ${openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
                     } ${socialErrors?.length > 0 && openTab == 3 ? 'border-b-[#DD2C5A] text-[#DD2C5A]' : socialErrors?.length > 0 ? 'text-[#DD2C5A]' : ''}`}
-                  onClick={() => setOpenTab(3)}
+                  onClick={() => onTabSelected(3)}
                 >
                   {' '}
                   {TAB_CONSTANTS.SOCIAL}{' '}

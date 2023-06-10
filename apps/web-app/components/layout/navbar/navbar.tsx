@@ -12,8 +12,9 @@ import { JoinNetworkMenu } from './join-network-menu/join-network-menu';
 import { Login } from './login-menu/login-menu';
 import { Menu as AppMenu } from './menu/menu';
 import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/Logo_PLN_directory.svg';
-import { PAGE_ROUTES, FATHOM_EVENTS } from '../../../constants';
+import { PAGE_ROUTES, FATHOM_EVENTS, APP_ANALYTICS_EVENTS } from '../../../constants';
 import { createLogoutChannel } from '../../../utils/services/auth';
+import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
 // import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
@@ -32,6 +33,7 @@ type ISettingMenu = {
 
 export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
   const router = useRouter();
+  const analytics = useAppAnalytics()
   const settingMenu: ISettingMenu[] = [
     {
       icon: CogIcon,
@@ -39,6 +41,9 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
       url: `/directory/settings`,
       eventCode:  FATHOM_EVENTS.directory.settings,
       onClick: () => {
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.NAVBAR_ACCOUNTMENU_ITEM_CLICKED, {
+          'itemName': 'settings'
+        })
         if (!Cookies.get('refreshToken')) {
           Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
           window.location.href = PAGE_ROUTES.TEAMS;
@@ -51,6 +56,9 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
       url: '#',
       eventCode: FATHOM_EVENTS.directory.logout,
       onClick: () => {
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.NAVBAR_ACCOUNTMENU_ITEM_CLICKED, {
+          'itemName': 'logout'
+        })
         Cookies.remove('authToken')
         Cookies.remove('refreshToken')
         Cookies.remove('userInfo')
@@ -86,7 +94,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
           <div className="flex h-14 w-full justify-end">
             {userInfo.name && (
               <div className="max-w-[200px] select-none flex gap-1 my-auto font-medium text-slate-600 mr-2">
-                <span>Welcome</span> 
+                <span>Welcome</span>
                 <Tooltip asChild
                 trigger={
                 <p className="select-none truncate">{userInfo?.name}</p>

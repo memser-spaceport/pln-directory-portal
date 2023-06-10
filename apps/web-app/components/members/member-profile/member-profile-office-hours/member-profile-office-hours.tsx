@@ -3,7 +3,7 @@ import { AnchorLink, Tooltip } from '@protocol-labs-network/ui';
 import { trackGoal } from 'fathom-client';
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
-import { FATHOM_EVENTS, OFFICE_HOURS_MSG } from '../../../../constants';
+import { APP_ANALYTICS_EVENTS, FATHOM_EVENTS, OFFICE_HOURS_MSG } from '../../../../constants';
 import { authenticate } from '../../../../utils/services/auth';
 import { IMember } from '../../../../../web-app/utils/members.types';
 import useAppAnalytics from '../../../../../web-app/hooks/shared/use-app-analytics';
@@ -38,7 +38,7 @@ export function MemberProfileOfficeHours({
   const onScheduleMeeting = () => {
     trackGoal(FATHOM_EVENTS.members.profile.officeHours.scheduleMeeting, 0);
     if (member) {
-      analytics.captureEvent('office-hours-clicked', {
+      analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_OFFICEHOURS_CLICKED, {
         name: member.name,
         uid: member.id,
       });
@@ -52,7 +52,7 @@ export function MemberProfileOfficeHours({
           <CalendarIcon className="stroke-1.5 h-4 w-4 rounded text-blue-700" />
         </span>
         {!userInfo.uid ? (
-          
+
           <p className="text-sm font-normal flex items-center gap-2">
             {OFFICE_HOURS_MSG} <span>
             <Tooltip

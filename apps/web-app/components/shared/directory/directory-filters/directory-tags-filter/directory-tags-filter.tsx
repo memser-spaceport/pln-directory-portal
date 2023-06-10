@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { DirectoryFilter } from '../directory-filter/directory-filter';
 import { IFilterTag } from './directory-tags-filter.types';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
+import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
 
 
 export interface DirectoryTagsFilterProps {
@@ -26,7 +27,7 @@ export function DirectoryTagsFilter({
   const analytics = useAppAnalytics()
   const onTagClicked = (tagProps, index) => {
     if(tagProps.selected === false) {
-      analytics.captureEvent('filter-applied', {
+      analytics.captureEvent(APP_ANALYTICS_EVENTS.FILTERS_APPLIED, {
         name: title,
         value: tagProps.value,
         nameAndValue: `${title}-${tagProps.value}`

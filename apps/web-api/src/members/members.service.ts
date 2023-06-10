@@ -210,10 +210,6 @@ export class MembersService {
       throw new ForbiddenException();
     }
     participantsRequest.requesterEmailId = requestorDetails.email;
-    console.log(
-      'safe parse',
-      ParticipantRequestMemberSchema.safeParse(participantsRequest)
-    );
     if (
       participantsRequest.participantType ===
         ParticipantType.MEMBER.toString() &&
@@ -262,7 +258,7 @@ export class MembersService {
         throw new HttpException(
           error?.response?.message,
           error?.response?.statusCode
-        )
+        );
       } else {
         throw new BadRequestException('Invalid Data');
       }
