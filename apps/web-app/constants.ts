@@ -148,6 +148,22 @@ export const APP_ANALYTICS_EVENTS = {
   MEMBER_CLICKED: 'member-clicked',
   MEMBER_JOIN_NETWORK_FORM_STEPS: 'member-join-network-form-steps',
 
+  USER_VERIFICATION_INIT: 'user-verification-init',
+  USER_VERIFICATION_SEND_OTP: 'user-verification-sendotp',
+  USER_VERIFICATION_RESEND_OTP: 'user-verification-resendotp',
+  USER_VERIFICATION_VERIFY_OTP: 'user-verification-verifyotp',
+  USER_VERIFICATION_SUCCESS: 'user-verification-success',
+
+  SETTINGS_USER_CHANGE_EMAIL_CLICKED: 'settings-user-change-email-clicked',
+  SETTINGS_USER_CHANGE_EMAIL_CANCELLED: 'settings-user-change-email-cancelled',
+  SETTINGS_USER_CHANGE_EMAIL_SEND_OTP: 'settings-user-change-email-sendotp',
+  SETTINGS_USER_CHANGE_EMAIL_RESEND_OTP: 'settings-user-change-email-resendotp',
+  SETTINGS_USER_CHANGE_EMAIL_VERIFY_OTP: 'settings-user-change-email-verifyotp',
+  SETTINGS_USER_CHANGE_EMAIL_SUCCESS: 'settings-user-change-email-success',
+  SETTINGS_MEMBER_CHANGE_EMAIL_CLICKED: 'settings-member-change-email-clicked',
+  SETTINGS_MEMBER_CHANGE_EMAIL_CANCELLED: 'settings-member-change-email-cancelled',
+  SETTINGS_MEMBER_CHANGE_EMAIL_SUCCESS: 'settings-member-change-email-success',
+
   SETTINGS_USER_PROFILE_EDIT_FORM: 'settings-user-profile-edit-form',
   SETTINGS_MEMBER_PROFILE_EDIT_FORM: 'settings-member-profile-edit-form',
   SETTINGS_TEAM_PROFILE_EDIT_FORM: 'settings-team-profile-edit-form',

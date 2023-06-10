@@ -222,6 +222,7 @@ export function EditMemberModal({
   const divRef = useRef<HTMLDivElement>(null);
 
   const onCancelEmailChange = () => {
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_CHANGE_EMAIL_CANCELLED, {})
     setEmailEditStatus(false);
     handleInputChange({
       target: { name: 'email', value: currentEmail },
@@ -243,6 +244,7 @@ export function EditMemberModal({
 
   const onEmailChange = () => {
     if(isUserProfile) {
+      analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_USER_CHANGE_EMAIL_CLICKED, {})
       const authToken = Cookies.get('authToken');
       if(!authToken) {
         return;
@@ -258,6 +260,7 @@ export function EditMemberModal({
        .catch(e => console.error(e))
       // .finally(() =>  setIsProcessing(false))
     } else {
+      analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_CHANGE_EMAIL_CLICKED, {})
       setEmailEditStatus(true);
     }
   };
@@ -584,6 +587,7 @@ export function EditMemberModal({
               if (isEmailEditActive) {
                 setCurrentEmail(formValues.email as any);
                 setEmailEditStatus(false);
+                analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_CHANGE_EMAIL_SUCCESS, {})
               }
               analytics.captureEvent(isUserProfile? APP_ANALYTICS_EVENTS.SETTINGS_USER_PROFILE_EDIT_FORM: APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_PROFILE_EDIT_FORM, {
                 'name': 'COMPLETED'
