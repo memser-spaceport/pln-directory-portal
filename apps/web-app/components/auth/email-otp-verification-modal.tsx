@@ -9,7 +9,8 @@ import { calculateExpiry, decodeToken } from "../../utils/services/auth";
 import ErrorBox from "./error-box";
 import { toast } from "react-toastify";
 import { ReactComponent as SuccessIcon } from '../../public/assets/images/icons/success.svg';
-import { EMAIL_OTP_CONSTANTS } from "../../constants";
+import { APP_ANALYTICS_EVENTS, EMAIL_OTP_CONSTANTS } from "../../constants";
+import useAppAnalytics from "../../hooks/shared/use-app-analytics";
 function EmailOtpVerificationModal() {
     // States
     const [showDialog, setDialogStatus] = useState(false);
@@ -17,6 +18,7 @@ function EmailOtpVerificationModal() {
     const [isLoaderActive, setLoaderStatus] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [resendInSeconds, setResendInSeconds] = useState(30);
+    const analytics = useAppAnalytics()
 
 
     const setNewTokensAndUserInfo = (allTokens, userInfo) => {
@@ -43,11 +45,13 @@ function EmailOtpVerificationModal() {
             }
 
             setLoaderStatus(true)
+            analytics.captureEvent(APP_ANALYTICS_EVENTS.USER_VERIFICATION_VERIFY_OTP, {})
             const data = await validateEmailOtp(otpPayload)
             setLoaderStatus(false)
             if (data?.userInfo) {
                 setNewTokensAndUserInfo(data?.newTokens, data?.userInfo)
                 clearAllOtpSessionVaribles()
+                analytics.captureEvent(APP_ANALYTICS_EVENTS.USER_VERIFICATION_SUCCESS, {})
                 setDialogStatus(false);
                 localStorage.removeItem('otp-verification-email');
                 localStorage.setItem('otp-verify', 'success')
@@ -77,6 +81,7 @@ function EmailOtpVerificationModal() {
         try {
             setLoaderStatus(true)
             const otpPayload = { email, clientToken, otpToken }
+            analytics.captureEvent(APP_ANALYTICS_EVENTS.USER_VERIFICATION_RESEND_OTP, {})
             const d = await resendEmailVerificationOtp(otpPayload);
             setLoaderStatus(false)
 
@@ -107,6 +112,7 @@ function EmailOtpVerificationModal() {
             const otpPayload = { email, clientToken }
             setErrorMessage('')
             setLoaderStatus(true)
+            analytics.captureEvent(APP_ANALYTICS_EVENTS.USER_VERIFICATION_SEND_OTP, {email})
             const d = await sendEmailVerificationOtp(otpPayload);
             setLoaderStatus(false)
             const uniqueEmailVerifyToken = d.token;
@@ -198,6 +204,7 @@ function EmailOtpVerificationModal() {
                 setResendInSeconds(30)
             }
             Cookies.remove('show-email-verification-box')
+            analytics.captureEvent(APP_ANALYTICS_EVENTS.USER_VERIFICATION_INIT, {})
             setDialogStatus(true)
         } else {
             clearAllOtpSessionVaribles();

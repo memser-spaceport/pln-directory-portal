@@ -7,13 +7,15 @@ import EmailSubmissionForm from "./email-submission-form";
 import OtpSubmissionForm from "./otp-submission-form";
 import { calculateExpiry, decodeToken } from "../../utils/services/auth";
 import ErrorBox from "./error-box";
-import { EMAIL_OTP_CONSTANTS } from "../../constants";
+import { APP_ANALYTICS_EVENTS, EMAIL_OTP_CONSTANTS } from "../../constants";
+import useAppAnalytics from "../../hooks/shared/use-app-analytics";
 function ChangeEmailModal(props) {
     // States
     const [verificationStep, setVerificationStep] = useState(1)
     const [isLoaderActive, setLoaderStatus] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [resendInSeconds, setResendInSeconds] = useState(30);
+    const analytics = useAppAnalytics()
 
     // Variables
     const onClose = props.onClose
@@ -58,11 +60,13 @@ function ChangeEmailModal(props) {
 
             setLoaderStatus(true)
             const headers = {Authorization: `Bearer ${JSON.parse(accessToken)}`}
+            analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_USER_CHANGE_EMAIL_VERIFY_OTP, {})
             const data = await verifyOtpForChangeEmail(otpPayload, headers)
             setLoaderStatus(false)
             if (data?.userInfo) {
                 setNewTokensAndUserInfo(data?.newTokens, data?.userInfo)
                 clearAllOtpSessionVaribles()
+                analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_USER_CHANGE_EMAIL_SUCCESS, {})
                 onClose(null);
                 Cookies.set('page_params', 'email_changed', { expires: 60, path: '/' });
                 window.location.reload()
@@ -98,6 +102,7 @@ function ChangeEmailModal(props) {
             setLoaderStatus(true)
             const otpPayload = {newEmail,clientToken, otpToken}
             const headers = {Authorization: `Bearer ${JSON.parse(accessToken)}`}
+            analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_USER_CHANGE_EMAIL_RESEND_OTP, {})
             const d = await resendOtpForEmailChange(otpPayload, headers);
             setLoaderStatus(false)
 
@@ -128,6 +133,7 @@ function ChangeEmailModal(props) {
             const headers = {Authorization: `Bearer ${JSON.parse(accessToken)}`}
             setErrorMessage('')
             setLoaderStatus(true)
+            analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_USER_CHANGE_EMAIL_SEND_OTP, {})
             const d = await sendOtpForEmailChange(otpPayload, headers);
             setLoaderStatus(false)
             const uniqueEmailVerifyToken = d.token;
