@@ -494,6 +494,7 @@ export function EditMemberModal({
         if (setRefreshMemberAutocomplete) {
           setRefreshMemberAutocomplete(false);
         }
+        setSaveCompleted(false);
         setErrors([]);
         const { basicFormErrors, skillFormErrors, errors } = validateForm(
           formValues,
@@ -622,7 +623,6 @@ export function EditMemberModal({
         : Math.max(...newRoles.map((item) => item.rowId + 1));
     newRoles.push({ teamUid: '', teamTitle: '', role: '', rowId: counter });
     setFormValues({ ...formValues, teamAndRoles: newRoles });
-    setSaveCompleted(false);
     setModified(true);
     setModifiedFlag(true);
   }
@@ -633,7 +633,6 @@ export function EditMemberModal({
     newTeamAndRoles[index].teamUid = teamUid;
     newTeamAndRoles[index].teamTitle = teamTitle;
     setFormValues({ ...formValues, teamAndRoles: newTeamAndRoles });
-    setSaveCompleted(false);
     setModified(true);
     setModifiedFlag(true);
   }
@@ -643,7 +642,6 @@ export function EditMemberModal({
     const index = newTeamAndRoles.findIndex((item) => item.rowId == rowId);
     newTeamAndRoles[index].role = role;
     setFormValues({ ...formValues, teamAndRoles: newTeamAndRoles });
-    setSaveCompleted(false);
     setModified(true);
     setModifiedFlag(true);
   }
@@ -654,7 +652,6 @@ export function EditMemberModal({
     if(name==='name'){
       setNameChanged(true);
     }
-    setSaveCompleted(false);
     setModified(true);
     setModifiedFlag(true);
   }
@@ -689,7 +686,6 @@ export function EditMemberModal({
       (item) => item.rowId != rowId
     );
     setFormValues({ ...formValues, teamAndRoles: newRoles });
-    setSaveCompleted(false);
     setModified(true);
     setModifiedFlag(true);
   }

@@ -30,15 +30,15 @@ export function MemberCard({
     .map((team) => team.name)
     .sort();
   const role = member.mainTeam?.role || 'Contributor';
-  const analytics = useAppAnalytics()
+  const analytics = useAppAnalytics();
 
   const onMemberClicked = () => {
     analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_CLICKED, {
       uid: member.id,
       name: member.name,
-      backLink: backLink
-    })
-  }
+      backLink: backLink,
+    });
+  };
 
   return (
     <DirectoryCard
@@ -81,8 +81,19 @@ export function MemberCard({
           }`}
         >
           <div className="flex items-center justify-center">
-            <div className="overflow-hidden text-ellipsis whitespace-nowrap font-medium">
-              {(member.teams.length && mainTeam?.name) || '-'}
+            <div className="max-w-[250px] font-medium">
+              {(member.teams.length && (
+                <Tooltip
+                  asChild whitespace-nowrap 
+                  trigger={
+                    <p className="select-none truncate">
+                      {mainTeam?.name}
+                    </p>
+                  }
+                  content={mainTeam?.name}
+                />
+              )) ||
+                '-'}
             </div>
             {otherTeams.length ? (
               <Tooltip

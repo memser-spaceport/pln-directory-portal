@@ -22,9 +22,7 @@ export function MemberProfileHeader({
     .sort();
   const memberRole = mainTeam?.role || 'Contributor';
   const isOpenToWorkEnabled =
-    process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK === 'true'
-      ? true
-      : false;
+    process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK === 'true' ? true : false;
   return (
     <div className="relative flex w-full justify-between space-x-4">
       <div
@@ -55,14 +53,14 @@ export function MemberProfileHeader({
           content={name}
         />
         <div className="flex items-center">
-          <div className="max-w-[150px] overflow-hidden truncate text-ellipsis whitespace-nowrap font-medium">
-            <Tooltip
-              asChild
-              trigger={
-                <p className="mt-0.5 select-none truncate">{mainTeam?.name}</p>
-              }
-              content={mainTeam?.name}
-            />
+        <div className="w-full font-medium">
+          <Tooltip
+            asChild
+            trigger={
+              <p className="mt-0.5 select-none truncate">{mainTeam?.name}</p>
+            }
+            content={mainTeam?.name}
+          />
           </div>
           {otherTeams.length ? (
             <Tooltip
@@ -121,7 +119,7 @@ export function MemberProfileHeader({
           {isOpenToWorkEnabled && openToWork ? (
             <span className="flex h-10 w-10 select-none  items-center justify-center rounded-full border border-slate-200 p-2 shadow-[0_1px_2px_rgba(15,23,42,0.16)]">
               <i className="flex h-6 w-6 shrink-0 cursor-none items-center justify-center rounded-full  not-italic text-white active:bg-black ">
-                <OpenToWorkBadge size="7" />
+                <OpenToWorkBadge type="PAGE" />
               </i>
             </span>
           ) : null}

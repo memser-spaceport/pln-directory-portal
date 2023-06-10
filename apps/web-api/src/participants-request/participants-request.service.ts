@@ -253,7 +253,7 @@ export class ParticipantsRequestService {
       where: { uid: uidToReject },
     });
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      throw new BadRequestException("Request already processed")
+      throw new BadRequestException('Request already processed');
     }
     await this.prisma.participantsRequest.update({
       where: { uid: uidToReject },
@@ -270,7 +270,7 @@ export class ParticipantsRequestService {
     });
 
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      throw new BadRequestException("Request already processed");
+      throw new BadRequestException('Request already processed');
     }
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
@@ -393,7 +393,7 @@ export class ParticipantsRequestService {
         where: { uid: uidToEdit },
       });
     if (dataFromDB?.status !== ApprovalStatus.PENDING.toString()) {
-      throw new BadRequestException("Request already processed")
+      throw new BadRequestException('Request already processed');
     }
     const existingData: any = await transactionType.member.findUnique({
       where: { uid: dataFromDB.referenceUid },
@@ -536,7 +536,8 @@ export class ParticipantsRequestService {
     tx
   ) {
     const dataToProcess = dataFromDB?.newData;
-    const isEmailChange = existingData.email !== dataToProcess.email ? true : false;
+    const isEmailChange =
+      existingData.email !== dataToProcess.email ? true : false;
     const isExternalIdAvailable = existingData.externalId ? true : false;
     // Team member roles relational mapping
     const oldTeamUids = [...existingData.teamMemberRoles].map((t) => t.teamUid);
@@ -630,7 +631,7 @@ export class ParticipantsRequestService {
         email: dataToSave.email,
         existingEmail: existingData.email,
         userId: existingData.externalId,
-        deleteAndReplace: true
+        deleteAndReplace: true,
       };
       await axios.patch(
         `${process.env.AUTH_API_URL}/admin/accounts/email`,
@@ -660,7 +661,7 @@ export class ParticipantsRequestService {
       where: { uid: uidToApprove },
     });
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      throw new BadRequestException("Request already processed")
+      throw new BadRequestException('Request already processed');
     }
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
@@ -757,13 +758,14 @@ export class ParticipantsRequestService {
   async processTeamEditRequest(
     uidToEdit,
     disableNotification = false,
-    isAutoApproval = false
+    isAutoApproval = false,
+    transactionType: Prisma.TransactionClient | PrismaClient = this.prisma
   ) {
-    const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
+    const dataFromDB: any = await transactionType.participantsRequest.findUnique({
       where: { uid: uidToEdit },
     });
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      throw new BadRequestException("Request already processed")
+      throw new BadRequestException('Request already processed');
     }
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
@@ -837,14 +839,30 @@ export class ParticipantsRequestService {
       }),
     };
 
-    await this.prisma.$transaction(async (tx) => {
-      // Update data
-      await tx.team.update({
+    if (transactionType === this.prisma) {
+      await this.prisma.$transaction(async (tx) => {
+        // Update data
+        await tx.team.update({
+          where: { uid: dataFromDB.referenceUid },
+          data: { ...dataToSave },
+        });
+        // Updating status
+        await tx.participantsRequest.update({
+          where: { uid: uidToEdit },
+          data: {
+            status: isAutoApproval
+              ? ApprovalStatus.AUTOAPPROVED
+              : ApprovalStatus.APPROVED,
+          },
+        });
+      });
+    } else {
+      await transactionType.team.update({
         where: { uid: dataFromDB.referenceUid },
         data: { ...dataToSave },
       });
       // Updating status
-      await tx.participantsRequest.update({
+      await transactionType.participantsRequest.update({
         where: { uid: uidToEdit },
         data: {
           status: isAutoApproval
@@ -852,7 +870,8 @@ export class ParticipantsRequestService {
             : ApprovalStatus.APPROVED,
         },
       });
-    });
+    }
+
     if (!disableNotification) {
       await this.awsService.sendEmail('TeamEditRequestCompleted', true, [], {
         teamName: dataToProcess.name,
