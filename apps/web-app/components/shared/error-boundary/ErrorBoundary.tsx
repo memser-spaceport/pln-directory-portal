@@ -1,5 +1,7 @@
 import React from 'react';
 import Image from 'next/image';
+import Link from 'next/link'
+import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/Logo_PLN_directory.svg';
 import { ReactComponent as Thunder } from '/public/assets/images/icons/thunder.svg';
 import { ReactComponent as Error } from '/public/assets/images/icons/error.svg';
 class ErrorBoundary extends React.Component<{}, { hasError: boolean }> {
@@ -21,28 +23,39 @@ class ErrorBoundary extends React.Component<{}, { hasError: boolean }> {
       if (this.state.hasError) {
         // You can render any custom fallback UI
         return (
-          <div className='h-screen w-full flex flex-col justify-center'>
-            <div className="mx-auto relative">
-              <Image
-                src='/assets/images/error.png'
-                width={392}
-                height={124}
-                alt="Profile Picture"
-                quality={100}
-                className="relative"
-                >
-              </Image>
-              <Thunder className="absolute w-7 h-7 left-20 top-5"/>
-              <Error className="absolute w-6 h-6 right-20 top-20"/>
-            </div>  
-            <div className='text-3xl text-center w-96 mx-auto font-bold'>Oh snap! Something went wrong!</div>
-            <button
-              onClick={() => {
-                window.location.href='/';
-              }}
-              className="shadow-special-button-default inline-flex w-40 mx-auto mt-4 justify-center rounded-full bg-[#156FF7] px-6 py-2 text-base font-semibold leading-6 text-white outline-none"
-            > Back to home
-            </button>
+          <div className='h-screen w-full flex flex-col justify-center items-center'>
+             <Link href="/directory">
+              <a className="on-focus w-[150] mx-auto mb-7">
+                <ProtocolLabsLogo
+                  title="Protocol Labs Network Directory Beta Black Logo"
+                  width="212"
+                  height="60"
+                />
+              </a>
+            </Link>
+            <div className='w-[500px] h-96 bg-white flex flex-col justify-center items-center rounded-md'>
+              <div className="relative">
+                <Image
+                  src='/assets/images/error.png'
+                  width={350}
+                  height={150}
+                  alt="Profile Picture"
+                  quality={100}
+                  className="relative"
+                  >
+                </Image>
+                <Thunder className="absolute w-7 h-7 left-18 top-5"/>
+                <Error className="absolute w-6 h-6 right-20 top-20"/>
+              </div>  
+              <div className='text-2xl text-center w-[350px] font-bold mt-5'>Oh snap! Something went wrong!</div>
+              <button
+                onClick={() => {
+                  window.location.href='/';
+                }}
+                className="shadow-special-button-default inline-flex w-40 mt-8 justify-center rounded-full bg-[#156FF7] px-6 py-2 text-base font-semibold leading-6 text-white outline-none"
+              > Back to home
+              </button>
+            </div>
           </div> 
         );
       }
