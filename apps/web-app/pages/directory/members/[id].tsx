@@ -23,7 +23,10 @@ import { IMember, IGitRepositories } from '../../../utils/members.types';
 import { parseMember, maskMemberDetails } from '../../../utils/members.utils';
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
-import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../../utils/services/auth';
+import {
+  renewAndStoreNewAccessToken,
+  convertCookiesToJson,
+} from '../../../utils/services/auth';
 import { MemberProfileLoginStrip } from '../../../components/members/member-profile/member-profile-login-strip/member-profile-login-strip';
 
 interface MemberProps {
@@ -69,8 +72,8 @@ export default function Member({
 
       <Breadcrumb items={breadcrumbItems} classname="max-w-[150px] truncate" />
 
-      <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-40">
-        <div className=''>
+      <section className="space-x-7.5 mx-auto mb-10 w-[917px] max-w-[917px] px-10 pt-40">
+        <div className="">
           {!userInfo?.uid && (
             <MemberProfileLoginStrip member={member} userInfo={userInfo} />
           )}
@@ -107,20 +110,16 @@ Member.getLayout = function getLayout(page: ReactElement) {
 };
 
 export const getServerSideProps = async (ctx) => {
-  const {
-    query,
-    res,
-    req
-  } = ctx;
-  
+  const { query, res, req } = ctx;
+
   let cookies = req?.cookies;
   if (!cookies?.authToken) {
     await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
-    if (ctx.res.getHeader('Set-Cookie')) 
+    if (ctx.res.getHeader('Set-Cookie'))
       cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
   }
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
-  const isUserLoggedIn = cookies?.authToken &&  cookies?.userInfo ? true : false;
+  const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
   const isMaskingRequired = cookies?.authToken ? false : true;
   const { id, backLink = '/directory/members' } = query as {
     id: string;
