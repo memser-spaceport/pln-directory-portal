@@ -212,3 +212,13 @@ nextjs-portal {
   background: rgba(255, 255, 255, 0.3);
 }
 }
+
+.gradiant-border {
+  border: double 2px transparent;
+  border-radius: 8px;
+  background-image: linear-gradient(white, white), 
+                    linear-gradient(to right,  #427DFF,#44D5BB);
+  background-origin: border-box;
+  background-clip: content-box, border-box;
+  border-image-slice: 30;
+}
