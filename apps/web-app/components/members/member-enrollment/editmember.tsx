@@ -15,7 +15,12 @@ import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
 import { ValidationErrorMessages } from '../../../components/shared/account-setttings/validation-error-message';
-import { MSG_CONSTANTS, PAGE_ROUTES, FATHOM_EVENTS, APP_ANALYTICS_EVENTS } from '../../../constants';
+import {
+  MSG_CONSTANTS,
+  PAGE_ROUTES,
+  FATHOM_EVENTS,
+  APP_ANALYTICS_EVENTS,
+} from '../../../constants';
 import { RequestPending } from '../../shared/request-pending/request-pending';
 import { IFormValues } from '../../../utils/members.types';
 import Modal from '../../layout/navbar/modal/modal';
@@ -180,7 +185,7 @@ export function EditMemberModal({
   const [imageUrl, setImageUrl] = useState<string>();
   const [emailExists, setEmailExists] = useState<boolean>(false);
   const [imageChanged, setImageChanged] = useState<boolean>(false);
-  const [isNameChanged,setNameChanged]= useState<boolean>(false);
+  const [isNameChanged, setNameChanged] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveCompleted, setSaveCompleted] = useState<boolean>(false);
   const [disableSubmit, setDisableSubmit] = useState<boolean>(false);
@@ -217,12 +222,15 @@ export function EditMemberModal({
   const [reset, setReset] = useState(false);
   const router = useRouter();
   const [resetImg, setResetImg] = useState(false);
-  const analytics = useAppAnalytics()
+  const analytics = useAppAnalytics();
 
   const divRef = useRef<HTMLDivElement>(null);
 
   const onCancelEmailChange = () => {
-    analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_CHANGE_EMAIL_CANCELLED, {})
+    analytics.captureEvent(
+      APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_CHANGE_EMAIL_CANCELLED,
+      {}
+    );
     setEmailEditStatus(false);
     handleInputChange({
       target: { name: 'email', value: currentEmail },
@@ -235,32 +243,39 @@ export function EditMemberModal({
 
   const onChangeEmailClose = (step) => {
     setEmailEditStatus(false);
-    if(step && step === 3) {
+    if (step && step === 3) {
       window.location.reload();
       return;
     }
-
   };
 
   const onEmailChange = () => {
-    if(isUserProfile) {
-      analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_USER_CHANGE_EMAIL_CLICKED, {})
+    if (isUserProfile) {
+      analytics.captureEvent(
+        APP_ANALYTICS_EVENTS.SETTINGS_USER_CHANGE_EMAIL_CLICKED,
+        {}
+      );
       const authToken = Cookies.get('authToken');
-      if(!authToken) {
+      if (!authToken) {
         return;
       }
-      const formattedJson = JSON.parse(authToken)
+      const formattedJson = JSON.parse(authToken);
       //setIsProcessing(true)
       getClientToken(formattedJson)
-       .then(d => {
-        const clientTokenExpiry = decodeToken(d);
-        Cookies.set('clientAccessToken', d, {expires: new Date(clientTokenExpiry.exp * 1000)})
-        setEmailEditStatus(true)
-       })
-       .catch(e => console.error(e))
+        .then((d) => {
+          const clientTokenExpiry = decodeToken(d);
+          Cookies.set('clientAccessToken', d, {
+            expires: new Date(clientTokenExpiry.exp * 1000),
+          });
+          setEmailEditStatus(true);
+        })
+        .catch((e) => console.error(e));
       // .finally(() =>  setIsProcessing(false))
     } else {
-      analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_CHANGE_EMAIL_CLICKED, {})
+      analytics.captureEvent(
+        APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_CHANGE_EMAIL_CLICKED,
+        {}
+      );
       setEmailEditStatus(true);
     }
   };
@@ -291,23 +306,23 @@ export function EditMemberModal({
         let counter = 1;
 
         let teamAndRoles = member?.teamMemberRoles?.length
-        ? member.teamMemberRoles
-        : [];
-      teamAndRoles = orderBy(
-        teamAndRoles,
-        ['mainTeam', 'team.name'],
-        ['desc', 'asc']
-      );
+          ? member.teamMemberRoles
+          : [];
+        teamAndRoles = orderBy(
+          teamAndRoles,
+          ['mainTeam', 'team.name'],
+          ['desc', 'asc']
+        );
 
-      teamAndRoles = teamAndRoles?.map((item) => {
-        return {
-          role: item.role,
-          teamUid: item?.team?.uid,
-          teamTitle: item?.team?.name,
-          rowId: counter++,
-          mainTeam: item.mainTeam,
-        };
-      });
+        teamAndRoles = teamAndRoles?.map((item) => {
+          return {
+            role: item.role,
+            teamUid: item?.team?.uid,
+            teamTitle: item?.team?.name,
+            rowId: counter++,
+            mainTeam: item.mainTeam,
+          };
+        });
         setCurrentEmail(member?.email);
         const formValues = {
           name: member?.name,
@@ -316,7 +331,7 @@ export function EditMemberModal({
           imageUid: member?.imageUid,
           imageFile: null,
           plnStartDate: member?.plnStartDate
-            ? new Date(member?.plnStartDate).toLocaleDateString('af-ZA')
+            ? new Date(member?.plnStartDate).toISOString().split('T')[0]
             : null,
           city: member?.location?.city,
           region: member?.location?.region,
@@ -457,7 +472,10 @@ export function EditMemberModal({
       twitterHandler: formValues.twitterHandler?.trim(),
       githubHandler: formValues.githubHandler?.trim(),
       telegramHandler: formValues.telegramHandler?.trim(),
-      officeHours: formValues.officeHours?.trim() === ''? null : formValues.officeHours?.trim(),
+      officeHours:
+        formValues.officeHours?.trim() === ''
+          ? null
+          : formValues.officeHours?.trim(),
       comments: formValues.comments?.trim(),
       plnStartDate: formValues.plnStartDate
         ? new Date(formValues.plnStartDate)?.toISOString()
@@ -536,11 +554,12 @@ export function EditMemberModal({
                 'content-type': 'multipart/form-data',
               },
             };
-            image = await api
-              .post(`/v1/images`, formData, config)
-              .then((response) => {
-                return response?.data?.image;
-              });
+            const imageResponse = await api.post(
+              `/v1/images`,
+              formData,
+              config
+            );
+            image = imageResponse?.data?.image;
           }
 
           delete values?.imageFile;
@@ -573,27 +592,37 @@ export function EditMemberModal({
               return false;
             }
           }
-          await api.put(`/v1/member/${id}`, data).then((response) => {
-            if (response.status === 200 && response.statusText === 'OK') {
-              setSaveCompleted(true);
-              setModified(false);
-              setModifiedFlag(false);
-              setOpenTab(1);
-              setBasicErrors([]);
-              setSkillErrors([]);
-              if ((imageChanged || isNameChanged) && setRefreshMemberAutocomplete) {
-                setRefreshMemberAutocomplete(true);
-              }
-              if (isEmailEditActive) {
-                setCurrentEmail(formValues.email as any);
-                setEmailEditStatus(false);
-                analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_CHANGE_EMAIL_SUCCESS, {})
-              }
-              analytics.captureEvent(isUserProfile? APP_ANALYTICS_EVENTS.SETTINGS_USER_PROFILE_EDIT_FORM: APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_PROFILE_EDIT_FORM, {
-                'name': 'COMPLETED'
-              })
+          const response = await api.put(`/v1/member/${id}`, data);
+          if (response.status === 200 && response.statusText === 'OK') {
+            setSaveCompleted(true);
+            setModified(false);
+            setModifiedFlag(false);
+            setOpenTab(1);
+            setBasicErrors([]);
+            setSkillErrors([]);
+            if (
+              (imageChanged || isNameChanged) &&
+              setRefreshMemberAutocomplete
+            ) {
+              setRefreshMemberAutocomplete(true);
             }
-          });
+            if (isEmailEditActive) {
+              setCurrentEmail(formValues.email as any);
+              setEmailEditStatus(false);
+              analytics.captureEvent(
+                APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_CHANGE_EMAIL_SUCCESS,
+                {}
+              );
+            }
+            analytics.captureEvent(
+              isUserProfile
+                ? APP_ANALYTICS_EVENTS.SETTINGS_USER_PROFILE_EDIT_FORM
+                : APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_PROFILE_EDIT_FORM,
+              {
+                name: 'COMPLETED',
+              }
+            );
+          }
         } catch (err) {
           // if (err?.response?.status === 400) {
           //   toast(err?.response?.data?.message, {
@@ -653,7 +682,7 @@ export function EditMemberModal({
   function handleInputChange(event) {
     const { name, value } = event.target;
     setFormValues({ ...formValues, [name]: value });
-    if(name==='name'){
+    if (name === 'name') {
       setNameChanged(true);
     }
     setModified(true);
@@ -695,24 +724,32 @@ export function EditMemberModal({
   }
 
   const onTabClicked = (tab) => {
-    const tabs = ["BASIC", "SKILLS", "SOCIAL"];
-    analytics.captureEvent(isUserProfile? APP_ANALYTICS_EVENTS.SETTINGS_USER_PROFILE_EDIT_FORM: APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_PROFILE_EDIT_FORM, {
-      'name': tabs[tab - 1]
-    })
-    setOpenTab(tab)
-  }
+    const tabs = ['BASIC', 'SKILLS', 'SOCIAL'];
+    analytics.captureEvent(
+      isUserProfile
+        ? APP_ANALYTICS_EVENTS.SETTINGS_USER_PROFILE_EDIT_FORM
+        : APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_PROFILE_EDIT_FORM,
+      {
+        name: tabs[tab - 1],
+      }
+    );
+    setOpenTab(tab);
+  };
 
   useEffect(() => {
-    setEmailEditStatus(false)
-    const tabs = ["BASIC", "SKILLS", "SOCIAL"]
-    analytics.captureEvent(isUserProfile? APP_ANALYTICS_EVENTS.SETTINGS_USER_PROFILE_EDIT_FORM: APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_PROFILE_EDIT_FORM, {
-      'name': tabs[0]
-    })
-  }, [isUserProfile, id])
+    setEmailEditStatus(false);
+    const tabs = ['BASIC', 'SKILLS', 'SOCIAL'];
+    analytics.captureEvent(
+      isUserProfile
+        ? APP_ANALYTICS_EVENTS.SETTINGS_USER_PROFILE_EDIT_FORM
+        : APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_PROFILE_EDIT_FORM,
+      {
+        name: tabs[0],
+      }
+    );
+  }, [isUserProfile, id]);
 
-  useEffect(() => {
-
-  }, [])
+  useEffect(() => {}, []);
 
   return (
     <>

@@ -5,10 +5,11 @@ import { AppModule } from './app.module';
 import { mainConfig } from './main.config';
 import { APP_ENV } from './utils/constants';
 import agent from './utils/forest-admin/agent';
+import { SetupService } from './setup.service';
 
 export async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'verbose'],
+    logger: new SetupService().setupLog(),
   });
 
   // Responsible for loading every major app configuration:

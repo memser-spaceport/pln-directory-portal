@@ -20,7 +20,11 @@ import {
 } from '../../../utils/services/dropdown-service';
 
 import api from '../../../utils/api';
-import { APP_ANALYTICS_EVENTS, ENROLLMENT_TYPE, FATHOM_EVENTS } from '../../../constants';
+import {
+  APP_ANALYTICS_EVENTS,
+  ENROLLMENT_TYPE,
+  FATHOM_EVENTS,
+} from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/create-member.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
@@ -101,9 +105,9 @@ function handleNextClick(
     setErrors(errors);
     return false;
   }
-   analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_JOIN_NETWORK_FORM_STEPS, {
-    'itemName': steps[formStep].name
-  })
+  analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_JOIN_NETWORK_FORM_STEPS, {
+    itemName: steps[formStep].name,
+  });
   setFormStep(++formStep);
   setErrors(errors);
   return true;
@@ -221,7 +225,7 @@ export function AddMemberModal({
 
   const divRef = useRef<HTMLDivElement>(null);
   // const { executeRecaptcha } = useGoogleReCaptcha();
-  const analytics = useAppAnalytics()
+  const analytics = useAppAnalytics();
 
   useEffect(() => {
     if (isOpen) {
@@ -301,7 +305,10 @@ export function AddMemberModal({
       twitterHandler: formValues.twitterHandler?.trim(),
       githubHandler: formValues.githubHandler?.trim(),
       telegramHandler: formValues.telegramHandler?.trim(),
-      officeHours: formValues.officeHours?.trim() === ''? null : formValues.officeHours?.trim(),
+      officeHours:
+        formValues.officeHours?.trim() === ''
+          ? null
+          : formValues.officeHours?.trim(),
       comments: formValues.comments?.trim(),
       plnStartDate: formValues.plnStartDate
         ? new Date(formValues.plnStartDate)?.toISOString()
@@ -333,14 +340,16 @@ export function AddMemberModal({
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
-      trackGoal(FATHOM_EVENTS.directory.joinNetworkAsMemberSave, 0);
       // if (!executeRecaptcha) {
       //   console.log('Execute recaptcha not yet available');
       //   return;
       // }
-      analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_JOIN_NETWORK_FORM_STEPS, {
-        'itemName': 'SOCIAL'
-      })
+      analytics.captureEvent(
+        APP_ANALYTICS_EVENTS.MEMBER_JOIN_NETWORK_FORM_STEPS,
+        {
+          itemName: 'SOCIAL',
+        }
+      );
       const values = formatData();
       try {
         // const captchaToken = await executeRecaptcha();
@@ -356,12 +365,8 @@ export function AddMemberModal({
               'content-type': 'multipart/form-data',
             },
           };
-          image = await api
-            .post(`/v1/images`, formData, config)
-            .then((response) => {
-              delete values.imageFile;
-              return response?.data?.image;
-            });
+          const imageResponse = await api.post(`/v1/images`, formData, config);
+          image = imageResponse?.data?.image;
         }
 
         const data = {
@@ -372,20 +377,23 @@ export function AddMemberModal({
           newData: { ...values, imageUid: image?.uid, imageUrl: image?.url },
           // captchaToken,
         };
-        await api.post(`/v1/participants-request`, data).then((response) => {
-          // if (
-          //   typeof document !== 'undefined' &&
-          //   document.getElementsByClassName('grecaptcha-badge').length
-          // ) {
-          //   document
-          //     .getElementsByClassName('grecaptcha-badge')[0]
-          //     .classList.add('w-0');
-          // }
-          analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_JOIN_NETWORK_FORM_STEPS, {
-            'itemName': 'COMPLETED'
-          })
-          setSaveCompleted(true);
-        });
+        const response = await api.post(`/v1/participants-request`, data);
+        // if (
+        //   typeof document !== 'undefined' &&
+        //   document.getElementsByClassName('grecaptcha-badge').length
+        // ) {
+        //   document
+        //     .getElementsByClassName('grecaptcha-badge')[0]
+        //     .classList.add('w-0');
+        // }
+        trackGoal(FATHOM_EVENTS.directory.joinNetworkAsMemberSave, 0);
+        analytics.captureEvent(
+          APP_ANALYTICS_EVENTS.MEMBER_JOIN_NETWORK_FORM_STEPS,
+          {
+            itemName: 'COMPLETED',
+          }
+        );
+        setSaveCompleted(true);
       } catch (err) {
         if (err.response.status === 400) {
           toast(err?.response?.data?.message);

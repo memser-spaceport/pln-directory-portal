@@ -18,7 +18,7 @@ const helpAreas = [
 
 export const MissionCard = () => {
   return (
-    <div className="mt-8 flex font-medium md:mt-7 md:text-lg justify-between ">
+    <div className="mt-8 flex font-medium md:mt-7 md:text-lg justify-between flex-wrap">
       {helpAreas.map((area, i) => (
         <MissionHelpArea key={i} areaIcon={area.icon} areaName={area.name} index={i}/>
       ))}
