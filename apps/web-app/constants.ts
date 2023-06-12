@@ -185,8 +185,8 @@ export const TAB_CONSTANTS = {
 }
 
 export const MSG_CONSTANTS = {
-  TEAM_UPDATE_MESSAGE:'Changes have been updated',
-  MEMBER_UPDATE_MESSAGE: 'Changes have been updated',
+  TEAM_UPDATE_MESSAGE:'Successfully Saved',
+  MEMBER_UPDATE_MESSAGE: 'Successfully Saved',
   CHANGE_CONF_MSG: 'Do you want to discard the changes before you proceed ?',
   RESET_CHANGE_CONF_MSG: 'Do you want to reset the changes ?',
   NO_CHANGES_TO_RESET: 'No changes made to reset',
