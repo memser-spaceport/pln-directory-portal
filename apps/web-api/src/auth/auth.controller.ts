@@ -87,7 +87,7 @@ export class AuthController {
       if (verificationResult.valid) {
         const foundUser = await this.authService.getUserInfoByEmail(verificationResult.recipient);
         if (!foundUser) {
-          throw new ForbiddenException('Please login again and try')
+          throw new ForbiddenException('Please login and try again')
         }
 
         // if user found by email... then link the verified email with account and get new tokens
