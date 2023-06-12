@@ -9,6 +9,7 @@ interface ProfileProjectCardProps {
   avatarIcon: (props: React.ComponentProps<'svg'>) => JSX.Element;
   name: string;
   description?: string;
+  clickHandler?: any;
 }
 
 export function ProfileProjectCard({
@@ -18,12 +19,13 @@ export function ProfileProjectCard({
   avatarIcon,
   name,
   description,
+  clickHandler
 }: ProfileProjectCardProps) {
   const Icon = avatarIcon;
 
   return (
     <div className="profile-card group m-[1px]">
-      <AnchorLink href={url} linkClassName="block">
+      <AnchorLink handleOnClick={clickHandler} href={url} linkClassName="block">
         <div className="h-18 flex items-start p-4">
           <div className="relative mr-4 h-10 w-10 shrink-0">
             <div className={`relative flex h-10 w-10 overflow-hidden`}>
