@@ -19,7 +19,7 @@ export function ProfileSocialLink({ profile, url, type, logo, height, width }: P
       target="_blank"
       rel="noreferrer noopener"
       data-testid="profile-social-link"
-      className="flex h-9 w-[130px] cursor-pointer items-center gap-2 rounded bg-[#F1F5F9] px-3 font-medium"
+      className="flex h-9 cursor-pointer items-center gap-2 rounded bg-[#F1F5F9] px-3 font-medium"
     >
       <img src={logo} alt={type} height={height} width={width} />
       <p className="on-focus--link line-clamp-1 break-all text-left text-base hover:text-slate-700">
