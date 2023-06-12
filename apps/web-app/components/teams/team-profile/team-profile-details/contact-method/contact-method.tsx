@@ -19,6 +19,7 @@ export function ContactMethod({ contactMethod }: TContactMethodProps) {
           trigger={
             <div>
               <ProfileSocialLink
+                profile={contactMethod}
                 url={contactMethod}
                 logo={contactLogo}
                 height={30}
