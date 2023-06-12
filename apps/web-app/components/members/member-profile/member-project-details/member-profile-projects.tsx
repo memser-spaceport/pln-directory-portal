@@ -39,15 +39,15 @@ export function MemberProfileProjects({
     analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_GITHUB_PROJECT_VIEW_ALL_CLICKED, {
       name: member?.name,
       uid: member?.id
-  })
+    })
   }
 
   const onGithubItemClicked = (project) => {
     analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_GITHUB_PROJECT_ITEM_CLICKED, {
-        name: member?.name,
-        uid: member?.id,
-        projectName: project.name,
-        url: project.url
+      name: member?.name,
+      uid: member?.id,
+      projectName: project.name,
+      url: project.url
     })
   }
 
@@ -57,7 +57,7 @@ export function MemberProfileProjects({
         {'Projects'} {repositories?.length > 0 && `(${repositories?.length})`}
         {repositories?.length > 3 && (
           <span
-            onClick={onGithubProject}
+            onClick={() => onGithubProject()}
             className="float-right cursor-pointer text-blue-500 pr-8"
           >
             See all
