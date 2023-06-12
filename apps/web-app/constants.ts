@@ -104,6 +104,10 @@ export const FATHOM_EVENTS = {
   },
 };
 export const AIRTABLE_REGEX = /^rec[A-Za-z0-9]{14}$/;
+export const LINKEDIN_URL_REGEX = /linkedin\.com\/in\/([a-zA-Z0-9_-]+)/;
+export const TWITTER_URL_REGEX = /twitter\.com\/([^/]+)/;
+export const GITHUB_URL_REGEX =  /github\.com\/([^/]+)/;
+export const TELEGRAM_URL_REGEX = /t\.me\/([^/]+)/;
 
 export const ENROLLMENT_TYPE = {
   MEMBER: 'MEMBER',

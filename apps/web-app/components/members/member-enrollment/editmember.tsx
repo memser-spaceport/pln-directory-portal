@@ -755,7 +755,7 @@ export function EditMemberModal({
     <>
       {isProcessing && (
         <div
-          className={`pointer-events-none fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
+          className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
         >
           <LoadingIndicator />
         </div>

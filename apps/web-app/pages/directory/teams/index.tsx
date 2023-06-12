@@ -51,7 +51,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
         excludeUrlFn={(url) => url.startsWith('/directory/teams/')}
       />
 
-      <section className="pl-sidebar flex">
+      <section className="pl-sidebar flex pt-20">
         <div className="w-sidebar fixed left-0 z-40 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">
           <TeamsDirectoryFilters
             filtersValues={filtersValues}

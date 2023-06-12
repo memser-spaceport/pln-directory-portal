@@ -49,7 +49,7 @@ export default function Team({ team, members, backLink, userInfo }: TeamProps) {
       />
 
       <Breadcrumb items={breadcrumbItems} classname="max-w-[150px] truncate"/>
-      <section className="space-x-7.5 mx-auto mb-10 flex max-w-6xl px-10 pt-24">
+      <section className="space-x-7.5 mx-auto mb-10 flex max-w-6xl px-10 pt-40">
         <div className="card p-7.5 w-full">
           <TeamProfileHeader team={team} loggedInMember={userInfo} />
           <TeamProfileDetails {...team} />
