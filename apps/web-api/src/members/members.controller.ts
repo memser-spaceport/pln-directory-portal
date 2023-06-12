@@ -16,18 +16,25 @@ import { ENABLED_RETRIEVAL_PROFILE } from '../utils/prisma-query-builder/profile
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { MembersService } from './members.service';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
+import { LogService } from '../shared/log.service';
+import { NoCache } from '../decorators/no-cache.decorator';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
 
 @Controller()
+@NoCache()
 export class MemberController {
-  constructor(private readonly membersService: MembersService) {}
+  constructor(
+    private readonly membersService: MembersService,
+    private readonly logger: LogService
+  ) {}
 
   @Api(server.route.getMembers)
   @ApiQueryFromZod(MemberQueryParams)
   @ApiOkResponseFromZod(ResponseMemberWithRelationsSchema.array())
   async findAll(@Req() request: Request) {
+    this.logger.info("In find all members....");
     const queryableFields = prismaQueryableFieldsFromZod(
       ResponseMemberWithRelationsSchema
     );
