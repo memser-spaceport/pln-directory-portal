@@ -20,7 +20,7 @@ export class SetupService {
 
     const instance = createLogger({
       transports: [
-        fileRotateTransport,
+        // fileRotateTransport,
         new winston.transports.Console({
           format: winston.format.combine(
             winston.format.timestamp(),
