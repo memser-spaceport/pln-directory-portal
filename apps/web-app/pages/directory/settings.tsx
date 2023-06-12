@@ -366,7 +366,7 @@ export default function Settings({
             <NextSeo {...DIRECTORY_SEO} title={userInfo.name} />
             <Breadcrumb items={breadcrumbItems} classname="max-w-[150px] truncate"/>
             <div className="w-full h-full">
-                <div className="grid grid-cols-4 pt-24 gap-x-8">
+                <div className="grid grid-cols-4 pt-40 gap-x-8">
                     <div className="col-span-1">
                         {
                             (teamsDropdownOptions && (<div className="relative float-right top-[15px]">

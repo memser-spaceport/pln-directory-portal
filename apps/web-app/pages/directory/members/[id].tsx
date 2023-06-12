@@ -69,7 +69,7 @@ export default function Member({
 
       <Breadcrumb items={breadcrumbItems} classname="max-w-[150px] truncate" />
 
-      <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-24">
+      <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-40">
         <div className=''>
           {!userInfo?.uid && (
             <MemberProfileLoginStrip member={member} userInfo={userInfo} />
