@@ -468,7 +468,7 @@ export const getServerSideProps = async (context) => {
       imageUid: requestData.imageUid ?? '',
       imageFile: null,
       plnStartDate: requestData.plnStartDate
-        ? new Date(requestData.plnStartDate).toLocaleDateString('af-ZA')
+        ? new Date(requestData.plnStartDate).toISOString().split('T')[0]
         : null,
       city: requestData?.city ?? '',
       region: requestData?.region ?? '',
