@@ -25,7 +25,7 @@ export function DirectoryLayout({ children }) {
           isUserLoggedIn={childrens?.[1]?.props?.isUserLoggedIn}
           userInfo={childrens?.[1]?.props?.userInfo || {}}
         />
-        <main className="min-w-[1272px] pt-20">{children}</main>
+        <main className="min-w-[1272px]">{children}</main>
       </PostHogProvider>
     </ErrorBoundary>
   );

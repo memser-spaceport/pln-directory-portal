@@ -27,7 +27,7 @@ export const NetworkSpotlight = ({ videoDetails, playlistDetails }) => {
     return (
         <>
             <div className="gradiant-border  mt-16 max-w-[1131px] mx-auto">
-                <section className="border p-[24px] rounded-lg bg-white">
+                <section className=" p-[24px] rounded-lg bg-white">
                     <p className="font-extrabold text-[24px] leading-[28px] pb-6 text-left">{NW_SPOTLIGHT_CONSTANTS.HEADING}</p>
                     <div className="flex flex-col md:flex-row justify-between gap-[16px]">
                         <div className="w-[350px] h-[328px] border rounded-[8px] bg-[#F1F5F9] p-[20px]">

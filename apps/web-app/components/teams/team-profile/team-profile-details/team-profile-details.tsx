@@ -17,7 +17,7 @@ export function TeamProfileDetails({
   return (
     <>
       <h3 className=" mt-6 font-medium text-slate-500">Contact Details</h3>
-      <div className="mt-3 flex gap-3 ">
+      <div className="mt-3 flex gap-3 flex-wrap">
         {/* Website */}
         {website && (
           <SocialProfile

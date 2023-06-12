@@ -39,7 +39,7 @@ export function MemberProfileDetails({
         )}
       </div>
       <h3 className=" mt-6 font-medium text-slate-500">Contact Details</h3>
-      <div className="mt-3 flex gap-3 ">
+      <div className="mt-3 flex gap-3 flex-wrap">
         {userInfo.uid && (
           <>
             {/* Linked-In */}
@@ -64,7 +64,7 @@ export function MemberProfileDetails({
 
             {/* Discord */}
             {discordHandle && (
-              <div className="flex h-9 w-[130px] items-center gap-2 rounded bg-[#F1F5F9] px-3 font-medium">
+              <div className="flex h-9 items-center gap-2 rounded bg-[#F1F5F9] px-3 font-medium">
                 <img src={discordLogo} alt="discord"/>
                 <Tooltip
                   asChild

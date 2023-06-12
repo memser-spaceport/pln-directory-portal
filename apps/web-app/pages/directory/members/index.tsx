@@ -81,7 +81,7 @@ export default function Members({
         excludeUrlFn={(url) => url.startsWith('/directory/members/')}
       />
 
-      <section className="pl-sidebar flex">
+      <section className="pl-sidebar flex pt-20">
         <div className="w-sidebar fixed left-0 z-40 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">
           <MembersDirectoryFilters
             filtersValues={filtersValues}

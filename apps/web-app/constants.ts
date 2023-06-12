@@ -104,6 +104,10 @@ export const FATHOM_EVENTS = {
   },
 };
 export const AIRTABLE_REGEX = /^rec[A-Za-z0-9]{14}$/;
+export const LINKEDIN_URL_REGEX = /linkedin\.com\/in\/([a-zA-Z0-9_-]+)/;
+export const TWITTER_URL_REGEX = /twitter\.com\/([^/]+)/;
+export const GITHUB_URL_REGEX =  /github\.com\/([^/]+)/;
+export const TELEGRAM_URL_REGEX = /t\.me\/([^/]+)/;
 
 export const ENROLLMENT_TYPE = {
   MEMBER: 'MEMBER',
@@ -147,8 +151,8 @@ export const APP_ANALYTICS_EVENTS = {
   MEMBER_OFFICEHOURS_CLICKED: 'member-officehours-clicked',
   MEMBER_CLICKED: 'member-clicked',
   MEMBER_JOIN_NETWORK_FORM_STEPS: 'member-join-network-form-steps',
-  MEMBER_GITHUB_PROJECT_VIEW_ALL_CLICKED: '',
-  MEMBER_GITHUB_PROJECT_ITEM_CLICKED: '',
+  MEMBER_GITHUB_PROJECT_VIEW_ALL_CLICKED: 'member-github-project-view-all-clicked',
+  MEMBER_GITHUB_PROJECT_ITEM_CLICKED: 'member-github-project-view-item-clicked',
 
   USER_VERIFICATION_INIT: 'user-verification-init',
   USER_VERIFICATION_SEND_OTP: 'user-verification-sendotp',

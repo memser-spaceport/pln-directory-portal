@@ -260,7 +260,9 @@ export class MembersService {
           error?.response?.statusCode
         );
       } else {
-        throw new BadRequestException('Invalid Data');
+        throw new BadRequestException(
+          'Oops, something went wrong. Please try again!'
+        );
       }
     }
     return result;
