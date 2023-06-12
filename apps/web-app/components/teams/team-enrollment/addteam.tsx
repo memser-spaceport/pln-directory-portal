@@ -21,7 +21,11 @@ import {
 } from '../../../utils/services/dropdown-service';
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
-import { APP_ANALYTICS_EVENTS, ENROLLMENT_TYPE, FATHOM_EVENTS } from '../../../constants';
+import {
+  APP_ANALYTICS_EVENTS,
+  ENROLLMENT_TYPE,
+  FATHOM_EVENTS,
+} from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/create-team.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
@@ -118,10 +122,10 @@ function handleNextClick(
     setErrors(errors);
     return false;
   }
-  console.log(teamFormSteps[formStep - 1])
+  console.log(teamFormSteps[formStep - 1]);
   analytics.captureEvent(APP_ANALYTICS_EVENTS.TEAM_JOIN_NETWORK_FORM_STEPS, {
-    'name': teamFormSteps[formStep - 1]
-  })
+    name: teamFormSteps[formStep - 1],
+  });
   setFormStep(++formStep);
   setErrors(errors);
   return true;
@@ -228,11 +232,11 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     website: '',
     linkedinHandler: '',
     twitterHandler: '',
-    telegramHandler:'',
+    telegramHandler: '',
     blog: '',
     officeHours: '',
   });
-  const analytics = useAppAnalytics()
+  const analytics = useAppAnalytics();
   const divRef = useRef<HTMLDivElement>(null);
   // const { executeRecaptcha } = useGoogleReCaptcha();
 
@@ -283,7 +287,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       website: '',
       linkedinHandler: '',
       twitterHandler: '',
-      telegramHandler:'',
+      telegramHandler: '',
       blog: '',
       officeHours: '',
     });
@@ -363,7 +367,6 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
-      trackGoal(FATHOM_EVENTS.directory.joinNetworkAsTeamSave, 0);
       // if (!executeRecaptcha) {
       //   console.log('Execute recaptcha not yet available');
       //   return;
@@ -379,9 +382,12 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
         setErrors(errors);
         return false;
       }
-      analytics.captureEvent(APP_ANALYTICS_EVENTS.TEAM_JOIN_NETWORK_FORM_STEPS, {
-        'itemName': 'SOCIAL'
-      })
+      analytics.captureEvent(
+        APP_ANALYTICS_EVENTS.TEAM_JOIN_NETWORK_FORM_STEPS,
+        {
+          itemName: 'SOCIAL',
+        }
+      );
       const requestorEmail = formValues.requestorEmail?.trim();
       const value = formatData();
       try {
@@ -398,12 +404,8 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
               'content-type': 'multipart/form-data',
             },
           };
-          image = await api
-            .post(`/v1/images`, formData, config)
-            .then((response) => {
-              delete value.logoFile;
-              return response?.data?.image;
-            });
+          const imageResponse = await api.post(`/v1/images`, formData, config);
+          image = imageResponse?.data?.image;
         }
         const data = {
           participantType: ENROLLMENT_TYPE.TEAM,
@@ -413,12 +415,15 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
           newData: { ...value, logoUid: image?.uid, logoUrl: image?.url },
           // captchaToken,
         };
-        await api.post(`/v1/participants-request`, data).then((response) => {
-          analytics.captureEvent(APP_ANALYTICS_EVENTS.TEAM_JOIN_NETWORK_FORM_STEPS, {
-            'itemName': 'COMPLETED'
-          })
-          setSaveCompleted(true);
-        });
+        const response = await api.post(`/v1/participants-request`, data);
+        trackGoal(FATHOM_EVENTS.directory.joinNetworkAsTeamSave, 0);
+        analytics.captureEvent(
+          APP_ANALYTICS_EVENTS.TEAM_JOIN_NETWORK_FORM_STEPS,
+          {
+            itemName: 'COMPLETED',
+          }
+        );
+        setSaveCompleted(true);
       } catch (err) {
         if (err?.response?.status === 400) {
           toast(err?.response?.data?.message);
