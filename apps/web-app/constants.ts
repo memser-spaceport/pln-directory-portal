@@ -78,6 +78,10 @@ export const FATHOM_EVENTS = {
         scheduleMeeting: 'EKX8QTJD',
         learnMore: 'QWTLEVVB',
       },
+      gitHub: {
+        seeAll: '6XTZM7BA',
+        projectItem: 'VBMVUVWX',
+      }
     },
   },
   teams: {
