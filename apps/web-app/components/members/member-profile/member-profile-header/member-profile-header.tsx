@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { AskToEditCard } from '../../../shared/profile/ask-to-edit-card/ask-to-edit-card';
 import { ReactComponent as ExploreIcon } from '../../../../public/assets/images/icons/explore.svg';
 import { IMember } from '../../../../utils/members.types';
-import { ReactComponent as BriefCase } from '../../../../public/assets/images/icons/mdi_briefcase-check.svg';
+import { ReactComponent as TeamLeadIndicator } from '../../../../public/assets/images/icons/Lead.svg';
 import { OpenToWorkBadge } from '../../../../../web-app/components/shared/open-to-work-badge/open-to-work-badge';
 
 export function MemberProfileHeader({
@@ -90,7 +90,7 @@ export function MemberProfileHeader({
           </div>
         )}
       </div>
-      <div className="flex w-3/4 justify-end gap-7">
+      <div className="flex w-3/4 justify-end gap-6">
         {(userInfo.uid === member.id ||
           (userInfo.roles?.length > 0 &&
             userInfo.roles.includes('DIRECTORYADMIN'))) && (
@@ -102,26 +102,28 @@ export function MemberProfileHeader({
             />
           </div>
         )}
-        <div className=" mt-1 flex   gap-3">
+        <div className="mt-1 flex gap-2">
           {teamLead ? (
             <Tooltip
               asChild
               trigger={
-                <span className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-slate-200 p-2 shadow-[0_1px_2px_rgba(15,23,42,0.16)]">
-                  <i className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] not-italic text-white">
-                    <FlagIcon className="h-[9px]" />
-                  </i>
-                </span>
+                // <span className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-slate-200 p-2 shadow-[0_1px_2px_rgba(15,23,42,0.16)]">
+                //   <i className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] not-italic text-white">
+                //     <FlagIcon className="h-[9px]" />
+                //   </i>
+                // </span>
+                <TeamLeadIndicator />
               }
               content="Team Lead"
             />
           ) : null}
           {isOpenToWorkEnabled && openToWork ? (
-            <span className="flex h-10 w-10 select-none  items-center justify-center rounded-full border border-slate-200 p-2 shadow-[0_1px_2px_rgba(15,23,42,0.16)]">
-              <i className="flex h-6 w-6 shrink-0 cursor-none items-center justify-center rounded-full  not-italic text-white active:bg-black ">
-                <OpenToWorkBadge type="PROFILE" />
-              </i>
-            </span>
+            // <span className="flex h-10 w-10 select-none  items-center justify-center rounded-full border border-slate-200 p-2 shadow-[0_1px_2px_rgba(15,23,42,0.16)]">
+            //   <i className="flex h-6 w-6 shrink-0 cursor-none items-center justify-center rounded-full  not-italic text-white active:bg-black ">
+            //     <OpenToWorkBadge type="PROFILE" />
+            //   </i>
+            // </span>
+            <span><OpenToWorkBadge type="PROFILE" /></span>
           ) : null}
         </div>
       </div>

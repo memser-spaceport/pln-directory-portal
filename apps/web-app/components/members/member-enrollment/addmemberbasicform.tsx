@@ -10,33 +10,24 @@ import { ReactComponent as InformationCircleIcon } from '../../../public/assets/
 export default function AddMemberBasicForm(props) {
   const values = props.formValues;
   const onChange = props.onChange;
-  const onNewEmailInputChange = props.onNewEmailInputChange;
   const requiredFlag = props?.isEditMode
     ? props?.dataLoaded
       ? true
       : false
     : true;
   const currentEmail = props.currentEmail;
-  const isCurrentMailBoxNeeded = props.isProfileSettings
-    ? props.isUserProfile
-      ? true
-      : props.isEmailEditActive
-      ? false
-      : true
-    : true;
 
   const editEmail = () => {
     return (
-
       <div
-      className="absolute right-0 top-[20px] flex cursor-pointer items-center gap-1"
-      onClick={props.onEmailChange}
-    >
-      <EditIcon className="m-1" />
-      <p className="right-0 cursor-pointer text-sm font-semibold text-[#156FF7]">
-        Edit Email
-      </p>
-    </div>
+        className="absolute right-0 top-[20px] flex cursor-pointer items-center gap-1"
+        onClick={props.onEmailChange}
+      >
+        <EditIcon className="m-1" />
+        <p className="right-0 cursor-pointer text-sm font-semibold text-[#156FF7]">
+          Edit Email
+        </p>
+      </div>
     );
   };
   return (
@@ -142,7 +133,9 @@ export default function AddMemberBasicForm(props) {
           value={values?.plnStartDate}
           hasClear={true}
           label="PLN Join Date"
-          onClear={()=>onChange({target:{name:'plnStartDate', value:''}})}
+          onClear={() =>
+            onChange({ target: { name: 'plnStartDate', value: '' } })
+          }
           className="custom-grey custom-outline-none border"
         />
       </div>

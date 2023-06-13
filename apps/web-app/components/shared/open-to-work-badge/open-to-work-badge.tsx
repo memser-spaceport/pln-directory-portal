@@ -1,6 +1,6 @@
 import { Tooltip } from '@protocol-labs-network/ui';
 import { ReactComponent as CardBadge } from '../../../public/assets/images/icons/collaborate_card.svg';
-import { ReactComponent as ProfilePageBadge } from '../../../public/assets/images/icons/collaborate_memberprofile.svg';
+import { ReactComponent as ProfilePageBadge } from '../../../public/assets/images/icons/collaborate_profile.svg';
 
 type IOpenToWorkBadgeProps = {
   type: 'CARD' | 'PROFILE';
