@@ -56,12 +56,12 @@ export function MemberProfileProjects({
       <h3 className="mb-2 mt-6 font-medium text-slate-500">
         {'Projects'} {repositories?.length > 0 && `(${repositories?.length})`}
         {repositories?.length > 3 && (
-          <span
+          <button
             onClick={() => onGithubProject()}
-            className="float-right cursor-pointer text-blue-500 pr-8"
+            className="float-right cursor-pointer text-blue-500 pt-0.5 pr-8"
           >
             See all
-          </span>
+          </button>
         )}
       </h3>
 
