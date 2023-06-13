@@ -39,7 +39,7 @@ export function MemberProfileDetails({
         )}
       </div>
       <h3 className=" mt-6 font-medium text-slate-500">Contact Details</h3>
-      <div className="mt-3 flex gap-3 flex-wrap">
+      <div className="mt-3 flex flex-wrap gap-2">
         {userInfo.uid && (
           <>
             {/* Linked-In */}
@@ -48,7 +48,8 @@ export function MemberProfileDetails({
                 handle={linkedinHandle}
                 type="linkedin"
                 logo={linkedInLogo}
-
+                height={14}
+                width={14}
               />
             )}
 
@@ -58,14 +59,15 @@ export function MemberProfileDetails({
                 handle={twitter}
                 type="twitter"
                 logo={twitterLogo}
-   
+                height={14}
+                width={14}
               />
             )}
 
             {/* Discord */}
             {discordHandle && (
-              <div className="flex h-9 items-center gap-2 rounded bg-[#F1F5F9] px-3 font-medium">
-                <img src={discordLogo} alt="discord"/>
+              <div className="flex h-[26px] items-center gap-2 rounded bg-[#F1F5F9] px-3 text-[12px] leading-[14px] font-medium">
+                <img src={discordLogo} alt="discord" height={14} width={14} />
                 <Tooltip
                   asChild
                   trigger={
@@ -84,7 +86,8 @@ export function MemberProfileDetails({
                 handle={telegramHandle}
                 type="telegram"
                 logo={telegramLogo}
-      
+                height={14}
+                width={14}
               />
             )}
 
@@ -94,7 +97,8 @@ export function MemberProfileDetails({
                 handle={email}
                 type="email"
                 logo={emailLogo}
-              
+                height={14}
+                width={14}
               />
             )}
 
@@ -104,7 +108,8 @@ export function MemberProfileDetails({
                 handle={githubHandle}
                 type="github"
                 logo={gitLogo}
-           
+                height={14}
+                width={14}
               />
             )}
           </>

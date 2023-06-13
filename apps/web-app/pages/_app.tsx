@@ -69,11 +69,6 @@ export default function CustomApp({
           hideProgressBar: true,
         });
         break;
-      case "logout":
-        toast.info(LOGOUT_MSG, {
-          hideProgressBar: true
-        });
-        break;
       case "user_logged_out":
         toast.info(RETRY_LOGIN_MSG, {
           hideProgressBar: true

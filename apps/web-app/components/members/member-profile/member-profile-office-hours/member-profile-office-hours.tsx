@@ -53,12 +53,12 @@ export function MemberProfileOfficeHours({
         </span>
         {!userInfo.uid ? (
 
-          <p className="text-sm font-normal flex items-center gap-2">
+          <p className="select-none text-sm font-normal flex items-center gap-1">
             {OFFICE_HOURS_MSG} <span>
             <Tooltip
                 asChild
                 trigger={
-                  <p className="mt-0.5 truncate w-[150px]">{member?.name}.</p>
+                  <p className="truncate w-[80px]">{member?.name}</p>
                 }
                 content={member?.name}
               />

@@ -8,11 +8,12 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Cookies from 'js-cookie';
 import { forwardRef, Fragment } from 'react';
+import { toast } from 'react-toastify';
 import { JoinNetworkMenu } from './join-network-menu/join-network-menu';
 import { Login } from './login-menu/login-menu';
 import { Menu as AppMenu } from './menu/menu';
 import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/Logo_PLN_directory.svg';
-import { PAGE_ROUTES, FATHOM_EVENTS, APP_ANALYTICS_EVENTS } from '../../../constants';
+import { PAGE_ROUTES, FATHOM_EVENTS, APP_ANALYTICS_EVENTS, LOGOUT_MSG } from '../../../constants';
 import { createLogoutChannel } from '../../../utils/services/auth';
 import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
 // import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
@@ -63,6 +64,9 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
         Cookies.remove('refreshToken')
         Cookies.remove('userInfo')
         Cookies.set('page_params', 'logout', { expires: 60, path: '/' });
+        toast.info(LOGOUT_MSG, {
+          hideProgressBar: true
+        });
         createLogoutChannel().postMessage('logout');
       },
     },

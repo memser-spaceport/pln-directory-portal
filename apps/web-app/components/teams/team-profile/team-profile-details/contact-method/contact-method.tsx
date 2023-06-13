@@ -22,8 +22,8 @@ export function ContactMethod({ contactMethod }: TContactMethodProps) {
                 profile={contactMethod}
                 url={contactMethod}
                 logo={contactLogo}
-                height={30}
-                width={30}
+                height={14}
+                width={14}
                 type={profileSocialLinkType}
               />
             </div>
