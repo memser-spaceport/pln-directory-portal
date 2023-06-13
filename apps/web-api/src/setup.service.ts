@@ -33,7 +33,7 @@ export class SetupService {
         }),
       ],
     });
-    if (process.env.ENVIRONMENT === 'DEV') {
+    if (process.env.ENVIRONMENT !== 'DEV') {
       this.addProductionTransport(instance);
     }
     return instance;
