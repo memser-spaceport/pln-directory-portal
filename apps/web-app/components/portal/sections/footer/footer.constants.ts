@@ -7,7 +7,7 @@ export const FOOTER_MAIN_NAV_LINKS: IFooterMainNavLink[] = [
   },
   {
     label: 'Merch',
-    url: 'https://protocol.almanac.io/handbook/protocol-labs-spaceport-JzKymu/swag-ilsLIajsqLXbHLXqwM0EKmvEhX2BuuPf',
+    url: 'https://protocol.almanac.io/handbook/guide-to-the-pln-galaxy-JzKymu/swag-XURtMBNv9ea4iCEr4aPRXwdXosGHDLT5?docView=Commenting',
   },
   {
     label: 'Network Funding',
