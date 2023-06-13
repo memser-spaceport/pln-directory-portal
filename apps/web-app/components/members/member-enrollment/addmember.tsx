@@ -512,7 +512,7 @@ export function AddMemberModal({
     <>
       {isProcessing && (
         <div
-          className={`fixed inset-0 z-[99999] flex h-screen w-screen items-center justify-center bg-gray-500 bg-opacity-75 outline-none transition-opacity`}
+          className={`fixed inset-0 z-[3000] flex h-screen w-screen items-center justify-center bg-gray-500 bg-opacity-75 outline-none transition-opacity`}
         >
           <LoadingIndicator />
         </div>
@@ -543,7 +543,7 @@ export function AddMemberModal({
             </div>
           </div>
         ) : (
-          <div className="">
+          <div>
             <FormStepsIndicator formStep={formStep} steps={steps} />
             {errors?.length > 0 && (
               <div className="w-full rounded-lg bg-white p-5 ">

@@ -17,15 +17,13 @@ export function TeamProfileDetails({
   return (
     <>
       <h3 className=" mt-6 font-medium text-slate-500">Contact Details</h3>
-      <div className="mt-3 flex gap-3 flex-wrap">
+      <div className="mt-3 flex gap-2 flex-wrap">
         {/* Website */}
         {website && (
           <SocialProfile
             handle={website}
             type="website"
             logo={websiteLogo}
-            height={30}
-            width={30}
           />
         )}
 
@@ -35,8 +33,8 @@ export function TeamProfileDetails({
             handle={twitter}
             type="twitter"
             logo={twitterLogo}
-            height={23}
-            width={23}
+            height={14}
+            width={14}
           />
         )}
 
@@ -46,8 +44,8 @@ export function TeamProfileDetails({
             handle={linkedinHandle}
             type="linkedin"
             logo={linkedInLogo}
-            height={23}
-            width={23}
+            height={14}
+            width={14}
           />
         )}
 
