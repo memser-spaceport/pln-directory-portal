@@ -64,7 +64,7 @@ module.exports = {
         6.5: '26px',
         7.5: '30px',
         18: '72px',
-        sidebar: '291px',
+        sidebar: '300px',
       },
       strokeWidth: {
         1.5: '1.5px',
