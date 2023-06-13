@@ -15,7 +15,7 @@ interface ProfileSocialLinkProps {
 export function ProfileSocialLink({ profile, url, type, logo, height, width }: ProfileSocialLinkProps) {
   return (
     <a
-      href={getSocialLinkUrl(profile, type)}
+      href={getSocialLinkUrl(profile, type, url)}
       target="_blank"
       rel="noreferrer noopener"
       data-testid="profile-social-link"
