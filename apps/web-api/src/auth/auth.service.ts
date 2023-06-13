@@ -102,6 +102,7 @@ export class AuthService {
       if (foundUser) {
         return {
           userInfo: {
+            isFirstTimeLogin: false,
             name: foundUser.name,
             email: foundUser?.email,
             profileImageUrl: foundUser?.image?.url,
@@ -128,6 +129,7 @@ export class AuthService {
         });
         return {
           userInfo: {
+            isFirstTimeLogin: true,
             name: foundUser.name,
             email: foundUser.email,
             profileImageUrl: foundUser?.image?.url,

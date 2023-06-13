@@ -106,7 +106,7 @@ function handleNextClick(
     return false;
   }
   analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_JOIN_NETWORK_FORM_STEPS, {
-    itemName: steps[formStep].name,
+    itemName: steps[formStep - 1].name,
   });
   setFormStep(++formStep);
   setErrors(errors);
