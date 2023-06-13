@@ -9,7 +9,8 @@ import { ReactComponent as project_icon } from '../../../../public/assets/images
 import { MemberProfileProjectsModal } from './member-projects-modal';
 import { MemberEmptyProject } from './member-empty-project';
 import useAppAnalytics from '../../../../hooks/shared/use-app-analytics';
-import { APP_ANALYTICS_EVENTS } from '../../../../constants';
+import { APP_ANALYTICS_EVENTS, FATHOM_EVENTS } from '../../../../constants';
+import { trackGoal } from 'fathom-client';
 // import { ReactComponent as InformationCircleIcon } from '../../../../public/assets/images/icons/info_icon.svg';
 
 interface IMemberProfileProjects {
@@ -36,6 +37,7 @@ export function MemberProfileProjects({
 
   const onGithubProject = () => {
     setIsModalOpen(true)
+    trackGoal(FATHOM_EVENTS.members.profile.gitHub.seeAll,0);
     analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_GITHUB_PROJECT_VIEW_ALL_CLICKED, {
       name: member?.name,
       uid: member?.id
@@ -43,6 +45,7 @@ export function MemberProfileProjects({
   }
 
   const onGithubItemClicked = (project) => {
+    trackGoal(FATHOM_EVENTS.members.profile.gitHub.projectItem,0);
     analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_GITHUB_PROJECT_ITEM_CLICKED, {
       name: member?.name,
       uid: member?.id,
@@ -100,6 +103,7 @@ export function MemberProfileProjects({
         isOpen={isModalOpen}
         setIsModalOpen={setIsModalOpen}
         repositories={repositories}
+        clickHandler={() => onGithubItemClicked(project)}
       />
     </>
   );

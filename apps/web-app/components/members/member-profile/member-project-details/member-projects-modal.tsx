@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { MemberProfileProjectsProps } from '../../../../utils/members.types';
+import { MemberProfileProjectsProps, IGitRepositories } from '../../../../utils/members.types';
 import { ProfileProjectCard } from '../../../shared/profile/profile-cards/profile-project-card';
 import { ReactComponent as project_icon } from '../../../../public/assets/images/icons/project_icon.svg';
 import Modal from '../../../../components/layout/navbar/modal/modal';
@@ -8,12 +8,14 @@ import { Dispatch, SetStateAction } from 'react';
 interface MemberProfileProjectsModalProps extends MemberProfileProjectsProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
+  onItemClick: (item:IGitRepositories) => null;
 }
 
 export function MemberProfileProjectsModal({
   isOpen,
   setIsModalOpen,
   repositories,
+  onItemClick,
 }: MemberProfileProjectsModalProps) {
   const {
     query: { id },
@@ -40,6 +42,7 @@ export function MemberProfileProjectsModal({
                 avatarIcon={project_icon}
                 name={project.name}
                 description={project.description}
+                clickHandler={() => onItemClick(project)}
               />
             );
           })}
