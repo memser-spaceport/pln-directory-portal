@@ -49,8 +49,8 @@ export function MemberProfileProjects({
     analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_GITHUB_PROJECT_ITEM_CLICKED, {
       name: member?.name,
       uid: member?.id,
-      projectName: project.name,
-      url: project.url
+      projectName: project?.name,
+      url: project?.url
     })
   }
 
@@ -103,7 +103,7 @@ export function MemberProfileProjects({
         isOpen={isModalOpen}
         setIsModalOpen={setIsModalOpen}
         repositories={repositories}
-        clickHandler={() => onGithubItemClicked(project)}
+        onItemClick={onGithubItemClicked}
       />
     </>
   );

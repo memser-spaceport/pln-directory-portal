@@ -8,7 +8,7 @@ import { Dispatch, SetStateAction } from 'react';
 interface MemberProfileProjectsModalProps extends MemberProfileProjectsProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
-  onItemClick: (item:IGitRepositories) => null;
+  onItemClick: (project: IGitRepositories) => void;
 }
 
 export function MemberProfileProjectsModal({
