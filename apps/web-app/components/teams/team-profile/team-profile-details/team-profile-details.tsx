@@ -24,6 +24,8 @@ export function TeamProfileDetails({
             handle={website}
             type="website"
             logo={websiteLogo}
+            height={14}
+            width={14}
           />
         )}
 
