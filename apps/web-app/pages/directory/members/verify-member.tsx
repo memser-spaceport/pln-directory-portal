@@ -68,7 +68,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
     return {
       redirect: {
         permanent: false,
-        destination: PAGE_ROUTES.MEMBERS,
+        destination: PAGE_ROUTES.TEAMS,
       },
     };
   } else if(authResp.status === 400 || authResp.status === 500 || authResp.status === 404 ) {
@@ -103,6 +103,14 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
     setCookie(ctx, 'verified', 'true' , {
       path: '/'
     });
+    if (userInfo?.isFirstTimeLogin) {
+      return {
+        redirect: {
+          permanent: false,
+          destination: PAGE_ROUTES.SETTINGS,
+        },
+      };
+    }
   } else if (clientToken && accessToken && refreshToken) {
     const accessTokenExpiry = decodeToken(accessToken);
     const refreshTokenExpiry = decodeToken(refreshToken);
@@ -134,7 +142,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
   return {
     redirect: {
       permanent: false,
-      destination: PAGE_ROUTES.MEMBERS,
+      destination: PAGE_ROUTES.TEAMS,
     },
   };
 };
