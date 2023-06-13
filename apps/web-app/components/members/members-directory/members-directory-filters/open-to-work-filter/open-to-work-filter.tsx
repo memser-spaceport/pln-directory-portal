@@ -8,33 +8,38 @@ export function OpenToWorkFilter() {
   const { enabled, onSetEnabled } = useSwitchFilter('openToWork');
   const hintContent = (
     <div className="">
-      <span>Members with this icon 
-      <CardBadge className='inline-block mx-1'/>
+      <span>
+        Members with this icon
+        <CardBadge className="mx-1 inline-block" />
         are open to collaborate on shared ideas & projects with other members.
       </span>
     </div>
   );
 
   return (
-    <div className="flex justify-between">
-      <NewBanner className="absolute left-1" />
-      <div className="flex gap-1">
-        <span className="select-none text-sm text-slate-600">
-          Open to Collaborate
-        </span>
-        <Tooltip
-          asChild
-          trigger={<InformationCircleIcon className="mt-0.5" />}
-          content={hintContent}
+    <>
+      <div className="relative left-[-31px]">
+        <NewBanner className="absolute" />
+      </div>
+      <div className="flex justify-between">
+        <div className="flex gap-1">
+          <span className="select-none text-sm text-slate-600">
+            Open to Collaborate
+          </span>
+          <Tooltip
+            asChild
+            trigger={<InformationCircleIcon className="mt-0.5" />}
+            content={hintContent}
+          />
+        </div>
+        {/* {hintContent} */}
+
+        <Switch
+          // label="Open to Collaborate"
+          initialValue={enabled}
+          onChange={onSetEnabled}
         />
       </div>
-      {/* {hintContent} */}
-
-      <Switch
-        // label="Open to Collaborate"
-        initialValue={enabled}
-        onChange={onSetEnabled}
-      />
-    </div>
+    </>
   );
 }

@@ -34,7 +34,7 @@ export class MemberController {
   @ApiQueryFromZod(MemberQueryParams)
   @ApiOkResponseFromZod(ResponseMemberWithRelationsSchema.array())
   async findAll(@Req() request: Request) {
-    this.logger.info("In find all members....");
+    this.logger.info('In find all members....');
     const queryableFields = prismaQueryableFieldsFromZod(
       ResponseMemberWithRelationsSchema
     );
@@ -61,9 +61,12 @@ export class MemberController {
     );
     const builtQuery = builder.build(request.query);
     const member = await this.membersService.findOne(uid, builtQuery);
-    const repositories = await this.membersService.getRepositories(
-      member?.githubHandler
-    );
+    let repositories = [];
+    if (member?.githubHandler) {
+      repositories = await this.membersService.getRepositories(
+        member?.githubHandler
+      );
+    }
     const memberResponse = { ...member, repositories };
     return memberResponse;
   }
