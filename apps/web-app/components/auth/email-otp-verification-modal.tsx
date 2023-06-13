@@ -55,7 +55,11 @@ function EmailOtpVerificationModal() {
                 setDialogStatus(false);
                 localStorage.removeItem('otp-verification-email');
                 localStorage.setItem('otp-verify', 'success')
-                window.location.reload()
+                if (data?.userInfo?.isFirstTimeLogin) {
+                    window.location.href = '/directory/settings';
+                } else {
+                  window.location.reload();
+                }
             } else if (!data?.valid) {
                 setResendInSeconds(30);
                 setErrorMessage('Invalid OTP. Please enter valid OTP sent to your email or try resending OTP.')

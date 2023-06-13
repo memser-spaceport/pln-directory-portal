@@ -6,7 +6,7 @@ import Cookies from 'js-cookie';
 import type { NextPage } from 'next';
 import { DefaultSeo } from 'next-seo';
 import type { AppProps } from 'next/app';
-import { ReactElement, useEffect, ReactNode} from 'react';
+import { ReactElement, useEffect, useState, ReactNode} from 'react';
 import { toast } from 'react-toastify';
 import { useFathom } from '../hooks/plugins/use-fathom.hook';
 import { DEFAULT_SEO } from '../seo.config';
@@ -15,11 +15,11 @@ import 'react-toastify/dist/ReactToastify.css';
 import './styles.css';
 import { useRouter } from 'next/router';
 import posthog from 'posthog-js';
-import { logoutAllTabs } from '../utils/services/auth';
-
-import { LOGIN_FAILED_MSG, LOGOUT_MSG, RETRY_LOGIN_MSG, LOGGED_IN_MSG, SOMETHING_WENT_WRONG, EMAIL_CHANGED } from '../constants';
+import { LOGIN_FAILED_MSG, LOGOUT_MSG, RETRY_LOGIN_MSG, LOGIN_MSG, LOGGED_IN_MSG, SOMETHING_WENT_WRONG, EMAIL_CHANGED, PAGE_ROUTES } from '../constants';
 import EmailOtpVerificationModal from '../components/auth/email-otp-verification-modal';
-
+import { VerifyEmailModal } from '../components/layout/navbar/login-menu/verify-email-modal';
+import { ReactComponent as SuccessIcon } from '../public/assets/images/icons/success.svg';
+import { logoutAllTabs } from '../utils/services/auth';
 // Check that PostHog is client-side (used to handle Next.js SSR)
 if (typeof window !== 'undefined') {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
@@ -45,16 +45,24 @@ export default function CustomApp({
   pageProps,
 }: AppPropsWithLayout) {
   // Load Fathom web analytics tracker
+  const [isOpen, setIsModalOpen] = useState(false);
   useFathom();
   const router = useRouter()
 
   useEffect(() => {
     // Track page views
-    const handleRouteChange = () => posthog?.capture('$pageview')
-    router.events.on('routeChangeComplete', handleRouteChange)
-    logoutAllTabs();
-    Cookies.remove('state');
+    const handleRouteChange = () => posthog?.capture('$pageview');
+    router.events.on('routeChangeComplete', handleRouteChange);
+    const isVerified = Cookies.get('verified');
     const params = Cookies.get('page_params');
+    if(isVerified === 'true') {
+      toast.success(LOGIN_MSG, {
+        icon: <SuccessIcon />
+      });
+    } else if (isVerified === 'false') {
+      setIsModalOpen(true);
+    }
+    logoutAllTabs();
     switch (params) {
       case "auth_error":
         toast.error(LOGIN_FAILED_MSG, {
@@ -90,6 +98,8 @@ export default function CustomApp({
         break;
     }
     Cookies.remove('page_params');
+    Cookies.remove('verified');
+    Cookies.remove('state');
     return () => {
       router.events.off('routeChangeComplete', handleRouteChange)
     }
@@ -111,6 +121,13 @@ export default function CustomApp({
         progressClassName="!bg-[#30C593]"
       />
       <EmailOtpVerificationModal/>
+      <VerifyEmailModal
+        isOpen={isOpen}
+        setIsModalOpen={(isOpen) => {
+          setIsModalOpen(isOpen);
+          router.push(PAGE_ROUTES.TEAMS);
+        }}
+      />
     </>
   );
 }

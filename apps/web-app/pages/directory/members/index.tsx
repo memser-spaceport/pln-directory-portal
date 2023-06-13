@@ -2,13 +2,10 @@ import {
   getMembers,
   getMembersFilters,
 } from '@protocol-labs-network/members/data-access';
-import Cookies from 'js-cookie';
 import { GetServerSideProps } from 'next';
-import { useRouter } from 'next/router';
 import { NextSeo } from 'next-seo';
 import nookies, { destroyCookie } from 'nookies';
-import { ReactElement, useEffect, useState } from 'react';
-import { PAGE_ROUTES } from '../../../constants';
+import { ReactElement } from 'react';
 import { LoadingOverlay } from '../../../components/layout/loading-overlay/loading-overlay';
 import { MembersDirectoryFilters } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters';
 import { IMembersFiltersValues } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters.types';
@@ -22,15 +19,10 @@ import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember } from '../../../utils/members.types';
 import { renewAndStoreNewAccessToken, convertCookiesToJson } from '../../../utils/services/auth';
 import { parseMember, maskMemberDetails } from '../../../utils/members.utils';
-import { VerifyEmailModal } from '../../../components/layout/navbar/login-menu/verify-email-modal';
 import {
   getMembersListOptions,
   getMembersOptionsFromQuery,
 } from '../../../utils/members.utils';
-import EmailOtpVerificationModal from '../../../components/auth/email-otp-verification-modal';
-import { toast } from 'react-toastify';
-import { LOGIN_MSG } from '../../../constants';
-import { ReactComponent as SuccessIcon } from '../../../public/assets/images/icons/success.svg';
 
 type MembersProps = {
   members: IMember[];
@@ -46,9 +38,7 @@ export default function Members({
   verified,
   userInfo
 }: MembersProps) {
-  const [isOpen, setIsModalOpen] = useState(false);
   const { selectedViewType } = useViewType();
-  const router = useRouter();
   const isGrid = selectedViewType === 'grid';
   const filterProperties = [
     'skills',
@@ -61,18 +51,6 @@ export default function Members({
   ];
 
   useDirectoryFiltersFathomLogger('members', filterProperties);
-
-  useEffect(() => {
-    const isVerified = Cookies.get('verified');
-    if(isVerified === 'true') {
-      toast.success(LOGIN_MSG, {
-        icon: <SuccessIcon />
-      });
-    } else if (isVerified === 'false') {
-      setIsModalOpen(true);
-    }
-    Cookies.remove('verified');
-  }, [])
 
   return (
     <>
@@ -108,13 +86,6 @@ export default function Members({
           </div>
         </div>
       </section>
-      <VerifyEmailModal
-        isOpen={isOpen}
-        setIsModalOpen={(isOpen) => {
-          setIsModalOpen(isOpen);
-          router.push(PAGE_ROUTES.MEMBERS);
-        }}
-      />
     </>
   );
 }
