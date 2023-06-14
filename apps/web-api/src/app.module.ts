@@ -5,7 +5,7 @@ import {
   Module,
   RequestMethod,
 } from '@nestjs/common';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import * as redisStore from 'cache-manager-redis-store';
 import type { ClientOpts } from 'redis';
@@ -27,6 +27,7 @@ import { TechnologiesModule } from './technologies/technologies.module';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { SharedModule } from './shared/shared.module';
+import { LogException } from './filters/log-exception.filter';
 
 @Module({
   controllers: [AppController],
@@ -85,6 +86,10 @@ import { SharedModule } from './shared/shared.module';
       provide: APP_INTERCEPTOR,
       useClass: ConcealEntityIDInterceptor,
     },
+    {
+      provide: APP_FILTER,
+      useClass: LogException
+    }
   ],
 })
 export class AppModule {
