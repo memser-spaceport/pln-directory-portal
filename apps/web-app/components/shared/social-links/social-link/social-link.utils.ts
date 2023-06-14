@@ -8,8 +8,9 @@ export function getSocialLinkUrl(linkContent: string, type?: TSocialLinkType, ur
   if (type === 'linkedin' && linkContent != url) {
     return url;
   } else if (type === 'linkedin' && linkContent === url){
-    return `https://linkedin.com/in/${linkContent}`;
+    return `https://www.linkedin.com/search/results/all/?keywords=${linkContent}`;
   }
+  if (type === 'discord') return 'https://discord.com/app';
 
   return linkContent;
 }

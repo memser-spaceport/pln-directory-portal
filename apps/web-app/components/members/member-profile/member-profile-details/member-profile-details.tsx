@@ -66,18 +66,13 @@ export function MemberProfileDetails({
 
             {/* Discord */}
             {discordHandle && (
-              <div className="flex h-[26px] items-center gap-2 rounded bg-[#F1F5F9] px-3 text-[12px] leading-[14px] font-medium">
-                <img src={discordLogo} alt="discord" height={14} width={14} />
-                <Tooltip
-                  asChild
-                  trigger={
-                    <span className="line-clamp-1 break-all">
-                      {discordHandle}
-                    </span>
-                  }
-                  content={discordHandle}
-                />
-              </div>
+              <SocialProfile
+                handle={discordHandle}
+                type="discord"
+                logo={discordLogo}
+                height={14}
+                width={14}
+              />
             )}
 
             {/* Telegram */}

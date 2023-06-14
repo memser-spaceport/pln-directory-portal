@@ -3,4 +3,4 @@ export interface ISocialLink {
   label?: string;
 }
 
-export type TSocialLinkType = 'email' | 'twitter' | 'github' | 'linkedin' | 'telegram';
+export type TSocialLinkType = 'email' | 'twitter' | 'github' | 'linkedin' | 'telegram' | 'discord';
