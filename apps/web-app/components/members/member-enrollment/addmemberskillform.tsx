@@ -99,8 +99,9 @@ export default function AddMemberSkillForm(props) {
               <InformationCircleIcon className="h-5 w-5" />
             </div>
             <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-              Inform others in the network that you are open to working on new
-              projects with new teams.
+              Enabling this implies you are open to collaborate on shared ideas
+              & projects with other members. This is one way to join forces &
+              reach a common goal.
             </span>
           </div>
         </>
