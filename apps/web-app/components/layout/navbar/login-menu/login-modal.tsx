@@ -2,6 +2,7 @@ import { XCircleIcon } from '@heroicons/react/solid';
 import { Dispatch, Fragment, SetStateAction } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { authenticate } from '../../../../utils/services/auth';
+import { useRouter } from 'next/router';
 interface ILoginModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -13,13 +14,14 @@ export function LoginModal({
   setIsModalOpen,
   setIsForgotEmailModalOpen,
 }: ILoginModalProps) {
+  const router = useRouter();
   const handleModalClose = (isBackDropClick) => {
     setIsModalOpen(false);
     if (!isBackDropClick) setIsForgotEmailModalOpen(true);
   };
 
   const handleSignIn = () => {
-    authenticate();
+    authenticate(router.asPath);
     handleModalClose(true);
   };
 

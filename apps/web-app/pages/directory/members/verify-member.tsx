@@ -32,18 +32,18 @@ VerifyMember.getLayout = function getLayout(page: ReactElement) {
   return <>{page}</>;
 };
 
-export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
+export const getServerSideProps = async (
   ctx
 ) => {
   const { query } = ctx;
-  const { state, code, error } = query;
+  const { state, code, error, landingPage=PAGE_ROUTES.TEAMS } = query;
   const cookies = nookies.get(ctx);
   // validating state which we gave to auth service to get auth code.
   if (cookies.state && cookies.state != state) {
     return {
       redirect: {
         permanent: false,
-        destination: PAGE_ROUTES.TEAMS,
+        destination: landingPage
       },
     };
   }
@@ -56,7 +56,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
     return {
       redirect: {
         permanent: false,
-        destination: PAGE_ROUTES.TEAMS,
+        destination: landingPage
       }
     };
   }
@@ -68,7 +68,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
     return {
       redirect: {
         permanent: false,
-        destination: PAGE_ROUTES.TEAMS,
+        destination:landingPage
       },
     };
   } else if(authResp.status === 400 || authResp.status === 500 || authResp.status === 404 ) {
@@ -79,7 +79,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
     return {
       redirect: {
         permanent: false,
-        destination: PAGE_ROUTES.TEAMS,
+        destination: landingPage
       },
     };
   }
@@ -142,7 +142,7 @@ export const getServerSideProps: GetServerSideProps<VerifyMember> = async (
   return {
     redirect: {
       permanent: false,
-      destination: PAGE_ROUTES.TEAMS,
+      destination: landingPage
     },
   };
 };

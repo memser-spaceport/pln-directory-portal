@@ -1,9 +1,7 @@
 import api, { renewAccessToken } from '../api';
-import Cookies from 'js-cookie';
 import { setCookie } from 'nookies';
 import * as Cookie from 'cookie'
 import * as jwt from 'jsonwebtoken';
-import { PAGE_ROUTES } from '../../constants';
 import { BroadcastChannel } from 'broadcast-channel';
 
 export const createLogoutChannel = () => {
@@ -50,14 +48,14 @@ export const generateOAuth2State = () => {
   return state;
 };
 
-export const authenticate = async () => {
+export const authenticate = async (currentURL) => {
   try {
     const state = generateOAuth2State();
     setCookie(null, 'state', state, {
       path: '/',
       maxAge: 60 * 1000,
     });
-    const redirectURL = `${location.protocol + '//' + location.host}/directory/members/verify-member`;
+    const redirectURL = `${location.protocol + '//' + location.host}/directory/members/verify-member?landingPage=${currentURL.replace(/#$/, "")}`;
     window.location.href = `${process.env.AUTH_API_URL}/auth?redirect_uri=${redirectURL}&state=${state}&scope=openid profile&client_id=${process.env.NEXT_PUBLIC_AUTH_APP_CLIENT_ID}`;
   } catch (error) {
     console.error(error);
