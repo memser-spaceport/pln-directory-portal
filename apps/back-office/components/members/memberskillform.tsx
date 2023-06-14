@@ -78,25 +78,37 @@ export default function AddMemberSkillForm(props) {
         </div>
       </div>
       {isOpenToWorkEnabled === 'true' && props.referenceUid && (
-        <div className="pt-5">
-          <span className="mr-2 text-sm font-bold">Are you open to Work?</span>
-          <div className="flex pt-3">
-            <Switch
-              label="Open to Work?"
-              initialValue={props.formValues.openToWork}
-              onChange={(evt) => console.log('event', evt)}
-            />
+        <>
+          <div className="pt-5">
+            <div className="flex place-content-between">
+              <span className="mr-2 pr-5 text-sm font-bold">
+                Are you open to collaborate?
+              </span>
+              <Switch
+                initialValue={props.formValues.openToWork}
+                onChange={(evt) => {
+                  const events = {
+                    target: {
+                      value: evt,
+                      name: 'openToWork',
+                    },
+                  };
+                  props.onChange(events);
+                }}
+              />
+            </div>
           </div>
           <div className="flex pt-3">
             <div>
-              <InformationCircleIcon />
+              <InformationCircleIcon className="h-5 w-5" />
             </div>
             <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-              Inform others in the network that you are open to working on new
-              projects with new teams.
+              Enabling this implies you are open to collaborate on shared ideas
+              & projects with other members. This is one way to join forces &
+              reach a common goal.
             </span>
           </div>
-        </div>
+        </>
       )}
     </>
   );

@@ -122,8 +122,9 @@ export function ProfileImageUpload({
             <Image
               src={imageUrl}
               alt="Profile Image"
-              width={95}
-              height={95}
+              layout="fill"
+              objectFit={previewImageShape === 'circle' ? 'cover' : 'contain'}
+              objectPosition="center"
             />
           ) : AvatarIcon ? (
             <AvatarIcon className="w-22 h-22 bg-gray-200 fill-white" />

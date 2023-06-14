@@ -36,20 +36,14 @@ export function DirectoryCardHeader({
           } ${isGrid ? 'mx-auto' : ''} ${img ? 'bg-white' : 'bg-slate-200'}`}
       >
         {img ? (
-          isImageRounded ? (<Image
+          <Image
             className={isImageRounded ? 'rounded-full' : 'rounded-lg'}
             alt={`${name} img`}
             src={img}
-            width={95}
-            height={95}
-          />) : (<Image
-            className={'rounded-lg'}
-            alt={`${name} img`}
-            src={img}
             layout="fill"
-            objectFit={'contain'}
+            objectFit={isImageRounded ? 'cover' : 'contain'}
             objectPosition="center"
-          />)
+          />
         ) : (
           <Icon className="w-22 h-22 mt-2 fill-white" />
         )}
