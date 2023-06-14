@@ -123,7 +123,7 @@ export function ProfileImageUpload({
               src={imageUrl}
               alt="Profile Image"
               layout="fill"
-              objectFit={previewImageShape === 'circle' ? 'cover' : 'contain'}
+              objectFit={previewImageShape === 'circle' ? 'scale-down' : 'contain'}
               objectPosition="center"
             />
           ) : AvatarIcon ? (

@@ -21,7 +21,6 @@ export function MembersDirectoryFilters({
 }: MembersDirectoryFiltersProps) {
   const isOpenToWorkEnabled =
     process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK === 'true' ? true : false;
-  const isLoggedIn = userInfo?.uid ? true : false;
   return (
     <DirectoryFilters filterProperties={filterProperties}>
       <div className="space-y-4">
@@ -31,16 +30,12 @@ export function MembersDirectoryFilters({
       </div>
       <div className="my-5 h-px bg-slate-200" />
       <SkillsFilter skillsTags={filtersValues.skills} />
-      {isLoggedIn && (
-        <>
-          <div className="my-5 h-px bg-slate-200" />
-          <RegionFilter regionTags={filtersValues.region} />
-          <div className="my-5 h-px bg-slate-200" />
-          <CountryFilter countryTags={filtersValues.country} />
-          <div className="my-5 h-px bg-slate-200" />
-          <MetroAreaFilter metroAreaTags={filtersValues.metroArea} />
-        </>
-      )}
+      <div className="my-5 h-px bg-slate-200" />
+      <RegionFilter regionTags={filtersValues.region}/>
+      <div className="my-5 h-px bg-slate-200" />
+      <CountryFilter countryTags={filtersValues.country}/>
+      <div className="my-5 h-px bg-slate-200" />
+      <MetroAreaFilter metroAreaTags={filtersValues.metroArea}/>
     </DirectoryFilters>
   );
 }
