@@ -112,7 +112,6 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
                 src={userInfo.profileImageUrl}
                 width={56}
                 height={56}
-                layout="fill"
                 objectFit="cover"
                 objectPosition="center"
                 alt="Profile Picture"

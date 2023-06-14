@@ -10,6 +10,6 @@ export function CountryFilter({ countryTags }: CountryFilterProps) {
   const [tags, toggleTag] = useTagsFilter('country', countryTags);
 
   return (
-    <DirectoryTagsFilter title="Country" tags={tags} onTagToggle={toggleTag} />
+    <DirectoryTagsFilter title="Country" tags={tags} onTagToggle={toggleTag} hideOnLogout={true}/>
   );
 }

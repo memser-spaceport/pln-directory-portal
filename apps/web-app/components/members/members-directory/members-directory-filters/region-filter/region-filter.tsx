@@ -10,6 +10,6 @@ export function RegionFilter({ regionTags }: RegionFilterProps) {
   const [tags, toggleTag] = useTagsFilter('region', regionTags);
 
   return (
-    <DirectoryTagsFilter title="Region" tags={tags} onTagToggle={toggleTag} />
+      <DirectoryTagsFilter title="Region" tags={tags} onTagToggle={toggleTag} hideOnLogout={true}/>
   );
 }
