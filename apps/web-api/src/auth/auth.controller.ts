@@ -91,10 +91,10 @@ export class AuthController {
         }
 
         // if user found by email... then link the verified email with account and get new tokens
-        const newTokens = await this.authService.linkEmailWithAccount(verificationResult.recipient, body.accessToken, body.clientToken)
+        const newTokens = await this.authService.linkEmailWithAccount(verificationResult.recipient, body.accessToken, body.clientToken, foundUser)
 
         // return userinfo
-        return { valid: true, userInfo: foundUser, newTokens }
+        return { valid: true, userInfo: {...foundUser, isFirstTimeLogin: foundUser?.isExternalIdAvailable }, newTokens }
       }
 
       // Invalid OTP
