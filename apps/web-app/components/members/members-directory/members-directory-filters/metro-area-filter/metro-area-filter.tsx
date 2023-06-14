@@ -14,6 +14,7 @@ export function MetroAreaFilter({ metroAreaTags }: MetroAreaFilterProps) {
       title="Metro Area"
       tags={tags}
       onTagToggle={toggleTag}
+      hideOnLogout={true}
     />
   );
 }
