@@ -193,6 +193,7 @@ export class AuthService {
     });
     if (foundUser) {
       return {
+        isExternalIdAvailable: foundUser.externalId ? false : true,
         name: foundUser.name,
         email: foundUser.email,
         profileImageUrl: foundUser.image?.url,
@@ -253,13 +254,20 @@ export class AuthService {
     };
   }
 
-  async linkEmailWithAccount(email, accessToken, clientToken) {
+  async linkEmailWithAccount(email, accessToken, clientToken, user) {
     const linkResult = await axios.put(`${process.env.AUTH_API_URL}/admin/accounts`, { token: accessToken, email: email }, {
       headers: {
         Authorization: `Bearer ${clientToken}`
       }
     })
+
+    // If user already has externalId then send new token directly
     const newTokens = linkResult.data;
+    if(user.isExternalIdAvailable) {
+      return newTokens
+    }
+
+    // Else update external Id and send new tokens
     const idToken = newTokens.id_token;
     const decoded: any = jwt_decode(idToken);
     const userExternalId = decoded.sub;
