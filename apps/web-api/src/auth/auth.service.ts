@@ -1,9 +1,11 @@
 /* eslint-disable prettier/prettier */
 import {
   BadRequestException,
+  CACHE_MANAGER,
   ForbiddenException,
   HttpException,
   HttpStatus,
+  Inject,
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
@@ -13,11 +15,12 @@ import jwt_decode from 'jwt-decode';
 import { PrismaService } from '../shared/prisma.service';
 import { RedisService } from '../utils/redis/redis.service';
 import { LogService } from '../shared/log.service';
+import { Cache } from 'cache-manager';
 @Injectable()
 export class AuthService {
   constructor(private prismaService: PrismaService,
      private redisService: RedisService,
-     private readonly logger: LogService) { }
+     @Inject(CACHE_MANAGER) private cacheService: Cache) { }
 
   async findUniqueMemberAndGetInfo(query) {
     const foundUser: any = await this.prismaService.member.findUnique({
@@ -52,7 +55,6 @@ export class AuthService {
       const newToken = this.getUserInfo(result);
       return newToken;
     } catch (e) {
-      this.logger.error('error', e);
       if (e?.response?.data?.message, e?.response?.status) {
         throw new HttpException("Request failed. Please try again later", e?.response?.status)
       }
@@ -143,7 +145,6 @@ export class AuthService {
       }
     } catch (e) {
       console.error(e)
-      this.logger.error('error', e);
       if (e?.response?.data?.message && e?.response?.status) {
         throw new HttpException(e?.response?.status, e?.response?.data?.message)
       }
@@ -167,7 +168,6 @@ export class AuthService {
       });
 
     } catch (error) {
-      this.logger.error('error', error);
       if (error.response) {
         throw new HttpException(error?.response?.data?.message, error?.response?.status ?? 400)
       }
@@ -185,7 +185,7 @@ export class AuthService {
     });
     if (foundUser) {
       return {
-        isExternalIdAvailable: foundUser.externalId ? false : true,
+        isExternalIdAvailable: foundUser.externalId ? true : false,
         name: foundUser.name,
         email: foundUser.email,
         profileImageUrl: foundUser.image?.url,
@@ -231,7 +231,7 @@ export class AuthService {
       newTokens = linkResult.data;
     })
 
-    await this.redisService.resetAllCache()
+    await this.cacheService.reset()
     return {
       newTokens,
       userInfo: {

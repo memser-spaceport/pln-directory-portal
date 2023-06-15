@@ -256,7 +256,6 @@ export class MembersService {
         }
       });
     } catch (error) {
-      this.logService.error('error', error);
       if (error?.response?.statusCode && error?.response?.message) {
         throw new HttpException(
           error?.response?.message,
