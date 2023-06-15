@@ -34,7 +34,6 @@ export class MemberController {
   @ApiQueryFromZod(MemberQueryParams)
   @ApiOkResponseFromZod(ResponseMemberWithRelationsSchema.array())
   async findAll(@Req() request: Request) {
-    this.logger.info('In find all members....');
     const queryableFields = prismaQueryableFieldsFromZod(
       ResponseMemberWithRelationsSchema
     );
