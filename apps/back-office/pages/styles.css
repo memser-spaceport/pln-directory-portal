@@ -446,3 +446,7 @@ summary svg {
   --tw-border-opacity: 1 !important;
   border-color: rgb(239 68 68 / var(--tw-border-opacity)) !important;
 }
+
+.padding-team-autocomplete {
+  padding-right: 27px !important;
+}
