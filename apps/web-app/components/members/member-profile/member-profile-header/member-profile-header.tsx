@@ -54,7 +54,7 @@ export function MemberProfileHeader({
           content={name}
         />
         <div className="flex items-center">
-        <div className="w-full font-medium">
+        <div className="max-w-full font-medium">
           <Tooltip
             asChild
             trigger={
