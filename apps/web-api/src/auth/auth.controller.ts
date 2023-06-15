@@ -12,11 +12,14 @@ import {
 import { AuthService } from './auth.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserAccessTokenValidateGuard } from '../guards/user-access-token-validate.guard';
+import { LogService } from '../shared/log.service';
 
 
 @Controller('v1/auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(
+    private readonly loggerService: LogService,
+    private readonly authService: AuthService) { }
 
   @Post('verification/send-otp')
   @NoCache()
@@ -39,6 +42,7 @@ export class AuthController {
       return await this.authService.sendEmailOtpForVerification(body.email, body.clientToken)
 
     } catch (error) {
+      this.loggerService.error('error', error);
       this.authService.handleErrors(error)
     }
   }
@@ -64,6 +68,7 @@ export class AuthController {
       return await this.authService.resendEmailOtpForVerification(body.otpToken, body.clientToken)
 
     } catch (error) {
+      this.loggerService.error('error', error);
       this.authService.handleErrors(error)
     }
   }
@@ -101,6 +106,7 @@ export class AuthController {
       return { valid: false }
     } catch (error) {
       console.log(error?.response)
+      this.loggerService.error('error', error);
       this.authService.handleErrors(error)
     }
   }
@@ -138,6 +144,7 @@ export class AuthController {
 
       return await this.authService.sendEmailOtpForVerification(body.newEmail, body.clientToken)
     } catch (e) {
+      this.loggerService.error('error', e);
       this.authService.handleErrors(e)
     }
   }
@@ -175,6 +182,7 @@ export class AuthController {
 
       return await this.authService.resendEmailOtpForVerification(body.otpToken, body.clientToken)
     } catch (e) {
+      this.loggerService.error('error', e);
       this.authService.handleErrors(e)
     }
   }
@@ -208,6 +216,7 @@ export class AuthController {
 
     return false;
     } catch (error) {
+      this.loggerService.error('error', error);
       this.authService.handleErrors(error)
     }
   }

@@ -20,7 +20,7 @@ export class LogException implements ExceptionFilter {
 
     this.logger.error(
       `${exception.getStatus()} - ${exception.message}`,
-      exception?.stack
+      exception as any
     );
     response.status(status).json({
       ...errorResponse,
