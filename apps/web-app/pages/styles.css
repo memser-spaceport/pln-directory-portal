@@ -222,3 +222,7 @@ nextjs-portal {
   background-clip: content-box, border-box;
   border-image-slice: 30;
 }
+
+.padding-team-autocomplete {
+  padding-right: 27px !important;
+}
