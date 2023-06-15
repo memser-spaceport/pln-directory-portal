@@ -54,8 +54,12 @@ export default function Member({
 
   useEffect(() => {
     const params = Cookies.get('page_params');
-    if (params === 'user_logged_in') {
+    if (params === 'schedule_meeting') {
       toast.info(LOGGED_IN_MSG + ', ' + SCHEDULE_MEETING_MSG, {
+        hideProgressBar: true,
+      });
+    } else if(params === 'user_logged_in') {
+      toast.info(LOGGED_IN_MSG, {
         hideProgressBar: true,
       });
     }

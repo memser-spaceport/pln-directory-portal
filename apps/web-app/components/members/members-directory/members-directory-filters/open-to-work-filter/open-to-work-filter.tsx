@@ -18,9 +18,9 @@ export function OpenToWorkFilter() {
 
   return (
     <>
-      <div className="relative left-[-31px]">
+      {/* <div className="relative left-[-31px]">
         <NewBanner className="absolute" />
-      </div>
+      </div> */}
       <div className="flex justify-between">
         <div className="flex gap-1">
           <span className="select-none text-sm text-slate-600">
