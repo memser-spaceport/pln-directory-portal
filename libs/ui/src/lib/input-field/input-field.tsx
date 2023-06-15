@@ -64,22 +64,31 @@ export function InputField({
       ) : (
         <span className="sr-only">{label}</span>
       )}
-      { dropDownType === 'member' && !InputIcon ? (<UserIcon className="bg-gray-200 fill-white absolute top-5 left-[5px] h-6 w-6 rounded-full"/>):null}
-      { dropDownType === 'team' && !InputIcon ? (<UserGroupIcon className="bg-gray-200 fill-white absolute top-5 left-[5px] h-6 w-6 rounded-full"/>):null}
-      {(InputIcon && typeof(InputIcon)!== 'string')? (
+      {dropDownType === 'member' && !InputIcon ? (
+        <UserIcon className="absolute top-5 left-[5px] h-6 w-6 rounded-full bg-gray-200 fill-white" />
+      ) : null}
+      {dropDownType === 'team' && !InputIcon ? (
+        <UserGroupIcon className="absolute top-5 left-[5px] h-6 w-6 rounded-full bg-gray-200 fill-white" />
+      ) : null}
+      {InputIcon && typeof InputIcon !== 'string' ? (
         <InputIcon className="stroke-1.5 absolute inset-y-0 left-2 my-auto h-4 w-4 text-slate-600" />
       ) : null}
-      {
-        (InputIcon && typeof (InputIcon) === 'string') ? (
-          <img src={InputIcon.toString()} className='absolute top-5 left-[5px] h-6 w-6 rounded-full'></img>
-        ) : null
-      }
+      {InputIcon && typeof InputIcon === 'string' ? (
+        <img
+          src={InputIcon.toString()}
+          className="absolute top-5 left-[5px] h-6 w-6 rounded-full"
+        ></img>
+      ) : null}
       <input
         {...props}
         type={showPassword ? 'text' : props.type}
         className={`mt-[12px] block w-full rounded-lg bg-white text-sm leading-6 text-slate-900  shadow-slate-300 transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-600 placeholder:opacity-50
-        ${(icon || dropDownType === 'member' || dropDownType === 'team') ? 'pl-9 truncate !pr-6' : 'pl-3'} ${hasClear && props.type !== 'date' ? 'pr-6' : 'pr-2'} 
-        h-10 leading-10 disabled:bg-slate-100 ${
+        ${hasClear && props.type !== 'date' ? 'pr-6' : 'pr-2'}
+        ${
+          icon || dropDownType === 'member' || dropDownType === 'team'
+            ? 'truncate pl-9 pr-7'
+            : 'pl-3'
+        } h-10 leading-10 disabled:bg-slate-100 ${
           props.className
         } ${requiredIndicator}`}
         onChange={handleUserInput}
@@ -97,9 +106,9 @@ export function InputField({
 
       {hasClear && !props.disabled ? (
         <button
-          className={`absolute inset-y-0 ${props.type === 'date' ? 'top-9 right-8' : 'right-0 pr-2'} ${
-            inputValue ? '' : 'hidden'
-          }`}
+          className={`absolute inset-y-0 ${
+            props.type === 'date' ? 'top-9 right-8' : 'right-0 pr-2'
+          } ${inputValue ? '' : 'hidden'}`}
           onClick={handleClear}
         >
           <XIcon className="h-3 w-3 fill-slate-600" />
