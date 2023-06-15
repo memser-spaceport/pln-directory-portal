@@ -1,4 +1,3 @@
-import { LockClosedIcon } from '@heroicons/react/outline';
 import { FATHOM_EVENTS } from '../../../../../web-app/constants';
 import { IMember } from '../../../../../web-app/utils/members.types';
 import { authenticate } from '../../../../../web-app/utils/services/auth';
