@@ -16,7 +16,7 @@ export function Login() {
       Cookies.set('page_params', 'user_logged_in', { expires: 60, path: '/' });
       router.push("/directory/members");
     } else {
-      authenticate();
+      authenticate(router.asPath);
       trackGoal(loginAsUserCode, 0);
     }
   };

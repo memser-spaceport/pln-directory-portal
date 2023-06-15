@@ -4,6 +4,7 @@ import {
   InformationCircleIcon,
   UserIcon,
 } from '@heroicons/react/solid';
+import { useRouter } from 'next/router';
 import { InputField } from '@protocol-labs-network/ui';
 import {
   ChangeEvent,
@@ -28,7 +29,7 @@ export function ForgotEmailModal({
 }: IForgotEmailModal) {
   const [name, setName] = useState('');
   const [members, setMembers] = useState([]);
-
+  const router = useRouter();
   const onNameChange = (
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -56,7 +57,7 @@ export function ForgotEmailModal({
   };
 
   const handleSignIn = () => {
-    authenticate();
+    authenticate(router.asPath);
     handleOnClick();
   };
 
