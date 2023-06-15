@@ -14,7 +14,7 @@ export class SetupService {
         winston.format.timestamp(),
         winston.format.printf((info) => {
           return `${info.timestamp} : ${info.level} - ${JSON.stringify(info)}`;
-        }),
+        })
       ),
     });
 
@@ -27,15 +27,15 @@ export class SetupService {
             winston.format.ms(),
             winston.format.printf((info) => {
               return `${info.timestamp} : ${info.level} - ${info.message}`;
-            }),
+            })
             //nestWinstonModuleUtilities.format.nestLike()
           ),
         }),
       ],
     });
-    if (process.env.ENVIRONMENT !== 'DEV') {
-      this.addProductionTransport(instance);
-    }
+    // if (process.env.ENVIRONMENT !== 'DEV') {
+    this.addProductionTransport(instance);
+    // }
     return instance;
   }
 
@@ -51,7 +51,8 @@ export class SetupService {
         },
         region: process.env.CLOUDWATCH_REGION,
       },
-      messageFormatter: (item: any) => `[${item.level}] : ${JSON.stringify(item)}`,
+      messageFormatter: (item: any) =>
+        `[${item.level}] : ${JSON.stringify(item)}`,
     };
     instance.add(new WinstonCloudwatch(cloudwatchConfig));
   }

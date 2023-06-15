@@ -17,6 +17,7 @@ import { hashFileName } from '../utils/hashing';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { ParticipantRequestMemberSchema } from 'libs/contracts/src/schema/participants-request';
 import axios from 'axios';
+import { LogService } from '../shared/log.service';
 
 @Injectable()
 export class MembersService {
@@ -24,7 +25,8 @@ export class MembersService {
     private prisma: PrismaService,
     private locationTransferService: LocationTransferService,
     private participantsRequestService: ParticipantsRequestService,
-    private fileMigrationService: FileMigrationService
+    private fileMigrationService: FileMigrationService,
+    private logService: LogService
   ) {}
 
   findAll(queryOptions: Prisma.MemberFindManyArgs) {
@@ -254,6 +256,7 @@ export class MembersService {
         }
       });
     } catch (error) {
+      this.logService.error('error', error);
       if (error?.response?.statusCode && error?.response?.message) {
         throw new HttpException(
           error?.response?.message,

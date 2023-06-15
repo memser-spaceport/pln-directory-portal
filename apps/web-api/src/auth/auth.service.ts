@@ -50,10 +50,9 @@ export class AuthService {
         }
       );
       const newToken = this.getUserInfo(result);
-      this.logger.info('newToken',newToken.toString());
       return newToken;
     } catch (e) {
-      this.logger.error(e?.response?.data?.message);
+      this.logger.error('error', e);
       if (e?.response?.data?.message, e?.response?.status) {
         throw new HttpException("Request failed. Please try again later", e?.response?.status)
       }
@@ -144,12 +143,9 @@ export class AuthService {
       }
     } catch (e) {
       console.error(e)
-      this.logger.info("Error in getUserinfo");
+      this.logger.error('error', e);
       if (e?.response?.data?.message && e?.response?.status) {
-        this.logger.error(e?.response?.data?.message);
         throw new HttpException(e?.response?.status, e?.response?.data?.message)
-      }else{
-        this.logger.error(e.toString());
       }
       throw new InternalServerErrorException();
     }
@@ -170,19 +166,15 @@ export class AuthService {
         grant_type: 'authorization_code',
       });
 
-      this.logger.info('result', result.toString());
-
     } catch (error) {
-      this.logger.info('In Catch of getToken')
+      this.logger.error('error', error);
       if (error.response) {
-        this.logger.error(error.response);
         throw new HttpException(error?.response?.data?.message, error?.response?.status ?? 400)
       }
       throw new UnauthorizedException();
     }
 
     const tokenResponse =  this.getUserInfo(result);
-    this.logger.info('tokenresponse',tokenResponse.toString());
     return tokenResponse;
   }
 

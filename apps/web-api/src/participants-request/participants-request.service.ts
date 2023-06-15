@@ -19,6 +19,7 @@ import { SlackService } from '../utils/slack/slack.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { getRandomId } from '../utils/helper/helper';
 import axios from 'axios';
+import { LogService } from '../shared/log.service';
 @Injectable()
 export class ParticipantsRequestService {
   constructor(
@@ -27,7 +28,8 @@ export class ParticipantsRequestService {
     private awsService: AwsService,
     private redisService: RedisService,
     private slackService: SlackService,
-    private forestAdminService: ForestAdminService
+    private forestAdminService: ForestAdminService,
+    private logService: LogService
   ) {}
 
   async getAll(userQuery) {
