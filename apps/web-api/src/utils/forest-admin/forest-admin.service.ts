@@ -19,7 +19,6 @@ export class ForestAdminService {
         highTouchSync(allSlugs['industry']),
       ]);
     } catch (e) {
-      this.logService.error('error', e)
       console.log(e);
     }
   }

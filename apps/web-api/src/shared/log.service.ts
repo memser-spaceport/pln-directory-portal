@@ -9,6 +9,6 @@ export class LogService {
     this.logger.log('info', message, context);
   }
   error(message: any, stack?: string, context?: string) {
-    this.logger.error(message, stack, context);
+    this.logger.log('error', message, stack, context);
   }
 }

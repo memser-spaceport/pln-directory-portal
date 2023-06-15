@@ -8,22 +8,30 @@ import {
 import { Response } from 'express';
 import { LogService } from '../shared/log.service';
 
-@Catch(HttpException)
+@Catch()
 export class LogException implements ExceptionFilter {
   @Inject()
   private readonly logger: LogService;
-  catch(exception: HttpException, host: ArgumentsHost) {
+  catch(exception: any, host: ArgumentsHost) {
+    this.logger.error(
+      exception.response ? exception.response.message : exception.message,
+      exception
+    );
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const status = exception.getStatus();
-    const errorResponse: any = exception.getResponse();
-
-    this.logger.error(
-      `${exception.getStatus()} - ${exception.message}`,
-      exception as any
-    );
+    const request = ctx.getRequest<Request>();
+    const status =
+      typeof exception.getStatus === 'function' ? exception.getStatus() : 500;
+    const message =
+      typeof exception.getStatus === 'function'
+        ? (exception?.response?.message ? exception.response.message : exception.message)
+        : 'Internal error, contact support';
     response.status(status).json({
-      ...errorResponse,
+      message,
+      errors: exception.error,
+      timestamp: new Date().toISOString(),
+      path: request.url,
+      statusCode: status,
     });
   }
 }
