@@ -6,7 +6,7 @@ import { DirectoryFilter } from '../directory-filter/directory-filter';
 import { IFilterTag } from './directory-tags-filter.types';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
-import {ReactComponent as Lock} from '../../../../../public/assets/images/icons/lock.svg';
+import { ReactComponent as Lock } from '../../../../../public/assets/images/icons/lock.svg';
 import Cookies from 'js-cookie';
 export interface DirectoryTagsFilterProps {
   title: string;
@@ -44,7 +44,7 @@ export function DirectoryTagsFilter({
   if (userInfoFromCookie) {
     userInfoFromCookie = JSON.parse(userInfoFromCookie);
   }
-  const logOut = (authToken && userInfoFromCookie?.uid) ? false : true;
+  const logOut = authToken && userInfoFromCookie?.uid ? false : true;
 
   const handleMouseEnter = () => {
     setIsHovered(true);
@@ -57,12 +57,12 @@ export function DirectoryTagsFilter({
   return (
     <div onMouseLeave={handleMouseLeave} onMouseEnter={handleMouseEnter}>
       <DirectoryFilter title={title}>
-        {(isHovered && hideOnLogout && logOut) && (
+        {isHovered && hideOnLogout && logOut && (
           <div
-            className={`absolute left-0 top-[-20px] box-content mx-[-36px] z-50 flex h-[calc(100%+40px)] w-[284px] bg-[#434B58] backdrop-blur-[2.5px] bg-opacity-60`}
+            className={`absolute left-0 top-[-20px] z-50 mx-[-36px] box-content flex h-[calc(100%+40px)] w-[284px] bg-[#434B58] bg-opacity-60 backdrop-blur-[2.5px]`}
           >
-            <div className="m-auto items-center justify-center text-[12px] leading-[20px] font-medium text-white">
-              <Lock className="m-auto items-center justify-center"/>
+            <div className="m-auto items-center justify-center text-[12px] font-medium leading-[20px] text-white">
+              <Lock className="m-auto items-center justify-center" />
               <span>Login to access</span>
             </div>
           </div>
@@ -73,6 +73,8 @@ export function DirectoryTagsFilter({
               key={index}
               {...tag}
               onClick={() => onTagClicked(tag, index)}
+              {...(hideOnLogout &&
+                logOut && { disabled: true })}
             />
           ))}
           {collapsibleTags.length ? (

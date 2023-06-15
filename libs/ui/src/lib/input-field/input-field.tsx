@@ -86,7 +86,7 @@ export function InputField({
         ${hasClear && props.type !== 'date' ? 'pr-6' : 'pr-2'}
         ${
           icon || dropDownType === 'member' || dropDownType === 'team'
-            ? 'truncate pl-9 pr-7'
+            ? 'truncate pl-9 !pr-6'
             : 'pl-3'
         } h-10 leading-10 disabled:bg-slate-100 ${
           props.className
