@@ -42,7 +42,6 @@ export class AuthController {
       return await this.authService.sendEmailOtpForVerification(body.email, body.clientToken)
 
     } catch (error) {
-      this.loggerService.error('error', error);
       this.authService.handleErrors(error)
     }
   }
@@ -68,7 +67,6 @@ export class AuthController {
       return await this.authService.resendEmailOtpForVerification(body.otpToken, body.clientToken)
 
     } catch (error) {
-      this.loggerService.error('error', error);
       this.authService.handleErrors(error)
     }
   }
@@ -99,14 +97,12 @@ export class AuthController {
         const newTokens = await this.authService.linkEmailWithAccount(verificationResult.recipient, body.accessToken, body.clientToken, foundUser)
 
         // return userinfo
-        return { valid: true, userInfo: {...foundUser, isFirstTimeLogin: foundUser?.isExternalIdAvailable }, newTokens }
+        return { valid: true, userInfo: {...foundUser, isFirstTimeLogin: foundUser?.isExternalIdAvailable ? false : true }, newTokens }
       }
 
       // Invalid OTP
       return { valid: false }
     } catch (error) {
-      console.log(error?.response)
-      this.loggerService.error('error', error);
       this.authService.handleErrors(error)
     }
   }
@@ -216,7 +212,6 @@ export class AuthController {
 
     return false;
     } catch (error) {
-      this.loggerService.error('error', error);
       this.authService.handleErrors(error)
     }
   }

@@ -28,7 +28,7 @@ export class SetupService {
             winston.format.printf((info) => {
               return `${info.timestamp} : ${info.level} - ${info.message}`;
             })
-            //nestWinstonModuleUtilities.format.nestLike()
+            // nestWinstonModuleUtilities.format.nestLike()
           ),
         }),
       ],

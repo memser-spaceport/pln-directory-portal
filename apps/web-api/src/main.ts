@@ -9,7 +9,7 @@ import { SetupService } from './setup.service';
 
 export async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
-    logger: new SetupService().setupLog(),
+    logger: ['error', 'warn', 'log', 'verbose'],
   });
 
   // Responsible for loading every major app configuration:

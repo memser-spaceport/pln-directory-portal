@@ -86,10 +86,10 @@ import { LogException } from './filters/log-exception.filter';
       provide: APP_INTERCEPTOR,
       useClass: ConcealEntityIDInterceptor,
     },
-    {
+    /* {
       provide: APP_FILTER,
       useClass: LogException
-    }
+    } */
   ],
 })
 export class AppModule {
