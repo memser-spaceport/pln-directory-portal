@@ -59,7 +59,7 @@ export function VerifyEmailModal({
                   <div className="text-sm/5 mt-3">
                     Email doesn't match a membership email in the directory.
                     Please contact our support at{' '}
-                    <span className="font-bold"> supportmail@protocol.ai </span>{' '}
+                    <span className="font-bold"> spaceport@protocol.ai </span>{' '}
                     for assistance or try to{' '}
                     <span
                       onClick={()=>{ authenticate(router.asPath)}}

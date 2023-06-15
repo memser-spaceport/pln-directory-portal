@@ -31,7 +31,7 @@ export function MemberProfileOfficeHours({
   const analytics = useAppAnalytics();
   const handleOnClick = () => {
     if (Cookies.get('userInfo')) {
-      Cookies.set('page_params', 'user_logged_in', { expires: 60, path: '/' });
+      Cookies.set('page_params', 'schedule_meeting', { expires: 60, path: '/' });
       router.reload();
     } else {
       authenticate(router.asPath);

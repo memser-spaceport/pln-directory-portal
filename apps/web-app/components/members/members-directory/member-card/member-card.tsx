@@ -45,6 +45,7 @@ export function MemberCard({
       isGrid={isGrid}
       cardUrl={`/directory/members/${member.id}?backLink=${backLink}`}
       handleOnClick={onMemberClicked}
+      type="member"
     >
       <DirectoryCardHeader
         isGrid={isGrid}
@@ -55,8 +56,9 @@ export function MemberCard({
         name={member.name}
         teamLead={member.teamLead}
         userInfo={loggedInMember}
+        type="member"
       />
-      <div className={isGrid ? '' : 'w-[400px] grow-0'}>
+      <div className={isGrid ? 'px-5' : 'w-[400px] grow-0'}>
         <div className={isGrid ? '' : 'flex'}>
           <h2
             className={`${
@@ -132,6 +134,7 @@ export function MemberCard({
       <DirectoryCardFooter
         isGrid={isGrid}
         tagsArr={member.skills.map((skill) => skill.title)}
+        type="member"
       />
     </DirectoryCard>
   );

@@ -22,7 +22,7 @@ export function ProfileSocialLink({ profile, url, type, logo, height, width }: P
       className="flex h-[26px] cursor-pointer items-center gap-2 rounded bg-[#F1F5F9] px-3 font-medium"
     >
       <img src={logo} alt={type} height={height} width={width} />
-      <p className="on-focus--link line-clamp-1 break-all text-left text-[12px] leading-[14px] text-base hover:text-slate-700">
+      <p className="on-focus--link break-all text-left text-[12px] leading-[14px] text-base hover:text-slate-700 max-w-[120px] truncate">
         {profile ? profile : url}
       </p>
     </a>
