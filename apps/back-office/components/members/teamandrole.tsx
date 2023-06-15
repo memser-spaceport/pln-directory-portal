@@ -38,8 +38,7 @@ export function TeamAndRoleGrid(props) {
       <div className="flex flex-row">
         <div className="w-full basis-6/12">
           <Autocomplete
-            name="team"
-            className="custom-grey custom-outline-none border"
+            className="custom-grey custom-outline-none border truncate pr-[27px]"
             required={true}
             disabled={!props.isEditEnabled}
             placeholder="Select a team"
