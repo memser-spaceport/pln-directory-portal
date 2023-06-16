@@ -4,9 +4,10 @@ import { useTagsFilter } from '../../../../shared/directory/directory-filters/di
 
 export interface MetroAreaFilterProps {
   metroAreaTags: IFilterTag[];
+  userInfo?: any;
 }
 
-export function MetroAreaFilter({ metroAreaTags }: MetroAreaFilterProps) {
+export function MetroAreaFilter({ metroAreaTags, userInfo }: MetroAreaFilterProps) {
   const [tags, toggleTag] = useTagsFilter('metroArea', metroAreaTags);
 
   return (
@@ -15,6 +16,7 @@ export function MetroAreaFilter({ metroAreaTags }: MetroAreaFilterProps) {
       tags={tags}
       onTagToggle={toggleTag}
       hideOnLogout={true}
+      userInfo={userInfo}
     />
   );
 }

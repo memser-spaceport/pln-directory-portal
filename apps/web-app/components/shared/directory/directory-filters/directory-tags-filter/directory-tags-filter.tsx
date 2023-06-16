@@ -7,12 +7,12 @@ import { IFilterTag } from './directory-tags-filter.types';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
 import { ReactComponent as Lock } from '../../../../../public/assets/images/icons/lock.svg';
-import Cookies from 'js-cookie';
 export interface DirectoryTagsFilterProps {
   title: string;
   tags: IFilterTag[];
   onTagToggle?: (index: number) => void;
   hideOnLogout?: boolean;
+  userInfo?: any;
 }
 
 const VISIBLE_TAGS_COUNT = 10;
@@ -21,13 +21,15 @@ export function DirectoryTagsFilter({
   title,
   tags,
   onTagToggle,
-  hideOnLogout,
+  hideOnLogout=false,
+  userInfo,
 }: DirectoryTagsFilterProps) {
   const visibleTags = tags.slice(0, VISIBLE_TAGS_COUNT);
   const collapsibleTags = tags.slice(VISIBLE_TAGS_COUNT);
   const [open, setOpen] = useState(tags.some((tag) => tag.selected));
   const [isHovered, setIsHovered] = useState(false);
   const analytics = useAppAnalytics();
+  const loggedIn = userInfo?.uid ? true : false;
   const onTagClicked = (tagProps, index) => {
     if (tagProps.selected === false) {
       analytics.captureEvent(APP_ANALYTICS_EVENTS.FILTERS_APPLIED, {
@@ -39,13 +41,6 @@ export function DirectoryTagsFilter({
     onTagToggle(index);
   };
 
-  const authToken = Cookies.get('authToken');
-  let userInfoFromCookie = Cookies.get('userInfo');
-  if (userInfoFromCookie) {
-    userInfoFromCookie = JSON.parse(userInfoFromCookie);
-  }
-  const logOut = authToken && userInfoFromCookie?.uid ? false : true;
-
   const handleMouseEnter = () => {
     setIsHovered(true);
   };
@@ -53,11 +48,10 @@ export function DirectoryTagsFilter({
   const handleMouseLeave = () => {
     setIsHovered(false);
   };
-
   return (
     <div onMouseLeave={handleMouseLeave} onMouseEnter={handleMouseEnter}>
       <DirectoryFilter title={title}>
-        {isHovered && hideOnLogout && logOut && (
+        {isHovered && hideOnLogout && !loggedIn && (
           <div
             className={`absolute left-0 top-[-20px] z-50 mx-[-36px] box-content flex h-[calc(100%+40px)] w-[284px] bg-[#434B58] bg-opacity-60 backdrop-blur-[2.5px]`}
           >
@@ -74,7 +68,7 @@ export function DirectoryTagsFilter({
               {...tag}
               onClick={() => onTagClicked(tag, index)}
               {...(hideOnLogout &&
-                logOut && { disabled: true })}
+                !loggedIn && { disabled: true })}
             />
           ))}
           {collapsibleTags.length ? (
