@@ -49,7 +49,7 @@ export function DirectoryCardHeader({
                   objectPosition="center"
                 />
               ) : (
-                <Icon className="w-22 h-22 mt-2 fill-white" />
+                <Icon className="w-22 h-22 fill-white" />
               )}
             </div>
             {isOpenTOWorkEnabled && openToWork && (
