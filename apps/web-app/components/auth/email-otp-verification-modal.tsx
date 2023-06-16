@@ -9,7 +9,7 @@ import { calculateExpiry, decodeToken } from "../../utils/services/auth";
 import ErrorBox from "./error-box";
 import { toast } from "react-toastify";
 import { ReactComponent as SuccessIcon } from '../../public/assets/images/icons/success.svg';
-import { APP_ANALYTICS_EVENTS, EMAIL_OTP_CONSTANTS } from "../../constants";
+import { APP_ANALYTICS_EVENTS, EMAIL_OTP_CONSTANTS, PAGE_ROUTES } from "../../constants";
 import useAppAnalytics from "../../hooks/shared/use-app-analytics";
 function EmailOtpVerificationModal() {
     // States
@@ -56,7 +56,7 @@ function EmailOtpVerificationModal() {
                 localStorage.removeItem('otp-verification-email');
                 localStorage.setItem('otp-verify', 'success')
                 if (data?.userInfo?.isFirstTimeLogin) {
-                    window.location.href = '/directory/settings';
+                    window.location.href = PAGE_ROUTES.SETTINGS;
                 } else {
                   window.location.reload();
                 }

@@ -262,6 +262,7 @@ export class MembersService {
             result.uid,
             true, // disable the notification
             true, // enable the auto approval
+            requestorDetails.isDirectoryAdmin, 
             tx
           );
         } else {

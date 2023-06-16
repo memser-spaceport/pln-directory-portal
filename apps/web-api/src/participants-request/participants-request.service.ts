@@ -394,6 +394,7 @@ export class ParticipantsRequestService {
     uidToEdit,
     disableNotification = false,
     isAutoApproval = false,
+    isDirectoryAdmin = false,
     transactionType: Prisma.TransactionClient | PrismaClient = this.prisma
   ) {
     // Get
@@ -531,7 +532,21 @@ export class ParticipantsRequestService {
       }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
       await this.slackService.notifyToChannel(slackConfig);
     }
-    await this.cacheService.reset()
+    await this.cacheService.reset();
+    // Send ack email to old & new email of member reg his/her email change.
+    if (isEmailChange && isDirectoryAdmin) {
+      const oldEmail = existingData.email;
+      const newEmail = dataToSave.email;
+      await this.awsService.sendEmail(
+        'MemberEmailChangeAcknowledgement', 
+        false, 
+        [oldEmail, newEmail], 
+        { 
+          oldEmail,
+          newEmail
+        }
+      );
+    }
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
