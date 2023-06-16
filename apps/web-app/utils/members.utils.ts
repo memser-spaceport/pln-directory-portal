@@ -44,7 +44,7 @@ export function getMembersOptionsFromQuery(
     ...(includeFriends ? {} : { plnFriend: false }),
     ...(openToWork ? { openToWork: true } : {}),
     ...(searchBy
-      ? { name__istartswith: stringifyQueryValues(searchBy).trim() }
+      ? { name__icontains: stringifyQueryValues(searchBy).trim() }
       : {}),
     orderBy: `${sortFromQuery.direction === 'desc' ? '-' : ''}${sortField}`,
   };

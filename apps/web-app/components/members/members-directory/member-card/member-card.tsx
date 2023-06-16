@@ -6,8 +6,9 @@ import { DirectoryCard } from '../../../shared/directory/directory-card/director
 import { DirectoryCardFooter } from '../../../shared/directory/directory-card/directory-card-footer';
 import { DirectoryCardHeader } from '../../../shared/directory/directory-card/directory-card-header';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
+import { OpenToWorkBadge } from '../../../shared/open-to-work-badge/open-to-work-badge';
+import { TeamLeadBadge } from '../../../shared/team-lead-badge/team-lead-badge';
 
-import { ReactComponent as BriefCase } from '../../../../public/assets/images/icons/mdi_briefcase-check.svg';
 import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
 
 interface MemberCardProps {
@@ -31,6 +32,10 @@ export function MemberCard({
     .sort();
   const role = member.mainTeam?.role || 'Contributor';
   const analytics = useAppAnalytics();
+  const isOpenTOWorkEnabled =
+    process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK === 'true'
+      ? true
+      : false;
 
   const onMemberClicked = () => {
     analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_CLICKED, {
@@ -67,14 +72,16 @@ export function MemberCard({
           >
             {member.name}
           </h2>
-          {/* {(isOpenToWorkEnabled) && !isGrid && member.openToWork && (
-            <span className="z-0 flex pl-2 pt-[5px] text-slate-600">
-              <BriefCase />
-              <span className="pl-1 pt-px text-[10px] font-medium leading-[14px] tracking-[0.01em]">
-                OPEN TO COLLABORATE
-              </span>
-            </span>
-          )} */}
+          {(isOpenTOWorkEnabled) && !isGrid && member.openToWork && (
+            <div className="pl-1">
+              <OpenToWorkBadge type='CARD'/>
+            </div>
+          )}
+          { !isGrid && member.teamLead && (
+            <div className="pl-1">
+              <TeamLeadBadge size="5" />
+            </div>
+          )}
         </div>
 
         <div
