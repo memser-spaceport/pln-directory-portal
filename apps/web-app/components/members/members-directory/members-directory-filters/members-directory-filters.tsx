@@ -31,11 +31,11 @@ export function MembersDirectoryFilters({
       <div className="my-5 h-px bg-slate-200" />
       <SkillsFilter skillsTags={filtersValues.skills} />
       <div className="my-5 h-px bg-slate-200" />
-      <RegionFilter regionTags={filtersValues.region}/>
+      <RegionFilter regionTags={filtersValues.region} userInfo={userInfo}/>
       <div className="my-5 h-px bg-slate-200" />
-      <CountryFilter countryTags={filtersValues.country}/>
+      <CountryFilter countryTags={filtersValues.country} userInfo={userInfo}/>
       <div className="my-5 h-px bg-slate-200" />
-      <MetroAreaFilter metroAreaTags={filtersValues.metroArea}/>
+      <MetroAreaFilter metroAreaTags={filtersValues.metroArea} userInfo={userInfo}/>
     </DirectoryFilters>
   );
 }
