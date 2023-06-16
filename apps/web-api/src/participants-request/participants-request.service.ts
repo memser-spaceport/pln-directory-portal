@@ -237,7 +237,7 @@ export class ParticipantsRequestService {
 
     if (!disableNotification)
       await this.slackService.notifyToChannel(slackConfig);
-    await this.cacheService.reset()
+    await this.redisService.resetAllCache()
     return result;
   }
 
@@ -253,7 +253,7 @@ export class ParticipantsRequestService {
       where: { uid: requestedUid },
       data: { ...formattedData },
     });
-    await this.cacheService.reset()
+    await this.redisService.resetAllCache()
     return { code: 1, message: 'success' };
   }
 
@@ -268,7 +268,7 @@ export class ParticipantsRequestService {
       where: { uid: uidToReject },
       data: { status: ApprovalStatus.REJECTED },
     });
-    await this.cacheService.reset()
+    await this.redisService.resetAllCache()
     return { code: 1, message: 'Success' };
   }
 
@@ -385,7 +385,7 @@ export class ParticipantsRequestService {
       newMember.uid
     }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
-    await this.cacheService.reset()
+    await this.redisService.resetAllCache()
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
@@ -531,7 +531,7 @@ export class ParticipantsRequestService {
       }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
       await this.slackService.notifyToChannel(slackConfig);
     }
-    await this.cacheService.reset()
+    await this.redisService.resetAllCache()
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
@@ -759,7 +759,7 @@ export class ParticipantsRequestService {
       newTeam.uid
     }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
-    await this.cacheService.reset()
+    await this.redisService.resetAllCache()
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
@@ -898,7 +898,7 @@ export class ParticipantsRequestService {
       slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`;
       await this.slackService.notifyToChannel(slackConfig);
     }
-    await this.cacheService.reset()
+    await this.redisService.resetAllCache()
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
