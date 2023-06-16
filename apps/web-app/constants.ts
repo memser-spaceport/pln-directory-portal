@@ -62,6 +62,7 @@ export const FATHOM_EVENTS = {
         region: '9DFPHYUF',
         country: 'EMEZBS7G',
         metroArea: 'O1I7TF4M',
+        openToWork: 'USG99P5G',
       },
       controls: {
         searchBy: '8BWPXHVB',

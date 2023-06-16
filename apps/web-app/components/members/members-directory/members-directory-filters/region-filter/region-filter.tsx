@@ -4,12 +4,13 @@ import { useTagsFilter } from '../../../../shared/directory/directory-filters/di
 
 export interface RegionFilterProps {
   regionTags: IFilterTag[];
+  userInfo?: any;
 }
 
-export function RegionFilter({ regionTags }: RegionFilterProps) {
+export function RegionFilter({ regionTags, userInfo }: RegionFilterProps) {
   const [tags, toggleTag] = useTagsFilter('region', regionTags);
 
   return (
-      <DirectoryTagsFilter title="Region" tags={tags} onTagToggle={toggleTag} hideOnLogout={true}/>
+      <DirectoryTagsFilter title="Region" tags={tags} onTagToggle={toggleTag} hideOnLogout={true} userInfo={userInfo}/>
   );
 }
