@@ -9,7 +9,7 @@ import { RedisService } from '../utils/redis/redis.service';
 import { SlackService } from '../utils/slack/slack.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 @Module({
-  imports: [CacheModule.register()],
+  imports: [],
   controllers: [ParticipantsRequestController, UniqueIdentifier],
   providers: [
     ParticipantsRequestService,

@@ -231,7 +231,7 @@ export class AuthService {
       newTokens = linkResult.data;
     })
 
-    await this.redisService.resetAllCache()
+    await this.cacheService.reset()
     return {
       newTokens,
       userInfo: {
