@@ -372,7 +372,7 @@ export class ParticipantsRequestService {
     await this.awsService.sendEmail(
       'NewMemberSuccess',
       false,
-      [dataFromDB.requesterEmailId],
+      [dataToSave.email],
       {
         memberName: dataToProcess.name,
         memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${
