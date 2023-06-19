@@ -64,7 +64,7 @@ export function MemberCard({
         type="member"
       />
       <div className={isGrid ? 'px-5' : 'w-[400px] grow-0'}>
-        <div className={isGrid ? '' : 'flex'}>
+        <div className={isGrid ? '' : 'flex items-center'}>
           <h2
             className={`${
               isGrid ? 'mt-2' : ''
@@ -73,12 +73,12 @@ export function MemberCard({
             {member.name}
           </h2>
           {(isOpenTOWorkEnabled) && !isGrid && member.openToWork && (
-            <div className="pl-1">
+            <div className="pl-1 h-6 w-6">
               <OpenToWorkBadge type='CARD'/>
             </div>
           )}
           { !isGrid && member.teamLead && (
-            <div className="pl-1">
+            <div className="pl-1 h-6 w-6">
               <TeamLeadBadge size="5" />
             </div>
           )}

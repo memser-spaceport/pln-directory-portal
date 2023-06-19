@@ -29,6 +29,8 @@ export default function AddTeamStepTwo(props) {
 
       <div className="pt-5">
         <span className="mr-2 text-sm font-bold">Funding Stage*</span>
+        <br/>
+        <br/>
         <Dropdown
           options={dropDownValues?.fundingStages}
           name="fundingStage"
