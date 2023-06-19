@@ -36,10 +36,10 @@ export const getServerSideProps = async (
   ctx
 ) => {
   const { query } = ctx;
-  const { state, code, error, landingPage=PAGE_ROUTES.TEAMS } = query;
+  const { state, code, error, landingPage=PAGE_ROUTES.TEAMS, source} = query;
   const cookies = nookies.get(ctx);
   // validating state which we gave to auth service to get auth code.
-  if (cookies.state && cookies.state != state) {
+  if (cookies.state && cookies.state != state && source != "direct") {
     return {
       redirect: {
         permanent: false,
