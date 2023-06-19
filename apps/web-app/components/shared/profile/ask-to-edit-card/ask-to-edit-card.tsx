@@ -1,7 +1,7 @@
 import { PencilAltIcon } from '@heroicons/react/outline';
 import { trackGoal } from 'fathom-client';
 import { useEffect, useState } from 'react';
-import { FATHOM_EVENTS, SETTINGS_CONSTANTS } from '../../../../constants';
+import { APP_ANALYTICS_EVENTS, FATHOM_EVENTS, SETTINGS_CONSTANTS } from '../../../../constants';
 import { EditMemberModal } from '../../../members/member-enrollment/editmember';
 import { EditTeamModal } from '../../../teams/team-enrollment/editteam';
 import { RequestPending } from '../../request-pending/request-pending';
@@ -11,6 +11,8 @@ import { IMember } from '../../../../utils/members.types';
 import { ITeam } from '../../../../utils/teams.types';
 import { ReactComponent as EditIcon } from '/public/assets/images/icons/edit.svg';
 import { Router, useRouter } from 'next/router';
+import Cookies from 'js-cookie';
+import useAppAnalytics from '../../../../hooks/shared/use-app-analytics';
 // import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 
 type TAskToEditProfileType = 'team' | 'member';
@@ -49,7 +51,7 @@ export function AskToEditCard({
     useState(false);
 
   const router = useRouter();
-
+  const analytics = useAppAnalytics();
   const handleOpenEditModal = async () => {
     // if (
     //   typeof document !== 'undefined' &&
@@ -70,11 +72,65 @@ export function AskToEditCard({
     }
   };
 
+  const logPosthogAnalytics = () => {
+    try {
+      const loggedInUser = Cookies.get('userInfo');
+      if(loggedInUser) {
+        const parsedLoggedInUser = JSON.parse(loggedInUser);
+        const isAdmin = parsedLoggedInUser.roles.includes('DIRECTORYADMIN');
+        const isTeamLead = parsedLoggedInUser?.leadingTeams?.includes(team?.id);
+        const isSelfEdit = parsedLoggedInUser?.uid === member?.id;
+
+        if(profileType === 'member' && isSelfEdit) {
+          analytics.captureEvent(
+            APP_ANALYTICS_EVENTS.MEMBER_EDIT_BY_SELF,
+            {
+              name: member?.name,
+              email: member?.email,
+              uid: member?.id
+            }
+          );
+        } else if (profileType === 'member' && isAdmin) {
+          analytics.captureEvent(
+            APP_ANALYTICS_EVENTS.MEMBER_EDIT_BY_ADMIN,
+            {
+              name: member?.name,
+              email: member?.email,
+              uid: member?.id
+            }
+          );
+        } else if (profileType === 'team' && isTeamLead) {
+          analytics.captureEvent(
+            APP_ANALYTICS_EVENTS.TEAM_EDIT_BY_LEAD,
+            {
+              name: team?.name,
+              uid: member?.id
+            }
+          );
+        } else if (profileType === 'team' && isAdmin) {
+          analytics.captureEvent(
+            APP_ANALYTICS_EVENTS.TEAM_EDIT_BY_ADMIN,
+            {
+              name: team?.name,
+              uid: member?.id
+            }
+          );
+        }
+      }
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
   const redirectToSettings = () => {
+    /* analytics.captureEvent(APP_ANALYTICS_EVENTS, {
+
+    }) */
+    logPosthogAnalytics()
     let query = {};
     if(profileType === SETTINGS_CONSTANTS.TEAM){
       query = { id: team.id, name: team.name, logo: team.logo, from: SETTINGS_CONSTANTS.TEAM };
-    }else if(profileType === SETTINGS_CONSTANTS.MEMBER){
+    } else if(profileType === SETTINGS_CONSTANTS.MEMBER){
       query = { id: member.id, name: member.name, logo: member.image, from: SETTINGS_CONSTANTS.MEMBER };
     }
     trackGoal(urlList[profileType].eventCode, 0);
@@ -124,7 +180,7 @@ export function AskToEditCard({
           </>
         )
       }
-      
+
       </button>
       {/* <GoogleReCaptchaProvider
         reCaptchaKey={process.env.NEXT_PUBLIC_GOOGLE_SITE_KEY}
