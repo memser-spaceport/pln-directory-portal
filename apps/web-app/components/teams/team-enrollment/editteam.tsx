@@ -679,6 +679,11 @@ export function EditTeamModal({
               </div>
             )}
             <div className="flex justify-center">
+              <div className="mx-5">
+                {getResetButton(() => {
+                  handleReset();
+                })}
+              </div>
               <div>
                 {getSubmitOrNextButton(
                   handleSubmit,
@@ -686,11 +691,6 @@ export function EditTeamModal({
                   fromSettings,
                   disableSubmit
                 )}
-              </div>
-              <div className="mx-5">
-                {getResetButton(() => {
-                  handleReset();
-                })}
               </div>
             </div>
           </div>
