@@ -73,12 +73,12 @@ export function MemberCard({
             {member.name}
           </h2>
           {(isOpenTOWorkEnabled) && !isGrid && member.openToWork && (
-            <div className="pl-1 h-6 w-6">
+            <div className="pl-1 pt-0.5 h-6 w-6">
               <OpenToWorkBadge type='CARD'/>
             </div>
           )}
           { !isGrid && member.teamLead && (
-            <div className="pl-1 h-6 w-6">
+            <div className="pl-1 pt-0.5 h-6 w-6">
               <TeamLeadBadge size="5" />
             </div>
           )}

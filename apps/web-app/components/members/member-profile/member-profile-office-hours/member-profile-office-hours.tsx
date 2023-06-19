@@ -1,4 +1,4 @@
-import { ArrowSmRightIcon, CalendarIcon } from '@heroicons/react/outline';
+import { ArrowSmRightIcon } from '@heroicons/react/outline';
 import { AnchorLink, Tooltip } from '@protocol-labs-network/ui';
 import { trackGoal } from 'fathom-client';
 import Cookies from 'js-cookie';
@@ -11,6 +11,7 @@ import {
 import { authenticate } from '../../../../utils/services/auth';
 import { IMember } from '../../../../../web-app/utils/members.types';
 import useAppAnalytics from '../../../../../web-app/hooks/shared/use-app-analytics';
+import {ReactComponent as CalendarIcon} from '../../../../public/assets/images/icons/ScheduleCalendar.svg'
 
 type MemberProfileOfficeHoursProps = {
   url?: string;
@@ -54,8 +55,8 @@ export function MemberProfileOfficeHours({
       {((!userInfo?.uid && member?.officeHours) || userInfo.uid) && (
         <div className="mt-6 flex items-center justify-between rounded-xl bg-slate-50 p-4">
           <div className="flex items-center ">
-            <span className="mr-3 w-7 rounded bg-blue-100 p-1.5">
-              <CalendarIcon className="stroke-1.5 h-4 w-4 rounded text-blue-700" />
+            <span className="mr-3">
+              <CalendarIcon />
             </span>
             {!userInfo.uid ? (
               <p className="flex select-none items-center gap-1 text-sm font-normal">
