@@ -298,7 +298,7 @@ export class AuthService {
       } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP005') {
         throw new UnauthorizedException("Unauthorized")
       } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP003') {
-        throw new ForbiddenException("MAX_OTP_ATTEMPTS_REACHED")
+        throw new ForbiddenException("MAX_OTP_ATTEMPTS_REACHED", error)
       } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EATH010') {
         throw new ForbiddenException("ACCOUNT_ALREADY_LINKED")
       } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EATH002') {
