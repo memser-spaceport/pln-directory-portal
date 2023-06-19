@@ -99,7 +99,7 @@ export function Dropdown({
         value={selectedOption?.value}
         onChange={onChangeHandler}
         placeholder="Enter value"
-        className="mt-[12px] w-full text-sm"
+        className="w-full text-sm"
         disabled={disabled}
       >
 

@@ -7,7 +7,7 @@ import { ReactComponent as CardBadge } from '../../../../../public/assets/images
 export function OpenToWorkFilter() {
   const { enabled, onSetEnabled } = useSwitchFilter('openToWork');
   const hintContent = (
-    <div className="">
+    <div className="font-normal leading-5 text-sm p-3.5">
       <span>
         Members with this icon
         <CardBadge className="mx-1 inline-block" />
