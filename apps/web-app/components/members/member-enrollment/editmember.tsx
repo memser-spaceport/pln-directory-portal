@@ -39,7 +39,7 @@ import orderBy from 'lodash/orderBy';
 import { requestPendingCheck } from '../../../utils/services/members';
 import { DiscardChangesPopup } from '../../../../../libs/ui/src/lib/modals/confirmation';
 import { getClientToken } from '../../../services/auth.service';
-import { calculateExpiry, decodeToken } from '../../../utils/services/auth';
+import { calculateExpiry, createLogoutChannel, decodeToken } from '../../../utils/services/auth';
 import ChangeEmailModal from '../../auth/change-email-modal';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { ReactComponent as SuccessIcon } from '../../../public/assets/images/icons/success.svg';
@@ -269,7 +269,16 @@ export function EditMemberModal({
           });
           setEmailEditStatus(true);
         })
-        .catch((e) => console.error(e));
+        .catch((e) => {
+          if(e?.response?.status === 401) {
+            Cookies.remove('authToken');
+            Cookies.remove('refreshToken');
+            Cookies.remove('userInfo');
+            createLogoutChannel().postMessage('logout');
+            Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
+            window.location.href = PAGE_ROUTES.TEAMS;
+          }
+        });
       // .finally(() =>  setIsProcessing(false))
     } else {
       analytics.captureEvent(
@@ -867,18 +876,20 @@ export function EditMemberModal({
                     {getCancelOrBackButton(handleModalClose)}
                   </div>
                 )}
-                <div className="float-right">
-                  {getSubmitOrNextButton(
-                    handleSubmit,
-                    isProcessing,
-                    isProfileSettings,
-                    disableSubmit
-                  )}
-                </div>
-                <div className="float-right mx-5">
-                  {getResetButton(() => {
-                    handleReset();
-                  })}
+                <div className="flex justify-center">
+                  <div>
+                    {getSubmitOrNextButton(
+                      handleSubmit,
+                      isProcessing,
+                      isProfileSettings,
+                      disableSubmit
+                    )}
+                  </div>
+                  <div className="mx-5">
+                    {getResetButton(() => {
+                      handleReset();
+                    })}
+                  </div>
                 </div>
               </div>
             }

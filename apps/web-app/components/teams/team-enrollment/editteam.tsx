@@ -678,18 +678,20 @@ export function EditTeamModal({
                 {getCancelOrBackButton(handleModalClose)}
               </div>
             )}
-            <div className="float-right">
-              {getSubmitOrNextButton(
-                handleSubmit,
-                isProcessing,
-                fromSettings,
-                disableSubmit
-              )}
-            </div>
-            <div className="float-right mx-5">
-              {getResetButton(() => {
-                handleReset();
-              })}
+            <div className="flex justify-center">
+              <div>
+                {getSubmitOrNextButton(
+                  handleSubmit,
+                  isProcessing,
+                  fromSettings,
+                  disableSubmit
+                )}
+              </div>
+              <div className="mx-5">
+                {getResetButton(() => {
+                  handleReset();
+                })}
+              </div>
             </div>
           </div>
         }
