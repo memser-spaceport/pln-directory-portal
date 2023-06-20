@@ -15,7 +15,6 @@ export class LogException extends BaseExceptionFilter {
   async catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse();
-    const request = ctx.getRequest();
 
     if (exception instanceof PrismaClientKnownRequestError) {
       // Handle Prisma errors
@@ -24,8 +23,6 @@ export class LogException extends BaseExceptionFilter {
       response.status(statusCode).json({
         statusCode,
         message,
-        timestamp: new Date().toISOString(),
-        path: request.url,
       });
     } else if (axios.isAxiosError(exception)) {
       // Handle Axios errors
@@ -35,8 +32,6 @@ export class LogException extends BaseExceptionFilter {
       response.status(statusCode).json({
         statusCode,
         message,
-        timestamp: new Date().toISOString(),
-        path: request.url,
       });
     } else if (exception instanceof HttpException) {
       // Handle NestJS errors
@@ -47,21 +42,20 @@ export class LogException extends BaseExceptionFilter {
       response.status(status).json({
         statusCode: status,
         message,
-        timestamp: new Date().toISOString(),
-        path: request.url,
       });
     } else {
+      // Handle all other errors
       const statusCode = 500;
       const message = 'Unexpected Error. Please try again.';
       response.status(statusCode).json({
         statusCode,
         message,
-        timestamp: new Date().toISOString(),
-        path: request.url,
       });
     }
 
-    // Log the error to CloudWatch using Winston logger
-    this.logger.error(exception);
+    // Log the error to CloudWatch using Winston logger only for production
+    if (process.env.environment && process.env.environment === 'production') {
+      this.logger.error('error', exception);
+    }
   }
 }

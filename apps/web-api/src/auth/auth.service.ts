@@ -291,30 +291,29 @@ export class AuthService {
   handleErrors = (error) => {
     console.log(error?.response?.statusCode, error?.response?.status, error?.response?.message, error?.response?.data)
     if (error?.response?.statusCode && error?.response?.message) {
-      throw new HttpException(error?.response?.message, error?.response?.statusCode)
+      throw new HttpException(error?.response?.message, error?.response?.statusCode, {cause: error})
     } else if (error?.response?.data && error?.response?.status) {
       if (error?.response?.status === 401) {
-        throw new UnauthorizedException("Unauthorized")
+        throw new UnauthorizedException("Unauthorized",  {cause: error})
       } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP005') {
-        throw new UnauthorizedException("Unauthorized")
+        throw new UnauthorizedException("Unauthorized",  {cause: error})
       } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP003') {
-        throw new ForbiddenException("MAX_OTP_ATTEMPTS_REACHED", error)
+        throw new ForbiddenException("MAX_OTP_ATTEMPTS_REACHED", {cause: error})
       } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EATH010') {
-        throw new ForbiddenException("ACCOUNT_ALREADY_LINKED")
+        throw new ForbiddenException("ACCOUNT_ALREADY_LINKED",  {cause: error})
       } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EATH002') {
-        throw new ForbiddenException("ACCOUNT_ALREADY_LINKED")
+        throw new ForbiddenException("ACCOUNT_ALREADY_LINKED",  {cause: error})
       } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP006') {
-        throw new ForbiddenException("MAX_RESEND_ATTEMPTS_REACHED")
+        throw new ForbiddenException("MAX_RESEND_ATTEMPTS_REACHED",  {cause: error})
       } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP004') {
-        throw new BadRequestException("CODE_EXPIRED")
+        throw new BadRequestException("CODE_EXPIRED",  {cause: error})
       }
       // EOTP002, EATH010
       else {
-        console.log(error?.response?.data)
-        throw new InternalServerErrorException("Unexpected error. Please try again")
+        throw new InternalServerErrorException("Unexpected error. Please try again",  {cause: error})
       }
     } else {
-      throw new InternalServerErrorException("Unexpected error. Please try again")
+      throw new InternalServerErrorException("Unexpected error. Please try again",  {cause: error})
     }
   }
 
