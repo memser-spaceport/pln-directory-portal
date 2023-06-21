@@ -16,6 +16,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { RedisService } from '../utils/redis/redis.service';
 import { LogService } from '../shared/log.service';
 import { Cache } from 'cache-manager';
+import { MembersService } from '../members/members.service';
 @Injectable()
 export class AuthService {
   constructor(private prismaService: PrismaService,
@@ -343,4 +344,36 @@ export class AuthService {
     const sendOtpResult = await axios.post(`${process.env.AUTH_API_URL}/mfa/otp`, payload, header);
     return sendOtpResult.data;
   }
+
+  checkIfTokenAttached = (request) => {
+    const token = this.extractTokenFromHeader(request);
+    if (!token) {
+      throw new UnauthorizedException('Invalid Token');
+    }else{
+      return token;
+    }
+  }
+
+  extractTokenFromHeader(request): string | undefined {
+    const [type, token] = request.headers.authorization?.split(' ') ?? [];
+    return type === 'Bearer' ? token : undefined;
+  }
+
+  validateToken = async (request,token) => {
+    const validationResult: any = await axios.post(
+      `${process.env.AUTH_API_URL}/auth/introspect`,
+      { token: token }
+    );
+    if (
+      validationResult?.data?.active &&
+      validationResult?.data?.email
+    ) {
+      request['userEmail'] = validationResult.data.email;
+      return request;
+    } else {
+      throw new UnauthorizedException();
+    }
+  }
+
 }
+

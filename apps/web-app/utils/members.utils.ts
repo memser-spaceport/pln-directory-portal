@@ -98,6 +98,7 @@ export const parseMember = (member: TMemberResponse,): IMember => {
     openToWork: member.openToWork || false,
     linkedinHandle: member.linkedinHandler || null,
     repositories: member.repositories ?? [],
+    preferences: member.preferences ?? null
   };
 };
 

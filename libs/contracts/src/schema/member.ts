@@ -14,6 +14,16 @@ export const GitHubRepositorySchema = z.object({
   updatedAt: z.string(),
 });
 
+export const PreferenceSchema = z.object({
+  showEmail:z.boolean(),
+  showGithubHandle:z.boolean(),
+  showTelegram:z.boolean(),
+  showLinkedin:z.boolean(),
+  showDiscord:z.boolean(),
+  showGithubProjects:z.boolean(),
+  showTwitter:z.boolean()
+});
+
 export const MemberSchema = z.object({
   id: z.number().int(),
   uid: z.string(),
@@ -33,7 +43,10 @@ export const MemberSchema = z.object({
   openToWork: z.boolean(),
   linkedinHandler: z.string().nullish(),
   repositories: GitHubRepositorySchema.array().optional(),
+  preferences: PreferenceSchema.optional()
 });
+
+
 
 export const ResponseMemberSchema = MemberSchema.omit({ id: true }).strict();
 

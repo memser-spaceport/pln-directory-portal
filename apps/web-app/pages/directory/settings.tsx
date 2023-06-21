@@ -1,26 +1,30 @@
-import { getMember, getMembers } from "@protocol-labs-network/members/data-access";
+import { getMember, getMemberPreferences, getMembers } from "@protocol-labs-network/members/data-access";
 import { getTeams } from "@protocol-labs-network/teams/data-access";
 import { Autocomplete, Breadcrumb, Dropdown } from "@protocol-labs-network/ui";
 import { trackGoal } from 'fathom-client';
 import { NextSeo } from "next-seo";
 import { setCookie } from "nookies";
-import { ReactElement, useEffect, useState } from "react";
+import React, { ReactElement, useEffect, useReducer, useState } from "react";
 import { EditMemberModal } from "apps/web-app/components/members/member-enrollment/editmember";
 import { EditTeamModal } from "apps/web-app/components/teams/team-enrollment/editteam";
-import { ADMIN_ROLE, MSG_CONSTANTS, PAGE_ROUTES, SETTINGS_CONSTANTS, FATHOM_EVENTS } from "apps/web-app/constants";
+import { ADMIN_ROLE, MSG_CONSTANTS, PAGE_ROUTES, SETTINGS_CONSTANTS, FATHOM_EVENTS, PRIVACY_CONSTANTS } from "apps/web-app/constants";
 import { useProfileBreadcrumb } from "apps/web-app/hooks/profile/use-profile-breadcrumb.hook";
 import { DirectoryLayout } from "apps/web-app/layouts/directory-layout";
 import { DIRECTORY_SEO } from "apps/web-app/seo.config";
 import api from "apps/web-app/utils/api";
 import { fetchMember } from "apps/web-app/utils/services/members";
 import { fetchTeam } from "apps/web-app/utils/services/teams";
-import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../utils/services/auth';
+import { renewAndStoreNewAccessToken, convertCookiesToJson } from '../../utils/services/auth';
 import { DiscardChangesPopup } from "libs/ui/src/lib/modals/confirmation";
+import Privacy from "apps/web-app/components/preference/privacy";
 
+
+
+export const SettingsContext = React.createContext(null);
 
 export default function Settings({
     backLink,
-    userInfo, teamsDropdown, membersDropdown, teamSelected, memberSelected, settingCategory }) {
+    userInfo, teamsDropdown, membersDropdown, teamSelected, memberSelected, settingCategory, preferences }) {
 
     const [activeSetting, setActiveSetting] = useState(settingCategory ?? SETTINGS_CONSTANTS.PROFILE_SETTINGS);
     const [selectedTeam, setSelectedTeam] = useState(teamSelected ? teamSelected : (teamsDropdown && teamsDropdown.length) ? teamsDropdown[0] : null);
@@ -32,10 +36,26 @@ export default function Settings({
     const [isModifiedMember, setModifiedMember] = useState<boolean>(false);
     const [isPflModified, setModifiedProfile] = useState<boolean>(false);
     const [openValidationPopup, setOpenValidationPopup] = useState<boolean>(false);
+    // const [isPrivacyModified, setPrivacymodifiedFlag] = useState<boolean>(false);
+
+    function settingsReducer(state, action) {
+        let newState = {...state}
+        switch(action.type) {
+            case 'SET_PREFERENCE':
+                newState.preferences = { ...action.payload };
+                break;
+            case 'SET_PRIVACY_MODIFIED':
+                newState.privacyModifiedFlag = action.payload;
+                break;
+        }
+    
+        return newState
+    }
+    const [state, dispatch] = useReducer(settingsReducer, { preferences })
 
     useEffect(() => {
         if (refreshTeamAutocomplete) {
-            if(userInfo?.roles.length && userInfo?.roles.includes(ADMIN_ROLE)){
+            if (userInfo?.roles.length && userInfo?.roles.includes(ADMIN_ROLE)) {
                 updateTeamAutocomplete();
             } else if (userInfo?.leadingTeams?.length) {
                 updateDropdown();
@@ -46,7 +66,7 @@ export default function Settings({
 
     useEffect(() => {
         if (refreshMemberAutocomplete) {
-            if(userInfo?.roles.length && userInfo?.roles.includes(ADMIN_ROLE)){
+            if (userInfo?.roles.length && userInfo?.roles.includes(ADMIN_ROLE)) {
                 updateMemberAutocomplete();
             }
         }
@@ -78,13 +98,14 @@ export default function Settings({
 
     const updateDropdown = () => {
         fetchMember(userInfo.uid).then((data) => {
+
             if (userInfo?.leadingTeams?.length) {
                 const teamsDropdownValues = userInfo?.leadingTeams?.map(teamUid => {
                     const filteredTeam = data?.teamMemberRoles.filter(teamObj => {
                         return teamObj?.team?.uid === teamUid
                     });
                     if (filteredTeam && filteredTeam.length) {
-                        if(selectedTeam.value === filteredTeam[0].team.uid){
+                        if (selectedTeam.value === filteredTeam[0].team.uid) {
                             setSelectedTeam({
                                 "label": filteredTeam[0].team.name,
                                 "value": filteredTeam[0].team.uid,
@@ -94,7 +115,7 @@ export default function Settings({
                         return {
                             "label": filteredTeam[0].team.name,
                             "value": filteredTeam[0].team.uid,
-                            "icon": filteredTeam[0]?.team?.logo?.url  ?? null
+                            "icon": filteredTeam[0]?.team?.logo?.url ?? null
                         }
                     }
                 });
@@ -110,18 +131,21 @@ export default function Settings({
     });
 
     let sidemenu = [
-        SETTINGS_CONSTANTS.PROFILE_SETTINGS
+        SETTINGS_CONSTANTS.PROFILE_SETTINGS,
+        SETTINGS_CONSTANTS.PRIVACY
     ]
 
-    if(userInfo?.roles.length && userInfo?.roles.includes(ADMIN_ROLE)){
-        sidemenu = [...sidemenu,SETTINGS_CONSTANTS.MEMBER_SETTINGS,SETTINGS_CONSTANTS.TEAM_SETTINGS];
-    }else if(userInfo?.leadingTeams?.length){
-        sidemenu = [...sidemenu,SETTINGS_CONSTANTS.TEAM_SETTINGS];
+    let adminSideMenu = [];
+
+    if (userInfo?.roles.length && userInfo?.roles.includes(ADMIN_ROLE)) {
+        adminSideMenu = [...adminSideMenu, SETTINGS_CONSTANTS.MEMBER_SETTINGS, SETTINGS_CONSTANTS.TEAM_SETTINGS];
+    } else if (userInfo?.leadingTeams?.length) {
+        adminSideMenu = [...adminSideMenu, SETTINGS_CONSTANTS.TEAM_SETTINGS];
     }
 
-    if(activeSetting){
+    if (activeSetting) {
         breadcrumbItems.push({ label: activeSetting });
-    }else{
+    } else {
         breadcrumbItems.push({ label: SETTINGS_CONSTANTS.PROFILE_SETTINGS });
         setActiveSetting(SETTINGS_CONSTANTS.PROFILE_SETTINGS);
     }
@@ -132,27 +156,34 @@ export default function Settings({
     function handleSettingsMenu(menu) {
         setTargetSetting(menu);
         if (menu === SETTINGS_CONSTANTS.PROFILE_SETTINGS) {
-            if(beforeChangeMemberValidation() || beforeChangeValidation()){
+            if (beforeChangeMemberValidation() || beforeChangeValidation() || state.privacyModifiedFlag) {
                 setOpenValidationPopup(true);
-            }else{
+            } else {
                 trackGoal(FATHOM_EVENTS.directory.settingCategory.profile, 0);
                 setActiveSetting(SETTINGS_CONSTANTS.PROFILE_SETTINGS);
             }
         } else if (menu === SETTINGS_CONSTANTS.TEAM_SETTINGS) {
             // setSelectedTeam(teamsDropdown[0]); //to always set first data
-            if (isProfileChanged() || beforeChangeMemberValidation()) {
+            if (isProfileChanged() || beforeChangeMemberValidation() || state.privacyModifiedFlag) {
                 setOpenValidationPopup(true);
-            }else{
+            } else {
                 trackGoal(FATHOM_EVENTS.directory.settingCategory.team, 0);
                 setActiveSetting(SETTINGS_CONSTANTS.TEAM_SETTINGS);
             }
-        } else if (menu === SETTINGS_CONSTANTS.MEMBER_SETTINGS){
+        } else if (menu === SETTINGS_CONSTANTS.MEMBER_SETTINGS) {
             // setSelectedMember(membersDropdown[0]);
-            if (isProfileChanged() || beforeChangeValidation()) {
+            if (isProfileChanged() || beforeChangeValidation() || state.privacyModifiedFlag) {
                 setOpenValidationPopup(true);
-            }else{
+            } else {
                 trackGoal(FATHOM_EVENTS.directory.settingCategory.member, 0);
                 setActiveSetting(SETTINGS_CONSTANTS.MEMBER_SETTINGS);
+            }
+        } else if (menu === SETTINGS_CONSTANTS.PRIVACY) {
+            if (isProfileChanged() || beforeChangeMemberValidation() || beforeChangeValidation() ) {
+                setOpenValidationPopup(true);
+            } else {
+                setActiveSetting(SETTINGS_CONSTANTS.PRIVACY);
+                trackGoal(FATHOM_EVENTS.directory.settingCategory.member, 0);
             }
         }
     }
@@ -179,32 +210,32 @@ export default function Settings({
 
     const fetchTeamsWithLogoSearchTerm = async (searchTerm) => {
         try {
-          const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}&select=uid,name,shortDescription,logo.url,industryTags.title`);
-          if (response.data) {
-            return response.data.map((item) => {
-              return { value: item.uid, label: item.name, logo:item?.logo?.url ? item.logo.url: null };
-            });
-          }
+            const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}&select=uid,name,shortDescription,logo.url,industryTags.title`);
+            if (response.data) {
+                return response.data.map((item) => {
+                    return { value: item.uid, label: item.name, logo: item?.logo?.url ? item.logo.url : null };
+                });
+            }
         } catch (error) {
-          console.error(error);
+            console.error(error);
         }
     };
 
     const fetchMembersWithLogoSearchTerm = async (searchTerm) => {
         try {
-          const response = await api.get(`/v1/members?name__istartswith=${searchTerm}&select=uid,name,image&orderBy=name,asc`);
-          if (response.data) {
-            return response.data.map((item) => {
-              return { value: item.uid, label: item.name, logo:item?.image?.url ? item.image.url: null };
-            });
-          }
+            const response = await api.get(`/v1/members?name__istartswith=${searchTerm}&select=uid,name,image&orderBy=name,asc`);
+            if (response.data) {
+                return response.data.map((item) => {
+                    return { value: item.uid, label: item.name, logo: item?.image?.url ? item.image.url : null };
+                });
+            }
         } catch (error) {
-          console.error(error);
+            console.error(error);
         }
     };
 
     const getAutoCompleteComponent = (name) => {
-        if(name === SETTINGS_CONSTANTS.MEMBER){
+        if (name === SETTINGS_CONSTANTS.MEMBER) {
             return (<Autocomplete
                 name={SETTINGS_CONSTANTS.MEMBER}
                 className="custom-grey custom-outline-none border"
@@ -218,7 +249,7 @@ export default function Settings({
                 validationFnBeforeChange={beforeChangeMemberValidation}
                 confirmationMessage={MSG_CONSTANTS.CHANGE_CONF_MSG}
             />);
-        }else if(name === SETTINGS_CONSTANTS.TEAM){
+        } else if (name === SETTINGS_CONSTANTS.TEAM) {
             return (
                 <Autocomplete
                     name={SETTINGS_CONSTANTS.TEAM}
@@ -280,7 +311,7 @@ export default function Settings({
                     setRefreshMemberAutocomplete={setRefreshMemberAutocomplete}
                 />
             )
-        } else if (settings === SETTINGS_CONSTANTS.PROFILE_SETTINGS){
+        } else if (settings === SETTINGS_CONSTANTS.PROFILE_SETTINGS) {
             return (
                 <EditMemberModal
                     isOpen={false}
@@ -294,9 +325,9 @@ export default function Settings({
         }
     }
 
-    const confirmationOnProfileClose = (flag:boolean) => {
+    const confirmationOnProfileClose = (flag: boolean) => {
         setOpenValidationPopup(false);
-        if(flag){
+        if (flag) {
             if (activeSetting === SETTINGS_CONSTANTS.PROFILE_SETTINGS) {
                 setModifiedProfile(false);
             } else if (activeSetting === SETTINGS_CONSTANTS.TEAM_SETTINGS) {
@@ -352,43 +383,87 @@ export default function Settings({
                             getMemberComponent(SETTINGS_CONSTANTS.MEMBER_SETTINGS)
                         }
                     </>);
+            case SETTINGS_CONSTANTS.PRIVACY:
+                return (
+                    <>
+                        <div>
+                            <div className="text-[32px] font-bold inline-block">{SETTINGS_CONSTANTS.PRIVACY}</div>
+                            <Privacy from={SETTINGS_CONSTANTS.PRIVACY} />
+                        </div>
+                    </>
+                );
             default:
                 return (<>
                     <div className="text-[32px] font-bold">{SETTINGS_CONSTANTS.PROFILE_SETTINGS}</div>
                     {
                         getMemberComponent(SETTINGS_CONSTANTS.PROFILE_SETTINGS)
                     }
-                    </>);
+                </>);
         }
     }
+
+    const getAdminMenuTemplate = () => {
+        return (
+            adminSideMenu && adminSideMenu.length > 0 && <div className="relative top-[23px]">
+                <div className="font-semibold text-[13px] opacity-40 pb-[8px]">
+                    {SETTINGS_CONSTANTS.ADMIN_SETTINGS}
+                </div>
+                <div className="flex flex-col justify-center items-start w-[256px] border bg-[#FFFFFF] border-[#CBD5E1] rounded-[8px]">
+                    {
+                        (
+                            adminSideMenu.map(menu => {
+                                return (<div
+                                    key={menu}
+                                    className=
+                                    {`w-full h-[48px] flex items-center pt-[8px] pb-[8px] pr-[24px] rounded-[8px] pl-[24px] cursor-pointer hover:bg-[#F1F5F9] ${activeSetting === menu ? 'bg-[#F1F5F9] font-semibold ' : 'font-normal'}`}
+                                    onClick={() => handleSettingsMenu(menu)}>
+                                    {menu}
+                                </div>)
+                            })
+                        )
+                    }
+                </div>
+
+            </div>
+        )
+    }
+
     return (
         <>
+           
             <NextSeo {...DIRECTORY_SEO} title={userInfo.name} />
-            <Breadcrumb items={breadcrumbItems} classname="max-w-[150px] truncate"/>
+            <Breadcrumb items={breadcrumbItems} classname="max-w-[150px] truncate" />
+            <SettingsContext.Provider value={{state, dispatch}}>
             <div className="w-full h-full">
                 <div className="grid grid-cols-4 pt-40 gap-x-8">
                     <div className="col-span-1">
                         {
-                            (teamsDropdownOptions && (<div className="relative float-right top-[15px]">
-                                <div className="font-semibold text-[13px] opacity-40 pb-[8px]">
-                                    {SETTINGS_CONSTANTS.ACCOUNT_SETTINGS}
+                            ((
+                                <div className="relative float-right top-[23px]">
+                                    <div>
+                                        <div className="font-semibold text-[13px] opacity-40 pb-[8px]">
+                                            {SETTINGS_CONSTANTS.ACCOUNT_SETTINGS}
+                                        </div>
+                                        <div className="flex flex-col justify-center items-start w-[256px] border bg-[#FFFFFF] border-[#CBD5E1] rounded-[8px]">
+                                            {
+                                                sidemenu && (
+                                                    sidemenu.map(menu => {
+                                                        return (<div
+                                                            key={menu}
+                                                            className=
+                                                            {`w-full h-[48px] flex items-center pt-[8px] pb-[8px] pr-[24px] rounded-[8px] pl-[24px] cursor-pointer hover:bg-[#F1F5F9] ${activeSetting === menu ? 'bg-[#F1F5F9] font-semibold ' : 'font-normal'}`}
+                                                            onClick={() => handleSettingsMenu(menu)}>
+                                                            {menu}
+                                                        </div>)
+                                                    })
+                                                )
+                                            }
+                                        </div>
+
+                                    </div>
+                                    {getAdminMenuTemplate()}
                                 </div>
-                                <div className="flex flex-col justify-center items-start w-[256px] border bg-[#FFFFFF] border-[#CBD5E1] rounded-[8px]">
-                                    {
-                                        sidemenu && (
-                                            sidemenu.map(menu => {
-                                                return (<div
-                                                    key={menu}
-                                                    className=
-                                                    {`w-full h-[48px] flex items-center pt-[8px] pb-[8px] pr-[24px] rounded-[8px] pl-[24px] cursor-pointer hover:bg-[#F1F5F9] ${activeSetting === menu ? 'bg-[#F1F5F9] font-semibold ' : 'font-normal'}`}
-                                                    onClick={() => handleSettingsMenu(menu)}>
-                                                    {menu}
-                                                </div>)
-                                            })
-                                        )
-                                    }
-                                </div>
-                            </div>))
+                            ))
                         }
                     </div>
                     <div className="col-span-2">
@@ -399,6 +474,7 @@ export default function Settings({
                 </div>
                 <DiscardChangesPopup text={MSG_CONSTANTS.CHANGE_CONF_MSG} isOpen={openValidationPopup} onCloseFn={confirmationOnProfileClose} />
             </div>
+            </SettingsContext.Provider>
         </>
     )
 }
@@ -411,34 +487,34 @@ export const getServerSideProps = async (ctx) => {
     const { res, req, query } = ctx;
     let cookies = req?.cookies;
     if (!cookies?.authToken) {
-    await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
-    if (ctx.res.getHeader('Set-Cookie')) 
-        cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
+        await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
+        if (ctx.res.getHeader('Set-Cookie'))
+            cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
     }
     const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
-    const isUserLoggedIn = cookies?.authToken &&  cookies?.userInfo ? true : false;
-    
-    let memberSelected=null;
-    let teamSelected=null;
-    let settingCategory='';
-    if(query?.id && query?.from){
-        if(query?.from === SETTINGS_CONSTANTS.TEAM){
+    const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
+
+    let memberSelected = null;
+    let teamSelected = null;
+    let settingCategory = '';
+    if (query?.id && query?.from) {
+        if (query?.from === SETTINGS_CONSTANTS.TEAM) {
             settingCategory = (SETTINGS_CONSTANTS.TEAM_SETTINGS);
             teamSelected = ({
                 "label": query.name,
                 "value": query.id,
-                "logo":  query.logo ?? null,
-                "icon":  query.logo ?? null
+                "logo": query.logo ?? null,
+                "icon": query.logo ?? null
             })
-        }else if(query.from === SETTINGS_CONSTANTS.MEMBER){
-            if(query.id === userInfo.uid){
+        } else if (query.from === SETTINGS_CONSTANTS.MEMBER) {
+            if (query.id === userInfo.uid) {
                 settingCategory = (SETTINGS_CONSTANTS.PROFILE_SETTINGS);
-            }else{
+            } else {
                 settingCategory = (SETTINGS_CONSTANTS.MEMBER_SETTINGS);
                 memberSelected = {
                     "label": query.name,
                     "value": query.id,
-                    "logo":  query.logo ?? null
+                    "logo": query.logo ?? null
                 };
             }
         }
@@ -461,7 +537,8 @@ export const getServerSideProps = async (ctx) => {
     let teamsDropdown = [];
     let membersDropdown = [];
 
-    const memberResponse = await getMember(userInfo.uid)
+    const memberResponse = await getMember(userInfo.uid);
+
     let member;
     if (memberResponse.status === 200) {
         member = memberResponse.body
@@ -473,30 +550,30 @@ export const getServerSideProps = async (ctx) => {
             notFound: true,
         };
     } else {
-        if (userInfo?.roles?.includes(ADMIN_ROLE)){
-            const allTeamsResponse = await getTeams({select: 'uid,name,shortDescription,logo.url,industryTags.title'});
+        if (userInfo?.roles?.includes(ADMIN_ROLE)) {
+            const allTeamsResponse = await getTeams({ select: 'uid,name,shortDescription,logo.url,industryTags.title' });
             if (allTeamsResponse.status === 200) {
                 teamsDropdown = [];
-                if(allTeamsResponse.body && allTeamsResponse.body.length){
+                if (allTeamsResponse.body && allTeamsResponse.body.length) {
                     teamsDropdown.push(
-                    {
-                        "label": allTeamsResponse.body[0].name,
-                        "value": allTeamsResponse.body[0].uid,
-                        "logo":allTeamsResponse.body[0]?.logo?.url ?? null
-                    }
+                        {
+                            "label": allTeamsResponse.body[0].name,
+                            "value": allTeamsResponse.body[0].uid,
+                            "logo": allTeamsResponse.body[0]?.logo?.url ?? null
+                        }
                     );
                 }
             }
-            const allMembersResponse = await getMembers({select: 'uid,name,image', orderBy:'name,asc'});
+            const allMembersResponse = await getMembers({ select: 'uid,name,image', orderBy: 'name,asc' });
             if (allMembersResponse.status === 200) {
                 membersDropdown = [];
-                if(allMembersResponse.body && allMembersResponse.body.length){
+                if (allMembersResponse.body && allMembersResponse.body.length) {
                     membersDropdown.push(
-                    {
-                        "label": allMembersResponse.body[0].name,
-                        "value": allMembersResponse.body[0].uid,
-                        "logo":allMembersResponse.body[0]?.image?.url ?? null
-                    }
+                        {
+                            "label": allMembersResponse.body[0].name,
+                            "value": allMembersResponse.body[0].uid,
+                            "logo": allMembersResponse.body[0]?.image?.url ?? null
+                        }
                     );
                 }
             }
@@ -519,12 +596,34 @@ export const getServerSideProps = async (ctx) => {
         }
     }
 
+    let preferences = null;
+    if(cookies?.authToken){
+    
+        try{
+            let memberPreferences = await getMemberPreferences(userInfo.uid, cookies.authToken);
+            if(memberPreferences.status === 200){
+              
+              if(memberPreferences.body?.['size'] === 0){
+                preferences = JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS));
+              }else{
+                preferences = memberPreferences.body;
+              }
+            //   hidePreferences(preferences, member);
+            }
+        }catch(err){
+            console.log(err);
+            
+        }
+      }
+
+      
+
     res.setHeader(
         'Cache-Control',
         'no-cache, no-store, max-age=0, must-revalidate'
     );
 
     return {
-        props: { isUserLoggedIn, userInfo, teamsDropdown , membersDropdown, teamSelected, memberSelected, settingCategory },
+        props: { isUserLoggedIn, userInfo, teamsDropdown, membersDropdown, teamSelected, memberSelected, settingCategory, preferences },
     };
 };

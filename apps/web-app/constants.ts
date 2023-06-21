@@ -140,14 +140,18 @@ export const PAGE_ROUTES = {
 }
 
 export const SETTINGS_CONSTANTS = {
-  PROFILE_SETTINGS: 'Profile Settings',
+  PROFILE_SETTINGS: 'Profile',
   TEAM_SETTINGS: 'Manage Teams',
   MEMBER_SETTINGS: 'Manage Members',
-  ACCOUNT_SETTINGS: 'ACCOUNT SETTINGS',
+  PRIVACY: 'Privacy',
+  ACCOUNT_SETTINGS: 'PREFERENCES',
   TEAM: 'team',
   MEMBER: 'member',
   CONF_TITLE: 'Discard Changes',
-  TEAM_HELP_TXT: 'Please update only the fields that you would like to change for this team'
+  TEAM_HELP_TXT: 'Please update only the fields that you would like to change for this team',
+  ADMIN_SETTINGS: 'ADMIN SETTINGS',
+  VIEW_PREFERNCES: 'View user preferences',
+  USER_PREF: 'User Preferences'
 }
 
 export const APP_ANALYTICS_EVENTS = {
@@ -182,6 +186,9 @@ export const APP_ANALYTICS_EVENTS = {
   SETTINGS_MEMBER_PROFILE_EDIT_FORM: 'settings-member-profile-edit-form',
   SETTINGS_TEAM_PROFILE_EDIT_FORM: 'settings-team-profile-edit-form',
 
+  SETTINGS_USER_PREFERENCES: 'settings-user-preferences',
+  SETTINGS_USER_PREFERENCES_RESET: 'settings-user-reset',
+
   TEAM_CLICKED: 'team-clicked',
   TEAM_JOIN_NETWORK_FORM_STEPS: 'team-join-network-form-steps',
   TEAM_EDIT_BY_LEAD: 'team-edit-by-lead',
@@ -213,7 +220,9 @@ export const BTN_LABEL_CONSTANTS = {
   PLAY_VIDEO: 'Play Video',
   VIEW_PLAYLIST: 'View Playlist',
   YES: 'Yes',
-  NO: 'No'
+  NO: 'No',
+  SAVE: 'Save Changes',
+  DISCARD: 'Discard'
 }
 
 export const NW_SPOTLIGHT_CONSTANTS = {
@@ -241,5 +250,37 @@ export const EMAIL_OTP_CONSTANTS = {
     sendEmailDesc: "",
     verifyOtpTitle: "Enter Code",
     verifyOtpDesc: "Please enter the code sent to"
+  }
+}
+
+const DEFAULT_PRIVACY_VISIBILITY = true;
+
+export const PRIVACY_CONSTANTS = {
+  CONTACT_DETAILS: 'Contact Details',
+  SHOW_EMAIL: 'Show Email',
+  EMAIL_HELP_TXT: 'Enabling this will display your email to all logged in members ',
+  SHOW_GITHUB: 'Show Github',
+  GH_HELP_TXT: 'Enabling this will display your GitHub handle to all logged in members',
+  SHOW_TELEGRAM: 'Show Telegram',
+  TELEGRAM_HELP_TXT: 'Enabling this will display your Telegram handle to all logged in members',
+  SHOW_LIN_PFL: 'Show LinkedIn Profile',
+  LIN_HELP_TXT: 'Enabling this will display your LinkedIn Profile link to all logged in members',
+  SHOW_DISCORD: 'Show Discord',
+  DISCORD_HLP_TXT: 'Enabling this will display your Discord handle link to all logged in members',
+  OPEN_TO_COLLABORATE: 'Open to collborate',
+  OTC_HELP_TXT: 'Enabling this will let the members know your collaboration logged in status',
+  SHOW_TWITTER: 'Show Twitter',
+  TWITTER_HELP_TXT: 'Enabling this will display your Twitter Handle to all logged in members ',
+  SHOW_GH_PJCTS: 'Show my Github Projects',
+  GH_PJCTS_HELP_TXT: 'Control visibility of your Github projects',
+  PROFILE:'Profile',
+  DEFAULT_SETTINGS:{
+    showEmail: DEFAULT_PRIVACY_VISIBILITY,
+    showGithubHandle: DEFAULT_PRIVACY_VISIBILITY,
+    showTelegram: DEFAULT_PRIVACY_VISIBILITY,
+    showLinkedin: DEFAULT_PRIVACY_VISIBILITY,
+    showDiscord: DEFAULT_PRIVACY_VISIBILITY,
+    showGithubProjects: DEFAULT_PRIVACY_VISIBILITY,
+    showTwitter: DEFAULT_PRIVACY_VISIBILITY
   }
 }

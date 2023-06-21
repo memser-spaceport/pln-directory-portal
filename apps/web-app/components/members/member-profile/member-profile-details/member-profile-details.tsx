@@ -8,6 +8,7 @@ import gitLogo from '/public/assets/images/icons/git-contact-logo.svg';
 import linkedInLogo from '/public/assets/images/icons/linkedIn-contact-logo.svg';
 import telegramLogo from '/public/assets/images/icons/telegram-contact-logo.svg';
 import twitterLogo from '/public/assets/images/icons/twitter-contact-logo.svg';
+import { ADMIN_ROLE, PRIVACY_CONSTANTS } from 'apps/web-app/constants';
 
 // import emailLogo from '/public/assets/images/icons/email-contact-logo.svg';
 
@@ -77,7 +78,6 @@ export function MemberProfileDetails({
                 width={14}
               />
             )}
-
             {/* Email */}
             {email && (
               <SocialProfile

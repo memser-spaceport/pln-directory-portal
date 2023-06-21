@@ -68,6 +68,7 @@ model Member {
   locationUid     String?
   teamMemberRoles TeamMemberRole[]
   memberRoles     MemberRole[]
+  preferences     Json?
 }
 
 model MemberRole {
