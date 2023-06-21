@@ -18,7 +18,7 @@ import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember } from '../../../utils/members.types';
 import { renewAndStoreNewAccessToken, convertCookiesToJson } from '../../../utils/services/auth';
-import { parseMember, maskMemberDetails } from '../../../utils/members.utils';
+import { parseMember, restrictMemberInfo } from '../../../utils/members.utils';
 import {
   getMembersListOptions,
   getMembersOptionsFromQuery,
@@ -103,15 +103,14 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) 
   let cookies = req?.cookies;
   if (!cookies?.authToken) {
     await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
-    if (ctx.res.getHeader('Set-Cookie')) 
+    if (ctx.res.getHeader('Set-Cookie'))
       cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
   }
   destroyCookie(null, 'state');
   const { verified } = query;
-  const isMaskingRequired = cookies?.authToken ? false : true
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
   const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
-  
+
   const optionsFromQuery = getMembersOptionsFromQuery(query);
   const listOptions = getMembersListOptions(optionsFromQuery);
   const [membersResponse, filtersValues] = await Promise.all([
@@ -121,16 +120,13 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) 
 
   let members: IMember[] =
     membersResponse.status === 200
-      ? membersResponse.body.map((member) => parseMember(member))
+      ? membersResponse.body.map((member) => isUserLoggedIn ? parseMember(member) : restrictMemberInfo(parseMember(member)))
       : [];
   const parsedFilters: IMembersFiltersValues = parseMembersFilters(
     filtersValues,
     query
   );
 
-  if(isMaskingRequired) {
-     members = [...members].map(m => maskMemberDetails(m))
-  }
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days

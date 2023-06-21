@@ -20,7 +20,7 @@ import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcr
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember, IGitRepositories } from '../../../utils/members.types';
-import { parseMember, maskMemberDetails } from '../../../utils/members.utils';
+import { parseMember, restrictMemberInfo } from '../../../utils/members.utils';
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
 import {
@@ -124,7 +124,6 @@ export const getServerSideProps = async (ctx) => {
   }
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
   const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
-  const isMaskingRequired = cookies?.authToken ? false : true;
   const { id, backLink = '/directory/members' } = query as {
     id: string;
     backLink: string;
@@ -161,7 +160,7 @@ export const getServerSideProps = async (ctx) => {
   ]);
 
   if (memberResponse.status === 200 && memberTeamsResponse.status === 200) {
-    member = parseMember(memberResponse.body);
+    member = isUserLoggedIn ? parseMember(memberResponse.body) : restrictMemberInfo(parseMember(memberResponse.body))
     teams = memberTeamsResponse.body.map(parseTeam);
   }
 
@@ -173,9 +172,6 @@ export const getServerSideProps = async (ctx) => {
     };
   }
 
-  if (isMaskingRequired) {
-    member = maskMemberDetails({ ...member });
-  }
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
