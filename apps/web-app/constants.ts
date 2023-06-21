@@ -159,6 +159,8 @@ export const APP_ANALYTICS_EVENTS = {
   MEMBER_JOIN_NETWORK_FORM_STEPS: 'member-join-network-form-steps',
   MEMBER_GITHUB_PROJECT_VIEW_ALL_CLICKED: 'member-github-project-view-all-clicked',
   MEMBER_GITHUB_PROJECT_ITEM_CLICKED: 'member-github-project-view-item-clicked',
+  MEMBER_EDIT_BY_SELF: 'member-edit-by-self',
+  MEMBER_EDIT_BY_ADMIN: 'member-edit-by-admin',
 
   USER_VERIFICATION_INIT: 'user-verification-init',
   USER_VERIFICATION_SEND_OTP: 'user-verification-sendotp',
@@ -182,6 +184,8 @@ export const APP_ANALYTICS_EVENTS = {
 
   TEAM_CLICKED: 'team-clicked',
   TEAM_JOIN_NETWORK_FORM_STEPS: 'team-join-network-form-steps',
+  TEAM_EDIT_BY_LEAD: 'team-edit-by-lead',
+  TEAM_EDIT_BY_ADMIN: 'team-edit-by-admin',
 
   FILTERS_APPLIED: 'filters-applied',
 

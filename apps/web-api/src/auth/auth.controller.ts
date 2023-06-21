@@ -126,7 +126,7 @@ export class AuthController {
 
       // New email cannot be same as old one
       if (body?.newEmail.toLowerCase().trim() === req?.userEmail.toLowerCase().trim()) {
-        throw new BadRequestException("New Email cannot be same as old email")
+        throw new BadRequestException("New email cannot be same as old email")
       }
 
       // If current email id doesn't match any email in the members directory.. then throw error
@@ -143,7 +143,7 @@ export class AuthController {
 
       return await this.authService.sendEmailOtpForVerification(body.newEmail, body.clientToken)
     } catch (e) {
-      this.loggerService.error('error', e);
+      // this.loggerService.error('error', e);
       this.authService.handleErrors(e)
     }
   }
@@ -164,7 +164,7 @@ export class AuthController {
 
       // New email cannot be same as old one
       if (body?.newEmail.toLowerCase().trim() === req?.userEmail.toLowerCase().trim()) {
-        throw new BadRequestException("New Email cannot be same as old email")
+        throw new BadRequestException("New email cannot be same as old email")
       }
 
       // If current email id doesn't match any email in the members directory.. then throw error
@@ -181,7 +181,7 @@ export class AuthController {
 
       return await this.authService.resendEmailOtpForVerification(body.otpToken, body.clientToken)
     } catch (e) {
-      this.loggerService.error('error', e);
+      // this.loggerService.error('error', e);
       this.authService.handleErrors(e)
     }
   }
