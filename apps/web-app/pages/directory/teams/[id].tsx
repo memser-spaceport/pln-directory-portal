@@ -19,6 +19,7 @@ import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember } from '../../../utils/members.types';
 import {
+  restrictMemberInfo,
   parseTeamMember,
 } from '../../../utils/members.utils';
 import { ITeam } from '../../../utils/teams.types';
@@ -79,7 +80,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
   let cookies = req?.cookies;
   if (!cookies?.authToken) {
     await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
-    if (ctx.res.getHeader('Set-Cookie')) 
+    if (ctx.res.getHeader('Set-Cookie'))
       cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
   }
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
@@ -123,7 +124,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
     team = parseTeam(teamResponse.body);
     members = orderBy(
       teamMembersResponse.body.map((member) =>
-        parseTeamMember(member, team.id)
+        isUserLoggedIn ? parseTeamMember(member, team.id) : restrictMemberInfo(parseTeamMember(member, team.id))
       ),
       ['teamLead', 'name'],
       ['desc', 'asc']
