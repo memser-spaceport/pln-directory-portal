@@ -9,6 +9,7 @@ import { NextSeo } from 'next-seo';
 import { ReactElement, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { LOGGED_IN_MSG, SCHEDULE_MEETING_MSG } from '../../../constants';
+import { TagsGroup } from '../../../components/shared/tags-group/tags-group';
 import { MemberProfileDetails } from '../../../components/members/member-profile/member-profile-details/member-profile-details';
 import { MemberProfileHeader } from '../../../components/members/member-profile/member-profile-header/member-profile-header';
 import { MemberProfileOfficeHours } from '../../../components/members/member-profile/member-profile-office-hours/member-profile-office-hours';
@@ -83,6 +84,11 @@ export default function Member({
           )}
           <div className="shadow-card--slate-900 p-7.5 w-full rounded-b-xl bg-white text-sm">
             <MemberProfileHeader member={member} userInfo={userInfo} />
+            <div className="mt-6">
+              {member.skills?.length ? (
+                <TagsGroup items={member.skills.map((skill) => skill.title)} />
+              ) : ('-')}
+            </div>
             {userInfo?.uid && (
               <MemberProfileDetails member={member} userInfo={userInfo} />
             )}

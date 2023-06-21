@@ -2,7 +2,6 @@
 import { Tooltip } from '@protocol-labs-network/ui';
 import SocialProfile from '../../../../../web-app/components/shared/directory/social-profile/social-profile';
 import { IMember } from '../../../../utils/members.types';
-import { TagsGroup } from '../../../shared/tags-group/tags-group';
 import discordLogo from '/public/assets/images/icons/discord-contact-logo.svg';
 import emailLogo from '/public/assets/images/icons/email-contact-logo.svg';
 import gitLogo from '/public/assets/images/icons/git-contact-logo.svg';
@@ -31,13 +30,6 @@ export function MemberProfileDetails({
 
   return (
     <>
-      <div className="mt-6">
-        {skills.length ? (
-          <TagsGroup items={skills.map((skill) => skill.title)} />
-        ) : (
-          '-'
-        )}
-      </div>
       <h3 className=" mt-6 font-medium text-slate-500">Contact Details</h3>
       <div className="mt-3 flex flex-wrap gap-2">
         {userInfo.uid && (
