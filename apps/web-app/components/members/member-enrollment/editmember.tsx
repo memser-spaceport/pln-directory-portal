@@ -261,10 +261,18 @@ export function EditMemberModal({
       );
       const authToken = Cookies.get('authToken');
       if (!authToken) {
-        return;
+        // If no token.. then logout user
+        Cookies.remove('authToken');
+        Cookies.remove('refreshToken');
+        Cookies.remove('userInfo');
+        createLogoutChannel().postMessage('logout');
+        Cookies.set('page_params', 'user_logged_out', {
+          expires: 60,
+          path: '/',
+        });
+        window.location.href = PAGE_ROUTES.TEAMS;
       }
       const formattedJson = JSON.parse(authToken);
-      //setIsProcessing(true)
       getClientToken(formattedJson)
         .then((d) => {
           const clientTokenExpiry = decodeToken(d);
@@ -276,7 +284,7 @@ export function EditMemberModal({
         .catch((e) => {
           console.error(e)
         });
-      // .finally(() =>  setIsProcessing(false))
+
     } else {
       analytics.captureEvent(
         APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_CHANGE_EMAIL_CLICKED,
