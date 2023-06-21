@@ -294,19 +294,19 @@ export class AuthService {
       throw new HttpException(error?.response?.message, error?.response?.statusCode, {cause: error})
     } else if (error?.response?.data && error?.response?.status) {
       if (error?.response?.status === 401) {
-        throw new UnauthorizedException("Unauthorized",  {cause: error})
+        throw new UnauthorizedException("Unauthorized")
       } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP005') {
-        throw new UnauthorizedException("Unauthorized",  {cause: error})
+        throw new UnauthorizedException("Unauthorized")
       } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP003') {
-        throw new ForbiddenException("MAX_OTP_ATTEMPTS_REACHED", {cause: error})
+        throw new ForbiddenException("MAX_OTP_ATTEMPTS_REACHED")
       } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EATH010') {
-        throw new ForbiddenException("ACCOUNT_ALREADY_LINKED",  {cause: error})
+        throw new ForbiddenException("ACCOUNT_ALREADY_LINKED")
       } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EATH002') {
-        throw new ForbiddenException("ACCOUNT_ALREADY_LINKED",  {cause: error})
+        throw new ForbiddenException("ACCOUNT_ALREADY_LINKED")
       } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP006') {
-        throw new ForbiddenException("MAX_RESEND_ATTEMPTS_REACHED",  {cause: error})
+        throw new ForbiddenException("MAX_RESEND_ATTEMPTS_REACHED")
       } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP004') {
-        throw new BadRequestException("CODE_EXPIRED",  {cause: error})
+        throw new BadRequestException("CODE_EXPIRED")
       }
       // EOTP002, EATH010
       else {
