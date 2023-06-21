@@ -274,17 +274,7 @@ export function EditMemberModal({
           setEmailEditStatus(true);
         })
         .catch((e) => {
-          if (e?.response?.status === 401) {
-            Cookies.remove('authToken');
-            Cookies.remove('refreshToken');
-            Cookies.remove('userInfo');
-            createLogoutChannel().postMessage('logout');
-            Cookies.set('page_params', 'user_logged_out', {
-              expires: 60,
-              path: '/',
-            });
-            window.location.href = PAGE_ROUTES.TEAMS;
-          }
+          console.error(e)
         });
       // .finally(() =>  setIsProcessing(false))
     } else {
