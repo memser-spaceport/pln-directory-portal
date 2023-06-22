@@ -143,7 +143,7 @@ export class AuthController {
 
       return await this.authService.sendEmailOtpForVerification(body.newEmail, body.clientToken)
     } catch (e) {
-      // this.loggerService.error('error', e);
+      //this.loggerService.error('error', e);
       this.authService.handleErrors(e)
     }
   }
@@ -181,7 +181,7 @@ export class AuthController {
 
       return await this.authService.resendEmailOtpForVerification(body.otpToken, body.clientToken)
     } catch (e) {
-      // this.loggerService.error('error', e);
+      //this.loggerService.error('error', e);
       this.authService.handleErrors(e)
     }
   }

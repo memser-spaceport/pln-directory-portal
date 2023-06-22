@@ -48,6 +48,7 @@ import ChangeEmailModal from '../../auth/change-email-modal';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { ReactComponent as SuccessIcon } from '../../../public/assets/images/icons/success.svg';
 import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
+import Error from 'next/error';
 interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -253,6 +254,19 @@ export function EditMemberModal({
     }
   };
 
+  const logoutAndRedirect = (path) => {
+     // If no token.. then logout user
+     Cookies.remove('authToken');
+     Cookies.remove('refreshToken');
+     Cookies.remove('userInfo');
+     Cookies.set('page_params', 'user_logged_out', {
+      expires: 60,
+      path: '/',
+    });
+     createLogoutChannel().postMessage('logout');
+     window.location.href = path;
+  }
+
   const onEmailChange = () => {
     if (isUserProfile) {
       analytics.captureEvent(
@@ -261,16 +275,7 @@ export function EditMemberModal({
       );
       const authToken = Cookies.get('authToken');
       if (!authToken) {
-        // If no token.. then logout user
-        Cookies.remove('authToken');
-        Cookies.remove('refreshToken');
-        Cookies.remove('userInfo');
-        createLogoutChannel().postMessage('logout');
-        Cookies.set('page_params', 'user_logged_out', {
-          expires: 60,
-          path: '/',
-        });
-        window.location.href = PAGE_ROUTES.TEAMS;
+        logoutAndRedirect(PAGE_ROUTES.MEMBERS)
       }
       const formattedJson = JSON.parse(authToken);
       getClientToken(formattedJson)
@@ -282,7 +287,14 @@ export function EditMemberModal({
           setEmailEditStatus(true);
         })
         .catch((e) => {
-          console.error(e)
+          console.error(e);
+          if(e?.response?.status === 401) {
+            logoutAndRedirect(PAGE_ROUTES.MEMBERS)
+          } else {
+            toast.info("Something went wrong. Please try again later.", {
+              hideProgressBar: true
+            });
+          }
         });
 
     } else {
