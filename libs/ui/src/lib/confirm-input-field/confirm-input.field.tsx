@@ -24,6 +24,14 @@ export function ConfirmInputField({
     setIsDuplicate(isDuplicateValues);
 
     if(inputOneRef.current.value.trim() === '' || inputTwoRef.current.value.trim() === '') {
+      if (props?.onChange) {
+        props?.onChange({
+          target: {
+            name: 'email',
+            value: ''
+          }
+        } as any);
+      }
       return;
     }
     const isMatchingValues = inputOneRef.current.value === inputTwoRef.current.value
