@@ -11,7 +11,7 @@ export class SetupService {
         new winston.transports.Console(),
         new WinstonCloudWatch({
           logGroupName: process.env.CLOUDWATCH_GROUP_NAME,
-          logStreamName: `${process.env.CLOUDWATCH_GROUP_NAME}-${process.env.NODE_ENV}`,
+          logStreamName: `${process.env.CLOUDWATCH_GROUP_NAME}-${process.env.DEPLOYMENT_ENVIRONMENT}`,
           awsRegion: process.env.CLOUDWATCH_REGION,
           jsonMessage: true,
           awsAccessKeyId: process.env.CLOUDWATCH_ACCESS_KEY as string,
