@@ -23,7 +23,7 @@ export class SetupService {
             `[${info.timestamp}] ${info.level}: ${info.message}\n${
               info.stack || ''
             }`,
-          silent: process.env.NODE_ENV === 'production', // Set to true in production to disable console logging
+          silent: process.env.NODE_ENV !== 'production',
         }),
       ],
     });
