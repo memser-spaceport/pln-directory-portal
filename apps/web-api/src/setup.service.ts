@@ -23,7 +23,7 @@ export class SetupService {
             `[${info.timestamp}] ${info.level}: ${info.message}\n${
               info.stack || ''
             }`,
-          silent: process.env.NODE_ENV !== 'production',
+          // silent: process.env.NODE_ENV !== 'production',
         }),
       ],
     });
