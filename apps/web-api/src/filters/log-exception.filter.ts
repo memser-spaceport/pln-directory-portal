@@ -53,6 +53,14 @@ export class LogException extends BaseExceptionFilter {
       });
     }
 
+    console.log(
+      'Cloud watch env',
+      process.env.CLOUDWATCH_GROUP_NAME,
+      process.env.CLOUDWATCH_ACCESS_KEY,
+      process.env.CLOUDWATCH_SECRET_KEY,
+      process.env.CLOUDWATCH_REGION,
+      process.env.DEPLOYMENT_ENVIRONMENT
+    );
     // Log the error to CloudWatch using Winston logger only for production
     if (process.env.NODE_ENV === 'production') {
       this.logger.error('error', exception);
