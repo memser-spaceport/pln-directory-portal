@@ -29,6 +29,9 @@ import {
   renewAndStoreNewAccessToken,
   convertCookiesToJson,
 } from '../../../utils/services/auth';
+import {
+  fetchGitProjectsByMember
+} from '../../../utils/services/members';
 import { MemberProfileLoginStrip } from '../../../components/members/member-profile/member-profile-login-strip/member-profile-login-strip';
 
 interface MemberProps {
@@ -201,6 +204,10 @@ export const getServerSideProps = async (ctx) => {
     return {
       notFound: true,
     };
+  }
+  
+  if (cookies?.authToken) {
+    member.repositories = await fetchGitProjectsByMember(member.id);
   }
 
   if (cookies?.authToken && (!userInfo?.roles?.includes(ADMIN_ROLE) || userInfo?.uid === member?.id)) {

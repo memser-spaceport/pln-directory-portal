@@ -67,14 +67,7 @@ export class MemberController {
     );
     const builtQuery = builder.build(request.query);
     const member = await this.membersService.findOne(uid, builtQuery);
-    let repositories = [];
-    if (member?.githubHandler) {
-      repositories = await this.membersService.getRepositories(
-        member?.githubHandler
-      );
-    }
-    const memberResponse = { ...member, repositories };
-    return memberResponse;
+    return member;
   }
 
   @Api(server.route.modifyMember)
@@ -124,5 +117,10 @@ export class MemberController {
       changeEmailRequest.otpToken,
       req.userEmail
     );
+  }
+
+  @Api(server.route.getMemberGitHubProjects)
+  async getGitProjects(@Param('uid') uid) {
+    return await this.membersService.getGitProjects(uid);
   }
 }
