@@ -79,10 +79,12 @@ export function DirectoryTagsFilter({
                     key={index + VISIBLE_TAGS_COUNT}
                     {...tag}
                     onClick={() => onTagToggle(index + VISIBLE_TAGS_COUNT)}
+                    {...(hideOnLogout &&
+                      !loggedIn && { disabled: true })}
                   />
                 ))}
               </Collapsible.Content>
-              <Collapsible.Trigger className="group mt-2 flex items-center space-x-1 outline-none">
+              <Collapsible.Trigger className="group mt-2 flex items-center space-x-1 outline-none" disabled={hideOnLogout && !loggedIn ? true : false}>
                 <span className="leading-3.5 text-xs font-medium text-slate-900 group-focus-within:shadow-[0_1px_0_#156ff7] group-focus:shadow-[0_1px_0_#156ff7] group-focus-visible:shadow-[0_1px_0_#156ff7]">
                   Show {open ? 'less' : 'more'}
                 </span>
