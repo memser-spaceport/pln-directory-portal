@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Param, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
@@ -18,6 +18,7 @@ import { MembersService } from './members.service';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { LogService } from '../shared/log.service';
 import { NoCache } from '../decorators/no-cache.decorator';
+import { AuthGuard } from '../guards/auth.guard';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
@@ -78,5 +79,22 @@ export class MemberController {
       participantsRequest,
       req.userEmail
     );
+  }
+
+  @Api(server.route.modifyMemberPreference)
+  @UseGuards(AuthGuard)
+  async updatePrefernce( @Param('uid') id,@Body() body, @Req() req) {
+    const preference = body;
+    return await this.membersService.updatePreference(
+      id,
+      preference
+    );
+  }
+
+  @Api(server.route.getMemberPreferences)
+  @UseGuards(AuthGuard)
+  @NoCache()
+  async getPreferences(@Param('uid') uid){
+    return await this.membersService.getPreferences(uid);
   }
 }

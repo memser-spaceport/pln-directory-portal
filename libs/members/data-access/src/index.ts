@@ -31,6 +31,21 @@ export const getMember = async (
 };
 
 /**
+ * Get member prefernce details from API
+ */
+export const getMemberPreferences = async (
+  id: string,
+  token :string
+) => {
+  return await client.members.getMemberPreferences({
+    params: { uid: id },
+    headers:{
+      Authorization:`Bearer ${JSON.parse(token)}`
+    }
+  } as any);
+};
+
+/**
  * Get member unique id based on provided airtable id
  */
 export const getMemberUIDByAirtableId = async (id: string) => {

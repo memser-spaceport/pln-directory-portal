@@ -110,7 +110,7 @@ api.interceptors.response.use(
       msg = SOMETHING_WENT_WRONG;
     }
     if (response?.status != 401) { 
-      toast.info(msg, {
+      toast.error(msg, {
         hideProgressBar: true
       });
     }

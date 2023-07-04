@@ -77,7 +77,6 @@ export function MemberProfileDetails({
                 width={14}
               />
             )}
-
             {/* Email */}
             {email && (
               <SocialProfile
