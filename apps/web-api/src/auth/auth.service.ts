@@ -291,7 +291,7 @@ export class AuthService {
   handleErrors = (error) => {
     console.log(error?.response?.statusCode, error?.response?.status, error?.response?.message, error?.response?.data)
     if (error?.response?.statusCode && error?.response?.message) {
-      throw new HttpException(error?.response?.message, error?.response?.statusCode)
+      throw new HttpException(error?.response?.message, error?.response?.statusCode, {cause: error})
     } else if (error?.response?.data && error?.response?.status) {
       if (error?.response?.status === 401) {
         throw new UnauthorizedException("Unauthorized")
@@ -310,11 +310,10 @@ export class AuthService {
       }
       // EOTP002, EATH010
       else {
-        console.log(error?.response?.data)
-        throw new InternalServerErrorException("Unexpected error. Please try again")
+        throw new InternalServerErrorException("Unexpected error. Please try again",  {cause: error})
       }
     } else {
-      throw new InternalServerErrorException("Unexpected error. Please try again")
+      throw new InternalServerErrorException("Unexpected error. Please try again",  {cause: error})
     }
   }
 

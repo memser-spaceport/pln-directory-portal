@@ -48,6 +48,7 @@ import ChangeEmailModal from '../../auth/change-email-modal';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { ReactComponent as SuccessIcon } from '../../../public/assets/images/icons/success.svg';
 import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
+import Error from 'next/error';
 interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -253,6 +254,19 @@ export function EditMemberModal({
     }
   };
 
+  const logoutAndRedirect = (path) => {
+     // If no token.. then logout user
+     Cookies.remove('authToken');
+     Cookies.remove('refreshToken');
+     Cookies.remove('userInfo');
+     Cookies.set('page_params', 'user_logged_out', {
+      expires: 60,
+      path: '/',
+    });
+     createLogoutChannel().postMessage('logout');
+     window.location.href = path;
+  }
+
   const onEmailChange = () => {
     if (isUserProfile) {
       analytics.captureEvent(
@@ -261,10 +275,9 @@ export function EditMemberModal({
       );
       const authToken = Cookies.get('authToken');
       if (!authToken) {
-        return;
+        logoutAndRedirect(PAGE_ROUTES.MEMBERS)
       }
       const formattedJson = JSON.parse(authToken);
-      //setIsProcessing(true)
       getClientToken(formattedJson)
         .then((d) => {
           const clientTokenExpiry = decodeToken(d);
@@ -274,19 +287,16 @@ export function EditMemberModal({
           setEmailEditStatus(true);
         })
         .catch((e) => {
-          if (e?.response?.status === 401) {
-            Cookies.remove('authToken');
-            Cookies.remove('refreshToken');
-            Cookies.remove('userInfo');
-            createLogoutChannel().postMessage('logout');
-            Cookies.set('page_params', 'user_logged_out', {
-              expires: 60,
-              path: '/',
+          console.error(e);
+          if(e?.response?.status === 401) {
+            logoutAndRedirect(PAGE_ROUTES.MEMBERS)
+          } else {
+            toast.info("Something went wrong. Please try again later.", {
+              hideProgressBar: true
             });
-            window.location.href = PAGE_ROUTES.TEAMS;
           }
         });
-      // .finally(() =>  setIsProcessing(false))
+
     } else {
       analytics.captureEvent(
         APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_CHANGE_EMAIL_CLICKED,

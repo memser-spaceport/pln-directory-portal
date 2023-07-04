@@ -67,7 +67,7 @@ export function getMembersListOptions(
 /**
  * Parse member fields values into a member object.
  **/
-export const parseMember = (member: TMemberResponse): IMember => {
+export const parseMember = (member: TMemberResponse,): IMember => {
   const location = parseMemberLocation(member.location);
   const teams =
     member.teamMemberRoles?.map((teamMemberRole) => ({
@@ -100,6 +100,17 @@ export const parseMember = (member: TMemberResponse): IMember => {
     repositories: member.repositories ?? [],
   };
 };
+
+export function restrictMemberInfo(member) {
+  const disAllowedKeys = ["discordHandle", "email", "githubHandle", "twitter", "repositories", "telegramHandle", "linkedinHandle", "location", "officeHours"];
+  const allKeys = Object.keys(member);
+  allKeys.forEach(key => {
+    if(disAllowedKeys.includes(key)) {
+      delete member[key];
+    }
+  })
+  return member;
+}
 
 export function maskMemberDetails(member) {
   // Mask Member details when user is not logged In (when accessToken not available in cookie).

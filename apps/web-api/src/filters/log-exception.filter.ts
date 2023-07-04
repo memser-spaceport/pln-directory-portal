@@ -1,37 +1,59 @@
 import {
-  ExceptionFilter,
-  Catch,
   ArgumentsHost,
   HttpException,
-  Inject,
+  Injectable,
+  Logger,
 } from '@nestjs/common';
-import { Response } from 'express';
-import { LogService } from '../shared/log.service';
+import { BaseExceptionFilter } from '@nestjs/core';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime';
+import axios, { AxiosError } from 'axios';
 
-@Catch()
-export class LogException implements ExceptionFilter {
-  @Inject()
-  private readonly logger: LogService;
-  catch(exception: any, host: ArgumentsHost) {
-    this.logger.error(
-      exception.response ? exception.response.message : exception.message,
-      exception
-    );
+@Injectable()
+export class LogException extends BaseExceptionFilter {
+  private readonly logger = new Logger();
+
+  async catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
-    const status =
-      typeof exception.getStatus === 'function' ? exception.getStatus() : 500;
-    const message =
-      typeof exception.getStatus === 'function'
-        ? (exception?.response?.message ? exception.response.message : exception.message)
-        : 'Internal error, contact support';
-    response.status(status).json({
-      message,
-      errors: exception.error,
-      timestamp: new Date().toISOString(),
-      path: request.url,
-      statusCode: status,
-    });
+    const response = ctx.getResponse();
+
+    if (exception instanceof PrismaClientKnownRequestError) {
+      // Handle Prisma errors
+      const statusCode = 500;
+      const message = 'Unexpected error. Please try again.';
+      response.status(statusCode).json({
+        statusCode,
+        message,
+      });
+    } else if (axios.isAxiosError(exception)) {
+      // Handle Axios errors
+      const axiosError = exception as AxiosError;
+      const statusCode = axiosError.response?.status || 500;
+      const message = 'Unexpected error. Please try again.';
+      response.status(statusCode).json({
+        statusCode,
+        message,
+      });
+    } else if (exception instanceof HttpException) {
+      // Handle NestJS errors
+      const status = exception.getStatus();
+      const responseObj = exception.getResponse();
+      const message =
+        typeof responseObj === 'string' ? responseObj : exception.message;
+      response.status(status).json({
+        statusCode: status,
+        message,
+      });
+    } else {
+      // Handle all other errors
+      const statusCode = 500;
+      const message = 'Unexpected Error. Please try again.';
+      response.status(statusCode).json({
+        statusCode,
+        message,
+      });
+    }
+
+    // Log the error.
+    this.logger.error('error', exception);
   }
 }

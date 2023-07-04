@@ -18,6 +18,10 @@ export function TeamProfileDetails({
     <>
       <h3 className=" mt-6 font-medium text-slate-500">Contact Details</h3>
       <div className="mt-3 flex gap-2 flex-wrap">
+        {/* Contact details */}
+        <div className="flex">
+          <ContactMethod contactMethod={contactMethod} />
+        </div>
         {/* Website */}
         {website && (
           <SocialProfile
@@ -51,10 +55,6 @@ export function TeamProfileDetails({
           />
         )}
 
-        {/* Contact details */}
-        <div className="flex">
-          <ContactMethod contactMethod={contactMethod} />
-        </div>
       </div>
       <div className="mt-6">
         <h2 className="detail-label">About</h2>
