@@ -6,8 +6,6 @@ import {
 import { UserIcon } from '@heroicons/react/solid';
 import { ReactComponent as EditIcon } from '/public/assets/images/icons/edit.svg';
 import { ReactComponent as InformationCircleIcon } from '../../../public/assets/images/icons/info_icon.svg';
-import { SETTINGS_CONSTANTS } from '../../../constants';
-import { ReactComponent as PrefernceIcon } from '../../../public/assets/images/icons/preferences.svg';
 
 export default function AddMemberBasicForm(props) {
   const values = props.formValues;
