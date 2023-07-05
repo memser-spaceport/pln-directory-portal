@@ -120,26 +120,26 @@ Member.getLayout = function getLayout(page: ReactElement) {
   return <DirectoryLayout>{page}</DirectoryLayout>;
 };
 
-const hidePreferences = (preferences, member) => {
-    if (!preferences?.showEmail) {
+const hidePreferences = (preferences, member, userInfo) => {
+    if (!preferences?.showEmail && (userInfo.uid !== member.id)) {
       delete member['email'];
     }
-    if (!preferences?.showDiscord) {
+    if (!preferences?.showDiscord && (userInfo.uid !== member.id)) {
       delete member['discordHandle'];
     }
-    if (!preferences?.showGithubHandle) {
+    if (!preferences?.showGithubHandle && (userInfo.uid !== member.id)) {
       delete member['githubHandle'];
     }
-    if (!preferences?.showTelegram) {
+    if (!preferences?.showTelegram && (userInfo.uid !== member.id)) {
       delete member['telegramHandle'];
     }
-    if (!preferences?.showLinkedin) {
+    if (!preferences?.showLinkedin && (userInfo.uid !== member.id)) {
       delete member['linkedinHandle'];
     }
-    if (!preferences?.showGithubProjects) {
+    if (!preferences?.showGithubProjects && (userInfo.uid !== member.id)) {
       delete member['repositories'];
     }
-    if (!preferences?.showTwitter) {
+    if (!preferences?.showTwitter && (userInfo.uid !== member.id)) {
       delete member['twitter'];
     }
 }
@@ -212,7 +212,7 @@ export const getServerSideProps = async (ctx) => {
     } else {
       preferences = memberPreferences;
     }
-    hidePreferences(preferences, member);
+    hidePreferences(preferences, member, userInfo);
   }
 
 

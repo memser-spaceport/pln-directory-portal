@@ -18,8 +18,10 @@ export function Switch({ label, initialValue = false, onChange, customClassName,
 
   const onSwitchChange = useCallback(
     (enabled: boolean) => {
-      setEnabled(enabled);
-      onChange?.(enabled);
+      if(!nonEditable){
+        setEnabled(enabled);
+        onChange?.(enabled);
+      }
     },
     [setEnabled, onChange]
   );
