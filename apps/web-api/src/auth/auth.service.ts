@@ -120,6 +120,36 @@ export class AuthService implements OnModuleInit {
     return linkResult.data;
   }
 
+  checkIfTokenAttached = (request) => {
+    const token = this.extractTokenFromHeader(request);
+    if (!token) {
+      throw new UnauthorizedException('Invalid Token');
+    }else{
+      return token;
+    }
+  }
+
+  extractTokenFromHeader(request): string | undefined {
+    const [type, token] = request.headers.authorization?.split(' ') ?? [];
+    return type === 'Bearer' ? token : undefined;
+  }
+
+  validateToken = async (request,token) => {
+    const validationResult: any = await axios.post(
+      `${process.env.AUTH_API_URL}/auth/introspect`,
+      { token: token }
+    );
+    if (
+      validationResult?.data?.active &&
+      validationResult?.data?.email
+    ) {
+      request['userEmail'] = validationResult.data.email;
+      return request;
+    } else {
+      throw new UnauthorizedException();
+    }
+  }
+
 
 
 
@@ -234,7 +264,6 @@ export class AuthService implements OnModuleInit {
       throw new InternalServerErrorException("Unexpected error. Please try again", { cause: error })
     }
   }
-
 
   private async getAuthClientToken() {
     const tokenFromMemory = await this.cacheService.store.get("authserviceClientToken");
