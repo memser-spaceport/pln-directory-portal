@@ -22,8 +22,6 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
 
     const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-    const [disableGitProject, setDisableGitProject] = useState<boolean>(false);
-    
     const [memberPreference, setMemberPreference] = useState((memberPreferences) ? memberPreferences : { ...state.preferences });
     const switchEvent = (type,val) => {
         const tempPreference = {
@@ -32,11 +30,7 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
         }
         if (type === 'showGithubHandle' && !val) {
             tempPreference.showGithubProjects = val;
-            setDisableGitProject(!val);
         } 
-        if (type === 'showGithubHandle' && val) {
-            setDisableGitProject(!val);
-        }
         setMemberPreference(tempPreference);
         dispatch({ type: 'SET_PRIVACY_MODIFIED', payload: true });
     }
@@ -99,7 +93,7 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
                         initialValue={settings.defaultValue}
                         onChange={settings.event}
                         customClassName="pointer-events-none"
-                        nonEditable={from === SETTINGS_CONSTANTS.VIEW_PREFERNCES || (disableGitProject && settings.label === PRIVACY_CONSTANTS.SHOW_GH_PJCTS)}
+                        nonEditable={from === SETTINGS_CONSTANTS.VIEW_PREFERNCES || (!memberPreference.showGithubHandle  && settings.label === PRIVACY_CONSTANTS.SHOW_GH_PJCTS)}
                     />
                 </div>
                 <div className="flex flex-col">
@@ -143,7 +137,6 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
     }
 
     const handleReset = () => {
-        setDisableGitProject(false);
         dispatch({ type: 'SET_PRIVACY_MODIFIED', payload: false });
         setMemberPreference({ ...state.preferences });
         analytics.captureEvent(
@@ -172,9 +165,6 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
                     {
                         preferenceSettings && (
                             preferenceSettings['contact-details'].map( contact => {
-                                if (contact.label === "Show GitHub" && !contact.defaultValue && !disableGitProject) {
-                                  setDisableGitProject(true);
-                                }
                                 return getPreferenceTemplate(contact);
                             })
                         )
