@@ -334,6 +334,8 @@ export default function Settings({
                 setModified(false);
             } else if (activeSetting === SETTINGS_CONSTANTS.MEMBER_SETTINGS) {
                 setModifiedMember(false);
+            }else if(activeSetting === SETTINGS_CONSTANTS.PRIVACY){
+                dispatch({ type: 'SET_PRIVACY_MODIFIED', payload: false });
             }
             setActiveSetting(targetSettings);
         }
