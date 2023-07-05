@@ -67,7 +67,7 @@ api.interceptors.request.use(async (config) => {
               /"/g,
               ''
             );
-          } 
+          }
           return config;
         }).catch((error) => {
           throw error;
@@ -105,11 +105,11 @@ api.interceptors.response.use(
         msg = response?.data?.message ? response?.data?.message : BAD_REQUEST_ERR_MSG;
       } else if (response.status === 404) {
         msg = NETWORK_ERR_MSG;
-      } 
+      }
     } else if (error.request) {
       msg = SOMETHING_WENT_WRONG;
     }
-    if (response?.status != 401) { 
+    if (response?.status != 401) {
       toast.error(msg, {
         hideProgressBar: true
       });
@@ -139,13 +139,13 @@ function getCsrfTokenFromResponseCookie(cookieHeader) {
 export function renewAccessToken(refreshToken) {
   // Make an API call to your server to get a new access token using refreshToken
   return fetch(
-      `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/auth/token/refresh`,
+      `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/auth/token`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ token : refreshToken }),
+        body: JSON.stringify({ refreshToken, grantType: 'refresh_token' }),
       }
     )
     .then((response) => {

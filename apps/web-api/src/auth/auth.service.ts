@@ -3,67 +3,130 @@ import {
   BadRequestException,
   CACHE_MANAGER,
   ForbiddenException,
-  HttpException,
-  HttpStatus,
   Inject,
   Injectable,
   InternalServerErrorException,
+  OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
 import axios from 'axios';
 import jwt_decode from 'jwt-decode';
-import { PrismaService } from '../shared/prisma.service';
-import { RedisService } from '../utils/redis/redis.service';
-import { LogService } from '../shared/log.service';
 import { Cache } from 'cache-manager';
 import { MembersService } from '../members/members.service';
+import { EmailOtpService } from '../otp/email-otp.service';
+import { ModuleRef } from '@nestjs/core';
 @Injectable()
-export class AuthService {
-  constructor(private prismaService: PrismaService,
-     private redisService: RedisService,
-     @Inject(CACHE_MANAGER) private cacheService: Cache) { }
+export class AuthService implements OnModuleInit {
+  private membersService: MembersService;
+  constructor(
+    private moduleRef: ModuleRef,
+    private emailOtpService: EmailOtpService,
+    @Inject(CACHE_MANAGER) private cacheService: Cache) { }
 
-  async findUniqueMemberAndGetInfo(query) {
-    const foundUser: any = await this.prismaService.member.findUnique({
-      where: { ...query },
-      include: { image: true, memberRoles: true },
-    });
+    onModuleInit() {
+      this.membersService = this.moduleRef.get(MembersService, {strict : false});
+    }
 
+
+
+
+  async getTokenAndUserInfo(tokenRequest) {
+    const { id_token, access_token, refresh_token } = await this.getAuthTokens(tokenRequest);
+    const { email, externalId } = await this.decodeAuthIdToken(id_token)
+
+    // If no email available, then account has to be linked first.
+    if(!email) {
+      return { accessToken: access_token, refreshToken: refresh_token, idToken: id_token, isAccountLinking: true,}
+    }
+
+    // Find User by externalId
+    let foundUser = await this.membersService.findMemberByExternalId(externalId);
     if (foundUser) {
-      return {
-        name: foundUser.name,
-        email: foundUser?.email,
-        profileImageUrl: foundUser?.image?.url,
-        uid: foundUser.uid,
-        roles: foundUser.memberRoles.map((r) => r.name),
-      };
+      return { userInfo: this.memberToUserInfo(foundUser), refreshToken: refresh_token, idToken: id_token, accessToken: access_token }
     }
 
-    return null;
+    // If there is no user found for externalId, then find user by  and update externalId
+    foundUser = await this.membersService.findMemberByEmail(email)
+    if (foundUser) {
+      await this.membersService.updateExternalIdByEmail(email, externalId);
+      return { userInfo: this.memberToUserInfo(foundUser), refreshToken: refresh_token, idToken: id_token, accessToken: access_token }
+    }
+
+    // if no user found for the email too, then throw forbidden exception
+    throw new ForbiddenException();
   }
 
-  async getNewTokens(refreshToken) {
+  async verifyAndSendEmailOtp(email) {
+    // Throw error if user email is not available in members directory
+    const foundUser = await this.membersService.findMemberByEmail(email)
+    if (!foundUser) {
+      throw new BadRequestException("The entered email doesn't match an email in the directory records. Please try again or contact support")
+    }
+
+    // Send OTP
+    return await this.emailOtpService.sendEmailOtp(email)
+  }
+
+
+  async resendEmailOtp(otpToken) {
+    return await this.emailOtpService.resendEmailOtp(otpToken)
+  }
+
+  async verifyEmailOtpAndLinkAccount(otp, otpToken, idToken) {
+    // Verify Otp
+    const { recipient, valid } = await this.emailOtpService.verifyEmailOtp(otp, otpToken)
+
+    if (!valid) {
+      return { valid }
+    }
+
+    // If user doesnt exist, throw error
+    const foundUser = await this.membersService.findMemberByEmail(recipient);
+    if (!foundUser) {
+      throw new ForbiddenException('Please login and try again')
+    }
+
+    // Link account by email
+    const newTokens = await this.linkEmailWithAuthAccount(foundUser.email, idToken)
+
+    // format userinfo
+    const userInfo = this.memberToUserInfo(foundUser)
+
+    // If user already has externalId then send new token directly
+    if (foundUser.externalId) {
+      return { newTokens, userInfo }
+    }
+
+    // Get external Id
+    const { externalId } = this.decodeAuthIdToken(newTokens.id_token);
+
+    // Update External Id and return new tokens
+    await this.membersService.updateExternalIdByEmail(foundUser.email, externalId);
+    return { newTokens, userInfo: {...userInfo, isFirstTimeLogin: true} };
+  }
+
+  async updateEmailInAuth(newEmail, oldEmail, externalId) {
+    const clientToken = await this.getAuthClientToken();
+    let linkResult;
     try {
-      const result = await axios.post(
-        `${process.env.AUTH_API_URL}/auth/token`,
-        {
-          client_id: process.env.AUTH_APP_CLIENT_ID,
-          client_secret: process.env.AUTH_APP_CLIENT_SECRET,
-          refresh_token: refreshToken,
-          grant_type: 'refresh_token',
+      linkResult = await this.getAuthApi().patch(`/admin/accounts/email`, { email: newEmail, existingEmail: oldEmail, userId: externalId, deleteAndReplace: true }, {
+        headers: {
+          Authorization: `Bearer ${clientToken}`
         }
-      );
-      const newToken = this.getUserInfo(result);
-      return newToken;
-    } catch (e) {
-      if (e?.response?.data?.message, e?.response?.status) {
-        throw new HttpException("Request failed. Please try again later", e?.response?.status)
-      }
-      throw new InternalServerErrorException();
+      })
+    } catch(error) {
+      this.handleAuthErrors(error)
     }
+    return linkResult.data;
   }
 
-  async getClientToken() {
+
+
+
+
+  /*********************** PRIVATE METHODS ****************************/
+
+  private async getClientToken() {
     const response = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
       "client_id": process.env.AUTH_APP_CLIENT_ID,
       "client_secret": process.env.AUTH_APP_CLIENT_SECRET,
@@ -74,306 +137,113 @@ export class AuthService {
     return response.data.access_token;
   }
 
-  async getUserInfo(result) {
+  private async linkEmailWithAuthAccount(email, userIdToken) {
+    const clientToken = await this.getAuthClientToken();
+    let linkResult;
     try {
-      const idToken = result.data.id_token;
-      const decoded: any = jwt_decode(idToken);
-      console.log('decoded values', decoded)
-      const userEmail = decoded.email;
-      const idFromAuth = decoded.sub;
-
-      // If email id is not available in id token, then user needs to enter and validate email id in ui
-      // Get client token.. for client to access email validation
-      if (!userEmail) {
-        const clientToken = await this.getClientToken()
-        return {
-          accessToken: result.data.access_token,
-          refreshToken: result.data.refresh_token,
-          clientToken,
-          idToken
-        }
-      }
-
-
-      // Search by external id. If user found, send the user details with tokens
-      let foundUser: any = await this.prismaService.member.findUnique({
-        where: { externalId: idFromAuth },
-        include: { image: true, memberRoles: true, teamMemberRoles: true },
-      });
-
-      if (foundUser) {
-        return {
-          userInfo: {
-            isFirstTimeLogin: false,
-            name: foundUser.name,
-            email: foundUser?.email,
-            profileImageUrl: foundUser?.image?.url,
-            uid: foundUser.uid,
-            roles: foundUser.memberRoles.map((r) => r.name),
-            leadingTeams: foundUser.teamMemberRoles.filter((role) => role.teamLead)
-              .map(role => role.teamUid)
-          },
-          accessToken: result.data.access_token,
-          refreshToken: result.data.refresh_token,
-        };
-      }
-
-      // If there is no user available for external id, then find by user by email
-      // and then update the external id for that user and send userinfo, tokens
-      foundUser = await this.prismaService.member.findUnique({
-        where: { email: userEmail },
-        include: { image: true, memberRoles: true, teamMemberRoles: true },
-      });
-      if (foundUser) {
-        await this.prismaService.member.update({
-          where: { email: userEmail },
-          data: { externalId: idFromAuth },
-        });
-        return {
-          userInfo: {
-            isFirstTimeLogin: true,
-            name: foundUser.name,
-            email: foundUser.email,
-            profileImageUrl: foundUser?.image?.url,
-            uid: foundUser.uid,
-            roles: foundUser.memberRoles.map((r) => r.name),
-            leadingTeams: foundUser.teamMemberRoles.filter((role) => role.teamLead)
-              .map(role => role.teamUid)
-          },
-          accessToken: result.data.access_token,
-          refreshToken: result.data.refresh_token,
-        };
-      }
-    } catch (e) {
-      console.error(e)
-      if (e?.response?.data?.message && e?.response?.status) {
-        throw new HttpException(e?.response?.status, e?.response?.data?.message)
-      }
-      throw new InternalServerErrorException();
-    }
-
-    // If no user found for externalid and for email then throw forbidden error
-    throw new ForbiddenException();
-  }
-
-  async getToken(code) {
-    // Get user token
-    let result: any;
-    try {
-      result = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
-        client_id: process.env.AUTH_APP_CLIENT_ID,
-        client_secret: process.env.AUTH_APP_CLIENT_SECRET,
-        redirect_uri: `${process.env.WEB_UI_BASE_URL}/directory/members/verify-member`,
-        code: code,
-        grant_type: 'authorization_code',
-      });
-
-    } catch (error) {
-      if (error.response) {
-        throw new HttpException(error?.response?.data?.message, error?.response?.status ?? 400)
-      }
-      throw new UnauthorizedException();
-    }
-
-    const tokenResponse =  this.getUserInfo(result);
-    return tokenResponse;
-  }
-
-  async getUserInfoByEmail(userEmail) {
-    const foundUser: any = await this.prismaService.member.findUnique({
-      where: { email: userEmail },
-      include: { image: true, memberRoles: true, teamMemberRoles: true },
-    });
-    if (foundUser) {
-      return {
-        isExternalIdAvailable: foundUser.externalId ? true : false,
-        name: foundUser.name,
-        email: foundUser.email,
-        profileImageUrl: foundUser.image?.url,
-        uid: foundUser.uid,
-        roles: foundUser.memberRoles?.map((r) => r.name),
-        leadingTeams: foundUser.teamMemberRoles?.filter((role) => role.teamLead)
-          .map(role => role.teamUid)
-      }
-    }
-    return null
-  }
-
-  async updateEmailAndLinkAccount(oldEmail, newEmail, accessToken, clientToken) {
-    let newTokens;
-    let updatedUser;
-    await this.prismaService.$transaction(async (tx) => {
-
-      // Update new email
-      updatedUser = await tx.member.update({
-        where: { email: oldEmail },
-        data: { email: newEmail },
-        include: { image: true, memberRoles: true, teamMemberRoles: true },
-      })
-
-      await tx.participantsRequest.create({
-        data: {
-          status: 'AUTOAPPROVED',
-          requesterEmailId: oldEmail,
-          referenceUid: updatedUser.uid,
-          uniqueIdentifier: oldEmail,
-          participantType: 'MEMBER',
-          newData: { oldEmail: oldEmail, newEmail: newEmail }
-        }
-      })
-
-      // Link new email to auth account
-      // newTokens = await this.linkEmailWithAccount(newEmail, accessToken, clientToken)
-      const linkResult = await axios.patch(`${process.env.AUTH_API_URL}/admin/accounts/email`, { email: newEmail, existingEmail: oldEmail, userId: updatedUser.externalId, deleteAndReplace: true }, {
+      linkResult = await this.getAuthApi().put(`/admin/accounts`, { token: userIdToken, email }, {
         headers: {
           Authorization: `Bearer ${clientToken}`
         }
       })
-      newTokens = linkResult.data;
-    })
+    } catch (error) {
+      this.handleAuthErrors(error)
+    }
 
-    await this.cacheService.reset()
+    return linkResult.data;
+  }
+
+  private async getAuthTokens({grantType, refreshToken, code}) {
+    const payload = { client_id: process.env.AUTH_APP_CLIENT_ID, client_secret: process.env.AUTH_APP_CLIENT_SECRET, grant_type: grantType}
+    let result;
+
+    if(grantType === 'authorization_code') {
+      payload['redirect_uri'] = `${process.env.WEB_UI_BASE_URL}/directory/members/verify-member`,
+      payload['code'] = code;
+    } else if (grantType === 'refresh_token') {
+      payload['refresh_token'] = refreshToken
+    }
+
+    try {
+      result = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, payload);
+      return result.data;
+    } catch (error) {
+      this.handleAuthErrors(error)
+    }
+  }
+
+  private decodeAuthIdToken(token) {
+    const decoded: any = jwt_decode(token);
+    return { email: decoded.email, externalId: decoded.sub }
+  }
+
+  private memberToUserInfo(memberInfo) {
     return {
-      newTokens,
-      userInfo: {
-        name: updatedUser.name,
-        email: updatedUser.email,
-        profileImageUrl: updatedUser.image?.url,
-        uid: updatedUser.uid,
-        roles: updatedUser.memberRoles?.map((r) => r.name),
-        leadingTeams: updatedUser.teamMemberRoles?.filter((role) => role.teamLead)
-          .map(role => role.teamUid)
-      }
+      isFirstTimeLogin: memberInfo?.externalId ? false : true,
+      name: memberInfo.name,
+      email: memberInfo.email,
+      profileImageUrl: memberInfo.image?.url,
+      uid: memberInfo.uid,
+      roles: memberInfo.memberRoles?.map((r) => r.name),
+      leadingTeams: memberInfo.teamMemberRoles?.filter((role) => role.teamLead)
+        .map(role => role.teamUid)
     };
   }
 
-  async linkEmailWithAccount(email, accessToken, clientToken, user) {
-    const linkResult = await axios.put(`${process.env.AUTH_API_URL}/admin/accounts`, { token: accessToken, email: email }, {
-      headers: {
-        Authorization: `Bearer ${clientToken}`
-      }
+  private getAuthApi() {
+    const authOtpService = axios.create({
+      baseURL: `${process.env.AUTH_API_URL}`
     })
-
-    // If user already has externalId then send new token directly
-    const newTokens = linkResult.data;
-    if(user.isExternalIdAvailable) {
-      return newTokens
-    }
-
-    // Else update external Id and send new tokens
-    const idToken = newTokens.id_token;
-    const decoded: any = jwt_decode(idToken);
-    const userExternalId = decoded.sub;
-
-    await this.prismaService.member.update({
-      where: { email: email },
-      data: { externalId: userExternalId }
-    })
-    return newTokens;
-  }
-
-  async verifyEmailOtp(otp, otpToken, clientToken) {
-    const payload = {
-      code: otp,
-      token: otpToken,
-    }
-    const header = {
-      headers: {
-        Authorization: `Bearer ${clientToken}`
+    authOtpService.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        const originalRequest = error.config;
+        if (error.response.status === 401 && !originalRequest._retry) {
+          originalRequest._retry = true;
+          return this.getClientToken().then((accessToken) => {
+            this.cacheService.store.set("authserviceClientToken", accessToken, {ttl: 3600});
+            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+            return axios(originalRequest);
+          });
+        }
+        return Promise.reject(error);
       }
-    }
-    const verifyOtpResult = await axios.post(`${process.env.AUTH_API_URL}/mfa/otp/verify`, payload, header)
-    return verifyOtpResult?.data
-  }
-
-
-
-
-  handleErrors = (error) => {
-    console.log(error?.response?.statusCode, error?.response?.status, error?.response?.message, error?.response?.data)
-    if (error?.response?.statusCode && error?.response?.message) {
-      throw new HttpException(error?.response?.message, error?.response?.statusCode, {cause: error})
-    } else if (error?.response?.data && error?.response?.status) {
-      if (error?.response?.status === 401) {
-        throw new UnauthorizedException("Unauthorized")
-      } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP005') {
-        throw new UnauthorizedException("Unauthorized")
-      } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP003') {
-        throw new ForbiddenException("MAX_OTP_ATTEMPTS_REACHED")
-      } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EATH010') {
-        throw new ForbiddenException("ACCOUNT_ALREADY_LINKED")
-      } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EATH002') {
-        throw new ForbiddenException("ACCOUNT_ALREADY_LINKED")
-      } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP006') {
-        throw new ForbiddenException("MAX_RESEND_ATTEMPTS_REACHED")
-      } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP004') {
-        throw new BadRequestException("CODE_EXPIRED")
-      }
-      // EOTP002, EATH010
-      else {
-        throw new InternalServerErrorException("Unexpected error. Please try again",  {cause: error})
-      }
-    } else {
-      throw new InternalServerErrorException("Unexpected error. Please try again",  {cause: error})
-    }
-  }
-
-  async resendEmailOtpForVerification(otpToken, clientToken) {
-    const payload = {
-      token: otpToken
-    }
-    const header = {
-      headers: {
-        Authorization: `Bearer ${clientToken}`
-      }
-    }
-    const sendOtpResult = await axios.post(`${process.env.AUTH_API_URL}/mfa/otp/resend`, payload, header);
-    return sendOtpResult.data;
-  }
-
-  async sendEmailOtpForVerification(email, clientToken) {
-    const payload = {
-      recipientAddress: email,
-      notificationType: 'EMAIL',
-    }
-    const header = {
-      headers: {
-        Authorization: `Bearer ${clientToken}`
-      }
-    }
-    const sendOtpResult = await axios.post(`${process.env.AUTH_API_URL}/mfa/otp`, payload, header);
-    return sendOtpResult.data;
-  }
-
-  checkIfTokenAttached = (request) => {
-    const token = this.extractTokenFromHeader(request);
-    if (!token) {
-      throw new UnauthorizedException('Invalid Token');
-    }else{
-      return token;
-    }
-  }
-
-  extractTokenFromHeader(request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
-  }
-
-  validateToken = async (request,token) => {
-    const validationResult: any = await axios.post(
-      `${process.env.AUTH_API_URL}/auth/introspect`,
-      { token: token }
     );
-    if (
-      validationResult?.data?.active &&
-      validationResult?.data?.email
-    ) {
-      request['userEmail'] = validationResult.data.email;
-      return request;
+
+    return authOtpService;
+
+  }
+
+  private handleAuthErrors(error) {
+    console.log(error?.response?.data)
+    if (error?.response?.status === 401) {
+      throw new UnauthorizedException("Unauthorized")
+    } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP005') {
+      throw new UnauthorizedException("Unauthorized")
+    } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP003') {
+      throw new ForbiddenException("MAX_OTP_ATTEMPTS_REACHED")
+    } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EATH010') {
+      throw new ForbiddenException("ACCOUNT_ALREADY_LINKED")
+    } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EATH002') {
+      throw new ForbiddenException("ACCOUNT_ALREADY_LINKED")
+    } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP006') {
+      throw new ForbiddenException("MAX_RESEND_ATTEMPTS_REACHED")
+    } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP004') {
+      throw new BadRequestException("CODE_EXPIRED")
     } else {
-      throw new UnauthorizedException();
+      throw new InternalServerErrorException("Unexpected error. Please try again", { cause: error })
     }
+  }
+
+
+  private async getAuthClientToken() {
+    const tokenFromMemory = await this.cacheService.store.get("authserviceClientToken");
+    if (tokenFromMemory) {
+      return tokenFromMemory
+    }
+    const newClientToken = await this.getClientToken();
+    await this.cacheService.store.set("authserviceClientToken", newClientToken, {ttl: 3600});
+    return newClientToken;
   }
 
 }
-

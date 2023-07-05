@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react"
 import Cookies from 'js-cookie';
-import { resendEmailVerificationOtp, sendEmailVerificationOtp, validateEmailOtp } from "../../services/auth.service";
+import { resendEmailOtp, sendEmailOtp, verifyEmailOtp } from "../../services/auth.service";
 import { LoadingIndicator } from "../shared/loading-indicator/loading-indicator";
 import EmailSubmissionForm from "./email-submission-form";
 import OtpSubmissionForm from "./otp-submission-form";
@@ -35,18 +35,19 @@ function EmailOtpVerificationModal() {
 
     const onOtpVerify = async (otp) => {
         try {
-            setErrorMessage('')
-            const otpPayload = {
-                otp: otp.join(''),
-                otpToken: Cookies.get('uniqueEmailVerifyToken'),
-                clientToken: Cookies.get('clientToken'),
-                accessToken: Cookies.get('idToken'),
-                emailId: localStorage.getItem('otp-verification-email')
+            const authToken = Cookies.get('authToken');
+            const otpToken = Cookies.get('uniqueEmailVerifyToken');
+            const idToken = Cookies.get('idToken');
+            if (!authToken || !otpToken || !idToken) {
+                goToError('Invalid attempt. Please login and try again');
+                return;
             }
-
+            setErrorMessage('')
+            const otpPayload = { otp: otp.join(''), otpToken, idToken}
+            const header = { headers: {Authorization: `Bearer ${authToken}`}}
             setLoaderStatus(true)
             analytics.captureEvent(APP_ANALYTICS_EVENTS.USER_VERIFICATION_VERIFY_OTP, {})
-            const data = await validateEmailOtp(otpPayload)
+            const data = await verifyEmailOtp(otpPayload, header)
             setLoaderStatus(false)
             if (data?.userInfo) {
                 setNewTokensAndUserInfo(data?.newTokens, data?.userInfo)
@@ -76,17 +77,19 @@ function EmailOtpVerificationModal() {
         setErrorMessage('')
         const otpToken = Cookies.get('uniqueEmailVerifyToken');
         const email = localStorage.getItem('otp-verification-email');
-        const clientToken = Cookies.get('clientToken');
-        if (!clientToken || !email || !otpToken) {
+        const authToken = Cookies.get('authToken');
+        if (!authToken || !email || !otpToken) {
             goToError('Invalid attempt. Please login and try again');
             return;
         }
 
         try {
             setLoaderStatus(true)
-            const otpPayload = { email, clientToken, otpToken }
+            const otpPayload = { email, otpToken }
+            const header = { headers: {Authorization: `Bearer ${authToken}`}}
+
             analytics.captureEvent(APP_ANALYTICS_EVENTS.USER_VERIFICATION_RESEND_OTP, {})
-            const d = await resendEmailVerificationOtp(otpPayload);
+            const d = await resendEmailOtp(otpPayload, header);
             setLoaderStatus(false)
 
             // Reset resend timer and set unique token for verification
@@ -108,16 +111,23 @@ function EmailOtpVerificationModal() {
 
     const onEmailSubmitted = async (email) => {
         try {
-            const clientToken = Cookies.get('clientToken');
-            if (!clientToken) {
+
+            // Validation
+            const authToken = Cookies.get('authToken');
+            if (!authToken) {
                 goToError('Invalid attempt. Please login and try again');
                 return;
             }
-            const otpPayload = { email, clientToken }
+
+            // Initiate API
             setErrorMessage('')
             setLoaderStatus(true)
+            const otpPayload = { email }
+            const header = {headers: {Authorization: `Bearer ${authToken}`}}
             analytics.captureEvent(APP_ANALYTICS_EVENTS.USER_VERIFICATION_SEND_OTP, {email})
-            const d = await sendEmailVerificationOtp(otpPayload);
+            const d = await sendEmailOtp(otpPayload, header);
+
+            // Handle Success
             setLoaderStatus(false)
             const uniqueEmailVerifyToken = d.token;
             Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 20 * 60 * 1000) })
@@ -125,7 +135,6 @@ function EmailOtpVerificationModal() {
             localStorage.setItem('otp-verification-step', '2');
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
             setVerificationStep(2);
-            //setResendTimer();
             setResendInSeconds(30)
 
         } catch (error) {
