@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import { SettingsContext } from "apps/web-app/pages/directory/settings";
 import { LoadingIndicator } from "../shared/loading-indicator/loading-indicator";
 import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
+import { DiscardChangesPopup } from "libs/ui/src/lib/modals/confirmation";
 
 
 interface IPrivacyProps {
@@ -19,6 +20,8 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
     const analytics = useAppAnalytics();
 
     const {state, dispatch} = useContext(SettingsContext);
+
+    const [isOpen, setIsOpen] = useState(false);
 
     const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
@@ -109,30 +112,37 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
     }
 
     const handleSave = async () => {
-        setIsProcessing(true);
-        try{
-            const response = await updatePreference(JSON.parse(Cookies.get('userInfo')).uid, memberPreference, JSON.parse(Cookies.get('authToken')));
-            if(response){
-                toast.success(MSG_CONSTANTS.MEMBER_UPDATE_MESSAGE);
-                dispatch({ type: 'SET_PRIVACY_MODIFIED', payload: false });
-                const prefrenceKeys = Object.keys(state.preferences);
-                prefrenceKeys.forEach(key => {
-                    if(state.preferences[key] !== response.preferences[key] ) {
-                        analytics.captureEvent(
-                            APP_ANALYTICS_EVENTS.SETTINGS_USER_PREFERENCES,
-                            {
-                               name: key,
-                               value: response.preferences[key]
-                            }
-                          );
-                    }
-                })
-                dispatch({type: 'SET_PREFERENCE', payload: {...response.preferences}})
-                
+        if (JSON.stringify(memberPreference) !== JSON.stringify(state.preferences)) {
+            setIsProcessing(true);
+            try{
+                const response = await updatePreference(JSON.parse(Cookies.get('userInfo')).uid, memberPreference, JSON.parse(Cookies.get('authToken')));
+                if(response){
+                    toast(MSG_CONSTANTS.MEMBER_UPDATE_MESSAGE);
+                    dispatch({ type: 'SET_PRIVACY_MODIFIED', payload: false });
+                    const prefrenceKeys = Object.keys(state.preferences);
+                    prefrenceKeys.forEach(key => {
+                        if(state.preferences[key] !== response.preferences[key] ) {
+                            analytics.captureEvent(
+                                APP_ANALYTICS_EVENTS.SETTINGS_USER_PREFERENCES,
+                                {
+                                   name: key,
+                                   value: response.preferences[key]
+                                }
+                              );
+                        }
+                    })
+                    dispatch({type: 'SET_PREFERENCE', payload: {...response.preferences}})
+                    
+                }
+            }finally{
+                setIsProcessing(false);
             }
-        }finally{
-            setIsProcessing(false);
+        } else {
+            toast(MSG_CONSTANTS.NO_CHANGES_TO_RESET, {
+                type: 'info',
+              });
         }
+    
         
     }
 
@@ -148,8 +158,28 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
           );
     }
 
+    const handleDiscord = () => {
+        if (JSON.stringify(memberPreference) !== JSON.stringify(state.preferences)) {
+            setIsOpen(true);
+        } else {
+            toast(MSG_CONSTANTS.NO_CHANGES_TO_RESET, {
+                type: 'info',
+              });
+        }
+    }
+
+    const onCloseFn = (flag:boolean) => {
+        if (flag) {
+            setIsOpen(false);
+            handleReset();
+        } else {
+            setIsOpen(false);
+        }
+    }
+
     return (
         <>
+        <DiscardChangesPopup text={MSG_CONSTANTS.RESET_CHANGE_CONF_MSG} isOpen={isOpen} onCloseFn={onCloseFn}/>
         {isProcessing && (
                 <div
                     className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
@@ -201,7 +231,7 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
                         className={
                             'hadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-[150px] float-right justify-center rounded-full px-6 py-2 m-6 text-base font-semibold leading-6 text-[#156FF7] outline outline-1 outline-[#156FF7] hover:outline-2'
                         }
-                        onClick={handleReset}
+                        onClick={handleDiscord}
                     >
                         {BTN_LABEL_CONSTANTS.RESET}
                     </button>
