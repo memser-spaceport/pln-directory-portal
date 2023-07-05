@@ -40,7 +40,7 @@ export function Switch({ label, initialValue = false, onChange, customClassName,
           onChange={onSwitchChange}
           className={`${
             enabled ? 'bg-blue-600' : 'bg-slate-300'
-            } on-focus h-4 w-7 shrink-0 items-center rounded-full transition ${nonEditable ? `pointer-events-none ${enabled ? 'bg-[#93C5FD]' : 'bg-slate-300'}` : 'pointer-events-auto'}`}
+            } on-focus h-4 w-7 shrink-0 items-center rounded-full transition ${nonEditable ? `pointer-events-none ${enabled ? 'bg-[#93C5FD] focus:ring-0 focus:outline-none ' : 'bg-slate-300'}` : 'pointer-events-auto'}`}
           data-testid="switch__button"
         >
           <div
