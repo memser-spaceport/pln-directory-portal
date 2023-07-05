@@ -27,7 +27,7 @@ const TokenRequestSchema = z.object({
             message: 'Refresh token required for this grant type',
             fatal: true,
         });
-        return z.NEVER;
+        return z.never;
     }
     if (data.grantType === 'authorization_code' && !data.code) {
         ctx.addIssue({
@@ -35,7 +35,7 @@ const TokenRequestSchema = z.object({
             message: 'Code required for this grant type',
             fatal: true,
         });
-        return z.NEVER;
+        return z.never;
     }
 });
 
