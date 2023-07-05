@@ -52,7 +52,6 @@ export class LogException extends BaseExceptionFilter {
         message,
       });
     }
-
     // Log the error.
     this.logger.error('error', exception);
   }

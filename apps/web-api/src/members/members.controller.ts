@@ -1,4 +1,11 @@
-import { Body, Controller, Param, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Param,
+  Req,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
@@ -6,6 +13,8 @@ import {
   MemberDetailQueryParams,
   MemberQueryParams,
   ResponseMemberWithRelationsSchema,
+  ChangeEmailRequestDto,
+  SendEmailOtpRequestDto,
 } from 'libs/contracts/src/schema';
 import { apiMembers } from '../../../../libs/contracts/src/lib/contract-member';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
@@ -16,9 +25,9 @@ import { ENABLED_RETRIEVAL_PROFILE } from '../utils/prisma-query-builder/profile
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { MembersService } from './members.service';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
-import { LogService } from '../shared/log.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { AuthGuard } from '../guards/auth.guard';
+import { UserAccessTokenValidateGuard } from '../guards/user-access-token-validate.guard';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
@@ -26,10 +35,7 @@ type RouteShape = typeof server.routeShapes;
 @Controller()
 @NoCache()
 export class MemberController {
-  constructor(
-    private readonly membersService: MembersService,
-    private readonly logger: LogService
-  ) {}
+  constructor(private readonly membersService: MembersService) {}
 
   @Api(server.route.getMembers)
   @ApiQueryFromZod(MemberQueryParams)
@@ -83,18 +89,40 @@ export class MemberController {
 
   @Api(server.route.modifyMemberPreference)
   @UseGuards(AuthGuard)
-  async updatePrefernce( @Param('uid') id,@Body() body, @Req() req) {
+  async updatePrefernce(@Param('uid') id, @Body() body, @Req() req) {
     const preference = body;
-    return await this.membersService.updatePreference(
-      id,
-      preference
-    );
+    return await this.membersService.updatePreference(id, preference);
   }
 
   @Api(server.route.getMemberPreferences)
   @UseGuards(AuthGuard)
   @NoCache()
-  async getPreferences(@Param('uid') uid){
+  async getPreferences(@Param('uid') uid) {
     return await this.membersService.getPreferences(uid);
+  }
+
+  @Api(server.route.sendOtpForEmailChange)
+  @UseGuards(UserAccessTokenValidateGuard)
+  async sendOtpForEmailChange(
+    @Body() sendOtpRequest: SendEmailOtpRequestDto,
+    @Req() req
+  ) {
+    return await this.membersService.sendOtpForEmailChange(
+      sendOtpRequest.newEmail,
+      req.userEmail
+    );
+  }
+
+  @Api(server.route.updateMemberEmail)
+  @UseGuards(UserAccessTokenValidateGuard)
+  async updateMemberEmail(
+    @Body() changeEmailRequest: ChangeEmailRequestDto,
+    @Req() req
+  ) {
+    return await this.membersService.verifyOtpAndUpdateEmail(
+      changeEmailRequest.otp,
+      changeEmailRequest.otpToken,
+      req.userEmail
+    );
   }
 }

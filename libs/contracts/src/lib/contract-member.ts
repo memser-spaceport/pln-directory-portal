@@ -28,15 +28,6 @@ export const apiMembers = contract.router({
     },
     summary: 'Get a member',
   },
-  modifyMember: {
-    method: 'PUT',
-    path: `${getAPIVersionAsPath('1')}/member/:uid`,
-    body: contract.body<unknown>(),
-    responses: {
-      200: contract.response<unknown>(),
-    },
-    summary: 'Modify a member',
-  },
   modifyMemberPreference: {
     method: 'PATCH',
     path: `${getAPIVersionAsPath('1')}/member/:uid/preferences`,
@@ -54,4 +45,31 @@ export const apiMembers = contract.router({
     },
     summary: 'Get member Preferences',
   },
+  modifyMember: {
+    method: 'PUT',
+    path: `${getAPIVersionAsPath('1')}/member/:uid`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Modify a member',
+  },
+  sendOtpForEmailChange: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/member/:uid/email/otp`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Request for email change',
+  },
+  updateMemberEmail: {
+    method: 'PATCH',
+    path: `${getAPIVersionAsPath('1')}/member/:uid/email`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Request for email change',
+  }
 });

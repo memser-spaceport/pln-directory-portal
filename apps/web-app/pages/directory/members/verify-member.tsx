@@ -84,7 +84,7 @@ export const getServerSideProps = async (
     };
   }
   // Set access token, refresh token, member Info in cookie.
-  const { accessToken, refreshToken, userInfo, clientToken, idToken } = authResp.data;
+  const { accessToken, refreshToken, userInfo, isAccountLinking, idToken } = authResp.data;
   if (accessToken && refreshToken && userInfo) {
     const accessTokenExpiry = decodeToken(accessToken);
     const refreshTokenExpiry = decodeToken(refreshToken);
@@ -111,10 +111,10 @@ export const getServerSideProps = async (
         },
       };
     }
-  } else if (clientToken && accessToken && refreshToken) {
+  } else if (isAccountLinking && accessToken && refreshToken) {
     const accessTokenExpiry = decodeToken(accessToken);
     const refreshTokenExpiry = decodeToken(refreshToken);
-    const clientTokenExpiry = decodeToken(clientToken);
+
 
     setCookie(ctx, 'authToken', accessToken, {
       maxAge: calculateExpiry(accessTokenExpiry.exp),
@@ -129,13 +129,8 @@ export const getServerSideProps = async (
       path: '/'
     });
 
-    setCookie(ctx, 'clientToken', clientToken, {
-      maxAge: calculateExpiry(clientTokenExpiry.exp),
-      path: '/'
-    });
-
     setCookie(ctx, 'show-email-verification-box', 'true', {
-      maxAge: calculateExpiry(clientTokenExpiry.exp),
+      maxAge: calculateExpiry(accessTokenExpiry.exp),
       path: '/'
     });
   }
