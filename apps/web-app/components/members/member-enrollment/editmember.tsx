@@ -42,18 +42,15 @@ import { requestPendingCheck } from '../../../utils/services/members';
 import { DiscardChangesPopup } from '../../../../../libs/ui/src/lib/modals/confirmation';
 import { getClientToken } from '../../../services/auth.service';
 import {
-  calculateExpiry,
-  createLogoutChannel,
-  decodeToken,
+  createLogoutChannel, decodeToken,
 } from '../../../utils/services/auth';
 import ChangeEmailModal from '../../auth/change-email-modal';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
-import { ReactComponent as SuccessIcon } from '../../../public/assets/images/icons/success.svg';
 import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
-import Error from 'next/error';
 import { ReactComponent as PrefernceIcon } from '../../../public/assets/images/icons/preferences.svg';
 import { PreferenceModal } from './preference-modal';
 import Privacy from '../../preference/privacy';
+import { getPreferences } from 'apps/web-app/services/member.service';
 interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -785,6 +782,11 @@ export function EditMemberModal({
 
   useEffect(() => {}, []);
 
+  const getMemberPreferences = async () => {
+    const memberPreferences = await getPreferences(userInfo.uid,JSON.parse(Cookies.get('authToken')));
+    setFormValues({ ...formValues, preferences: memberPreferences });
+  }
+
   return (
     <>
       {isProcessing && (
@@ -841,8 +843,9 @@ export function EditMemberModal({
                     SOCIAL{' '}
                   </button>
                 </div>
-                <div className='relative float-right text-[13px] leading-[20px] text-[#156FF7] font-medium cursor-pointer top-[-33px]' onClick={() => {
-                 setOpenPreferenceFlag(true);
+                <div className='relative float-right text-[13px] leading-[20px] text-[#156FF7] font-medium cursor-pointer top-[-33px]' onClick={async () => {
+                  await getMemberPreferences();
+                  setOpenPreferenceFlag(true);
                 }}>
                     {
                       !isUserProfile && (

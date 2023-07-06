@@ -6,6 +6,6 @@ export const updatePreference = async (uid,payload,token) => {
 }
 
 export const getPreferences = async (uid,token) => {
-    const result = await api.get(`${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/member/${uid}/preferences`, { headers: { Authorization: `Bearer ${token}` } });
+    const result = await api.get(`${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/members/${uid}/preferences`, { headers: { Authorization: `Bearer ${token}` } });
     return result.data;
 }

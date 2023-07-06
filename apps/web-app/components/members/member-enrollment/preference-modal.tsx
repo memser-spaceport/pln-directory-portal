@@ -1,7 +1,6 @@
 import { Transition, Dialog } from "@headlessui/react";
 import { XCircleIcon } from "@heroicons/react/solid";
 import { Fragment } from "react";
-import Privacy from "../../preference/privacy";
 import { SETTINGS_CONSTANTS } from "apps/web-app/constants";
 
 export function PreferenceModal({
