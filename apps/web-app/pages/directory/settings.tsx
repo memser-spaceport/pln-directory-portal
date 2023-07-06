@@ -309,6 +309,7 @@ export default function Settings({
                     isUserProfile={false}
                     setModified={setModifiedMember}
                     setRefreshMemberAutocomplete={setRefreshMemberAutocomplete}
+                    userInfo={userInfo}
                 />
             )
         } else if (settings === SETTINGS_CONSTANTS.PROFILE_SETTINGS) {
