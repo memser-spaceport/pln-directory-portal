@@ -211,7 +211,9 @@ export const MSG_CONSTANTS = {
   CHANGE_CONF_MSG: 'Do you want to discard the changes before you proceed ?',
   RESET_CHANGE_CONF_MSG: 'Do you want to reset the changes ?',
   NO_CHANGES_TO_RESET: 'No changes made to reset',
-  NO_CHANGES_TO_SAVE: 'No changes made to save.'
+  NO_CHANGES_TO_SAVE: 'No changes made to save.',
+  GIT_HANDLE_DISABLE_ALERT_DESC: 'By disabling this setting you will be unable to display your GIT projects to others. Do you wish to proceed ?',
+  GIT_HANDLE_DISABLE_ALERT_TITLE: 'GitHub - Privacy Settings'
 }
 
 export const BTN_LABEL_CONSTANTS = {

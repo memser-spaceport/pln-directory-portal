@@ -3,12 +3,14 @@ import { Transition, Dialog } from "@headlessui/react";
 import { Fragment } from "react";
 
 interface IDiscardChangesPopupProps {
+    title?: string
     text: string;
     isOpen: boolean;
     onCloseFn: (flag:boolean) => void;
 }
 
 export function DiscardChangesPopup({
+    title,
     text,
     isOpen,
     onCloseFn
@@ -52,7 +54,7 @@ export function DiscardChangesPopup({
                                         as="h2"
                                         className="text-xl font-bold leading-6"
                                     >
-                                        <p className="mt-4">Discard Changes</p>
+                                        <p className="mt-4"> { title ? title : "Discard Changes"}</p>
                                     </Dialog.Title>
                                     {
                                         (<>

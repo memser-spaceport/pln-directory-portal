@@ -24,6 +24,7 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
     const [isOpen, setIsOpen] = useState(false);
 
     const [isProcessing, setIsProcessing] = useState<boolean>(false);
+    const [showAlert, setShowAlert] = useState(false);
 
     const [memberPreference, setMemberPreference] = useState((memberPreferences) ? memberPreferences : { ...state.preferences });
     const switchEvent = (type,val) => {
@@ -31,10 +32,10 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
             ...memberPreference,
             [type]:val
         }
-        if (type === 'showGithubHandle' && !val) {
-            tempPreference.showGithubProjects = val;
-        } 
         setMemberPreference(tempPreference);
+        if (type === 'showGithubHandle' && !val) {
+            setShowAlert(true);
+        }
         dispatch({ type: 'SET_PRIVACY_MODIFIED', payload: true });
     }
 
@@ -237,6 +238,23 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
                     </button>
                 </>
             )}
+            <DiscardChangesPopup title={MSG_CONSTANTS.GIT_HANDLE_DISABLE_ALERT_TITLE} text={MSG_CONSTANTS.GIT_HANDLE_DISABLE_ALERT_DESC} isOpen={showAlert} onCloseFn={(flag)=> {
+                if (flag) { 
+                    setMemberPreference({
+                        ...memberPreference,
+                        showGithubHandle: false,
+                        showGithubProjects: false
+                    });
+                    
+                } else {
+                    setMemberPreference({
+                        ...memberPreference,
+                        showGithubHandle: true,
+                        showGithubProjects: true
+                    });
+                }
+                setShowAlert(false);
+            }} />
             
         </>
     );
