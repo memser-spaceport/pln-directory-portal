@@ -42,7 +42,7 @@ import { requestPendingCheck } from '../../../utils/services/members';
 import { DiscardChangesPopup } from '../../../../../libs/ui/src/lib/modals/confirmation';
 import { getClientToken } from '../../../services/auth.service';
 import {
-  createLogoutChannel,
+  createLogoutChannel, decodeToken,
 } from '../../../utils/services/auth';
 import ChangeEmailModal from '../../auth/change-email-modal';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
