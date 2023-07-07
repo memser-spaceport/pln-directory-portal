@@ -254,9 +254,15 @@ export class AuthController {
       const redirectURL = `${process.env.WEB_UI_BASE_URL}/${process.env.LOGIN_REDIRECT_URL}?source=direct`;
       const url = `${process.env.AUTH_API_URL}/auth?redirect_uri=${redirectURL}
         &state=${state}&scope=openid profile&client_id=${process.env.NEXT_PUBLIC_AUTH_APP_CLIENT_ID}`;
-      res.redirect(302, url);
+      return {
+        url,
+        statusCode: 302
+      }
     } catch(error) {
-      res.redirect(302, `${process.env.WEB_UI_BASE_URL}/internal-error`);
+      return { 
+        url: `${process.env.WEB_UI_BASE_URL}/internal-error`, 
+        statusCode: 302 
+      };
     }
   }
 }
