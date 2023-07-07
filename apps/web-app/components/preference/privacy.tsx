@@ -249,8 +249,8 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
                 } else {
                     setMemberPreference({
                         ...memberPreference,
-                        showGithubHandle: true,
-                        showGithubProjects: true
+                        showGithubHandle: state.preferences?.showGithubHandle,
+                        showGithubProjects: state.preferences?.showGithubProjects
                     });
                 }
                 setShowAlert(false);
