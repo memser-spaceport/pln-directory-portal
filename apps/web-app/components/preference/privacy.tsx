@@ -139,7 +139,7 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
                 setIsProcessing(false);
             }
         } else {
-            toast(MSG_CONSTANTS.NO_CHANGES_TO_RESET, {
+            toast(MSG_CONSTANTS.NO_CHANGES_TO_SAVE, {
                 type: 'info',
               });
         }
