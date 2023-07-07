@@ -1,11 +1,14 @@
 import {
   BadRequestException,
+  CACHE_MANAGER,
   ForbiddenException,
   HttpException,
+  Inject,
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Cache } from 'cache-manager';
 import { ParticipantType, Prisma } from '@prisma/client';
 import * as path from 'path';
 import { z } from 'zod';
@@ -26,6 +29,7 @@ export class MembersService {
     private locationTransferService: LocationTransferService,
     private participantsRequestService: ParticipantsRequestService,
     private fileMigrationService: FileMigrationService,
+    @Inject(CACHE_MANAGER) private cacheService: Cache,
     private logService: LogService
   ) {}
 
@@ -54,6 +58,15 @@ export class MembersService {
             },
           },
         },
+      },
+    });
+  }
+
+  findMemberFromEmail(email:string){
+    return this.prisma.member.findUniqueOrThrow({
+      where: { email },
+      include: {
+        memberRoles: true,
       },
     });
   }
@@ -268,5 +281,26 @@ export class MembersService {
       }
     }
     return result;
+  }
+
+  async updatePreference(id,preference){
+    const response = this.prisma.member.update(
+      {
+        where: {uid: id},
+        data: {preferences: preference}
+    }
+    );
+    this.cacheService.reset();
+    return response;
+  }
+
+  async getPreferences(uid) {
+    const response = await this.prisma.member.findUnique(
+      {
+        where: { uid: uid },
+        select: {preferences: true}
+      }
+    );
+    return response?.preferences;
   }
 }

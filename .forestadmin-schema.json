@@ -1284,6 +1284,22 @@
       {
         "defaultValue": null,
         "enums": null,
+        "field": "preferences",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": false,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "Json",
+        "validations": []
+      },
+      {
+        "defaultValue": null,
+        "enums": null,
         "field": "telegramHandler",
         "integration": null,
         "inverseOf": null,

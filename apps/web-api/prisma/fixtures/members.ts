@@ -51,6 +51,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
       updatedAt: faker.date.recent(),
       locationUid: '',
       openToWork: faker.datatype.boolean(),
+      preferences: {showEmail:true,showGithubHandle:true,showTelegram:true,showLinkedin:true,showDiscord:false,showGithubProjects:false,showTwitter:true}
     };
   }
 );

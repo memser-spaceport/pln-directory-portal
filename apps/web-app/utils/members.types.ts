@@ -1,4 +1,5 @@
 import { TMemberResponse } from '@protocol-labs-network/contracts';
+import { boolean } from 'zod';
 
 export interface IGitRepositories {
   name?: string;
@@ -28,6 +29,17 @@ export interface IMember {
   linkedinHandle: string | null;
   telegramHandle?: string | null;
   repositories: IGitRepositories[];
+  preferences: IPreferences | null;
+}
+
+interface IPreferences {
+  showEmail?: boolean;
+  showGithubHandle?: boolean;
+  showTelegram?: boolean;
+  showLinkedin?: boolean;
+  showDiscord?: boolean;
+  showGithubProjects?: boolean;
+  showTwitter?: boolean;
 }
 
 export interface IMemberTeam {
@@ -72,6 +84,7 @@ export interface IFormValues {
   teamAndRoles: Roles[];
   skills: Skill[];
   openToWork: boolean;
+  preferences?: IPreferences | null;
 }
 
 export interface MemberProfileProjectsProps {

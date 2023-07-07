@@ -1,5 +1,6 @@
 import {
   getMember,
+  getMemberPreferences,
   getMemberUIDByAirtableId,
 } from '@protocol-labs-network/members/data-access';
 import { getTeams } from '@protocol-labs-network/teams/data-access';
@@ -8,7 +9,7 @@ import Cookies from 'js-cookie';
 import { NextSeo } from 'next-seo';
 import { ReactElement, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { LOGGED_IN_MSG, SCHEDULE_MEETING_MSG } from '../../../constants';
+import { ADMIN_ROLE, LOGGED_IN_MSG, PRIVACY_CONSTANTS, SCHEDULE_MEETING_MSG  } from '../../../constants';
 import { TagsGroup } from '../../../components/shared/tags-group/tags-group';
 import { MemberProfileDetails } from '../../../components/members/member-profile/member-profile-details/member-profile-details';
 import { MemberProfileHeader } from '../../../components/members/member-profile/member-profile-header/member-profile-header';
@@ -119,6 +120,30 @@ Member.getLayout = function getLayout(page: ReactElement) {
   return <DirectoryLayout>{page}</DirectoryLayout>;
 };
 
+const hidePreferences = (preferences, member) => {
+  if (!preferences?.showEmail) {
+    delete member['email'];
+  }
+  if (!preferences?.showDiscord) {
+    delete member['discordHandle'];
+  }
+  if (!preferences?.showGithubHandle) {
+    delete member['githubHandle'];
+  }
+  if (!preferences?.showTelegram) {
+    delete member['telegramHandle'];
+  }
+  if (!preferences?.showLinkedin) {
+    delete member['linkedinHandle'];
+  }
+  if (!preferences?.showGithubProjects) {
+    delete member['repositories'];
+  }
+  if (!preferences?.showTwitter) {
+    delete member['twitter'];
+  }
+}
+
 export const getServerSideProps = async (ctx) => {
   const { query, res, req } = ctx;
 
@@ -178,6 +203,18 @@ export const getServerSideProps = async (ctx) => {
     };
   }
 
+  if (cookies?.authToken && (!userInfo?.roles?.includes(ADMIN_ROLE) || userInfo?.uid === member?.id)) {
+
+    let memberPreferences = member?.preferences;
+    let preferences;
+    if (!memberPreferences) {
+      preferences = JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS));
+    } else {
+      preferences = memberPreferences;
+    }
+    hidePreferences(preferences, member);
+  }
+
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
@@ -186,6 +223,9 @@ export const getServerSideProps = async (ctx) => {
     'no-cache, no-store, max-age=0, must-revalidate'
   );
 
+  if(member?.preferences){
+    delete member.preferences
+  }
   return {
     props: { member, teams, backLink, isUserLoggedIn, userInfo },
   };

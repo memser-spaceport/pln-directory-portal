@@ -28,80 +28,89 @@ export function MemberProfileDetails({
     linkedinHandle,
   } = member;
 
+  const checkifNoContactDetails = () => {
+    return !linkedinHandle && !twitter && !discordHandle && !telegramHandle && !email && !githubHandle;
+  }
+
   return (
     <>
-      <h3 className=" mt-6 font-medium text-slate-500">Contact Details</h3>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {userInfo.uid && (
+      {
+        !checkifNoContactDetails() && (
           <>
-            {/* Linked-In */}
-            {linkedinHandle && (
-              <SocialProfile
-                handle={linkedinHandle}
-                type="linkedin"
-                logo={linkedInLogo}
-                height={14}
-                width={14}
-              />
-            )}
+            <h3 className=" mt-6 font-medium text-slate-500">Contact Details</h3>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {userInfo.uid && (
+                <>
+                  {/* Linked-In */}
+                  {linkedinHandle && (
+                    <SocialProfile
+                      handle={linkedinHandle}
+                      type="linkedin"
+                      logo={linkedInLogo}
+                      height={14}
+                      width={14}
+                    />
+                  )}
 
-            {/* Twitter */}
-            {twitter && (
-              <SocialProfile
-                handle={twitter}
-                type="twitter"
-                logo={twitterLogo}
-                height={14}
-                width={14}
-              />
-            )}
+                  {/* Twitter */}
+                  {twitter && (
+                    <SocialProfile
+                      handle={twitter}
+                      type="twitter"
+                      logo={twitterLogo}
+                      height={14}
+                      width={14}
+                    />
+                  )}
 
-            {/* Discord */}
-            {discordHandle && (
-              <SocialProfile
-                handle={discordHandle}
-                type="discord"
-                logo={discordLogo}
-                height={14}
-                width={14}
-              />
-            )}
+                  {/* Discord */}
+                  {discordHandle && (
+                    <SocialProfile
+                      handle={discordHandle}
+                      type="discord"
+                      logo={discordLogo}
+                      height={14}
+                      width={14}
+                    />
+                  )}
 
-            {/* Telegram */}
-            {telegramHandle && (
-              <SocialProfile
-                handle={telegramHandle}
-                type="telegram"
-                logo={telegramLogo}
-                height={14}
-                width={14}
-              />
-            )}
+                  {/* Telegram */}
+                  {telegramHandle && (
+                    <SocialProfile
+                      handle={telegramHandle}
+                      type="telegram"
+                      logo={telegramLogo}
+                      height={14}
+                      width={14}
+                    />
+                  )}
+                  {/* Email */}
+                  {email && (
+                    <SocialProfile
+                      handle={email}
+                      type="email"
+                      logo={emailLogo}
+                      height={14}
+                      width={14}
+                    />
+                  )}
 
-            {/* Email */}
-            {email && (
-              <SocialProfile
-                handle={email}
-                type="email"
-                logo={emailLogo}
-                height={14}
-                width={14}
-              />
-            )}
-
-            {/* GitHub */}
-            {githubHandle && (
-              <SocialProfile
-                handle={githubHandle}
-                type="github"
-                logo={gitLogo}
-                height={14}
-                width={14}
-              />
-            )}
+                  {/* GitHub */}
+                  {githubHandle && (
+                    <SocialProfile
+                      handle={githubHandle}
+                      type="github"
+                      logo={gitLogo}
+                      height={14}
+                      width={14}
+                    />
+                  )}
+                </>
+              )}
+            </div>
           </>
-        )}
-      </div>
+        )
+      }
     </>
   );
 }

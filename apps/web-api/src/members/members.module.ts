@@ -12,6 +12,7 @@ import { RedisService } from '../utils/redis/redis.service';
 import { SlackService } from '../utils/slack/slack.service';
 import { MembersService } from './members.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
+import { AuthService } from '../auth/auth.service';
 
 @Module({
   providers: [
@@ -26,7 +27,7 @@ import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
     AwsService,
     RedisService,
     SlackService,
-    ForestAdminService,
+    ForestAdminService,AuthService
   ],
   controllers: [MemberController],
 })

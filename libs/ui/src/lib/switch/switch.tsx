@@ -6,9 +6,10 @@ export interface SwitchProps {
   initialValue?: boolean;
   customClassName?: string;
   onChange?: (enabled: boolean) => void;
+  nonEditable?: boolean
 }
 
-export function Switch({ label, initialValue = false, onChange, customClassName }: SwitchProps) {
+export function Switch({ label, initialValue = false, onChange, customClassName, nonEditable }: SwitchProps) {
   const [enabled, setEnabled] = useState(initialValue);
 
   useEffect(() => {
@@ -17,8 +18,10 @@ export function Switch({ label, initialValue = false, onChange, customClassName 
 
   const onSwitchChange = useCallback(
     (enabled: boolean) => {
-      setEnabled(enabled);
-      onChange?.(enabled);
+      if(!nonEditable){
+        setEnabled(enabled);
+        onChange?.(enabled);
+      }
     },
     [setEnabled, onChange]
   );
@@ -39,7 +42,7 @@ export function Switch({ label, initialValue = false, onChange, customClassName 
           onChange={onSwitchChange}
           className={`${
             enabled ? 'bg-blue-600' : 'bg-slate-300'
-          } on-focus h-4 w-7 shrink-0 items-center rounded-full transition`}
+            } on-focus h-4 w-7 shrink-0 items-center rounded-full transition ${nonEditable ? `pointer-events-none focus:ring-0 focus:outline-none ${enabled ? 'bg-[#93C5FD] ' : 'bg-slate-300'}` : 'pointer-events-auto'}`}
           data-testid="switch__button"
         >
           <div

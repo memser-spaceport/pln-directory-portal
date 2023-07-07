@@ -20,6 +20,8 @@ import {
   PAGE_ROUTES,
   FATHOM_EVENTS,
   APP_ANALYTICS_EVENTS,
+  SETTINGS_CONSTANTS,
+  PRIVACY_CONSTANTS,
 } from '../../../constants';
 import { RequestPending } from '../../shared/request-pending/request-pending';
 import { IFormValues } from '../../../utils/members.types';
@@ -40,15 +42,15 @@ import { requestPendingCheck } from '../../../utils/services/members';
 import { DiscardChangesPopup } from '../../../../../libs/ui/src/lib/modals/confirmation';
 import { getClientToken } from '../../../services/auth.service';
 import {
-  calculateExpiry,
-  createLogoutChannel,
-  decodeToken,
+  createLogoutChannel, decodeToken,
 } from '../../../utils/services/auth';
 import ChangeEmailModal from '../../auth/change-email-modal';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
-import { ReactComponent as SuccessIcon } from '../../../public/assets/images/icons/success.svg';
 import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
-import Error from 'next/error';
+import { ReactComponent as PrefernceIcon } from '../../../public/assets/images/icons/preferences.svg';
+import { PreferenceModal } from './preference-modal';
+import Privacy from '../../preference/privacy';
+import { getPreferences } from 'apps/web-app/services/member.service';
 interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -199,6 +201,7 @@ export function EditMemberModal({
   const [openValidationPopup, setOpenValidationPopup] =
     useState<boolean>(false);
   const [isEmailEditActive, setEmailEditStatus] = useState<boolean>(false);
+  const [openPreference, setOpenPreferenceFlag] = useState<boolean>(false);
   const [currentEmail, setCurrentEmail] = useState('');
   const [formValues, setFormValues] = useState<IFormValues>({
     name: '',
@@ -220,6 +223,7 @@ export function EditMemberModal({
     teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
     skills: [],
     openToWork: false,
+    preferences: JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))
   });
 
   const [isPendingRequestModalOpen, setIsPendingRequestModalOpen] =
@@ -375,6 +379,7 @@ export function EditMemberModal({
           skills: member?.skills?.map((item) => {
             return { value: item.uid, label: item.title };
           }),
+          preferences: member?.preferences ?? JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))
         };
         // set requestor email
         const userInfoFromCookie = Cookies.get('userInfo');
@@ -777,6 +782,11 @@ export function EditMemberModal({
 
   useEffect(() => {}, []);
 
+  const getMemberPreferences = async () => {
+    const memberPreferences = await getPreferences(id,JSON.parse(Cookies.get('authToken')));
+    setFormValues({ ...formValues, preferences: (memberPreferences ? memberPreferences : JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))) });
+  }
+
   return (
     <>
       {isProcessing && (
@@ -791,6 +801,7 @@ export function EditMemberModal({
           <div className="h-full w-full">
             <div className="mx-auto mb-40 h-full">
               {
+                <>
                 <div className="mt-3 flex h-10 w-full w-3/5  justify-start text-slate-400">
                   <button
                     className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
@@ -832,6 +843,23 @@ export function EditMemberModal({
                     SOCIAL{' '}
                   </button>
                 </div>
+                <div className='relative float-right text-[13px] leading-[20px] text-[#156FF7] font-medium cursor-pointer top-[-33px]' onClick={async () => {
+                  await getMemberPreferences();
+                  setOpenPreferenceFlag(true);
+                }}>
+                    {
+                      !isUserProfile && (
+                        <>
+                          <PrefernceIcon className='inline-block' />
+                          <span className='relative pl-[5px]'>{SETTINGS_CONSTANTS.VIEW_PREFERNCES}</span>
+                        </>
+                      )
+                    }
+              </div>
+                <PreferenceModal isOpen={openPreference} onCloseFn={setOpenPreferenceFlag}>
+                  <Privacy from={SETTINGS_CONSTANTS.VIEW_PREFERNCES} memberPreferences={formValues.preferences}/>
+                  </PreferenceModal>
+              </>
               }
               <div className="mt-3 w-full rounded-md border bg-white  px-6 py-10">
                 {

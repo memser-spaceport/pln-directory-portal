@@ -1,30 +1,23 @@
 import { Transition, Dialog } from "@headlessui/react";
-// import { XCircleIcon } from "@heroicons/react/solid";
+import { XCircleIcon } from "@heroicons/react/solid";
 import { Fragment } from "react";
+import { SETTINGS_CONSTANTS } from "apps/web-app/constants";
 
-interface IDiscardChangesPopupProps {
-    title?: string
-    text: string;
-    isOpen: boolean;
-    onCloseFn: (flag:boolean) => void;
-}
-
-export function DiscardChangesPopup({
-    title,
-    text,
+export function PreferenceModal({
     isOpen,
-    onCloseFn
-}:IDiscardChangesPopupProps) {
+    onCloseFn,
+    children
+}) {
 
-    const handleModalClose = (flag:boolean) => {
-        onCloseFn(flag);
-      };
+    const handleModalClose = () => {
+        onCloseFn(false);
+    };
     return (
         <>
             <Transition appear show={isOpen} as={Fragment}>
                 <Dialog
                     as="div"
-                    className="fixed relative inset-0 left-0 top-0 z-[1000] w-full grow overflow-x-hidden outline-none"
+                    className="fixed relative inset-0 left-0 top-0 z-[1058] w-full grow overflow-x-hidden outline-none"
                     onClose={() => onCloseFn}
                 >
                     <Transition.Child
@@ -54,30 +47,20 @@ export function DiscardChangesPopup({
                                         as="h2"
                                         className="text-xl font-bold leading-6"
                                     >
-                                        <p className="mt-4"> { title ? title : "Discard Changes"}</p>
+                                        <p className="mt-4">{SETTINGS_CONSTANTS.USER_PREF}</p>
                                     </Dialog.Title>
                                     {
                                         (<>
-                                            <p className="mt-[20px] mb-[20px]">
-                                               {text}
-                                            </p>
-
-                                            <div>
-                                                <button className={'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus float-right inline-flex w-[150px] justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]'}
-
-                                                    onClick={() => { handleModalClose(true) }}
-                                                >
-                                                    YES
-                                                </button>
-
-                                                <button className={'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-[150px] justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]'}
-                                                    onClick={() => { handleModalClose(false) }}
-                                                >
-                                                    NO
-                                                </button>
-                                            </div>
+                                            {children}
                                         </>)
                                     }
+                                    <XCircleIcon
+                                        onClick={handleModalClose}
+                                        data-testid={'close-icon'}
+                                        className={
+                                            'absolute -top-4 -right-4 h-8 w-8 text-slate-600 cursor-pointer'
+                                        }
+                                    />
                                 </Dialog.Panel>
                             </Transition.Child>
                         </div>

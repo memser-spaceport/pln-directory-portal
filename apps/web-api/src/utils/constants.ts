@@ -60,3 +60,5 @@ export const THUMBNAIL_SIZES = {
 export const FILE_UPLOAD_SIZE_LIMIT = 1000000; // 1MB in bytes
 
 export const IMAGE_UPLOAD_MAX_DIMENSION = 2000;
+
+export const DIRECTORYADMIN = 'DIRECTORYADMIN';

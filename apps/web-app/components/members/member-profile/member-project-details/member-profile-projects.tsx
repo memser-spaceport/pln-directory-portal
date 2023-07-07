@@ -56,19 +56,22 @@ export function MemberProfileProjects({
 
   return (
     <>
-      <h3 className="mb-2 mt-6 font-medium text-slate-500">
-        {'Projects'} {repositories?.length > 0 && `(${repositories?.length})`}
-        {repositories?.length > 3 && (
-          <button
-            onClick={() => onGithubProject()}
-            className="float-right cursor-pointer text-blue-500 pt-0.5 pr-8"
-          >
-            See all
-          </button>
-        )}
-      </h3>
-
-      {repositories.length > 0 ? (
+      {
+        repositories && (
+          <h3 className="mb-2 mt-6 font-medium text-slate-500">
+            {'Projects'} {repositories?.length > 0 && `(${repositories?.length})`}
+            {repositories?.length > 3 && (
+              <button
+                onClick={() => onGithubProject()}
+                className="float-right cursor-pointer text-blue-500 pt-0.5 pr-8"
+              >
+                See all
+              </button>
+            )}
+          </h3>
+        )
+      }
+      {repositories && (repositories.length > 0 ? (
         <div className="max-h-96 overflow-y-auto rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)] focus-within:outline-none focus:outline-none focus-visible:outline-none">
           {displayRepos.map((project, i) => {
             return (
@@ -86,7 +89,7 @@ export function MemberProfileProjects({
         </div>
       ) : (
         <MemberEmptyProject profileType="member" userInfo={userInfo} member={member} />
-      )}
+      ))}
 
       {/* <div className="flex pt-2">
         <div>
