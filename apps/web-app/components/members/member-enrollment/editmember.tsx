@@ -783,7 +783,7 @@ export function EditMemberModal({
   useEffect(() => {}, []);
 
   const getMemberPreferences = async () => {
-    const memberPreferences = await getPreferences(userInfo.uid,JSON.parse(Cookies.get('authToken')));
+    const memberPreferences = await getPreferences(id,JSON.parse(Cookies.get('authToken')));
     setFormValues({ ...formValues, preferences: memberPreferences });
   }
 
