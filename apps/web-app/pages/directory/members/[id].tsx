@@ -203,7 +203,7 @@ export const getServerSideProps = async (ctx) => {
     };
   }
 
-  if (cookies?.authToken && !userInfo?.roles?.includes(ADMIN_ROLE)) {
+  if (cookies?.authToken && (!userInfo?.roles?.includes(ADMIN_ROLE) || userInfo?.uid === member?.id)) {
 
     let memberPreferences = member?.preferences;
     let preferences;
