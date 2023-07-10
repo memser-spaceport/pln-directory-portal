@@ -65,7 +65,7 @@ export const authenticate = async (currentURL) => {
 export const getAccessToken = async (code) => {
   try {
     // code denotes auth code for oauth.
-    const response = await api.post(`/v1/auth/token`, { code });
+    const response = await api.post(`/v1/auth/token`, { code, grantType: 'authorization_code' });
     if (response) {
       return {
         status: 201,

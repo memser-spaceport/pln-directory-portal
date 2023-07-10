@@ -139,13 +139,13 @@ function getCsrfTokenFromResponseCookie(cookieHeader) {
 export function renewAccessToken(refreshToken) {
   // Make an API call to your server to get a new access token using refreshToken
   return fetch(
-      `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/auth/token/refresh`,
+      `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/auth/token`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ token : refreshToken }),
+        body: JSON.stringify({ refreshToken, grantType: 'refresh_token' }),
       }
     )
     .then((response) => {

@@ -73,6 +73,12 @@ export class ParticipantsRequestService {
     return results;
   }
 
+  async addAutoApprovalEntry(tx, newEntry) {
+    await tx.participantsRequest.create({
+        data: {...newEntry}
+    })
+  }
+
   async getByUid(uid) {
     const result = await this.prisma.participantsRequest.findUnique({
       where: { uid: uid },
