@@ -28,6 +28,7 @@ import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { SharedModule } from './shared/shared.module';
 import { LogException } from './filters/log-exception.filter';
+import { OtpModule } from './otp/otp.module';
 
 @Module({
   controllers: [AppController],
@@ -72,6 +73,7 @@ import { LogException } from './filters/log-exception.filter';
     AdminModule,
     AuthModule,
     SharedModule,
+    OtpModule
   ],
   providers: [
     {

@@ -40,9 +40,10 @@ import { toast } from 'react-toastify';
 import orderBy from 'lodash/orderBy';
 import { requestPendingCheck } from '../../../utils/services/members';
 import { DiscardChangesPopup } from '../../../../../libs/ui/src/lib/modals/confirmation';
-import { getClientToken } from '../../../services/auth.service';
 import {
-  createLogoutChannel, decodeToken,
+  calculateExpiry,
+  createLogoutChannel,
+  decodeToken,
 } from '../../../utils/services/auth';
 import ChangeEmailModal from '../../auth/change-email-modal';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
@@ -281,25 +282,8 @@ export function EditMemberModal({
       if (!authToken) {
         logoutAndRedirect(PAGE_ROUTES.MEMBERS)
       }
-      const formattedJson = JSON.parse(authToken);
-      getClientToken(formattedJson)
-        .then((d) => {
-          const clientTokenExpiry = decodeToken(d);
-          Cookies.set('clientAccessToken', d, {
-            expires: new Date(clientTokenExpiry.exp * 1000),
-          });
-          setEmailEditStatus(true);
-        })
-        .catch((e) => {
-          console.error(e);
-          if(e?.response?.status === 401) {
-            logoutAndRedirect(PAGE_ROUTES.MEMBERS)
-          } else {
-            toast.info("Something went wrong. Please try again later.", {
-              hideProgressBar: true
-            });
-          }
-        });
+
+      setEmailEditStatus(true);
 
     } else {
       analytics.captureEvent(
