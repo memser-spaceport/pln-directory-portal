@@ -56,7 +56,7 @@ export const apiMembers = contract.router({
   },
   sendOtpForEmailChange: {
     method: 'POST',
-    path: `${getAPIVersionAsPath('1')}/member/:uid/email/otp`,
+    path: `${getAPIVersionAsPath('1')}/members/:uid/email/otp`,
     body: contract.body<unknown>(),
     responses: {
       200: contract.response<unknown>(),
@@ -65,7 +65,7 @@ export const apiMembers = contract.router({
   },
   updateMemberEmail: {
     method: 'PATCH',
-    path: `${getAPIVersionAsPath('1')}/member/:uid/email`,
+    path: `${getAPIVersionAsPath('1')}/members/:uid/email`,
     body: contract.body<unknown>(),
     responses: {
       200: contract.response<unknown>(),
