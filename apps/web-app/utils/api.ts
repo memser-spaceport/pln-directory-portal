@@ -5,7 +5,7 @@ import { setCookie } from 'nookies';
 import { decodeToken, calculateExpiry } from '../utils/services/auth';
 import { toast } from 'react-toastify';
 import { createLogoutChannel } from '../utils/services/auth';
-import { PAGE_ROUTES , FORBIDDEN_ERR_MSG, BAD_REQUEST_ERR_MSG, NETWORK_ERR_MSG, SOMETHING_WENT_WRONG } from '../constants';
+import { PAGE_ROUTES , FORBIDDEN_ERR_MSG, BAD_REQUEST_ERR_MSG, NETWORK_ERR_MSG, SOMETHING_WENT_WRONG, RETRY_LOGIN_MSG } from '../constants';
 
 // Ignore auth to urls
 const authIgnoreURLS = ["/v1/auth/token", "/v1/participants-request/unique-identifier"];
@@ -96,8 +96,10 @@ api.interceptors.response.use(
         Cookies.remove('authToken');
         Cookies.remove('refreshToken');
         Cookies.remove('userInfo');
+        toast.info(RETRY_LOGIN_MSG, {
+          hideProgressBar: true
+        });
         createLogoutChannel().postMessage('logout');
-        Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
         window.location.href = PAGE_ROUTES.TEAMS;
       } else if (response.status === 403) {
         msg = response?.data?.message ? response?.data?.message : FORBIDDEN_ERR_MSG;
