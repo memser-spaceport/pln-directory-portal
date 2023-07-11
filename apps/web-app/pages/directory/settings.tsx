@@ -225,7 +225,7 @@ export default function Settings({
         try {
             const response = await api.get(`/v1/members?name__istartswith=${searchTerm}&select=uid,name,image&orderBy=name,asc`);
             if (response.data) {
-                return response.data.map((item) => {
+                return response.data.filter(item=>item?.uid !== userInfo?.uid).map((item) => {
                     return { value: item.uid, label: item.name, logo: item?.image?.url ? item.image.url : null };
                 });
             }
@@ -506,8 +506,8 @@ export const getServerSideProps = async (ctx) => {
             teamSelected = ({
                 "label": query.name,
                 "value": query.id,
-                "logo": query.logo ?? null,
-                "icon": query.logo ?? null
+                "logo": query.logo ? query.logo : null,
+                "icon": query.logo ? query.logo : null
             })
         } else if (query.from === SETTINGS_CONSTANTS.MEMBER) {
             if (query.id === userInfo.uid) {
