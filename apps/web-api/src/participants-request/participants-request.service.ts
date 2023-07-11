@@ -549,7 +549,8 @@ export class ParticipantsRequestService {
         [oldEmail, newEmail], 
         { 
           oldEmail,
-          newEmail
+          newEmail,
+          memberName: dataToProcess.name
         }
       );
     }
