@@ -6,6 +6,7 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Cache } from 'cache-manager';
@@ -24,6 +25,7 @@ import { EmailOtpService } from '../otp/email-otp.service';
 import { AuthService } from '../auth/auth.service';
 @Injectable()
 export class MembersService {
+  private readonly logger = new Logger();
   constructor(
     private prisma: PrismaService,
     private locationTransferService: LocationTransferService,
@@ -266,56 +268,77 @@ export class MembersService {
     }
   }
 
-  async getRepositories(githubHandle) {
-    let repositories = [];
-    repositories = await axios
-      .post(
-        'https://api.github.com/graphql',
-        {
-          query: `{
-          user(login: "${githubHandle}") {
-            pinnedItems(first: 10, types: REPOSITORY) {
-              nodes {
-                ... on RepositoryInfo {
-                  name
-                  description
-                  url
-                  createdAt
-                  updatedAt
+  async getGitProjects(uid) {
+    const member = await this.prisma.member.findUnique(
+      {
+        where: { uid: uid },
+        select: { githubHandler: true }
+      }
+    );
+    if (!member || !member.githubHandler) {
+      return [];
+    }
+    try {
+      const resp = await axios
+        .post(
+          'https://api.github.com/graphql',
+          {
+            query: `{
+              user(login: "${member?.githubHandler}") {
+                repositories(first: 50, orderBy: { field: PUSHED_AT, direction: DESC }, privacy: PUBLIC) {
+                  nodes {
+                    ... on Repository {
+                      name
+                      description
+                      url
+                      createdAt
+                      updatedAt
+                      pushedAt
+                    }
+                  }
+                },
+                pinnedItems(first: 6, types: REPOSITORY) {
+                  nodes {
+                    ... on RepositoryInfo {
+                      name
+                      description
+                      url
+                      createdAt
+                      updatedAt
+                    }
+                  }
                 }
               }
-            }
-          }
-        }`,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.GITHUB_API_KEY}`,
-            'Content-Type': 'application/json',
+            }`,
           },
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.GITHUB_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+      if (resp?.data?.data?.user) {
+        const { repositories, pinnedItems } = resp.data.data.user;
+        if (pinnedItems?.nodes?.length > 0) {
+          // Create a Set of pinned repository names for efficient lookup
+          const pinnedRepositoryNames = new Set(pinnedItems.nodes.map((repo) => repo.name));
+          // Filter out the pinned repositories from the list of all repositories
+          const filteredRepositories = repositories?.nodes.filter((repo) => !pinnedRepositoryNames.has(repo.name));
+          return [...pinnedItems.nodes, ...filteredRepositories].slice(0, 50);
+        } else {
+          return repositories?.nodes || [];
         }
-      )
-      .then((v) => v.data.data.user?.pinnedItems?.nodes)
-      .catch((e) => console.log(e));
-
-    if (!repositories?.length) {
-      repositories = await axios
-        .get(`https://api.github.com/users/${githubHandle}/repos`)
-        .then((v) => {
-          const repoArray = v.data.map((item) => {
-            return {
-              name: item.name,
-              description: item.description,
-              url: item.html_url,
-              createdAt: item.created_at,
-              updatedAt: item.updated_at,
-            };
-          });
-          return repoArray;
-        })
-        .catch((e) => console.log(e.message));
+      }
     }
-    return repositories;
+    catch(err) {
+      this.logger.error('Error occured while fetching the git projects.', err);
+      return {
+        statusCode: 500,
+        message: 'Internal Server Error.'
+      };
+    }
+    return [];
   }
 
   async editMemberParticipantsRequest(participantsRequest, userEmail) {

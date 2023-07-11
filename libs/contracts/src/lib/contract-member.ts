@@ -71,5 +71,13 @@ export const apiMembers = contract.router({
       200: contract.response<unknown>(),
     },
     summary: 'Request for email change',
-  }
+  },
+  getMemberGitHubProjects: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/git-projects`,
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Get member Projects',
+  },
 });
