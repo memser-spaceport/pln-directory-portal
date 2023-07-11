@@ -16,7 +16,7 @@ export class UserAuthTokenValidation implements CanActivate {
       const request = context.switchToHttp().getRequest();
       const token = this.extractTokenFromHeader(request);
       if (!token) {
-        throw new UnauthorizedException('Invalid Token');
+        throw new UnauthorizedException('Invalid Session. Please login and try again');
       }
       const validationResult: any = await axios.post(
         `${process.env.AUTH_API_URL}/auth/introspect`,
@@ -32,7 +32,7 @@ export class UserAuthTokenValidation implements CanActivate {
         error?.response?.status === 400 ||
         error?.response?.status === 401
       ) {
-        throw new UnauthorizedException('Invalid Token');
+        throw new UnauthorizedException('Invalid Session. Please login and try again');
       }
       throw new InternalServerErrorException();
     }

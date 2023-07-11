@@ -123,7 +123,7 @@ export class AuthService implements OnModuleInit {
   checkIfTokenAttached = (request) => {
     const token = this.extractTokenFromHeader(request);
     if (!token) {
-      throw new UnauthorizedException('Invalid Token');
+      throw new UnauthorizedException('Invalid Session. Please login and try again');
     }else{
       return token;
     }
