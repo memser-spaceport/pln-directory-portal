@@ -28,7 +28,7 @@ export class UserAccessTokenValidateGuard implements CanActivate {
         { token: token }
       );
       if (!validationResult?.data?.active) {
-        throw new UnauthorizedException('Invalid Token');
+        throw new UnauthorizedException('Invalid Session. Please login and try again');
       }
 
       // If user email is available in token set it in request. No Validation error if no email.

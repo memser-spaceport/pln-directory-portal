@@ -20,10 +20,10 @@ export function ConfirmInputField({
 
   const onInputChanges = () => {
     // Check if old and new values match. if yes.. show error
-    const isDuplicateValues = ((currentEmail?.trim() === inputOneRef.current.value.trim()) || (currentEmail?.trim() === inputTwoRef.current.value.trim()))
+    const isDuplicateValues = ((currentEmail?.toLowerCase().trim() === inputOneRef.current.value.toLowerCase().trim()) || (currentEmail?.trim() === inputTwoRef.current.value.trim()))
     setIsDuplicate(isDuplicateValues);
 
-    if(inputOneRef.current.value.trim() === '' || inputTwoRef.current.value.trim() === '') {
+    if(inputOneRef.current.value.toLowerCase().trim() === '' || inputTwoRef.current.value.toLowerCase().trim() === '') {
       if (props?.onChange) {
         props?.onChange({
           target: {

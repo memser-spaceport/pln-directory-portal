@@ -48,7 +48,7 @@ export class AuthGuard implements CanActivate {
         error?.response?.status === 400 ||
         error?.response?.status === 401
       ) {
-        throw new UnauthorizedException('Invalid Token');
+        throw new UnauthorizedException('Invalid Session. Please login and try again');
       }else if(error instanceof ForbiddenException){
         throw new ForbiddenException('Forbidden. Email doesn`t match');
       }

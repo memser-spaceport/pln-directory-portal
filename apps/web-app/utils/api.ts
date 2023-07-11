@@ -10,6 +10,14 @@ import { PAGE_ROUTES , FORBIDDEN_ERR_MSG, BAD_REQUEST_ERR_MSG, NETWORK_ERR_MSG, 
 // Ignore auth to urls
 const authIgnoreURLS = ["/v1/auth/token", "/v1/participants-request/unique-identifier"];
 
+const isUrlToIgnoreToaster = (baseUrl, fullUrl) => {
+  const urlPath = fullUrl.replace(new RegExp(`^${baseUrl}`), "");
+  const staticUrlsToIgnoreForToaster = [`/v1/auth/otp`, `/v1/auth/otp/verify`];
+  const dynamicUrlRegexToIgnoreForToaster = /^\/v1\/members\/([a-zA-Z0-9]+)\/email(?:\/otp)?$/;
+  console.log(urlPath, fullUrl, baseUrl, staticUrlsToIgnoreForToaster.includes(urlPath), dynamicUrlRegexToIgnoreForToaster.test(urlPath))
+  return staticUrlsToIgnoreForToaster.includes(urlPath) || dynamicUrlRegexToIgnoreForToaster.test(urlPath)
+}
+
 // Create an Axios instance with default configuration
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_WEB_API_BASE_URL,
@@ -67,7 +75,7 @@ api.interceptors.request.use(async (config) => {
               /"/g,
               ''
             );
-          } 
+          }
           return config;
         }).catch((error) => {
           throw error;
@@ -75,7 +83,6 @@ api.interceptors.request.use(async (config) => {
     }
     return config;
   } catch (error) {
-    console.log('Request Interceptor Error Info', error);
     toast.info(SOMETHING_WENT_WRONG, {
       hideProgressBar: true
     });
@@ -107,14 +114,16 @@ api.interceptors.response.use(
         msg = response?.data?.message ? response?.data?.message : BAD_REQUEST_ERR_MSG;
       } else if (response.status === 404) {
         msg = NETWORK_ERR_MSG;
-      } 
+      }
     } else if (error.request) {
       msg = SOMETHING_WENT_WRONG;
     }
-    if (response?.status != 401) { 
-      toast.error(msg, {
-        hideProgressBar: true
-      });
+    if (response?.status != 401) {
+      if(!isUrlToIgnoreToaster(response.config.baseURL, response.config.url)) {
+        toast.error(msg, {
+          hideProgressBar: true
+        });
+      }
     }
     return Promise.reject(error);
   }

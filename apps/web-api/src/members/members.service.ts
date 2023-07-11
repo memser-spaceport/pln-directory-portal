@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import {
   BadRequestException,
   CACHE_MANAGER,
@@ -392,7 +393,7 @@ export class MembersService {
             result.uid,
             true, // disable the notification
             true, // enable the auto approval
-            requestorDetails.isDirectoryAdmin, 
+            requestorDetails.isDirectoryAdmin,
             tx
           );
         } else {
