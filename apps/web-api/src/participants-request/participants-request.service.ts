@@ -21,7 +21,7 @@ import { LocationTransferService } from '../utils/location-transfer/location-tra
 import { RedisService } from '../utils/redis/redis.service';
 import { SlackService } from '../utils/slack/slack.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
-import { getRandomId } from '../utils/helper/helper';
+import { getRandomId, generateProfileURL } from '../utils/helper/helper';
 import axios from 'axios';
 import { LogService } from '../shared/log.service';
 import { Cache } from 'cache-manager';
@@ -550,7 +550,9 @@ export class ParticipantsRequestService {
         { 
           oldEmail,
           newEmail,
-          memberName: dataToProcess.name
+          memberName: dataToProcess.name,
+          profileURL: this.generateMemberProfileURL(existingData.uid),
+          loginURL: process.env.LOGIN_URL
         }
       );
     }
@@ -923,5 +925,9 @@ export class ParticipantsRequestService {
     await this.cacheService.reset()
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
+  }
+
+  generateMemberProfileURL(value) {
+    return generateProfileURL(value);
   }
 }

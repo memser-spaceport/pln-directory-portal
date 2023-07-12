@@ -8,3 +8,11 @@ export const generateOAuth2State = () => {
   return Math.random().toString(36).substring(2, 15) +
     Math.random().toString(36).substring(2, 15);
 };
+
+export const generateProfileURL = (value, type='uid') => {
+  let profileURL;
+  if (type === 'uid') {
+    profileURL = `${process.env.WEB_UI_BASE_URL}/members/${value}`
+  }
+  return profileURL;
+}
