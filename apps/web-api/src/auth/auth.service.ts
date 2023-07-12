@@ -109,7 +109,7 @@ export class AuthService implements OnModuleInit {
     const clientToken = await this.getAuthClientToken();
     let linkResult;
     try {
-      linkResult = await this.getAuthApi().patch(`/admin/accounts/email`, { email: newEmail, existingEmail: oldEmail, userId: externalId, deleteAndReplace: true }, {
+      linkResult = await this.getAuthApi().patch(`/admin/accounts/email`, { email: newEmail.toLowerCase().trim(), existingEmail: oldEmail.toLowerCase().trim(), userId: externalId, deleteAndReplace: true }, {
         headers: {
           Authorization: `Bearer ${clientToken}`
         }
@@ -171,7 +171,7 @@ export class AuthService implements OnModuleInit {
     const clientToken = await this.getAuthClientToken();
     let linkResult;
     try {
-      linkResult = await this.getAuthApi().put(`/admin/accounts`, { token: userIdToken, email }, {
+      linkResult = await this.getAuthApi().put(`/admin/accounts`, { token: userIdToken, email: email.toLowerCase().trim() }, {
         headers: {
           Authorization: `Bearer ${clientToken}`
         }
