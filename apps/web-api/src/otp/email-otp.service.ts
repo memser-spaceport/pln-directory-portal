@@ -17,7 +17,7 @@ export class EmailOtpService {
 
     async sendEmailOtp(email) {
         const clientToken = await this.getAuthClientToken();
-        const payload = { recipientAddress: email, notificationType: 'EMAIL', }
+        const payload = { recipientAddress: email.toLowerCase().trim(), notificationType: 'EMAIL', }
         const header = { headers: { Authorization: `Bearer ${clientToken}` } }
         let otpResult;
         try {

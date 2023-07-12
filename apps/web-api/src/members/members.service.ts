@@ -69,7 +69,7 @@ export class MembersService {
 
   async findMemberByEmail(emailId) {
     return await this.prisma.member.findUnique({
-      where: { email: emailId },
+      where: { email: emailId.toLowerCase().trim() },
       include: {
         image: true,
         memberRoles: true,
@@ -132,7 +132,7 @@ export class MembersService {
       })
 
       newMemberInfo = await tx.member.update({
-          where: {email: oldEmail},
+          where: {email: oldEmail.toLowerCase().trim()},
           data: {email: recipient},
           include: {
             memberRoles: true,
@@ -155,7 +155,7 @@ export class MembersService {
 
   async isMemberExistForEmailId(emailId) {
     const member = await this.prisma.member.findUnique({
-      where: { email: emailId },
+      where: { email: emailId.toLowerCase().trim() },
     });
 
     return member ? true : false;
@@ -176,7 +176,7 @@ export class MembersService {
 
   async updateExternalIdByEmail(emailId, externalId) {
    return await this.prisma.member.update({
-      where: { email: emailId },
+      where: { email: emailId.toLowerCase().trim() },
       data: { externalId: externalId },
     });
   }
@@ -417,7 +417,7 @@ export class MembersService {
 
   findMemberFromEmail(email:string){
     return this.prisma.member.findUniqueOrThrow({
-      where: { email },
+      where: { email: email.toLowerCase().trim() },
       include: {
         memberRoles: true,
       },
