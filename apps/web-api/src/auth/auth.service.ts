@@ -15,12 +15,14 @@ import { Cache } from 'cache-manager';
 import { MembersService } from '../members/members.service';
 import { EmailOtpService } from '../otp/email-otp.service';
 import { ModuleRef } from '@nestjs/core';
+import { LogService } from '../shared/log.service';
 @Injectable()
 export class AuthService implements OnModuleInit {
   private membersService: MembersService;
   constructor(
     private moduleRef: ModuleRef,
     private emailOtpService: EmailOtpService,
+    private logger: LogService,
     @Inject(CACHE_MANAGER) private cacheService: Cache) { }
 
     onModuleInit() {
@@ -36,6 +38,7 @@ export class AuthService implements OnModuleInit {
 
     // If no email available, then account has to be linked first.
     if(!email) {
+      this.logger.info(`Initiated account linking for ${externalId}>`)
       return { accessToken: access_token, refreshToken: refresh_token, idToken: id_token, isAccountLinking: true,}
     }
 
@@ -49,6 +52,7 @@ export class AuthService implements OnModuleInit {
     foundUser = await this.membersService.findMemberByEmail(email)
     if (foundUser) {
       await this.membersService.updateExternalIdByEmail(email, externalId);
+      this.logger.info(`Updated externalId - ${externalId} for emailId - ${email}`)
       return { userInfo: this.memberToUserInfo(foundUser), refreshToken: refresh_token, idToken: id_token, accessToken: access_token }
     }
 
