@@ -289,18 +289,6 @@ export class MembersService {
           {
             query: `{
               user(login: "${member?.githubHandler}") {
-                repositories(first: 50, orderBy: { field: PUSHED_AT, direction: DESC }, privacy: PUBLIC) {
-                  nodes {
-                    ... on Repository {
-                      name
-                      description
-                      url
-                      createdAt
-                      updatedAt
-                      pushedAt
-                    }
-                  }
-                },
                 pinnedItems(first: 6, types: REPOSITORY) {
                   nodes {
                     ... on RepositoryInfo {
@@ -322,16 +310,27 @@ export class MembersService {
             },
           }
         );
+      const response = await axios
+        .get(`https://api.github.com/users/${member.githubHandler}/repos?sort=pushed&per_page=50`);
+      const repositories = response?.data.map((item) => {
+        return {
+          name: item.name,
+          description: item.description,
+          url: item.html_url,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+        };
+      });
       if (resp?.data?.data?.user) {
-        const { repositories, pinnedItems } = resp.data.data.user;
+        const { pinnedItems } = resp.data.data.user;
         if (pinnedItems?.nodes?.length > 0) {
           // Create a Set of pinned repository names for efficient lookup
           const pinnedRepositoryNames = new Set(pinnedItems.nodes.map((repo) => repo.name));
           // Filter out the pinned repositories from the list of all repositories
-          const filteredRepositories = repositories?.nodes.filter((repo) => !pinnedRepositoryNames.has(repo.name));
+          const filteredRepositories = repositories?.filter((repo) => !pinnedRepositoryNames.has(repo.name));
           return [...pinnedItems.nodes, ...filteredRepositories].slice(0, 50);
         } else {
-          return repositories?.nodes || [];
+          return repositories || [];
         }
       }
     }
