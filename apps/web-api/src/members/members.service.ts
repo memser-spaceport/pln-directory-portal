@@ -24,9 +24,9 @@ import { ParticipantRequestMemberSchema } from 'libs/contracts/src/schema/partic
 import axios from 'axios';
 import { EmailOtpService } from '../otp/email-otp.service';
 import { AuthService } from '../auth/auth.service';
+import { LogService } from '../shared/log.service';
 @Injectable()
 export class MembersService {
-  private readonly logger = new Logger();
   constructor(
     private prisma: PrismaService,
     private locationTransferService: LocationTransferService,
@@ -34,6 +34,7 @@ export class MembersService {
     private fileMigrationService: FileMigrationService,
     private emailOtpService: EmailOtpService,
     private authService: AuthService,
+    private logger: LogService,
     @Inject(CACHE_MANAGER) private cacheService: Cache
 
   ) {}
@@ -143,6 +144,8 @@ export class MembersService {
       newTokens = await this.authService.updateEmailInAuth(recipient, oldEmail, memberInfo.externalId)
     })
 
+    // Log Info
+    this.logger.info(`Email has been successfully updated from ${oldEmail} to ${recipient}`)
     await this.cacheService.reset();
     return {
       refreshToken: newTokens.refresh_token,
