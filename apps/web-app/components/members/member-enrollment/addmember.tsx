@@ -322,7 +322,7 @@ export function AddMemberModal({
 
   function onEmailBlur(event: ChangeEvent<HTMLInputElement>) {
     const data = {
-      uniqueIdentifier: event.target.value?.trim(),
+      uniqueIdentifier: event.target.value?.toLowerCase().trim(),
       participantType: ENROLLMENT_TYPE.MEMBER,
     };
     api

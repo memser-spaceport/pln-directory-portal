@@ -144,7 +144,7 @@ export default function MemberView(props) {
 
   function onEmailBlur(event: ChangeEvent<HTMLInputElement>) {
     const data = {
-      uniqueIdentifier: event.target.value?.trim(),
+      uniqueIdentifier: event.target.value?.toLowerCase().trim(),
       participantType: ENROLLMENT_TYPE.MEMBER,
       uid: props.referenceUid,
       requestId: props.id,
