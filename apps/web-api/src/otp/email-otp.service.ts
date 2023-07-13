@@ -10,14 +10,18 @@ import {
 } from '@nestjs/common';
 import axios from 'axios';
 import { Cache } from 'cache-manager';
+import { LogService } from '../shared/log.service';
 
 @Injectable()
 export class EmailOtpService {
-    constructor(@Inject(CACHE_MANAGER) private cacheService: Cache) { }
+    constructor(
+        @Inject(CACHE_MANAGER) private cacheService: Cache,
+        private logger: LogService
+        ) { }
 
     async sendEmailOtp(email) {
         const clientToken = await this.getAuthClientToken();
-        const payload = { recipientAddress: email, notificationType: 'EMAIL', }
+        const payload = { recipientAddress: email.toLowerCase().trim(), notificationType: 'EMAIL', }
         const header = { headers: { Authorization: `Bearer ${clientToken}` } }
         let otpResult;
         try {
@@ -25,6 +29,7 @@ export class EmailOtpService {
         } catch (error) {
             this.handleAuthErrors(error)
         }
+        this.logger.info(`Successfully sent email otp for emailid - ${email}`)
         return otpResult.data;
     }
 
@@ -38,6 +43,8 @@ export class EmailOtpService {
         } catch (error) {
             this.handleAuthErrors(error)
         }
+
+        this.logger.info(`Successfully resent email otp for otptoken - ${otpToken}`)
         return sendOtpResult.data;
     }
 
@@ -51,6 +58,8 @@ export class EmailOtpService {
         } catch (error) {
             this.handleAuthErrors(error)
         }
+
+        this.logger.info(`Successfully validated email otp for otptoken - ${otpToken}`)
         return verifyOtpResult?.data
     }
 
@@ -68,12 +77,17 @@ export class EmailOtpService {
     }
 
     private async getClientToken() {
-        const response = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
-            "client_id": process.env.AUTH_APP_CLIENT_ID,
-            "client_secret": process.env.AUTH_APP_CLIENT_SECRET,
-            "grant_type": "client_credentials",
-            "grantTypes": ["client_credentials", "authorization_code", "refresh_token"]
-        })
+        let response;
+        try {
+            response = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
+                "client_id": process.env.AUTH_APP_CLIENT_ID,
+                "client_secret": process.env.AUTH_APP_CLIENT_SECRET,
+                "grant_type": "client_credentials",
+                "grantTypes": ["client_credentials", "authorization_code", "refresh_token"]
+            })
+        } catch(error) {
+            this.handleAuthErrors(error)
+        }
 
         return response.data.access_token;
     }

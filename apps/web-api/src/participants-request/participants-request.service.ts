@@ -141,7 +141,7 @@ export class ParticipantsRequestService {
       } else {
         let memResult = await this.prisma.member.findMany({
           where: {
-            email: uniqueIdentifier,
+            email: uniqueIdentifier.toLowerCase(),
           },
         });
         memResult = memResult?.filter((item) => item.uid !== uid);
@@ -164,7 +164,7 @@ export class ParticipantsRequestService {
     const uniqueIdentifier =
       requestData.participantType === 'TEAM'
         ? requestData.newData.name
-        : requestData.newData.email;
+        : requestData.newData.email.toLowerCase().trim();
     const postData = { ...requestData, uniqueIdentifier };
     requestData[uniqueIdentifier] = uniqueIdentifier;
     if (requestData.participantType === ParticipantType.MEMBER.toString()) {
@@ -297,7 +297,7 @@ export class ParticipantsRequestService {
 
     // Mandatory fields
     dataToSave['name'] = dataToProcess.name;
-    dataToSave['email'] = dataToProcess.email;
+    dataToSave['email'] = dataToProcess.email.toLowerCase().trim();
 
     // Optional fields
     dataToSave['githubHandler'] = dataToProcess.githubHandler;
@@ -431,14 +431,14 @@ export class ParticipantsRequestService {
 
     const isEmailChange = existingData.email !== dataToProcess.email ? true: false;
     if(isEmailChange) {
-      const foundUser: any = await transactionType.member.findUnique({where: {email: dataToProcess.email}});
+      const foundUser: any = await transactionType.member.findUnique({where: {email: dataToProcess.email.toLowerCase().trim()}});
       if(foundUser && foundUser.email) {
-        throw new BadRequestException("Email already exists")
+        throw new BadRequestException("Email already exists. Please try again with different email")
       }
     }
     // Mandatory fields
     dataToSave['name'] = dataToProcess.name;
-    dataToSave['email'] = dataToProcess.email;
+    dataToSave['email'] = dataToProcess.email.toLowerCase().trim();
 
     // Optional fields
     dataToSave['githubHandler'] = dataToProcess.githubHandler;
@@ -544,10 +544,10 @@ export class ParticipantsRequestService {
       const oldEmail = existingData.email;
       const newEmail = dataToSave.email;
       await this.awsService.sendEmail(
-        'MemberEmailChangeAcknowledgement', 
-        false, 
-        [oldEmail, newEmail], 
-        { 
+        'MemberEmailChangeAcknowledgement',
+        false,
+        [oldEmail, newEmail],
+        {
           oldEmail,
           newEmail,
           memberName: dataToProcess.name,
@@ -662,7 +662,7 @@ export class ParticipantsRequestService {
       };
       const authPayload = {
         email: dataToSave.email,
-        existingEmail: existingData.email,
+        existingEmail: existingData.email.toLowerCase().trim(),
         userId: existingData.externalId,
         deleteAndReplace: true,
       };

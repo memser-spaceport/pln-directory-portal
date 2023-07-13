@@ -24,9 +24,9 @@ import { ParticipantRequestMemberSchema } from 'libs/contracts/src/schema/partic
 import axios from 'axios';
 import { EmailOtpService } from '../otp/email-otp.service';
 import { AuthService } from '../auth/auth.service';
+import { LogService } from '../shared/log.service';
 @Injectable()
 export class MembersService {
-  private readonly logger = new Logger();
   constructor(
     private prisma: PrismaService,
     private locationTransferService: LocationTransferService,
@@ -34,6 +34,7 @@ export class MembersService {
     private fileMigrationService: FileMigrationService,
     private emailOtpService: EmailOtpService,
     private authService: AuthService,
+    private logger: LogService,
     @Inject(CACHE_MANAGER) private cacheService: Cache
 
   ) {}
@@ -69,7 +70,7 @@ export class MembersService {
 
   async findMemberByEmail(emailId) {
     return await this.prisma.member.findUnique({
-      where: { email: emailId },
+      where: { email: emailId.toLowerCase().trim() },
       include: {
         image: true,
         memberRoles: true,
@@ -132,7 +133,7 @@ export class MembersService {
       })
 
       newMemberInfo = await tx.member.update({
-          where: {email: oldEmail},
+          where: {email: oldEmail.toLowerCase().trim()},
           data: {email: recipient},
           include: {
             memberRoles: true,
@@ -143,6 +144,8 @@ export class MembersService {
       newTokens = await this.authService.updateEmailInAuth(recipient, oldEmail, memberInfo.externalId)
     })
 
+    // Log Info
+    this.logger.info(`Email has been successfully updated from ${oldEmail} to ${recipient}`)
     await this.cacheService.reset();
     return {
       refreshToken: newTokens.refresh_token,
@@ -155,7 +158,7 @@ export class MembersService {
 
   async isMemberExistForEmailId(emailId) {
     const member = await this.prisma.member.findUnique({
-      where: { email: emailId },
+      where: { email: emailId.toLowerCase().trim() },
     });
 
     return member ? true : false;
@@ -176,7 +179,7 @@ export class MembersService {
 
   async updateExternalIdByEmail(emailId, externalId) {
    return await this.prisma.member.update({
-      where: { email: emailId },
+      where: { email: emailId.toLowerCase().trim() },
       data: { externalId: externalId },
     });
   }
@@ -416,7 +419,7 @@ export class MembersService {
 
   findMemberFromEmail(email:string){
     return this.prisma.member.findUniqueOrThrow({
-      where: { email },
+      where: { email: email.toLowerCase().trim() },
       include: {
         memberRoles: true,
       },
