@@ -8,7 +8,7 @@ import {
 import axios from 'axios';
 
 @Injectable()
-export class UserTokenValidation implements CanActivate {
+export class UserAuthTokenValidation implements CanActivate {
   constructor() {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -22,17 +22,16 @@ export class UserTokenValidation implements CanActivate {
         `${process.env.AUTH_API_URL}/auth/introspect`,
         { token: token }
       );
-      if (
-        validationResult?.data?.active &&
-        validationResult?.data?.email
-      ) {
-        request['userEmail'] = validationResult.data.email;
-      } else {
+      if (!validationResult?.data?.active) {
         throw new UnauthorizedException();
       }
-    } catch(error) {
-      if ( error instanceof UnauthorizedException || error?.response?.status === 400
-        || error?.response?.status === 401) {
+
+    } catch (error) {
+      if (
+        error instanceof UnauthorizedException ||
+        error?.response?.status === 400 ||
+        error?.response?.status === 401
+      ) {
         throw new UnauthorizedException('Invalid Session. Please login and try again');
       }
       throw new InternalServerErrorException();

@@ -73,6 +73,12 @@ export class ParticipantsRequestService {
     return results;
   }
 
+  async addAutoApprovalEntry(tx, newEntry) {
+    await tx.participantsRequest.create({
+        data: {...newEntry}
+    })
+  }
+
   async getByUid(uid) {
     const result = await this.prisma.participantsRequest.findUnique({
       where: { uid: uid },
@@ -158,7 +164,7 @@ export class ParticipantsRequestService {
     const uniqueIdentifier =
       requestData.participantType === 'TEAM'
         ? requestData.newData.name
-        : requestData.newData.email;
+        : requestData.newData.email.toLowerCase().trim();
     const postData = { ...requestData, uniqueIdentifier };
     requestData[uniqueIdentifier] = uniqueIdentifier;
     if (requestData.participantType === ParticipantType.MEMBER.toString()) {
@@ -291,7 +297,7 @@ export class ParticipantsRequestService {
 
     // Mandatory fields
     dataToSave['name'] = dataToProcess.name;
-    dataToSave['email'] = dataToProcess.email;
+    dataToSave['email'] = dataToProcess.email.toLowerCase().trim();
 
     // Optional fields
     dataToSave['githubHandler'] = dataToProcess.githubHandler;
@@ -394,6 +400,7 @@ export class ParticipantsRequestService {
     uidToEdit,
     disableNotification = false,
     isAutoApproval = false,
+    isDirectoryAdmin = false,
     transactionType: Prisma.TransactionClient | PrismaClient = this.prisma
   ) {
     // Get
@@ -424,14 +431,14 @@ export class ParticipantsRequestService {
 
     const isEmailChange = existingData.email !== dataToProcess.email ? true: false;
     if(isEmailChange) {
-      const foundUser: any = await transactionType.member.findUnique({where: {email: dataToProcess.email}});
+      const foundUser: any = await transactionType.member.findUnique({where: {email: dataToProcess.email.toLowerCase().trim()}});
       if(foundUser && foundUser.email) {
-        throw new BadRequestException("Email already exists")
+        throw new BadRequestException("Email already exists. Please try again with different email")
       }
     }
     // Mandatory fields
     dataToSave['name'] = dataToProcess.name;
-    dataToSave['email'] = dataToProcess.email;
+    dataToSave['email'] = dataToProcess.email.toLowerCase().trim();
 
     // Optional fields
     dataToSave['githubHandler'] = dataToProcess.githubHandler;
@@ -531,7 +538,22 @@ export class ParticipantsRequestService {
       }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
       await this.slackService.notifyToChannel(slackConfig);
     }
-    await this.cacheService.reset()
+    await this.cacheService.reset();
+    // Send ack email to old & new email of member reg his/her email change.
+    if (isEmailChange && isDirectoryAdmin) {
+      const oldEmail = existingData.email;
+      const newEmail = dataToSave.email;
+      await this.awsService.sendEmail(
+        'MemberEmailChangeAcknowledgement',
+        false,
+        [oldEmail, newEmail],
+        {
+          oldEmail,
+          newEmail,
+          memberName: dataToProcess.name
+        }
+      );
+    }
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
@@ -638,7 +660,7 @@ export class ParticipantsRequestService {
       };
       const authPayload = {
         email: dataToSave.email,
-        existingEmail: existingData.email,
+        existingEmail: existingData.email.toLowerCase().trim(),
         userId: existingData.externalId,
         deleteAndReplace: true,
       };

@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react"
 import Cookies from 'js-cookie';
-import { resendOtpForEmailChange, sendEmailVerificationOtp, sendOtpForEmailChange, validateEmailOtp, verifyOtpForChangeEmail } from "../../services/auth.service";
+import { resendEmailOtp } from "../../services/auth.service";
 import { LoadingIndicator } from "../shared/loading-indicator/loading-indicator";
 import EmailSubmissionForm from "./email-submission-form";
 import OtpSubmissionForm from "./otp-submission-form";
@@ -9,25 +9,27 @@ import { calculateExpiry, decodeToken } from "../../utils/services/auth";
 import ErrorBox from "./error-box";
 import { APP_ANALYTICS_EVENTS, EMAIL_OTP_CONSTANTS } from "../../constants";
 import useAppAnalytics from "../../hooks/shared/use-app-analytics";
+import { sendOtpToChangeEmail, verifyAndProcessEmailChange } from "../../services/member.service";
 function ChangeEmailModal(props) {
     // States
     const [verificationStep, setVerificationStep] = useState(1)
     const [isLoaderActive, setLoaderStatus] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [resendInSeconds, setResendInSeconds] = useState(30);
+    const [memberUid, setMemberUid] = useState(null)
     const analytics = useAppAnalytics()
 
     // Variables
     const onClose = props.onClose
     const textConstants = EMAIL_OTP_CONSTANTS['CHANGE_EMAIL'];
 
-    const setNewTokensAndUserInfo = (allTokens, userInfo) => {
-        const { refresh_token, access_token, } = allTokens;
-        if (refresh_token && access_token) {
-            const accessTokenExpiry = decodeToken(access_token);
-            const refreshTokenExpiry = decodeToken(refresh_token);
-            Cookies.set('authToken', JSON.stringify(access_token), { expires: calculateExpiry(new Date(accessTokenExpiry.exp)) })
-            Cookies.set('refreshToken', JSON.stringify(refresh_token), { expires: calculateExpiry(new Date(refreshTokenExpiry.exp)) })
+    const setNewTokensAndUserInfo = (allData) => {
+        const { refreshToken, accessToken, userInfo} = allData;
+        if (refreshToken && accessToken) {
+            const accessTokenExpiry = decodeToken(accessToken);
+            const refreshTokenExpiry = decodeToken(refreshToken);
+            Cookies.set('authToken', JSON.stringify(accessToken), { expires: calculateExpiry(new Date(accessTokenExpiry.exp)) })
+            Cookies.set('refreshToken', JSON.stringify(refreshToken), { expires: calculateExpiry(new Date(refreshTokenExpiry.exp)) })
             Cookies.set('userInfo', JSON.stringify(userInfo), { expires: calculateExpiry(new Date(accessTokenExpiry.exp)) })
         }
     }
@@ -37,11 +39,9 @@ function ChangeEmailModal(props) {
         try {
             setErrorMessage('')
             const otpToken = Cookies.get('uniqueEmailVerifyToken');
-            const newEmail = localStorage.getItem('otp-verification-email');
-            const clientToken = Cookies.get('clientAccessToken')
             const accessToken = Cookies.get('authToken');
 
-            if (!clientToken || !newEmail || !accessToken) {
+            if (!accessToken) {
                 goToError('Invalid attempt. Please login and try again');
                 return;
             }
@@ -53,18 +53,15 @@ function ChangeEmailModal(props) {
             const otpPayload = {
                 otp: otp.join(''),
                 otpToken: otpToken,
-                clientToken: clientToken,
-                accessToken: accessToken,
-                emailId: localStorage.getItem('otp-verification-email')
             }
 
             setLoaderStatus(true)
-            const headers = {Authorization: `Bearer ${JSON.parse(accessToken)}`}
+            const header = {headers: {Authorization: `Bearer ${JSON.parse(accessToken)}`}}
             analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_USER_CHANGE_EMAIL_VERIFY_OTP, {})
-            const data = await verifyOtpForChangeEmail(otpPayload, headers)
+            const data = await verifyAndProcessEmailChange(otpPayload, memberUid, header)
             setLoaderStatus(false)
             if (data?.userInfo) {
-                setNewTokensAndUserInfo(data?.newTokens, data?.userInfo)
+                setNewTokensAndUserInfo(data)
                 clearAllOtpSessionVaribles()
                 analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_USER_CHANGE_EMAIL_SUCCESS, {})
                 onClose(null);
@@ -85,10 +82,8 @@ function ChangeEmailModal(props) {
     const onResendOtp = async () => {
         setErrorMessage('')
         const otpToken = Cookies.get('uniqueEmailVerifyToken');
-        const newEmail = localStorage.getItem('otp-verification-email');
         const accessToken = Cookies.get('authToken');
-        const clientToken = Cookies.get('clientAccessToken');
-        if (!clientToken || !newEmail || !accessToken) {
+        if (!accessToken) {
             goToError('Invalid attempt. Please login and try again');
             return;
         }
@@ -100,10 +95,10 @@ function ChangeEmailModal(props) {
 
         try {
             setLoaderStatus(true)
-            const otpPayload = {newEmail,clientToken, otpToken}
-            const headers = {Authorization: `Bearer ${JSON.parse(accessToken)}`}
+            const otpPayload = {otpToken}
+            const header = {headers: {Authorization: `Bearer ${JSON.parse(accessToken)}`}}
             analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_USER_CHANGE_EMAIL_RESEND_OTP, {})
-            const d = await resendOtpForEmailChange(otpPayload, headers);
+            const d = await resendEmailOtp(otpPayload, header);
             setLoaderStatus(false)
 
             // Reset resend timer and set unique token for verification
@@ -123,18 +118,13 @@ function ChangeEmailModal(props) {
 
     const onEmailSubmitted = async (email) => {
         try {
-            const clientToken = Cookies.get('clientAccessToken');
             const accessToken = Cookies.get('authToken');
-            if (!clientToken) {
-                goToError('Invalid attempt. Please login and try again');
-                return;
-            }
-            const otpPayload = { newEmail: email, clientToken }
-            const headers = {Authorization: `Bearer ${JSON.parse(accessToken)}`}
+            const otpPayload = { newEmail: email }
+            const header = {headers: {Authorization: `Bearer ${JSON.parse(accessToken)}`}}
             setErrorMessage('')
             setLoaderStatus(true)
             analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_USER_CHANGE_EMAIL_SEND_OTP, {})
-            const d = await sendOtpForEmailChange(otpPayload, headers);
+            const d = await sendOtpToChangeEmail(otpPayload, memberUid, header);
             setLoaderStatus(false)
             const uniqueEmailVerifyToken = d.token;
             Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 20 * 60 * 1000) })
@@ -223,6 +213,14 @@ function ChangeEmailModal(props) {
         return () => clearInterval(countdown);
 
     }, [resendInSeconds]);
+
+    useEffect(() => {
+        const userInfoFromCookie = Cookies.get('userInfo');
+        if (userInfoFromCookie) {
+          const parsedUserInfo = JSON.parse(userInfoFromCookie);
+          setMemberUid(parsedUserInfo.uid)
+        }
+    }, [])
 
 
     return <>

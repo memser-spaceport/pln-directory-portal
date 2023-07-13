@@ -13,6 +13,17 @@ export const fetchMember = async (id) => {
   }
 };
 
+export const fetchGitProjectsByMember = async (id) => {
+  try {
+    const response = await api.get(`/v1/members/${id}/git-projects`);
+    if (response.data) {
+      return response.data;
+    }
+  } catch (error) {
+    console.error(error);
+  }
+};
+
 export const fetchMembers = async (query) => {
   try {
     const { searchBy } = query;

@@ -19,5 +19,6 @@ import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
     SlackService,
     ForestAdminService,
   ],
+  exports: [ParticipantsRequestService]
 })
 export class ParticipantsRequestModule {}

@@ -28,7 +28,7 @@ export function MemberProfileProjects({
     query: { id },
   } = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const displayRepos = repositories?.slice(0, 3) ?? [];
+  const displayRepos = Array.isArray(repositories) ? repositories?.slice(0, 3) ?? [] : [];
   const analytics = useAppAnalytics()
   // const seeAllInfoText =
   //   repositories?.length > 3
@@ -57,7 +57,7 @@ export function MemberProfileProjects({
   return (
     <>
       {
-        repositories && (
+        repositories && Array.isArray(repositories) && (
           <h3 className="mb-2 mt-6 font-medium text-slate-500">
             {'Projects'} {repositories?.length > 0 && `(${repositories?.length})`}
             {repositories?.length > 3 && (
@@ -71,7 +71,12 @@ export function MemberProfileProjects({
           </h3>
         )
       }
-      {repositories && (repositories.length > 0 ? (
+      { repositories && !Array.isArray(repositories) && repositories.statusCode == 500 && (
+        <div className="mb-2 mt-6 w-full rounded-xl border bg-gray-50 p-3 text-center">
+          <p>Unable to load projects</p>
+        </div>)
+      }
+      {repositories && Array.isArray(repositories) &&(repositories?.length > 0 ? (
         <div className="max-h-96 overflow-y-auto rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)] focus-within:outline-none focus:outline-none focus-visible:outline-none">
           {displayRepos.map((project, i) => {
             return (
@@ -102,12 +107,14 @@ export function MemberProfileProjects({
           {seeAllInfoText}
         </span>
       </div> */}
-      <MemberProfileProjectsModal
-        isOpen={isModalOpen}
-        setIsModalOpen={setIsModalOpen}
-        repositories={repositories}
-        onItemClick={onGithubItemClicked}
-      />
+      { Array.isArray(repositories) &&
+        <MemberProfileProjectsModal
+          isOpen={isModalOpen}
+          setIsModalOpen={setIsModalOpen}
+          repositories={repositories}
+          onItemClick={onGithubItemClicked}
+        />
+      }
     </>
   );
 }

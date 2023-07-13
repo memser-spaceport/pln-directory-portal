@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import {
   BadRequestException,
   CACHE_MANAGER,
@@ -6,6 +7,7 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Cache } from 'cache-manager';
@@ -20,8 +22,9 @@ import { hashFileName } from '../utils/hashing';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { ParticipantRequestMemberSchema } from 'libs/contracts/src/schema/participants-request';
 import axios from 'axios';
+import { EmailOtpService } from '../otp/email-otp.service';
+import { AuthService } from '../auth/auth.service';
 import { LogService } from '../shared/log.service';
-
 @Injectable()
 export class MembersService {
   constructor(
@@ -29,8 +32,11 @@ export class MembersService {
     private locationTransferService: LocationTransferService,
     private participantsRequestService: ParticipantsRequestService,
     private fileMigrationService: FileMigrationService,
-    @Inject(CACHE_MANAGER) private cacheService: Cache,
-    private logService: LogService
+    private emailOtpService: EmailOtpService,
+    private authService: AuthService,
+    private logger: LogService,
+    @Inject(CACHE_MANAGER) private cacheService: Cache
+
   ) {}
 
   findAll(queryOptions: Prisma.MemberFindManyArgs) {
@@ -62,12 +68,119 @@ export class MembersService {
     });
   }
 
-  findMemberFromEmail(email:string){
-    return this.prisma.member.findUniqueOrThrow({
-      where: { email },
+  async findMemberByEmail(emailId) {
+    return await this.prisma.member.findUnique({
+      where: { email: emailId.toLowerCase().trim() },
       include: {
+        image: true,
         memberRoles: true,
+        teamMemberRoles: true,
       },
+    });
+  }
+
+  async findMemberByExternalId(externalId) {
+    return await this.prisma.member.findUnique({
+      where: { externalId: externalId },
+      include: {
+        image: true,
+        memberRoles: true,
+        teamMemberRoles: true,
+      },
+    });
+  }
+
+
+  async sendOtpForEmailChange(newEmailId, oldEmailId) {
+    if (newEmailId.toLowerCase().trim() === oldEmailId.toLowerCase().trim()) {
+      throw new BadRequestException('New email cannot be same as old email');
+    }
+
+    let isMemberAvailable = await this.isMemberExistForEmailId(oldEmailId);
+    if (!isMemberAvailable) {
+      throw new ForbiddenException('Your email seems to have been updated recently. Please login and try again');
+    }
+
+    isMemberAvailable = await this.isMemberExistForEmailId(newEmailId);
+    if (isMemberAvailable) {
+      throw new BadRequestException('Above email id is already used. Please try again with different email id.');
+    }
+     return await this.emailOtpService.sendEmailOtp(newEmailId);
+  }
+
+  async verifyOtpAndUpdateEmail(otp, otpToken, oldEmail) {
+    const memberInfo = await this.findMemberByEmail(oldEmail);
+    if(!memberInfo || !memberInfo.externalId) {
+      throw new ForbiddenException("Please login again and try")
+    }
+
+    const { recipient, valid } =  await this.emailOtpService.verifyEmailOtp(otp, otpToken);
+    if (!valid) {
+      return { valid }
+    }
+
+    let newTokens;
+    let newMemberInfo;
+
+    await this.prisma.$transaction(async (tx) => {
+      await this.participantsRequestService.addAutoApprovalEntry(tx, {
+        status: 'AUTOAPPROVED',
+        requesterEmailId: oldEmail,
+        referenceUid: memberInfo.uid,
+        uniqueIdentifier: oldEmail,
+        participantType: 'MEMBER',
+        newData: { oldEmail: oldEmail, newEmail: recipient }
+      })
+
+      newMemberInfo = await tx.member.update({
+          where: {email: oldEmail.toLowerCase().trim()},
+          data: {email: recipient},
+          include: {
+            memberRoles: true,
+            image: true,
+            teamMemberRoles: true,
+          }
+        })
+      newTokens = await this.authService.updateEmailInAuth(recipient, oldEmail, memberInfo.externalId)
+    })
+
+    // Log Info
+    this.logger.info(`Email has been successfully updated from ${oldEmail} to ${recipient}`)
+    await this.cacheService.reset();
+    return {
+      refreshToken: newTokens.refresh_token,
+      idToken: newTokens.id_token,
+      accessToken: newTokens.access_token,
+      userInfo: this.memberToUserInfo(newMemberInfo)
+    }
+  }
+
+
+  async isMemberExistForEmailId(emailId) {
+    const member = await this.prisma.member.findUnique({
+      where: { email: emailId.toLowerCase().trim() },
+    });
+
+    return member ? true : false;
+  }
+  private memberToUserInfo(memberInfo) {
+    return {
+      isFirstTimeLogin: memberInfo?.externalId ? false : true,
+      name: memberInfo.name,
+      email: memberInfo.email,
+      profileImageUrl: memberInfo.image?.url,
+      uid: memberInfo.uid,
+      roles: memberInfo.memberRoles?.map((r) => r.name),
+      leadingTeams: memberInfo.teamMemberRoles?.filter((role) => role.teamLead)
+        .map(role => role.teamUid)
+    };
+  }
+
+
+  async updateExternalIdByEmail(emailId, externalId) {
+   return await this.prisma.member.update({
+      where: { email: emailId.toLowerCase().trim() },
+      data: { externalId: externalId },
     });
   }
 
@@ -159,56 +272,76 @@ export class MembersService {
     }
   }
 
-  async getRepositories(githubHandle) {
-    let repositories = [];
-    repositories = await axios
-      .post(
-        'https://api.github.com/graphql',
-        {
-          query: `{
-          user(login: "${githubHandle}") {
-            pinnedItems(first: 10, types: REPOSITORY) {
-              nodes {
-                ... on RepositoryInfo {
-                  name
-                  description
-                  url
-                  createdAt
-                  updatedAt
+  async getGitProjects(uid) {
+    const member = await this.prisma.member.findUnique(
+      {
+        where: { uid: uid },
+        select: { githubHandler: true }
+      }
+    );
+    if (!member || !member.githubHandler) {
+      return [];
+    }
+    try {
+      const resp = await axios
+        .post(
+          'https://api.github.com/graphql',
+          {
+            query: `{
+              user(login: "${member?.githubHandler}") {
+                pinnedItems(first: 6, types: REPOSITORY) {
+                  nodes {
+                    ... on RepositoryInfo {
+                      name
+                      description
+                      url
+                      createdAt
+                      updatedAt
+                    }
+                  }
                 }
               }
-            }
-          }
-        }`,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.GITHUB_API_KEY}`,
-            'Content-Type': 'application/json',
+            }`,
           },
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.GITHUB_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+      const response = await axios
+        .get(`https://api.github.com/users/${member.githubHandler}/repos?sort=pushed&per_page=50`);
+      const repositories = response?.data.map((item) => {
+        return {
+          name: item.name,
+          description: item.description,
+          url: item.html_url,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+        };
+      });
+      if (resp?.data?.data?.user) {
+        const { pinnedItems } = resp.data.data.user;
+        if (pinnedItems?.nodes?.length > 0) {
+          // Create a Set of pinned repository names for efficient lookup
+          const pinnedRepositoryNames = new Set(pinnedItems.nodes.map((repo) => repo.name));
+          // Filter out the pinned repositories from the list of all repositories
+          const filteredRepositories = repositories?.filter((repo) => !pinnedRepositoryNames.has(repo.name));
+          return [...pinnedItems.nodes, ...filteredRepositories].slice(0, 50);
+        } else {
+          return repositories || [];
         }
-      )
-      .then((v) => v.data.data.user?.pinnedItems?.nodes)
-      .catch((e) => console.log(e));
-
-    if (!repositories?.length) {
-      repositories = await axios
-        .get(`https://api.github.com/users/${githubHandle}/repos`)
-        .then((v) => {
-          const repoArray = v.data.map((item) => {
-            return {
-              name: item.name,
-              description: item.description,
-              url: item.html_url,
-              createdAt: item.created_at,
-              updatedAt: item.updated_at,
-            };
-          });
-          return repoArray;
-        })
-        .catch((e) => console.log(e.message));
+      }
     }
-    return repositories;
+    catch(err) {
+      this.logger.error('Error occured while fetching the git projects.', err);
+      return {
+        statusCode: 500,
+        message: 'Internal Server Error.'
+      };
+    }
+    return [];
   }
 
   async editMemberParticipantsRequest(participantsRequest, userEmail) {
@@ -262,6 +395,7 @@ export class MembersService {
             result.uid,
             true, // disable the notification
             true, // enable the auto approval
+            requestorDetails.isDirectoryAdmin,
             tx
           );
         } else {
@@ -281,6 +415,15 @@ export class MembersService {
       }
     }
     return result;
+  }
+
+  findMemberFromEmail(email:string){
+    return this.prisma.member.findUniqueOrThrow({
+      where: { email: email.toLowerCase().trim() },
+      include: {
+        memberRoles: true,
+      },
+    });
   }
 
   async updatePreference(id,preference){
