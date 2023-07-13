@@ -11,7 +11,7 @@ export class UniqueIdentifier {
   @Post()
   async findDuplicates(@Body() body) {
     const result = await this.participantsRequestService.findDuplicates(
-      body.uniqueIdentifier.toLowerCase(),
+      body.uniqueIdentifier,
       body.participantType,
       body.uid,
       body.requestId

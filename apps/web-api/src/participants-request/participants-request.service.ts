@@ -141,7 +141,7 @@ export class ParticipantsRequestService {
       } else {
         let memResult = await this.prisma.member.findMany({
           where: {
-            email: uniqueIdentifier,
+            email: uniqueIdentifier.toLowerCase(),
           },
         });
         memResult = memResult?.filter((item) => item.uid !== uid);
