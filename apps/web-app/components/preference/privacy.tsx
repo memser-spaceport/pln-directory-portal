@@ -45,45 +45,52 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
                 'label': PRIVACY_CONSTANTS.SHOW_EMAIL,
                 'defaultValue': memberPreference?.showEmail,
                 'event': (evt) => switchEvent('showEmail',evt),
-                'helpText': PRIVACY_CONSTANTS.EMAIL_HELP_TXT
+                'helpText': PRIVACY_CONSTANTS.EMAIL_HELP_TXT,
+                'type': 'email'
             },
             {
                 'label': PRIVACY_CONSTANTS.SHOW_GITHUB,
                 'defaultValue': memberPreference?.showGithubHandle,
                 'event': (evt) => switchEvent('showGithubHandle',evt),
-                'helpText': PRIVACY_CONSTANTS.GH_HELP_TXT
+                'helpText': PRIVACY_CONSTANTS.GH_HELP_TXT,
+                'type': 'github'
             },
             {
                 'label': PRIVACY_CONSTANTS.SHOW_TELEGRAM,
                 'defaultValue': memberPreference?.showTelegram,
                 'event': (evt) => switchEvent('showTelegram',evt),
-                'helpText': PRIVACY_CONSTANTS.TELEGRAM_HELP_TXT
+                'helpText': PRIVACY_CONSTANTS.TELEGRAM_HELP_TXT,
+                'type': 'telegram'
             },
             {
                 'label': PRIVACY_CONSTANTS.SHOW_LIN_PFL,
-                'defaultValue': memberPreference.showLinkedin,
+                'defaultValue': memberPreference?.showLinkedin,
                 'event': (evt) => switchEvent('showLinkedin',evt),
-                'helpText': PRIVACY_CONSTANTS.LIN_HELP_TXT
+                'helpText': PRIVACY_CONSTANTS.LIN_HELP_TXT,
+                'type': 'linkedin'
             },
             {
                 'label': PRIVACY_CONSTANTS.SHOW_DISCORD,
-                'defaultValue': memberPreference.showDiscord,
+                'defaultValue': memberPreference?.showDiscord,
                 'event': (evt) => switchEvent('showDiscord',evt),
-                'helpText': PRIVACY_CONSTANTS.DISCORD_HLP_TXT
+                'helpText': PRIVACY_CONSTANTS.DISCORD_HLP_TXT,
+                'type':'discord'
             },
             {
                 'label': PRIVACY_CONSTANTS.SHOW_TWITTER,
-                'defaultValue': memberPreference.showTwitter,
+                'defaultValue': memberPreference?.showTwitter,
                 'event': (evt) => switchEvent('showTwitter',evt),
-                'helpText': PRIVACY_CONSTANTS.TWITTER_HELP_TXT
+                'helpText': PRIVACY_CONSTANTS.TWITTER_HELP_TXT,
+                'type':'twitter'
             }
         ],
         "profile": [
             {
                 'label': PRIVACY_CONSTANTS.SHOW_GH_PJCTS,
-                'defaultValue': memberPreference.showGithubProjects,
+                'defaultValue': memberPreference?.showGithubProjects,
                 'event': (evt) => switchEvent('showGithubProjects',evt),
-                'helpText': PRIVACY_CONSTANTS.GH_PJCTS_HELP_TXT
+                'helpText': PRIVACY_CONSTANTS.GH_PJCTS_HELP_TXT,
+                'type': 'github'
             }
 
         ]
@@ -91,13 +98,13 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
 
     const getPreferenceTemplate = (settings) => {
         return (
-            <div className="flex flex-row py-4 gap-4" key={settings.label}>
+            <div className={`flex flex-row py-4 gap-4 ${!memberPreference[settings.type] ? 'opacity-40':''}`} key={settings.label}>
                 <div className="my-auto">
                     <Switch
                         initialValue={settings.defaultValue}
                         onChange={settings.event}
                         customClassName="pointer-events-none"
-                        nonEditable={from === SETTINGS_CONSTANTS.VIEW_PREFERNCES || (!memberPreference.showGithubHandle  && settings.label === PRIVACY_CONSTANTS.SHOW_GH_PJCTS)}
+                        nonEditable={!memberPreference[settings.type] || from === SETTINGS_CONSTANTS.VIEW_PREFERNCES || (!memberPreference.showGithubHandle  && settings.label === PRIVACY_CONSTANTS.SHOW_GH_PJCTS)}
                     />
                 </div>
                 <div className="flex flex-col">

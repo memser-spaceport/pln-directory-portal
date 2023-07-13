@@ -20,7 +20,7 @@ import Privacy from "apps/web-app/components/preference/privacy";
 
 
 
-export const SettingsContext = React.createContext(null);
+export const SettingsContext = React.createContext({state:null, dispatch:null});
 
 export default function Settings({
     backLink,
@@ -124,10 +124,13 @@ export default function Settings({
         })
     }
 
-    const { breadcrumbItems } = useProfileBreadcrumb({
-        backLink,
-        directoryName: 'Members',
-        pageName: userInfo?.name,
+    const  breadcrumbItems :[any] = [{ 
+        href: `members/`,
+        label: `Members`,
+    }];
+    breadcrumbItems.push({ 
+        href: `members/${userInfo.uid}`,
+        label: `${userInfo?.name}`,
     });
 
     let sidemenu = [
@@ -331,6 +334,7 @@ export default function Settings({
         if (flag) {
             if (activeSetting === SETTINGS_CONSTANTS.PROFILE_SETTINGS) {
                 setModifiedProfile(false);
+                dispatch({ type: 'SET_PRIVACY_MODIFIED', payload: false });
             } else if (activeSetting === SETTINGS_CONSTANTS.TEAM_SETTINGS) {
                 setModified(false);
             } else if (activeSetting === SETTINGS_CONSTANTS.MEMBER_SETTINGS) {
