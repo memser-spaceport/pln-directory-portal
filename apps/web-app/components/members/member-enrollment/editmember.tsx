@@ -7,6 +7,7 @@ import {
   useCallback,
   Fragment,
   useRef,
+  useContext
 } from 'react';
 import { trackGoal } from 'fathom-client';
 import Cookies from 'js-cookie';
@@ -52,6 +53,7 @@ import { ReactComponent as PrefernceIcon } from '../../../public/assets/images/i
 import { PreferenceModal } from './preference-modal';
 import Privacy from '../../preference/privacy';
 import { getPreferences } from 'apps/web-app/services/member.service';
+import { SettingsContext } from "apps/web-app/pages/directory/settings";
 interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -233,7 +235,7 @@ export function EditMemberModal({
   const router = useRouter();
   const [resetImg, setResetImg] = useState(false);
   const analytics = useAppAnalytics();
-
+  const {state, dispatch} = useContext(SettingsContext);
   const divRef = useRef<HTMLDivElement>(null);
 
   const onCancelEmailChange = () => {
@@ -629,6 +631,17 @@ export function EditMemberModal({
                 {}
               );
             }
+            dispatch({type: 'SET_PREFERENCE', 
+              payload: { 
+                ...values.preferences,
+                email: values.email != "" ? true : false,
+                github: values.githubHandler != "" ? true : false,
+                linkedin: values.linkedinHandler != "" ? true : false,
+                twitter: values.twitterHandler != ""? true : false,
+                telegram: values.telegramHandler != ""? true : false,
+                discord: values.discordHandler != ""? true: false
+              }
+            });
             analytics.captureEvent(
               isUserProfile
                 ? APP_ANALYTICS_EVENTS.SETTINGS_USER_PROFILE_EDIT_FORM
