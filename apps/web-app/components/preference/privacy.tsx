@@ -1,4 +1,4 @@
-import { Switch } from "@protocol-labs-network/ui";
+import { Switch, Tooltip } from "@protocol-labs-network/ui";
 import { APP_ANALYTICS_EVENTS, BTN_LABEL_CONSTANTS, MSG_CONSTANTS, PRIVACY_CONSTANTS, SETTINGS_CONSTANTS, SOMETHING_WENT_WRONG } from "apps/web-app/constants";
 import { updatePreference } from "apps/web-app/services/member.service";
 import {  useContext, useEffect, useState } from "react";
@@ -8,6 +8,7 @@ import { SettingsContext } from "apps/web-app/pages/directory/settings";
 import { LoadingIndicator } from "../shared/loading-indicator/loading-indicator";
 import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
 import { DiscardChangesPopup } from "libs/ui/src/lib/modals/confirmation";
+import { ReactComponent as InformationCircleIcon } from '../../public/assets/images/icons/info_icon.svg';
 
 
 interface IPrivacyProps {
@@ -98,7 +99,7 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
 
     const getPreferenceTemplate = (settings) => {
         return (
-            <div className={`flex flex-row py-4 gap-4 ${!memberPreference[settings.type] ? 'opacity-40':''}`} key={settings.label}>
+            <div className={`flex flex-row py-4 gap-4 ${!(memberPreference[settings.type] || from === SETTINGS_CONSTANTS.VIEW_PREFERNCES) ? 'opacity-40':''}`} key={settings.label}>
                 <div className="my-auto">
                     <Switch
                         initialValue={settings.defaultValue}
@@ -206,8 +207,13 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
             )}
             <div className="bg-white rounded-lg mt-5">
                 <div className="px-8 py-6">
-                    <div className="text-[16px] leading-5 font-bold">
+                    <div className="flex text-[16px] leading-5 font-bold">
                         {PRIVACY_CONSTANTS.CONTACT_DETAILS}
+                        <Tooltip
+                          asChild
+                          trigger={<InformationCircleIcon className="ml-0.5 mt-0.5" />}
+                          content={"Privacy settings enabled for available contact details."}
+                        />
                     </div>
                     {
                         preferenceSettings && (

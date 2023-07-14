@@ -62,15 +62,15 @@ export function DiscardChangesPopup({
                                                {text}
                                             </p>
 
-                                            <div>
-                                                <button className={'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus float-right inline-flex w-[150px] justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]'}
+                                            <div className="float-right">
+                                                <button className={'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus w-[150px] justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8] mr-4'}
 
                                                     onClick={() => { handleModalClose(true) }}
                                                 >
                                                     YES
                                                 </button>
 
-                                                <button className={'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-[150px] justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]'}
+                                                <button className={'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus w-[150px] justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]'}
                                                     onClick={() => { handleModalClose(false) }}
                                                 >
                                                     NO
