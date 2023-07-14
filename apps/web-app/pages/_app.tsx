@@ -100,6 +100,20 @@ export default function CustomApp({
     }
   }, [])
 
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      // Check cookie on every one hour and refresh the page if it doesn't exist.
+      if (!Cookies.get('refreshToken')) {
+        window.location.reload();
+      }
+    }, 60 * 60 * 1000); // 1 hour
+
+    return () => {
+      // Clear the interval when the component unmounts
+      clearInterval(intervalId);
+    };
+  }, []);
+
   // Use the layout defined at the page level, if available
   const getLayout = Component.getLayout || ((page: ReactNode) => page);
 
