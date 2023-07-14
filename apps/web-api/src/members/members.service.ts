@@ -453,6 +453,11 @@ export class MembersService {
       }
     );
     const preferences = {...resp.preferences};
+    if (!resp.preferences) {
+      preferences.isnull = true; 
+    } else{
+      preferences.isnull = false; 
+    }
     preferences.email = resp?.email ? true: false;
     preferences.github = resp?.githubHandler ? true: false;
     preferences.telegram = resp?.telegramHandler ? true: false;
