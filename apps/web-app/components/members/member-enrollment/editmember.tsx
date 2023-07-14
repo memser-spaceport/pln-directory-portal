@@ -781,7 +781,7 @@ export function EditMemberModal({
 
   const getMemberPreferences = async () => {
     const memberPreferences = await getPreferences(id,JSON.parse(Cookies.get('authToken')));
-    setFormValues({ ...formValues, preferences: (!memberPreferences.isnull  ? memberPreferences : JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS)))});
+    setFormValues({ ...formValues, preferences: (!memberPreferences?.isnull  ? memberPreferences : JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS)))});
   }
 
   return (
