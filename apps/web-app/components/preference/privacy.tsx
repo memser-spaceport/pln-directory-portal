@@ -212,7 +212,7 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
                         <Tooltip
                           asChild
                           trigger={<InformationCircleIcon className="ml-0.5 mt-0.5" />}
-                          content={"Privacy settings enabled for available contact details."}
+                          content={"Privacy settings only enabled for available contact details."}
                         />
                     </div>
                     {
