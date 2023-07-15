@@ -204,14 +204,14 @@ export function Autocomplete({
                   key={option.value}
                   onClick={() => handleOptionClick(option)}
                 >
-                  <div className='relative truncate'>
+                  <div className='flex items-center truncate'>
                   {option.logo && (
                     <img src={option.logo} className='relative inline-block h-6 w-6 rounded-full'></img>
                     )
                   }
                   { option.logo === null && memberDefaultIcon }
                   { option.logo === null && teamDefaultIcon }
-                  <span className='relative left-[5px]'>{option.label}</span>
+                  <span className='overflow-hidden overflow-ellipsis max-w-full pl-[5px]'>{option.label}</span>
                   </div>
                 </li>
               ))
