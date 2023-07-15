@@ -103,7 +103,7 @@ export const parseMember = (member: TMemberResponse,): IMember => {
 };
 
 export function restrictMemberInfo(member) {
-  const disAllowedKeys = ["discordHandle", "email", "githubHandle", "twitter", "repositories", "telegramHandle", "linkedinHandle", "location", "officeHours"];
+  const disAllowedKeys = ["discordHandle", "email", "githubHandle", "twitter", "repositories", "telegramHandle", "linkedinHandle", "location"];
   const allKeys = Object.keys(member);
   allKeys.forEach(key => {
     if(disAllowedKeys.includes(key)) {
