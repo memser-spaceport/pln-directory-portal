@@ -99,7 +99,7 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
 
     const getPreferenceTemplate = (settings) => {
         return (
-            <div className={`flex flex-row py-4 gap-4 ${!(memberPreference[settings.type] || from === SETTINGS_CONSTANTS.VIEW_PREFERNCES) ? 'opacity-40':''}`} key={settings.label}>
+            <div className={`flex flex-row py-4 gap-4 ${!memberPreference[settings.type] ? 'opacity-40':''}`} key={settings.label}>
                 <div className="my-auto">
                     <Switch
                         initialValue={settings.defaultValue}
