@@ -120,8 +120,17 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
         );
     }
 
+    const checkIfModified = (oldPref,newPref) => {
+        for (const [key, value] of Object.entries(oldPref)) {
+            if(oldPref[key] !== newPref[key]){
+                return true;
+            }
+        }
+        return false;
+    }
+
     const handleSave = async () => {
-        if (JSON.stringify(memberPreference) !== JSON.stringify(state.preferences)) {
+        if (checkIfModified(memberPreference,state.preferences)) {
             setIsProcessing(true);
             try{
                 const response = await updatePreference(JSON.parse(Cookies.get('userInfo')).uid, memberPreference, JSON.parse(Cookies.get('authToken')));
@@ -168,7 +177,7 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
     }
 
     const handleDiscord = () => {
-        if (JSON.stringify(memberPreference) !== JSON.stringify(state.preferences)) {
+        if (checkIfModified(memberPreference,state.preferences)) {
             setIsOpen(true);
         } else {
             toast(MSG_CONSTANTS.NO_CHANGES_TO_RESET, {
@@ -203,7 +212,7 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
                         <Tooltip
                           asChild
                           trigger={<InformationCircleIcon className="ml-0.5 mt-0.5" />}
-                          content={"Privacy settings enabled for available contact details."}
+                          content={"Privacy settings only enabled for available contact details."}
                         />
                     </div>
                     {

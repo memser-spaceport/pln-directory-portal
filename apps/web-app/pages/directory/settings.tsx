@@ -51,7 +51,7 @@ export default function Settings({
     
         return newState
     }
-    const [state, dispatch] = useReducer(settingsReducer, { preferences: preferences.isnull ? { ...JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS)), ...preferences }: preferences })
+    const [state, dispatch] = useReducer(settingsReducer, { preferences: preferences?.isnull ? { ...JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS)), ...preferences }: preferences })
 
     useEffect(() => {
         if (refreshTeamAutocomplete) {

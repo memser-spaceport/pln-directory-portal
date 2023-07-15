@@ -6,9 +6,9 @@ export class LogService {
   private readonly logger: Logger;
 
   info(message: string, context?: string) {
-    this.logger.log('info', message, context);
+    this.logger.log('info', JSON.stringify(message), context);
   }
   error(message: any, stack?: string, context?: string) {
-    this.logger.log('error', message, stack, context);
+    this.logger.log('error', JSON.stringify(message), stack, context);
   }
 }
