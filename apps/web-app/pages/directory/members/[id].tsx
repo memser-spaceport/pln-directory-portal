@@ -40,6 +40,7 @@ interface MemberProps {
   backLink: string;
   isUserLoggedIn: boolean;
   userInfo: any;
+  officeHoursFlag: boolean;
 }
 
 export default function Member({
@@ -47,6 +48,7 @@ export default function Member({
   teams,
   backLink,
   userInfo,
+  officeHoursFlag
 }: MemberProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
@@ -100,6 +102,7 @@ export default function Member({
               url={member.officeHours}
               userInfo={userInfo}
               member={member}
+              officeHoursFlag={officeHoursFlag}
             />
             <MemberProfileTeams teams={teams} member={member} />
             {userInfo?.uid && (
@@ -205,7 +208,13 @@ export const getServerSideProps = async (ctx) => {
       notFound: true,
     };
   }
-  
+
+  let officeHoursFlag = false;
+  officeHoursFlag = member['officeHours'] ? true : false;
+  if(!isUserLoggedIn && member['officeHours']){
+    delete member['officeHours'];
+  }
+
   if (cookies?.authToken) {
     member.repositories = await fetchGitProjectsByMember(member.id);
   }
@@ -234,6 +243,6 @@ export const getServerSideProps = async (ctx) => {
     delete member.preferences
   }
   return {
-    props: { member, teams, backLink, isUserLoggedIn, userInfo },
+    props: { member, teams, backLink, isUserLoggedIn, userInfo, officeHoursFlag },
   };
 };
