@@ -1,4 +1,4 @@
-import { Switch } from "@protocol-labs-network/ui";
+import { Switch, Tooltip } from "@protocol-labs-network/ui";
 import { APP_ANALYTICS_EVENTS, BTN_LABEL_CONSTANTS, MSG_CONSTANTS, PRIVACY_CONSTANTS, SETTINGS_CONSTANTS, SOMETHING_WENT_WRONG } from "apps/web-app/constants";
 import { updatePreference } from "apps/web-app/services/member.service";
 import {  useContext, useEffect, useState } from "react";
@@ -8,6 +8,7 @@ import { SettingsContext } from "apps/web-app/pages/directory/settings";
 import { LoadingIndicator } from "../shared/loading-indicator/loading-indicator";
 import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
 import { DiscardChangesPopup } from "libs/ui/src/lib/modals/confirmation";
+import { ReactComponent as InformationCircleIcon } from '../../public/assets/images/icons/info_icon.svg';
 
 
 interface IPrivacyProps {
@@ -45,45 +46,52 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
                 'label': PRIVACY_CONSTANTS.SHOW_EMAIL,
                 'defaultValue': memberPreference?.showEmail,
                 'event': (evt) => switchEvent('showEmail',evt),
-                'helpText': PRIVACY_CONSTANTS.EMAIL_HELP_TXT
+                'helpText': PRIVACY_CONSTANTS.EMAIL_HELP_TXT,
+                'type': 'email'
             },
             {
                 'label': PRIVACY_CONSTANTS.SHOW_GITHUB,
                 'defaultValue': memberPreference?.showGithubHandle,
                 'event': (evt) => switchEvent('showGithubHandle',evt),
-                'helpText': PRIVACY_CONSTANTS.GH_HELP_TXT
+                'helpText': PRIVACY_CONSTANTS.GH_HELP_TXT,
+                'type': 'github'
             },
             {
                 'label': PRIVACY_CONSTANTS.SHOW_TELEGRAM,
                 'defaultValue': memberPreference?.showTelegram,
                 'event': (evt) => switchEvent('showTelegram',evt),
-                'helpText': PRIVACY_CONSTANTS.TELEGRAM_HELP_TXT
+                'helpText': PRIVACY_CONSTANTS.TELEGRAM_HELP_TXT,
+                'type': 'telegram'
             },
             {
                 'label': PRIVACY_CONSTANTS.SHOW_LIN_PFL,
-                'defaultValue': memberPreference.showLinkedin,
+                'defaultValue': memberPreference?.showLinkedin,
                 'event': (evt) => switchEvent('showLinkedin',evt),
-                'helpText': PRIVACY_CONSTANTS.LIN_HELP_TXT
+                'helpText': PRIVACY_CONSTANTS.LIN_HELP_TXT,
+                'type': 'linkedin'
             },
             {
                 'label': PRIVACY_CONSTANTS.SHOW_DISCORD,
-                'defaultValue': memberPreference.showDiscord,
+                'defaultValue': memberPreference?.showDiscord,
                 'event': (evt) => switchEvent('showDiscord',evt),
-                'helpText': PRIVACY_CONSTANTS.DISCORD_HLP_TXT
+                'helpText': PRIVACY_CONSTANTS.DISCORD_HLP_TXT,
+                'type':'discord'
             },
             {
                 'label': PRIVACY_CONSTANTS.SHOW_TWITTER,
-                'defaultValue': memberPreference.showTwitter,
+                'defaultValue': memberPreference?.showTwitter,
                 'event': (evt) => switchEvent('showTwitter',evt),
-                'helpText': PRIVACY_CONSTANTS.TWITTER_HELP_TXT
+                'helpText': PRIVACY_CONSTANTS.TWITTER_HELP_TXT,
+                'type':'twitter'
             }
         ],
         "profile": [
             {
                 'label': PRIVACY_CONSTANTS.SHOW_GH_PJCTS,
-                'defaultValue': memberPreference.showGithubProjects,
+                'defaultValue': memberPreference?.showGithubProjects,
                 'event': (evt) => switchEvent('showGithubProjects',evt),
-                'helpText': PRIVACY_CONSTANTS.GH_PJCTS_HELP_TXT
+                'helpText': PRIVACY_CONSTANTS.GH_PJCTS_HELP_TXT,
+                'type': 'github'
             }
 
         ]
@@ -91,13 +99,13 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
 
     const getPreferenceTemplate = (settings) => {
         return (
-            <div className="flex flex-row py-4 gap-4" key={settings.label}>
+            <div className={`flex flex-row py-4 gap-4 ${!memberPreference[settings.type] ? 'opacity-40':''}`} key={settings.label}>
                 <div className="my-auto">
                     <Switch
                         initialValue={settings.defaultValue}
                         onChange={settings.event}
                         customClassName="pointer-events-none"
-                        nonEditable={from === SETTINGS_CONSTANTS.VIEW_PREFERNCES || (!memberPreference.showGithubHandle  && settings.label === PRIVACY_CONSTANTS.SHOW_GH_PJCTS)}
+                        nonEditable={!memberPreference[settings.type] || from === SETTINGS_CONSTANTS.VIEW_PREFERNCES || (!memberPreference.showGithubHandle  && settings.label === PRIVACY_CONSTANTS.SHOW_GH_PJCTS)}
                     />
                 </div>
                 <div className="flex flex-col">
@@ -112,8 +120,17 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
         );
     }
 
+    const checkIfModified = (oldPref,newPref) => {
+        for (const [key, value] of Object.entries(oldPref)) {
+            if(oldPref[key] !== newPref[key]){
+                return true;
+            }
+        }
+        return false;
+    }
+
     const handleSave = async () => {
-        if (JSON.stringify(memberPreference) !== JSON.stringify(state.preferences)) {
+        if (checkIfModified(memberPreference,state.preferences)) {
             setIsProcessing(true);
             try{
                 const response = await updatePreference(JSON.parse(Cookies.get('userInfo')).uid, memberPreference, JSON.parse(Cookies.get('authToken')));
@@ -160,7 +177,7 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
     }
 
     const handleDiscord = () => {
-        if (JSON.stringify(memberPreference) !== JSON.stringify(state.preferences)) {
+        if (checkIfModified(memberPreference,state.preferences)) {
             setIsOpen(true);
         } else {
             toast(MSG_CONSTANTS.NO_CHANGES_TO_RESET, {
@@ -190,8 +207,13 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
             )}
             <div className="bg-white rounded-lg mt-5">
                 <div className="px-8 py-6">
-                    <div className="text-[16px] leading-5 font-bold">
+                    <div className="flex text-[16px] leading-5 font-bold">
                         {PRIVACY_CONSTANTS.CONTACT_DETAILS}
+                        <Tooltip
+                          asChild
+                          trigger={<InformationCircleIcon className="ml-0.5 mt-0.5" />}
+                          content={"Privacy settings only enabled for available contact details."}
+                        />
                     </div>
                     {
                         preferenceSettings && (

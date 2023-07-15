@@ -46,7 +46,8 @@ export class AuthGuard implements CanActivate {
       if (
         error instanceof UnauthorizedException ||
         error?.response?.status === 400 ||
-        error?.response?.status === 401
+        error?.response?.status === 401 ||
+        error?.name === 'NotFoundError'
       ) {
         throw new UnauthorizedException('Invalid Session. Please login and try again');
       }else if(error instanceof ForbiddenException){

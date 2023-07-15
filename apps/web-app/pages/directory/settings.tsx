@@ -20,7 +20,7 @@ import Privacy from "apps/web-app/components/preference/privacy";
 
 
 
-export const SettingsContext = React.createContext(null);
+export const SettingsContext = React.createContext({state:null, dispatch:null});
 
 export default function Settings({
     backLink,
@@ -51,7 +51,7 @@ export default function Settings({
     
         return newState
     }
-    const [state, dispatch] = useReducer(settingsReducer, { preferences })
+    const [state, dispatch] = useReducer(settingsReducer, { preferences: preferences?.isnull ? { ...JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS)), ...preferences }: preferences })
 
     useEffect(() => {
         if (refreshTeamAutocomplete) {
@@ -124,10 +124,13 @@ export default function Settings({
         })
     }
 
-    const { breadcrumbItems } = useProfileBreadcrumb({
-        backLink,
-        directoryName: 'Members',
-        pageName: userInfo?.name,
+    const  breadcrumbItems :[any] = [{ 
+        href: `members/`,
+        label: `Members`,
+    }];
+    breadcrumbItems.push({ 
+        href: `members/${userInfo.uid}`,
+        label: `${userInfo?.name}`,
     });
 
     let sidemenu = [
@@ -331,6 +334,7 @@ export default function Settings({
         if (flag) {
             if (activeSetting === SETTINGS_CONSTANTS.PROFILE_SETTINGS) {
                 setModifiedProfile(false);
+                dispatch({ type: 'SET_PRIVACY_MODIFIED', payload: false });
             } else if (activeSetting === SETTINGS_CONSTANTS.TEAM_SETTINGS) {
                 setModified(false);
             } else if (activeSetting === SETTINGS_CONSTANTS.MEMBER_SETTINGS) {
@@ -571,11 +575,12 @@ export const getServerSideProps = async (ctx) => {
             if (allMembersResponse.status === 200) {
                 membersDropdown = [];
                 if (allMembersResponse.body && allMembersResponse.body.length) {
+                    const filteredMembers = allMembersResponse.body.filter(item=>item.uid!==userInfo?.uid)
                     membersDropdown.push(
                         {
-                            "label": allMembersResponse.body[0].name,
-                            "value": allMembersResponse.body[0].uid,
-                            "logo": allMembersResponse.body[0]?.image?.url ?? null
+                            "label": filteredMembers[0].name,
+                            "value": filteredMembers[0].uid,
+                            "logo": filteredMembers[0]?.image?.url ?? null
                         }
                     );
                 }

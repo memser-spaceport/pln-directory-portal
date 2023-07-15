@@ -438,12 +438,32 @@ export class MembersService {
   }
 
   async getPreferences(uid) {
-    const response = await this.prisma.member.findUnique(
+    const resp:any = await this.prisma.member.findUnique(
       {
         where: { uid: uid },
-        select: {preferences: true}
+        select: {
+          email: true, 
+          githubHandler: true, 
+          telegramHandler:true,
+          discordHandler: true,
+          linkedinHandler: true,
+          twitterHandler: true,
+          preferences: true,
+        }
       }
     );
-    return response?.preferences;
+    const preferences = {...resp.preferences};
+    if (!resp.preferences) {
+      preferences.isnull = true; 
+    } else{
+      preferences.isnull = false; 
+    }
+    preferences.email = resp?.email ? true: false;
+    preferences.github = resp?.githubHandler ? true: false;
+    preferences.telegram = resp?.telegramHandler ? true: false;
+    preferences.discord = resp?.discordHandler ? true: false;
+    preferences.linkedin = resp?.linkedinHandler ? true : false;
+    preferences.twitter = resp?.twitterHandler ? true: false;
+    return preferences;
   }
 }
