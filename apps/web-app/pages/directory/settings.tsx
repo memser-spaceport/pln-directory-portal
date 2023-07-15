@@ -575,11 +575,12 @@ export const getServerSideProps = async (ctx) => {
             if (allMembersResponse.status === 200) {
                 membersDropdown = [];
                 if (allMembersResponse.body && allMembersResponse.body.length) {
+                    const filteredMembers = allMembersResponse.body.filter(item=>item.uid!==userInfo?.uid)
                     membersDropdown.push(
                         {
-                            "label": allMembersResponse.body[0].name,
-                            "value": allMembersResponse.body[0].uid,
-                            "logo": allMembersResponse.body[0]?.image?.url ?? null
+                            "label": filteredMembers[0].name,
+                            "value": filteredMembers[0].uid,
+                            "logo": filteredMembers[0]?.image?.url ?? null
                         }
                     );
                 }
