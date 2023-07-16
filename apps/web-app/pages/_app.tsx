@@ -20,6 +20,7 @@ import EmailOtpVerificationModal from '../components/auth/email-otp-verification
 import { VerifyEmailModal } from '../components/layout/navbar/login-menu/verify-email-modal';
 import { ReactComponent as SuccessIcon } from '../public/assets/images/icons/success.svg';
 import { logoutAllTabs } from '../utils/services/auth';
+import { decodeToken } from '../utils/services/auth';
 // Check that PostHog is client-side (used to handle Next.js SSR)
 if (typeof window !== 'undefined') {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
@@ -101,12 +102,18 @@ export default function CustomApp({
   }, [])
 
   useEffect(() => {
+    const intervalEnv: any = process.env.NEXT_PUBLIC_TOKEN_EXPIRY_CHECK_IN_MINUTES;
+    const interval = !isNaN(intervalEnv) ? intervalEnv * 60 * 1000 : 60 * 60 * 1000;
+    console.log(`Token interval from env: ${interval}`); 
     const intervalId = setInterval(() => {
+      const refreshToken = Cookies.get('refreshToken');
       // Check cookie on every one hour and refresh the page if it doesn't exist.
-      if (!Cookies.get('refreshToken')) {
+      console.log(`Token expiry checked at: ${new Date()}`);
+      console.log(`${refreshToken ? 'Token will be expired at:' + new Date(decodeToken(JSON.parse(refreshToken))?.exp * 1000) : "Token expired!"}`)
+      if (!refreshToken) {
         window.location.reload();
       }
-    }, 60 * 60 * 1000); // 1 hour
+    }, interval);
 
     return () => {
       // Clear the interval when the component unmounts

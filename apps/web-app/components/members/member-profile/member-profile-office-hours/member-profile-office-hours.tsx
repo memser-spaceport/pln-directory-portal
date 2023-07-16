@@ -17,6 +17,7 @@ type MemberProfileOfficeHoursProps = {
   url?: string;
   userInfo: any;
   member?: IMember;
+  officeHoursFlag?: boolean;
 };
 
 const LEARN_MORE_URL =
@@ -26,6 +27,7 @@ export function MemberProfileOfficeHours({
   url,
   userInfo,
   member,
+  officeHoursFlag
 }: MemberProfileOfficeHoursProps) {
   const loginAsUserCode = FATHOM_EVENTS.directory.loginAsUser;
   const router = useRouter();
@@ -52,7 +54,7 @@ export function MemberProfileOfficeHours({
 
   return (
     <>
-      {((!userInfo?.uid && member?.officeHours) || userInfo.uid) && (
+      {((!userInfo?.uid && officeHoursFlag) || userInfo.uid) && (
         <div className="mt-6 flex items-center justify-between rounded-xl bg-slate-50 p-4">
           <div className="flex items-center ">
             <span className="mr-3">
