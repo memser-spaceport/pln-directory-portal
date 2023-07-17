@@ -21,8 +21,6 @@ export class AuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     try {
-      this.logger.info('Inside Authguard');
-
       let request = context.switchToHttp().getRequest();
       const token = this.authService.checkIfTokenAttached(request);
       request = await this.authService.validateToken(request, token);
@@ -34,12 +32,8 @@ export class AuthGuard implements CanActivate {
           request.method
         )
       ) {
-        this.logger.info('Token validated');
         return true;
       } else {
-        this.logger.info(
-          'Email in the token is not matching with the requester Email'
-        );
         throw new ForbiddenException();
       }
     } catch (error) {
@@ -49,8 +43,10 @@ export class AuthGuard implements CanActivate {
         error?.response?.status === 401 ||
         error?.name === 'NotFoundError'
       ) {
-        throw new UnauthorizedException('Invalid Session. Please login and try again');
-      }else if(error instanceof ForbiddenException){
+        throw new UnauthorizedException(
+          'Invalid Session. Please login and try again'
+        );
+      } else if (error instanceof ForbiddenException) {
         throw new ForbiddenException('Forbidden. Email doesn`t match');
       }
       throw new InternalServerErrorException();
