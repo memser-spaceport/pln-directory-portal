@@ -3,7 +3,7 @@ import 'winston-daily-rotate-file';
 import { createLogger } from 'winston';
 import { utilities as nestWinstonModuleUtilities } from 'nest-winston';
 import WinstonCloudWatch from 'winston-cloudwatch';
-
+import * as ip from 'ip';
 export class SetupService {
   setupLog(): winston.Logger {
     const instance = createLogger({
@@ -28,8 +28,8 @@ export class SetupService {
 
   private addProductionTransport(instance: winston.Logger) {
     const cloudwatchConfig = {
-      logGroupName: process.env.CLOUDWATCH_GROUP_NAME,
-      logStreamName: `${process.env.CLOUDWATCH_GROUP_NAME}-${process.env.DEPLOYMENT_ENVIRONMENT}`,
+      logGroupName: `${process.env.CLOUDWATCH_GROUP_NAME}-${process.env.DEPLOYMENT_ENVIRONMENT}`,
+      logStreamName: `${ip.address()}`,
       awsRegion: process.env.CLOUDWATCH_REGION,
       awsOptions: {
         credentials: {
