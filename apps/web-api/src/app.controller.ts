@@ -10,12 +10,20 @@ export class AppController {
    ** We have this so we don't have a 404 on the root path
    */
   @Get()
-  @NoCache()
-  @Redirect()
-  getHello(@Req() req, @Res() res): any {
+  getHello(): string {
+    return 'Protocol labs API';
+  }
+
+  /*
+   ** Its api which is used to redirect to rollup login.
+   */
+   @Get('/directory')
+   @NoCache()
+   @Redirect()
+   redirectToLogin(@Req() req, @Res() res): any {
     try {
       const host = req.hostname;
-      if (host.includes('login')) {
+      if (host && host.includes('login')) {
         const state = generateOAuth2State();
         const redirectURL = `${process.env.WEB_UI_BASE_URL}/${process.env.LOGIN_REDIRECT_URL}?source=direct`;
         const url = `${process.env.AUTH_API_URL}/auth?redirect_uri=${redirectURL}
