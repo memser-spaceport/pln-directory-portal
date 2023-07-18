@@ -17,6 +17,7 @@ import {
   teamRelations,
   teams,
   technologies,
+  memberRoles,
 } from './fixtures';
 
 /**
@@ -74,6 +75,7 @@ async function load(fixtures) {
 }
 
 load([
+  { [Prisma.ModelName.MemberRole]: memberRoles },
   { [Prisma.ModelName.Skill]: skills },
   { [Prisma.ModelName.FundingStage]: fundingStages },
   { [Prisma.ModelName.MembershipSource]: membershipSources },

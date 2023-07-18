@@ -13,6 +13,32 @@ export const fetchMember = async (id) => {
   }
 };
 
+export const fetchGitProjectsByMember = async (id) => {
+  try {
+    const response = await api.get(`/v1/members/${id}/git-projects`);
+    if (response.data) {
+      return response.data;
+    }
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+export const fetchMembers = async (query) => {
+  try {
+    const { searchBy } = query;
+    const response = await api.get(
+      `/v1/members?name__istartswith=${searchBy}` +
+        `&select=uid,name,image.url,email&maskMemberEmail=true`
+    );
+    if (response.data) {
+      return response.data;
+    }
+  } catch (error) {
+    console.error(error);
+  }
+};
+
 export const requestPendingCheck = async (email, id) => {
   try {
     const data = {
@@ -31,55 +57,4 @@ export const requestPendingCheck = async (email, id) => {
   } catch (error) {
     console.error(error);
   }
-};
-
-export const getAllPinned = async (userName) => {
-  const key = process.env.NEXT_PUBLIC_GITHUB_API_KEY;
-  return await axios
-    .post(
-      'https://api.github.com/graphql',
-      {
-        query: `{
-          user(login: "${userName}") {
-            pinnedItems(first: 10, types: REPOSITORY) {
-              nodes {
-                ... on RepositoryInfo {
-                  name
-                  description
-                  url
-                  createdAt
-                  updatedAt
-                }
-              }
-            }
-          }
-        }`,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${key}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    )
-    .then((v) => v.data.data.user?.pinnedItems?.nodes)
-    .catch((e) => console.log(e));
-};
-
-export const getAllRepositories = async (userName) => {
-  return await axios
-    .get(`https://api.github.com/users/${userName}/repos`)
-    .then((v) => {
-      const repoArray = v.data.map((item) => {
-        return {
-          name: item.name,
-          description: item.description,
-          url: item.html_url,
-          createdAt: item.created_at,
-          updatedAt: item.updated_at,
-        };
-      });
-      return repoArray;
-    })
-    .catch((e) => console.log(e.message));
 };

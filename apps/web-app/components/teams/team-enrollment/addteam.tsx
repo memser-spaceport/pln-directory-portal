@@ -7,6 +7,7 @@ import {
   useCallback,
   useRef,
 } from 'react';
+import { trackGoal } from 'fathom-client';
 import AddTeamStepOne from './addteamstepone';
 import AddTeamStepTwo from './addteamsteptwo';
 import AddTeamStepThree from './addteamstepthree';
@@ -20,10 +21,15 @@ import {
 } from '../../../utils/services/dropdown-service';
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
-import { ENROLLMENT_TYPE } from '../../../constants';
+import {
+  APP_ANALYTICS_EVENTS,
+  ENROLLMENT_TYPE,
+  FATHOM_EVENTS,
+} from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/create-team.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
+import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddTeamModalProps {
@@ -103,7 +109,8 @@ function handleNextClick(
   setFormStep,
   setErrors,
   nameExists,
-  divRef
+  divRef,
+  analytics
 ) {
   const errors = validateForm(formValues, formStep);
   const element1 = divRef.current;
@@ -115,6 +122,10 @@ function handleNextClick(
     setErrors(errors);
     return false;
   }
+  console.log(teamFormSteps[formStep - 1]);
+  analytics.captureEvent(APP_ANALYTICS_EVENTS.TEAM_JOIN_NETWORK_FORM_STEPS, {
+    name: teamFormSteps[formStep - 1],
+  });
   setFormStep(++formStep);
   setErrors(errors);
   return true;
@@ -129,7 +140,8 @@ function getSubmitOrNextButton(
   isProcessing,
   nameExists,
   disableNext,
-  divRef
+  divRef,
+  analytics
 ) {
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8] disabled:bg-slate-400';
@@ -157,7 +169,8 @@ function getSubmitOrNextButton(
             setFormStep,
             setErrors,
             nameExists,
-            divRef
+            divRef,
+            analytics
           )
         }
       >
@@ -219,10 +232,11 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     website: '',
     linkedinHandler: '',
     twitterHandler: '',
+    telegramHandler: '',
     blog: '',
     officeHours: '',
   });
-
+  const analytics = useAppAnalytics();
   const divRef = useRef<HTMLDivElement>(null);
   // const { executeRecaptcha } = useGoogleReCaptcha();
 
@@ -273,6 +287,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       website: '',
       linkedinHandler: '',
       twitterHandler: '',
+      telegramHandler: '',
       blog: '',
       officeHours: '',
     });
@@ -319,6 +334,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       website: formValues.website?.trim(),
       twitterHandler: formValues.twitterHandler?.trim(),
       linkedinHandler: formValues.linkedinHandler?.trim(),
+      telegramHandler: formValues.telegramHandler?.trim(),
       blog: formValues.blog?.trim(),
       officeHours: formValues.officeHours?.trim(),
       fundingStage: formattedFundingStage,
@@ -351,7 +367,6 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
-
       // if (!executeRecaptcha) {
       //   console.log('Execute recaptcha not yet available');
       //   return;
@@ -367,6 +382,12 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
         setErrors(errors);
         return false;
       }
+      analytics.captureEvent(
+        APP_ANALYTICS_EVENTS.TEAM_JOIN_NETWORK_FORM_STEPS,
+        {
+          itemName: 'SOCIAL',
+        }
+      );
       const requestorEmail = formValues.requestorEmail?.trim();
       const value = formatData();
       try {
@@ -383,12 +404,8 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
               'content-type': 'multipart/form-data',
             },
           };
-          image = await api
-            .post(`/v1/images`, formData, config)
-            .then((response) => {
-              delete value.logoFile;
-              return response?.data?.image;
-            });
+          const imageResponse = await api.post(`/v1/images`, formData, config);
+          image = imageResponse?.data?.image;
         }
         const data = {
           participantType: ENROLLMENT_TYPE.TEAM,
@@ -398,11 +415,17 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
           newData: { ...value, logoUid: image?.uid, logoUrl: image?.url },
           // captchaToken,
         };
-        await api.post(`/v1/participants-request`, data).then((response) => {
-          setSaveCompleted(true);
-        });
+        const response = await api.post(`/v1/participants-request`, data);
+        trackGoal(FATHOM_EVENTS.directory.joinNetworkAsTeamSave, 0);
+        analytics.captureEvent(
+          APP_ANALYTICS_EVENTS.TEAM_JOIN_NETWORK_FORM_STEPS,
+          {
+            itemName: 'COMPLETED',
+          }
+        );
+        setSaveCompleted(true);
       } catch (err) {
-        if (err.response.status === 400) {
+        if (err?.response?.status === 400) {
           toast(err?.response?.data?.message);
         } else {
           toast(err?.message);
@@ -546,7 +569,8 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
                   isProcessing,
                   nameExists,
                   disableNext,
-                  divRef
+                  divRef,
+                  analytics
                 )}
               </div>
             </div>

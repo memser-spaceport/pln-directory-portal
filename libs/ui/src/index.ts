@@ -16,3 +16,4 @@ export * from './lib/image-upload/image-upload';
 export * from './lib/multi-select/multi-select';
 export * from './lib/text-area/text-area';
 export * from './lib/autocomplete/autocomplete';
+export * from './lib/confirm-input-field/confirm-input.field';

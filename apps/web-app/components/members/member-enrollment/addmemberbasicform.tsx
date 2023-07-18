@@ -1,11 +1,35 @@
-import { InputField, ProfileImageUpload } from '@protocol-labs-network/ui';
+import {
+  InputField,
+  ProfileImageUpload,
+  ConfirmInputField,
+} from '@protocol-labs-network/ui';
 import { UserIcon } from '@heroicons/react/solid';
+import { ReactComponent as EditIcon } from '/public/assets/images/icons/edit.svg';
 import { ReactComponent as InformationCircleIcon } from '../../../public/assets/images/icons/info_icon.svg';
 
 export default function AddMemberBasicForm(props) {
   const values = props.formValues;
   const onChange = props.onChange;
+  const requiredFlag = props?.isEditMode
+    ? props?.dataLoaded
+      ? true
+      : false
+    : true;
+  const currentEmail = props.currentEmail;
 
+  const editEmail = () => {
+    return (
+      <div
+        className="absolute right-0 top-[20px] flex cursor-pointer items-center gap-1"
+        onClick={props.onEmailChange}
+      >
+        <EditIcon className="m-1" />
+        <p className="right-0 cursor-pointer text-sm font-semibold text-[#156FF7]">
+          Edit Email
+        </p>
+      </div>
+    );
+  };
   return (
     <>
       <div className="flex pt-5">
@@ -20,11 +44,13 @@ export default function AddMemberBasicForm(props) {
             }
             avatarIcon={props.isEditMode && UserIcon}
             onImageChange={props.handleImageChange}
+            resetImg={props.resetImg}
+            onResetImg={props.onResetImg}
           />
         </div>
         <div className="namefield inputfield">
           <InputField
-            required={true}
+            required={requiredFlag}
             name="name"
             label="Name"
             pattern="^[a-zA-Z\s]*$"
@@ -45,22 +71,54 @@ export default function AddMemberBasicForm(props) {
           4MB.
         </span>
       </div>
-      <div className="inputfield pt-5">
-        <InputField
-          required
-          name="email"
-          type="email"
-          label="Email"
-          maxLength={255}
-          value={values?.email}
-          onKeyDown={() => props?.setDisableNext(true)}
-          disabled={props.disableEmail ? props.disableEmail : false}
-          onChange={onChange}
-          onBlur={props.onEmailBlur && props.onEmailBlur}
-          placeholder="Enter your email address"
-          className="custom-grey custom-outline-none border"
-        />
-      </div>
+      {!props.isUserProfile && !props.isEmailEditActive && (
+        <div className="inputfield relative pt-5">
+          <InputField
+            required={requiredFlag}
+            name="email"
+            type="email"
+            label="Email"
+            maxLength={255}
+            value={values?.email}
+            onKeyDown={() => props?.setDisableNext(true)}
+            disabled={props.disableEmail ? props.disableEmail : false}
+            onChange={onChange}
+            onBlur={props.onEmailBlur && props.onEmailBlur}
+            placeholder="Enter your email address"
+            className="custom-grey custom-outline-none border"
+          />
+          {!props.isEmailEditActive && props.isProfileSettings && editEmail()}
+        </div>
+      )}
+
+      {props.isUserProfile && (
+        <div className="inputfield relative pt-5">
+          <p className="text-sm font-bold">Email</p>
+          <p className="mt-[12px] text-sm text-slate-900">{values?.email}</p>
+          {!props.isEmailEditActive && props.isProfileSettings && editEmail()}
+        </div>
+      )}
+      {props.isEmailEditActive &&
+        props.isProfileSettings &&
+        !props.isUserProfile && (
+          <div className="relative flex pt-5">
+            <ConfirmInputField
+              name="email"
+              currentEmail={currentEmail}
+              onChange={onChange}
+              pattern="^[a-zA-Z\s]*$"
+              type="email"
+              label="Enter New Email"
+              className="custom-grey custom-outline-none border"
+            />
+            <p
+              onClick={props.onCancelEmailChange}
+              className="absolute top-[20px] right-0 cursor-pointer text-sm font-semibold text-[#156FF7]"
+            >
+              Cancel
+            </p>
+          </div>
+        )}
       {props.emailExists && (
         <span className="pt-3 text-xs text-rose-600">
           Email already exists!
@@ -73,7 +131,11 @@ export default function AddMemberBasicForm(props) {
           onChange={onChange}
           onKeyDown={(e) => e.preventDefault()}
           value={values?.plnStartDate}
+          hasClear={true}
           label="PLN Join Date"
+          onClear={() =>
+            onChange({ target: { name: 'plnStartDate', value: '' } })
+          }
           className="custom-grey custom-outline-none border"
         />
       </div>

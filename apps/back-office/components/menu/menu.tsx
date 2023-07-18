@@ -39,7 +39,6 @@ export function Menu() {
     <ul className="flex space-x-4 text-sm text-gray-700">
       {MENU_ITEMS.map((item) => {
         const Icon = item.icon;
-
         return (
           <li key={item.name}>
             <div
@@ -74,10 +73,8 @@ export function Menu() {
                 />
                 {item.name}
                 <div
-                  className={`m-[4px] h-[20px] rounded-[15px] border border-solid ${
-                    item.count > 9 ? 'w-[25px]' : 'w-[20px]'
-                  }
-                   border-[#1D4ED8] bg-[#1D4ED8] pl-[5px] pt-[1px] text-xs text-white
+                  className={`m-[4px] flex items-center justify-center rounded-full border border-solid h-[35px] w-[35px]
+                   border-[#1D4ED8] bg-[#1D4ED8] text-xs text-white
                    ${
                      (isTeamActive &&
                        item.name === APP_CONSTANTS.TEAMS_LABEL) ||
@@ -86,7 +83,7 @@ export function Menu() {
                        : 'border-[#475569] bg-[#475569]'
                    }`}
                 >
-                  {item.count}
+                  <span className="text-center">{item.count}</span>
                 </div>
               </a>
             </div>

@@ -52,7 +52,6 @@ export function Index() {
         }
       })
       .catch((err) => {
-        console.log('err>>>>', err);
         setError('Please try again!');
       })
       .finally(() => {

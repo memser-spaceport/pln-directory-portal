@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { UserIcon, UserGroupIcon } from '@heroicons/react/solid';
 import { InputField } from '../input-field/input-field';
 import { ReactComponent as ArrowDown } from '../../assets/icons/arrow-down-filled.svg';
 import { debounce } from 'lodash';
+import { DiscardChangesPopup } from '../modals/confirmation';
 
 interface IDropdownOption {
   label: string;
   value?: string;
+  logo?: string | any;
 }
 
 interface AutocompleteProps {
@@ -19,6 +22,9 @@ interface AutocompleteProps {
   excludeValues?: string[];
   onSelectOption: (option: IDropdownOption) => void;
   debounceCall: (searchTerm: string | undefined) => Promise<IDropdownOption[]>;
+  confirmationMessage?: string;
+  validateBeforeChange?: boolean;
+  validationFnBeforeChange?: (option: IDropdownOption) => boolean;
 }
 
 export function Autocomplete({
@@ -32,10 +38,15 @@ export function Autocomplete({
   placeholder,
   excludeValues = [],
   name,
+  confirmationMessage = '',
+  validateBeforeChange,
+  validationFnBeforeChange
 }: AutocompleteProps) {
   const [searchTerm, setSearchTerm] = useState<string>(selectedOption.label);
   const [filteredOptions, setFilteredOptions] = useState<IDropdownOption[]>([]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [openValidationPopup, setValidationPopup] = useState<boolean>(false);
+  const [tempOption, setTempOption] = useState<IDropdownOption>(selectedOption);
   const [selectedValue, setSelectedValue] =
     useState<IDropdownOption>(selectedOption);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -43,12 +54,13 @@ export function Autocomplete({
   const excludeList = excludeValues?.filter(
     (item) => item !== selectedValue.value
   );
-
+  const memberDefaultIcon = (name === 'member') ? <UserIcon className="bg-gray-200 fill-white relative inline-block h-6 w-6 rounded-full"/> : null;
+  const teamDefaultIcon = (name === 'team') ? <UserGroupIcon className="bg-gray-200 fill-white relative inline-block h-6 w-6 rounded-full"/> : null; 
   useMemo(() => {
-    if (searchTerm === '') {
+    // if (searchTerm === '') {
       setSearchTerm(selectedOption.label);
-    }
-  }, [selectedOption.label]);
+    // }
+  }, [selectedOption]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -69,18 +81,22 @@ export function Autocomplete({
 
   // Define the debounced function
   const debouncedGetData = debounce((searchTerm) => {
+    
     debounceCall(searchTerm).then((res: IDropdownOption[]) => {
       const availableTeams = res?.filter((item) =>
         excludeList?.every((filterItem) => filterItem !== item.value)
       );
       setFilteredOptions(availableTeams);
-      setIsProcessing(false);
+      // if(availableTeams.length){
+        setIsProcessing(false);
+      // }
     });
   }, debounceTime);
 
   useEffect(() => {
     if (isExpanded) {
       setIsProcessing(true);
+      
       // Call the debounced function when the searchTerm changes
       debouncedGetData(searchTerm);
 
@@ -91,35 +107,70 @@ export function Autocomplete({
     } else {
       return;
     }
-  }, [searchTerm, excludeValues, isExpanded]);
+  }, [searchTerm, isExpanded]);
 
   const handleUserInput = (event: React.ChangeEvent<HTMLInputElement>) => {
+
     setSearchTerm(event.currentTarget?.value);
   };
 
   const checkValidData = () => {
     if (searchTerm?.trim() === '') {
-      setSelectedValue({ value: '', label: '' });
-      onSelectOption({ value: '', label: '' });
+      // setSelectedValue({ value: '', label: '' });
+      // onSelectOption({ value: '', label: '' });
+
+      setSearchTerm(selectedOption.label);
+      setSelectedValue(selectedOption);
     } else {
-      setSearchTerm(selectedValue?.label);
+      if(selectedValue?.label === ''){
+        setSearchTerm(selectedOption.label);
+      }else{
+
+        setSearchTerm(selectedValue?.label);
+      }
     }
   };
 
   const handleOptionClick = (option: IDropdownOption) => {
+    if(validateBeforeChange){
+      if(validationFnBeforeChange){
+        if (validationFnBeforeChange(option)) {
+          setTempOption(option);
+          setValidationPopup(true);
+        } else {
+          changeDropdown(option);
+        }
+      }else{
+        changeDropdown(option);
+      }
+    }else{
+      changeDropdown(option);
+    }
+  };
+
+  const changeDropdown = (option: IDropdownOption) => {
     setSelectedValue(option);
     setSearchTerm(option?.label);
     setIsExpanded(false);
     onSelectOption(option);
     setFilteredOptions([]);
-  };
+  }
+
+  const confirmationOnClose = (flag: boolean) => {
+    setValidationPopup(false);
+    if (flag) {
+      changeDropdown(tempOption);
+    }
+  }
 
   return (
+    <>
     <div onBlur={() => checkValidData()}>
       <div className="flex">
         <InputField
+          icon={selectedValue.logo ? selectedValue.logo : undefined}
           label={'te'}
-          className={`mt-[12px] flex cursor-pointer items-center justify-between rounded-md border border-gray-300 bg-white py-2 px-6 focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
+          className={`mt-[12px] flex ${!disabled && 'cursor-pointer'} items-center justify-between rounded-md border border-gray-300 bg-white py-2 px-6 focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
           type="text"
           showLabel={false}
           disabled={disabled}
@@ -127,9 +178,11 @@ export function Autocomplete({
           placeholder={placeholder}
           required={required}
           value={searchTerm}
+          dropDownType={name}
           onClick={() => {
             setIsExpanded(!isExpanded);
-            setSearchTerm(selectedValue.label);
+            setSearchTerm('');
+            setSelectedValue({ value: '', label: '' ,logo:''});
           }}
           onKeyDown={(e) => e.key === 'Tab' && setIsExpanded(false)}
         />
@@ -151,17 +204,27 @@ export function Autocomplete({
                   key={option.value}
                   onClick={() => handleOptionClick(option)}
                 >
-                  {option.label}
+                  <div className='flex items-center truncate'>
+                  {option.logo && (
+                    <img src={option.logo} className='relative inline-block h-6 w-6 rounded-full'></img>
+                    )
+                  }
+                  { option.logo === null && memberDefaultIcon }
+                  { option.logo === null && teamDefaultIcon }
+                  <span className='overflow-hidden overflow-ellipsis max-w-full pl-[5px]'>{option.label}</span>
+                  </div>
                 </li>
               ))
-            ) : isProcessing ? (
+            ) : (isProcessing ? (
               <li className="text-gray-500">Searching</li>
             ) : (
               <li className="text-gray-500">No options available</li>
-            )}
+            ))}
           </ul>
         </div>
       )}
     </div>
+    <DiscardChangesPopup text={confirmationMessage} isOpen={openValidationPopup} onCloseFn={confirmationOnClose} />
+    </>
   );
 }

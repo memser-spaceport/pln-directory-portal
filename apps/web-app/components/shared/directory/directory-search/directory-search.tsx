@@ -4,10 +4,12 @@ import { useRouter } from 'next/router';
 
 interface DirectorySearchProps {
   placeholder?: string;
+  onSearch: any,
 }
 
 export function DirectorySearch({
   placeholder = 'Search',
+  onSearch
 }: DirectorySearchProps) {
   const { query, push, pathname } = useRouter();
   const searchTerm = query.searchBy as string;
@@ -15,6 +17,7 @@ export function DirectorySearch({
   function pushQuery(inputVal = '') {
     if (inputVal) {
       push({ pathname, query: { ...query, searchBy: inputVal } });
+      onSearch(inputVal)
     } else if (searchTerm) {
       const { searchBy, ...restQuery } = query;
       push({ pathname, query: restQuery });
@@ -29,7 +32,7 @@ export function DirectorySearch({
         showLabel={false}
         icon={SearchIcon}
         placeholder={placeholder}
-        defaultValue={searchTerm}
+        value={searchTerm}
         onKeyUp={(event) => {
           if (event.key === 'Enter' || event.keyCode === 13) {
             pushQuery(event.currentTarget.value);

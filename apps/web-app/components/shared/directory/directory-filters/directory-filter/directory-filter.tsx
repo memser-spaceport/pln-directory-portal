@@ -8,8 +8,10 @@ interface DirectoryFilterProps {
 export function DirectoryFilter({ title, children }: DirectoryFilterProps) {
   return (
     <>
+      <div className='relative'>
       <div className="mb-4 text-sm font-semibold leading-5">{title}</div>
       <div>{children}</div>
+      </div>
     </>
   );
 }

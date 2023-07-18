@@ -1,13 +1,31 @@
 /* eslint-disable prettier/prettier */
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { ApprovalStatus, ParticipantType } from '@prisma/client';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  CACHE_MANAGER,
+  CacheModule,
+  UnauthorizedException,
+} from '@nestjs/common';
+
+import {
+  ApprovalStatus,
+  ParticipantType,
+  Prisma,
+  PrismaClient,
+} from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AwsService } from '../utils/aws/aws.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { RedisService } from '../utils/redis/redis.service';
 import { SlackService } from '../utils/slack/slack.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
-import { getRandomId } from '../utils/helper/helper';
+import { getRandomId, generateProfileURL } from '../utils/helper/helper';
+import axios from 'axios';
+import { LogService } from '../shared/log.service';
+import { Cache } from 'cache-manager';
+
 @Injectable()
 export class ParticipantsRequestService {
   constructor(
@@ -16,7 +34,9 @@ export class ParticipantsRequestService {
     private awsService: AwsService,
     private redisService: RedisService,
     private slackService: SlackService,
-    private forestAdminService: ForestAdminService
+    private forestAdminService: ForestAdminService,
+    private logService: LogService,
+    @Inject(CACHE_MANAGER) private cacheService: Cache,
   ) {}
 
   async getAll(userQuery) {
@@ -53,11 +73,47 @@ export class ParticipantsRequestService {
     return results;
   }
 
+  async addAutoApprovalEntry(tx, newEntry) {
+    await tx.participantsRequest.create({
+        data: {...newEntry}
+    })
+  }
+
   async getByUid(uid) {
     const result = await this.prisma.participantsRequest.findUnique({
       where: { uid: uid },
     });
     return result;
+  }
+
+  async findMemberByEmail(userEmail) {
+    const foundMember = await this.prisma.member.findUnique({
+      where: {
+        email: userEmail,
+      },
+      include: {
+        memberRoles: true,
+        teamMemberRoles: true,
+      },
+    });
+
+    if (!foundMember) {
+      return null;
+    }
+
+    const roleNames = foundMember.memberRoles.map((m) => m.name);
+    const isDirectoryAdmin = roleNames.includes('DIRECTORYADMIN');
+
+    const formattedMemberDetails = {
+      ...foundMember,
+      isDirectoryAdmin,
+      roleNames,
+      leadingTeams: foundMember.teamMemberRoles
+        .filter((role) => role.teamLead)
+        .map((role) => role.teamUid),
+    };
+
+    return formattedMemberDetails;
   }
 
   async findDuplicates(uniqueIdentifier, participantType, uid, requestId) {
@@ -85,7 +141,7 @@ export class ParticipantsRequestService {
       } else {
         let memResult = await this.prisma.member.findMany({
           where: {
-            email: uniqueIdentifier,
+            email: uniqueIdentifier.toLowerCase(),
           },
         });
         memResult = memResult?.filter((item) => item.uid !== uid);
@@ -100,34 +156,39 @@ export class ParticipantsRequestService {
     }
   }
 
-  async addRequest(requestData) {
+  async addRequest(
+    requestData,
+    disableNotification = false,
+    transactionType: Prisma.TransactionClient | PrismaClient = this.prisma
+  ) {
     const uniqueIdentifier =
       requestData.participantType === 'TEAM'
         ? requestData.newData.name
-        : requestData.newData.email;
+        : requestData.newData.email.toLowerCase().trim();
     const postData = { ...requestData, uniqueIdentifier };
     requestData[uniqueIdentifier] = uniqueIdentifier;
-
-    let existingData: any;
-    if (requestData.referenceUid) {
-      existingData =
-        requestData.participantType === 'TEAM'
-          ? await this.prisma.team.findUnique({
-              where: { uid: requestData.referenceUid },
-            })
-          : await this.prisma.member.findUnique({
-              where: { uid: requestData.referenceUid },
-            });
+    if (requestData.participantType === ParticipantType.MEMBER.toString()) {
+      const { city, country, region } = postData.newData;
+      if (city || country || region) {
+        const result: any = await this.locationTransferService.fetchLocation(
+          city,
+          country,
+          null,
+          region,
+          null
+        );
+        if (!result || !result?.location) {
+          throw new BadRequestException('Invalid Location info');
+        }
+      }
     }
 
     const slackConfig = {
       requestLabel: '',
       url: '',
-      name: requestData.referenceUid
-        ? existingData.name
-        : requestData.newData.name,
+      name: requestData.newData.name,
     };
-    const result: any = await this.prisma.participantsRequest.create({
+    const result: any = await transactionType.participantsRequest.create({
       data: { ...postData },
     });
     if (
@@ -143,12 +204,13 @@ export class ParticipantsRequestService {
       });
     } else if (
       result.participantType === ParticipantType.MEMBER.toString() &&
-      result.referenceUid !== null
+      result.referenceUid !== null &&
+      !disableNotification
     ) {
       slackConfig.requestLabel = 'Edit Labber Request';
       slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`;
       await this.awsService.sendEmail('EditMemberRequest', true, [], {
-        memberName: existingData.name,
+        memberName: result.newData.name,
         requestUid: result.uid,
         requesterEmailId: requestData.requesterEmailId,
         adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`,
@@ -170,16 +232,18 @@ export class ParticipantsRequestService {
     ) {
       slackConfig.requestLabel = 'Edit Team Request';
       slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`;
-      await this.awsService.sendEmail('EditTeamRequest', true, [], {
-        teamName: existingData.name,
-        teamUid: result.referenceUid,
-        requesterEmailId: requestData.requesterEmailId,
-        adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,
-      });
+      if (!disableNotification)
+        await this.awsService.sendEmail('EditTeamRequest', true, [], {
+          teamName: result.newData.name,
+          teamUid: result.referenceUid,
+          requesterEmailId: requestData.requesterEmailId,
+          adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,
+        });
     }
 
-    await this.slackService.notifyToChannel(slackConfig);
-    await this.redisService.resetAllCache();
+    if (!disableNotification)
+      await this.slackService.notifyToChannel(slackConfig);
+    await this.cacheService.reset()
     return result;
   }
 
@@ -195,7 +259,7 @@ export class ParticipantsRequestService {
       where: { uid: requestedUid },
       data: { ...formattedData },
     });
-    await this.redisService.resetAllCache();
+    await this.cacheService.reset()
     return { code: 1, message: 'success' };
   }
 
@@ -204,13 +268,13 @@ export class ParticipantsRequestService {
       where: { uid: uidToReject },
     });
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      return { code: -1, message: 'Request already Processed' };
+      throw new BadRequestException('Request already processed');
     }
     await this.prisma.participantsRequest.update({
       where: { uid: uidToReject },
       data: { status: ApprovalStatus.REJECTED },
     });
-    await this.redisService.resetAllCache();
+    await this.cacheService.reset()
     return { code: 1, message: 'Success' };
   }
 
@@ -221,7 +285,7 @@ export class ParticipantsRequestService {
     });
 
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      return { code: -1, message: 'Request already Processed' };
+      throw new BadRequestException('Request already processed');
     }
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
@@ -230,15 +294,17 @@ export class ParticipantsRequestService {
       url: '',
       name: dataToProcess.name,
     };
+
     // Mandatory fields
     dataToSave['name'] = dataToProcess.name;
-    dataToSave['email'] = dataToProcess.email;
+    dataToSave['email'] = dataToProcess.email.toLowerCase().trim();
 
     // Optional fields
     dataToSave['githubHandler'] = dataToProcess.githubHandler;
     dataToSave['discordHandler'] = dataToProcess.discordHandler;
     dataToSave['twitterHandler'] = dataToProcess.twitterHandler;
     dataToSave['linkedinHandler'] = dataToProcess.linkedinHandler;
+    dataToSave['telegramHandler'] = dataToProcess.telegramHandler;
     dataToSave['officeHours'] = dataToProcess.officeHours;
     dataToSave['moreDetails'] = dataToProcess.moreDetails;
     dataToSave['plnStartDate'] = dataToProcess.plnStartDate;
@@ -312,7 +378,7 @@ export class ParticipantsRequestService {
     await this.awsService.sendEmail(
       'NewMemberSuccess',
       false,
-      [dataFromDB.requesterEmailId],
+      [dataToSave.email],
       {
         memberName: dataToProcess.name,
         memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${
@@ -325,27 +391,34 @@ export class ParticipantsRequestService {
       newMember.uid
     }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
-    await this.redisService.resetAllCache();
+    await this.cacheService.reset()
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
 
-  async processMemberEditRequest(uidToEdit) {
+  async processMemberEditRequest(
+    uidToEdit,
+    disableNotification = false,
+    isAutoApproval = false,
+    isDirectoryAdmin = false,
+    transactionType: Prisma.TransactionClient | PrismaClient = this.prisma
+  ) {
     // Get
-    const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
-      where: { uid: uidToEdit },
-    });
-    if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      return { code: -1, message: 'Request already Processed' };
+    const dataFromDB: any =
+      await transactionType.participantsRequest.findUnique({
+        where: { uid: uidToEdit },
+      });
+    if (dataFromDB?.status !== ApprovalStatus.PENDING.toString()) {
+      throw new BadRequestException('Request already processed');
     }
-
-    const existingData: any = await this.prisma.member.findUnique({
+    const existingData: any = await transactionType.member.findUnique({
       where: { uid: dataFromDB.referenceUid },
       include: {
         image: true,
         location: true,
         skills: true,
         teamMemberRoles: true,
+        memberRoles: true,
       },
     });
     const dataToProcess = dataFromDB?.newData;
@@ -356,15 +429,23 @@ export class ParticipantsRequestService {
       name: dataToProcess.name,
     };
 
+    const isEmailChange = existingData.email !== dataToProcess.email ? true: false;
+    if(isEmailChange) {
+      const foundUser: any = await transactionType.member.findUnique({where: {email: dataToProcess.email.toLowerCase().trim()}});
+      if(foundUser && foundUser.email) {
+        throw new BadRequestException("Email already exists. Please try again with different email")
+      }
+    }
     // Mandatory fields
     dataToSave['name'] = dataToProcess.name;
-    dataToSave['email'] = dataToProcess.email;
+    dataToSave['email'] = dataToProcess.email.toLowerCase().trim();
 
     // Optional fields
     dataToSave['githubHandler'] = dataToProcess.githubHandler;
     dataToSave['discordHandler'] = dataToProcess.discordHandler;
     dataToSave['twitterHandler'] = dataToProcess.twitterHandler;
     dataToSave['linkedinHandler'] = dataToProcess.linkedinHandler;
+    dataToSave['telegramHandler'] = dataToProcess.telegramHandler;
     dataToSave['officeHours'] = dataToProcess.officeHours;
     dataToSave['moreDetails'] = dataToProcess.moreDetails;
     dataToSave['plnStartDate'] = dataToProcess.plnStartDate;
@@ -410,8 +491,87 @@ export class ParticipantsRequestService {
       } else {
         throw new BadRequestException('Invalid Location info');
       }
+    } else {
+      dataToSave['location'] = { disconnect: true };
     }
 
+    if (transactionType === this.prisma) {
+      await this.prisma.$transaction(async (tx) => {
+        await this.processMemberEditChanges(
+          existingData,
+          dataFromDB,
+          dataToSave,
+          uidToEdit,
+          isAutoApproval,
+          tx
+        );
+      });
+    } else {
+      await this.processMemberEditChanges(
+        existingData,
+        dataFromDB,
+        dataToSave,
+        uidToEdit,
+        isAutoApproval,
+        transactionType
+      );
+    }
+
+    if (!disableNotification) {
+      await this.awsService.sendEmail('MemberEditRequestCompleted', true, [], {
+        memberName: dataToProcess.name,
+      });
+      await this.awsService.sendEmail(
+        'EditMemberSuccess',
+        false,
+        [dataFromDB.requesterEmailId],
+        {
+          memberName: dataToProcess.name,
+          memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${
+            dataFromDB.referenceUid
+          }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
+        }
+      );
+      slackConfig.requestLabel = 'Edit Labber Request Completed';
+      slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${
+        dataFromDB.referenceUid
+      }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
+      await this.slackService.notifyToChannel(slackConfig);
+    }
+    await this.cacheService.reset();
+    // Send ack email to old & new email of member reg his/her email change.
+    if (isEmailChange && isDirectoryAdmin) {
+      const oldEmail = existingData.email;
+      const newEmail = dataToSave.email;
+      await this.awsService.sendEmail(
+        'MemberEmailChangeAcknowledgement',
+        false,
+        [oldEmail, newEmail],
+        {
+          oldEmail,
+          newEmail,
+          memberName: dataToProcess.name,
+          profileURL: this.generateMemberProfileURL(existingData.uid),
+          loginURL: process.env.LOGIN_URL
+        }
+      );
+    }
+    await this.forestAdminService.triggerAirtableSync();
+    return { code: 1, message: 'Success' };
+  }
+
+  async processMemberEditChanges(
+    existingData,
+    dataFromDB,
+    dataToSave,
+    uidToEdit,
+    isAutoApproval,
+    tx
+  ) {
+    const dataToProcess = dataFromDB?.newData;
+    const isEmailChange =
+      existingData.email !== dataToProcess.email ? true : false;
+    const isExternalIdAvailable = existingData.externalId ? true : false;
     // Team member roles relational mapping
     const oldTeamUids = [...existingData.teamMemberRoles].map((t) => t.teamUid);
     const newTeamUids = [...dataToProcess.teamAndRoles].map((t) => t.teamUid);
@@ -439,78 +599,94 @@ export class ParticipantsRequestService {
       (t) => !oldTeamUids.includes(t.teamUid)
     );
 
-    // Updating All data using transation.
-    await this.prisma.$transaction(async (tx) => {
-      // team-member-role changes
-      const promisesToDelete = teamAndRolesUidsToDelete.map((v) =>
-        tx.teamMemberRole.delete({
-          where: {
-            memberUid_teamUid: {
-              teamUid: v.teamUid,
-              memberUid: dataFromDB.referenceUid,
-            },
-          },
-        })
-      );
-      const promisesToUpdate = teamAndRolesUidsToUpdate.map((v) =>
-        tx.teamMemberRole.update({
-          where: {
-            memberUid_teamUid: {
-              teamUid: v.teamUid,
-              memberUid: dataFromDB.referenceUid,
-            },
-          },
-          data: { role: v.role },
-        })
-      );
-      await Promise.all(promisesToDelete);
-      await Promise.all(promisesToUpdate);
-      await tx.teamMemberRole.createMany({
-        data: teamAndRolesUidsToCreate.map((t) => {
-          return {
-            role: t.role,
-            mainTeam: false,
-            teamLead: false,
-            teamUid: t.teamUid,
+    const promisesToDelete = teamAndRolesUidsToDelete.map((v) =>
+      tx.teamMemberRole.delete({
+        where: {
+          memberUid_teamUid: {
+            teamUid: v.teamUid,
             memberUid: dataFromDB.referenceUid,
-          };
-        }),
-      });
-
-      // Other member Changes
-      await tx.member.update({
-        where: { uid: dataFromDB.referenceUid },
-        data: { ...dataToSave },
-      });
-
-      // Updating status
-      await tx.participantsRequest.update({
-        where: { uid: uidToEdit },
-        data: { status: ApprovalStatus.APPROVED },
-      });
-    });
-    await this.awsService.sendEmail('MemberEditRequestCompleted', true, [], {
-      memberName: dataToProcess.name,
-    });
-    await this.awsService.sendEmail(
-      'EditMemberSuccess',
-      false,
-      [dataFromDB.requesterEmailId],
-      {
-        memberName: dataToProcess.name,
-        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${
-          dataFromDB.referenceUid
-        }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
-      }
+          },
+        },
+      })
     );
-    slackConfig.requestLabel = 'Edit Labber Request Completed';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${
-      dataFromDB.referenceUid
-    }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
-    await this.slackService.notifyToChannel(slackConfig);
-    await this.redisService.resetAllCache();
-    await this.forestAdminService.triggerAirtableSync();
-    return { code: 1, message: 'Success' };
+    const promisesToUpdate = teamAndRolesUidsToUpdate.map((v) =>
+      tx.teamMemberRole.update({
+        where: {
+          memberUid_teamUid: {
+            teamUid: v.teamUid,
+            memberUid: dataFromDB.referenceUid,
+          },
+        },
+        data: { role: v.role },
+      })
+    );
+    await Promise.all(promisesToDelete);
+    await Promise.all(promisesToUpdate);
+    await tx.teamMemberRole.createMany({
+      data: teamAndRolesUidsToCreate.map((t) => {
+        return {
+          role: t.role,
+          mainTeam: false,
+          teamLead: false,
+          teamUid: t.teamUid,
+          memberUid: dataFromDB.referenceUid,
+        };
+      }),
+    });
+
+    // Other member Changes
+    await tx.member.update({
+      where: { uid: dataFromDB.referenceUid },
+      data: { ...dataToSave },
+    });
+
+    if (isEmailChange && isExternalIdAvailable) {
+      // try {
+      const response = await axios.post(
+        `${process.env.AUTH_API_URL}/auth/token`,
+        {
+          client_id: process.env.AUTH_APP_CLIENT_ID,
+          client_secret: process.env.AUTH_APP_CLIENT_SECRET,
+          grant_type: 'client_credentials',
+          grantTypes: [
+            'client_credentials',
+            'authorization_code',
+            'refresh_token',
+          ],
+        }
+      );
+
+      const clientToken = response.data.access_token;
+      const headers = {
+        Authorization: `Bearer ${clientToken}`,
+      };
+      const authPayload = {
+        email: dataToSave.email,
+        existingEmail: existingData.email.toLowerCase().trim(),
+        userId: existingData.externalId,
+        deleteAndReplace: true,
+      };
+      await axios.patch(
+        `${process.env.AUTH_API_URL}/admin/accounts/email`,
+        authPayload,
+        { headers: headers }
+      );
+      // } catch (e) {
+      //   if (e?.response?.data?.message && e?.response.status === 404) {
+      //   } else {
+      //     throw e;
+      //   }
+      // }
+    }
+    // Updating status
+    await tx.participantsRequest.update({
+      where: { uid: uidToEdit },
+      data: {
+        status: isAutoApproval
+          ? ApprovalStatus.AUTOAPPROVED
+          : ApprovalStatus.APPROVED,
+      },
+    });
   }
 
   async processTeamCreateRequest(uidToApprove) {
@@ -518,9 +694,8 @@ export class ParticipantsRequestService {
       where: { uid: uidToApprove },
     });
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      return { code: -1, message: 'Request already Processed' };
+      throw new BadRequestException('Request already processed');
     }
-
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
     const slackConfig = {
@@ -539,6 +714,7 @@ export class ParticipantsRequestService {
     // Non Mandatory Fields
     dataToSave['twitterHandler'] = dataToProcess.twitterHandler;
     dataToSave['linkedinHandler'] = dataToProcess.linkedinHandler;
+    dataToSave['telegramHandler'] = dataToProcess.telegramHandler;
     dataToSave['airtableRecId'] = dataToProcess.airtableRecId;
     dataToSave['blog'] = dataToProcess.blog;
     dataToSave['officeHours'] = dataToProcess.officeHours;
@@ -607,17 +783,22 @@ export class ParticipantsRequestService {
       newTeam.uid
     }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
-    await this.redisService.resetAllCache();
+    await this.cacheService.reset()
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
 
-  async processTeamEditRequest(uidToEdit) {
-    const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
+  async processTeamEditRequest(
+    uidToEdit,
+    disableNotification = false,
+    isAutoApproval = false,
+    transactionType: Prisma.TransactionClient | PrismaClient = this.prisma
+  ) {
+    const dataFromDB: any = await transactionType.participantsRequest.findUnique({
       where: { uid: uidToEdit },
     });
     if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      return { code: -1, message: 'Request already Processed' };
+      throw new BadRequestException('Request already processed');
     }
     const dataToProcess: any = dataFromDB.newData;
     const dataToSave: any = {};
@@ -648,6 +829,7 @@ export class ParticipantsRequestService {
     // Non Mandatory Fields
     dataToSave['twitterHandler'] = dataToProcess.twitterHandler;
     dataToSave['linkedinHandler'] = dataToProcess.linkedinHandler;
+    dataToSave['telegramHandler'] = dataToProcess.telegramHandler;
     dataToSave['airtableRecId'] = dataToProcess.airtableRecId;
     dataToSave['blog'] = dataToProcess.blog;
     dataToSave['officeHours'] = dataToProcess.officeHours;
@@ -690,39 +872,62 @@ export class ParticipantsRequestService {
       }),
     };
 
-    await this.prisma.$transaction(async (tx) => {
-      // Update data
-      await tx.team.update({
+    if (transactionType === this.prisma) {
+      await this.prisma.$transaction(async (tx) => {
+        // Update data
+        await tx.team.update({
+          where: { uid: dataFromDB.referenceUid },
+          data: { ...dataToSave },
+        });
+        // Updating status
+        await tx.participantsRequest.update({
+          where: { uid: uidToEdit },
+          data: {
+            status: isAutoApproval
+              ? ApprovalStatus.AUTOAPPROVED
+              : ApprovalStatus.APPROVED,
+          },
+        });
+      });
+    } else {
+      await transactionType.team.update({
         where: { uid: dataFromDB.referenceUid },
         data: { ...dataToSave },
       });
       // Updating status
-      await tx.participantsRequest.update({
+      await transactionType.participantsRequest.update({
         where: { uid: uidToEdit },
-        data: { status: ApprovalStatus.APPROVED },
+        data: {
+          status: isAutoApproval
+            ? ApprovalStatus.AUTOAPPROVED
+            : ApprovalStatus.APPROVED,
+        },
       });
-    });
-    await this.awsService.sendEmail('TeamEditRequestCompleted', true, [], {
-      teamName: dataToProcess.name,
-    });
-    await this.awsService.sendEmail(
-      'EditTeamSuccess',
-      false,
-      [dataFromDB.requesterEmailId],
-      {
+    }
+
+    if (!disableNotification) {
+      await this.awsService.sendEmail('TeamEditRequestCompleted', true, [], {
         teamName: dataToProcess.name,
-        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${
-          existingData.uid
-        }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
-      }
-    );
-    slackConfig.requestLabel = 'Edit Team Request Completed ';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${
-      existingData.uid
-    }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
-    await this.slackService.notifyToChannel(slackConfig);
-    await this.redisService.resetAllCache();
+      });
+      await this.awsService.sendEmail(
+        'EditTeamSuccess',
+        false,
+        [dataFromDB.requesterEmailId],
+        {
+          teamName: dataToProcess.name,
+          teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`,
+        }
+      );
+      slackConfig.requestLabel = 'Edit Team Request Completed ';
+      slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`;
+      await this.slackService.notifyToChannel(slackConfig);
+    }
+    await this.cacheService.reset()
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
+  }
+
+  generateMemberProfileURL(value) {
+    return generateProfileURL(value);
   }
 }

@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 export interface BreadcrumbProps {
   items: IBreadcrumbItem[];
+  classname?: string;
 }
 
 export interface IBreadcrumbItem {
@@ -10,7 +11,7 @@ export interface IBreadcrumbItem {
   href?: string;
 }
 
-export function Breadcrumb({ items }: BreadcrumbProps) {
+export function Breadcrumb({ items, classname }: BreadcrumbProps) {
   return (
     <nav
       aria-label="breadcrumb"
@@ -31,7 +32,7 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
         return (
           <div
             className={`${
-              isLastItem ? 'font-medium text-slate-900' : 'text-slate-600'
+              isLastItem ? 'flex font-medium text-slate-900' : 'flex text-slate-600'
             }`}
             key={item.label}
             {...ariaCurrent}
@@ -46,7 +47,9 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
                 </a>
               </Link>
             ) : (
-              item.label
+              <p className= {classname}>
+              {item.label}
+              </p>
             )}
             {isLastItem ? null : <span className="mx-4 text-slate-400">/</span>}
           </div>

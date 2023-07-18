@@ -5,15 +5,24 @@ import { IMember } from '../../../../utils/members.types';
 import { DirectoryCard } from '../../../shared/directory/directory-card/directory-card';
 import { DirectoryCardFooter } from '../../../shared/directory/directory-card/directory-card-footer';
 import { DirectoryCardHeader } from '../../../shared/directory/directory-card/directory-card-header';
-import { ReactComponent as BriefCase } from '../../../../public/assets/images/icons/mdi_briefcase-check.svg';
+import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
+import { OpenToWorkBadge } from '../../../shared/open-to-work-badge/open-to-work-badge';
+import { TeamLeadBadge } from '../../../shared/team-lead-badge/team-lead-badge';
+
+import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
 
 interface MemberCardProps {
   isGrid?: boolean;
   member: IMember;
+  loggedInMember: any;
 }
 
-export function MemberCard({ isGrid = true, member }: MemberCardProps) {
-  const isOpenToWorkEnabled = process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK;
+export function MemberCard({
+  isGrid = true,
+  member,
+  loggedInMember,
+}: MemberCardProps) {
+  // const isOpenToWorkEnabled = (process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK  === 'true' && loggedInMember?.uid) ? true : false;
   const router = useRouter();
   const backLink = encodeURIComponent(router.asPath);
   const mainTeam = member.mainTeam;
@@ -22,11 +31,26 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
     .map((team) => team.name)
     .sort();
   const role = member.mainTeam?.role || 'Contributor';
+  const analytics = useAppAnalytics();
+  const isOpenTOWorkEnabled =
+    process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK === 'true'
+      ? true
+      : false;
+
+  const onMemberClicked = () => {
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_CLICKED, {
+      uid: member.id,
+      name: member.name,
+      backLink: backLink,
+    });
+  };
 
   return (
     <DirectoryCard
       isGrid={isGrid}
       cardUrl={`/directory/members/${member.id}?backLink=${backLink}`}
+      handleOnClick={onMemberClicked}
+      type="member"
     >
       <DirectoryCardHeader
         isGrid={isGrid}
@@ -36,9 +60,11 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
         avatarIcon={UserIcon}
         name={member.name}
         teamLead={member.teamLead}
+        userInfo={loggedInMember}
+        type="member"
       />
-      <div className={isGrid ? '' : 'w-[400px] grow-0'}>
-        <div className={isGrid ? '' : 'flex'}>
+      <div className={isGrid ? 'px-5' : 'w-[400px] grow-0'}>
+        <div className={isGrid ? '' : 'flex items-center'}>
           <h2
             className={`${
               isGrid ? 'mt-2' : ''
@@ -46,13 +72,15 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
           >
             {member.name}
           </h2>
-          {(isOpenToWorkEnabled === 'true') && !isGrid && member.openToWork && (
-            <span className="z-0 flex pl-2 pt-[5px] text-slate-600">
-              <BriefCase />
-              <span className="pl-1 pt-px text-[10px] font-medium leading-[14px] tracking-[0.01em]">
-                OPEN TO WORK
-              </span>
-            </span>
+          {(isOpenTOWorkEnabled) && !isGrid && member.openToWork && (
+            <div className="pl-1 pt-0.5 h-6 w-6">
+              <OpenToWorkBadge type='CARD'/>
+            </div>
+          )}
+          { !isGrid && member.teamLead && (
+            <div className="pl-1 pt-0.5 h-6 w-6">
+              <TeamLeadBadge size="5" />
+            </div>
           )}
         </div>
 
@@ -62,8 +90,19 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
           }`}
         >
           <div className="flex items-center justify-center">
-            <div className="overflow-hidden text-ellipsis whitespace-nowrap font-medium">
-              {(member.teams.length && mainTeam?.name) || '-'}
+            <div className="max-w-[250px] font-medium">
+              {(member.teams.length && (
+                <Tooltip
+                  asChild whitespace-nowrap 
+                  trigger={
+                    <p className="select-none truncate">
+                      {mainTeam?.name}
+                    </p>
+                  }
+                  content={mainTeam?.name}
+                />
+              )) ||
+                '-'}
             </div>
             {otherTeams.length ? (
               <Tooltip
@@ -83,24 +122,26 @@ export function MemberCard({ isGrid = true, member }: MemberCardProps) {
             {role}
           </div>
         </div>
-
-        <div
-          className={`${isGrid ? 'mt-2 justify-center' : 'mt-1'}
-            flex items-center text-sm text-slate-600`}
-        >
-          {member.location ? (
-            <>
-              <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0 fill-slate-400" />
-              <span className="line-clamp-1">{member.location}</span>
-            </>
-          ) : (
-            '-'
-          )}
-        </div>
+        {loggedInMember?.uid && (
+          <div
+            className={`${isGrid ? 'mt-2 justify-center' : 'mt-1'}
+              flex items-center text-sm text-slate-600`}
+          >
+            {member.location ? (
+              <>
+                <LocationMarkerIcon className="mr-1 h-4 w-4 flex-shrink-0 fill-slate-400" />
+                <span className="line-clamp-1">{member.location}</span>
+              </>
+            ) : (
+              '-'
+            )}
+          </div>
+        )}
       </div>
       <DirectoryCardFooter
         isGrid={isGrid}
         tagsArr={member.skills.map((skill) => skill.title)}
+        type="member"
       />
     </DirectoryCard>
   );

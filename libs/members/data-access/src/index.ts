@@ -12,7 +12,7 @@ export const getMembers = async (options: TMemberListOptions) => {
   return await client.members.getMembers({
     query: {
       ...options,
-    },
+    } as any,
   });
 };
 
@@ -31,11 +31,26 @@ export const getMember = async (
 };
 
 /**
+ * Get member prefernce details from API
+ */
+export const getMemberPreferences = async (
+  id: string,
+  token :string
+) => {
+  return await client.members.getMemberPreferences({
+    params: { uid: id },
+    headers:{
+      Authorization:`Bearer ${JSON.parse(token)}`
+    }
+  } as any);
+};
+
+/**
  * Get member unique id based on provided airtable id
  */
 export const getMemberUIDByAirtableId = async (id: string) => {
   const res = await client.members.getMembers({
-    query: { airtableRecId: id, select: 'uid' },
+    query: { airtableRecId: id, select: 'uid' } as any,
   });
 
   return res.status === 200 && res.body[0] ? res.body[0].uid : null;

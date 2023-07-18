@@ -14,6 +14,8 @@ type Props = {
   disabled?: boolean;
   enableHover?: boolean;
   avatarIcon?: (props: React.ComponentProps<'svg'>) => JSX.Element;
+  resetImg?: boolean;
+  onResetImg?: () => void;
 };
 
 function bytesToSize(bytes: number) {
@@ -32,6 +34,8 @@ export function ProfileImageUpload({
   disabled = false,
   enableHover = true,
   avatarIcon: AvatarIcon,
+  resetImg,
+  onResetImg
 }: Props) {
   const [, setImage] = useState<File | null>(null);
   const [uploadError, setError] = useState('');
@@ -39,12 +43,15 @@ export function ProfileImageUpload({
   const previewClassName =
     previewImageShape === 'circle' ? 'rounded-full' : 'rounded-xl';
   const inputRef = useRef<HTMLInputElement>(null);
-
+  
   useEffect(() => {
     if (enableHover === false) {
       setIsHovered(false);
     }
-  }, [enableHover]);
+    if (resetImg && onResetImg) {
+      setError('');
+    }
+  }, [enableHover, resetImg]);
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -86,6 +93,12 @@ export function ProfileImageUpload({
   ) => {
     evt.preventDefault();
     evt.stopPropagation();
+    if (inputRef.current) {
+      inputRef.current.value = '';
+    }
+    if(onResetImg) {
+      onResetImg();
+    }
     inputRef.current?.click();
   };
 
@@ -110,7 +123,8 @@ export function ProfileImageUpload({
               src={imageUrl}
               alt="Profile Image"
               layout="fill"
-              objectFit="cover"
+              objectFit={previewImageShape === 'circle' ? 'cover' : 'contain'}
+              objectPosition="center"
             />
           ) : AvatarIcon ? (
             <AvatarIcon className="w-22 h-22 bg-gray-200 fill-white" />
@@ -127,7 +141,7 @@ export function ProfileImageUpload({
             type="file"
             ref={inputRef}
             accept="image/png, image/jpeg"
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            className={`absolute inset-0 h-full w-full ${!disabled && 'cursor-pointer'} opacity-0`}
             onChange={handleImageChange}
             disabled={disabled}
           />

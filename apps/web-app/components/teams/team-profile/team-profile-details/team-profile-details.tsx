@@ -1,7 +1,10 @@
-import { CollapsibleText, Tooltip } from '@protocol-labs-network/ui';
+import { CollapsibleText } from '@protocol-labs-network/ui';
+import SocialProfile from '../../../../../web-app/components/shared/directory/social-profile/social-profile';
 import { ITeam } from '../../../../utils/teams.types';
-import { ProfileSocialLink } from '../../../shared/profile/profile-social-link/profile-social-link';
 import { ContactMethod } from './contact-method/contact-method';
+import linkedInLogo from '/public/assets/images/icons/linkedIn-contact-logo.svg';
+import twitterLogo from '/public/assets/images/icons/twitter-contact-logo.svg';
+import websiteLogo from '/public/assets/images/icons/website-contact-logo.svg';
 
 export function TeamProfileDetails({
   website,
@@ -13,59 +16,45 @@ export function TeamProfileDetails({
 }: ITeam) {
   return (
     <>
-      <div className="mt-6 flex space-x-6">
-        <div className="flex flex-1 flex-col items-start">
-          <h2 className="detail-label">Website</h2>
-          {website ? (
-            <Tooltip
-              asChild
-              trigger={
-                <div>
-                  <ProfileSocialLink url={website} />
-                </div>
-              }
-              content={<span className="break-all">{website}</span>}
-            />
-          ) : (
-            '-'
-          )}
-        </div>
-        <div className="flex flex-1 flex-col items-start">
-          <h2 className="detail-label">Contact us</h2>
+      <h3 className=" mt-6 font-medium text-slate-500">Contact Details</h3>
+      <div className="mt-3 flex gap-2 flex-wrap">
+        {/* Contact details */}
+        <div className="flex">
           <ContactMethod contactMethod={contactMethod} />
         </div>
-        <div className="flex flex-1 flex-col items-start">
-          <h2 className="detail-label">Twitter</h2>
-          {twitter ? (
-            <Tooltip
-              asChild
-              trigger={
-                <div>
-                  <ProfileSocialLink url={twitter} type="twitter" />
-                </div>
-              }
-              content={twitter}
-            />
-          ) : (
-            '-'
-          )}
-        </div>
-        <div className="flex flex-1 flex-col items-start">
-          <h2 className="detail-label">LinkedIn</h2>
-          {linkedinHandle ? (
-            <Tooltip
-              asChild
-              trigger={
-                <div>
-                  <ProfileSocialLink url={linkedinHandle} type="linkedin" />
-                </div>
-              }
-              content={linkedinHandle}
-            />
-          ) : (
-            '-'
-          )}
-        </div>
+        {/* Website */}
+        {website && (
+          <SocialProfile
+            handle={website}
+            type="website"
+            logo={websiteLogo}
+            height={14}
+            width={14}
+          />
+        )}
+
+        {/* Twitter */}
+        {twitter && (
+          <SocialProfile
+            handle={twitter}
+            type="twitter"
+            logo={twitterLogo}
+            height={14}
+            width={14}
+          />
+        )}
+
+        {/* Linked-In */}
+        {linkedinHandle && (
+          <SocialProfile
+            handle={linkedinHandle}
+            type="linkedin"
+            logo={linkedInLogo}
+            height={14}
+            width={14}
+          />
+        )}
+
       </div>
       <div className="mt-6">
         <h2 className="detail-label">About</h2>

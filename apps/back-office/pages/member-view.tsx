@@ -85,6 +85,7 @@ export default function MemberView(props) {
   const [disableSave, setDisableSave] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [resetImg, setResetImg] = useState(false); 
   const {
     setIsOpenRequest,
     setMemberList,
@@ -101,6 +102,10 @@ export default function MemberView(props) {
   useEffect(() => {
     setDropDownValues({ skillValues: props?.skills, teamNames: props?.teams });
   }, [props]);
+  
+  const handleResetImg = () => {
+    setResetImg(false);
+  }
 
   function formatData() {
     const teamAndRoles = structuredClone(formValues.teamAndRoles);
@@ -122,9 +127,12 @@ export default function MemberView(props) {
       discordHandler: formValues.discordHandler?.trim(),
       twitterHandler: formValues.twitterHandler?.trim(),
       githubHandler: formValues.githubHandler?.trim(),
-      officeHours: formValues.officeHours?.trim(),
+      telegramHandler: formValues.telegramHandler?.trim(),
+      officeHours: formValues.officeHours?.trim() === ''? null : formValues.officeHours?.trim(),
       comments: formValues.comments?.trim(),
-      plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
+      plnStartDate: formValues.plnStartDate
+        ? new Date(formValues.plnStartDate)?.toISOString()
+        : null,
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
@@ -136,7 +144,7 @@ export default function MemberView(props) {
 
   function onEmailBlur(event: ChangeEvent<HTMLInputElement>) {
     const data = {
-      uniqueIdentifier: event.target.value?.trim(),
+      uniqueIdentifier: event.target.value?.toLowerCase().trim(),
       participantType: ENROLLMENT_TYPE.MEMBER,
       uid: props.referenceUid,
       requestId: props.id,
@@ -217,6 +225,7 @@ export default function MemberView(props) {
           .then((response) => {
             setSaveCompleted(true);
             setIsEditEnabled(false);
+            setResetImg(true);
           });
       } catch (err) {
         toast(err?.message);
@@ -340,6 +349,8 @@ export default function MemberView(props) {
                   emailExists={emailExists}
                   onEmailBlur={onEmailBlur}
                   setDisableNext={setDisableSave}
+                  resetImg={resetImg}
+                  onResetImg={handleResetImg}
                 />
                 <MemberSkillForm
                   formValues={formValues}
@@ -451,14 +462,15 @@ export const getServerSideProps = async (context) => {
           rowId: counter++,
         };
       });
+      
     formValues = {
       name: requestData?.name,
       email: requestData.email,
       imageUid: requestData.imageUid ?? '',
       imageFile: null,
-      plnStartDate: new Date(requestData.plnStartDate).toLocaleDateString(
-        'af-ZA'
-      ),
+      plnStartDate: requestData.plnStartDate
+        ? new Date(requestData.plnStartDate).toISOString().split('T')[0]
+        : null,
       city: requestData?.city ?? '',
       region: requestData?.region ?? '',
       country: requestData?.country ?? '',
@@ -466,6 +478,7 @@ export const getServerSideProps = async (context) => {
       discordHandler: requestData.discordHandler ?? '',
       twitterHandler: requestData.twitterHandler ?? '',
       githubHandler: requestData.githubHandler ?? '',
+      telegramHandler: requestData.telegramHandler ?? '',
       officeHours: requestData.officeHours ?? '',
       requestorEmail: requestDetailResponse?.data?.requesterEmailId ?? '',
       comments: requestData?.comments ?? '',

@@ -35,6 +35,7 @@ export async function createTeam({ amount }: TestFactorySeederParams) {
       linkedinHandler: faker.internet.url(),
       officeHours: faker.internet.url(),
       twitterHandler: faker.name.firstName(),
+      telegramHandler: faker.name.firstName(),
       shortDescription: faker.lorem.sentence(),
       longDescription: faker.lorem.paragraph(),
       plnFriend: true,

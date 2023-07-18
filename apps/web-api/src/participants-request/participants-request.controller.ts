@@ -1,23 +1,19 @@
 /* eslint-disable prettier/prettier */
 import {
-  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
   Get,
   Param,
-  Patch,
   Post,
-  Put,
   Query,
   Req,
-  UseGuards,
+  BadRequestException
 } from '@nestjs/common';
-import { ApprovalStatus, ParticipantType } from '@prisma/client';
+import { ParticipantType } from '@prisma/client';
 import { ParticipantsRequestService } from './participants-request.service';
 import { GoogleRecaptchaGuard } from '../guards/google-recaptcha.guard';
 import {
-  ParticipantProcessRequestSchema,
   ParticipantRequestTeamSchema,
   ParticipantRequestMemberSchema,
 } from '../../../../libs/contracts/src/schema/participants-request';
@@ -31,7 +27,6 @@ export class ParticipantsRequestController {
   @Get()
   @NoCache()
   async findAll(@Query() query) {
-    console.log(query);
     const result = await this.participantsRequestService.getAll(query);
     return result;
   }
@@ -44,32 +39,32 @@ export class ParticipantsRequestController {
   }
 
   @Post()
-  // @UseGuards(GoogleRecaptchaGuard)
-  async addRequest(@Body() body) {
+  async addRequest(@Body() body, @Req() req) {
     const postData = body;
     const participantType = body.participantType;
-    // delete postData.captchaToken;
+    const referenceUid = body.referenceUid;
 
     if (
       participantType === ParticipantType.MEMBER.toString() &&
       !ParticipantRequestMemberSchema.safeParse(postData).success
     ) {
-      throw new ForbiddenException();
+      throw new BadRequestException("Validation failed")
     } else if (
       participantType === ParticipantType.TEAM.toString() &&
       !ParticipantRequestTeamSchema.safeParse(postData).success
     ) {
-      throw new ForbiddenException();
+      throw new BadRequestException("Validation failed")
     } else if (
       participantType !== ParticipantType.TEAM.toString() &&
       participantType !== ParticipantType.MEMBER.toString()
     ) {
-      throw new ForbiddenException();
+      throw new BadRequestException("Validation failed")
     }
+
     const checkDuplicate = await this.participantsRequestService.findDuplicates(
       postData?.uniqueIdentifier,
       participantType,
-      postData?.referenceUid,
+      referenceUid,
       ''
     );
     if (

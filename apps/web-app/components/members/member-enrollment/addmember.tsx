@@ -7,6 +7,7 @@ import {
   useCallback,
   useRef,
 } from 'react';
+import { trackGoal } from 'fathom-client';
 import AddMemberBasicForm from './addmemberbasicform';
 import AddMemberSkillForm from './addmemberskillform';
 import AddMemberSocialForm from './addmembersocialform';
@@ -19,10 +20,15 @@ import {
 } from '../../../utils/services/dropdown-service';
 
 import api from '../../../utils/api';
-import { ENROLLMENT_TYPE } from '../../../constants';
+import {
+  APP_ANALYTICS_EVENTS,
+  ENROLLMENT_TYPE,
+  FATHOM_EVENTS,
+} from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/create-member.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
+import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddMemberModalProps {
@@ -86,7 +92,8 @@ function handleNextClick(
   setFormStep,
   setErrors,
   emailExists,
-  divRef
+  divRef,
+  analytics
 ) {
   const errors = validateForm(formValues, formStep);
   const element1 = divRef.current;
@@ -98,6 +105,9 @@ function handleNextClick(
     setErrors(errors);
     return false;
   }
+  analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_JOIN_NETWORK_FORM_STEPS, {
+    itemName: steps[formStep - 1].name,
+  });
   setFormStep(++formStep);
   setErrors(errors);
   return true;
@@ -112,7 +122,8 @@ function getSubmitOrNextButton(
   isProcessing,
   emailExists,
   disableNext,
-  divRef
+  divRef,
+  analytics
 ) {
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8] disabled:bg-slate-400';
@@ -140,7 +151,8 @@ function getSubmitOrNextButton(
             setFormStep,
             setErrors,
             emailExists,
-            divRef
+            divRef,
+            analytics
           )
         }
       >
@@ -195,7 +207,7 @@ export function AddMemberModal({
     email: '',
     imageUid: '',
     imageFile: null,
-    plnStartDate: new Date().toLocaleDateString('af-ZA'),
+    plnStartDate: null,
     city: '',
     region: '',
     country: '',
@@ -203,6 +215,7 @@ export function AddMemberModal({
     discordHandler: '',
     twitterHandler: '',
     githubHandler: '',
+    telegramHandler: '',
     officeHours: '',
     comments: '',
     teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
@@ -212,6 +225,7 @@ export function AddMemberModal({
 
   const divRef = useRef<HTMLDivElement>(null);
   // const { executeRecaptcha } = useGoogleReCaptcha();
+  const analytics = useAppAnalytics();
 
   useEffect(() => {
     if (isOpen) {
@@ -239,7 +253,7 @@ export function AddMemberModal({
       email: '',
       imageUid: '',
       imageFile: null,
-      plnStartDate: new Date().toLocaleDateString('af-ZA'),
+      plnStartDate: null,
       city: '',
       region: '',
       country: '',
@@ -247,6 +261,7 @@ export function AddMemberModal({
       discordHandler: '',
       twitterHandler: '',
       githubHandler: '',
+      telegramHandler: '',
       officeHours: '',
       comments: '',
       teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
@@ -289,9 +304,15 @@ export function AddMemberModal({
       discordHandler: formValues.discordHandler?.trim(),
       twitterHandler: formValues.twitterHandler?.trim(),
       githubHandler: formValues.githubHandler?.trim(),
-      officeHours: formValues.officeHours?.trim(),
+      telegramHandler: formValues.telegramHandler?.trim(),
+      officeHours:
+        formValues.officeHours?.trim() === ''
+          ? null
+          : formValues.officeHours?.trim(),
       comments: formValues.comments?.trim(),
-      plnStartDate: new Date(formValues.plnStartDate)?.toISOString(),
+      plnStartDate: formValues.plnStartDate
+        ? new Date(formValues.plnStartDate)?.toISOString()
+        : null,
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
@@ -301,7 +322,7 @@ export function AddMemberModal({
 
   function onEmailBlur(event: ChangeEvent<HTMLInputElement>) {
     const data = {
-      uniqueIdentifier: event.target.value?.trim(),
+      uniqueIdentifier: event.target.value?.toLowerCase().trim(),
       participantType: ENROLLMENT_TYPE.MEMBER,
     };
     api
@@ -323,6 +344,12 @@ export function AddMemberModal({
       //   console.log('Execute recaptcha not yet available');
       //   return;
       // }
+      analytics.captureEvent(
+        APP_ANALYTICS_EVENTS.MEMBER_JOIN_NETWORK_FORM_STEPS,
+        {
+          itemName: 'SOCIAL',
+        }
+      );
       const values = formatData();
       try {
         // const captchaToken = await executeRecaptcha();
@@ -338,12 +365,8 @@ export function AddMemberModal({
               'content-type': 'multipart/form-data',
             },
           };
-          image = await api
-            .post(`/v1/images`, formData, config)
-            .then((response) => {
-              delete values.imageFile;
-              return response?.data?.image;
-            });
+          const imageResponse = await api.post(`/v1/images`, formData, config);
+          image = imageResponse?.data?.image;
         }
 
         const data = {
@@ -354,17 +377,23 @@ export function AddMemberModal({
           newData: { ...values, imageUid: image?.uid, imageUrl: image?.url },
           // captchaToken,
         };
-        await api.post(`/v1/participants-request`, data).then((response) => {
-          // if (
-          //   typeof document !== 'undefined' &&
-          //   document.getElementsByClassName('grecaptcha-badge').length
-          // ) {
-          //   document
-          //     .getElementsByClassName('grecaptcha-badge')[0]
-          //     .classList.add('w-0');
-          // }
-          setSaveCompleted(true);
-        });
+        const response = await api.post(`/v1/participants-request`, data);
+        // if (
+        //   typeof document !== 'undefined' &&
+        //   document.getElementsByClassName('grecaptcha-badge').length
+        // ) {
+        //   document
+        //     .getElementsByClassName('grecaptcha-badge')[0]
+        //     .classList.add('w-0');
+        // }
+        trackGoal(FATHOM_EVENTS.directory.joinNetworkAsMemberSave, 0);
+        analytics.captureEvent(
+          APP_ANALYTICS_EVENTS.MEMBER_JOIN_NETWORK_FORM_STEPS,
+          {
+            itemName: 'COMPLETED',
+          }
+        );
+        setSaveCompleted(true);
       } catch (err) {
         if (err.response.status === 400) {
           toast(err?.response?.data?.message);
@@ -483,7 +512,7 @@ export function AddMemberModal({
     <>
       {isProcessing && (
         <div
-          className={`fixed inset-0 z-[99999] flex h-screen w-screen items-center justify-center bg-gray-500 bg-opacity-75 outline-none transition-opacity`}
+          className={`fixed inset-0 z-[3000] flex h-screen w-screen items-center justify-center bg-gray-500 bg-opacity-75 outline-none transition-opacity`}
         >
           <LoadingIndicator />
         </div>
@@ -514,7 +543,7 @@ export function AddMemberModal({
             </div>
           </div>
         ) : (
-          <div className="">
+          <div>
             <FormStepsIndicator formStep={formStep} steps={steps} />
             {errors?.length > 0 && (
               <div className="w-full rounded-lg bg-white p-5 ">
@@ -545,7 +574,8 @@ export function AddMemberModal({
                   isProcessing,
                   emailExists,
                   disableNext,
-                  divRef
+                  divRef,
+                  analytics
                 )}
               </div>
             </div>

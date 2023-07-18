@@ -1,4 +1,4 @@
-import { Controller, Req } from '@nestjs/common';
+import { Controller, Req, UseGuards, Body, Param } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
@@ -15,6 +15,9 @@ import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { ENABLED_RETRIEVAL_PROFILE } from '../utils/prisma-query-builder/profile/defaults';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { TeamsService } from './teams.service';
+import { NoCache } from '../decorators/no-cache.decorator';
+import { UserTokenValidation } from '../guards/user-token-validation.guard';
+import { ParticipantRequestTeamSchema } from '../../../../libs/contracts/src/schema/participants-request';
 
 const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
@@ -25,6 +28,7 @@ export class TeamsController {
   @Api(server.route.getTeams)
   @ApiQueryFromZod(TeamQueryParams)
   @ApiOkResponseFromZod(ResponseTeamWithRelationsSchema.array())
+  @NoCache()
   findAll(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(
       ResponseTeamWithRelationsSchema
@@ -39,6 +43,7 @@ export class TeamsController {
   @ApiOkResponseFromZod(ResponseTeamWithRelationsSchema)
   @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
   @ApiQueryFromZod(TeamDetailQueryParams)
+  @NoCache()
   findOne(
     @Req() request: Request,
     @ApiDecorator() { params: { uid } }: RouteShape['getTeam']
@@ -52,5 +57,15 @@ export class TeamsController {
     );
     const builtQuery = builder.build(request.query);
     return this.teamsService.findOne(uid, builtQuery);
+  }
+
+  @Api(server.route.modifyTeam)
+  @UseGuards(UserTokenValidation)
+  async updateOne(@Param('id') id, @Body() body, @Req() req) {
+    const participantsRequest = body;
+    return await this.teamsService.editTeamParticipantsRequest(
+      participantsRequest,
+      req.userEmail
+    );
   }
 }

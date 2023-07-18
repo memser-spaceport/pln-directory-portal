@@ -89,6 +89,7 @@
   padding-bottom: 32px;
   padding-left: 44px;
   padding-right: 44px;
+  z-index: 1057;
 }
 .cross-icon {
   width: 16px;
@@ -169,4 +170,68 @@
 
 .Toastify__toast {
   z-index: 99999;
+}
+
+.youtube-title {
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: initial;
+  display: -webkit-box;
+}
+.github-project-popup{
+  max-height: calc(100vh - 380px);
+}
+
+nextjs-portal {
+  display
+  : none;
+}
+
+.slim-scroll{
+  /* scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+  -webkit-border-radius: 10px;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  -webkit-border-radius: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.3);
+  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+}
+
+::-webkit-scrollbar-thumb:window-inactive {
+  background: rgba(255, 255, 255, 0.3);
+}
+}
+
+.gradiant-border {
+  border: double 2px transparent;
+  border-radius: 8px;
+  background-image: linear-gradient(white, white), 
+                    linear-gradient(to right,  #427DFF,#44D5BB);
+  background-origin: border-box;
+  background-clip: content-box, border-box;
+  border-image-slice: 30;
+}
+
+.padding-team-autocomplete {
+  padding-right: 27px !important;
+}
+
+.gradiant-border-rounded {
+  border: double 1px transparent;
+  border-radius: 50%;
+  background-image: linear-gradient(rgb(248 250 252), rgb(248 250 252)), 
+                    linear-gradient(to right,  #427DFF,#44D5BB);
+  background-origin: border-box;
+  background-clip: content-box, border-box;
 }

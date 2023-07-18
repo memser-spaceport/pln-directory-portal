@@ -10,10 +10,11 @@ import { ReactComponent as InformationCircleIcon } from '../../../public/assets/
 export default function AddMemberStepOne(props) {
   const values = props?.formValues;
   const onChange = props?.handleInputChange;
-
+  const requiredFlag = props?.isEditMode ? props?.dataLoaded ? true : false :true;
+  const disableRequestorEmail = props?.disableRequestorEmail;
   return (
     <>
-      <div className="pt-5">
+      {!disableRequestorEmail && <div className="pt-5">
         <InputField
           required
           name="requestorEmail"
@@ -24,7 +25,7 @@ export default function AddMemberStepOne(props) {
           placeholder="Enter your email address"
           className="custom-grey custom-outline-none border"
         />
-      </div>
+      </div>}
       <div className="flex pt-5">
         <div className="">
           <ProfileImageUpload
@@ -38,11 +39,13 @@ export default function AddMemberStepOne(props) {
             avatarIcon={props.isEditMode && UserGroupIcon}
             previewImageShape="square"
             onImageChange={props.handleImageChange}
+            resetImg={props.resetImg}
+            onResetImg={props.onResetImg}
           />
         </div>
         <div className="namefield inputfield">
           <InputField
-            required
+            required={requiredFlag}
             value={values?.name}
             onChange={onChange}
             maxLength={150}
@@ -76,7 +79,7 @@ export default function AddMemberStepOne(props) {
 
       <div className="pt-5">
         <TextArea
-          required
+          required={requiredFlag}
           value={values?.shortDescription}
           onChange={onChange}
           maxLength={1000}
@@ -98,7 +101,7 @@ export default function AddMemberStepOne(props) {
 
       <div className="pt-5">
         <TextArea
-          required
+          required={requiredFlag}
           value={values?.longDescription}
           onChange={onChange}
           maxLength={2000}

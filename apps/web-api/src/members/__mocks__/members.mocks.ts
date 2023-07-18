@@ -1,7 +1,10 @@
-import { Location, Member } from '@prisma/client';
+import { Location, Member, PrismaClient, Prisma } from '@prisma/client';
 import { Factory } from 'fishery';
 import { prisma } from '../../../prisma/__mocks__/index';
 import { TestFactorySeederParams } from '../../utils/factory-interfaces';
+import { JsonValue } from 'aws-sdk/clients/glue';
+import zodToJsonSchema from 'zod-to-json-schema';
+import { JSONInput } from 'aws-sdk/clients/s3';
 
 async function createLocation() {
   const locationFactory = Factory.define<Omit<Location, 'id'>>(
@@ -28,7 +31,7 @@ async function createLocation() {
 export async function createMember({ amount }: TestFactorySeederParams) {
   const location = await createLocation();
 
-  const memberFactory = Factory.define<Omit<Member, 'id'>>(({ sequence }) => {
+  const memberFactory = Factory.define<Omit<Prisma.MemberCreateManyInput, 'id'>>(({ sequence }) => {
     const industryTag = {
       uid: `uid-${sequence}`,
       name: `name-${sequence}`,
@@ -38,16 +41,19 @@ export async function createMember({ amount }: TestFactorySeederParams) {
       discordHandler: 'discordHandler',
       twitterHandler: 'twitterHandler',
       linkedinHandler: 'linkedinHandler',
+      telegramHandler: 'telegramHandler',
       moreDetails: 'moreDetails',
       officeHours: 'officeHours',
       plnFriend: true,
       airtableRecId: `airtable-rec-id-${sequence}`,
+      externalId: `external-${sequence}`,
       plnStartDate: new Date(),
       createdAt: new Date(),
       updatedAt: new Date(),
       locationUid: location.uid,
       openToWork: false,
-    };
+      preferences: {showEmail:true,showGithubHandle:true,showTelegram:true,showLinkedin:true,showDiscord:false,showGithubProjects:false,showTwitter:true}
+    } as Prisma.MemberCreateManyInput;
 
     return industryTag;
   });

@@ -2,9 +2,14 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 import { APP_ENV } from '../constants';
+import { LogService } from '../../shared/log.service';
 
 @Injectable()
 export class ForestAdminService {
+  constructor(
+    private readonly logService: LogService
+  ) {
+  }
   async triggerAirtableSync() {
     try {
       const allSlugs = airtableSlugs();

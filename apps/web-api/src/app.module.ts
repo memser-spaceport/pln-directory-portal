@@ -5,7 +5,7 @@ import {
   Module,
   RequestMethod,
 } from '@nestjs/common';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import * as redisStore from 'cache-manager-redis-store';
 import type { ClientOpts } from 'redis';
@@ -25,7 +25,10 @@ import { SkillsModule } from './skills/skills.module';
 import { TeamsModule } from './teams/teams.module';
 import { TechnologiesModule } from './technologies/technologies.module';
 import { AdminModule } from './admin/admin.module';
+import { AuthModule } from './auth/auth.module';
 import { SharedModule } from './shared/shared.module';
+import { LogException } from './filters/log-exception.filter';
+import { OtpModule } from './otp/otp.module';
 
 @Module({
   controllers: [AppController],
@@ -34,9 +37,9 @@ import { SharedModule } from './shared/shared.module';
       ttl: 1,
       limit: 10,
     }),
-    CacheModule.register<ClientOpts>({
+   CacheModule.register<ClientOpts>({
       store: redisStore,
-      url: process.env.REDIS_URL,
+      url: process.env.REDIS_TLS_URL,
       isGlobal: true,
       ttl: 86400, // 1 day in seconds
       max: 100, // maximum number of items in cache
@@ -49,7 +52,7 @@ import { SharedModule } from './shared/shared.module';
     }),
     BullModule.forRoot({
       redis: {
-        path: process.env.REDIS_URL,
+        path: process.env.REDIS_TLS_URL,
         tls: {
           rejectUnauthorized: false,
           requestCert: true,
@@ -68,7 +71,9 @@ import { SharedModule } from './shared/shared.module';
     TechnologiesModule,
     ParticipantsRequestModule,
     AdminModule,
+    AuthModule,
     SharedModule,
+    OtpModule
   ],
   providers: [
     {
@@ -83,6 +88,10 @@ import { SharedModule } from './shared/shared.module';
       provide: APP_INTERCEPTOR,
       useClass: ConcealEntityIDInterceptor,
     },
+    {
+      provide: APP_FILTER,
+      useClass: LogException
+    }
   ],
 })
 export class AppModule {

@@ -17,6 +17,8 @@ export default function AddMemberBasicForm(props) {
             avatarIcon={UserIcon}
             enableHover={props.isEditEnabled ? true : false}
             disabled={!props.isEditEnabled}
+            resetImg={props.resetImg}
+            onResetImg={props.onResetImg}
           />
         </div>
         <div className="w-full">
@@ -77,6 +79,8 @@ export default function AddMemberBasicForm(props) {
           value={values?.plnStartDate}
           disabled={!props.isEditEnabled}
           label="PLN Join Date"
+          hasClear={true}
+          onClear={()=>onChange({target:{name:'plnStartDate', value:''}})}
           className="custom-grey custom-outline-none border"
         />
       </div>

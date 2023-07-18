@@ -2,6 +2,7 @@ import { initContract } from '@ts-rest/core';
 import {
   MemberDetailQueryParams,
   MemberQueryParams,
+  PreferenceSchema,
   ResponseMemberWithRelationsSchema,
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
@@ -26,5 +27,57 @@ export const apiMembers = contract.router({
       200: ResponseMemberWithRelationsSchema,
     },
     summary: 'Get a member',
+  },
+  modifyMemberPreference: {
+    method: 'PATCH',
+    path: `${getAPIVersionAsPath('1')}/member/:uid/preferences`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Update member preference',
+  },
+  getMemberPreferences: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/preferences`,
+    responses: {
+      200: PreferenceSchema,
+    },
+    summary: 'Get member Preferences',
+  },
+  modifyMember: {
+    method: 'PUT',
+    path: `${getAPIVersionAsPath('1')}/member/:uid`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Modify a member',
+  },
+  sendOtpForEmailChange: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/email/otp`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Request for email change',
+  },
+  updateMemberEmail: {
+    method: 'PATCH',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/email`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Request for email change',
+  },
+  getMemberGitHubProjects: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/git-projects`,
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Get member Projects',
   },
 });

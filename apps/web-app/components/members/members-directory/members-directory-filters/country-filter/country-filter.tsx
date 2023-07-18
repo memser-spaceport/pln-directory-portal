@@ -4,12 +4,13 @@ import { useTagsFilter } from '../../../../shared/directory/directory-filters/di
 
 export interface CountryFilterProps {
   countryTags: IFilterTag[];
+  userInfo?: any;
 }
 
-export function CountryFilter({ countryTags }: CountryFilterProps) {
+export function CountryFilter({ countryTags, userInfo }: CountryFilterProps) {
   const [tags, toggleTag] = useTagsFilter('country', countryTags);
 
   return (
-    <DirectoryTagsFilter title="Country" tags={tags} onTagToggle={toggleTag} />
+    <DirectoryTagsFilter title="Country" tags={tags} onTagToggle={toggleTag} hideOnLogout={true} userInfo={userInfo}/>
   );
 }

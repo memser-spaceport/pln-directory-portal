@@ -4,6 +4,8 @@ import { ITeam } from '../../../../utils/teams.types';
 import { DirectoryCard } from '../../../shared/directory/directory-card/directory-card';
 import { DirectoryCardFooter } from '../../../shared/directory/directory-card/directory-card-footer';
 import { DirectoryCardHeader } from '../../../shared/directory/directory-card/directory-card-header';
+import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
+import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
 
 export interface TeamCardProps {
   team: ITeam;
@@ -14,16 +16,29 @@ export function TeamCard({ team, isGrid = true }: TeamCardProps) {
   const router = useRouter();
   const backLink = encodeURIComponent(router.asPath);
 
+  const analytics = useAppAnalytics()
+
+  const onTeamClicked = () => {
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.TEAM_CLICKED, {
+      uid: team.id,
+      name: team.name,
+      backLink: backLink
+    })
+  }
+
   return (
     <DirectoryCard
       isGrid={isGrid}
       cardUrl={`/directory/teams/${team.id}?backLink=${backLink}`}
+      handleOnClick={onTeamClicked}
+      type="team"
     >
       <DirectoryCardHeader
         isGrid={isGrid}
         img={team.logo}
         avatarIcon={UserGroupIcon}
         name={team.name}
+        type="team"
       />
       <div className={isGrid ? '' : 'w-[400px] grow-0'}>
         <h2
@@ -44,6 +59,7 @@ export function TeamCard({ team, isGrid = true }: TeamCardProps) {
       <DirectoryCardFooter
         isGrid={isGrid}
         tagsArr={team.industryTags.map((tag) => tag.title)}
+        type="team"
       />
     </DirectoryCard>
   );

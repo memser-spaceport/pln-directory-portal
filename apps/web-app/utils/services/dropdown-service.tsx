@@ -26,12 +26,12 @@ export const fetchTeams = async () => {
   }
 };
 
-export const fetchTeamsForAutocomplete = async (searchTerm) => {
+export const fetchMembershipSources = async () => {
   try {
-    const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}`);
+    const response = await api.get(`/v1/membership-sources?pagination=false`);
     if (response.data) {
       return response.data.map((item) => {
-        return { value: item.uid, label: item.name };
+        return { value: item.uid, label: item.title };
       });
     }
   } catch (error) {
@@ -39,12 +39,12 @@ export const fetchTeamsForAutocomplete = async (searchTerm) => {
   }
 };
 
-export const fetchMembershipSources = async () => {
+export const fetchTeamsForAutocomplete = async (searchTerm) => {
   try {
-    const response = await api.get(`/v1/membership-sources?pagination=false`);
+    const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}&select=uid,name,shortDescription,logo.url,industryTags.title&pagination=false`);
     if (response.data) {
       return response.data.map((item) => {
-        return { value: item.uid, label: item.title };
+        return { value: item.uid, label: item.name };
       });
     }
   } catch (error) {
@@ -65,9 +65,9 @@ export const fetchProtocol = async () => {
   }
 };
 
-export const fetchFundingStages = async () => {
+export const fetchIndustryTags = async () => {
   try {
-    const response = await api.get(`/v1/funding-stages?pagination=false`);
+    const response = await api.get(`/v1/industry-tags?pagination=false`);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };
@@ -78,9 +78,9 @@ export const fetchFundingStages = async () => {
   }
 };
 
-export const fetchIndustryTags = async () => {
+export const fetchFundingStages = async () => {
   try {
-    const response = await api.get(`/v1/industry-tags?pagination=false`);
+    const response = await api.get(`/v1/funding-stages`);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.title };

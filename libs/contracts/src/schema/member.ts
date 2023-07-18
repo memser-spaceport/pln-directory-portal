@@ -6,6 +6,24 @@ import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseSkillSchema } from './skill';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
 
+export const GitHubRepositorySchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  url: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const PreferenceSchema = z.object({
+  showEmail:z.boolean(),
+  showGithubHandle:z.boolean(),
+  showTelegram:z.boolean(),
+  showLinkedin:z.boolean(),
+  showDiscord:z.boolean(),
+  showGithubProjects:z.boolean(),
+  showTwitter:z.boolean()
+});
+
 export const MemberSchema = z.object({
   id: z.number().int(),
   uid: z.string(),
@@ -15,6 +33,7 @@ export const MemberSchema = z.object({
   githubHandler: z.string().nullish(),
   discordHandler: z.string().nullish(),
   twitterHandler: z.string().nullish(),
+  telegramHandler: z.string().nullish(),
   officeHours: z.string().nullish(),
   airtableRecId: z.string().nullish(),
   plnFriend: z.boolean(),
@@ -23,7 +42,11 @@ export const MemberSchema = z.object({
   locationUid: z.string(),
   openToWork: z.boolean(),
   linkedinHandler: z.string().nullish(),
+  repositories: GitHubRepositorySchema.array().optional(),
+  preferences: PreferenceSchema.optional()
 });
+
+
 
 export const ResponseMemberSchema = MemberSchema.omit({ id: true }).strict();
 
@@ -33,6 +56,7 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   skills: ResponseSkillSchema.array().optional(),
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
 });
+
 
 export const CreateMemberSchema = MemberSchema.pick({
   name: true,
@@ -73,3 +97,15 @@ export class ResponseMemberSchemaDto extends createZodDto(
 ) {}
 
 export type TMemberResponse = z.infer<typeof ResponseMemberWithRelationsSchema>;
+
+const ChangeEmailRequestSchema = z.object({
+  otpToken: z.string(),
+  otp: z.string()
+})
+
+const SendEmailOtpRequestSchema = z.object({
+  newEmail: z.string()
+})
+
+export class SendEmailOtpRequestDto extends createZodDto(SendEmailOtpRequestSchema) {}
+export class ChangeEmailRequestDto extends createZodDto(ChangeEmailRequestSchema) {}

@@ -26,6 +26,7 @@ model Team {
   contactMethod     String?
   twitterHandler    String?
   linkedinHandler   String?
+  telegramHandler   String?
   shortDescription  String?
   longDescription   String?
   plnFriend         Boolean            @default(false)
@@ -52,18 +53,31 @@ model Member {
   discordHandler  String?
   twitterHandler  String?
   linkedinHandler String?
+  telegramHandler String?
   officeHours     String?
   moreDetails     String?
   plnFriend       Boolean          @default(false)
-  plnStartDate    DateTime?        @default(now())
+  plnStartDate    DateTime?        
   airtableRecId   String?          @unique
+  externalId      String?          @unique
+  openToWork     Boolean?         @default(false)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   skills          Skill[]
   location        Location?        @relation(fields: [locationUid], references: [uid])
   locationUid     String?
   teamMemberRoles TeamMemberRole[]
-  openToWork     Boolean          @default(false)
+  memberRoles     MemberRole[]
+  preferences     Json?
+}
+
+model MemberRole {
+  id              Int              @id @default(autoincrement())
+  uid             String           @unique @default(cuid())
+  name            String           @unique
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  members         Member[]
 }
 
 enum ParticipantType {
@@ -75,6 +89,7 @@ enum ApprovalStatus {
   PENDING
   APPROVED
   REJECTED
+  AUTOAPPROVED
 }
 
 model ParticipantsRequest {

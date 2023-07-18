@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { MemberProfileProjectsProps } from '../../../../utils/members.types';
+import { MemberProfileProjectsProps, IGitRepositories } from '../../../../utils/members.types';
 import { ProfileProjectCard } from '../../../shared/profile/profile-cards/profile-project-card';
 import { ReactComponent as project_icon } from '../../../../public/assets/images/icons/project_icon.svg';
 import Modal from '../../../../components/layout/navbar/modal/modal';
@@ -8,12 +8,14 @@ import { Dispatch, SetStateAction } from 'react';
 interface MemberProfileProjectsModalProps extends MemberProfileProjectsProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
+  onItemClick: (project: IGitRepositories) => void;
 }
 
 export function MemberProfileProjectsModal({
   isOpen,
   setIsModalOpen,
   repositories,
+  onItemClick,
 }: MemberProfileProjectsModalProps) {
   const {
     query: { id },
@@ -26,11 +28,11 @@ export function MemberProfileProjectsModal({
       enableFooter={false}
       enableHeader={false}
     >
-      <div className="p-8">
-        <span className="mb-2 mt-6 pb-5 font-bold text-slate-900">
+      <div className="pt-8 slim-scroll">
+        <div className="px-8 mb-4 font-bold text-slate-900">
           {'Projects'} ({repositories?.length})
-        </span>
-        <div className="rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)] focus-within:outline-none focus:outline-none focus-visible:outline-none">
+        </div>
+        <div className="px-8 rounded-xl github-project-popup overflow-y-auto">
           {repositories?.map((project, i) => {
             return (
               <ProfileProjectCard
@@ -40,12 +42,13 @@ export function MemberProfileProjectsModal({
                 avatarIcon={project_icon}
                 name={project.name}
                 description={project.description}
+                clickHandler={() => onItemClick(project)}
               />
             );
           })}
         </div>
-        <div className="footerCancelDiv flow-root w-full">
-          <div className="float-right">
+        <div className="p-4 border-t-2 w-full">
+          <div className="flex place-content-end  ">
             <button
               className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-[90px] w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8] disabled:bg-slate-400"
               onClick={() => setIsModalOpen(false)}

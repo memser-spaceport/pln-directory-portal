@@ -40,15 +40,18 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
       discordHandler: faker.internet.userName(name),
       twitterHandler: faker.internet.userName(name),
       linkedinHandler: faker.internet.userName(name),
+      telegramHandler: faker.internet.userName(name),
       officeHours: faker.helpers.arrayElement([null, faker.internet.url()]),
       moreDetails: faker.helpers.arrayElement([null, faker.lorem.paragraph()]),
       plnFriend: faker.datatype.boolean(),
       airtableRecId: `airtable-rec-id-${sequence}`,
+      externalId: null,
       createdAt: faker.date.past(),
       plnStartDate: faker.date.past(),
       updatedAt: faker.date.recent(),
       locationUid: '',
       openToWork: faker.datatype.boolean(),
+      preferences: {showEmail:true,showGithubHandle:true,showTelegram:true,showLinkedin:true,showDiscord:false,showGithubProjects:false,showTwitter:true}
     };
   }
 );
@@ -58,7 +61,7 @@ export const members = async () => await membersFactory.createList(800);
 export const memberRelations = async (members) => {
   const skillUids = await getUidsFrom(Prisma.ModelName.Skill);
 
-  return members.map((member) => {
+  return members.map((member, mIndex) => {
     const randomSkills = sampleSize(skillUids, random(0, 5));
     return {
       where: {
@@ -67,6 +70,9 @@ export const memberRelations = async (members) => {
       data: {
         ...(randomSkills.length && {
           skills: { connect: randomSkills },
+        }),
+        ...(mIndex === 0 && {
+          memberRoles: { connect: [{ id: 1 }] },
         }),
       },
     };

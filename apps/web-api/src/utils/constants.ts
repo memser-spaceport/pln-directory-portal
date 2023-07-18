@@ -14,12 +14,18 @@ export const ALLOWED_CORS_ORIGINS = {
     /dev.plnetwork.io/,
     /dev-admin.plnetwork.io/,
     /staging.plnetwork.io/,
+    /dev-auth-admin.plnetwork.io/,
+    /dev-auth-app.plnetwork.io/,
+    /dev-analytics.plnetwork.io/,
     /staging-admin.plnetwork.io/,
   ],
   [APP_ENV.STAGING]: [
     /.-protocol-labs-spaceport.vercel.app/,
     /app.forestadmin.com/,
     /staging.plnetwork.io/,
+    /dev-auth-admin.plnetwork.io/,
+    /dev-auth-app.plnetwork.io/,
+    /dev-analytics.plnetwork.io/,
     /staging-admin.plnetwork.io/,
   ],
   [APP_ENV.PRODUCTION]: [
@@ -54,3 +60,5 @@ export const THUMBNAIL_SIZES = {
 export const FILE_UPLOAD_SIZE_LIMIT = 1000000; // 1MB in bytes
 
 export const IMAGE_UPLOAD_MAX_DIMENSION = 2000;
+
+export const DIRECTORYADMIN = 'DIRECTORYADMIN';

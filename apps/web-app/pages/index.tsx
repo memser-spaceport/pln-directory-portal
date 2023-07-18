@@ -9,11 +9,13 @@ import { Mission } from '../components/portal/sections/mission/mission';
 import { Projects } from '../components/portal/sections/projects/projects';
 import { Substack } from '../components/portal/sections/substack/substack';
 import { PortalLayout } from '../layouts/portal-layout';
+import api from '../utils/api';
+import { NW_SPOTLIGHT_CONSTANTS } from '../constants';
 
-export default function Index() {
+export default function Index({videoDetails,playlistDetails}) {
   return (
     <div>
-      <Mission />
+      <Mission videoDetails={videoDetails} playlistDetails={playlistDetails} />
       <PortalDivider />
       <div className="bg-white px-6 py-24 md:px-16 md:py-[120px]">
         <div className="mx-auto max-w-[1110px]">
@@ -21,7 +23,7 @@ export default function Index() {
         </div>
       </div>
       <div className="bg-gradient-to-b from-slate-50 to-white">
-        <div className="px-6 py-24 md:px-16 md:py-[152px]">
+        <div className="px-6 py-24 md:px-16 ">
           <div className="mx-auto max-w-[1110px]">
             <div className="mb-[106px] md:mb-[162px]">
               <LabWeek />
@@ -48,7 +50,34 @@ Index.getLayout = function getLayout(page: ReactElement) {
   return <PortalLayout>{page}</PortalLayout>;
 };
 
+const getVideoDetails = async () => {
+  try {
+    const videoDetails = await api.get(NW_SPOTLIGHT_CONSTANTS.VIDEO_URL);
+    if (videoDetails.status === 200) {
+      return videoDetails.data;
+    } else {
+      return null;
+    }
+  } catch (err) {
+    return null;
+  }
+}
+
+const getPlaylistVideoDetails = async () => {
+  try {
+    const playlistDetails = await api.get(NW_SPOTLIGHT_CONSTANTS.PLAYLIST_URL);
+    if (playlistDetails.status === 200) {
+      return playlistDetails.data;
+    } else {
+      return null;
+    }
+  } catch (err) {
+    return null;
+  }
+}
+
 export const getServerSideProps: GetServerSideProps = async () => {
+  let [videoDetails, playlistDetails] = await Promise.all([getVideoDetails(), getPlaylistVideoDetails()]);
   return process.env.NEXT_PUBLIC_HIDE_NETWORK_PORTAL
     ? {
         redirect: {
@@ -56,5 +85,5 @@ export const getServerSideProps: GetServerSideProps = async () => {
           destination: '/directory/teams',
         },
       }
-    : { props: {} };
+    : { props: { videoDetails , playlistDetails } };
 };

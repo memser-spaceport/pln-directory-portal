@@ -2,11 +2,13 @@ import { Menu, Transition } from '@headlessui/react';
 import { UserGroupIcon, UserIcon } from '@heroicons/react/outline';
 import { ArrowIcon } from '@protocol-labs-network/ui';
 import { trackGoal } from 'fathom-client';
+import Cookies from 'js-cookie';
 import Link from 'next/link';
 import React, { forwardRef, Fragment, useState } from 'react';
-import { FATHOM_EVENTS } from '../../../../constants';
+import { FATHOM_EVENTS, PAGE_ROUTES } from '../../../../constants';
 import { AddMemberModal } from '../../../members/member-enrollment/addmember';
 import { AddTeamModal } from '../../../teams/team-enrollment/addteam';
+import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
@@ -36,7 +38,7 @@ export function JoinNetworkMenu() {
   const joinNetworkCode = FATHOM_EVENTS.directory.joinNetwork;
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
-
+  const {captureEvent}  = useAppAnalytics()
   const handleOpenModal = (label: string) => {
     // if (
     //   typeof document !== 'undefined' &&
@@ -51,15 +53,39 @@ export function JoinNetworkMenu() {
       : setIsTeamModalOpen(true);
   };
 
+  const onJoinMenuClicked = () => {
+    if(!open && joinNetworkCode) {
+      trackGoal(joinNetworkCode, 0);
+    }
+    captureEvent('navbar-join-network-menu-clicked')
+  }
+
+  const onJoinMenuItemClicked = (label) => {
+    if (Cookies.get('userInfo')) {
+      Cookies.set('page_params', 'user_logged_in', { expires: 60, path: '/' });
+      window.location.href = PAGE_ROUTES.TEAMS;
+    } else {
+      handleOpenModal(label)
+      if(label && label.includes('Member')) {
+        captureEvent('navbar-join-network-menu-item-clicked', {
+            name: 'member'
+        })
+      } else if (label && label.includes('Team')) {
+        captureEvent('navbar-join-network-menu-item-clicked', {
+          name: 'team'
+      })
+      }
+    }
+    //
+  }
+
   return (
     <>
       <Menu as="div" className="relative">
         {({ open }) => (
           <>
             <Menu.Button
-              onClick={() =>
-                !open && joinNetworkCode && trackGoal(joinNetworkCode, 0)
-              }
+              onClick={onJoinMenuClicked}
               className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
             >
               Join the network
@@ -88,7 +114,7 @@ export function JoinNetworkMenu() {
                         <OptionLink
                           href={'#'}
                           eventCode={option.eventCode}
-                          onClick={() => handleOpenModal(option.label)}
+                          onClick={() => onJoinMenuItemClicked(option.label)}
                         >
                           <OptionIcon className="stroke-1.5 mr-2 h-4 w-4" />
                           {option.label}

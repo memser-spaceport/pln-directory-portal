@@ -1,105 +1,116 @@
+/* eslint-disable @next/next/no-img-element */
 import { Tooltip } from '@protocol-labs-network/ui';
+import SocialProfile from '../../../../../web-app/components/shared/directory/social-profile/social-profile';
 import { IMember } from '../../../../utils/members.types';
-import { ProfileSocialLink } from '../../../shared/profile/profile-social-link/profile-social-link';
-import { TagsGroup } from '../../../shared/tags-group/tags-group';
+import discordLogo from '/public/assets/images/icons/discord-contact-logo.svg';
+import emailLogo from '/public/assets/images/icons/email-contact-logo.svg';
+import gitLogo from '/public/assets/images/icons/git-contact-logo.svg';
+import linkedInLogo from '/public/assets/images/icons/linkedIn-contact-logo.svg';
+import telegramLogo from '/public/assets/images/icons/telegram-contact-logo.svg';
+import twitterLogo from '/public/assets/images/icons/twitter-contact-logo.svg';
+
+// import emailLogo from '/public/assets/images/icons/email-contact-logo.svg';
 
 export function MemberProfileDetails({
-  skills,
-  email,
-  twitter,
-  discordHandle,
-  githubHandle,
-  linkedinHandle,
-}: IMember) {
+  member,
+  userInfo,
+}: {
+  member: IMember;
+  userInfo: any;
+}) {
+  const {
+    skills,
+    email,
+    twitter,
+    discordHandle,
+    githubHandle,
+    telegramHandle,
+    linkedinHandle,
+  } = member;
+
+  const checkifNoContactDetails = () => {
+    return !linkedinHandle && !twitter && !discordHandle && !telegramHandle && !email && !githubHandle;
+  }
+
   return (
     <>
-      <div className="mt-6">
-        {skills.length ? (
-          <TagsGroup items={skills.map((skill) => skill.title)} />
-        ) : (
-          '-'
-        )}
-      </div>
-      <div className="mt-4 flex space-x-6">
-        <div className="flex w-1/4 flex-col items-start">
-          <h2 className="detail-label">Email</h2>
-          {email ? (
-            <Tooltip
-              asChild
-              trigger={
-                <div>
-                  <ProfileSocialLink url={email} type="email" />
-                </div>
-              }
-              content={email}
-            />
-          ) : (
-            '-'
-          )}
-        </div>
-        <div className="flex w-1/4 flex-col items-start">
-          <h2 className="detail-label">Twitter</h2>
-          {twitter ? (
-            <Tooltip
-              asChild
-              trigger={
-                <div>
-                  <ProfileSocialLink url={twitter} type="twitter" />
-                </div>
-              }
-              content={twitter}
-            />
-          ) : (
-            '-'
-          )}
-        </div>
-        <div className="flex w-1/4 flex-col items-start">
-          <h2 className="detail-label">Discord</h2>
-          {discordHandle ? (
-            <Tooltip
-              asChild
-              trigger={
-                <span className="line-clamp-1 break-all">{discordHandle}</span>
-              }
-              content={discordHandle}
-            />
-          ) : (
-            '-'
-          )}
-        </div>
-        <div className="flex w-1/4 flex-col items-start">
-          <h2 className="detail-label">Github</h2>
-          {githubHandle ? (
-            <Tooltip
-              asChild
-              trigger={
-                <div>
-                  <ProfileSocialLink url={githubHandle} type="github" />
-                </div>
-              }
-              content={githubHandle}
-            />
-          ) : (
-            '-'
-          )}
-        </div>
-        <div className="flex w-1/4 flex-col items-start">
-          <h2 className="detail-label">LinkedIn</h2>
-          {linkedinHandle ? (
-            <Tooltip
-              asChild
-              trigger={
-                <div>
-                  <ProfileSocialLink url={linkedinHandle} type="linkedin" />
-                </div>
-              }
-              content={linkedinHandle}
-            />
-          ) : (
-            '-'
-          )}
-        </div>
-      </div>
+      {
+        !checkifNoContactDetails() && (
+          <>
+            <h3 className=" mt-6 font-medium text-slate-500">Contact Details</h3>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {userInfo.uid && (
+                <>
+                  {/* Linked-In */}
+                  {linkedinHandle && (
+                    <SocialProfile
+                      handle={linkedinHandle}
+                      type="linkedin"
+                      logo={linkedInLogo}
+                      height={14}
+                      width={14}
+                    />
+                  )}
+
+                  {/* Twitter */}
+                  {twitter && (
+                    <SocialProfile
+                      handle={twitter}
+                      type="twitter"
+                      logo={twitterLogo}
+                      height={14}
+                      width={14}
+                    />
+                  )}
+
+                  {/* Discord */}
+                  {discordHandle && (
+                    <SocialProfile
+                      handle={discordHandle}
+                      type="discord"
+                      logo={discordLogo}
+                      height={14}
+                      width={14}
+                    />
+                  )}
+
+                  {/* Telegram */}
+                  {telegramHandle && (
+                    <SocialProfile
+                      handle={telegramHandle}
+                      type="telegram"
+                      logo={telegramLogo}
+                      height={14}
+                      width={14}
+                    />
+                  )}
+                  {/* Email */}
+                  {email && (
+                    <SocialProfile
+                      handle={email}
+                      type="email"
+                      logo={emailLogo}
+                      height={14}
+                      width={14}
+                    />
+                  )}
+
+                  {/* GitHub */}
+                  {githubHandle && (
+                    <SocialProfile
+                      handle={githubHandle}
+                      type="github"
+                      logo={gitLogo}
+                      height={14}
+                      width={14}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+          </>
+        )
+      }
     </>
   );
 }

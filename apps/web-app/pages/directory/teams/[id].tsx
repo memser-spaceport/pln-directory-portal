@@ -18,17 +18,23 @@ import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcr
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
 import { IMember } from '../../../utils/members.types';
-import { parseTeamMember } from '../../../utils/members.utils';
+import {
+  restrictMemberInfo,
+  parseTeamMember,
+} from '../../../utils/members.utils';
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
+import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../../utils/services/auth';
 
 interface TeamProps {
   team: ITeam;
   members: IMember[];
   backLink: string;
+  isUserLoggedIn: boolean;
+  userInfo: any;
 }
 
-export default function Team({ team, members, backLink }: TeamProps) {
+export default function Team({ team, members, backLink, userInfo }: TeamProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
     directoryName: 'Teams',
@@ -43,19 +49,19 @@ export default function Team({ team, members, backLink }: TeamProps) {
         description={team.shortDescription}
       />
 
-      <Breadcrumb items={breadcrumbItems} />
-      <section className="space-x-7.5 mx-auto mb-10 flex max-w-7xl px-10 pt-24">
+      <Breadcrumb items={breadcrumbItems} classname="max-w-[150px] truncate"/>
+      <section className="space-x-7.5 mx-auto mb-10 w-[917px] max-w-[917px] px-10 pt-40">
         <div className="card p-7.5 w-full">
-          <TeamProfileHeader {...team} />
+          <TeamProfileHeader team={team} loggedInMember={userInfo} />
           <TeamProfileDetails {...team} />
           {team.fundingStage || team.membershipSources.length ? (
             <TeamProfileFunding {...team} />
           ) : null}
           <TeamProfileMembers members={members} />
         </div>
-        <div className="w-sidebar shrink-0">
+        {/* <div className="w-sidebar shrink-0">
           <AskToEditCard profileType="team" team={team} />
-        </div>
+        </div> */}
       </section>
     </>
   );
@@ -65,10 +71,20 @@ Team.getLayout = function getLayout(page: ReactElement) {
   return <DirectoryLayout>{page}</DirectoryLayout>;
 };
 
-export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
-  query,
-  res,
-}) => {
+export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => {
+  const {
+    query,
+    res,
+    req
+  } = ctx;
+  let cookies = req?.cookies;
+  if (!cookies?.authToken) {
+    await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
+    if (ctx.res.getHeader('Set-Cookie'))
+      cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
+  }
+  const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
+  const isUserLoggedIn = cookies?.authToken &&  cookies?.userInfo ? true : false;
   const { id, backLink = '/directory/teams' } = query as {
     id: string;
     backLink: string;
@@ -108,7 +124,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
     team = parseTeam(teamResponse.body);
     members = orderBy(
       teamMembersResponse.body.map((member) =>
-        parseTeamMember(member, team.id)
+        isUserLoggedIn ? parseTeamMember(member, team.id) : restrictMemberInfo(parseTeamMember(member, team.id))
       ),
       ['teamLead', 'name'],
       ['desc', 'asc']
@@ -127,10 +143,10 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async ({
   // and in the CDN for 5 minutes, while keeping it stale for 7 days.
   res.setHeader(
     'Cache-Control',
-    'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
+    'no-cache, no-store, max-age=0, must-revalidate'
   );
 
   return {
-    props: { team, members, backLink },
+    props: { team, members, backLink, isUserLoggedIn, userInfo },
   };
 };

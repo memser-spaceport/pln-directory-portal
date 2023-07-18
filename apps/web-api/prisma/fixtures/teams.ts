@@ -46,6 +46,7 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(
       twitterHandler: faker.name.firstName(),
       officeHours: faker.name.firstName(),
       linkedinHandler: faker.name.firstName(),
+      telegramHandler: faker.name.firstName(),
       shortDescription: faker.helpers.arrayElement([
         null,
         faker.lorem.sentence(),

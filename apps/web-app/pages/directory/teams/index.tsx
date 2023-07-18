@@ -16,6 +16,7 @@ import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-dire
 import { DirectoryLayout } from '../../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../../seo.config';
 import { ITeam } from '../../../utils/teams.types';
+import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../../utils/services/auth';
 import {
   getTeamsListOptions,
   getTeamsOptionsFromQuery,
@@ -25,6 +26,8 @@ import {
 type TeamsProps = {
   teams: ITeam[];
   filtersValues: ITeamsFiltersValues;
+  isUserLoggedIn: boolean;
+  userInfo: any
 };
 
 export default function Teams({ teams, filtersValues }: TeamsProps) {
@@ -48,7 +51,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
         excludeUrlFn={(url) => url.startsWith('/directory/teams/')}
       />
 
-      <section className="pl-sidebar flex">
+      <section className="pl-sidebar flex pt-20">
         <div className="w-sidebar fixed left-0 z-40 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">
           <TeamsDirectoryFilters
             filtersValues={filtersValues}
@@ -81,10 +84,21 @@ Teams.getLayout = function getLayout(page: ReactElement) {
   return <DirectoryLayout>{page}</DirectoryLayout>;
 };
 
-export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
-  query,
-  res,
-}) => {
+export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) => {
+  const {
+    query,
+    res,
+    req
+  } = ctx;
+  let cookies = req?.cookies;
+  if (!cookies?.authToken) {
+    await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
+    if (ctx.res.getHeader('Set-Cookie')) 
+      cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
+  }
+  const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
+  const isUserLoggedIn = cookies?.authToken &&  cookies?.userInfo ? true : false;
+  
   const optionsFromQuery = getTeamsOptionsFromQuery(query);
   const listOptions = getTeamsListOptions(optionsFromQuery);
   const [teamsResponse, filtersValues] = await Promise.all([
@@ -105,10 +119,15 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async ({
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
   res.setHeader(
     'Cache-Control',
-    'public, max-age=60, s-maxage=300, stale-while-revalidate=604800'
+    'no-cache, no-store, max-age=0, must-revalidate'
   );
 
   return {
-    props: { teams, filtersValues: parsedFilters },
+    props: {
+      teams,
+      filtersValues: parsedFilters,
+      isUserLoggedIn,
+      userInfo
+    },
   };
 };

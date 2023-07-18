@@ -1,7 +1,8 @@
 import { UserGroupIcon, UserIcon } from '@heroicons/react/solid';
+import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
+import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
 interface IMenuItem {
@@ -25,6 +26,13 @@ export function Menu() {
   ];
 
   const router = useRouter();
+  const analytics = useAppAnalytics()
+
+  const onMenuItemClicked = (itemName) => {
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.NAVBAR_MENU_ITEM_CLICKED, {
+      'name': itemName
+    })
+  }
 
   return (
     <ul className="flex space-x-4 text-sm text-gray-700">
@@ -40,6 +48,7 @@ export function Menu() {
                     ? 'bg-slate-100 text-slate-900'
                     : 'text-slate-600'
                 }`}
+                onClick={e => onMenuItemClicked(item.name)}
               >
                 <Icon
                   data-testid={`${item.name}-icon`}

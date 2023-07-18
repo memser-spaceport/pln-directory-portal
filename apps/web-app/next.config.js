@@ -10,6 +10,9 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
  * @type {import('@nrwl/next/plugins/with-nx').WithNxOptions}
  **/
 let nextConfig = {
+  env: {
+    AUTH_API_URL: process.env.AUTH_API_URL
+  },
   nx: {
     // Set this to true if you would like to to use SVGR
     // See: https://github.com/gregberge/svgr
@@ -18,7 +21,7 @@ let nextConfig = {
   images: {
     // List remote domains that have access to Next.js Image Optimization API,
     // to protect the app from malicious users
-    domains: ['loremflickr.com', 'files.plnetwork.io'],
+    domains: ['loremflickr.com', 'files.plnetwork.io','i.ytimg.com'],
     // Enable `dangerouslyAllowSVG` and `contentSecurityPolicy` to serve
     // SVG images using the default Image Optimization API
     dangerouslyAllowSVG: true,

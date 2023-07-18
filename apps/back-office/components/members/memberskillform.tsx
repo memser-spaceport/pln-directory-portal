@@ -1,4 +1,4 @@
-import { MultiSelect } from '@protocol-labs-network/ui';
+import { MultiSelect, Switch } from '@protocol-labs-network/ui';
 import { TeamAndRoleGrid } from './teamandrole';
 import { ReactComponent as InformationCircleIcon } from '../../public/assets/icons/info_icon.svg';
 
@@ -77,63 +77,38 @@ export default function AddMemberSkillForm(props) {
           </span>
         </div>
       </div>
-      {(isOpenToWorkEnabled === 'true') && props.referenceUid && (
-        <div className="pt-5">
-          <span className="mr-2 text-sm font-bold">Are you open to Work?</span>
-          <div className="flex pt-3">
-            <div className="basis-1/4">
-              <label className="text-[14px] font-medium leading-[24px]">
-                <input
-                  type="radio"
-                  value="no"
-                  name="openToWork"
-                  checked={!props.formValues?.openToWork}
-                  disabled={!props.isEditEnabled}
-                  onChange={(e) => {
-                    const events = {
-                      target: {
-                        value: false,
-                        name: 'openToWork',
-                      },
-                    };
-                    props.onChange(events);
-                  }}
-                />
-                <span className="pl-1">No</span>
-              </label>
-            </div>
-            <div className="basis-1/4">
-              <label className="text-[14px] font-medium leading-[24px]">
-                <input
-                  type="radio"
-                  value="yes"
-                  name="openToWork"
-                  checked={props.formValues?.openToWork}
-                  disabled={!props.isEditEnabled}
-                  onChange={(e) => {
-                    const events = {
-                      target: {
-                        value: true,
-                        name: 'openToWork',
-                      },
-                    };
-                    props.onChange(events);
-                  }}
-                />
-                <span className="pl-1">Yes</span>
-              </label>
+      {isOpenToWorkEnabled === 'true' && props.referenceUid && (
+        <>
+          <div className="pt-5">
+            <div className="flex place-content-between">
+              <span className="mr-2 pr-5 text-sm font-bold">
+                Are you open to collaborate?
+              </span>
+              <Switch
+                initialValue={props.formValues.openToWork}
+                onChange={(evt) => {
+                  const events = {
+                    target: {
+                      value: evt,
+                      name: 'openToWork',
+                    },
+                  };
+                  props.onChange(events);
+                }}
+              />
             </div>
           </div>
           <div className="flex pt-3">
             <div>
-              <InformationCircleIcon />
+              <InformationCircleIcon className="h-5 w-5" />
             </div>
             <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-              Enabling this will inform others in the network that you are open
-              to working on other teams & projects.
+              Enabling this implies you are open to collaborate on shared ideas
+              & projects with other members. This is one way to join forces &
+              reach a common goal.
             </span>
           </div>
-        </div>
+        </>
       )}
     </>
   );

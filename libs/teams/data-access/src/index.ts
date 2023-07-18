@@ -12,7 +12,7 @@ export const getTeams = async (options: TTeamListOptions) => {
   return await client.teams.getTeams({
     query: {
       ...options,
-    },
+    } as any,
   });
 };
 
@@ -32,7 +32,7 @@ export const getTeam = async (id: string, options: TGetRequestOptions = {}) => {
  */
 export const getTeamUIDByAirtableId = async (id: string) => {
   const res = await client.teams.getTeams({
-    query: { airtableRecId: id, select: 'uid' },
+    query: { airtableRecId: id, select: 'uid' } as any,
   });
 
   return res.status === 200 && res.body[0] ? res.body[0].uid : null;
@@ -50,11 +50,11 @@ export const getTeamsFilters = async (options: TTeamListOptions) => {
     getTeamsFiltersValues(options),
   ]);
 
-  console.log(
-    'valuesByFilter, availableValuesByFilter>>>>',
-    valuesByFilter,
-    availableValuesByFilter
-  );
+  // console.log(
+  //   'valuesByFilter, availableValuesByFilter>>>>',
+  //   valuesByFilter,
+  //   availableValuesByFilter
+  // );
 
   if (valuesByFilter.status !== 200 || availableValuesByFilter.status !== 200) {
     const emptyFilters = {

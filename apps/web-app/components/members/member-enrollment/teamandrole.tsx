@@ -1,23 +1,20 @@
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useEffect, useState } from 'react';
 import { InputField, Autocomplete } from '@protocol-labs-network/ui';
 import { XIcon as CloseIcon } from '@heroicons/react/outline';
 import { fetchTeamsForAutocomplete } from '../../../utils/services/dropdown-service';
 
-interface Team {
-  teamUid: string;
-  teamTitle: string;
-}
+// interface Team {
+//   teamUid: string;
+//   teamTitle: string;
+// }
 
 export function TeamAndRoleGrid(props) {
-  const [teamDetail, setTeamDetail] = useState<Team>(props?.teamAndRole.team);
-  const [teamRowId] = useState(props?.teamAndRole.rowId);
-  const [roleTitle, setRoleTitle] = useState(props?.teamAndRole.role);
-  const team = props?.teamAndRole;
+  const [teamRowId, setTeamRowId] = useState(props?.teamAndRole.rowId);
+  const team= props?.teamAndRole;
 
   const teamNames = props.teamNames;
 
   function handleDropDownChange(selectedOption) {
-    setTeamDetail(selectedOption);
     props.updateParentTeamValue(
       selectedOption.value,
       selectedOption.label,
@@ -29,7 +26,6 @@ export function TeamAndRoleGrid(props) {
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) {
     const { value } = event.target;
-    setRoleTitle(value);
     props.updateParentRoleValue(value, props?.teamAndRole.rowId);
   }
 
@@ -38,8 +34,7 @@ export function TeamAndRoleGrid(props) {
       <div className="flex flex-row">
         <div className="basis-6/12">
           <Autocomplete
-            name="team"
-            className="custom-grey custom-outline-none border"
+            className="custom-grey custom-outline-none border truncate padding-team-autocomplete"
             required={true}
             placeholder="Select a team"
             selectedOption={{ value: team?.teamUid, label: team?.teamTitle }}
