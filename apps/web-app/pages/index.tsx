@@ -10,7 +10,7 @@ import { Projects } from '../components/portal/sections/projects/projects';
 import { Substack } from '../components/portal/sections/substack/substack';
 import { PortalLayout } from '../layouts/portal-layout';
 import api from '../utils/api';
-import { NW_SPOTLIGHT_CONSTANTS } from '../constants';
+import { ANNOUNCEMENT_S3_URL, NW_SPOTLIGHT_CONSTANTS } from '../constants';
 
 export default function Index({videoDetails,playlistDetails}) {
   return (
@@ -47,7 +47,7 @@ export default function Index({videoDetails,playlistDetails}) {
 }
 
 Index.getLayout = function getLayout(page: ReactElement) {
-  return <PortalLayout>{page}</PortalLayout>;
+  return <PortalLayout bannerJSON={page?.props?.children[1]?.props?.bannerJSON}>{page}</PortalLayout>;
 };
 
 const getVideoDetails = async () => {
@@ -78,6 +78,20 @@ const getPlaylistVideoDetails = async () => {
 
 export const getServerSideProps: GetServerSideProps = async () => {
   let [videoDetails, playlistDetails] = await Promise.all([getVideoDetails(), getPlaylistVideoDetails()]);
+  
+  const bannerResponse = await fetch(ANNOUNCEMENT_S3_URL, {
+    headers: {
+      Authorization: process.env.NEXT_PUBLIC_ANNOUNCEMENT_S3_AUTH_TOKEN,
+    },
+  });
+
+  const responseJson = await bannerResponse.json();
+  let bannerJSON = null;
+
+  if (responseJson && responseJson?.message && responseJson.message.length) {
+    bannerJSON = responseJson;
+  }
+ 
   return process.env.NEXT_PUBLIC_HIDE_NETWORK_PORTAL
     ? {
         redirect: {
@@ -85,5 +99,5 @@ export const getServerSideProps: GetServerSideProps = async () => {
           destination: '/directory/teams',
         },
       }
-    : { props: { videoDetails , playlistDetails } };
+    : { props: { videoDetails , playlistDetails , bannerJSON} };
 };
