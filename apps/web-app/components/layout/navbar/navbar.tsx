@@ -72,20 +72,20 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
     },
   ];
   return (
-    <nav className="navbar top-0 h-20 justify-between pl-12 only-of-type:shadow-[0_1px_4px_0_#e2e8f0]">
-      <div className="flex items-center space-x-5">
-        <Link href="/directory">
-          <a className="on-focus">
-            <ProtocolLabsLogo
-              title="Protocol Labs Network Directory Beta Black Logo"
-              width="212"
-              height="60"
-            />
-          </a>
-        </Link>
-        <AppMenu />
-      </div>
-      {/* <GoogleReCaptchaProvider
+    <nav className="navbar h-20 justify-between px-12 only-of-type:shadow-[0_1px_4px_0_#e2e8f0]">
+    <div className="flex items-center space-x-5">
+      <Link href="/directory">
+        <a className="on-focus">
+          <ProtocolLabsLogo
+            title="Protocol Labs Network Directory Beta Black Logo"
+            width="212"
+            height="60"
+          />
+        </a>
+      </Link>
+      <AppMenu />
+    </div>
+    {/* <GoogleReCaptchaProvider
         reCaptchaKey={process.env.NEXT_PUBLIC_GOOGLE_SITE_KEY}
         scriptProps={{
           async: false,

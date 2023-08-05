@@ -3,7 +3,7 @@ import { PortalMenuMobile } from './portal-menu-mobile/portal-menu-mobile';
 import { PortalNavbar } from './portal-navbar/portal-navbar';
 import { useFloatingPortalHeader } from './use-floating-portal-header';
 
-export function PortalHeader() {
+export function PortalHeader({showBanner}) {
   const isFloating = useFloatingPortalHeader();
 
   return (
@@ -22,9 +22,7 @@ export function PortalHeader() {
         </div>
       </div>
       <div
-        className={`fixed ${
-          isFloating ? 'top-4' : 'top-8'
-        } left-1/2 z-50 hidden -translate-x-1/2 transition-all duration-700 ease-in-out md:block`}
+        className={`fixed top-16 ${!showBanner ? 'top-7':''} left-1/2 z-50 hidden -translate-x-1/2 transition-all duration-700 ease-in-out md:block`}
       >
         <PortalNavbar floating={isFloating} />
       </div>

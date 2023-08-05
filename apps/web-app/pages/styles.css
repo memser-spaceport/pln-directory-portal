@@ -235,3 +235,16 @@ nextjs-portal {
   background-origin: border-box;
   background-clip: content-box, border-box;
 }
+
+
+.carousel .control-dots{
+  position: relative !important;
+}
+
+.carousel .control-dots .dot{
+  margin: 0px 4px !important;
+}
+
+.banner-gradiant{
+  background: linear-gradient(90deg, #44D5BB 0%, #3EB7EB 14.03%, #427DFF 41.15%, #427DFF 52.59%, #427DFF 64.58%, #3EB7EB 85.42%, #44D5BB 100%);
+}
