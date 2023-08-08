@@ -20,7 +20,7 @@ const faqItems = [
   {
     triggerText: 'I want to join the network, what can I do?',
     content:
-      "<p>We welcome teams interested in the Protocol Labs mission to collaborate with us on a short or long-term basis. You can read more about membership options <a href='https://protocol.almanac.io/handbook/protocol-labs-spaceport-JzKymu/pln-membership-G4pIdsLCQ6q0BJwwDTOfaVSeoV3NNd8V' target='_blank' rel='noopener noreferrer'><u>here</u></a>, or reach out to <a href='mailto:spaceport-admin@protocol.ai' title='mailto:spaceport-admin@protocol.ai'><u>spaceport-admin@protocol.ai</u></a> and we'll take things from there.</p>",
+      "<p>We welcome teams interested in the Protocol Labs mission to collaborate with us on a short or long-term basis. You can read more about membership options <a href='https://protocol.almanac.io/folders/guide-to-the-pln-galaxy-I0wPaO/pln-membership-G4pIdsLCQ6q0BJwwDTOfaVSeoV3NNd8V?focusView=I0wPaO&mention_id=3257' target='_blank' rel='noopener noreferrer'><u>here</u></a>, or reach out to <a href='mailto:spaceport-admin@protocol.ai' title='mailto:spaceport-admin@protocol.ai'><u>spaceport-admin@protocol.ai</u></a> and we'll take things from there.</p>",
     handleClick: (open) =>
       !open && trackGoal(FATHOM_EVENTS.portal.faq.howToJoin, 0),
   },
