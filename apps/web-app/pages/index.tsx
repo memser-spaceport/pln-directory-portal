@@ -10,7 +10,7 @@ import { Projects } from '../components/portal/sections/projects/projects';
 import { Substack } from '../components/portal/sections/substack/substack';
 import { PortalLayout } from '../layouts/portal-layout';
 import api from '../utils/api';
-import { ANNOUNCEMENT_S3_URL, NW_SPOTLIGHT_CONSTANTS } from '../constants';
+import { NW_SPOTLIGHT_CONSTANTS } from '../constants';
 
 export default function Index({videoDetails,playlistDetails}) {
   return (
@@ -81,7 +81,8 @@ export const getServerSideProps: GetServerSideProps = async () => {
   let bannerJSON = null;
   
   try{
-    const bannerResponse = await fetch(ANNOUNCEMENT_S3_URL, {
+    
+    const bannerResponse = await fetch(process.env.NEXT_PUBLIC_ANNOUNCEMENT_API_URL, {
       headers: {
         Authorization: process.env.NEXT_PUBLIC_ANNOUNCEMENT_S3_AUTH_TOKEN,
       },
@@ -97,7 +98,6 @@ export const getServerSideProps: GetServerSideProps = async () => {
     
   }catch(err){
     console.log(err);
-    
   }
   
  

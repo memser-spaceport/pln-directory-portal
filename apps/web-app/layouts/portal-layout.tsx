@@ -3,7 +3,7 @@ import { AnnouncementBanner } from "../components/layout/announcement/banner";
 import { PortalHeader } from "../components/portal/portal-header/portal-header";
 
 export function PortalLayout({ bannerJSON,children }) {
-  const [showBanner, setBannerState] = useState(true);
+  const [showBanner, setBannerState] = useState(bannerJSON && bannerJSON?.message && bannerJSON && bannerJSON?.message.length);
   return (
     <>
     {
