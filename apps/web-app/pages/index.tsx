@@ -78,19 +78,28 @@ const getPlaylistVideoDetails = async () => {
 
 export const getServerSideProps: GetServerSideProps = async () => {
   let [videoDetails, playlistDetails] = await Promise.all([getVideoDetails(), getPlaylistVideoDetails()]);
-  
-  const bannerResponse = await fetch(ANNOUNCEMENT_S3_URL, {
-    headers: {
-      Authorization: process.env.NEXT_PUBLIC_ANNOUNCEMENT_S3_AUTH_TOKEN,
-    },
-  });
-
-  const responseJson = await bannerResponse.json();
   let bannerJSON = null;
-
-  if (responseJson && responseJson?.message && responseJson.message.length) {
-    bannerJSON = responseJson;
+  
+  try{
+    const bannerResponse = await fetch(ANNOUNCEMENT_S3_URL, {
+      headers: {
+        Authorization: process.env.NEXT_PUBLIC_ANNOUNCEMENT_S3_AUTH_TOKEN,
+      },
+    });
+  
+    if(bannerResponse.status === 200){
+      const responseJson = await bannerResponse.json();
+    
+      if (responseJson && responseJson?.message && responseJson.message.length) {
+        bannerJSON = responseJson;
+      }
+    }
+    
+  }catch(err){
+    console.log(err);
+    
   }
+  
  
   return process.env.NEXT_PUBLIC_HIDE_NETWORK_PORTAL
     ? {

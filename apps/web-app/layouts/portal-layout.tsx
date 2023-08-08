@@ -7,7 +7,7 @@ export function PortalLayout({ bannerJSON,children }) {
   return (
     <>
     {
-        bannerJSON?.message && (
+        bannerJSON && bannerJSON?.message && (
           <AnnouncementBanner content={bannerJSON.message} showBanner={showBanner} setBannerState={setBannerState}/>
         )
       }
