@@ -40,15 +40,22 @@ export function AnnouncementBanner({ content, showBanner, setBannerState }) {
                         {
                             !isMobile && (
                                 <div className="inline-block pt-2 min-w-[124px]">
-                                    <div className="inline-block px-4 text-[14px] cursor-pointer" onClick={prev}>
-                                        <PreviousArrow />
-                                    </div>
-                                    <div className="inline-block text-white text-[14px]">
-                                        {selectedItem + 1} of {content.length}
-                                    </div>
-                                    <div className="inline-block px-4 text-[14px] cursor-pointer" onClick={next}>
-                                        <NextArrow />
-                                    </div>
+                                    {
+                                        content.length > 1 && (
+                                            <>
+                                                <div className="inline-block px-4 text-[14px] cursor-pointer" onClick={prev}>
+                                                    <PreviousArrow />
+                                                </div>
+                                                <div className="inline-block text-white text-[14px]">
+                                                    {selectedItem + 1} of {content.length}
+                                                </div>
+                                                <div className="inline-block px-4 text-[14px] cursor-pointer" onClick={next}>
+                                                    <NextArrow />
+                                                </div>
+                                            </>
+                                        )
+                                    }
+                                    
                                 </div>
                             )
                         }

@@ -22,7 +22,7 @@ export function PortalHeader({showBanner}) {
         </div>
       </div>
       <div
-        className={`fixed top-16 ${!showBanner ? 'top-7':''} left-1/2 z-50 hidden -translate-x-1/2 transition-all duration-700 ease-in-out md:block`}
+        className={`fixed top-7 ${showBanner ? '!top-16':''} left-1/2 z-50 hidden -translate-x-1/2 transition-all duration-700 ease-in-out md:block`}
       >
         <PortalNavbar floating={isFloating} />
       </div>

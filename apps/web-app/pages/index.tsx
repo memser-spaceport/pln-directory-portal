@@ -10,7 +10,7 @@ import { Projects } from '../components/portal/sections/projects/projects';
 import { Substack } from '../components/portal/sections/substack/substack';
 import { PortalLayout } from '../layouts/portal-layout';
 import api from '../utils/api';
-import { ANNOUNCEMENT_S3_URL, NW_SPOTLIGHT_CONSTANTS } from '../constants';
+import { NW_SPOTLIGHT_CONSTANTS } from '../constants';
 
 export default function Index({videoDetails,playlistDetails}) {
   return (
@@ -78,19 +78,28 @@ const getPlaylistVideoDetails = async () => {
 
 export const getServerSideProps: GetServerSideProps = async () => {
   let [videoDetails, playlistDetails] = await Promise.all([getVideoDetails(), getPlaylistVideoDetails()]);
-  
-  const bannerResponse = await fetch(ANNOUNCEMENT_S3_URL, {
-    headers: {
-      Authorization: process.env.NEXT_PUBLIC_ANNOUNCEMENT_S3_AUTH_TOKEN,
-    },
-  });
-
-  const responseJson = await bannerResponse.json();
   let bannerJSON = null;
-
-  if (responseJson && responseJson?.message && responseJson.message.length) {
-    bannerJSON = responseJson;
+  
+  try{
+    
+    const bannerResponse = await fetch(process.env.NEXT_PUBLIC_ANNOUNCEMENT_API_URL, {
+      headers: {
+        Authorization: process.env.NEXT_PUBLIC_ANNOUNCEMENT_S3_AUTH_TOKEN,
+      },
+    });
+  
+    if(bannerResponse.status === 200){
+      const responseJson = await bannerResponse.json();
+    
+      if (responseJson && responseJson?.message && responseJson.message.length) {
+        bannerJSON = responseJson;
+      }
+    }
+    
+  }catch(err){
+    console.log(err);
   }
+  
  
   return process.env.NEXT_PUBLIC_HIDE_NETWORK_PORTAL
     ? {
