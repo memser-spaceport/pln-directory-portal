@@ -16,7 +16,7 @@ const projects = [
     title: 'Mosaia',
     description:
       'Mosaia connects you to vetted service providers that can help you, solve problems in areas such as legal, marketing, and event production',
-    buttonUrl: 'https://mosaia.io/',
+    buttonUrl: 'https://pln.mosaia.io/',
     buttonLabel: 'Learn more',
     eventCode: FATHOM_EVENTS.portal.mosaia.learnMore,
   },

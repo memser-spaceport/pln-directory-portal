@@ -47,7 +47,7 @@ export default function Index({videoDetails,playlistDetails}) {
 }
 
 Index.getLayout = function getLayout(page: ReactElement) {
-  return <PortalLayout>{page}</PortalLayout>;
+  return <PortalLayout bannerJSON={page?.props?.children[1]?.props?.bannerJSON}>{page}</PortalLayout>;
 };
 
 const getVideoDetails = async () => {
@@ -78,6 +78,29 @@ const getPlaylistVideoDetails = async () => {
 
 export const getServerSideProps: GetServerSideProps = async () => {
   let [videoDetails, playlistDetails] = await Promise.all([getVideoDetails(), getPlaylistVideoDetails()]);
+  let bannerJSON = null;
+  
+  try{
+    
+    const bannerResponse = await fetch(process.env.NEXT_PUBLIC_ANNOUNCEMENT_API_URL, {
+      headers: {
+        Authorization: process.env.NEXT_PUBLIC_ANNOUNCEMENT_S3_AUTH_TOKEN,
+      },
+    });
+  
+    if(bannerResponse.status === 200){
+      const responseJson = await bannerResponse.json();
+    
+      if (responseJson && responseJson?.message && responseJson.message.length) {
+        bannerJSON = responseJson;
+      }
+    }
+    
+  }catch(err){
+    console.log(err);
+  }
+  
+ 
   return process.env.NEXT_PUBLIC_HIDE_NETWORK_PORTAL
     ? {
         redirect: {
@@ -85,5 +108,5 @@ export const getServerSideProps: GetServerSideProps = async () => {
           destination: '/directory/teams',
         },
       }
-    : { props: { videoDetails , playlistDetails } };
+    : { props: { videoDetails , playlistDetails , bannerJSON} };
 };
