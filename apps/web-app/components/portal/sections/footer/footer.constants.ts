@@ -7,11 +7,11 @@ export const FOOTER_MAIN_NAV_LINKS: IFooterMainNavLink[] = [
   },
   {
     label: 'Merch',
-    url: 'https://protocol.almanac.io/handbook/guide-to-the-pln-galaxy-JzKymu/swag-XURtMBNv9ea4iCEr4aPRXwdXosGHDLT5?docView=Commenting',
+    url: 'https://protocol.almanac.io/folders/guide-to-the-pln-galaxy-I0wPaO/swag-XURtMBNv9ea4iCEr4aPRXwdXosGHDLT5?focusView=I0wPaO',
   },
   {
     label: 'Network Funding',
-    url: 'https://protocol.almanac.io/handbook/protocol-labs-spaceport-JzKymu/network-funding-YANVDroOLIURUJsfFENd8fJerOtbDaSK',
+    url: 'https://protocol.almanac.io/folders/guide-to-the-pln-galaxy-I0wPaO/network-capital-YANVDroOLIURUJsfFENd8fJerOtbDaSK?focusView=I0wPaO',
   },
   {
     label: 'Terms',
@@ -19,10 +19,10 @@ export const FOOTER_MAIN_NAV_LINKS: IFooterMainNavLink[] = [
   },
   {
     label: 'Code of Conduct',
-    url: 'https://protocol.almanac.io/handbook/protocol-labs-spaceport-JzKymu/pln-code-of-conduct-ymBUYyonmhfvizGu6yOpXH1qkuWYce96',
+    url: 'https://protocol.almanac.io/folders/guide-to-the-pln-galaxy-I0wPaO/pln-code-of-conduct-ymBUYyonmhfvizGu6yOpXH1qkuWYce96?focusView=I0wPaO',
   },
   {
     label: 'Guide to the PLN Galaxy',
-    url: 'https://protocol.almanac.io/handbook/protocol-labs-spaceport-JzKymu',
+    url: 'https://protocol.almanac.io/folders/guide-to-the-pln-galaxy-I0wPaO?focusView=I0wPaO',
   },
 ];
