@@ -12,6 +12,7 @@ import { useFathom } from '../hooks/plugins/use-fathom.hook';
 import { DEFAULT_SEO } from '../seo.config';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import "react-responsive-carousel/lib/styles/carousel.min.css";
 import './styles.css';
 import { useRouter } from 'next/router';
 import posthog from 'posthog-js';

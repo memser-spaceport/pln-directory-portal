@@ -286,3 +286,8 @@ export const PRIVACY_CONSTANTS = {
     showTwitter: DEFAULT_PRIVACY_VISIBILITY
   }
 }
+
+export const ANNOUNCEMENT_BANNER = {
+  VIEW_WEBSITE: 'View website',
+  LEARN_MORE: 'Learn More'
+}

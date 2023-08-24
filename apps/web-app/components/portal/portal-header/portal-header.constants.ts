@@ -19,7 +19,7 @@ export const PORTAL_HEADER_LINKS: IPortalHeaderLink[] = [
   },
   {
     label: 'Mosaia',
-    url: 'https://mosaia.io/',
+    url: 'https://pln.mosaia.io/',
     eventCode: FATHOM_EVENTS.portal.nav.mosaia,
   },
   {
