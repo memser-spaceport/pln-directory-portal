@@ -23,7 +23,7 @@ export default function Index({videoDetails,playlistDetails}) {
         </div>
       </div>
       <div className="bg-gradient-to-b from-slate-50 to-white">
-        <div className="px-6 py-24 md:px-16 ">
+        <div className="px-6 pb-[100px] md:px-16 ">
           <div className="mx-auto max-w-[1110px]">
             <div className="mb-[106px] md:mb-[162px]">
               <LabWeek />
@@ -79,28 +79,28 @@ const getPlaylistVideoDetails = async () => {
 export const getServerSideProps: GetServerSideProps = async () => {
   let [videoDetails, playlistDetails] = await Promise.all([getVideoDetails(), getPlaylistVideoDetails()]);
   let bannerJSON = null;
-  
+
   try{
-    
+
     const bannerResponse = await fetch(process.env.NEXT_PUBLIC_ANNOUNCEMENT_API_URL, {
       headers: {
         Authorization: process.env.NEXT_PUBLIC_ANNOUNCEMENT_S3_AUTH_TOKEN,
       },
     });
-  
+
     if(bannerResponse.status === 200){
       const responseJson = await bannerResponse.json();
-    
+
       if (responseJson && responseJson?.message && responseJson.message.length) {
         bannerJSON = responseJson;
       }
     }
-    
+
   }catch(err){
     console.log(err);
   }
-  
- 
+
+
   return process.env.NEXT_PUBLIC_HIDE_NETWORK_PORTAL
     ? {
         redirect: {
