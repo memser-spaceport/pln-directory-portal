@@ -155,6 +155,10 @@ export const SETTINGS_CONSTANTS = {
 }
 
 export const APP_ANALYTICS_EVENTS = {
+  HOME_LABWEEK_WEBSITE_LINK_CLICKED: "home_labweek_website_link_clicked",
+  HOME_LABWEEK_SCHEDULE_LINK_CLICKED: "home_labweek_schedule_link_clicked",
+
+
   NAVBAR_MENU_ITEM_CLICKED: 'navbar-menu-item-clicked',
   NAVBAR_ACCOUNTMENU_ITEM_CLICKED: 'navbar-accountmenu-item-clicked',
 

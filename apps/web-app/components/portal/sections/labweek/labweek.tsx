@@ -1,78 +1,47 @@
 import { trackGoal } from 'fathom-client';
-import { FATHOM_EVENTS } from '../../../../constants';
+import { APP_ANALYTICS_EVENTS, FATHOM_EVENTS } from '../../../../constants';
 
 import { ArrowSmRightIcon } from '@heroicons/react/solid';
 import { EventCard } from '../../event-card/event-card';
+import useAppAnalytics from '../../../../hooks/shared/use-app-analytics';
 
 export const LabWeek = () => {
+  const appAnalytics = useAppAnalytics();
+  const onWebsiteLinkClicked = () => {
+    appAnalytics.captureEvent(APP_ANALYTICS_EVENTS.HOME_LABWEEK_WEBSITE_LINK_CLICKED)
+  }
+
+  const onEventScheduleLinkClicked = () => {
+    appAnalytics.captureEvent(APP_ANALYTICS_EVENTS.HOME_LABWEEK_SCHEDULE_LINK_CLICKED)
+  }
   return (
-    <section className="text-left md:text-center">
+    <section className="text-left md:text-center py-[24px] relative">
+
       <div className="md:mb-18 mb-6">
         <h2 className="text-4xl font-bold leading-[46px] md:text-5xl md:leading-[60px]">
-          LabWeek22
+          LabWeek23
         </h2>
-        <p className="text-[16px] leading-6 text-slate-600 md:mx-auto md:mt-2 md:w-1/2 md:text-lg">
-          The Protocol Labs Network is gathering in Lisbon for our first ever
-          decentralized conference.
+        <p className="text-[16px] leading-6 text-slate-600 md:mx-auto mt-[8px] lg:mt-[16px] md:text-lg w-full lg:w-[880px] xl:w-[920px]">
+          LabWeek23 is Protocol Lab's annual decentralized global conference. It features several days of curated events, all organized by the visionary teams in the Protocol Labs Network to advance our mission — to drive breakthroughs in computing to push humanity forward.
         </p>
       </div>
-      <div className="md:gap-x-7.5 flex flex-col gap-6 md:mt-2 md:flex-row">
-        <div className="h-[350px] grow">
-          <EventCard
-            cardUrl="https://plsummit.labweek.io/"
-            imageURL="/assets/images/portal/pl-summit.png"
-            topic="Conference"
-            eventTitle="PL Summit"
-            eventDetails="Lisbon, Oct. 24"
-            handleClick={() =>
-              trackGoal(FATHOM_EVENTS.portal.labWeek22.plSummit, 0)
-            }
-          />
+
+      <div className="w-full h-fit relative  bg-[#156FF7]">
+        <picture className="object-cover w-full -mt-[24px]">
+          <source media="(max-width: 767px)" srcSet="/assets/images/home/labweek_banner_mobile.jpg, /assets/images/home/labweek_banner_mobile2x.jpg 2x" />
+          <source media="(max-width: 1199px)" srcSet="/assets/images/home/labweek_banner_tab.jpg, /assets/images/home/labweek_banner_tab2x.jpg 2x" />
+          <source media="(min-width: 1200px)" srcSet="/assets/images/home/labweek_banner_desktop.jpg, /assets/images/home/labweek_banner_desktop2x.jpg 2x" />
+          <img className="w-full" src="/assets/images/home/labweek_banner_tab.jpg" />
+        </picture>
+        <div className="w-full h-full py-[36px] absolute top-0 left-0 flex flex-col items-center justify-center">
+          <img className="w-[70px] lg:w-[98px]" src="/assets/images/icons/labweek23.svg" />
+          <h2 className="text-[46px] lg:text-[55px] mt-[19px] leading-[46px] lg:leading-[55px] text-[#fff]">LabWeek23</h2>
+          <p className="text-[16px] my-[16px] md:my-[12px] text-[#fff] text-center w-[238px] font-[400]">Happening at Istanbul between 13th - 17th Nov</p>
+          <div className="flex flex-col lg:flex-row gap-[12px] items-center">
+            <a onClick={onWebsiteLinkClicked} target="_blank" href="https://23.labweek.io" className="bg-white px-[24px] w-fit py-[10px] rounded-[8px] text-[14px] font-[500] text-[#0F172A] cursor-pointer" rel="noreferrer">Visit Website</a>
+            <a onClick={onEventScheduleLinkClicked} target="_blank" href="https://23.labweek.io/schedule/calendar" className="border-solid w-fit border-white border-[1px] px-[24px] py-[10px] rounded-[8px] text-[14px] font-[500] text-[#fff] cursor-pointer bg-[#156FF7]" rel="noreferrer">See Event Schedule</a>
+          </div>
         </div>
-
-        <div className="h-[350px] grow">
-          <EventCard
-            cardUrl="https://2022.ipfs.camp/"
-            imageURL="/assets/images/portal/ipfs-camp.png"
-            topic="Talks & Workshops"
-            eventTitle="IPFS Camp"
-            eventDetails="Lisbon, Oct. 28"
-            handleClick={() =>
-              trackGoal(FATHOM_EVENTS.portal.labWeek22.ipfsCamp, 0)
-            }
-          />
-        </div>
-
-        <div className="h-[350px] grow">
-          <EventCard
-            cardUrl="https://fil-lisbon.io/"
-            imageURL="/assets/images/portal/fil-lisbon.png"
-            topic="Conference"
-            eventTitle="FIL Lisbon"
-            eventDetails="Lisbon, Oct. 31"
-            handleClick={() =>
-              trackGoal(FATHOM_EVENTS.portal.labWeek22.filLisbon, 0)
-            }
-          />
-        </div>
-      </div>
-
-      <div className="mr-3 mt-6 flex md:mt-5 md:justify-end">
-        <a
-          href="https://22.labweek.io/#schedule"
-          className="group mr-3 flex items-center text-sm font-semibold leading-5"
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() =>
-            trackGoal(FATHOM_EVENTS.portal.labWeek22.fullSchedule, 0)
-          }
-        >
-          <span className="relative mr-1 after:absolute after:-bottom-px after:left-0 after:h-px after:w-full after:bg-gradient-to-r after:from-[#4282fc] after:to-[#44d5bb]">
-            See full event schedule
-          </span>
-
-          <ArrowSmRightIcon className="h-4 w-4 stroke-2 transition-all ease-out group-hover:translate-x-1/4 group-hover:duration-[300ms]" />
-        </a>
       </div>
     </section>
   );
