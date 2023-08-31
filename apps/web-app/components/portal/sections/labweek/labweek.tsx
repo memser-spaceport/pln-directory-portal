@@ -15,9 +15,9 @@ export const LabWeek = () => {
     appAnalytics.captureEvent(APP_ANALYTICS_EVENTS.HOME_LABWEEK_SCHEDULE_LINK_CLICKED)
   }
   return (
-    <section className="text-left md:text-center py-[24px] relative">
+    <section className="text-center py-[24px] relative">
 
-      <div className="md:mb-18 mb-6">
+      <div className="mb-[32px]">
         <h2 className="text-4xl font-bold leading-[46px] md:text-5xl md:leading-[60px]">
           LabWeek23
         </h2>
@@ -37,9 +37,9 @@ export const LabWeek = () => {
           <img className="w-[70px] lg:w-[98px]" src="/assets/images/icons/labweek23.svg" />
           <h2 className="text-[46px] lg:text-[55px] mt-[19px] leading-[46px] lg:leading-[55px] text-[#fff]">LabWeek23</h2>
           <p className="text-[16px] my-[16px] md:my-[12px] text-[#fff] text-center w-[238px] font-[400]">Happening at Istanbul between 13th - 17th Nov</p>
-          <div className="flex flex-col lg:flex-row gap-[12px] items-center">
-            <a onClick={onWebsiteLinkClicked} target="_blank" href="https://23.labweek.io" className="bg-white px-[24px] w-fit py-[10px] rounded-[8px] text-[14px] font-[500] text-[#0F172A] cursor-pointer" rel="noreferrer">Visit Website</a>
-            <a onClick={onEventScheduleLinkClicked} target="_blank" href="https://23.labweek.io/schedule/calendar" className="border-solid w-fit border-white border-[1px] px-[24px] py-[10px] rounded-[8px] text-[14px] font-[500] text-[#fff] cursor-pointer bg-[#156FF7]" rel="noreferrer">See Event Schedule</a>
+          <div className="flex flex-col w-[calc(100%_-_32px)] md:w-fit md:flex-row gap-[12px] items-center">
+            <a onClick={onWebsiteLinkClicked} target="_blank" href="https://23.labweek.io" className="bg-white px-[24px] flex justify-center w-full md:w-fit py-[10px] rounded-[8px] text-[14px] font-[500] text-[#0F172A] cursor-pointer" rel="noreferrer">Visit Website</a>
+            <a onClick={onEventScheduleLinkClicked} target="_blank" href="https://23.labweek.io/schedule/calendar" className="border-solid flex justify-center  w-full md:w-fit border-white border-[1px] px-[24px] py-[10px] rounded-[8px] text-[14px] font-[500] text-[#fff] cursor-pointer bg-[#156FF7]" rel="noreferrer">See Event Schedule</a>
           </div>
         </div>
       </div>
