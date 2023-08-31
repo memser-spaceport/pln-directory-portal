@@ -22,7 +22,7 @@ export default function Index({videoDetails,playlistDetails}) {
           <Directory />
         </div>
       </div>
-      <div className="bg-gradient-to-b from-slate-50 to-white">
+      <div className="bg-white">
         <div className="px-6 pb-[100px] md:px-16 ">
           <div className="mx-auto max-w-[1110px]">
             <div className="mb-[106px] md:mb-[162px]">

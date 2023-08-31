@@ -15,7 +15,7 @@ export const LabWeek = () => {
     appAnalytics.captureEvent(APP_ANALYTICS_EVENTS.HOME_LABWEEK_SCHEDULE_LINK_CLICKED)
   }
   return (
-    <section className="text-center py-[24px] relative">
+    <section className="text-center relative">
 
       <div className="mb-[32px]">
         <h2 className="text-4xl font-bold leading-[46px] md:text-5xl md:leading-[60px]">
@@ -26,12 +26,12 @@ export const LabWeek = () => {
         </p>
       </div>
 
-      <div className="w-full h-fit relative  bg-[#156FF7]">
-        <picture className="object-cover w-full -mt-[24px]">
+      <div className="w-full h-fit relative rounded-[8px] bg-[#156FF7]">
+        <picture className="object-cover w-full -mt-[24px] rounded-[8px]">
           <source media="(max-width: 767px)" srcSet="/assets/images/home/labweek_banner_mobile.jpg, /assets/images/home/labweek_banner_mobile2x.jpg 2x" />
           <source media="(max-width: 1199px)" srcSet="/assets/images/home/labweek_banner_tab.jpg, /assets/images/home/labweek_banner_tab2x.jpg 2x" />
           <source media="(min-width: 1200px)" srcSet="/assets/images/home/labweek_banner_desktop.jpg, /assets/images/home/labweek_banner_desktop2x.jpg 2x" />
-          <img className="w-full" src="/assets/images/home/labweek_banner_tab.jpg" />
+          <img className="w-full  rounded-[8px]" src="/assets/images/home/labweek_banner_tab.jpg" />
         </picture>
         <div className="w-full h-full py-[36px] absolute top-0 left-0 flex flex-col items-center justify-center">
           <img className="w-[70px] lg:w-[98px]" src="/assets/images/icons/labweek23.svg" />
