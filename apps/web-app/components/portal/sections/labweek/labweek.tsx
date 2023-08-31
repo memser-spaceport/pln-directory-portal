@@ -39,7 +39,8 @@ export const LabWeek = () => {
           <p className="text-[16px] my-[16px] md:my-[12px] text-[#fff] text-center w-[238px] font-[400]">Happening at Istanbul between 13th - 17th Nov</p>
           <div className="flex flex-col w-[calc(100%_-_32px)] md:w-fit md:flex-row gap-[12px] items-center">
             <a onClick={onWebsiteLinkClicked} target="_blank" href="https://23.labweek.io" className="bg-white px-[24px] flex justify-center w-full md:w-fit py-[10px] rounded-[8px] text-[14px] font-[500] text-[#0F172A] cursor-pointer" rel="noreferrer">Visit Website</a>
-            <a onClick={onEventScheduleLinkClicked} target="_blank" href="https://23.labweek.io/schedule/calendar" className="border-solid flex justify-center  w-full md:w-fit border-white border-[1px] px-[24px] py-[10px] rounded-[8px] text-[14px] font-[500] text-[#fff] cursor-pointer bg-[#156FF7]" rel="noreferrer">See Event Schedule</a>
+            <a onClick={onEventScheduleLinkClicked} target="_blank" href="https://23.labweek.io/schedule/calendar" className="hidden lg:flex border-solid justify-center  w-full md:w-fit border-white border-[1px] px-[24px] py-[10px] rounded-[8px] text-[14px] font-[500] text-[#fff] cursor-pointer bg-[#156FF7]" rel="noreferrer">See Event Schedule</a>
+            <a onClick={onEventScheduleLinkClicked} target="_blank" href="https://23.labweek.io/schedule/list" className="border-solid flex lg:hidden justify-center  w-full md:w-fit border-white border-[1px] px-[24px] py-[10px] rounded-[8px] text-[14px] font-[500] text-[#fff] cursor-pointer bg-[#156FF7]" rel="noreferrer">See Event Schedule</a>
           </div>
         </div>
       </div>
