@@ -22,16 +22,17 @@ export default function Index({videoDetails,playlistDetails}) {
           <Directory />
         </div>
       </div>
-      <div className="bg-white">
+      <PortalDivider/>
+      <div className="bg-white pt-[96px]">
         <div className="px-6 pb-[100px] md:px-16 ">
           <div className="mx-auto max-w-[1110px]">
-            <div className="mb-[106px] md:mb-[162px]">
+            <div className="mb-[60px] md:mb-[64px]">
               <LabWeek />
             </div>
-            <div className="mb-[72px] md:mb-40">
+            <div className="mb-[60px] md:mb-[64px]">
               <Projects />
             </div>
-            <div className="mb-32 md:mb-48">
+            <div className="mb-[60px] md:mb-[64px]">
               <Substack />
             </div>
             <div className="mx-auto max-w-[800px]">
