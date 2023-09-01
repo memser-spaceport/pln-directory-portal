@@ -24,7 +24,7 @@ const projects = [
 
 export const Projects = () => {
   return (
-    <div className="md:gap-7.5 flex flex-col gap-6 md:flex-row">
+    <div className="md:gap-7.5 flex flex-col gap-[24px] md:flex-row bg-[#F8FAFC] rounded-[8px] p-[24px]">
       {projects.map((project, i) => (
         <div key={i} className="md:flex-grow md:basis-0">
           <ProjectCard {...{ ...project }} />

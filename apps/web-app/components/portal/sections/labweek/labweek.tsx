@@ -36,7 +36,7 @@ export const LabWeek = () => {
         <div className="w-full h-full py-[36px] absolute top-0 left-0 flex flex-col items-center justify-center">
           <img className="w-[70px] lg:w-[98px]" src="/assets/images/icons/labweek23.svg" />
           <h2 className="text-[46px] lg:text-[55px] mt-[19px] leading-[46px] lg:leading-[55px] text-[#fff]">LabWeek23</h2>
-          <p className="text-[16px] my-[16px] md:my-[12px] text-[#fff] text-center w-[238px] font-[400]">Happening at Istanbul between 13th - 17th Nov</p>
+          <p className="text-[16px] my-[16px] md:my-[12px] text-[#fff] text-center w-[150px] font-[400]">Istanbul, Turkey 13th - 17th Nov</p>
           <div className="flex flex-col w-[calc(100%_-_32px)] md:w-fit md:flex-row gap-[12px] items-center">
             <a onClick={onWebsiteLinkClicked} target="_blank" href="https://23.labweek.io" className="bg-white px-[24px] flex justify-center w-full md:w-fit py-[10px] rounded-[8px] text-[14px] font-[500] text-[#0F172A] cursor-pointer" rel="noreferrer">Visit Website</a>
             <a onClick={onEventScheduleLinkClicked} target="_blank" href="https://23.labweek.io/schedule/calendar" className="hidden lg:flex border-solid justify-center  w-full md:w-fit border-white border-[1px] px-[24px] py-[10px] rounded-[8px] text-[14px] font-[500] text-[#fff] cursor-pointer bg-[#156FF7]" rel="noreferrer">See Event Schedule</a>
