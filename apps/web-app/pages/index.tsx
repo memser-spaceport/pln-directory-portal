@@ -22,16 +22,17 @@ export default function Index({videoDetails,playlistDetails}) {
           <Directory />
         </div>
       </div>
-      <div className="bg-gradient-to-b from-slate-50 to-white">
-        <div className="px-6 py-24 md:px-16 ">
+      <PortalDivider/>
+      <div className="bg-white pt-[96px]">
+        <div className="px-6 pb-[100px] md:px-16 ">
           <div className="mx-auto max-w-[1110px]">
-            <div className="mb-[106px] md:mb-[162px]">
+            <div className="mb-[60px] md:mb-[64px]">
               <LabWeek />
             </div>
-            <div className="mb-[72px] md:mb-40">
+            <div className="mb-[60px] md:mb-[64px]">
               <Projects />
             </div>
-            <div className="mb-32 md:mb-48">
+            <div className="mb-[60px] md:mb-[64px]">
               <Substack />
             </div>
             <div className="mx-auto max-w-[800px]">
@@ -79,28 +80,28 @@ const getPlaylistVideoDetails = async () => {
 export const getServerSideProps: GetServerSideProps = async () => {
   let [videoDetails, playlistDetails] = await Promise.all([getVideoDetails(), getPlaylistVideoDetails()]);
   let bannerJSON = null;
-  
+
   try{
-    
+
     const bannerResponse = await fetch(process.env.NEXT_PUBLIC_ANNOUNCEMENT_API_URL, {
       headers: {
         Authorization: process.env.NEXT_PUBLIC_ANNOUNCEMENT_S3_AUTH_TOKEN,
       },
     });
-  
+
     if(bannerResponse.status === 200){
       const responseJson = await bannerResponse.json();
-    
+
       if (responseJson && responseJson?.message && responseJson.message.length) {
         bannerJSON = responseJson;
       }
     }
-    
+
   }catch(err){
     console.log(err);
   }
-  
- 
+
+
   return process.env.NEXT_PUBLIC_HIDE_NETWORK_PORTAL
     ? {
         redirect: {

@@ -14,7 +14,7 @@ export function CustomCarousel({ selectedItem, onChange, content, isMobile }) {
         <>
             {
                 content && (
-                    <Carousel selectedItem={selectedItem} autoPlay={true} showArrows={false} infiniteLoop={true} showIndicators={isMobile} interval={4000}
+                    <Carousel selectedItem={selectedItem} autoPlay={true} showArrows={false} infiniteLoop={true} showIndicators={isMobile && content.length > 1} interval={4000}
                         className='relative' showStatus={false} showThumbs={false} swipeable={false}
                         onChange={onChange}
                     >
@@ -22,7 +22,7 @@ export function CustomCarousel({ selectedItem, onChange, content, isMobile }) {
                             content.map((info, index) => {
                                 return (
                                     <div className='relative ' key={index}>
-                                        <div className="relative text-white text-[14px] m-auto h-full p-2 flex flex-col md:flex-row justify-center">
+                                        <div className={`relative text-white text-[14px] m-auto h-full p-2 flex flex-col md:flex-row justify-center ${isMobile && content.length === 1 ? 'pt-[30px]' : ''}`}>
                                             {
                                                 !isMobile && (
                                                     <div>
