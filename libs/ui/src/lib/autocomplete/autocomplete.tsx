@@ -168,7 +168,7 @@ export function Autocomplete({
     <div onBlur={() => checkValidData()}>
       <div className="flex">
         <InputField
-          icon={selectedValue.logo ? selectedValue.logo : undefined}
+          icon={selectedValue.logo ? selectedValue.logo : (selectedOption.logo ? selectedOption.logo : null)}
           label={'te'}
           className={`mt-[12px] flex ${!disabled && 'cursor-pointer'} items-center justify-between rounded-md border border-gray-300 bg-white py-2 px-6 focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
           type="text"
