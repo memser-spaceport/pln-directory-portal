@@ -244,6 +244,16 @@ model Experience {
   member      Member?  @relation(fields: [memberUid], references: [uid])
 }
 
+model Faq {
+  id                    Int         @default(autoincrement()) @id
+  uid                   String      @unique @default(cuid())
+  email                 String      @db.VarChar(100)
+  question              String    
+  requestIp             String      @db.VarChar(35)
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+}
+
 enum ImageSize {
   ORIGINAL
   LARGE

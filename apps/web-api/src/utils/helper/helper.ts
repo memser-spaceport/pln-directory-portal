@@ -16,3 +16,14 @@ export const generateProfileURL = (value, type='uid') => {
   }
   return profileURL;
 }
+
+export const isEmails = (emails: string[]) => {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  let isValid = true;
+  for (const email of emails) {
+    if (!re.test(email)) {
+      isValid = false;
+    }
+  }
+  return isValid;
+}
