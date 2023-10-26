@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router';
 import { DirectoryCard } from '../shared/directory/directory-card/directory-card';
 import Image from 'next/image';
+import { UserGroupIcon } from '@heroicons/react/solid';
 
 export function ProjectCard({ project, isGrid = true }) {
     const router = useRouter();
@@ -35,8 +36,14 @@ export function ProjectCard({ project, isGrid = true }) {
                         <div>{project.description}</div>
                     </div>
                     <div className='flex pb-[20px] border-b'>
-                        <div><Image src={project.contributingTeamImage} alt="project image" width={35} height={35} /></div>
-                        <div className='font-[13px] font-medium pl-2'>{project.contributingTeamName}</div>
+                        <div>
+                            {
+                                project.contributingTeamImage === 'default'
+                                    ? <UserGroupIcon className="bg-gray-200 fill-white relative inline-block h-6 w-6 rounded-full" />
+                                    : <Image src={project.contributingTeamImage} alt="project image" width={35} height={35} />
+                            }
+                        </div>
+                        <div className='font-[13px] font-medium pl-2 my-auto'>{project.contributingTeamName}</div>
                     </div>
                     <div className='pt-[20px] mx-auto'>
                             <div className='border w-max px-[23px] py-[8px] border-[#156FF7] rounded-[47px] font-medium text-[14px] text-[#156FF7] cursor-pointer'>

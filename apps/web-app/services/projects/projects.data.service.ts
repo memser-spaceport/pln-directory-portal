@@ -10,8 +10,8 @@ const getAllFormattedProjects = (data) => {
                 formattedProject['description'] = project.description ?? '';
                 formattedProject['image'] = project.image ? project.image : '/assets/images/icons/projects/default.svg';
                 formattedProject['contributingTeamName'] = project.contributingTeam?.name ?? '',
-                    formattedProject['contributingTeamImage'] = project.contributingTeam?.image ? project.contributingTeam.image : '/assets/images/icons/projects/default.svg',
-                    formattedProject['fundingNeeded'] = project.fundingNeeded ?? false;
+                formattedProject['contributingTeamImage'] = project.contributingTeam?.image ? project.contributingTeam.image : 'default',
+                formattedProject['fundingNeeded'] = project.fundingNeeded ?? false;
                 formattedArray.push(formattedProject);
             }
         });

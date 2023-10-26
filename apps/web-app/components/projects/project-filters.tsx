@@ -11,16 +11,24 @@ export default function ProjectsFilter({ filterProperties }) {
     const [selectedTeam,setSelectedTeam] = useState({ value: '', label: '',logo:'' });
 
     useEffect(() => {
-        setSelectedOption().then(option=>{
-            setSelectedTeam(option);
-        });
+        setTeam();
     },[])
 
-    useEffect(() => {
-        setSelectedOption().then(option=>{
-            setSelectedTeam(option);
-        });
-    },[projectsState.filterState.TEAM])
+    const setTeam = () => {
+        if(query['TEAM']){
+            getSelectedOptionFromQuery(query['TEAM']).then((option) => {
+                setSelectedTeam(option);
+            })
+        }else{
+            setSelectedTeam({ value: '', label: '',logo:'' });
+        }
+    }
+
+    // useEffect(() => {
+    //     setSelectedOption().then(option=>{
+    //         setSelectedTeam(option);
+    //     });
+    // },[projectsState.filterState.TEAM])
 
     const clearFilters = () => {
         const cleanQuery = { ...query };
@@ -29,18 +37,12 @@ export default function ProjectsFilter({ filterProperties }) {
         
         push({ pathname, query: cleanQuery });
         projectsDispatch({ type: 'CLEAR_FILTER'});
+        setSelectedTeam({ value: '', label: '',logo:'' });
     }
 
-    const handleTeamChange = (selectedTeam) => {
-        projectsDispatch({ type: 'SET_FILTER', payload: { filterType: 'TEAM', value: selectedTeam?.label } });
-    }
-
-    const setSelectedOption = async () => {
-        if(query['TEAM']){
-            return getSelectedOptionFromQuery(query['TEAM']);
-        }else{
-            return { value: '', label: '',logo:'' };
-        }
+    const handleTeamChange = (team) => {
+        setSelectedTeam(team);
+        projectsDispatch({ type: 'SET_FILTER', payload: { filterType: 'TEAM', value: team?.label } });
     }
 
     const getSelectedOptionFromQuery =async (searchTerm) => {

@@ -59,6 +59,7 @@ export function Autocomplete({
   useMemo(() => {
     // if (searchTerm === '') {
       setSearchTerm(selectedOption.label);
+      setSelectedValue(selectedOption);
     // }
   }, [selectedOption]);
 
