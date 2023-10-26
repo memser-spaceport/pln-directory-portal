@@ -1,12 +1,15 @@
+import { useRouter } from "next/router";
 import TeamProfileProjectCard from "./team-profile-project-card";
 
 export default function TeamProfileProjects({projects}) {
+
+    const router = useRouter();
     return (
         <>
             <h3 className="mb-2 mt-6 font-medium text-slate-500 flex justify-between">
                 <div className="flex">
                     <div>Projects ({projects.length})</div>
-                    <div className="px-2 cursor-pointer">
+                    <div className="px-2 cursor-pointer" onClick={()=>{router.push('/directory/projects/add')}}>
                         <div className="px-[8px] py-[5px] rounded bg-[#156FF7] text-white text-[12px] font-semibold">+Add</div>
                     </div>
                 </div>
