@@ -2,13 +2,14 @@ import { InputField } from '@protocol-labs-network/ui';
 import { ReactComponent as RemoveKPIIcon } from '../../public/assets/images/icons/projects/remove-kpi.svg';
 import { useContext } from 'react';
 import { AddProjectsContext } from 'apps/web-app/context/projects/add.context';
+import InputError from './input-error';
 export default function KPI({ onInputChange, kpiFieldArray, setKPIField }) {
 
     const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
 
     const getKPIHeader = (field, index) => {
         return <div className="flex justify-between">
-            <div className="text-[#64748B] text-[12px] font-bold">KPI {index + 1}</div>
+            <div className="text-[#64748B] text-[12px] font-bold pb-3">KPI {index + 1}</div>
             {
                 index !== 0 && <div className='cursor-pointer' onClick={() => {
                     deleteKPI(field.id)
@@ -27,7 +28,7 @@ export default function KPI({ onInputChange, kpiFieldArray, setKPIField }) {
         </div>
     }
 
-    const getKPIInput = (field) => {
+    const getKPIInput = (field,index) => {
         return <div className="flex gap-2 pb-5">
             <div className='basis-1/2'>
                 <InputField
@@ -42,6 +43,7 @@ export default function KPI({ onInputChange, kpiFieldArray, setKPIField }) {
                     placeholder="Enter KPI Name"
                     className="custom-grey custom-outline-none border"
                 />
+                <InputError content={addProjectsState.errors?.KPIs?.[index]?.['name']}/>
             </div>
             <div className='basis-1/2'>
                 <InputField
@@ -56,6 +58,7 @@ export default function KPI({ onInputChange, kpiFieldArray, setKPIField }) {
                     placeholder="Enter KPI Value"
                     className="custom-grey custom-outline-none border"
                 />
+                <InputError content={addProjectsState.errors?.KPIs?.[index]?.['value']}/>
             </div>
         </div>
     }
@@ -89,7 +92,7 @@ export default function KPI({ onInputChange, kpiFieldArray, setKPIField }) {
         return <div className="flex flex-col" key={index}>
             {getKPIHeader(field, index)}
             {getKPILabelHeader()}
-            {getKPIInput(field)}
+            {getKPIInput(field,index)}
         </div>
     }
     return <div>

@@ -2,6 +2,7 @@ import { XIcon as CloseIcon } from '@heroicons/react/outline';
 import { InputField } from '@protocol-labs-network/ui';
 import { AddProjectsContext } from 'apps/web-app/context/projects/add.context';
 import React, { useContext } from 'react';
+import InputError from './input-error';
 
 export default function URLDetails({ onInputChange, urlFieldArray, setURLField }) {
 
@@ -46,6 +47,7 @@ export default function URLDetails({ onInputChange, urlFieldArray, setURLField }
                     placeholder="Enter Link Text"
                     className="custom-grey custom-outline-none border"
                 />
+                <InputError content={addProjectsState.errors?.projectURLs?.[index]['text']}/>
             </div>
             <div className="w-[340px]">
                 <InputField
@@ -60,6 +62,7 @@ export default function URLDetails({ onInputChange, urlFieldArray, setURLField }
                     placeholder="Enter Link"
                     className="custom-grey custom-outline-none border"
                 />
+                <InputError content={addProjectsState.errors?.projectURLs?.[index]['url']}/>
             </div>
             <div className="cursor-pointer" onClick={() => {
                 deleteURLRow(field.id)

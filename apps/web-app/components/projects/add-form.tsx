@@ -5,10 +5,12 @@ import KPI from "./kpi";
 import React, { useContext, useState } from "react";
 import URLDetails from "./url";
 import { AddProjectsContext } from "apps/web-app/context/projects/add.context";
+import InputError from "./input-error";
 
 export default function AddForm(){
 
     const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
+    
     const [kpiFieldArray, setKPIField] = useState([{
         name: '',
         value: '',
@@ -23,32 +25,36 @@ export default function AddForm(){
 
 
     const onInputChange = (event, id?) => {
-        const { name, value } = event.target;
-        console.log(addProjectsState);
-        
-        if (name.includes('linktext')) {
-            const oldField = [...urlFieldArray];
-            const [changedField] = oldField.filter((val) => val.id === id);
-            changedField.text = value;
-            addProjectsDispatch({ type: 'SET_INPUT', payload: { ...addProjectsState.inputs, 'projectURLs': oldField } });
-        }else if (name.includes('url')) {
-            const oldField = [...urlFieldArray];
-            const [changedField] = oldField.filter((val) => val.id === id);
-            changedField.url = value;
-            addProjectsDispatch({ type: 'SET_INPUT', payload: { ...addProjectsState.inputs, 'projectURLs': oldField } });
-        }else if (name.includes('kpiname')) {
-            const oldField = [...kpiFieldArray];
-            const [changedField] = oldField.filter((val) => val.id === id);
-            changedField.name = value;
-            addProjectsDispatch({ type: 'SET_INPUT', payload: { ...addProjectsState.inputs, 'KPIs': oldField } });
-        }else if (name.includes('kpivalue')) {
-            const oldField = [...kpiFieldArray];
-            const [changedField] = oldField.filter((val) => val.id === id);
-            changedField.value = value;
-            addProjectsDispatch({ type: 'SET_INPUT', payload: { ...addProjectsState.inputs, 'KPIs': oldField } });
+        if(id === 'fund'){
+            addProjectsDispatch({ type: 'SET_INPUT', payload: { ...addProjectsState.inputs, 'fundsNeeded': event } });
         }else{
-            addProjectsDispatch({ type: 'SET_INPUT', payload: { ...addProjectsState.inputs, [name]: value } });
+            const { name, value } = event.target;
+            if (name.includes('linktext')) {
+                const oldField = [...urlFieldArray];
+                const [changedField] = oldField.filter((val) => val.id === id);
+                changedField.text = value;
+                addProjectsDispatch({ type: 'SET_INPUT', payload: { ...addProjectsState.inputs, 'projectURLs': oldField } });
+            }else if (name.includes('url')) {
+                const oldField = [...urlFieldArray];
+                const [changedField] = oldField.filter((val) => val.id === id);
+                changedField.url = value;
+                addProjectsDispatch({ type: 'SET_INPUT', payload: { ...addProjectsState.inputs, 'projectURLs': oldField } });
+            }else if (name.includes('kpiname')) {
+                const oldField = [...kpiFieldArray];
+                const [changedField] = oldField.filter((val) => val.id === id);
+                changedField.name = value;
+                addProjectsDispatch({ type: 'SET_INPUT', payload: { ...addProjectsState.inputs, 'KPIs': oldField } });
+            }else if (name.includes('kpivalue')) {
+                const oldField = [...kpiFieldArray];
+                const [changedField] = oldField.filter((val) => val.id === id);
+                changedField.value = value;
+                addProjectsDispatch({ type: 'SET_INPUT', payload: { ...addProjectsState.inputs, 'KPIs': oldField } });
+            }else{
+                addProjectsDispatch({ type: 'SET_INPUT', payload: { ...addProjectsState.inputs, [name]: value } });
+            }
         }
+        
+        
 
         
     }
@@ -75,25 +81,25 @@ export default function AddForm(){
                                     label="Project Name"
                                     pattern="^[a-zA-Z\s]*$"
                                     maxLength={64}
-                                    value={''}
                                     onChange={onInputChange}
                                     placeholder="Enter Project Name Here"
                                     className="custom-grey custom-outline-none border"
                                 />
+                                <InputError content={addProjectsState.errors?.name}/>
                             </div>
                         </div>
                         <div>
                             <InputField
                                 required={true}
-                                name="name"
+                                name="tagline"
                                 label="Project Tagline"
                                 pattern="^[a-zA-Z\s]*$"
                                 maxLength={64}
-                                value={''}
                                 onChange={onInputChange}
                                 placeholder="Enter Your Project Tagline"
                                 className="custom-grey custom-outline-none border"
                             />
+                            <InputError content={addProjectsState.errors?.tagline}/>
                         </div>
                         <div>
                             <TextArea
@@ -101,11 +107,12 @@ export default function AddForm(){
                                 value={''}
                                 onChange={onInputChange}
                                 maxLength={1000}
-                                name="shortDescription"
+                                name="desc"
                                 label="Detailed description of your project"
                                 className="custom-grey custom-outline-none min-h-[200px] border"
                                 placeholder="Enter description of your project"
                             />
+                            <InputError content={addProjectsState.errors?.desc}/>
                         </div>
                         <div>
                             <URLDetails onInputChange={onInputChange} urlFieldArray={urlFieldArray} setURLField={setURLField} />
@@ -113,7 +120,7 @@ export default function AddForm(){
                         <div>
                             <InputField
                                 required
-                                name="email"
+                                name="contactEmail"
                                 type="email"
                                 label="Contact Email"
                                 value={'abc@gmail.com'}
@@ -122,11 +129,12 @@ export default function AddForm(){
                                 placeholder="Enter your email address"
                                 className="custom-grey custom-outline-none border"
                             />
+                            <InputError content={addProjectsState.errors?.contactEmail}/>
                         </div>
                         <div className="flex text-sm font-semibold gap-2 pt-2">
                             <Switch
                                 initialValue={false}
-                                onChange={onInputChange}
+                                onChange={(e)=>{onInputChange(e,'fund')}}
                             />
                             <div>
                                 Are you currently looking to raise funds for your project?

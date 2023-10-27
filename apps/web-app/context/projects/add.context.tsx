@@ -15,14 +15,18 @@ export function AddProjectContextProvider(props) {
             fundsNeeded: false,
             KPIs: [],
             readme: ''
-        }
+        },
+        errors: null
     }
 
     const reducer = (state, action) => {
         const newState = { ...state }
         switch (action.type) {
             case 'SET_INPUT':
-                newState.inputs = {...action.payload};
+                newState.inputs = { ...action.payload };
+                break;
+            case 'SET_ERROR':
+                newState.errors = { ...action.payload };
                 break;
         }
     
