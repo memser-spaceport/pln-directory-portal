@@ -76,6 +76,7 @@
     "jsonwebtoken": "^9.0.0",
     "jwt-decode": "^3.1.2",
     "lodash": "^4.17.21",
+    "md-editor-rt": "^4.8.2",
     "ncsrf": "^1.0.3",
     "nest-commander": "^3.3.0",
     "nest-winston": "^1.9.2",

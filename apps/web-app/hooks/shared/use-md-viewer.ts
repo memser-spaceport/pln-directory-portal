@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 // import marked from 'marked';
 import { Converter } from 'showdown';
 
-export function useMdViewer() {
+export function useMdViewer(content) {
     const [response, setResponse] = useState(null);
     const testCon = new Converter({
         tables: true
@@ -65,7 +65,7 @@ https://cdnjs.cloudflare.com/ajax/libs/showdown/<version tag>/showdown.min.js
         // setResponse(matterResult.content);
 
         // const markedContent = marked.parse(fileContent);
-        const test = testCon.makeHtml(fileContent);
+        const test = testCon.makeHtml(content);
 
         setResponse(test);
 
@@ -77,7 +77,7 @@ https://cdnjs.cloudflare.com/ajax/libs/showdown/<version tag>/showdown.min.js
 
         //         setResponse(res.toString());
         //     });
-    }, [])
+    }, [content])
 
 
     return {
