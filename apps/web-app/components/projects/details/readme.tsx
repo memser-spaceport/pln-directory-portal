@@ -1,12 +1,14 @@
 // import { useMdViewer } from "apps/web-app/hooks/shared/use-md-viewer";
-import ReactMarkdown from 'react-markdown'
+// import ReactMarkdown from 'react-markdown'
+
+import { useMdViewer } from "apps/web-app/hooks/shared/use-md-viewer";
+// import md from 'markdown-it';
+
+
 // import MarkdownPreview from "@uiw/react-markdown-preview";
 export default function AdditionalDetails() {
-    const fileContent = "| Plugin | README |"
-    // const { response } = useMdViewer();
-    const source = `- Type some Markdown on the left\n
-    > The overriding design goal for Markdown's\n
-    Dillinger requires [Node.js](https://nodejs.org/) v10+ to run.`;
+    const { response } = useMdViewer();
+
     return (
         <>
             <div className="flex justify-between">
@@ -17,13 +19,10 @@ export default function AdditionalDetails() {
                     Edit
                 </div>
             </div>
-            <h1>TEST</h1>
-            <h2>dsh</h2>
-            {/* <div dangerouslySetInnerHTML={{ __html: response  }} /> */}
-            <h1>TEST</h1>
-                <div className='no-tailwind'>
-                    <ReactMarkdown>{source}</ReactMarkdown>
-                </div>
+            <div className='no-tailwind'>
+                <div dangerouslySetInnerHTML={{ __html: response }} />
+                {/* <ReactMarkdown>{response}</ReactMarkdown> */}
+            </div>
             {/* <MarkdownPreview source={source} /> */}
 
 
