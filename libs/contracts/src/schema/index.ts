@@ -12,3 +12,4 @@ export * from './team-member-role';
 export * from './technology';
 export * from './experience';
 export * from './faq';
+export * from './project';
