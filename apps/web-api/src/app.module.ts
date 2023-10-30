@@ -30,6 +30,7 @@ import { SharedModule } from './shared/shared.module';
 import { LogException } from './filters/log-exception.filter';
 import { OtpModule } from './otp/otp.module';
 import { FaqModule } from './faq/faq.module';
+import { ProjectsModule } from './projects/projects.module';
 
 @Module({
   controllers: [AppController],
@@ -75,7 +76,8 @@ import { FaqModule } from './faq/faq.module';
     AuthModule,
     SharedModule,
     OtpModule,
-    FaqModule
+    FaqModule,
+    ProjectsModule
   ],
   providers: [
     {

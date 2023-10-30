@@ -2,7 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["interactiveTransactions"]
 }
 
@@ -40,6 +40,7 @@ model Team {
   fundingStageUid   String?
   technologies      Technology[]
   moreDetails       String?
+  Project           Project[]
 }
 
 model Member {
@@ -57,10 +58,10 @@ model Member {
   officeHours     String?
   moreDetails     String?
   plnFriend       Boolean          @default(false)
-  plnStartDate    DateTime?        
+  plnStartDate    DateTime?
   airtableRecId   String?          @unique
   externalId      String?          @unique
-  openToWork     Boolean?         @default(false)
+  openToWork      Boolean?         @default(false)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   skills          Skill[]
@@ -69,15 +70,16 @@ model Member {
   teamMemberRoles TeamMemberRole[]
   memberRoles     MemberRole[]
   preferences     Json?
+  Project         Project[]
 }
 
 model MemberRole {
-  id              Int              @id @default(autoincrement())
-  uid             String           @unique @default(cuid())
-  name            String           @unique
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  members         Member[]
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  members   Member[]
 }
 
 enum ParticipantType {
@@ -93,17 +95,17 @@ enum ApprovalStatus {
 }
 
 model ParticipantsRequest {
-   id                    Int                @id @default(autoincrement())
-   uid                   String             @unique @default(cuid())
-   participantType       ParticipantType
-   status                ApprovalStatus     @default(PENDING)
-   oldData               Json?
-   newData               Json
-   referenceUid          String?
-   requesterEmailId      String
-   uniqueIdentifier      String
-   createdAt             DateTime           @default(now())
-   updatedAt             DateTime           @updatedAt
+  id               Int             @id @default(autoincrement())
+  uid              String          @unique @default(cuid())
+  participantType  ParticipantType
+  status           ApprovalStatus  @default(PENDING)
+  oldData          Json?
+  newData          Json
+  referenceUid     String?
+  requesterEmailId String
+  uniqueIdentifier String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 }
 
 model Skill {
@@ -115,7 +117,6 @@ model Skill {
   updatedAt   DateTime @updatedAt
   members     Member[]
 }
-
 
 model Location {
   id                 Int      @id @default(autoincrement())
@@ -168,7 +169,7 @@ model IndustryTag {
   uid                 String            @unique @default(cuid())
   title               String            @unique
   definition          String?
-  airtableRecId   String?             @unique
+  airtableRecId       String?           @unique
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
   industryCategory    IndustryCategory? @relation(fields: [industryCategoryUid], references: [uid])
@@ -226,16 +227,38 @@ model Image {
   // Reverse Relations:
   Team           Team[]
   Member         Member[]
+  Project        Project[]
 }
 
 model Faq {
-  id                    Int         @default(autoincrement()) @id
-  uid                   String      @unique @default(cuid())
-  email                 String      @db.VarChar(100)
-  question              String    
-  requestIp             String      @db.VarChar(35)
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  email     String   @db.VarChar(100)
+  question  String
+  requestIp String   @db.VarChar(35)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Project {
+  id                Int           @id @default(autoincrement())
+  uid               String        @unique @default(cuid())
+  logo              Image?        @relation(fields: [logoUid], references: [uid])
+  logoUid           String?
+  name              String
+  tagline           String
+  description       String
+  contactEmail      String
+  lookingForFunding Boolean       @default(false)
+  projectLinks      Json?
+  kpis              Json?
+  readMe            String?
+  creator           Member?       @relation(fields: [createdBy], references: [uid])
+  createdBy         String
+  team              Team?         @relation(fields: [teamUid], references: [uid])
+  teamUid           String
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 }
 
 enum ImageSize {
