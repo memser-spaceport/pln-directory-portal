@@ -309,7 +309,7 @@ export class ParticipantsRequestService {
     dataToSave['moreDetails'] = dataToProcess.moreDetails;
     dataToSave['plnStartDate'] = dataToProcess.plnStartDate;
     dataToSave['openToWork'] = dataToProcess.openToWork;
-
+    dataToSave['experience'] = dataToProcess.experience;
     // Team member roles relational mapping
     dataToSave['teamMemberRoles'] = {
       createMany: {
@@ -321,6 +321,11 @@ export class ParticipantsRequestService {
             teamUid: t.teamUid,
           };
         }),
+      },      
+    };
+    dataToSave['experience'] = {
+      createMany: {
+        data: dataToProcess.experience
       },
     };
 
@@ -631,6 +636,53 @@ export class ParticipantsRequestService {
           teamUid: t.teamUid,
           memberUid: dataFromDB.referenceUid,
         };
+      }),
+    });
+
+    let expToCreate: any = [];
+    let expIdsTodelete:any = [];
+    let expIdsToUpdate:any = [];
+    
+    let expIds = dataToSave.experience?.map(exp => {
+      if (!exp.uid) {
+        expToCreate.push(exp);
+      }
+      return exp.uid;
+    }); 
+    
+    dataFromDB.experience?.map((exp:any)=> {
+      if(!expIds.includes(exp.uid)) {
+        expIdsTodelete.push(exp.uid);  
+      } else {
+        expIdsToUpdate.push(exp);
+      }
+    });
+
+    const experienceToDelete = expIdsTodelete.map((uid) =>
+      tx.experience.delete({
+        where: {
+          uid
+        }
+      })
+    );
+
+    const experienceToUpdate = expIdsToUpdate.map((exp) =>
+      tx.experience.update({
+        where: {
+          uid: exp.uid
+        },
+        data: {
+          ...exp
+        }
+      })
+    );
+    await Promise.all(experienceToDelete);
+    await Promise.all(experienceToUpdate);
+
+    await tx.experience.createMany({
+      data: expToCreate.map((exp) => {
+        exp.memberUid = dataFromDB.referenceUid;
+        return exp;
       }),
     });
 

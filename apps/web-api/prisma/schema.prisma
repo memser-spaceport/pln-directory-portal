@@ -2,7 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["interactiveTransactions"]
 }
 
@@ -57,10 +57,10 @@ model Member {
   officeHours     String?
   moreDetails     String?
   plnFriend       Boolean          @default(false)
-  plnStartDate    DateTime?        
+  plnStartDate    DateTime?
   airtableRecId   String?          @unique
   externalId      String?          @unique
-  openToWork     Boolean?         @default(false)
+  openToWork      Boolean?         @default(false)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   skills          Skill[]
@@ -69,15 +69,16 @@ model Member {
   teamMemberRoles TeamMemberRole[]
   memberRoles     MemberRole[]
   preferences     Json?
+  experience      Experience[]
 }
 
 model MemberRole {
-  id              Int              @id @default(autoincrement())
-  uid             String           @unique @default(cuid())
-  name            String           @unique
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  members         Member[]
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  members   Member[]
 }
 
 enum ParticipantType {
@@ -93,17 +94,17 @@ enum ApprovalStatus {
 }
 
 model ParticipantsRequest {
-   id                    Int                @id @default(autoincrement())
-   uid                   String             @unique @default(cuid())
-   participantType       ParticipantType
-   status                ApprovalStatus     @default(PENDING)
-   oldData               Json?
-   newData               Json
-   referenceUid          String?
-   requesterEmailId      String
-   uniqueIdentifier      String
-   createdAt             DateTime           @default(now())
-   updatedAt             DateTime           @updatedAt
+  id               Int             @id @default(autoincrement())
+  uid              String          @unique @default(cuid())
+  participantType  ParticipantType
+  status           ApprovalStatus  @default(PENDING)
+  oldData          Json?
+  newData          Json
+  referenceUid     String?
+  requesterEmailId String
+  uniqueIdentifier String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 }
 
 model Skill {
@@ -115,7 +116,6 @@ model Skill {
   updatedAt   DateTime @updatedAt
   members     Member[]
 }
-
 
 model Location {
   id                 Int      @id @default(autoincrement())
@@ -168,7 +168,7 @@ model IndustryTag {
   uid                 String            @unique @default(cuid())
   title               String            @unique
   definition          String?
-  airtableRecId   String?             @unique
+  airtableRecId       String?           @unique
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
   industryCategory    IndustryCategory? @relation(fields: [industryCategoryUid], references: [uid])
@@ -204,8 +204,8 @@ model Technology {
 }
 
 model Image {
-  id             Int       @id @default(autoincrement())
-  uid            String    @unique @default(cuid())
+  id             Int          @id @default(autoincrement())
+  uid            String       @unique @default(cuid())
   // The cid is not unique because this id represents an array of multiple images
   // with different sizes that can be accessed trough the cid and filename
   cid            String
@@ -218,14 +218,30 @@ model Image {
   version        ImageSize
   // This image can be a thumbnail to other image
   thumbnailToUid String?
-  thumbnailTo    Image?    @relation("ImageThumbnails", fields: [thumbnailToUid], references: [uid])
+  thumbnailTo    Image?       @relation("ImageThumbnails", fields: [thumbnailToUid], references: [uid])
   // This image can have multiple thumbnails
-  thumbnails     Image[]   @relation("ImageThumbnails")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  thumbnails     Image[]      @relation("ImageThumbnails")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
   // Reverse Relations:
   Team           Team[]
   Member         Member[]
+  Experience     Experience[]
+}
+
+model Experience {
+  id          Int      @id @default(autoincrement())
+  uid         String   @unique @default(cuid())
+  companyName String
+  logoUid     String?
+  companylogo Image?   @relation(fields: [logoUid], references: [uid])
+  title       String
+  currentTeam Boolean  @default(false)
+  startDate   DateTime
+  endDate     DateTime
+  description String?
+  memberUid   String
+  member      Member?  @relation(fields: [memberUid], references: [uid])
 }
 
 enum ImageSize {
