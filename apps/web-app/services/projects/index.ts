@@ -1,7 +1,7 @@
 import api from "apps/web-app/utils/api";
 import ProjectsDataService from "./projects.data.service";
 
-const { getAllFormattedProjects } = ProjectsDataService;
+const { getAllFormattedProjects,formatToSave } = ProjectsDataService;
 
 const getAll = () => {
     const temp = [
@@ -115,7 +115,7 @@ const getTeamsProject = () => {
     }
 }
 
-const saveProject = async (inputs) => {
+const uploadProjectLogo = async (inputs) => {
     if (inputs.logoURL) {
         const formData = new FormData();
         formData.append('file', inputs.logoURL);
@@ -126,7 +126,7 @@ const saveProject = async (inputs) => {
         };
         const imageResponse = await api.post(`/v1/images`, formData, config);
         console.log(imageResponse.data.image);
-        
+        return imageResponse.data.image;
     }
     // if (values.imageFile) {
     //     const formData = new FormData();
@@ -140,10 +140,18 @@ const saveProject = async (inputs) => {
     //     image = imageResponse?.data?.image;
     //   }
 }
+
+const addProject = async (inputs,image) => {
+    const data = formatToSave(inputs,image);
+    const addedResponse = await api.post(`/v1/projects`, data);
+    console.log(addedResponse);
+    
+}
 const ProjectsService = {
     getAll,
     getTeamsProject,
-    saveProject
+    uploadProjectLogo,
+    addProject
 }
 
 export default ProjectsService;

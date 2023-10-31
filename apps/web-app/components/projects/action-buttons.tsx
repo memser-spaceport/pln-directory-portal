@@ -8,7 +8,7 @@ import { toast } from "react-toastify";
 export default function ActionButtons(){
     const urlRE = /(^|\s)((https?:\/\/)?[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?)(?![.\S])/gi;
     const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
-    const { saveProject} = ProjectsService;
+    const { uploadProjectLogo, addProject } = ProjectsService;
     const router = useRouter();
 
     const validateInputs = () => {
@@ -83,21 +83,29 @@ export default function ActionButtons(){
         return true;
     }
 
-    const onAddProject = () => {
+    const onAddProject = async () => {
         console.log(addProjectsState);
-        saveProject(addProjectsState.inputs)
-        if(validateInputs()){
-            // const data = formatToSave();
+        // if(validateInputs()){
+            let image = null;
+            try{
+                image = await uploadProjectLogo(addProjectsState.inputs);
+                console.log(image);
+                const data = addProject(addProjectsState.inputs,image);
+                
+            }catch(err){
+                console.log(err);
+                
+            }
             // console.log(data);
             //API call
-        }else{
-            window.scrollTo({
-                top: 0,
-                behavior: "smooth",
-              })
-            toast.error('Validation failed');
+        // }else{
+        //     window.scrollTo({
+        //         top: 0,
+        //         behavior: "smooth",
+        //       })
+        //     toast.error('Validation failed');
 
-        }
+        // }
     }
 
     return (

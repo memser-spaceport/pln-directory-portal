@@ -91,13 +91,23 @@ export default function AddForm() {
             <div className="mt-5 bg-white px-[42px] py-[24px] rounded-[8px] flex flex-col gap-4">
                 <div className="flex">
                     <div className="w-[100px] h-[100px] border rounded-[8px] border-[3px] border-[#CBD5E1] bg-[#F1F5F9] cursor-pointer flex flex-col">
-                        <div className="m-auto">
-                            <div className="ml-6">
-                                <Image src={'/assets/images/icons/projects/add-img.svg'} alt="project image" width={24} height={24} />
-                            </div>
-                            <div className="text-[#156FF7] text-[13px] font-semibold w-[74px] text-center">
-                                Add Project logo
-                            </div>
+                        <div className="m-auto relative">
+                            {
+                                addProjectsState.inputs.logoURL 
+                                && <Image src={URL.createObjectURL(addProjectsState.inputs.logoURL)} alt="project image" width={100} height={100} />
+
+                            }
+                            {
+                                !addProjectsState.inputs.logoURL && <div>
+                                    <div className="ml-6">
+                                        <Image src={'/assets/images/icons/projects/add-img.svg'} alt="project image" width={24} height={24} />
+                                    </div>
+                                    <div className="text-[#156FF7] text-[13px] font-semibold w-[74px] text-center">
+                                        Add Project logo
+                                    </div>
+                                </div>
+                            }
+                            
                             <input
                                 id="image-upload-input"
                                 type="file"
