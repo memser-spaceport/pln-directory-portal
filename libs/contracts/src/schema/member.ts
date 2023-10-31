@@ -5,6 +5,7 @@ import { LocationResponseSchema } from './location';
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseSkillSchema } from './skill';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
+import { ExperienceSchema } from './experience';
 
 export const GitHubRepositorySchema = z.object({
   name: z.string(),
@@ -43,7 +44,8 @@ export const MemberSchema = z.object({
   openToWork: z.boolean(),
   linkedinHandler: z.string().nullish(),
   repositories: GitHubRepositorySchema.array().optional(),
-  preferences: PreferenceSchema.optional()
+  preferences: PreferenceSchema.optional(),
+  experience:  z.array(ExperienceSchema).optional()
 });
 
 

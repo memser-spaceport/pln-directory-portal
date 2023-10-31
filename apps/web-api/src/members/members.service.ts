@@ -64,6 +64,7 @@ export class MembersService {
             },
           },
         },
+        experience: true
       },
     });
   }
@@ -75,6 +76,7 @@ export class MembersService {
         image: true,
         memberRoles: true,
         teamMemberRoles: true,
+        experience: true
       },
     });
   }
@@ -86,6 +88,7 @@ export class MembersService {
         image: true,
         memberRoles: true,
         teamMemberRoles: true,
+        experience: true
       },
     });
   }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RefinedExperienceSchema } from './experience';
 
 export const statusEnum = z.enum(['PENDING', 'APPROVED', 'REJECTED']);
 export const participantTypeEnum = z.enum(['MEMBER', 'TEAM']);
@@ -45,7 +46,8 @@ const newDataMemberSchema = z.object({
   telegramHandler: z.string().optional().nullable(),
   officeHours: z.string().optional().nullable(),
   imageUid: z.string().optional().nullable(),
-  moreDetails: z.string().optional().nullable(), 
+  moreDetails: z.string().optional().nullable(),
+  experience:  z.array(RefinedExperienceSchema).optional()
 });
 
 const newDataTeamSchema = z.object({
