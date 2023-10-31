@@ -40,6 +40,7 @@ model Team {
   fundingStageUid   String?
   technologies      Technology[]
   moreDetails       String?
+  Project           Project[]
 }
 
 model Member {
@@ -70,6 +71,7 @@ model Member {
   memberRoles     MemberRole[]
   preferences     Json?
   experience      Experience[]
+  Project         Project[]
 }
 
 model MemberRole {
@@ -226,6 +228,7 @@ model Image {
   // Reverse Relations:
   Team           Team[]
   Member         Member[]
+  Project        Project[]
   Experience     Experience[]
 }
 
@@ -242,6 +245,37 @@ model Experience {
   description String?
   memberUid   String
   member      Member?  @relation(fields: [memberUid], references: [uid])
+}
+
+model Faq {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  email     String   @db.VarChar(100)
+  question  String
+  requestIp String   @db.VarChar(35)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Project {
+  id                Int           @id @default(autoincrement())
+  uid               String        @unique @default(cuid())
+  logo              Image?        @relation(fields: [logoUid], references: [uid])
+  logoUid           String?
+  name              String
+  tagline           String
+  description       String
+  contactEmail      String
+  lookingForFunding Boolean       @default(false)
+  projectLinks      Json?
+  kpis              Json?
+  readMe            String?
+  creator           Member?       @relation(fields: [createdBy], references: [uid])
+  createdBy         String
+  team              Team?         @relation(fields: [teamUid], references: [uid])
+  teamUid           String
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 }
 
 enum ImageSize {

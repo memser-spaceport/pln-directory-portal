@@ -469,4 +469,12 @@ export class MembersService {
     preferences.twitter = resp?.twitterHandler ? true: false;
     return preferences;
   }
+
+  async isMemberLeadTeam(member, teamUid) {
+    const user = await this.memberToUserInfo(member);
+    if (user.leadingTeams.includes(teamUid)) {
+      return true;
+    }  
+    return false;
+  }
 }
