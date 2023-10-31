@@ -61,7 +61,8 @@ export default function Team({ team, members, backLink, userInfo, teamsProjectLi
             <TeamProfileFunding {...team} />
           ) : null}
           <TeamProfileMembers members={members} />
-          <TeamProfileProjects projects={teamsProjectList}/>
+          <TeamProfileProjects projects={teamsProjectList} userInfo={userInfo} team={team}/>
+
         </div>
         {/* <div className="w-sidebar shrink-0">
           <AskToEditCard profileType="team" team={team} />

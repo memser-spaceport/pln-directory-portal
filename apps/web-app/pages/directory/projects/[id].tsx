@@ -5,7 +5,10 @@ import KPIs from "apps/web-app/components/projects/details/kpis";
 import AdditionalDetails from "apps/web-app/components/projects/details/readme";
 import { DirectoryLayout } from "apps/web-app/layouts/directory-layout";
 import { DIRECTORY_SEO } from "apps/web-app/seo.config";
+import { convertCookiesToJson, renewAndStoreNewAccessToken } from "apps/web-app/utils/services/auth";
+import { GetServerSideProps } from "next";
 import { NextSeo } from "next-seo";
+import { destroyCookie } from "nookies";
 import { ReactElement } from "react";
 
 export default function ProjectDetails() {
@@ -28,3 +31,27 @@ export default function ProjectDetails() {
 ProjectDetails.getLayout = function getLayout(page: ReactElement) {
     return <DirectoryLayout>{page}</DirectoryLayout>;
 };
+
+export const getServerSideProps: GetServerSideProps = async (ctx) => {
+    const {
+        query,
+        res,
+        req
+    } = ctx;
+    let cookies = req?.cookies;
+    if (!cookies?.authToken) {
+        await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
+        if (ctx.res.getHeader('Set-Cookie'))
+            cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
+    }
+    destroyCookie(null, 'state');
+    const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
+    const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
+
+    return {
+        props: {
+            isUserLoggedIn,
+            userInfo,
+        }
+    };
+}

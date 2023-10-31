@@ -20,6 +20,21 @@ const getAllFormattedProjects = (data) => {
         console.log(err);
     }
 }
+
+const formatToSave = (inputs) => {
+    const objectToSave = {
+        logoURL: inputs.logoURL,
+        name: inputs.name,
+        tagline: inputs.tagline,
+        desc: inputs.desc,
+        projectURLs: inputs.projectURLs,
+        contactEmail: inputs.contactEmail,
+        fundsNeeded: inputs.fundsNeeded,
+        KPIs: inputs.KPIs,
+        readme: inputs.readme
+    }
+    return objectToSave;
+}
 const ProjectsDataService = {
     getAllFormattedProjects
 }

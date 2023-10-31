@@ -5,16 +5,11 @@ export const ProjectsContext = createContext({ projectsState: null, projectsDisp
 
 export function ProjectContextProvider(props) {
     const { query, push, pathname } = useRouter();
-    console.log(query);
-    
     const initialFilterState = {
         FUNDING: query['FUNDING'] && query['FUNDING'] === 'true' ? true : false,
         TEAM: query['TEAM'] ? query['TEAM'] : null
     }
 
-    console.log();
-    
-    
     const defaultState = {
         filterState: { ...initialFilterState }
     }
@@ -41,8 +36,6 @@ export function ProjectContextProvider(props) {
                 });
                 break;
             case 'CLEAR_FILTER':
-                console.log("CLEARED",initialFilterState);
-                
                 newState.filterState = { FUNDING: false, TEAM: null };
                 break;
         }

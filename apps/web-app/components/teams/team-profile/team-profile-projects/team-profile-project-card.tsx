@@ -1,8 +1,11 @@
 import Image from "next/image";
+import { useRouter } from "next/router";
 
 export default function TeamProfileProjectCard({ project }) {
+    const router = useRouter();
     return (
-        <div className="py-[16px] pl-[16px] pr-[32px] flex cursor-pointer hover:bg-[#F8FAFC] justify-between">
+        <div className="py-[16px] pl-[16px] pr-[32px] flex cursor-pointer hover:bg-[#F8FAFC] justify-between"
+            onClick={() => { router.push(`/directory/projects/${project.id}`) }}>
             <div className="flex ">
                 <Image src={project.image} alt="project image" width={41} height={41} />
                 <div className="pl-4">

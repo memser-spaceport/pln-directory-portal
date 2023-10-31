@@ -11,6 +11,7 @@ import { convertCookiesToJson, renewAndStoreNewAccessToken } from "apps/web-app/
 import { getTeamsListOptions, getTeamsOptionsFromQuery } from "apps/web-app/utils/teams.utils";
 import { GetServerSideProps } from "next";
 import { NextSeo } from "next-seo";
+import { destroyCookie } from "nookies";
 import { ReactElement } from "react";
 
 export default function Projects(props) {
@@ -35,7 +36,7 @@ export default function Projects(props) {
                                     title="Projects"
                                     directoryType="projects"
                                     searchPlaceholder="Search for a Project"
-                                    count={10}
+                                    count={props?.projects?.length}
                                 />
                                 <ProjectList projects={props.projects} isGrid={isGrid} filterProperties={filterProperties} />
 
@@ -61,14 +62,26 @@ Projects.getLayout = function getLayout(page: ReactElement) {
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
     const {
         query,
+        res,
+        req
     } = ctx;
-    console.log(query);
+    let cookies = req?.cookies;
+    if (!cookies?.authToken) {
+        await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
+        if (ctx.res.getHeader('Set-Cookie'))
+            cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
+    }
+    destroyCookie(null, 'state');
+    const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
+    const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
 
     const { getAll } = ProjectsService;
     const projects = getAll();
     return {
         props: {
             projects,
+            isUserLoggedIn,
+            userInfo,
         }
     };
 }

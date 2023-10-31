@@ -145,7 +145,8 @@ export const OFFICE_HOURS_MSG = "Schedule a one on one office hours discussion w
 export const PAGE_ROUTES = {
   MEMBERS:'/directory/members',
   TEAMS: '/directory/teams',
-  SETTINGS: '/directory/settings'
+  SETTINGS: '/directory/settings',
+  PROJECTS: '/directory/projects'
 }
 
 export const SETTINGS_CONSTANTS = {

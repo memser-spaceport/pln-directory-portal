@@ -1,4 +1,5 @@
 import { AddProjectsContext } from "apps/web-app/context/projects/add.context";
+import ProjectsService from "apps/web-app/services/projects";
 import { useRouter } from "next/router"
 import { useContext } from "react";
 import { toast } from "react-toastify";
@@ -7,6 +8,7 @@ import { toast } from "react-toastify";
 export default function ActionButtons(){
     const urlRE = /(^|\s)((https?:\/\/)?[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?)(?![.\S])/gi;
     const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
+    const { saveProject} = ProjectsService;
     const router = useRouter();
 
     const validateInputs = () => {
@@ -15,16 +17,16 @@ export default function ActionButtons(){
         const inputs = addProjectsState.inputs;
 
         if(!inputs.logoURL){
-            errors['logoURL'] = 'Project Logo is required';
+            errors['logoURL'] = 'Logo is required';
         }
         if(!inputs.name){
-            errors['name'] = 'Project Name is required';
+            errors['name'] = 'Name is required';
         }
         if(!inputs.tagline){
-            errors['tagline'] = 'Project tagline is required';
+            errors['tagline'] = 'Tagline is required';
         }
         if(!inputs.desc){
-            errors['desc'] = 'Project description is required';
+            errors['desc'] = 'Description is required';
         }
 
         inputs.projectURLs?.map((link,index)=>{
@@ -81,26 +83,12 @@ export default function ActionButtons(){
         return true;
     }
 
-    const formatToSave = () => {
-        const objectToSave = {
-            logoURL: addProjectsState.logoURL,
-            name: addProjectsState.name,
-            tagline: addProjectsState.tagline,
-            desc: addProjectsState.desc,
-            projectURLs: addProjectsState.projectURLs,
-            contactEmail: addProjectsState.contactEmail,
-            fundsNeeded: addProjectsState.fundsNeeded,
-            KPIs: addProjectsState.KPIs,
-            readme: addProjectsState.readme
-        }
-        return objectToSave;
-    }
-
     const onAddProject = () => {
         console.log(addProjectsState);
+        saveProject(addProjectsState.inputs)
         if(validateInputs()){
-            const data = formatToSave();
-            console.log(data);
+            // const data = formatToSave();
+            // console.log(data);
             //API call
         }else{
             window.scrollTo({

@@ -15,7 +15,7 @@ export function ProjectCard({ project, isGrid = true }) {
     return (
         <DirectoryCard
             isGrid={isGrid}
-            cardUrl={`/directory/teams/${project.id}?backLink=${backLink}`}
+            cardUrl={`/directory/projects/${project.id}?backLink=${backLink}`}
             handleOnClick={onProjectClicked}
             type="projects"
         >
@@ -35,7 +35,7 @@ export function ProjectCard({ project, isGrid = true }) {
                     <div className='py-[20px] text-left text-[16px]'>
                         <div>{project.description}</div>
                     </div>
-                    <div className='flex pb-[20px] border-b'>
+                    <div className={`flex ${isGrid?'pb-[20px] border-b':''}`}>
                         <div>
                             {
                                 project.contributingTeamImage === 'default'
@@ -45,11 +45,14 @@ export function ProjectCard({ project, isGrid = true }) {
                         </div>
                         <div className='font-[13px] font-medium pl-2 my-auto'>{project.contributingTeamName}</div>
                     </div>
-                    <div className='pt-[20px] mx-auto'>
+                    {
+                        isGrid && <div className='pt-[20px] mx-auto'>
                             <div className='border w-max px-[23px] py-[8px] border-[#156FF7] rounded-[47px] font-medium text-[14px] text-[#156FF7] cursor-pointer'>
                                 View Project
                             </div>
-                    </div>
+                        </div>
+                    }
+
                 </div>
             </div>
         </DirectoryCard>
