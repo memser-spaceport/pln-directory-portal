@@ -3,7 +3,8 @@ import { z } from 'zod';
 
 const CustomQuestionSchema = z.object({
   email: z.string().email(),
-  question: z.string().max(200)
+  question: z.string(),
+  type: z.string()
 });
 
 const CustomQuestionResponseSchema = z.object({

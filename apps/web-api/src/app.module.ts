@@ -31,6 +31,7 @@ import { LogException } from './filters/log-exception.filter';
 import { OtpModule } from './otp/otp.module';
 import { FaqModule } from './faq/faq.module';
 import { ProjectsModule } from './projects/projects.module';
+import { JoinRequestsModule } from './join-requests/join-requests.module';
 
 @Module({
   controllers: [AppController],
@@ -77,7 +78,8 @@ import { ProjectsModule } from './projects/projects.module';
     SharedModule,
     OtpModule,
     FaqModule,
-    ProjectsModule
+    ProjectsModule,
+    JoinRequestsModule
   ],
   providers: [
     {
