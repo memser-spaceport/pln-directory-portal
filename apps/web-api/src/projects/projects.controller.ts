@@ -43,7 +43,7 @@ export class ProjectsController {
   
   @Api(server.route.getProjects)
   @ApiOkResponseFromZod(ResponseProjectWithRelationsSchema.array())
-  @UseGuards(UserTokenValidation)
+  @NoCache()
   async findAll(@Req() req) {
     const queryableFields = prismaQueryableFieldsFromZod(
       ResponseProjectWithRelationsSchema

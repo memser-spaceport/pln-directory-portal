@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'nestjs-zod/z';
 const ProjectSchema = z.object({
-  logo: z.string().optional(),
+  logoUid: z.string().optional(),
   name: z.string(),
   tagline: z.string(),
   description: z.string(),
