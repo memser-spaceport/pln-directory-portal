@@ -9,13 +9,21 @@ import { convertCookiesToJson, renewAndStoreNewAccessToken } from "apps/web-app/
 import { destroyCookie } from "nookies";
 import { GetServerSideProps } from "next";
 import { PAGE_ROUTES } from "apps/web-app/constants";
+import { Breadcrumb } from "@protocol-labs-network/ui";
+import { useProfileBreadcrumb } from "apps/web-app/hooks/profile/use-profile-breadcrumb.hook";
 
 export default function AddProject() {
+    const { breadcrumbItems } = useProfileBreadcrumb({
+        backLink:'/directory/projects',
+        directoryName: 'Projects',
+        pageName: 'Add',
+      });
 
     return <>
         <NextSeo {...DIRECTORY_SEO} title="AddProject" />
+        <Breadcrumb items={breadcrumbItems} classname="max-w-[150px] truncate"/>
         <AddProjectContextProvider>
-            <div className="flex pt-20 ">
+            <div className="flex pt-32 ">
                 <div className="mx-auto w-[656px] pt-10">
                     <div className="text-[30px] font-bold">
                         Add Project
@@ -41,6 +49,8 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
         req
     } = ctx;
     let cookies = req?.cookies;
+    console.log(query);
+    
     if (!cookies?.authToken) {
         await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
         if (ctx.res.getHeader('Set-Cookie'))
@@ -52,7 +62,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
 
     if (!isUserLoggedIn || !((userInfo?.roles?.length > 0 &&
         (userInfo.roles.includes('DIRECTORYADMIN')) ||
-        userInfo?.leadingTeams?.length > 0))) {
+        (userInfo?.leadingTeams?.length > 0 && query.teamUid && userInfo?.leadingTeams.includes(query.teamUid))))) {
         return {
             redirect: {
                 permanent: false,

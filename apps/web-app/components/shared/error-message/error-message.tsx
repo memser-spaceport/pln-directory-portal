@@ -18,6 +18,12 @@ export function ErrorMessage() {
             members
           </a>
         </Link>
+        {''} or {''}
+        <Link href="/directory/projects">
+          <a className="text-base text-blue-600 outline-none hover:text-blue-700 focus:text-blue-900 active:text-blue-900">
+            projects
+          </a>
+        </Link>
         {''} pages.
       </p>
     </div>

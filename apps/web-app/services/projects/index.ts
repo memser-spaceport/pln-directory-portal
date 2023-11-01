@@ -65,7 +65,7 @@ const getAll = async (params) => {
     // }
 }
 
-const getTeamsProject = () => {
+const getTeamsProject = async (uid) => {
     // const temp = [
     //     {
     //         id:1,
@@ -112,10 +112,15 @@ const getTeamsProject = () => {
     //         fundingNeeded: true
     //     }
     // ]
-    const temp = [];
     try {
-        const formattedData = getAllFormattedProjects(temp);
-        return formattedData;
+        const response = await api.get(`/v1/projects?teamUid=${uid}`);
+        if (response.status === 200) {
+
+            const formattedData = getAllFormattedProjects(response.data);
+            return formattedData;
+        } else {
+            return null;
+        }
     } catch (err) {
         console.log(err);
     }

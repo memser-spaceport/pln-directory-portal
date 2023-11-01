@@ -8,6 +8,8 @@ import { AddProjectsContext } from "apps/web-app/context/projects/add.context";
 import InputError from "./input-error";
 import { MdEditor } from "md-editor-rt";
 import 'md-editor-rt/lib/style.css';
+import Cookies from 'js-cookie';
+import { useRouter } from "next/router";
 
 export default function AddForm() {
 
@@ -83,6 +85,16 @@ export default function AddForm() {
             } else {
                 // setError(`Please upload a file less than ${maxSize}MB`);
             }
+        }
+    }
+
+    const getEmail = () => {
+        const userInfoFromCookie = Cookies.get('userInfo');
+        if (userInfoFromCookie) {
+            const parsedUserInfo = JSON.parse(userInfoFromCookie);
+            return parsedUserInfo.email;
+        }else{
+            return '';
         }
     }
 
@@ -165,11 +177,10 @@ export default function AddForm() {
                 </div>
                 <div>
                     <InputField
-                        required
                         name="contactEmail"
                         type="email"
                         label="Contact Email"
-                        value={'abc@gmail.com'}
+                        value={getEmail()}
                         onChange={onInputChange}
                         disabled={true}
                         placeholder="Enter your email address"

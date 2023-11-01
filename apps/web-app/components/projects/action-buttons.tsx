@@ -89,8 +89,11 @@ export default function ActionButtons(){
             let image = null;
             try{
                 image = await ProjectsService.uploadProjectLogo(addProjectsState.inputs);
-                console.log(image);
-                const data = ProjectsService.addProject(addProjectsState.inputs,image);
+                const data = await ProjectsService.addProject(addProjectsState.inputs,image);
+                if(data.status === 201){
+                    toast.info("Project added successfully.")
+                    router.push('/directory/teams/'+data.data.teamUid)
+                }
                 
             }catch(err){
                 console.log(err);

@@ -4,16 +4,26 @@ import { useEffect, useState } from "react";
 import { MdPreview } from 'md-editor-rt';
 import ProjectsService from 'apps/web-app/services/projects';
 import { useRouter } from 'next/router';
+import Cookies from 'js-cookie';
 
 export default function AdditionalDetails({ project }) {
     const initialReadme = project?.readMe;
-    const {query} = useRouter();
-    
+    const [isTeamOftheProject, setTeamOftheProject] = useState(false);
+    const { query } = useRouter();
     const [text, setText] = useState(project?.readMe);
-    console.log(project);
-
     const [showEditor, setEditorVisible] = useState(false);
     // const { response } = useMdViewer(text);
+
+    useEffect(() => {
+        const userInfoFromCookie = Cookies.get('userInfo');
+        if (userInfoFromCookie) {
+            const parsedUserInfo = JSON.parse(userInfoFromCookie);
+            if (parsedUserInfo?.leadingTeams?.length > 0 &&
+                parsedUserInfo.leadingTeams.includes(project.teamUid)) {
+                setTeamOftheProject(true);
+            }
+        }
+    }, [])
 
     const onEditAction = () => {
         setEditorVisible(true)
@@ -39,8 +49,9 @@ export default function AdditionalDetails({ project }) {
                 <div className="text-[14px] font-medium text-[#64748B] tracking-[1px]">
                     Additional Details
                 </div>
+                {/* Enable edit button only when the corresponding team lead logsin and view */}
                 {
-                    !showEditor && initialReadme && <div className="px-[16px] py-[8px] text-white bg-[#156FF7] rounded border border-[#156FF7] cursor-pointer" onClick={onEditAction}>
+                    isTeamOftheProject && !showEditor && initialReadme && <div className="px-[16px] py-[8px] text-white bg-[#156FF7] rounded border border-[#156FF7] cursor-pointer" onClick={onEditAction}>
                         Edit
                     </div>
                 }
@@ -57,8 +68,15 @@ export default function AdditionalDetails({ project }) {
             </div>
             {
                 !showEditor && !initialReadme && <div className='border rounded-[12px] p-[16px] text-[12px] font-medium tracking-[0.12px]'>
-                    No additional details added. <span className='text-[#156FF7] cursor-pointer'
-                    onClick={onEditAction}>Click Here</span> to add additional details (markdown supported).
+                    No additional details added.
+                    {
+                        isTeamOftheProject
+                        && <span>
+                            <span className='text-[#156FF7] cursor-pointer'
+                                onClick={onEditAction}>Click Here</span>
+                            to add additional details (markdown supported).
+                        </span>
+                    }
                 </div>
             }
             <div className='no-tailwind'>
@@ -69,7 +87,7 @@ export default function AdditionalDetails({ project }) {
             </div>
             {
                 showEditor && <div>
-                    <MdEditor modelValue={text} onChange={setText} language={'en-US'} onSave={onSaveAction} toolbarsExclude={['catalog', 'github','save','htmlPreview']} />
+                    <MdEditor modelValue={text} onChange={setText} language={'en-US'} onSave={onSaveAction} toolbarsExclude={['catalog', 'github', 'save', 'htmlPreview']} />
                 </div>
             }
 
