@@ -1,4 +1,5 @@
 import Cookies from 'js-cookie';
+import KPIs from '../../components/projects/details/kpis';
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 const getAllFormattedProjects = (data) => {
     try {
@@ -10,10 +11,10 @@ const getAllFormattedProjects = (data) => {
                 formattedProject['name'] = project.name ?? '';
                 formattedProject['tagline'] = project.tagline ?? '';
                 formattedProject['description'] = project.description ?? '';
-                formattedProject['image'] = project.logo ? project.logo : '/assets/images/icons/projects/default.svg';
-                formattedProject['contributingTeamName'] = project.contributingTeam?.name ?? '',
-                    formattedProject['contributingTeamImage'] = project.contributingTeam?.image ? project.contributingTeam.image : 'default',
-                    formattedProject['fundingNeeded'] = project.fundingNeeded ?? false;
+                formattedProject['image'] = project.logo?.url ? project.logo?.url : '/assets/images/icons/projects/default.svg';
+                formattedProject['contributingTeamName'] = project.team?.name ?? '',
+                formattedProject['contributingTeamImage'] = project.team?.logo?.url ? project.team?.logo?.url : 'default',
+                formattedProject['fundingNeeded'] = project.lookingForFunding ?? false;
                 formattedArray.push(formattedProject);
             }
         });
@@ -23,7 +24,7 @@ const getAllFormattedProjects = (data) => {
     }
 }
 
-const formatToSave = (inputs, image) => {
+const formatToSave = (inputs, image, teamuid) => {
     // const objectToSave = {
     //     logoURL: inputs.logoURL,
     //     name: inputs.name,
@@ -43,35 +44,34 @@ const formatToSave = (inputs, image) => {
         "name": inputs.name,
         "tagline": inputs.tagline,
         "description": inputs.desc,
-        "contactEmail": 'nivedhapl@yopmail.com',
+        "contactEmail": userInfo?.email,
         "lookingForFunding": inputs.fundsNeeded,
-        "kpis": [
-            {
-                "key": "key1",
-                "value": "value2"
-            }
-        ],
         "readMe": inputs.readme,
-        "teamUid": "uid-kunde---gleichner",
-        "projectLinks": [
-            {
-
-                "name": "Link 3",
-                "url": "https://link2.example.com1"
-
-            },
-            {
-
-                "name": "Link 5",
-                "url": "https://link1.example.com"
-
-            }
-        ]
+        "teamUid": teamuid,
     }
+    const tempKpi = [];
+    inputs.KPIs.forEach(kpi => {
+        const kpiObj = {};
+        kpiObj['key'] = kpi.name;
+        kpiObj['value'] = kpi.value;
+        tempKpi.push(kpiObj);
+    });
+    objectToSave['kpis'] = tempKpi;
+
+    const tempProjectlinks = [];
+    inputs.projectURLs.forEach(urls => {
+        const urlObj = {};
+        urlObj['name'] = urls.text;
+        urlObj['url'] = urls.url;
+        tempProjectlinks.push(urlObj);
+    });
+    objectToSave['projectLinks'] = tempProjectlinks;
+
     return objectToSave;
 }
 
 const getFormattedProject = (project) => {
+    
     try {
         const formattedProject = {};
         if (project) {
@@ -80,7 +80,7 @@ const getFormattedProject = (project) => {
             formattedProject['tagline'] = project.tagline ?? '';
             formattedProject['description'] = project.description ?? '';
             formattedProject['contactEmail'] = project.contactEmail ?? '';
-            formattedProject['image'] = project.logo ? project.logo : '/assets/images/icons/projects/default.svg';
+            formattedProject['image'] = project.logo?.url ? project.logo.url : '/assets/images/icons/projects/default.svg';
             formattedProject['fundingNeeded'] = project.lookingForFunding ?? false;
             formattedProject['projectLinks'] = project.projectLinks ?? [];
             formattedProject['kpis'] = project.kpis ?? [];

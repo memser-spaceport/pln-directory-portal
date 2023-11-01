@@ -16,7 +16,7 @@ export default function Description({content}) {
                 >
                     <span className="text-[15px] leading-[20px] ">{content}</span>
                 </p>
-                {content && content.length > 264 && (
+                {content && content.length > 350 && (
                     <div className="flex flex-row-reverse">
                         <button
                         className="block mt-1 text-blue-500 hover:underline right-0 relative"

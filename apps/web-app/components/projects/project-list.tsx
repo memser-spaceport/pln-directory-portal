@@ -9,7 +9,7 @@ export function ProjectList({
   return (
     <DirectoryList
       filterProperties={filterProperties}
-      itemsCount={10}
+      itemsCount={projects.length}
     >
       {projects.map((project) => {
         return <ProjectCard project={project} isGrid={isGrid} key={project.id}/>

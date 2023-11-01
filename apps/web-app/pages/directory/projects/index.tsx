@@ -67,15 +67,22 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
         req
     } = ctx;
     let cookies = req?.cookies;
-    console.log(query);
 
-    const queryParams = {};
+    const queryParams = {
+        orderBy:'name'
+    };
     if(query){
         if(query?.FUNDING){
             queryParams['lookingForFunding'] = query?.FUNDING === 'true';
         }
         if(query?.TEAM){
             queryParams['teamUid'] = query?.TEAM;
+        }
+        if(query?.sort && query.sort === 'Name,desc'){
+            queryParams['orderBy'] = '-name'
+        }
+        if(query?.searchBy){
+            queryParams['name'] = query?.searchBy;
         }
     }
     
@@ -91,9 +98,9 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     // const { getAll } = ProjectsService;
     // const projects = await getAll(queryParams);
     let projects = null;
+    
     const allProjects = await getAllProjects(queryParams);
     // const allProjects = await api.get('/v1/projects')
-    console.log(allProjects);
     if (allProjects.status === 200) {
         projects = ProjectsDataService.getAllFormattedProjects(allProjects.body);
     }

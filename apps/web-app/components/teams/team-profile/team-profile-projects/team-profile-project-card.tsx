@@ -7,7 +7,7 @@ export default function TeamProfileProjectCard({ project }) {
         <div className="py-[16px] pl-[16px] pr-[32px] flex cursor-pointer hover:bg-[#F8FAFC] justify-between"
             onClick={() => { router.push(`/directory/projects/${project.id}`) }}>
             <div className="flex ">
-                <Image src={project.image} alt="project image" width={41} height={41} />
+                <div className="relative w-[41px] h-[41px]"><Image src={project.image} alt="project image" width={41} height={41} className="rounded"/></div>
                 <div className="pl-4">
                     <div className="text-[14px] font-semibold flex">
                         <div>{project.name}</div>
@@ -19,7 +19,7 @@ export default function TeamProfileProjectCard({ project }) {
                             </div>
                         }
                     </div>
-                    <div className="text-[12px]">{project.description}</div>
+                    <div className="text-[12px]">{project.tagline}</div>
                 </div>
             </div>
             <div className="my-auto">

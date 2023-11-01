@@ -101,6 +101,6 @@ export default function KPI({ onInputChange, kpiFieldArray, setKPIField }) {
                 return getKPIComponent(kpi, index)
             })
         }
-        {getAddMoreTemplate()}
+        {kpiFieldArray.length < 5 && getAddMoreTemplate()}
     </div>
 }

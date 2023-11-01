@@ -15,10 +15,10 @@ export default function KPIs({ project }) {
                                             key={index}
                                             className="p-[10px] h-[88px] flex flex-col rounded border border-[#E2E8F0] w-full justify-center items-center min-w-[163px]">
                                             <div className="text-[24px] font-bold">
-                                                {kpi.key}
+                                                {kpi.value}
                                             </div>
                                             <div className="text-[#64748B] text-[13px] leading-[18px] text-center">
-                                                {kpi.value}
+                                                {kpi.key}
                                             </div>
                                         </div>
                                     )

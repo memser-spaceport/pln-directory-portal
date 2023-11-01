@@ -1,13 +1,15 @@
 import { AddProjectsContext } from "apps/web-app/context/projects/add.context";
 import ProjectsService from "apps/web-app/services/projects";
 import { useRouter } from "next/router"
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { toast } from "react-toastify";
+import { LoadingIndicator } from "../shared/loading-indicator/loading-indicator";
 
 
 export default function ActionButtons(){
     const urlRE = /(^|\s)((https?:\/\/)?[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?)(?![.\S])/gi;
     const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
+    const [isProcessing, setIsProcessing] = useState<boolean>(false);
     // const { uploadProjectLogo, addProject } = ProjectsService;
     const router = useRouter();
 
@@ -50,9 +52,9 @@ export default function ActionButtons(){
             }
         });
 
-        if(!inputs.contactEmail){
-            errors['contactEmail'] = 'Contact Email is required';
-        }
+        // if(!inputs.contactEmail){
+        //     errors['contactEmail'] = 'Contact Email is required';
+        // }
 
         inputs.KPIs?.map((kpi,index)=>{
             if(kpi.name && !kpi.value){
@@ -85,34 +87,44 @@ export default function ActionButtons(){
 
     const onAddProject = async () => {
         console.log(addProjectsState);
-        // if(validateInputs()){
+        if(validateInputs()){
             let image = null;
             try{
+                setIsProcessing(true);
                 image = await ProjectsService.uploadProjectLogo(addProjectsState.inputs);
-                const data = await ProjectsService.addProject(addProjectsState.inputs,image);
+                const data = await ProjectsService.addProject(addProjectsState.inputs, image, router.query.teamUid);
                 if(data.status === 201){
                     toast.info("Project added successfully.")
-                    router.push('/directory/teams/'+data.data.teamUid)
+                    router.push('/directory/teams/'+data.data.teamUid);
                 }
                 
             }catch(err){
                 console.log(err);
-                
+                toast.error('Something went wrong.Please try again.')
+            }finally{
+                setIsProcessing(false);
             }
             // console.log(data);
             //API call
-        // }else{
-        //     window.scrollTo({
-        //         top: 0,
-        //         behavior: "smooth",
-        //       })
-        //     toast.error('Validation failed');
+        }else{
+            window.scrollTo({
+                top: 0,
+                behavior: "smooth",
+              })
+            toast.error('Validation failed');
 
-        // }
+        }
     }
 
     return (
         <>
+            {isProcessing && (
+                <div
+                    className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
+                >
+                    <LoadingIndicator />
+                </div>
+            )}
             <div className="flex flex-row-reverse gap-[8px] py-[20px] font-[15px] font-semibold">
                 <div className="px-[24px] py-[8px] rounded-[100px] border cursor-pointer border-[#156FF7] bg-[#156FF7] text-white" 
                 onClick={onAddProject}>
@@ -120,7 +132,7 @@ export default function ActionButtons(){
                 </div>
                 <div className="px-[24px] py-[8px] rounded-[100px] border border-[#156FF7]  text-[#156FF7] cursor-pointer"
                 onClick={()=>{
-                    router.push('/directory/projects')
+                    router.push('/directory/teams/' + router.query.teamUid)
                 }}>
                     Cancel
                 </div>

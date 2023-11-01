@@ -96,7 +96,7 @@ export default function URLDetails({ onInputChange, urlFieldArray, setURLField }
         <>
             {getURLHeader()}
             {addMoreTemplate()}
-            {getAddMoreLinkTemplate()}
+            {urlFieldArray.length < 3 && getAddMoreLinkTemplate()}
         </>
     );
 }

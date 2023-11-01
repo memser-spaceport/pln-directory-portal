@@ -152,8 +152,8 @@ const uploadProjectLogo = async (inputs) => {
     //   }
 }
 
-const addProject = async (inputs,image) => {
-    const data = formatToSave(inputs,image);
+const addProject = async (inputs,image,teamuid) => {
+    const data = formatToSave(inputs,image,teamuid);
     const addedResponse = await api.post(`/v1/projects`, data);
     return addedResponse;
 }

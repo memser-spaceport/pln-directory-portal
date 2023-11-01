@@ -19,11 +19,11 @@ export function ProjectCard({ project, isGrid = true }) {
             handleOnClick={onProjectClicked}
             type="projects"
         >
-            <div className={`${isGrid ? 'p-[24px]' : ''} w-full`}>
+            <div className={`${isGrid ? 'p-[24px] h-[308px]' : ''} w-full`}>
                 <div className='flex flex-col'>
                     <div className='flex justify-between'>
                         <div className='flex'>
-                            <Image src={project.image} alt="project image" width={41} height={41} />
+                            <div className='relative w-[41px] h-[41px]'><Image src={project.image} alt="project image" width={41} height={41} className='rounded'/></div>
                             <div className='pl-2 my-auto font-semibold text-[16px]'>{project.name}</div>
                         </div>
                         {
@@ -32,15 +32,15 @@ export function ProjectCard({ project, isGrid = true }) {
                             </div>
                         }
                     </div>
-                    <div className='py-[20px] text-left text-[16px]'>
-                        <div>{project.description}</div>
+                    <div className={`py-[20px] text-left text-[16px] ${isGrid ? 'h-[100px]' : ''}`}>
+                        <div>{project.tagline}</div>
                     </div>
                     <div className={`flex ${isGrid?'pb-[20px] border-b':''}`}>
                         <div>
                             {
                                 project.contributingTeamImage === 'default'
                                     ? <UserGroupIcon className="bg-gray-200 fill-white relative inline-block h-6 w-6 rounded-full" />
-                                    : <Image src={project.contributingTeamImage} alt="project image" width={35} height={35} />
+                                    : <Image src={project.contributingTeamImage} alt="project image" width={35} height={35} className='rounded'/>
                             }
                         </div>
                         <div className='font-[13px] font-medium pl-2 my-auto'>{project.contributingTeamName}</div>
