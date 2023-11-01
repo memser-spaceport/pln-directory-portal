@@ -83,6 +83,7 @@ export interface IFormValues {
   comments: string;
   teamAndRoles: Roles[];
   skills: Skill[];
+  experiences: any[];
   openToWork: boolean;
   preferences?: IPreferences | null;
 }

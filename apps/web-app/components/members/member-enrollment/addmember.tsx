@@ -29,6 +29,7 @@ import { ReactComponent as TextImage } from '/public/assets/images/create-member
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
 import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
+import AddMemberExperience from './add-member-experience';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddMemberModalProps {
@@ -39,7 +40,8 @@ interface AddMemberModalProps {
 const steps = [
   { number: 1, name: 'BASIC' },
   { number: 2, name: 'SKILL' },
-  { number: 3, name: 'SOCIAL' },
+  { number: 3, name: 'EXPERIENCE' },
+  { number: 4, name: 'SOCIAL' },
 ];
 
 function validateBasicForm(formValues) {
@@ -73,9 +75,25 @@ function validateSkillForm(formValues) {
   return errors;
 }
 
+function validateExperienceForm(fValues) {
+  const formErrors = []
+  const exps = fValues.experiences;
+  exps.forEach((exp, expIndex) => {
+    console.log(exp.startDate.getTime(), exp.endDate.getTime())
+    if(exp.companyName.trim() === '') {
+      formErrors.push({id: expIndex, field: 'companyName', error: "Company Name is Mandatory"})
+    } if(exp.title.trim() === '') {
+      formErrors.push({id: expIndex, field: 'title', error: "Title is Mandatory"})
+    } if(exp.startDate.getTime() >= exp.endDate.getTime()) {
+      formErrors.push({id: expIndex, field: 'date', error: "To Date cannot be less than start date"})
+    }
+  })
+
+  return formErrors
+}
+
 function validateForm(formValues, formStep) {
   let errors = [];
-
   switch (formStep) {
     case 1:
       errors = validateBasicForm(formValues);
@@ -83,6 +101,10 @@ function validateForm(formValues, formStep) {
     case 2:
       errors = validateSkillForm(formValues);
       return errors;
+    case 3:
+      errors = validateExperienceForm(formValues);
+      return errors;
+
   }
 }
 
@@ -91,6 +113,7 @@ function handleNextClick(
   formStep,
   setFormStep,
   setErrors,
+  setExperienceErrors,
   emailExists,
   divRef,
   analytics
@@ -102,9 +125,17 @@ function handleNextClick(
     // element1.scrollTop = 0;
   }
   if (errors?.length > 0 || emailExists) {
-    setErrors(errors);
-    return false;
+    if(formStep === 3) {
+      setExperienceErrors(errors)
+      setErrors(["There are fields that require your attention. Please review the fields below."]);
+      return false;
+    } else {
+      setErrors(errors);
+      return false;
+    }
+
   }
+  setExperienceErrors([])
   analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_JOIN_NETWORK_FORM_STEPS, {
     itemName: steps[formStep - 1].name,
   });
@@ -119,6 +150,7 @@ function getSubmitOrNextButton(
   setFormStep,
   handleSubmit,
   setErrors,
+  setExperienceErrors,
   isProcessing,
   emailExists,
   disableNext,
@@ -128,7 +160,7 @@ function getSubmitOrNextButton(
   const buttonClassName =
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8] disabled:bg-slate-400';
   const submitOrNextButton =
-    formStep === 3 ? (
+    formStep === 4 ? (
       <button
         className={buttonClassName}
         disabled={isProcessing}
@@ -150,6 +182,7 @@ function getSubmitOrNextButton(
             formStep,
             setFormStep,
             setErrors,
+            setExperienceErrors,
             emailExists,
             divRef,
             analytics
@@ -196,6 +229,7 @@ export function AddMemberModal({
 }: AddMemberModalProps) {
   const [formStep, setFormStep] = useState<number>(1);
   const [errors, setErrors] = useState([]);
+  const [experienceErrors, setExperienceErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({});
   const [emailExists, setEmailExists] = useState<boolean>(false);
   const [imageUrl, setImageUrl] = useState<string>();
@@ -220,6 +254,7 @@ export function AddMemberModal({
     comments: '',
     teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
     skills: [],
+    experiences: [],
     openToWork: false,
   });
 
@@ -266,6 +301,7 @@ export function AddMemberModal({
       comments: '',
       teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
       skills: [],
+      experiences: [],
       openToWork: false,
     });
   }
@@ -493,11 +529,20 @@ export function AddMemberModal({
         );
       case 3:
         return (
-          <AddMemberSocialForm
+          <AddMemberExperience
             formValues={formValues}
             onChange={handleInputChange}
+            experienceErrors={experienceErrors}
+            setExperienceErrors={setExperienceErrors}
           />
         );
+        case 4:
+          return (
+            <AddMemberSocialForm
+              formValues={formValues}
+              onChange={handleInputChange}
+            />
+          );
       default:
         return (
           <AddMemberBasicForm
@@ -571,6 +616,7 @@ export function AddMemberModal({
                   setFormStep,
                   handleSubmit,
                   setErrors,
+                  setExperienceErrors,
                   isProcessing,
                   emailExists,
                   disableNext,

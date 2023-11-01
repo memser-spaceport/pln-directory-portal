@@ -10,6 +10,7 @@ export * from './lib/icons/menu/menu';
 export * from './lib/icons/spinner/spinner';
 export * from './lib/input-field/input-field';
 export * from './lib/switch/switch';
+export * from './lib/single-select/single-select';
 export * from './lib/tag/tag';
 export * from './lib/tooltip/tooltip';
 export * from './lib/image-upload/image-upload';
