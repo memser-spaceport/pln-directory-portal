@@ -163,7 +163,7 @@ export const LOOKUP_FILTER_MAP: Map<LookupFilter, BuildQueryFunction> = new Map(
       {
         build: ({ prop, value, numeric, fromMany }) =>
           set({}, !fromMany ? prop : prop.replace(/\./g, '.some.'), {
-            in: numeric
+            has: numeric
               ? value.split(',').map((val) => +val)
               : value.split(','),
           }),

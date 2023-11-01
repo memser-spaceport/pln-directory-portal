@@ -10,3 +10,4 @@ export * from './skills';
 export * from './team-member-roles';
 export * from './teams';
 export * from './member-roles';
+export * from './project';

@@ -48,6 +48,11 @@ export class ProjectsService {
 
   async getProjects(queryOptions: Prisma.ProjectFindManyArgs) {
     try {
+      queryOptions.include = {
+        team: { select: { uid: true, name: true, logo: true }},
+        creator: { select: { uid: true, name: true, image: true }},
+        logo: true
+      };
       return await this.prisma.project.findMany(queryOptions);
     } catch(err) {
       this.handleErrors(err);
@@ -61,9 +66,9 @@ export class ProjectsService {
       return await this.prisma.project.findUnique({
         where: { uid },
         include: {
-          creator: {
-             select: { uid: true, name: true } 
-          }
+          team: { select: { uid: true, name: true, logo: true }},
+          creator: { select: { uid: true, name: true, image: true }},
+          logo: true
         }
       });
     } catch(err) {

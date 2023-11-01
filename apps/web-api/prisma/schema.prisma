@@ -240,25 +240,34 @@ model Faq {
   updatedAt DateTime @updatedAt
 }
 
+model JoinRequest {
+  id           Int      @id @default(autoincrement())
+  uid          String   @unique @default(cuid())
+  email        String   @db.VarChar(100)
+  introduction String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 model Project {
-  id                Int           @id @default(autoincrement())
-  uid               String        @unique @default(cuid())
-  logo              Image?        @relation(fields: [logoUid], references: [uid])
+  id                Int      @id @default(autoincrement())
+  uid               String   @unique @default(cuid())
+  logo              Image?   @relation(fields: [logoUid], references: [uid])
   logoUid           String?
   name              String
   tagline           String
   description       String
   contactEmail      String
-  lookingForFunding Boolean       @default(false)
+  lookingForFunding Boolean  @default(false)
   projectLinks      Json?
   kpis              Json?
   readMe            String?
-  creator           Member?       @relation(fields: [createdBy], references: [uid])
+  creator           Member?  @relation(fields: [createdBy], references: [uid])
   createdBy         String
-  team              Team?         @relation(fields: [teamUid], references: [uid])
+  team              Team?    @relation(fields: [teamUid], references: [uid])
   teamUid           String
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 enum ImageSize {
