@@ -2,30 +2,35 @@ import { MdEditor } from 'md-editor-rt';
 import 'md-editor-rt/lib/style.css';
 import { useEffect, useState } from "react";
 import { MdPreview } from 'md-editor-rt';
+import ProjectsService from 'apps/web-app/services/projects';
+import { useRouter } from 'next/router';
 
-export default function AdditionalDetails() {
-    const [text, setText] = useState('# Hello Editor');
+export default function AdditionalDetails({ project }) {
+    const initialReadme = project?.readMe;
+    const {query} = useRouter();
+    
+    const [text, setText] = useState(project?.readMe);
+    console.log(project);
 
     const [showEditor, setEditorVisible] = useState(false);
     // const { response } = useMdViewer(text);
-
-    useEffect(() => {
-        console.log(text);
-        console.log(typeof(text));
-        
-    }, [text])
 
     const onEditAction = () => {
         setEditorVisible(true)
     }
 
     const onCancelAction = () => {
+        setText(initialReadme);
         setEditorVisible(false)
     }
 
-    const onSaveAction = (test) => {
-        console.log(test);
-        
+    const onSaveAction = () => {
+        try {
+            project['readMe'] = text;
+            ProjectsService.updateProject(query.id, project)
+        } catch (er) {
+            console.log(er);
+        }
         setEditorVisible(false)
     }
     return (
@@ -35,7 +40,7 @@ export default function AdditionalDetails() {
                     Additional Details
                 </div>
                 {
-                    !showEditor && <div className="text-[#156FF7] text-[13px] font-medium cursor-pointer" onClick={onEditAction}>
+                    !showEditor && initialReadme && <div className="px-[16px] py-[8px] text-white bg-[#156FF7] rounded border border-[#156FF7] cursor-pointer" onClick={onEditAction}>
                         Edit
                     </div>
                 }
@@ -44,21 +49,27 @@ export default function AdditionalDetails() {
                         <div className="px-[16px] py-[8px] text-[#156FF7] rounded border border-[#156FF7] cursor-pointer" onClick={onCancelAction}>
                             Cancel
                         </div>
-                        <div className="px-[16px] py-[8px] text-white bg-[#156FF7] rounded border border-[#156FF7] cursor-pointer">
-                            Save 
+                        <div className="px-[16px] py-[8px] text-white bg-[#156FF7] rounded border border-[#156FF7] cursor-pointer" onClick={onSaveAction}>
+                            Save
                         </div>
                     </div>
                 }
             </div>
+            {
+                !showEditor && !initialReadme && <div className='border rounded-[12px] p-[16px] text-[12px] font-medium tracking-[0.12px]'>
+                    No additional details added. <span className='text-[#156FF7] cursor-pointer'
+                    onClick={onEditAction}>Click Here</span> to add additional details (markdown supported).
+                </div>
+            }
             <div className='no-tailwind'>
                 {/* <div dangerouslySetInnerHTML={{ __html: response }} /> */}
                 {
-                    !showEditor && <MdPreview modelValue={text} />
+                    !showEditor && initialReadme && <MdPreview modelValue={text} />
                 }
             </div>
             {
                 showEditor && <div>
-                    <MdEditor modelValue={text} onChange={setText} language={'en-US'} onSave={onSaveAction} toolbarsExclude={['catalog','github']}/>
+                    <MdEditor modelValue={text} onChange={setText} language={'en-US'} onSave={onSaveAction} toolbarsExclude={['catalog', 'github','save','htmlPreview']} />
                 </div>
             }
 

@@ -42,7 +42,7 @@ export default function ProjectsFilter({ filterProperties }) {
 
     const handleTeamChange = (team) => {
         setSelectedTeam(team);
-        projectsDispatch({ type: 'SET_FILTER', payload: { filterType: 'TEAM', value: team?.label } });
+        projectsDispatch({ type: 'SET_FILTER', payload: { filterType: 'TEAM', value: team?.value } });
     }
 
     const getSelectedOptionFromQuery =async (searchTerm) => {

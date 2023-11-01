@@ -1,9 +1,10 @@
 import api from "apps/web-app/utils/api";
 import ProjectsDataService from "./projects.data.service";
+// import { getAllProjects } from '@protocol-labs-network/projects/data-access';
 
 const { getAllFormattedProjects,formatToSave } = ProjectsDataService;
 
-const getAll = () => {
+const getAll = async (params) => {
     const temp = [
         {
             id:1,
@@ -50,13 +51,18 @@ const getAll = () => {
             fundingNeeded: true
         }
     ]
-
-    try {
-        const formattedData = getAllFormattedProjects(temp);
-        return formattedData;
-    } catch (err) {
-        console.log(err);
-    }
+    // try {
+    //     const allProjects = await getAllProjects(params);
+    //     // const allProjects = await api.get('/v1/projects')
+    //     console.log(allProjects);
+    //     if(allProjects.status === 200){
+    //         const formattedData = getAllFormattedProjects(allProjects.body);
+    //         return formattedData;   
+    //     }
+    //     return null;
+    // } catch (err) {
+    //     console.log('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.',err);
+    // }
 }
 
 const getTeamsProject = () => {
@@ -106,7 +112,7 @@ const getTeamsProject = () => {
     //         fundingNeeded: true
     //     }
     // ]
-    const temp = []
+    const temp = [];
     try {
         const formattedData = getAllFormattedProjects(temp);
         return formattedData;
@@ -144,14 +150,18 @@ const uploadProjectLogo = async (inputs) => {
 const addProject = async (inputs,image) => {
     const data = formatToSave(inputs,image);
     const addedResponse = await api.post(`/v1/projects`, data);
-    console.log(addedResponse);
-    
+    return addedResponse;
+}
+
+const updateProject = async (uid,project) => {
+ const updateResponse = await api.put(`/v1/projects/${uid}`,project);
+ return updateResponse;
 }
 const ProjectsService = {
-    getAll,
     getTeamsProject,
     uploadProjectLogo,
-    addProject
+    addProject,
+    updateProject
 }
 
 export default ProjectsService;

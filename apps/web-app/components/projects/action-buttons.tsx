@@ -8,7 +8,7 @@ import { toast } from "react-toastify";
 export default function ActionButtons(){
     const urlRE = /(^|\s)((https?:\/\/)?[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?)(?![.\S])/gi;
     const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
-    const { uploadProjectLogo, addProject } = ProjectsService;
+    // const { uploadProjectLogo, addProject } = ProjectsService;
     const router = useRouter();
 
     const validateInputs = () => {
@@ -88,9 +88,9 @@ export default function ActionButtons(){
         // if(validateInputs()){
             let image = null;
             try{
-                image = await uploadProjectLogo(addProjectsState.inputs);
+                image = await ProjectsService.uploadProjectLogo(addProjectsState.inputs);
                 console.log(image);
-                const data = addProject(addProjectsState.inputs,image);
+                const data = ProjectsService.addProject(addProjectsState.inputs,image);
                 
             }catch(err){
                 console.log(err);

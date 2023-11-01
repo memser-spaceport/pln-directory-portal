@@ -8,11 +8,12 @@ import { DirectoryLayout } from "apps/web-app/layouts/directory-layout";
 import { DIRECTORY_SEO } from "apps/web-app/seo.config";
 import ProjectsService from "apps/web-app/services/projects";
 import { convertCookiesToJson, renewAndStoreNewAccessToken } from "apps/web-app/utils/services/auth";
-import { getTeamsListOptions, getTeamsOptionsFromQuery } from "apps/web-app/utils/teams.utils";
 import { GetServerSideProps } from "next";
 import { NextSeo } from "next-seo";
 import { destroyCookie } from "nookies";
 import { ReactElement } from "react";
+import { getAllProjects } from '../../../../../libs/projects/data-access/src/index';
+import ProjectsDataService from "apps/web-app/services/projects/projects.data.service";
 
 export default function Projects(props) {
     const { selectedViewType } = useViewType();
@@ -66,6 +67,18 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
         req
     } = ctx;
     let cookies = req?.cookies;
+    console.log(query);
+
+    const queryParams = {};
+    if(query){
+        if(query?.FUNDING){
+            queryParams['lookingForFunding'] = query?.FUNDING === 'true';
+        }
+        if(query?.TEAM){
+            queryParams['teamUid'] = query?.TEAM;
+        }
+    }
+    
     if (!cookies?.authToken) {
         await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
         if (ctx.res.getHeader('Set-Cookie'))
@@ -75,8 +88,15 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
     const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
 
-    const { getAll } = ProjectsService;
-    const projects = getAll();
+    // const { getAll } = ProjectsService;
+    // const projects = await getAll(queryParams);
+    let projects = null;
+    const allProjects = await getAllProjects(queryParams);
+    // const allProjects = await api.get('/v1/projects')
+    console.log(allProjects);
+    if (allProjects.status === 200) {
+        projects = ProjectsDataService.getAllFormattedProjects(allProjects.body);
+    }
     return {
         props: {
             projects,
