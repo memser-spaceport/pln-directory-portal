@@ -1,7 +1,4 @@
-import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
-import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
-
 export const ExperienceSchema = z.object({
     companyName: z.string().nullish(),
     logoUid: z.string().optional(), 
@@ -11,49 +8,41 @@ export const ExperienceSchema = z.object({
     endDate: z.string().nullish(),
     description: z.string().optional(),    
     memberUid: z.string().optional()
-})
-
-export const RefinedExperienceSchema = ExperienceSchema;
-
-RefinedExperienceSchema.superRefine((data, ctx) => {
+}).superRefine((data, ctx) => {
   if (data.currentTeam) {
     data.endDate = null;
-  } else {
+  } else if(!data.currentTeam && !data.endDate) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'end date should not be null for past experience',
       fatal: true,
-    });
-    
+    });    
   }
+
+  if(data.startDate && data.endDate && new Date(data.startDate).getTime() > new Date(data.endDate).getTime() ){
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'end date should be greater than start date',
+      fatal: true,
+    }); 
+  }
+
+  if(data.startDate  && new Date(data.startDate).getTime() > Date.now() ){
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'start date should be less than or equal to current date',
+      fatal: true,
+    }); 
+  }
+
+  if(data.endDate  && new Date(data.endDate).getTime() > Date.now() ){
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'end date should be less than or equal to current date',
+      fatal: true,
+    }); 
+  }
+
+
   return z.never;
 });
-
-export const ResponseExperienceSchema = ExperienceSchema.omit({}).strict();
-
-export const ExperienceQueryableFields = ResponseExperienceSchema.keyof();
-
-export const ExperienceQueryParams = QueryParams({
-  queryableFields: ExperienceQueryableFields,
-});
-
-export const ExperienceDetailQueryParams = ExperienceQueryParams.unwrap()
-  .pick(RETRIEVAL_QUERY_FILTERS)
-  .optional();
-
-export const CreateExperienceSchema = ExperienceSchema.pick({
-  title: true,
-  companyName: true,
-  currentTeam: true,
-  startDate: true,
-  endDate: true,
-  description: true,
-});
-
-export class ExperienceDto extends createZodDto(ExperienceSchema) {}
-
-export class CreateExperienceDto extends createZodDto(CreateExperienceSchema) {}
-
-export class ResponseExperienceDto extends createZodDto(ResponseExperienceSchema) {}
-
-export type TExperienceResponse = z.infer<typeof ResponseExperienceSchema>;

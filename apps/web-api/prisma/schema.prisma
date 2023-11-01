@@ -237,7 +237,7 @@ model Experience {
   uid         String   @unique @default(cuid())
   companyName String
   logoUid     String?
-  companylogo Image?   @relation(fields: [logoUid], references: [uid])
+  companyLogo Image?   @relation(fields: [logoUid], references: [uid])
   title       String
   currentTeam Boolean  @default(false)
   startDate   DateTime
