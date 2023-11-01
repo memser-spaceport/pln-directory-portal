@@ -25,6 +25,8 @@ import {
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
 import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../../utils/services/auth';
+import TeamProfileProjects from 'apps/web-app/components/teams/team-profile/team-profile-projects/team-profile-projects';
+import ProjectsService from 'apps/web-app/services/projects';
 
 interface TeamProps {
   team: ITeam;
@@ -32,9 +34,10 @@ interface TeamProps {
   backLink: string;
   isUserLoggedIn: boolean;
   userInfo: any;
+  teamsProjectList:any;
 }
 
-export default function Team({ team, members, backLink, userInfo }: TeamProps) {
+export default function Team({ team, members, backLink, userInfo, teamsProjectList }: TeamProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
     directoryName: 'Teams',
@@ -58,6 +61,8 @@ export default function Team({ team, members, backLink, userInfo }: TeamProps) {
             <TeamProfileFunding {...team} />
           ) : null}
           <TeamProfileMembers members={members} />
+          <TeamProfileProjects projects={teamsProjectList} userInfo={userInfo} team={team}/>
+
         </div>
         {/* <div className="w-sidebar shrink-0">
           <AskToEditCard profileType="team" team={team} />
@@ -131,6 +136,10 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
     );
   }
 
+  const { getTeamsProject } = ProjectsService;
+
+  const teamsProjectList = await getTeamsProject(id);
+
   // Redirects user to the 404 page when we're unable to fetch
   // a valid team with the provided ID
   if (!team) {
@@ -147,6 +156,6 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
   );
 
   return {
-    props: { team, members, backLink, isUserLoggedIn, userInfo },
+    props: { team, members, backLink, isUserLoggedIn, userInfo, teamsProjectList },
   };
 };

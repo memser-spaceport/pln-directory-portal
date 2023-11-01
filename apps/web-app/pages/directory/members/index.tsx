@@ -112,6 +112,8 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) 
   const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
 
   const optionsFromQuery = getMembersOptionsFromQuery(query);
+  console.log(optionsFromQuery);
+  
   const listOptions = getMembersListOptions(optionsFromQuery);
   const [membersResponse, filtersValues] = await Promise.all([
     getMembers(listOptions),
