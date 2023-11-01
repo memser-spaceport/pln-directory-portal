@@ -1,6 +1,6 @@
 import { TGetRequestOptions, client } from '@protocol-labs-network/shared/data-access';
 
-export const getAllProjects = async (options: TGetRequestOptions = {}) => {
+export const getAllProjects = async (options = {}) => {
   // return await client.projects.getProjects({query:{with:'team'}});
   return await client.projects.getProjects({
     query: options,
