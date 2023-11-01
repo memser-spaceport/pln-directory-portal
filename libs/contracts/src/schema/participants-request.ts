@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RefinedExperienceSchema } from './experience';
+import { ExperienceSchema } from './experience';
 
 export const statusEnum = z.enum(['PENDING', 'APPROVED', 'REJECTED']);
 export const participantTypeEnum = z.enum(['MEMBER', 'TEAM']);
@@ -47,7 +47,7 @@ const newDataMemberSchema = z.object({
   officeHours: z.string().optional().nullable(),
   imageUid: z.string().optional().nullable(),
   moreDetails: z.string().optional().nullable(),
-  experience:  z.array(RefinedExperienceSchema).optional()
+  experience:  z.array(ExperienceSchema).optional()
 });
 
 const newDataTeamSchema = z.object({
