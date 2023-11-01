@@ -17,7 +17,7 @@ export const ExperienceSchema = z.object({
     });    
   }
 
-  if(data.startDate && data.endDate && new Date(data.startDate).getTime() > new Date(data.endDate).getTime() ){
+  if(data.startDate && data.endDate && new Date(data.startDate).getTime() >= new Date(data.endDate).getTime() ){
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'End date should be greater than start date',
