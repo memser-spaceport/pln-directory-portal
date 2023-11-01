@@ -36,7 +36,7 @@ export const getServerSideProps = async (
   ctx
 ) => {
   const { query } = ctx;
-  const { state, code, error, landingPage=PAGE_ROUTES.TEAMS, source} = query;
+  const { state, code, error, landingPage=PAGE_ROUTES.TEAMS, externalRedirectUrl, source} = query;
   const cookies = nookies.get(ctx);
   // validating state which we gave to auth service to get auth code.
   if (cookies.state && cookies.state != state && source != "direct") {
@@ -90,15 +90,18 @@ export const getServerSideProps = async (
     const refreshTokenExpiry = decodeToken(refreshToken);
     setCookie(ctx, 'authToken', JSON.stringify(accessToken), {
       maxAge: calculateExpiry(accessTokenExpiry.exp),
-      path: '/'
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN || ''
     });
     setCookie(ctx, 'refreshToken', JSON.stringify(refreshToken), {
       maxAge: calculateExpiry(refreshTokenExpiry.exp),
-      path: '/'
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN || ''
     });
     setCookie(ctx, 'userInfo', JSON.stringify(userInfo), {
       maxAge: calculateExpiry(accessTokenExpiry.exp),
-      path: '/'
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN || ''
     });
     setCookie(ctx, 'verified', 'true' , {
       path: '/'
@@ -107,7 +110,7 @@ export const getServerSideProps = async (
       return {
         redirect: {
           permanent: false,
-          destination: PAGE_ROUTES.SETTINGS,
+          destination: externalRedirectUrl ? externalRedirectUrl: PAGE_ROUTES.SETTINGS,
         },
       };
     }
@@ -115,10 +118,10 @@ export const getServerSideProps = async (
     const accessTokenExpiry = decodeToken(accessToken);
     const refreshTokenExpiry = decodeToken(refreshToken);
 
-
     setCookie(ctx, 'authToken', accessToken, {
       maxAge: calculateExpiry(accessTokenExpiry.exp),
-      path: '/'
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN || ''
     });
     setCookie(ctx, 'idToken', idToken, {
       maxAge: calculateExpiry(accessTokenExpiry.exp),
@@ -126,18 +129,30 @@ export const getServerSideProps = async (
     });
     setCookie(ctx, 'refreshToken', refreshToken, {
       maxAge: calculateExpiry(refreshTokenExpiry.exp),
-      path: '/'
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN || ''
     });
 
     setCookie(ctx, 'show-email-verification-box', 'true', {
       maxAge: calculateExpiry(accessTokenExpiry.exp),
       path: '/'
     });
+
+    setCookie(ctx, 'external_redirect_url', externalRedirectUrl, {
+      maxAge: calculateExpiry(accessTokenExpiry.exp),
+      path: '/'
+    });
+    return {
+      redirect: {
+        permanent: false,
+        destination: landingPage
+      }
+    };
   }
   return {
     redirect: {
       permanent: false,
-      destination: landingPage
-    },
+      destination: externalRedirectUrl ? externalRedirectUrl : landingPage
+    }
   };
 };
