@@ -113,18 +113,18 @@ export function Dropdown({
               {buttonContent ? (
                 buttonContent
               ) : selectedOption?.label ? (
-                <div className="text-left leading-6 flex">
+                <div className="text-left leading-6 flex mr-2">
                     {selectedOption?.icon &&
                       (<img src={selectedOption?.icon?.toString()} width={25} height={45} className='h-6 w-6 rounded-full mr-[5px]'></img>
                       )}
                     {(selectedOption?.icon === null && name === 'team') && <UserGroupIcon className="bg-gray-200 fill-white inline inset-y-0 left-2 my-auto h-6 w-6 rounded-full mr-[4px]" />}
                     <span  className={`${'relative'} ${(selectedOption?.icon || (selectedOption?.icon === null && name === 'team')) ? ' w-[153px] text-ellipsis overflow-hidden whitespace-nowrap':' width-full'}`}>{selectedOption?.label}</span></div>
               ) : (
-                <div className="text-sm text-slate-600 opacity-50">
+                <div className="text-sm text-slate-600 opacity-50 mr-2">
                   {placeholder}
                 </div>
               )}
-              <div className="absolute right-4 text-slate-500">
+              <div className="text-slate-500">
                 <ArrowIcon />
               </div>
             </Listbox.Button>

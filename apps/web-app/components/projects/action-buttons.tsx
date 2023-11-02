@@ -18,9 +18,9 @@ export default function ActionButtons(){
 
         const inputs = addProjectsState.inputs;
 
-        if(!inputs.logoURL){
-            errors['logoURL'] = 'Logo is required';
-        }
+        // if(!inputs.logoURL){
+        //     errors['logoURL'] = 'Logo is required';
+        // }
         if(!inputs.name){
             errors['name'] = 'Name is required';
         }
@@ -86,7 +86,6 @@ export default function ActionButtons(){
     }
 
     const onAddProject = async () => {
-        console.log(addProjectsState);
         if(validateInputs()){
             let image = null;
             try{
