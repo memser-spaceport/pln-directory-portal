@@ -103,9 +103,9 @@ api.interceptors.response.use(
     let msg = SOMETHING_WENT_WRONG;
     if (response) {
       if (response.status === 401) {
-        Cookies.remove('authToken');
-        Cookies.remove('refreshToken');
-        Cookies.remove('userInfo');
+        Cookies.remove('authToken', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+        Cookies.remove('refreshToken', { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
+        Cookies.remove('userInfo', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
         toast.info(RETRY_LOGIN_MSG, {
           hideProgressBar: true
         });
