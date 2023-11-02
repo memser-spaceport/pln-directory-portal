@@ -50,7 +50,7 @@ export default function TeamProfileProjects({ projects, userInfo, team }) {
 
             {
                 projects.length === 0 && isTeamLead && <div className="p-[16px] max-h-96 overflow-y-auto rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)] focus-within:outline-none focus:outline-none focus-visible:outline-none">
-                    You have not added any projects. <span className="text-[#156FF7] cursor-pointer" onClick={() => { router.push('/directory/projects/add?teamUid='+team.uid) }}>Click Here</span> to add a new project.
+                    You have not added any projects. <span className="text-[#156FF7] cursor-pointer" onClick={() => { router.push('/directory/projects/add?teamUid='+team.id) }}>Click Here</span> to add a new project.
                 </div>
             }
             {

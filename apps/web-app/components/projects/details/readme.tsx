@@ -73,7 +73,7 @@ export default function AdditionalDetails({ project }) {
                         isTeamOftheProject
                         && <span>
                             <span className='text-[#156FF7] cursor-pointer'
-                                onClick={onEditAction}>Click Here</span>
+                                onClick={onEditAction}> Click Here </span>
                             to add additional details (markdown supported).
                         </span>
                     }
@@ -87,7 +87,7 @@ export default function AdditionalDetails({ project }) {
             </div>
             {
                 showEditor && <div>
-                    <MdEditor modelValue={text} onChange={setText} language={'en-US'} onSave={onSaveAction} toolbarsExclude={['catalog', 'github', 'save', 'htmlPreview']} />
+                    <MdEditor modelValue={text} onChange={setText} language={'en-US'} toolbarsExclude={['catalog', 'github', 'save', 'htmlPreview']} />
                 </div>
             }
 

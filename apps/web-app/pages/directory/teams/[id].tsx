@@ -138,7 +138,12 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
 
   const { getTeamsProject } = ProjectsService;
 
-  const teamsProjectList = await getTeamsProject(id);
+  let teamsProjectList = [];
+  try{
+    teamsProjectList = await getTeamsProject(id);
+  }catch(err){
+    console.log(err);
+  }
 
   // Redirects user to the 404 page when we're unable to fetch
   // a valid team with the provided ID
