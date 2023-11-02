@@ -7,6 +7,7 @@ function AddMemberExperience(props) {
     const errors = props.experienceErrors ?? [];
     const formValues = props.formValues;
     const experiences = formValues.experiences;
+    const currentCompaniesCount = experiences.filter(v => v.currentTeam === true).length;
     const onChange = props.onChange;
    // const [experiences, setExperiences] = useState([]);
     const [expandedId, setExpandedId] = useState(-1);
@@ -78,14 +79,14 @@ function AddMemberExperience(props) {
                 </div>
             </div>}
             <div className="mb-[32px]">
-                {experiences.map((exp, expIndex) => <AddMemberExperienceForm errors={errors} setLoaderStatus={setLoaderStatus} onToggleExpansion={onToggleExpansion} expandedId={expandedId} key={`${expIndex}-exp`} onDeleteExperience={onDeleteExperience} exp={exp} expIndex={expIndex} onItemChange={onItemChange} />)}
+                {experiences.map((exp, expIndex) => <AddMemberExperienceForm currentCompaniesCount={currentCompaniesCount} errors={errors} setLoaderStatus={setLoaderStatus} onToggleExpansion={onToggleExpansion} expandedId={expandedId} key={`${expIndex}-exp`} onDeleteExperience={onDeleteExperience} exp={exp} expIndex={expIndex} onItemChange={onItemChange} />)}
             </div>
             {(experiences.length > 0 ) && <div className="flex justify-start">
-                 {experiences.length <= 4 && <button onClick={onAddExperience} className="flex items-center justify-center text-[14px]">
+                 {experiences.length <= 6 && <button onClick={onAddExperience} className="flex items-center justify-center text-[14px]">
                     <img className="" src="/assets/images/icons/expand-blue.svg" />
                     <span className="text-blue-600 mx-[4px]">Add Company</span>
                 </button>}
-                <p className="text-[14px] text-[#94A3B8]">(max 5 companies)</p>
+                <p className="text-[14px] text-[#94A3B8]">(max 7 companies)</p>
             </div>}
             {isLoading && <div className="absolute flex items-center justify-center bg-black bg-opacity-40 top-0 left-0 right-0 w-full h-full z-[10]">
             <LoadingIndicator/>

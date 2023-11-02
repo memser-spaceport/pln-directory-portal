@@ -3,7 +3,7 @@ import api from "apps/web-app/utils/api";
 import { useRef, useState } from "react";
 
 function AddMemberExperienceForm(props) {
-
+    const currentCompaniesCount = props.currentCompaniesCount;
     const onItemChange = props.onItemChange;
     const exp = props.exp;
     const expIndex = props.expIndex;
@@ -122,7 +122,7 @@ function AddMemberExperienceForm(props) {
                     {exp.companyName.trim() === '' && <h2 className="text-[#0F172A] flex-1 font-[600] text-[14px]">{`Company ${expIndex + 1}`}</h2>}
                     {exp.companyName.trim() !== '' && <h2 className="text-[#0F172A] flex-1 font-[600] text-[14px]">{`${exp.companyName.trim()}`}</h2>}
                     <div className="flex flex-row items-center gap-[8px]">
-                        <Switch initialValue={exp.currentTeam} onChange={(val) => onItemChange(expIndex, 'currentTeam', val)} key={`${expIndex}-switch`} />
+                        <Switch nonEditable={exp.currentTeam === false && currentCompaniesCount === 3} initialValue={exp.currentTeam} onChange={(val) => onItemChange(expIndex, 'currentTeam', val)} key={`${expIndex}-switch`} />
                         <label className="text-[12px] font-[600]">Current Team</label>
                     </div>
                 </div>
@@ -191,7 +191,7 @@ function AddMemberExperienceForm(props) {
                     {/********************************   DESCRIPTION   ***********************************/}
                     <div className="mt-[20px]">
                         <label className="text-[14px] font-[600]">Description</label>
-                        <textarea ref={descriptionRef} placeholder="" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" value={exp.description} onChange={(e) => onItemChange(expIndex, 'description', e.target.value)} />
+                        <textarea rows={5} ref={descriptionRef} placeholder="" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" value={exp.description} onChange={(e) => onItemChange(expIndex, 'description', e.target.value)} />
                         {descriptionRef.current && <p className="text-[#475569] font-[500] text-[12px]">{`${descriptionRef?.current?.value?.length} of 400 characters used`}</p>}
                     </div>
                 </div>}
