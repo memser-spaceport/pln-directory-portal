@@ -215,9 +215,9 @@ function EmailOtpVerificationModal() {
 
     const clearAllAuthCookies = () => {
         Cookies.remove('idToken')
-        Cookies.remove('authToken')
-        Cookies.remove('refreshToken')
-        Cookies.remove('userInfo')
+        Cookies.remove('authToken', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+        Cookies.remove('refreshToken', { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
+        Cookies.remove('userInfo', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
     }
 
     useEffect(() => {

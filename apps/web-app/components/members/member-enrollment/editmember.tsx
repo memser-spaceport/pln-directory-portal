@@ -263,10 +263,10 @@ export function EditMemberModal({
 
   const logoutAndRedirect = (path) => {
      // If no token.. then logout user
-     Cookies.remove('authToken');
-     Cookies.remove('refreshToken');
-     Cookies.remove('userInfo');
-     Cookies.set('page_params', 'user_logged_out', {
+    Cookies.remove('authToken', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+    Cookies.remove('refreshToken', { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
+    Cookies.remove('userInfo', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+    Cookies.set('page_params', 'user_logged_out', {
       expires: 60,
       path: '/',
     });
