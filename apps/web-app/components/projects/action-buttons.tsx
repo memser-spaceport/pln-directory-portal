@@ -41,6 +41,15 @@ export default function ActionButtons(){
                 }
                 errors['projectURLs'][index]['text'] = 'Link text is required';
             }
+            if(!link.url && link.text){
+                if(!errors['projectURLs']){
+                    errors['projectURLs'] = new Array(inputs.projectURLs.length).fill(null);
+                }
+                if(!errors['projectURLs'][index]){
+                    errors['projectURLs'][index] = {};
+                }
+                errors['projectURLs'][index]['url'] = 'Link url is required';
+            }
             if(link.url && !link.url.match(urlRE)){
                 if(!errors['projectURLs']){
                     errors['projectURLs'] = new Array(inputs.projectURLs.length).fill(null);

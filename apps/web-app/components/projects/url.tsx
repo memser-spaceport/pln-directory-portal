@@ -47,7 +47,7 @@ export default function URLDetails({ onInputChange, urlFieldArray, setURLField }
                     placeholder="Enter Link Text"
                     className="custom-grey custom-outline-none border"
                 />
-                <InputError content={addProjectsState.errors?.projectURLs?.[index]['text']}/>
+                <InputError content={addProjectsState.errors?.projectURLs?.[index]?.['text']}/>
             </div>
             <div className="w-[340px]">
                 <InputField
@@ -62,7 +62,7 @@ export default function URLDetails({ onInputChange, urlFieldArray, setURLField }
                     placeholder="Enter Link"
                     className="custom-grey custom-outline-none border"
                 />
-                <InputError content={addProjectsState.errors?.projectURLs?.[index]['url']}/>
+                <InputError content={addProjectsState.errors?.projectURLs?.[index]?.['url']}/>
             </div>
             <div className="cursor-pointer" onClick={() => {
                 deleteURLRow(field.id)

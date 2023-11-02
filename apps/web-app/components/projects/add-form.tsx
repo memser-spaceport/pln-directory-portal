@@ -135,7 +135,6 @@ export default function AddForm() {
                             required={true}
                             name="name"
                             label="Project Name"
-                            pattern="^[a-zA-Z\s]*$"
                             maxLength={64}
                             value={addProjectsState.inputs.name}
                             onChange={onInputChange}
