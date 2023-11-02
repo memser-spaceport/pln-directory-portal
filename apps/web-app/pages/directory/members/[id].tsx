@@ -33,6 +33,7 @@ import {
   fetchGitProjectsByMember
 } from '../../../utils/services/members';
 import { MemberProfileLoginStrip } from '../../../components/members/member-profile/member-profile-login-strip/member-profile-login-strip';
+import MemberExperience from 'apps/web-app/components/members/member-profile/member-experience/member-experience';
 
 interface MemberProps {
   member: IMember;
@@ -112,6 +113,7 @@ export default function Member({
                 member={member}
               />
             )}
+            {userInfo?.uid && <MemberExperience/>}
           </div>
         </div>
         {/* <div className="w-sidebar shrink-0">

@@ -54,6 +54,7 @@ import { PreferenceModal } from './preference-modal';
 import Privacy from '../../preference/privacy';
 import { getPreferences } from 'apps/web-app/services/member.service';
 import { SettingsContext } from "apps/web-app/pages/directory/settings";
+import AddMemberExperience from './add-member-experience';
 interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -225,6 +226,7 @@ export function EditMemberModal({
     comments: '',
     teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
     skills: [],
+    experiences: [],
     openToWork: false,
     preferences: JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))
   });
@@ -365,6 +367,7 @@ export function EditMemberModal({
           skills: member?.skills?.map((item) => {
             return { value: item.uid, label: item.title };
           }),
+          experiences: [],
           preferences: member?.preferences ?? JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))
         };
         // set requestor email
@@ -373,6 +376,7 @@ export function EditMemberModal({
           const parsedUserInfo = JSON.parse(userInfoFromCookie);
           formValues['requestorEmail'] = parsedUserInfo.email;
         }
+
         setImageUrl(member?.image?.url ?? '');
         setFormValues(formValues);
         setDropDownValues({ skillValues: data[1], teamNames: data[2] });
@@ -446,6 +450,7 @@ export function EditMemberModal({
       comments: '',
       teamAndRoles: [],
       skills: [],
+      experiences: [],
       openToWork: false,
     });
   }
@@ -498,6 +503,7 @@ export function EditMemberModal({
         ? new Date(formValues.plnStartDate)?.toISOString()
         : null,
       skills: skills,
+      experiences: [],
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
     };
@@ -631,8 +637,8 @@ export function EditMemberModal({
                 {}
               );
             }
-            dispatch({type: 'SET_PREFERENCE', 
-              payload: { 
+            dispatch({type: 'SET_PREFERENCE',
+              payload: {
                 ...values.preferences,
                 email: values.email != "" ? true : false,
                 github: values.githubHandler != "" ? true : false,
@@ -837,6 +843,15 @@ export function EditMemberModal({
                     onClick={() => onTabClicked(3)}
                   >
                     {' '}
+                    EXPERIENCE{' '}
+                  </button>
+                  <button
+                    className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
+                      openTab == 4 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                    }`}
+                    onClick={() => onTabClicked(4)}
+                  >
+                    {' '}
                     SOCIAL{' '}
                   </button>
                 </div>
@@ -858,7 +873,7 @@ export function EditMemberModal({
                   </PreferenceModal>
               </>
               }
-              <div className="mt-3 w-full rounded-md border bg-white  px-6 py-10">
+              <div className="mt-3 w-full relative rounded-md border bg-white  px-6 py-10">
                 {
                   <Fragment>
                     <div className={openTab === 1 ? 'block' : 'hidden'}>
@@ -896,6 +911,12 @@ export function EditMemberModal({
                       />
                     </div>
                     <div className={openTab === 3 ? 'block' : 'hidden'}>
+                      <AddMemberExperience
+                        formValues={formValues}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    <div className={openTab === 4 ? 'block' : 'hidden'}>
                       <AddMemberSocialForm
                         formValues={formValues}
                         onChange={handleInputChange}
