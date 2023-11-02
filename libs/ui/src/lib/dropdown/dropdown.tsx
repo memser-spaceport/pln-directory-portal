@@ -124,7 +124,7 @@ export function Dropdown({
                   {placeholder}
                 </div>
               )}
-              <div className="absolute right-4 text-slate-500">
+              <div className="text-slate-500">
                 <ArrowIcon />
               </div>
             </Listbox.Button>
