@@ -70,6 +70,7 @@ model Member {
   teamMemberRoles TeamMemberRole[]
   memberRoles     MemberRole[]
   preferences     Json?
+  experience      Experience[]
   Project         Project[]
 }
 
@@ -205,8 +206,8 @@ model Technology {
 }
 
 model Image {
-  id             Int       @id @default(autoincrement())
-  uid            String    @unique @default(cuid())
+  id             Int          @id @default(autoincrement())
+  uid            String       @unique @default(cuid())
   // The cid is not unique because this id represents an array of multiple images
   // with different sizes that can be accessed trough the cid and filename
   cid            String
@@ -219,15 +220,31 @@ model Image {
   version        ImageSize
   // This image can be a thumbnail to other image
   thumbnailToUid String?
-  thumbnailTo    Image?    @relation("ImageThumbnails", fields: [thumbnailToUid], references: [uid])
+  thumbnailTo    Image?       @relation("ImageThumbnails", fields: [thumbnailToUid], references: [uid])
   // This image can have multiple thumbnails
-  thumbnails     Image[]   @relation("ImageThumbnails")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  thumbnails     Image[]      @relation("ImageThumbnails")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
   // Reverse Relations:
   Team           Team[]
   Member         Member[]
   Project        Project[]
+  Experience     Experience[]
+}
+
+model Experience {
+  id          Int      @id @default(autoincrement())
+  uid         String   @unique @default(cuid())
+  companyName String
+  logoUid     String?
+  companyLogo Image?   @relation(fields: [logoUid], references: [uid])
+  title       String
+  currentTeam Boolean  @default(false)
+  startDate   DateTime
+  endDate     DateTime
+  description String?
+  memberUid   String
+  member      Member?  @relation(fields: [memberUid], references: [uid])
 }
 
 model Faq {
