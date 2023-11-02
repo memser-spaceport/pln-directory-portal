@@ -70,6 +70,8 @@ model Member {
   teamMemberRoles TeamMemberRole[]
   memberRoles     MemberRole[]
   preferences     Json?
+  experience      Experience[]
+  Project         Project[]
 }
 
 model MemberRole {

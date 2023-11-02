@@ -4,6 +4,7 @@ import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
+import { ReactComponent as ProjectsIcon } from '../../../../public/assets/images/icons/projects/projects.svg';
 
 interface IMenuItem {
   icon: HeroIcon;
@@ -22,6 +23,11 @@ export function Menu() {
       icon: UserIcon,
       name: 'Members',
       path: '/directory/members',
+    },
+    {
+      icon: ProjectsIcon,
+      name: 'Projects',
+      path: '/directory/projects',
     },
   ];
 

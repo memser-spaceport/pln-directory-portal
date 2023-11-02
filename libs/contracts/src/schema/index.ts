@@ -10,7 +10,7 @@ export * from './skill';
 export * from './team';
 export * from './team-member-role';
 export * from './technology';
-export * from './experience';
 export * from './faq';
 export * from './project';
+export * from './experience';
 export * from './join-requests';

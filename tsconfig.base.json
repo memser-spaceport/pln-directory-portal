@@ -47,6 +47,9 @@
       "@protocol-labs-network/technologies/data-access": [
         "libs/technologies/data-access/src/index.ts"
       ],
+      "@protocol-labs-network/projects/data-access": [
+        "libs/projects/data-access/src/index.ts"
+      ],
       "@protocol-labs-network/ui": ["libs/ui/src/index.ts"]
     }
   },

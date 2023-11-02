@@ -23,8 +23,8 @@ export function DirectoryCard({
         <div
           className={`flex ${
             isGrid
-              ? type === 'member' ? 'flex-col text-center w-full rounded-t-xl' : 'before:bg-gradient-to-b--white-to-slate-200 flex-col p-5 pb-4 text-center before:absolute before:left-0 before:top-0 before:h-16 before:w-full before:rounded-t-xl before:border-b before:border-slate-200'
-              : 'flex-row flex-wrap space-x-4 p-5'
+            ? (type === 'member' || type === 'projects') ? 'flex-col text-center w-full rounded-t-xl' : 'before:bg-gradient-to-b--white-to-slate-200 flex-col p-5 pb-4 text-center before:absolute before:left-0 before:top-0 before:h-16 before:w-full before:rounded-t-xl before:border-b before:border-slate-200'
+              : 'flex-row flex-wrap space-x-4 p-5 '
           }`}
         >
           {children}

@@ -107,6 +107,15 @@ export const FATHOM_EVENTS = {
       editSave: 'GZ6LFEDJ',
     },
   },
+  projects: {
+    directory:{
+      controls:{
+        viewType: '9E11MZ5Q',
+        viewTypeListToGrid: 'KHBW7DAV',
+        viewTypeGridToList: 'RPBE1AWN',
+      }
+    }
+  }
 };
 export const AIRTABLE_REGEX = /^rec[A-Za-z0-9]{14}$/;
 export const LINKEDIN_URL_REGEX = /(?:https?:\/\/)?(?:www\.)?linkedin\.com\/(?:in|profile|company)\/([a-zA-Z0-9-_]+)/;
@@ -136,7 +145,8 @@ export const OFFICE_HOURS_MSG = "Schedule a one on one office hours discussion w
 export const PAGE_ROUTES = {
   MEMBERS:'/directory/members',
   TEAMS: '/directory/teams',
-  SETTINGS: '/directory/settings'
+  SETTINGS: '/directory/settings',
+  PROJECTS: '/directory/projects'
 }
 
 export const SETTINGS_CONSTANTS = {
