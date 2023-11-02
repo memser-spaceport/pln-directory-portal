@@ -61,15 +61,18 @@ api.interceptors.request.use(async (config) => {
 
             setCookie(null, 'authToken', JSON.stringify(accessToken), {
               maxAge: calculateExpiry(access_token.exp),
-              path: '/'
+              path: '/',
+              domain: process.env.COOKIE_DOMAIN || ''
             });
             setCookie(null, 'refreshToken', JSON.stringify(refreshToken), {
               maxAge: calculateExpiry(refresh_token.exp),
-              path: '/'
+              path: '/',
+              domain: process.env.COOKIE_DOMAIN || ''
             });
             setCookie(null, 'userInfo', JSON.stringify(userInfo), {
               maxAge: calculateExpiry(access_token.exp),
-              path: '/'
+              path: '/',
+              domain: process.env.COOKIE_DOMAIN || ''
             });
             config.headers['Authorization'] = `Bearer ${accessToken}`.replace(
               /"/g,

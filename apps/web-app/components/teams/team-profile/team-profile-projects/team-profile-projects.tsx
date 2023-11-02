@@ -1,10 +1,12 @@
 import { useRouter } from "next/router";
 import TeamProfileProjectCard from "./team-profile-project-card";
 import { useState } from "react";
+import { TeamProfileProjectsModal } from "./team-profile-seeall-popop";
 
 export default function TeamProfileProjects({ projects, userInfo, team }) {
 
     const [teamProjects, setTeamProjects] = useState(projects.slice(0, 3));
+    const [seeAllPopup, setSeeAllPopup] = useState(false);
 
     const isTeamLead = ((userInfo?.roles?.length > 0 &&
         userInfo.roles.includes('DIRECTORYADMIN')) ||
@@ -12,7 +14,8 @@ export default function TeamProfileProjects({ projects, userInfo, team }) {
             userInfo.leadingTeams.includes(team.id)));
 
     const seeAllAction = () => {
-        setTeamProjects(projects);
+        // setTeamProjects(projects);
+        setSeeAllPopup(true);
     }
 
     const router = useRouter();
@@ -65,6 +68,11 @@ export default function TeamProfileProjects({ projects, userInfo, team }) {
                     })
                 }
             </div>
+            <TeamProfileProjectsModal
+                isOpen={seeAllPopup}
+                setIsModalOpen={setSeeAllPopup}
+                projects={projects}
+            />
         </>
     )
 }

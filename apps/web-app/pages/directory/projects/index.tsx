@@ -69,7 +69,8 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     let cookies = req?.cookies;
 
     const queryParams = {
-        orderBy:'name'
+        orderBy:'name',
+        pagination: false
     };
     if(query){
         if(query?.FUNDING){
