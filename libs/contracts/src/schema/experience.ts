@@ -25,7 +25,7 @@ export const ExperienceSchema = z.object({
     }); 
   }
 
-  if(data.startDate  && new Date(data.startDate).getTime() > Date.now() ){
+  if(data.startDate  && new Date(data.startDate).getTime() >= Date.now() ){
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'Start date should be less than or equal to current date',
