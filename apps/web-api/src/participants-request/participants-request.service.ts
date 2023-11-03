@@ -329,11 +329,7 @@ export class ParticipantsRequestService {
     if(dataToProcess.experience && Array.isArray(dataToProcess.experience) && dataToProcess.experience.length > 0) {
       dataToSave['experience'] = {
         createMany: {
-          data: dataToProcess.experience.map(exp => {
-            if(!exp.endDate) {
-              exp.endDate = null;
-            }
-          })
+          data: dataToProcess.experience
         },
       };
     }

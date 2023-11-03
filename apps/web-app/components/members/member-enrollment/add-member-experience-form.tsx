@@ -13,7 +13,7 @@ function AddMemberExperienceForm(props) {
     const onToggleExpansion = props.onToggleExpansion;
     const setLoaderStatus = props.setLoaderStatus
     const uploadRef = useRef<HTMLInputElement>(null);
-    const descriptionRef = useRef();
+    const descriptionRef = useRef<HTMLTextAreaElement>(null);
     const [isLogoHovered, setLogoHoverStatus] = useState(false);
 
     const getYears = () => {
@@ -65,11 +65,11 @@ function AddMemberExperienceForm(props) {
         const file = e.target.files?.[0];
         const isValidFormat = ['image/jpeg', 'image/png'].includes(file.type);
         const sizeInMB = bytesToSize(file.size);
-        if(!isValidFormat) {
+        /* if(!isValidFormat) {
 
         }
         if(sizeInMB > 4) {
-        }
+        } */
 
         try {
             const formData = new FormData();
