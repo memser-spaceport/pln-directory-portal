@@ -393,7 +393,7 @@ export function EditMemberModal({
           experience: member?.experience.map(exp => {
             exp.startDate = new Date(exp.startDate);
             exp.endDate = exp.endDate ? new Date(exp.endDate) : null;
-
+            exp.logoUrl = exp?.companyLogo?.url
             return exp;
           }),
           preferences: member?.preferences ?? JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))
@@ -541,6 +541,7 @@ export function EditMemberModal({
           delete v.endDate
         }
 
+        delete v.companyLogo
         return v
       }),
       teamAndRoles: formattedTeamAndRoles,
