@@ -7,6 +7,7 @@ import InputError from './input-error';
 export default function URLDetails({ onInputChange, urlFieldArray, setURLField }) {
 
     const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
+    const urlRE = /(^|\s)((https?:\/\/)?[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?)(?![.\S])/gi;
 
     const getURLHeader = () => {
         return <div className="flex gap-2 text-sm font-bold">
@@ -84,6 +85,11 @@ export default function URLDetails({ onInputChange, urlFieldArray, setURLField }
             id: Math.max(...oldField.map((item) => item.id + 1))
         });
         setURLField([...oldField]);
+        const errors = { ...addProjectsState.errors };
+        if(errors?.projectURLs?.[oldField.length]){
+            errors.projectURLs[oldField.length] = {};
+        }
+        addProjectsDispatch({ type: 'SET_ERROR', payload: { ...errors } });
     }
 
     const deleteURLRow = (id) => {
@@ -91,6 +97,40 @@ export default function URLDetails({ onInputChange, urlFieldArray, setURLField }
         const removedArray = oldField.filter((val) => val.id !== id);
         setURLField([...removedArray]);
         addProjectsDispatch({ type: 'SET_INPUT', payload: { ...addProjectsState.inputs, 'projectURLs': [...removedArray] } });
+        const errors = { ...addProjectsState.errors };
+        if(errors['projectURLs']){
+            errors['projectURLs'] = null;
+        }
+        removedArray?.map((link,index)=>{
+            if(link.url && !link.text){
+                if(!errors['projectURLs']){
+                    errors['projectURLs'] = new Array(removedArray.length).fill(null);
+                }
+                if(!errors['projectURLs'][index]){
+                    errors['projectURLs'][index] = {};
+                }
+                errors['projectURLs'][index]['text'] = 'Link text is required';
+            }
+            if(!link.url && link.text){
+                if(!errors['projectURLs']){
+                    errors['projectURLs'] = new Array(removedArray.length).fill(null);
+                }
+                if(!errors['projectURLs'][index]){
+                    errors['projectURLs'][index] = {};
+                }
+                errors['projectURLs'][index]['url'] = 'Link url is required';
+            }
+            if(link.url && !link.url.match(urlRE)){
+                if(!errors['projectURLs']){
+                    errors['projectURLs'] = new Array(removedArray.length).fill(null);
+                }
+                if(!errors['projectURLs'][index]){
+                    errors['projectURLs'][index] = {};
+                }
+                errors['projectURLs'][index]['url'] = 'Invalid Link.';
+            }
+        });
+        addProjectsDispatch({ type: 'SET_ERROR', payload: { ...errors } });
     }
     return (
         <>

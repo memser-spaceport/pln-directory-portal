@@ -149,7 +149,6 @@ export default function AddForm() {
                         required={true}
                         name="tagline"
                         label="Project Tagline"
-                        pattern="^[a-zA-Z\s]*$"
                         maxLength={80}
                         value={addProjectsState.inputs.tagline}
                         onChange={onInputChange}

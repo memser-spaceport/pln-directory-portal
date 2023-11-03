@@ -68,7 +68,31 @@ export default function KPI({ onInputChange, kpiFieldArray, setKPIField }) {
         const removedArray = oldField.filter((val) => val.id !== id);
         setKPIField([...removedArray]);
         addProjectsDispatch({ type: 'SET_INPUT', payload: { ...addProjectsState.inputs, 'KPIs': [...removedArray] } });
-        
+        const errors = { ...addProjectsState.errors };
+        if(errors['KPIs']){
+            errors['KPIs'] = null;
+        }
+        removedArray?.map((kpi,index)=>{
+            if(kpi.name && !kpi.value){
+                if(!errors['KPIs']){
+                    errors['KPIs'] = new Array(removedArray.length).fill(null);
+                }
+                if(!errors['KPIs'][index]){
+                    errors['KPIs'][index] = {};
+                }
+                errors['KPIs'][index]['value'] = 'KPI value is required';
+            }
+            if(!kpi.name && kpi.value){
+                if(!errors['KPIs']){
+                    errors['KPIs'] = new Array(removedArray.length).fill(null);
+                }
+                if(!errors['KPIs'][index]){
+                    errors['KPIs'][index] = {};
+                }
+                errors['KPIs'][index]['name'] = 'KPI name is required';
+            }
+        });
+        addProjectsDispatch({ type: 'SET_ERROR', payload: { ...errors } });
     }
 
     const addKPIRow = () => {
@@ -79,6 +103,11 @@ export default function KPI({ onInputChange, kpiFieldArray, setKPIField }) {
             id: oldField.length === 0 ? 0 : Math.max(...oldField.map((item) => item.id + 1))
         });
         setKPIField([...oldField]);
+        const errors = { ...addProjectsState.errors };
+        if(errors?.KPIs?.[oldField.length]){
+            errors.KPIs[oldField.length] = {};
+        }
+        addProjectsDispatch({ type: 'SET_ERROR', payload: { ...errors } });
     }
 
     const getAddMoreTemplate = () => {
