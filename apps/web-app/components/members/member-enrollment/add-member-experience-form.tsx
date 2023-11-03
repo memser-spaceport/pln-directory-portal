@@ -12,7 +12,7 @@ function AddMemberExperienceForm(props) {
     const expandedId = props.expandedId;
     const onToggleExpansion = props.onToggleExpansion;
     const setLoaderStatus = props.setLoaderStatus
-    const uploadRef = useRef();
+    const uploadRef = useRef<HTMLInputElement>(null);
     const descriptionRef = useRef();
     const [isLogoHovered, setLogoHoverStatus] = useState(false);
 
