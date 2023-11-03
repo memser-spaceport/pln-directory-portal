@@ -537,10 +537,6 @@ export function EditMemberModal({
           delete v.logoUid
         }
 
-        if(v.endDate === null) {
-          delete v.endDate
-        }
-
         delete v.companyLogo
         return v
       }),
