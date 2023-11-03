@@ -25,22 +25,10 @@ const getAllFormattedProjects = (data) => {
 }
 
 const formatToSave = (inputs, image, teamuid) => {
-    // const objectToSave = {
-    //     logoURL: inputs.logoURL,
-    //     name: inputs.name,
-    //     tagline: inputs.tagline,
-    //     desc: inputs.desc,
-    //     projectURLs: inputs.projectURLs,
-    //     contactEmail: inputs.contactEmail,
-    //     fundsNeeded: inputs.fundsNeeded,
-    //     KPIs: inputs.KPIs,
-    //     readme: inputs.readme
-    // }
 
     const userInfo = Cookies.get('userInfo') ? JSON.parse(Cookies.get('userInfo')) : null;
     const objectToSave = {
         // "uid": userInfo.uid,
-        "logoUid": image ? image.uid : null,
         "name": inputs.name,
         "tagline": inputs.tagline,
         "description": inputs.desc,
@@ -57,6 +45,10 @@ const formatToSave = (inputs, image, teamuid) => {
         tempKpi.push(kpiObj);
     });
     objectToSave['kpis'] = tempKpi;
+
+    if (image) {
+        objectToSave['logoUid'] = image.uid;
+    }
 
     const tempProjectlinks = [];
     inputs.projectURLs.forEach(urls => {
