@@ -65,7 +65,7 @@ export class MembersService {
             },
           },
         },
-        experience: true
+        experience: {include: {companyLogo : true}}
       },
     });
   }
@@ -446,8 +446,8 @@ export class MembersService {
       {
         where: { uid: uid },
         select: {
-          email: true, 
-          githubHandler: true, 
+          email: true,
+          githubHandler: true,
           telegramHandler:true,
           discordHandler: true,
           linkedinHandler: true,
@@ -458,9 +458,9 @@ export class MembersService {
     );
     const preferences = {...resp.preferences};
     if (!resp.preferences) {
-      preferences.isnull = true; 
+      preferences.isnull = true;
     } else{
-      preferences.isnull = false; 
+      preferences.isnull = false;
     }
     preferences.email = resp?.email ? true: false;
     preferences.github = resp?.githubHandler ? true: false;
@@ -475,7 +475,7 @@ export class MembersService {
     const user = await this.memberToUserInfo(member);
     if (user.leadingTeams.includes(teamUid)) {
       return true;
-    }  
+    }
     return false;
   }
 

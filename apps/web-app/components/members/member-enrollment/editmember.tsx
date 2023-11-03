@@ -392,7 +392,8 @@ export function EditMemberModal({
           }),
           experience: member?.experience.map(exp => {
             exp.startDate = new Date(exp.startDate);
-            exp.endDate = new Date(exp.endDate);
+            exp.endDate = exp.endDate ? new Date(exp.endDate) : null;
+
             return exp;
           }),
           preferences: member?.preferences ?? JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))
