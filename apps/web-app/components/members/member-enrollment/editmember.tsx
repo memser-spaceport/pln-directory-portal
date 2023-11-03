@@ -54,6 +54,7 @@ import { PreferenceModal } from './preference-modal';
 import Privacy from '../../preference/privacy';
 import { getPreferences } from 'apps/web-app/services/member.service';
 import { SettingsContext } from "apps/web-app/pages/directory/settings";
+import AddMemberExperience from './add-member-experience';
 interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -104,6 +105,22 @@ function validateSkillForm(formValues) {
   return errors;
 }
 
+function validateExperienceForm(fValues) {
+  const formErrors = []
+  const exps = fValues.experience;
+  exps.forEach((exp, expIndex) => {
+    if(exp.companyName.trim() === '') {
+      formErrors.push({id: expIndex, field: 'companyName', error: "Company Name is Mandatory"})
+    } if(exp.title.trim() === '') {
+      formErrors.push({id: expIndex, field: 'title', error: "Title is Mandatory"})
+    } if(exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
+      formErrors.push({id: expIndex, field: 'date', error: "To Date cannot be less than start date"})
+    }
+  })
+
+  return formErrors
+}
+
 function validateForm(formValues, imageUrl, isProfileSettings) {
   let errors = [];
   const basicFormErrors = validateBasicForm(
@@ -118,9 +135,16 @@ function validateForm(formValues, imageUrl, isProfileSettings) {
   if (skillFormErrors.length) {
     errors = [...errors, ...skillFormErrors];
   }
+
+  const experienceFormErrors = validateExperienceForm(formValues);
+  if(experienceFormErrors.length > 0) {
+    errors.push("Please review experience details")
+  }
+
   return {
     basicFormErrors,
     skillFormErrors,
+    experienceFormErrors,
     errors,
   };
 }
@@ -191,6 +215,7 @@ export function EditMemberModal({
   const [isErrorPopupOpen, setIsErrorPopupOpen] = useState(false);
   const [basicErrors, setBasicErrors] = useState([]);
   const [skillErrors, setSkillErrors] = useState([]);
+  const [expErrors, setExperienceErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({});
   const [imageUrl, setImageUrl] = useState<string>();
   const [emailExists, setEmailExists] = useState<boolean>(false);
@@ -225,6 +250,7 @@ export function EditMemberModal({
     comments: '',
     teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
     skills: [],
+    experience: [],
     openToWork: false,
     preferences: JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))
   });
@@ -320,7 +346,6 @@ export function EditMemberModal({
       .then((data) => {
         const member = data[0];
         let counter = 1;
-
         let teamAndRoles = member?.teamMemberRoles?.length
           ? member.teamMemberRoles
           : [];
@@ -365,6 +390,11 @@ export function EditMemberModal({
           skills: member?.skills?.map((item) => {
             return { value: item.uid, label: item.title };
           }),
+          experience: member?.experience.map(exp => {
+            exp.startDate = new Date(exp.startDate);
+            exp.endDate = new Date(exp.endDate);
+            return exp;
+          }),
           preferences: member?.preferences ?? JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))
         };
         // set requestor email
@@ -373,6 +403,7 @@ export function EditMemberModal({
           const parsedUserInfo = JSON.parse(userInfoFromCookie);
           formValues['requestorEmail'] = parsedUserInfo.email;
         }
+
         setImageUrl(member?.image?.url ?? '');
         setFormValues(formValues);
         setDropDownValues({ skillValues: data[1], teamNames: data[2] });
@@ -446,6 +477,7 @@ export function EditMemberModal({
       comments: '',
       teamAndRoles: [],
       skills: [],
+      experience: [],
       openToWork: false,
     });
   }
@@ -498,6 +530,18 @@ export function EditMemberModal({
         ? new Date(formValues.plnStartDate)?.toISOString()
         : null,
       skills: skills,
+      experience:[...formValues.experience].map(v => {
+        delete v.logoUrl;
+        if (v.logoUid === 0 || v.logoUid === null) {
+          delete v.logoUid
+        }
+
+        if(v.endDate === null) {
+          delete v.endDate
+        }
+
+        return v
+      }),
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
     };
@@ -534,7 +578,7 @@ export function EditMemberModal({
         }
         setSaveCompleted(false);
         setErrors([]);
-        const { basicFormErrors, skillFormErrors, errors } = validateForm(
+        const { basicFormErrors, skillFormErrors, experienceFormErrors,  errors } = validateForm(
           formValues,
           imageUrl,
           isProfileSettings
@@ -552,6 +596,7 @@ export function EditMemberModal({
           setErrors(errors);
           setBasicErrors(basicFormErrors);
           setSkillErrors(skillFormErrors);
+          setExperienceErrors(experienceFormErrors)
           setIsErrorPopupOpen(true);
           return false;
         }
@@ -631,8 +676,8 @@ export function EditMemberModal({
                 {}
               );
             }
-            dispatch({type: 'SET_PREFERENCE', 
-              payload: { 
+            dispatch({type: 'SET_PREFERENCE',
+              payload: {
                 ...values.preferences,
                 email: values.email != "" ? true : false,
                 github: values.githubHandler != "" ? true : false,
@@ -837,6 +882,15 @@ export function EditMemberModal({
                     onClick={() => onTabClicked(3)}
                   >
                     {' '}
+                    EXPERIENCE{' '}
+                  </button>
+                  <button
+                    className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
+                      openTab == 4 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                    }`}
+                    onClick={() => onTabClicked(4)}
+                  >
+                    {' '}
                     SOCIAL{' '}
                   </button>
                 </div>
@@ -858,7 +912,7 @@ export function EditMemberModal({
                   </PreferenceModal>
               </>
               }
-              <div className="mt-3 w-full rounded-md border bg-white  px-6 py-10">
+              <div className="mt-3 w-full relative rounded-md border bg-white  px-6 py-10">
                 {
                   <Fragment>
                     <div className={openTab === 1 ? 'block' : 'hidden'}>
@@ -896,6 +950,13 @@ export function EditMemberModal({
                       />
                     </div>
                     <div className={openTab === 3 ? 'block' : 'hidden'}>
+                      <AddMemberExperience
+                        formValues={formValues}
+                        onChange={handleInputChange}
+                        experienceErrors={expErrors}
+                      />
+                    </div>
+                    <div className={openTab === 4 ? 'block' : 'hidden'}>
                       <AddMemberSocialForm
                         formValues={formValues}
                         onChange={handleInputChange}

@@ -309,7 +309,8 @@ export class ParticipantsRequestService {
     dataToSave['moreDetails'] = dataToProcess.moreDetails;
     dataToSave['plnStartDate'] = dataToProcess.plnStartDate;
     dataToSave['openToWork'] = dataToProcess.openToWork;
-    dataToSave['experience'] = dataToProcess.experience;
+    //dataToSave['experience'] = dataToProcess.experience;
+
     // Team member roles relational mapping
     dataToSave['teamMemberRoles'] = {
       createMany: {
@@ -321,13 +322,17 @@ export class ParticipantsRequestService {
             teamUid: t.teamUid,
           };
         }),
-      },      
-    };
-    dataToSave['experience'] = {
-      createMany: {
-        data: dataToProcess.experience
       },
     };
+
+    // Save Experience if available
+    if(dataToProcess.experience && Array.isArray(dataToProcess.experience) && dataToProcess.experience.length > 0) {
+      dataToSave['experience'] = {
+        createMany: {
+          data: dataToProcess.experience
+        },
+      };
+    }
 
     // Skills relation mapping
     dataToSave['skills'] = {
@@ -424,6 +429,7 @@ export class ParticipantsRequestService {
         skills: true,
         teamMemberRoles: true,
         memberRoles: true,
+        experience: true
       },
     });
     const dataToProcess = dataFromDB?.newData;
@@ -639,24 +645,21 @@ export class ParticipantsRequestService {
       }),
     });
 
-    let expToCreate: any = [];
-    let expIdsTodelete:any = [];
-    let expIdsToUpdate:any = [];
-    
-    let expIds = dataToSave.experience?.map(exp => {
-      if (!exp.uid) {
-        expToCreate.push(exp);
-      }
-      return exp.uid;
-    }); 
-    
-    dataFromDB.experience?.map((exp:any)=> {
+    const expToCreate: any = [...dataToProcess.experience].filter(exp => !exp.uid)
+    const expIdsTodelete:any = [];
+    const expIdsToUpdate:any = [];
+
+
+    const expIds = [...dataToProcess.experience].filter(exp => exp.uid).map(v => v.uid);
+
+    existingData.experience?.map((exp:any)=> {
       if(!expIds.includes(exp.uid)) {
-        expIdsTodelete.push(exp.uid);  
+        expIdsTodelete.push(exp.uid);
       } else {
-        expIdsToUpdate.push(exp);
+        expIdsToUpdate.push(exp.uid);
       }
     });
+
 
     const experienceToDelete = expIdsTodelete.map((uid) =>
       tx.experience.delete({
@@ -666,7 +669,8 @@ export class ParticipantsRequestService {
       })
     );
 
-    const experienceToUpdate = expIdsToUpdate.map((exp) =>
+    const expsToUpdate = dataToProcess.experience.filter(v => expIdsToUpdate.includes(v.uid))
+    const experienceToUpdate = expsToUpdate.map((exp) =>
       tx.experience.update({
         where: {
           uid: exp.uid
