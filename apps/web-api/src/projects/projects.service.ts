@@ -15,7 +15,7 @@ export class ProjectsService {
   async createProject(project: Prisma.ProjectUncheckedCreateInput, userEmail: string) {
     try {
       const member:any = await this.getMemberInfo(userEmail);
-      await this.checkTeamLead(member, project.teamUid);
+      await this.checkDirectoryAdminOrTeamLead(member, project.teamUid);
       project.createdBy = member.uid;
       return await this.prisma.project.create({
         data: project
@@ -32,7 +32,7 @@ export class ProjectsService {
   ) {
     try {
       const member:any = await this.getMemberInfo(userEmail);
-      await this.checkTeamLead(member, project.teamUid);
+      await this.checkDirectoryAdminOrTeamLead(member, project.teamUid);
       return await this.prisma.project.update({
         where: {
           uid,
@@ -111,7 +111,10 @@ export class ProjectsService {
     return await this.memberService.findMemberByEmail(memberEmail)
   };
 
-  async checkTeamLead(member, teamUid) {
+  async checkDirectoryAdminOrTeamLead(member, teamUid) {
+    if (this.memberService.checkIfAdminUser(member)) {
+      return true;
+    }
     const res = await this.memberService.isMemberLeadTeam(member, teamUid);
     if (res) {
       return res;

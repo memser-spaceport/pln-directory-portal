@@ -25,6 +25,7 @@ import axios from 'axios';
 import { EmailOtpService } from '../otp/email-otp.service';
 import { AuthService } from '../auth/auth.service';
 import { LogService } from '../shared/log.service';
+import { DIRECTORYADMIN } from '../utils/constants';
 @Injectable()
 export class MembersService {
   constructor(
@@ -477,4 +478,11 @@ export class MembersService {
     }  
     return false;
   }
+
+  checkIfAdminUser = (member) => {
+    const roleFilter = member.memberRoles.filter((roles) => {
+      return roles.name === DIRECTORYADMIN;
+    });
+    return roleFilter.length > 0;
+  };
 }
