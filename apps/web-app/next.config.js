@@ -11,7 +11,8 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
  **/
 let nextConfig = {
   env: {
-    AUTH_API_URL: process.env.AUTH_API_URL
+    AUTH_API_URL: process.env.AUTH_API_URL,
+    COOKIE_DOMAIN: process.env.COOKIE_DOMAIN
   },
   nx: {
     // Set this to true if you would like to to use SVGR
