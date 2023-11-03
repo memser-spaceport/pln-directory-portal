@@ -24,7 +24,7 @@ function MemberExperience(props) {
                     {experiences.map((exp, expIndex) => <div key={`exp-${expIndex}`} className="border-[1px] border-solid border-[#E2E8F0] border-t-0 border-l-0 border-r-0 p-[16px]">
                         <div className="flex gap-[16px]">
                             <div>
-                                <img src={exp.companyLogo ? exp.companyLogo : '/assets/images/icons/company-logo-default.svg'} />
+                                <img className="w-[40px] h-[40px] object-contain" src={exp?.companyLogo?.url ? exp.companyLogo.url : '/assets/images/icons/company-logo-default.svg'} />
                             </div>
                             <div>
                                 <p className="text-[14px] text-[#0F172A] font-[600]">{exp.title}</p>

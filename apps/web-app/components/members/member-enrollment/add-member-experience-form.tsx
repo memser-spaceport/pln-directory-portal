@@ -80,7 +80,6 @@ function AddMemberExperienceForm(props) {
               },
             };
 
-          console.log("calling api")
           const imageResponse = await api.post(`/v1/images`, formData, config);
           const result = imageResponse.data.image;
           onItemChange(expIndex, 'logoUid', result.uid);
@@ -146,7 +145,7 @@ function AddMemberExperienceForm(props) {
                         </div>}
                         <div className="flex-1">
                             <label className="text-[14px] font-[600]">Company Name*</label>
-                            <input placeholder="Ex: Microsoft" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" type="text" value={exp.companyName} onChange={(e) => onItemChange(expIndex, 'companyName', e.target.value)} />
+                            <input maxLength={100} placeholder="Ex: Microsoft" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" type="text" value={exp.companyName} onChange={(e) => onItemChange(expIndex, 'companyName', e.target.value)} />
                         </div>
                     </div>
                     <div className="mt-8px flex gap-[8px]">
@@ -158,7 +157,7 @@ function AddMemberExperienceForm(props) {
                     {/********************************   TITLE   ***********************************/}
                     <div className="my-[20px]">
                         <label className="text-[14px] font-[600]">Title*</label>
-                        <input placeholder="Ex: Senior Architect" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" type="text" value={exp.title} onChange={(e) => onItemChange(expIndex, 'title', e.target.value)} />
+                        <input maxLength={100} placeholder="Ex: Senior Architect" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" type="text" value={exp.title} onChange={(e) => onItemChange(expIndex, 'title', e.target.value)} />
                     </div>
 
 
@@ -191,7 +190,7 @@ function AddMemberExperienceForm(props) {
                     {/********************************   DESCRIPTION   ***********************************/}
                     <div className="mt-[20px]">
                         <label className="text-[14px] font-[600]">Description</label>
-                        <textarea rows={5} ref={descriptionRef} placeholder="" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" value={exp.description} onChange={(e) => onItemChange(expIndex, 'description', e.target.value)} />
+                        <textarea rows={5} maxLength={2000} ref={descriptionRef} placeholder="" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" value={exp.description} onChange={(e) => onItemChange(expIndex, 'description', e.target.value)} />
                         {descriptionRef.current && <p className="text-[#475569] font-[500] text-[12px]">{`${descriptionRef?.current?.value?.length} of 2000 characters used`}</p>}
                     </div>
                 </div>}
