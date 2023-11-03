@@ -5,7 +5,7 @@ export const ExperienceSchema = z.object({
     title: z.string(),
     currentTeam: z.boolean(),
     startDate: z.string(),
-    endDate: z.string().optional(),
+    endDate: z.string().optional().nullable(),
     description: z.string().optional(),
     memberUid: z.string().optional(),
     uid: z.string().optional()
