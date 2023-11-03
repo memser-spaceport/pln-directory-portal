@@ -241,7 +241,7 @@ model Experience {
   title       String
   currentTeam Boolean  @default(false)
   startDate   DateTime
-  endDate     DateTime
+  endDate     DateTime?
   description String?
   memberUid   String
   member      Member?  @relation(fields: [memberUid], references: [uid])

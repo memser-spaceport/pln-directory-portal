@@ -93,6 +93,7 @@ export const parseMember = (member: TMemberResponse,): IMember => {
     location,
     skills: member.skills || [],
     teamLead,
+    experience: member.experience,
     teams,
     mainTeam,
     openToWork: member.openToWork || false,

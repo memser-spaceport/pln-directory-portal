@@ -77,14 +77,14 @@ function validateSkillForm(formValues) {
 
 function validateExperienceForm(fValues) {
   const formErrors = []
-  const exps = fValues.experiences;
+  const exps = fValues.experience;
   exps.forEach((exp, expIndex) => {
-    console.log(exp.startDate.getTime(), exp.endDate.getTime())
+
     if(exp.companyName.trim() === '') {
       formErrors.push({id: expIndex, field: 'companyName', error: "Company Name is Mandatory"})
     } if(exp.title.trim() === '') {
       formErrors.push({id: expIndex, field: 'title', error: "Title is Mandatory"})
-    } if(exp.startDate.getTime() >= exp.endDate.getTime()) {
+    } if(exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
       formErrors.push({id: expIndex, field: 'date', error: "To Date cannot be less than start date"})
     }
   })
@@ -254,7 +254,7 @@ export function AddMemberModal({
     comments: '',
     teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
     skills: [],
-    experiences: [],
+    experience: [],
     openToWork: false,
   });
 
@@ -301,7 +301,7 @@ export function AddMemberModal({
       comments: '',
       teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
       skills: [],
-      experiences: [],
+      experience: [],
       openToWork: false,
     });
   }
@@ -387,6 +387,16 @@ export function AddMemberModal({
         }
       );
       const values = formatData();
+      values.experience = [...values.experience].map(v => {
+        delete v.logoUrl;
+        if (v.logoUid === 0) {
+          delete v.logoUid
+        }
+        if(v.endDate === null) {
+          delete v.endDate
+        }
+        return v
+      })
       try {
         // const captchaToken = await executeRecaptcha();
 

@@ -105,6 +105,22 @@ function validateSkillForm(formValues) {
   return errors;
 }
 
+function validateExperienceForm(fValues) {
+  const formErrors = []
+  const exps = fValues.experience;
+  exps.forEach((exp, expIndex) => {
+    if(exp.companyName.trim() === '') {
+      formErrors.push({id: expIndex, field: 'companyName', error: "Company Name is Mandatory"})
+    } if(exp.title.trim() === '') {
+      formErrors.push({id: expIndex, field: 'title', error: "Title is Mandatory"})
+    } if(exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
+      formErrors.push({id: expIndex, field: 'date', error: "To Date cannot be less than start date"})
+    }
+  })
+
+  return formErrors
+}
+
 function validateForm(formValues, imageUrl, isProfileSettings) {
   let errors = [];
   const basicFormErrors = validateBasicForm(
@@ -119,9 +135,16 @@ function validateForm(formValues, imageUrl, isProfileSettings) {
   if (skillFormErrors.length) {
     errors = [...errors, ...skillFormErrors];
   }
+
+  const experienceFormErrors = validateExperienceForm(formValues);
+  if(experienceFormErrors.length > 0) {
+    errors.push("Please review experience details")
+  }
+
   return {
     basicFormErrors,
     skillFormErrors,
+    experienceFormErrors,
     errors,
   };
 }
@@ -192,6 +215,7 @@ export function EditMemberModal({
   const [isErrorPopupOpen, setIsErrorPopupOpen] = useState(false);
   const [basicErrors, setBasicErrors] = useState([]);
   const [skillErrors, setSkillErrors] = useState([]);
+  const [expErrors, setExperienceErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({});
   const [imageUrl, setImageUrl] = useState<string>();
   const [emailExists, setEmailExists] = useState<boolean>(false);
@@ -226,7 +250,7 @@ export function EditMemberModal({
     comments: '',
     teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
     skills: [],
-    experiences: [],
+    experience: [],
     openToWork: false,
     preferences: JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))
   });
@@ -322,7 +346,6 @@ export function EditMemberModal({
       .then((data) => {
         const member = data[0];
         let counter = 1;
-
         let teamAndRoles = member?.teamMemberRoles?.length
           ? member.teamMemberRoles
           : [];
@@ -367,7 +390,11 @@ export function EditMemberModal({
           skills: member?.skills?.map((item) => {
             return { value: item.uid, label: item.title };
           }),
-          experiences: [],
+          experience: member?.experience.map(exp => {
+            exp.startDate = new Date(exp.startDate);
+            exp.endDate = new Date(exp.endDate);
+            return exp;
+          }),
           preferences: member?.preferences ?? JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))
         };
         // set requestor email
@@ -450,7 +477,7 @@ export function EditMemberModal({
       comments: '',
       teamAndRoles: [],
       skills: [],
-      experiences: [],
+      experience: [],
       openToWork: false,
     });
   }
@@ -503,7 +530,18 @@ export function EditMemberModal({
         ? new Date(formValues.plnStartDate)?.toISOString()
         : null,
       skills: skills,
-      experiences: [],
+      experience:[...formValues.experience].map(v => {
+        delete v.logoUrl;
+        if (v.logoUid === 0 || v.logoUid === null) {
+          delete v.logoUid
+        }
+
+        if(v.endDate === null) {
+          delete v.endDate
+        }
+
+        return v
+      }),
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
     };
@@ -540,7 +578,7 @@ export function EditMemberModal({
         }
         setSaveCompleted(false);
         setErrors([]);
-        const { basicFormErrors, skillFormErrors, errors } = validateForm(
+        const { basicFormErrors, skillFormErrors, experienceFormErrors,  errors } = validateForm(
           formValues,
           imageUrl,
           isProfileSettings
@@ -558,6 +596,7 @@ export function EditMemberModal({
           setErrors(errors);
           setBasicErrors(basicFormErrors);
           setSkillErrors(skillFormErrors);
+          setExperienceErrors(experienceFormErrors)
           setIsErrorPopupOpen(true);
           return false;
         }
@@ -914,6 +953,7 @@ export function EditMemberModal({
                       <AddMemberExperience
                         formValues={formValues}
                         onChange={handleInputChange}
+                        experienceErrors={expErrors}
                       />
                     </div>
                     <div className={openTab === 4 ? 'block' : 'hidden'}>

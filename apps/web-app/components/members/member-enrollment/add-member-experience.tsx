@@ -6,7 +6,7 @@ import { LoadingIndicator } from "../../shared/loading-indicator/loading-indicat
 function AddMemberExperience(props) {
     const errors = props.experienceErrors ?? [];
     const formValues = props.formValues;
-    const experiences = formValues.experiences;
+    const experiences = formValues.experience;
     const currentCompaniesCount = experiences.filter(v => v.currentTeam === true).length;
     const onChange = props.onChange;
    // const [experiences, setExperiences] = useState([]);
@@ -37,7 +37,7 @@ function AddMemberExperience(props) {
         const newExp = [...experiences];
         newExp.push(defaultValues);
         setExpandedId(newExp.length - 1)
-        onChange({ target: { name: 'experiences', value: newExp } })
+        onChange({ target: { name: 'experience', value: newExp } })
     }
 
     const onDeleteExperience = (index) => {
@@ -47,7 +47,7 @@ function AddMemberExperience(props) {
         const newExp = [...experiences];
         newExp.splice(index, 1);
         console.log(index, newExp)
-        onChange({ target: { name: 'experiences', value: newExp } });
+        onChange({ target: { name: 'experience', value: newExp } });
     }
 
     const onItemChange = (index, key, value) => {
@@ -58,7 +58,7 @@ function AddMemberExperience(props) {
        } else if (key === 'currentTeam' && value === true) {
           newExp[index].endDate = null;
        }
-       onChange({ target: { name: 'experiences', value: [...newExp] } })
+       onChange({ target: { name: 'experience', value: [...newExp] } })
     }
 
     useEffect(() => {

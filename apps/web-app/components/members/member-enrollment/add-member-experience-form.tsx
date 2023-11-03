@@ -31,10 +31,10 @@ function AddMemberExperienceForm(props) {
         'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'
     ];
-    const startMonthIndex = monthNames.indexOf(exp.startDate.toLocaleDateString(undefined, { month: 'long' }))
-    const endMonthIndex = monthNames.indexOf(exp.endDate?.toLocaleDateString(undefined, { month: 'long' }))
-    const selectedStartYear = {label: `${exp.startDate.getFullYear()}`, value: `${exp.startDate.getFullYear()}`}
-    const selectedEndyear = {label: `${exp.endDate?.getFullYear()}`, value: `${exp.endDate?.getFullYear()}`}
+    const startMonthIndex = monthNames.indexOf(new Date(exp.startDate).toLocaleDateString(undefined, { month: 'long' }))
+    const endMonthIndex = monthNames.indexOf(new Date(exp.endDate).toLocaleDateString(undefined, { month: 'long' }))
+    const selectedStartYear = {label: `${new Date(exp.startDate).getFullYear()}`, value: `${new Date(exp.startDate).getFullYear()}`}
+    const selectedEndyear = {label: `${new Date(exp.endDate).getFullYear()}`, value: `${new Date(exp.endDate).getFullYear()}`}
 
     const getMonths = () => {
         return [...monthNames].map(m => {
@@ -192,7 +192,7 @@ function AddMemberExperienceForm(props) {
                     <div className="mt-[20px]">
                         <label className="text-[14px] font-[600]">Description</label>
                         <textarea rows={5} ref={descriptionRef} placeholder="" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" value={exp.description} onChange={(e) => onItemChange(expIndex, 'description', e.target.value)} />
-                        {descriptionRef.current && <p className="text-[#475569] font-[500] text-[12px]">{`${descriptionRef?.current?.value?.length} of 400 characters used`}</p>}
+                        {descriptionRef.current && <p className="text-[#475569] font-[500] text-[12px]">{`${descriptionRef?.current?.value?.length} of 2000 characters used`}</p>}
                     </div>
                 </div>}
 
