@@ -43,7 +43,6 @@ export class ProjectsController {
   
   @Api(server.route.getProjects)
   @ApiOkResponseFromZod(ResponseProjectWithRelationsSchema.array())
-  @NoCache()
   async findAll(@Req() req) {
     const queryableFields = prismaQueryableFieldsFromZod(
       ResponseProjectWithRelationsSchema
@@ -57,7 +56,6 @@ export class ProjectsController {
   @Api(server.route.getProject)
   @ApiParam({ name: 'uid', type: 'string' })
   @ApiOkResponseFromZod(ResponseProjectWithRelationsSchema)
-  @NoCache()
   async findOne(
     @ApiDecorator() { params: { uid } }: RouteShape['getProject']
   ) {
@@ -66,5 +64,14 @@ export class ProjectsController {
       throw new NotFoundException(`Project not found with uid: ${uid}.`);
     }
     return project;
+  }
+
+  @Api(server.route.removeProject)
+  @UsePipes(ZodValidationPipe)
+  @UseGuards(UserTokenValidation)
+  remove(@Param('uid') uid: string,
+    @Req() request
+  ) {
+    return this.projectsService.removeProjectByUid(uid, request.userEmail);
   }
 }

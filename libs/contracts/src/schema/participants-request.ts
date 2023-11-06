@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ExperienceSchema } from './experience';
+import { ProjectContributionSchema } from './project-contribution';
 
 export const statusEnum = z.enum(['PENDING', 'APPROVED', 'REJECTED']);
 export const participantTypeEnum = z.enum(['MEMBER', 'TEAM']);
@@ -47,7 +47,7 @@ const newDataMemberSchema = z.object({
   officeHours: z.string().optional().nullable(),
   imageUid: z.string().optional().nullable(),
   moreDetails: z.string().optional().nullable(),
-  experience:  z.array(ExperienceSchema).optional()
+  projectContributions:  z.array(ProjectContributionSchema).optional()
 });
 
 const newDataTeamSchema = z.object({

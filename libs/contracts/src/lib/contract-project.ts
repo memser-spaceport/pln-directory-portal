@@ -42,5 +42,14 @@ export const apiProjects = contract.router({
       200: contract.response<unknown>(),
     },
     summary: 'Modify a project',
+  },
+  removeProject: {
+    method: 'DELETE',
+    path: `${getAPIVersionAsPath('1')}/projects/:uid`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Remove a project',
   }
 });

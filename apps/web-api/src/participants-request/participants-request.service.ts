@@ -309,7 +309,6 @@ export class ParticipantsRequestService {
     dataToSave['moreDetails'] = dataToProcess.moreDetails;
     dataToSave['plnStartDate'] = dataToProcess.plnStartDate;
     dataToSave['openToWork'] = dataToProcess.openToWork;
-    //dataToSave['experience'] = dataToProcess.experience;
 
     // Team member roles relational mapping
     dataToSave['teamMemberRoles'] = {
@@ -326,10 +325,11 @@ export class ParticipantsRequestService {
     };
 
     // Save Experience if available
-    if(dataToProcess.experience && Array.isArray(dataToProcess.experience) && dataToProcess.experience.length > 0) {
-      dataToSave['experience'] = {
+    if(Array.isArray(dataToProcess.projectContributions) 
+      && dataToProcess.projectContributions?.length > 0) {
+      dataToSave['projectContributions'] = {
         createMany: {
-          data: dataToProcess.experience
+          data: dataToProcess.projectContributions
         },
       };
     }
@@ -429,7 +429,7 @@ export class ParticipantsRequestService {
         skills: true,
         teamMemberRoles: true,
         memberRoles: true,
-        experience: true
+        projectContributions: true
       },
     });
     const dataToProcess = dataFromDB?.newData;
@@ -645,48 +645,46 @@ export class ParticipantsRequestService {
       }),
     });
 
-    const expToCreate: any = [...dataToProcess.experience].filter(exp => !exp.uid)
-    const expIdsTodelete:any = [];
-    const expIdsToUpdate:any = [];
+    const contributionsToCreate: any = dataToProcess.projectContributions
+      ?.filter(contribution => !contribution.uid);
+    const contributionIdsToDelete:any = [];
+    const contributionIdsToUpdate:any = [];
+    const contributionIds = dataToProcess.projectContributions
+      ?.filter(contribution => contribution.uid).map(contribution => contribution.uid);
 
-
-    const expIds = [...dataToProcess.experience].filter(exp => exp.uid).map(v => v.uid);
-
-    existingData.experience?.map((exp:any)=> {
-      if(!expIds.includes(exp.uid)) {
-        expIdsTodelete.push(exp.uid);
+    existingData.projectContributions?.map((contribution:any)=> {
+      if(!contributionIds.includes(contribution.uid)) {
+        contributionIdsToDelete.push(contribution.uid);
       } else {
-        expIdsToUpdate.push(exp.uid);
+        contributionIdsToUpdate.push(contribution.uid);
       }
     });
 
-
-    const experienceToDelete = expIdsTodelete.map((uid) =>
-      tx.experience.delete({
+    const contributionToDelete = contributionIdsToDelete.map((uid) =>
+      tx.projectContribution.delete({
         where: {
           uid
         }
       })
     );
-
-    const expsToUpdate = dataToProcess.experience.filter(v => expIdsToUpdate.includes(v.uid))
-    const experienceToUpdate = expsToUpdate.map((exp) =>
-      tx.experience.update({
+    const contributions = dataToProcess.projectContributions.
+      filter(contribution => contributionIdsToUpdate.includes(contribution.uid));
+    const contributionsToUpdate = contributions.map((contribution) =>
+      tx.projectContribution.update({
         where: {
-          uid: exp.uid
+          uid: contribution.uid
         },
         data: {
-          ...exp
+          ...contribution
         }
       })
     );
-    await Promise.all(experienceToDelete);
-    await Promise.all(experienceToUpdate);
-
-    await tx.experience.createMany({
-      data: expToCreate.map((exp) => {
-        exp.memberUid = dataFromDB.referenceUid;
-        return exp;
+    await Promise.all(contributionToDelete);
+    await Promise.all(contributionsToUpdate);
+    await tx.projectContribution.createMany({
+      data: contributionsToCreate.map((contribution) => {
+        contribution.memberUid = dataFromDB.referenceUid;
+        return contribution;
       }),
     });
 
