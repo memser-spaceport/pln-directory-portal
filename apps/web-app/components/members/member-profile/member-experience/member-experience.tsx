@@ -13,6 +13,44 @@ function MemberExperience(props) {
     const onEditOrAdd  = () => {
         router.push('/directory/settings')
     }
+
+    const dateDifference = (date1, date2) => {
+        // Calculate the time difference in milliseconds
+        const timeDifference = Math.abs(date1 - date2);
+
+        // Helper function to calculate the number of full months between two dates
+        const monthsBetween = (date1, date2) => {
+          return (date2.getFullYear() - date1.getFullYear()) * 12 + date2.getMonth() - date1.getMonth();
+        }
+
+        // Calculate the difference in seconds, minutes, months, and years
+        const secondsDifference = Math.floor(timeDifference / 1000);
+        const minutesDifference = Math.floor(secondsDifference / 60);
+        const hoursDifference = Math.floor(minutesDifference / 60);
+        const daysDifference = Math.floor(hoursDifference / 24);
+        const monthsDifference = monthsBetween(date1, date2);
+        const yearsDifference = Math.floor(monthsDifference / 12);
+
+        // Create a human-readable string based on the difference
+        if (yearsDifference >= 1) {
+          if (monthsDifference % 12 !== 0) {
+            return `${yearsDifference} years and ${monthsDifference % 12} months`;
+          } else {
+            return `${yearsDifference} years`;
+          }
+        } else if (monthsDifference >= 1) {
+          return `${monthsDifference} months`;
+        } else if (daysDifference >= 1) {
+          return `${daysDifference} days`;
+        } else if (hoursDifference >= 1) {
+          return `${hoursDifference} hours`;
+        } else if (minutesDifference >= 1) {
+          return `${minutesDifference} minutes`;
+        } else {
+          return `${secondsDifference} seconds`;
+        }
+      }
+
     return <>
         <div className="my-[20px]">
             <div className="text-[#64748B] text-[15px] font-[500] flex justify-between">
@@ -33,6 +71,8 @@ function MemberExperience(props) {
                                     <p>{formatDate(exp.startDate)}</p>
                                     {exp.currentTeam && <p>{`- Present`}</p>}
                                     {(!exp.currentTeam && exp.endDate) && <p>{` - ${formatDate(exp.endDate)}`}</p>}
+                                    {exp.endDate && <p>{` (${dateDifference(new Date(exp.startDate), new Date(exp.endDate))})`}</p>}
+                                    {!exp.endDate && <p>{` (${dateDifference(new Date(exp.startDate), new Date())})`}</p>}
                                 </div>
                             </div>
                         </div>

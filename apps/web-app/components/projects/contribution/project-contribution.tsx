@@ -1,24 +1,24 @@
-import { Dropdown, Switch, SingleSelect } from "@protocol-labs-network/ui";
 import { useEffect, useState } from "react";
-import AddMemberExperienceForm from "./add-member-experience-form";
 import { LoadingIndicator } from "../../shared/loading-indicator/loading-indicator";
+import ProjectContributionForm from "./project-contribution-form";
 
-function AddMemberExperience(props) {
-    const errors = props.experienceErrors ?? [];
+function ProjectContribution(props) {
+    const errors = props.contributionErrors ?? [];
     const formValues = props.formValues;
-    const experiences = formValues.experience;
-    const currentCompaniesCount = experiences.filter(v => v.currentTeam === true).length;
+    const contributions = formValues.contributions;
+    const currentProjectsCount = contributions.filter(v => v.currentProject === true).length;
     const onChange = props.onChange;
-   // const [experiences, setExperiences] = useState([]);
+
     const [expandedId, setExpandedId] = useState(-1);
     const [isLoading, setLoaderStatus] = useState(false)
+
     const defaultValues = {
-        companyName: "",
-        logoUrl: "",
-        logoUid: 0,
-        currentTeam: false,
-        title: "",
-        description: "",
+        projectUid: "",
+        projectName: "",
+        projectLogo: "",
+        currentProject: false,
+        contribution: "",
+        role: "",
         startDate: new Date(new Date().getFullYear() - 50, 0),
         endDate: new Date(new Date().getFullYear() - 50, 1)
     }
@@ -33,32 +33,32 @@ function AddMemberExperience(props) {
         })
     }
 
-    const onAddExperience = () => {
-        const newExp = [...experiences];
+    const onAddContribution = () => {
+        const newExp = [...contributions];
         newExp.push(defaultValues);
         setExpandedId(newExp.length - 1)
-        onChange({ target: { name: 'experience', value: newExp } })
+        onChange({ target: { name: 'contributions', value: newExp } })
     }
 
-    const onDeleteExperience = (index) => {
+    const onDeleteContribution = (index) => {
         if(index === expandedId) {
             setExpandedId(-1)
         }
-        const newExp = [...experiences];
+        const newExp = [...contributions];
         newExp.splice(index, 1);
         console.log(index, newExp)
-        onChange({ target: { name: 'experience', value: newExp } });
+        onChange({ target: { name: 'contributions', value: newExp } });
     }
 
     const onItemChange = (index, key, value) => {
-       const newExp =  [...experiences];
+       const newExp =  [...contributions];
        newExp[index][key] = value;
-       if(key === 'currentTeam' && value === false) {
+       if(key === 'currentProject' && value === false) {
           newExp[index].endDate = new Date(new Date().getFullYear() - 50, 0);
-       } else if (key === 'currentTeam' && value === true) {
+       } else if (key === 'currentProject' && value === true) {
           newExp[index].endDate = null;
        }
-       onChange({ target: { name: 'experience', value: [...newExp] } })
+       onChange({ target: { name: 'contributions', value: [...newExp] } })
     }
 
     useEffect(() => {
@@ -68,10 +68,10 @@ function AddMemberExperience(props) {
 
     return <>
         <div className="">
-            {experiences.length === 0 && <div className="w-full p-[8px] flex justify-center">
+            {contributions.length === 0 && <div className="w-full p-[8px] flex justify-center">
                 <div className="border-dashed w-full border-[1px] mt-[20px] bg-[#F1F5F9] border-blue-600 p-[20px] flex flex-row items-center justify-center">
-                    <p className="hidden">{`Total experiences ${experiences.length}`}</p>
-                    <button onClick={onAddExperience} className="flex items-center justify-center">
+                    <p className="hidden">{`Total experiences ${contributions.length}`}</p>
+                    <button onClick={onAddContribution} className="flex items-center justify-center">
                         <img src="/assets/images/icons/add-company-icon.svg" />
                         <span className="text-blue-600 font-[500] text-[13px]" >Click to add Project contributions</span>
                     </button>
@@ -79,10 +79,10 @@ function AddMemberExperience(props) {
                 </div>
             </div>}
             <div className="mb-[32px]">
-                {experiences.map((exp, expIndex) => <AddMemberExperienceForm currentCompaniesCount={currentCompaniesCount} errors={errors} setLoaderStatus={setLoaderStatus} onToggleExpansion={onToggleExpansion} expandedId={expandedId} key={`${expIndex}-exp`} onDeleteExperience={onDeleteExperience} exp={exp} expIndex={expIndex} onItemChange={onItemChange} />)}
+                {contributions.map((exp, expIndex) => <ProjectContributionForm currentProjectsCount={currentProjectsCount} errors={errors} setLoaderStatus={setLoaderStatus} onToggleExpansion={onToggleExpansion} expandedId={expandedId} key={`${expIndex}-exp`} onDeleteContribution={onDeleteContribution} exp={exp} expIndex={expIndex} onItemChange={onItemChange} />)}
             </div>
-            {(experiences.length > 0 ) && <div className="flex justify-start">
-                 {experiences.length <= 6 && <button onClick={onAddExperience} className="flex items-center justify-center text-[14px]">
+            {(contributions.length > 0 ) && <div className="flex justify-start">
+                 {contributions.length <= 6 && <button onClick={onAddContribution} className="flex items-center justify-center text-[14px]">
                     <img className="" src="/assets/images/icons/expand-blue.svg" />
                     <span className="text-blue-600 mx-[4px]">Add Contribution</span>
                 </button>}
@@ -96,4 +96,4 @@ function AddMemberExperience(props) {
     </>
 }
 
-export default AddMemberExperience;
+export default ProjectContribution;

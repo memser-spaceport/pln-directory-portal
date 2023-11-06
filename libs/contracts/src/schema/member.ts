@@ -56,7 +56,7 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   image: ResponseImageWithRelationsSchema.optional(),
   location: LocationResponseSchema.optional(),
   skills: ResponseSkillSchema.array().optional(),
-  teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
+  teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional()
 });
 
 

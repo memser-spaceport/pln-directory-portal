@@ -110,7 +110,6 @@ function AddMemberExperienceForm(props) {
     return <>
         <div key={`${expIndex}-exp`} className="my-[8px]">
             <div className="w-full">
-
                 {/********************************   HEAD   ***********************************/}
                 <div className={`rounded-[4px] ${errors.length === 0 ? 'bg-[#F1F5F9]': 'bg-[#ef44441a]'} ${errors.length > 0 ? 'border-[1px] border-solid border-[#ED6E68]': ''} h-[32px] flex items-center justify-between px-[8px]`}>
                     <div className="flex gap-[10px] mr-[16px]">
@@ -118,11 +117,11 @@ function AddMemberExperienceForm(props) {
                         {expIndex !== expandedId && <img className="cursor-pointer" onClick={() => onToggleExpansion(expIndex)} src="/assets/images/icons/expand-blue.svg" />}
                         <img onClick={() => onDeleteExperience(expIndex)} className="cursor-pointer" src="/assets/images/icons/delete-icon.svg" />
                     </div>
-                    {exp.companyName.trim() === '' && <h2 className="text-[#0F172A] flex-1 font-[600] text-[14px]">{`Company ${expIndex + 1}`}</h2>}
+                    {exp.companyName.trim() === '' && <h2 className="text-[#0F172A] flex-1 font-[600] text-[14px]">{`Project ${expIndex + 1}`}</h2>}
                     {exp.companyName.trim() !== '' && <h2 className="text-[#0F172A] flex-1 font-[600] text-[14px]">{`${exp.companyName.trim()}`}</h2>}
                     <div className="flex flex-row items-center gap-[8px]">
                         <Switch nonEditable={exp.currentTeam === false && currentCompaniesCount === 3} initialValue={exp.currentTeam} onChange={(val) => onItemChange(expIndex, 'currentTeam', val)} key={`${expIndex}-switch`} />
-                        <label className="text-[12px] font-[600]">Current Team</label>
+                        <label className="text-[12px] font-[600]">Current Project</label>
                     </div>
                 </div>
 
@@ -144,8 +143,8 @@ function AddMemberExperienceForm(props) {
                             </div>}
                         </div>}
                         <div className="flex-1">
-                            <label className="text-[14px] font-[600]">Company Name*</label>
-                            <input maxLength={100} placeholder="Ex: Microsoft" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" type="text" value={exp.companyName} onChange={(e) => onItemChange(expIndex, 'companyName', e.target.value)} />
+                            <label className="text-[14px] font-[600]">Project Name*</label>
+                            <input maxLength={100} placeholder="Ex: Filecoin" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" type="text" value={exp.companyName} onChange={(e) => onItemChange(expIndex, 'companyName', e.target.value)} />
                         </div>
                     </div>
                     <div className="mt-8px flex gap-[8px]">
@@ -154,9 +153,9 @@ function AddMemberExperienceForm(props) {
 
                     </div>
 
-                    {/********************************   TITLE   ***********************************/}
+                    {/********************************   ROLE   ***********************************/}
                     <div className="my-[20px]">
-                        <label className="text-[14px] font-[600]">Title*</label>
+                        <label className="text-[14px] font-[600]">Role*</label>
                         <input maxLength={100} placeholder="Ex: Senior Architect" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" type="text" value={exp.title} onChange={(e) => onItemChange(expIndex, 'title', e.target.value)} />
                     </div>
 
@@ -189,7 +188,7 @@ function AddMemberExperienceForm(props) {
 
                     {/********************************   DESCRIPTION   ***********************************/}
                     <div className="mt-[20px]">
-                        <label className="text-[14px] font-[600]">Description</label>
+                        <label className="text-[14px] font-[600]">Contribution</label>
                         <textarea rows={5} maxLength={2000} ref={descriptionRef} placeholder="" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" value={exp.description} onChange={(e) => onItemChange(expIndex, 'description', e.target.value)} />
                         {descriptionRef.current && <p className="text-[#475569] font-[500] text-[12px]">{`${descriptionRef?.current?.value?.length} of 2000 characters used`}</p>}
                     </div>

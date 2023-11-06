@@ -29,7 +29,7 @@ import { ReactComponent as TextImage } from '/public/assets/images/create-member
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
 import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
-import AddMemberExperience from './add-member-experience';
+import ProjectContribution from '../../projects/contribution/project-contribution';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddMemberModalProps {
@@ -40,7 +40,7 @@ interface AddMemberModalProps {
 const steps = [
   { number: 1, name: 'BASIC' },
   { number: 2, name: 'SKILL' },
-  { number: 3, name: 'EXPERIENCE' },
+  { number: 3, name: 'CONTRIBUTIONS' },
   { number: 4, name: 'SOCIAL' },
 ];
 
@@ -75,15 +75,15 @@ function validateSkillForm(formValues) {
   return errors;
 }
 
-function validateExperienceForm(fValues) {
+function validateContributionForm(fValues) {
   const formErrors = []
-  const exps = fValues.experience;
+  const exps = fValues.contributions;
   exps.forEach((exp, expIndex) => {
 
-    if(exp.companyName.trim() === '') {
-      formErrors.push({id: expIndex, field: 'companyName', error: "Company Name is Mandatory"})
-    } if(exp.title.trim() === '') {
-      formErrors.push({id: expIndex, field: 'title', error: "Title is Mandatory"})
+    if(exp.projectName.trim() === '') {
+      formErrors.push({id: expIndex, field: 'projectName', error: "Project name is mandatory"})
+    } if(exp.role.trim() === '') {
+      formErrors.push({id: expIndex, field: 'role', error: "Role is Mandatory"})
     } if(exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
       formErrors.push({id: expIndex, field: 'date', error: "To Date cannot be less than start date"})
     }
@@ -102,7 +102,7 @@ function validateForm(formValues, formStep) {
       errors = validateSkillForm(formValues);
       return errors;
     case 3:
-      errors = validateExperienceForm(formValues);
+      errors = validateContributionForm(formValues);
       return errors;
 
   }
@@ -113,7 +113,7 @@ function handleNextClick(
   formStep,
   setFormStep,
   setErrors,
-  setExperienceErrors,
+  setContributionErrors,
   emailExists,
   divRef,
   analytics
@@ -126,7 +126,7 @@ function handleNextClick(
   }
   if (errors?.length > 0 || emailExists) {
     if(formStep === 3) {
-      setExperienceErrors(errors)
+      setContributionErrors(errors)
       setErrors(["There are fields that require your attention. Please review the fields below."]);
       return false;
     } else {
@@ -135,7 +135,7 @@ function handleNextClick(
     }
 
   }
-  setExperienceErrors([])
+  setContributionErrors([])
   analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_JOIN_NETWORK_FORM_STEPS, {
     itemName: steps[formStep - 1].name,
   });
@@ -150,7 +150,7 @@ function getSubmitOrNextButton(
   setFormStep,
   handleSubmit,
   setErrors,
-  setExperienceErrors,
+  setContributionErrors,
   isProcessing,
   emailExists,
   disableNext,
@@ -182,7 +182,7 @@ function getSubmitOrNextButton(
             formStep,
             setFormStep,
             setErrors,
-            setExperienceErrors,
+            setContributionErrors,
             emailExists,
             divRef,
             analytics
@@ -229,7 +229,7 @@ export function AddMemberModal({
 }: AddMemberModalProps) {
   const [formStep, setFormStep] = useState<number>(1);
   const [errors, setErrors] = useState([]);
-  const [experienceErrors, setExperienceErrors] = useState([]);
+  const [contributionErrors, setContributionErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({});
   const [emailExists, setEmailExists] = useState<boolean>(false);
   const [imageUrl, setImageUrl] = useState<string>();
@@ -254,7 +254,7 @@ export function AddMemberModal({
     comments: '',
     teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
     skills: [],
-    experience: [],
+    contributions: [],
     openToWork: false,
   });
 
@@ -301,7 +301,7 @@ export function AddMemberModal({
       comments: '',
       teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
       skills: [],
-      experience: [],
+      contributions: [],
       openToWork: false,
     });
   }
@@ -387,14 +387,7 @@ export function AddMemberModal({
         }
       );
       const values = formatData();
-      values.experience = [...values.experience].map(v => {
-        delete v.logoUrl;
-        if (v.logoUid === 0) {
-          delete v.logoUid
-        }
-        if(v.endDate === null) {
-          delete v.endDate
-        }
+      values.contributions = [...values.contributions].map(v => {
         return v
       })
       try {
@@ -539,11 +532,11 @@ export function AddMemberModal({
         );
       case 3:
         return (
-          <AddMemberExperience
+          <ProjectContribution
             formValues={formValues}
             onChange={handleInputChange}
-            experienceErrors={experienceErrors}
-            setExperienceErrors={setExperienceErrors}
+            contributionErrors={contributionErrors}
+            setContributionErrors={setContributionErrors}
           />
         );
         case 4:
@@ -626,7 +619,7 @@ export function AddMemberModal({
                   setFormStep,
                   handleSubmit,
                   setErrors,
-                  setExperienceErrors,
+                  setContributionErrors,
                   isProcessing,
                   emailExists,
                   disableNext,
