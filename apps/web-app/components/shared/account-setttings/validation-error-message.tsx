@@ -75,6 +75,14 @@ export function ValidationErrorMessages({
                       ))}
                     </ul>
                   </div>
+                  { errors?.contribution?.length > 0 &&  <div className="w-full text-base mt-2 font-semibold"> Contribution </div>}
+                  <div className="w-full rounded-lg bg-white px-5 py-2">
+                    <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
+                      {errors?.contribution?.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
                   </>):(<>
                     { errors?.basic?.length>0 && <div className="w-full text-base mt-2 font-semibold"> Basic </div>}
                     <div className="w-full rounded-lg bg-white px-5 py-2">
@@ -100,9 +108,10 @@ export function ValidationErrorMessages({
                       ))}
                     </ul>
                   </div>
+
                   </>)
                  }
-                 
+
                   <div className="w-100 mt-6 flex justify-end">
                     <button
                       type="button"

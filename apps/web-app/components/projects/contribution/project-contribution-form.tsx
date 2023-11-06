@@ -1,5 +1,5 @@
 import { SingleSelect, Switch } from "@protocol-labs-network/ui";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import ProjectSelection from "./project-selection";
 
 function ProjectContributionForm(props) {
@@ -56,10 +56,12 @@ function ProjectContributionForm(props) {
     const onProjectSelected = (item) => {
         if(item && item.name) {
             onItemChange(expIndex, 'projectName', item.name);
+            onItemChange(expIndex, 'projectUid', item?.uid)
         onItemChange(expIndex, 'projectLogo', item?.logo?.url)
         } else {
             onItemChange(expIndex, 'projectName', "");
             onItemChange(expIndex, 'projectLogo', "")
+            onItemChange(expIndex, 'projectUid', "");
         }
     }
 
@@ -73,10 +75,10 @@ function ProjectContributionForm(props) {
                         {expIndex !== expandedId && <img className="cursor-pointer" onClick={() => onToggleExpansion(expIndex)} src="/assets/images/icons/arrow-up.svg" />}
                         <img onClick={() => onDeleteContribution(expIndex)} className="cursor-pointer" src="/assets/images/icons/delete-icon.svg" />
                     </div>
-                    {exp.projectName.trim() === '' && <h2 className="text-[#0F172A] flex-1 font-[600] text-[14px]">{`Project ${expIndex + 1}`}</h2>}
-                    {exp.projectName.trim() !== '' && <h2 className="text-[#0F172A] flex-1 font-[600] text-[14px]">{`${exp.projectName.trim()}`}</h2>}
+                    {exp?.projectName.trim() === '' && <h2 className="text-[#0F172A] flex-1 font-[600] text-[14px]">{`Project ${expIndex + 1}`}</h2>}
+                    {exp?.projectName.trim() !== '' && <h2 className="text-[#0F172A] flex-1 font-[600] text-[14px]">{`${exp?.projectName.trim()}`}</h2>}
                     <div className="flex flex-row items-center gap-[8px]">
-                        <Switch nonEditable={exp.currentProject === false && currentProjectsCount === 3} initialValue={exp.currentTeam} onChange={(val) => onItemChange(expIndex, 'currentProject', val)} key={`${expIndex}-switch`} />
+                        <Switch nonEditable={exp.currentProject === false && currentProjectsCount === 5} initialValue={exp.currentProject} onChange={(val) => onItemChange(expIndex, 'currentProject', val)} key={`${expIndex}-switch`} />
                         <label className="text-[12px] font-[600]">Current Project</label>
                     </div>
                 </div>
@@ -89,10 +91,10 @@ function ProjectContributionForm(props) {
                    <div className="flex-1 flex flex-col my-[20px] gap-[12px]">
                             <div className="flex items-center justify-between">
                             <label className="text-[14px] font-[600]">Project Name*</label>
-                            <button className="text-[12px] flex gap-[6px] items-center"><img className="w-[10px]" src="/assets/images/icons/expand-blue.svg"/><span className="text-blue-600">Add New Project</span></button>
+                            <a target="_blank" href="/directory/projects/add" className="text-[12px] flex gap-[6px] items-center"><img className="w-[10px]" src="/assets/images/icons/expand-blue.svg"/><span className="text-blue-600">Add New Project</span></a>
                             </div>
                            {/*  <input maxLength={100} placeholder="Ex: Filecoin" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" type="text" value={exp.companyName} onChange={(e) => onItemChange(expIndex, 'companyName', e.target.value)} /> */}
-                            <ProjectSelection onProjectSelected={onProjectSelected}/>
+                            <ProjectSelection selectedProj={exp?.project} onProjectSelected={onProjectSelected}/>
                         </div>
 
 
@@ -129,7 +131,7 @@ function ProjectContributionForm(props) {
                     {/********************************   DESCRIPTION   ***********************************/}
                     <div className="mt-[20px]">
                         <label className="text-[14px] font-[600]">Description</label>
-                        <textarea rows={5} maxLength={2000} ref={descriptionRef} placeholder="" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" value={exp.description} onChange={(e) => onItemChange(expIndex, 'contribution', e.target.value)} />
+                        <textarea rows={5} maxLength={2000} ref={descriptionRef} placeholder="" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" value={exp.description} onChange={(e) => onItemChange(expIndex, 'description', e.target.value)} />
                         {descriptionRef.current && <p className="text-[#475569] font-[500] text-[12px]">{`${descriptionRef?.current?.value?.length} of 2000 characters used`}</p>}
                     </div>
                 </div>}

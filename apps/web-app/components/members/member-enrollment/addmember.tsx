@@ -77,7 +77,7 @@ function validateSkillForm(formValues) {
 
 function validateContributionForm(fValues) {
   const formErrors = []
-  const exps = fValues.contributions;
+  const exps = fValues.projectContributions;
   exps.forEach((exp, expIndex) => {
 
     if(exp.projectName.trim() === '') {
@@ -254,7 +254,7 @@ export function AddMemberModal({
     comments: '',
     teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
     skills: [],
-    contributions: [],
+    projectContributions: [],
     openToWork: false,
   });
 
@@ -301,7 +301,7 @@ export function AddMemberModal({
       comments: '',
       teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
       skills: [],
-      contributions: [],
+      projectContributions: [],
       openToWork: false,
     });
   }
@@ -387,7 +387,9 @@ export function AddMemberModal({
         }
       );
       const values = formatData();
-      values.contributions = [...values.contributions].map(v => {
+      values.projectContributions = [...values.projectContributions].map(v => {
+        delete v.projectName;
+        delete v.projectLogo;
         return v
       })
       try {

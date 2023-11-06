@@ -2,7 +2,7 @@ import { useRouter } from "next/router";
 import MemberExperienceDescription from "./member-experience-item";
 
 function MemberExperience(props) {
-    const experiences = props.experience ?? [];
+    const experiences = props.contributions ?? [];
     const router = useRouter();
 
     const formatDate = (dateString) => {
@@ -62,15 +62,15 @@ function MemberExperience(props) {
                     {experiences.map((exp, expIndex) => <div key={`exp-${expIndex}`} className="border-[1px] border-solid border-[#E2E8F0] border-t-0 border-l-0 border-r-0 p-[16px]">
                         <div className="flex gap-[16px]">
                             <div>
-                                <img className="w-[40px] h-[40px] object-contain" src={exp?.companyLogo?.url ? exp.companyLogo.url : '/assets/images/icons/company-logo-default.svg'} />
+                                <img className="w-[40px] h-[40px] object-contain" src={exp?.project?.logo?.url ? exp.project?.logo?.url : '/assets/images/icons/company-logo-default.svg'} />
                             </div>
                             <div>
-                                <p className="text-[14px] text-[#0F172A] font-[600]">{exp.title}</p>
-                                <p className="text-[#475569] text-[12px] font-[400]">{exp.companyName}</p>
+                                <p className="text-[14px] text-[#0F172A] font-[600]">{exp.role}</p>
+                                <p className="text-[#475569] text-[12px] font-[400]">{exp?.project?.name}</p>
                                 <div className="text-[#475569] text-[12px] font-[400] flex gap-[5px]">
                                     <p>{formatDate(exp.startDate)}</p>
-                                    {exp.currentTeam && <p>{`- Present`}</p>}
-                                    {(!exp.currentTeam && exp.endDate) && <p>{` - ${formatDate(exp.endDate)}`}</p>}
+                                    {exp.currentProject && <p>{`- Present`}</p>}
+                                    {(!exp.currentProject && exp.endDate) && <p>{` - ${formatDate(exp.endDate)}`}</p>}
                                     {exp.endDate && <p>{` (${dateDifference(new Date(exp.startDate), new Date(exp.endDate))})`}</p>}
                                     {!exp.endDate && <p>{` (${dateDifference(new Date(exp.startDate), new Date())})`}</p>}
                                 </div>

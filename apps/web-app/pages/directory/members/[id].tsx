@@ -113,7 +113,7 @@ export default function Member({
                 member={member}
               />
             )}
-            {userInfo?.uid && <MemberExperience experience={member.experience} />}
+            {userInfo?.uid && <MemberExperience contributions={member.projectContributions} />}
           </div>
         </div>
         {/* <div className="w-sidebar shrink-0">

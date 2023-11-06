@@ -3,6 +3,7 @@ import { findProjectByName } from "apps/web-app/services/projects.service";
 import { useEffect, useRef, useState } from "react"
 
 function ProjectSelection(props) {
+    const selectedProj = props?.selectedProj ?? null
     const inputRef = useRef<HTMLInputElement>(null);
     const [isPaneActive, setPaneStatus] = useState(false);
     const [searchText, setSearchText] = useState("")
@@ -27,8 +28,6 @@ function ProjectSelection(props) {
     useEffect(() => {
         console.log(searchQuery, searchText, selectedItem)
         if (searchQuery !== '') {
-            setPaneStatus(false);
-            setPaneStatus(true)
             setLoadingStatus(true)
             findProjectByName(searchQuery)
                 .then(d => setSearchResult(d))
@@ -36,6 +35,14 @@ function ProjectSelection(props) {
                 .finally(() => setLoadingStatus(false))
         }
     }, [searchQuery, searchText, selectedItem])
+
+    useEffect(() => {
+       if(selectedProj){
+        setSelectedItem(selectedProj)
+        setSearchText(selectedProj.name)
+        inputRef.current.value = selectedProj.name
+       }
+    },[])
 
     return <>
         <div className="relative w-full flex gap-[8px] border-solid border-[1px] border-[#CBD5E1] px-[8px] py-[8px] rounded-[8px]">

@@ -77,6 +77,7 @@ export const MemberRelationalFields = ResponseMemberWithRelationsSchema.pick({
   location: true,
   skills: true,
   teamMemberRoles: true,
+  projectContributions: true
 }).strip();
 
 export const MemberQueryableFields = ResponseMemberSchema.keyof();
