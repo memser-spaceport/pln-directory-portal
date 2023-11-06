@@ -65,7 +65,15 @@ export class MembersService {
             },
           },
         },
-        experience: {include: {companyLogo : true}}
+        projectContributions: {
+          include: {
+            project: {
+              include:{
+                logo: true
+              }
+            }
+          }
+        }
       },
     });
   }
@@ -77,7 +85,7 @@ export class MembersService {
         image: true,
         memberRoles: true,
         teamMemberRoles: true,
-        experience: true
+        projectContributions: true
       },
     });
   }
@@ -89,7 +97,7 @@ export class MembersService {
         image: true,
         memberRoles: true,
         teamMemberRoles: true,
-        experience: true
+        projectContributions: true
       },
     });
   }
@@ -485,4 +493,10 @@ export class MembersService {
     });
     return roleFilter.length > 0;
   };
+
+  async isMemberPartOfTeams(member, teams) {
+    return member.teamMemberRoles.some((role) => {
+      return teams.includes(role.teamUid)
+    });
+  }
 }

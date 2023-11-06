@@ -1,19 +1,19 @@
 import { z } from 'zod';
-export const ExperienceSchema = z.object({
-    companyName: z.string(),
-    logoUid: z.string().optional(),
-    title: z.string(),
-    currentTeam: z.boolean(),
-    startDate: z.string(),
-    endDate: z.string().optional().nullable(),
-    description: z.string().optional(),
-    memberUid: z.string().optional(),
-    uid: z.string().optional()
+
+export const ProjectContributionSchema = z.object({
+  role: z.string(),
+  currentProject: z.boolean(),
+  startDate: z.string(),
+  endDate: z.string().optional().nullable(),
+  description: z.string().optional(),
+  projectUid: z.string(),
+  uid: z.string().optional()
 }).superRefine((data, ctx) => {
-  if(!data.currentTeam && !data.endDate) {
+  
+  if(!data.currentProject && !data.endDate) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'End date should not be null for past experience',
+      message: 'End date should not be null for past contribution',
       fatal: true,
     });
   }
@@ -41,7 +41,6 @@ export const ExperienceSchema = z.object({
       fatal: true,
     });
   }
-
 
   return z.never;
 });

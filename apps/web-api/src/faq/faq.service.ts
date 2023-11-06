@@ -26,6 +26,7 @@ export class FaqService {
         data: {
           email: question.email,
           question: question.question,
+          type: question.type,
           requestIp: requestIP
         }
       });
