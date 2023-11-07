@@ -81,7 +81,7 @@ function MemberExperience(props) {
             <div className="mt-[8px] focus-within:outline-none focus:outline-none focus-visible:outline-none">
                 <div>
                     {contributions.map((exp, expIndex) => <div key={`exp-${expIndex}`} className="mb-[10px] rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)]">
-                        <a href={`/directory/projects/${exp?.project?.uid}`} onClick={() => onProjectClicked(exp?.project)} className="flex gap-[16px] cursor-pointer hover:bg-[#f7fbff] rounded-tl-xl rounded-tr-xl p-[16px] border-[1px] items-center border-solid border-[#E2E8F0] border-t-0 border-l-0 border-r-0">
+                        {!exp?.project?.isDeleted && <a href={`/directory/projects/${exp?.project?.uid}`} onClick={() => onProjectClicked(exp?.project)} className="flex gap-[16px] cursor-pointer hover:bg-[#f7fbff] rounded-tl-xl rounded-tr-xl p-[16px] border-[1px] items-center border-solid border-[#E2E8F0] border-t-0 border-l-0 border-r-0">
                             <div>
                                 <img className="w-[70px] h-[70px] object-contain" src={exp?.project?.logo?.url ? exp.project?.logo?.url : '/assets/images/icons/company-logo-default.svg'} />
                             </div>
@@ -96,7 +96,23 @@ function MemberExperience(props) {
                                     {!exp.endDate && <p>{` (${dateDifference(new Date(exp.startDate), new Date())})`}</p>}
                                 </div>
                             </div>
-                        </a>
+                        </a>}
+                        {exp?.project?.isDeleted && <div title="This project has been deleted" onClick={() => onProjectClicked(exp?.project)} className="flex gap-[16px] rounded-tl-xl rounded-tr-xl p-[16px] border-[1px] items-center border-solid border-[#E2E8F0] border-t-0 border-l-0 border-r-0">
+                            <div>
+                                <img className="w-[70px] h-[70px] object-contain" src={exp?.project?.logo?.url ? exp.project?.logo?.url : '/assets/images/icons/company-logo-default.svg'} />
+                            </div>
+                            <div>
+                                <p className="text-[14px] text-[#0F172A] font-[600]">{exp?.project?.name}</p>
+                                <p className="text-[#475569] text-[12px] font-[400]">{exp?.role}</p>
+                                <div className="text-[#475569] text-[12px] font-[400] flex gap-[5px]">
+                                    <p>{formatDate(exp.startDate)}</p>
+                                    {exp.currentProject && <p>{`- Present`}</p>}
+                                    {(!exp.currentProject && exp.endDate) && <p>{` - ${formatDate(exp.endDate)}`}</p>}
+                                    {exp.endDate && <p>{` (${dateDifference(new Date(exp.startDate), new Date(exp.endDate))})`}</p>}
+                                    {!exp.endDate && <p>{` (${dateDifference(new Date(exp.startDate), new Date())})`}</p>}
+                                </div>
+                            </div>
+                        </div>}
                         {exp?.description !== '' && <div className="p-[16px]">
                            <MemberExperienceDescription desc={exp.description}/>
                         </div>}
