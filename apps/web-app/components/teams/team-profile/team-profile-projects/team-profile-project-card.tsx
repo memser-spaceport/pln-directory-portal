@@ -1,11 +1,13 @@
 import Image from "next/image";
 import { useRouter } from "next/router";
 
-export default function TeamProfileProjectCard({ project }) {
+export default function TeamProfileProjectCard({ project, hasProjectsEditAccess = false }) {
     const router = useRouter();
+
+   
     return (
-        <div className="py-[16px] pl-[16px] pr-[32px] flex cursor-pointer hover:bg-[#F8FAFC] justify-between"
-            onClick={() => { router.push(`/directory/projects/${project.id}`) }}>
+        <div className="py-[16px] pl-[16px] pr-[32px] flex hover:bg-[#F8FAFC] justify-between"
+            >
             <div className="flex ">
                 <div className="relative w-[41px] h-[41px]"><Image src={project.image} alt="project image" width={41} height={41} className="rounded"/></div>
                 <div className="pl-4">
@@ -22,9 +24,24 @@ export default function TeamProfileProjectCard({ project }) {
                     <div className="text-[12px]">{project.tagline}</div>
                 </div>
             </div>
-            <div className="my-auto">
+            <div className="my-auto gap-2 flex">
                 {/* Edit and pin */}
-                <Image src='/assets/images/icons/projects/more-details.svg' alt="project image" width={16} height={16} />
+                {
+                    hasProjectsEditAccess
+                    &&
+                    <div 
+                    className="cursor-pointer"
+                    onClick={() => { router.push(`/directory/projects/edit/${project.id}`) }}
+                    >
+                        <Image src='/assets/images/icons/projects/edit-project.svg' alt="project image" width={24} height={24} />
+                    </div> 
+                }
+                <div
+                    onClick={() => { router.push(`/directory/projects/${project.id}`) }}
+                    className="cursor-pointer"
+                >
+                    <Image src='/assets/images/icons/projects/more-details.svg' alt="project image" width={16} height={16} />
+                </div>
             </div>
         </div>
     )

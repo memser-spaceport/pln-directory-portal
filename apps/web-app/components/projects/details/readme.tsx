@@ -6,7 +6,7 @@ import ProjectsService from 'apps/web-app/services/projects';
 import { useRouter } from 'next/router';
 import Cookies from 'js-cookie';
 
-export default function AdditionalDetails({ project }) {
+export default function AdditionalDetails({ project, userHasEditRights }) {
     const initialReadme = project?.readMe;
     const [isTeamOftheProject, setTeamOftheProject] = useState(false);
     const { query } = useRouter();
@@ -51,7 +51,7 @@ export default function AdditionalDetails({ project }) {
                 </div>
                 {/* Enable edit button only when the corresponding team lead logsin and view */}
                 {
-                    isTeamOftheProject && !showEditor && initialReadme && <div className="px-[16px] py-[8px] text-white bg-[#156FF7] rounded border border-[#156FF7] cursor-pointer" onClick={onEditAction}>
+                    userHasEditRights && !showEditor && initialReadme && <div className="px-[16px] py-[8px] text-white bg-[#156FF7] rounded border border-[#156FF7] cursor-pointer" onClick={onEditAction}>
                         Edit
                     </div>
                 }

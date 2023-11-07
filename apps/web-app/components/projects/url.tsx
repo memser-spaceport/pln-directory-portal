@@ -12,7 +12,7 @@ export default function URLDetails({ onInputChange, urlFieldArray, setURLField }
     const getURLHeader = () => {
         return <div className="flex gap-2 text-sm font-bold">
             <div className="basis-2/6">
-                Project Link Title
+                Project Link Text
             </div>
             <div className="basis-4/6">
                 Project Link
@@ -21,7 +21,7 @@ export default function URLDetails({ onInputChange, urlFieldArray, setURLField }
     }
 
     const addMoreTemplate = () => {
-        return urlFieldArray.length && urlFieldArray.map((field, index) => {
+        return urlFieldArray && urlFieldArray.length && urlFieldArray.map((field, index) => {
             return <React.Fragment key={index}>{getURLTemplate(index, field)}</React.Fragment>
         })
     }
@@ -136,7 +136,7 @@ export default function URLDetails({ onInputChange, urlFieldArray, setURLField }
         <>
             {getURLHeader()}
             {addMoreTemplate()}
-            {urlFieldArray.length < 3 && getAddMoreLinkTemplate()}
+            {urlFieldArray && urlFieldArray.length < 3 && getAddMoreLinkTemplate()}
         </>
     );
 }

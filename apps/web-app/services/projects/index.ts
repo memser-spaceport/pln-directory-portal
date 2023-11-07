@@ -6,7 +6,7 @@ const { getAllFormattedProjects,formatToSave } = ProjectsDataService;
 
 const getTeamsProject = async (uid) => {
     try {
-        const response = await api.get(`/v1/projects?teamUid=${uid}`);
+        const response = await api.get(`/v1/projects?maintainingTeamUid=${uid}`);
         if (response.status === 200) {
 
             const formattedData = getAllFormattedProjects(response.data);
@@ -20,9 +20,9 @@ const getTeamsProject = async (uid) => {
 }
 
 const uploadProjectLogo = async (inputs) => {
-    if (inputs.logoURL) {
+    if (inputs.logoObject) {
         const formData = new FormData();
-        formData.append('file', inputs.logoURL);
+        formData.append('file', inputs.logoObject);
         const config = {
             headers: {
                 'content-type': 'multipart/form-data',
@@ -31,24 +31,36 @@ const uploadProjectLogo = async (inputs) => {
         const imageResponse = await api.post(`/v1/images`, formData, config);
         console.log(imageResponse.data.image);
         return imageResponse.data.image;
+    }else{
+        return null;
     }
 }
 
-const addProject = async (inputs,image,teamuid) => {
-    const data = formatToSave(inputs,image,teamuid);
+const addProject = async (inputs,image) => {
+    const data = formatToSave(inputs,image?.uid);
     const addedResponse = await api.post(`/v1/projects`, data);
     return addedResponse;
 }
 
+const updateProjectDetails = async (inputs, image, uid) => {
+    const data = formatToSave(inputs, image?.uid);
+    console.log(data,'FORMATTEED');
+    
+    const addedResponse = await api.put(`/v1/projects/${uid}`, data);
+    return addedResponse;
+}
+
 const updateProject = async (uid,project) => {
- const updateResponse = await api.put(`/v1/projects/${uid}`,project);
+    const data = formatToSave(project, null);
+ const updateResponse = await api.put(`/v1/projects/${uid}`,data);
  return updateResponse;
 }
 const ProjectsService = {
     getTeamsProject,
     uploadProjectLogo,
     addProject,
-    updateProject
+    updateProject,
+    updateProjectDetails
 }
 
 export default ProjectsService;

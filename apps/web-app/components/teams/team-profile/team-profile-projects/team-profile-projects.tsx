@@ -3,15 +3,15 @@ import TeamProfileProjectCard from "./team-profile-project-card";
 import { useState } from "react";
 import { TeamProfileProjectsModal } from "./team-profile-seeall-popop";
 
-export default function TeamProfileProjects({ projects, userInfo, team }) {
+export default function TeamProfileProjects({ projects, userInfo, team, hasProjectsEditAccess }) {
 
     const [teamProjects, setTeamProjects] = useState(projects.slice(0, 3));
     const [seeAllPopup, setSeeAllPopup] = useState(false);
 
-    const isTeamLead = ((userInfo?.roles?.length > 0 &&
-        userInfo.roles.includes('DIRECTORYADMIN')) ||
-        (userInfo?.leadingTeams?.length > 0 &&
-            userInfo.leadingTeams.includes(team.id)));
+    // const isTeamLead = ((userInfo?.roles?.length > 0 &&
+    //     userInfo.roles.includes('DIRECTORYADMIN')) ||
+    //     (userInfo?.leadingTeams?.length > 0 &&
+    //         userInfo.leadingTeams.includes(team.id)));
 
     const seeAllAction = () => {
         // setTeamProjects(projects);
@@ -33,7 +33,7 @@ export default function TeamProfileProjects({ projects, userInfo, team }) {
                 {
                     projects.length > 0 && <div className="text-[13px] text-[#156FF7] cursor-pointer flex gap-[12px]">
                         {
-                            isTeamLead && <div className=" cursor-pointer" onClick={() => { router.push('/directory/projects/add?teamUid='+team.id) }}>
+                            <div className=" cursor-pointer" onClick={() => { router.push('/directory/projects/add') }}>
                                 Add Project
                             </div>
                         }
@@ -49,22 +49,22 @@ export default function TeamProfileProjects({ projects, userInfo, team }) {
             </h3>
 
             {
-                projects.length === 0 && isTeamLead && <div className="p-[16px] max-h-96 overflow-y-auto rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)] focus-within:outline-none focus:outline-none focus-visible:outline-none">
-                    You have not added any projects. <span className="text-[#156FF7] cursor-pointer" onClick={() => { router.push('/directory/projects/add?teamUid='+team.id) }}>Click Here</span> to add a new project.
+                projects.length === 0 && <div className="p-[16px] max-h-96 overflow-y-auto rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)] focus-within:outline-none focus:outline-none focus-visible:outline-none">
+                    You have not added any projects. <span className="text-[#156FF7] cursor-pointer" onClick={() => { router.push('/directory/projects/add') }}>Click Here</span> to add a new project.
                 </div>
             }
-            {
+            {/* {
                 projects.length === 0 && !isTeamLead  && <div className="p-[16px] max-h-96 overflow-y-auto rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)] focus-within:outline-none focus:outline-none focus-visible:outline-none">
                 No Projects added yet.
             </div>
-            }
+            } */}
 
             
 
             <div className="max-h-96 overflow-y-auto rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)] focus-within:outline-none focus:outline-none focus-visible:outline-none">
                 {
                     teamProjects.map(project => {
-                        return project && <TeamProfileProjectCard key={project.id} project={project}/>
+                        return project && <TeamProfileProjectCard key={project.id} project={project} hasProjectsEditAccess={hasProjectsEditAccess}/>
                     })
                 }
             </div>
@@ -72,6 +72,7 @@ export default function TeamProfileProjects({ projects, userInfo, team }) {
                 isOpen={seeAllPopup}
                 setIsModalOpen={setSeeAllPopup}
                 projects={projects}
+                hasProjectsEditAccess={hasProjectsEditAccess}
             />
         </>
     )

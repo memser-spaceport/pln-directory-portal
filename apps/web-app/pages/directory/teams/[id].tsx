@@ -35,9 +35,10 @@ interface TeamProps {
   isUserLoggedIn: boolean;
   userInfo: any;
   teamsProjectList:any;
+  hasProjectsEditAccess: boolean;
 }
 
-export default function Team({ team, members, backLink, userInfo, teamsProjectList }: TeamProps) {
+export default function Team({ team, members, backLink, userInfo, teamsProjectList, hasProjectsEditAccess }: TeamProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
     directoryName: 'Teams',
@@ -61,7 +62,7 @@ export default function Team({ team, members, backLink, userInfo, teamsProjectLi
             <TeamProfileFunding {...team} />
           ) : null}
           <TeamProfileMembers members={members} />
-          <TeamProfileProjects projects={teamsProjectList} userInfo={userInfo} team={team}/>
+          <TeamProfileProjects projects={teamsProjectList} userInfo={userInfo} team={team} hasProjectsEditAccess={hasProjectsEditAccess}/>
 
         </div>
         {/* <div className="w-sidebar shrink-0">
@@ -90,6 +91,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
   }
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
   const isUserLoggedIn = cookies?.authToken &&  cookies?.userInfo ? true : false;
+  let hasProjectsEditAccess = false;
   const { id, backLink = '/directory/teams' } = query as {
     id: string;
     backLink: string;
@@ -120,7 +122,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
     getMembers({
       'teamMemberRoles.team.uid': id,
       select:
-        'uid,name,image.url,skills.title,teamMemberRoles.team.uid,teamMemberRoles.team.name,teamMemberRoles.role,teamMemberRoles.teamLead,teamMemberRoles.mainTeam',
+        'uid,name,image.url,skills.title,teamMemberRoles.team.uid,projectContributions,teamMemberRoles.team.name,teamMemberRoles.role,teamMemberRoles.teamLead,teamMemberRoles.mainTeam',
       pagination: false,
     }),
   ]);
@@ -135,6 +137,17 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
       ['desc', 'asc']
     );
   }
+
+  for(const mem of members){
+    if(mem.id === userInfo.uid){
+      hasProjectsEditAccess = true;
+      break;
+    }
+  }
+  if(userInfo.roles && userInfo.roles.length && userInfo.roles.includes('DIRECTORYADMIN')){
+    hasProjectsEditAccess = true;
+  }
+  
 
   const { getTeamsProject } = ProjectsService;
 
@@ -161,6 +174,6 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
   );
 
   return {
-    props: { team, members, backLink, isUserLoggedIn, userInfo, teamsProjectList },
+    props: { team, members, backLink, isUserLoggedIn, userInfo, teamsProjectList, hasProjectsEditAccess },
   };
 };

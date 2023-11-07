@@ -59,7 +59,7 @@ export function MemberProfileProjects({
       {
         repositories && Array.isArray(repositories) && (
           <h3 className="mb-2 mt-6 font-medium text-slate-500">
-            {'Projects'} {repositories?.length > 0 && `(${repositories?.length})`}
+            {'Repositories'} {repositories?.length > 0 && `(${repositories?.length})`}
             {repositories?.length > 3 && (
               <button
                 onClick={() => onGithubProject()}
@@ -73,7 +73,7 @@ export function MemberProfileProjects({
       }
       { repositories && !Array.isArray(repositories) && repositories.statusCode == 500 && (
         <div className="mb-2 mt-6 w-full rounded-xl border bg-gray-50 p-3 text-center">
-          <p>Unable to load projects</p>
+          <p>Unable to load repositories</p>
         </div>)
       }
       {repositories && Array.isArray(repositories) &&(repositories?.length > 0 ? (

@@ -6,6 +6,7 @@ export function TeamProfileProjectsModal({
   isOpen,
   setIsModalOpen,
   projects,
+  hasProjectsEditAccess=false
 }) {
 //   const {
 //     query: { id },
@@ -25,7 +26,7 @@ export function TeamProfileProjectsModal({
         <div className="px-8 rounded-xl github-project-popup overflow-y-auto">
           {projects?.map((project, i) => {
             return (
-                <TeamProfileProjectCard key={project.id} project={project}/>
+                <TeamProfileProjectCard key={project.id} project={project} hasProjectsEditAccess={hasProjectsEditAccess}/>
             );
           })}
         </div>
