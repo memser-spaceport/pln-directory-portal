@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import ProjectSelection from "./project-selection";
 
 function ProjectContributionForm(props) {
+    const showAddProject = props.showAddProject;
     const currentProjectsCount = props.currentProjectsCount;
     const onItemChange = props.onItemChange;
     const exp = props.exp;
@@ -78,7 +79,7 @@ function ProjectContributionForm(props) {
                     {exp?.projectName.trim() === '' && <h2 className="text-[#0F172A] flex-1 font-[600] text-[14px]">{`Project ${expIndex + 1}`}</h2>}
                     {exp?.projectName.trim() !== '' && <h2 className="text-[#0F172A] flex-1 font-[600] text-[14px]">{`${exp?.projectName.trim()}`}</h2>}
                     <div className="flex flex-row items-center gap-[8px]">
-                        <Switch nonEditable={exp.currentProject === false && currentProjectsCount === 5} initialValue={exp.currentProject} onChange={(val) => onItemChange(expIndex, 'currentProject', val)} key={`${expIndex}-switch`} />
+                        <div title={`${exp.currentProject === false && currentProjectsCount === 5 ? 'Max 5 projects can be set us current': ''} `} ><Switch nonEditable={exp.currentProject === false && currentProjectsCount === 5} initialValue={exp.currentProject} onChange={(val) => onItemChange(expIndex, 'currentProject', val)} key={`${expIndex}-switch`} /></div>
                         <label className="text-[12px] font-[600]">Current Project</label>
                     </div>
                 </div>
@@ -91,7 +92,7 @@ function ProjectContributionForm(props) {
                    <div className="flex-1 flex flex-col my-[20px] gap-[12px]">
                             <div className="flex items-center justify-between">
                             <label className="text-[14px] font-[600]">Project Name*</label>
-                            <a target="_blank" href="/directory/projects/add" className="text-[12px] flex gap-[6px] items-center"><img className="w-[10px]" src="/assets/images/icons/expand-blue.svg"/><span className="text-blue-600">Add New Project</span></a>
+                            {showAddProject &&  <a target="_blank" href="/directory/projects/add" className="text-[12px] flex gap-[6px] items-center"><img className="w-[10px]" src="/assets/images/icons/expand-blue.svg"/><span className="text-blue-600">Add New Project</span></a>}
                             </div>
                            {/*  <input maxLength={100} placeholder="Ex: Filecoin" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" type="text" value={exp.companyName} onChange={(e) => onItemChange(expIndex, 'companyName', e.target.value)} /> */}
                             <ProjectSelection selectedProj={exp?.project} onProjectSelected={onProjectSelected}/>

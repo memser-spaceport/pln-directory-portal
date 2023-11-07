@@ -963,6 +963,7 @@ export function EditMemberModal({
                     <div className={openTab === 3 ? 'block' : 'hidden'}>
                       <ProjectContribution
                         formValues={formValues}
+                        showAddProject={true}
                         onChange={handleInputChange}
                         contributionErrors={contributionObjErrors}
                       />

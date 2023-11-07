@@ -3,6 +3,7 @@ import { LoadingIndicator } from "../../shared/loading-indicator/loading-indicat
 import ProjectContributionForm from "./project-contribution-form";
 
 function ProjectContribution(props) {
+    const showAddProject = props.showAddProject ?? false;
     const errors = props.contributionErrors ?? [];
     const formValues = props.formValues;
     const contributions = formValues.projectContributions;
@@ -76,7 +77,7 @@ function ProjectContribution(props) {
                 </div>
             </div>}
             <div className="mb-[32px]">
-                {contributions.map((exp, expIndex) => <ProjectContributionForm currentProjectsCount={currentProjectsCount} errors={errors} setLoaderStatus={setLoaderStatus} onToggleExpansion={onToggleExpansion} expandedId={expandedId} key={`${expIndex}-exp`} onDeleteContribution={onDeleteContribution} exp={exp} expIndex={expIndex} onItemChange={onItemChange} />)}
+                {contributions.map((exp, expIndex) => <ProjectContributionForm showAddProject={showAddProject} currentProjectsCount={currentProjectsCount} errors={errors} setLoaderStatus={setLoaderStatus} onToggleExpansion={onToggleExpansion} expandedId={expandedId} key={`${expIndex}-exp`} onDeleteContribution={onDeleteContribution} exp={exp} expIndex={expIndex} onItemChange={onItemChange} />)}
             </div>
             {(contributions.length > 0 ) && <div className="flex justify-start">
                  {contributions.length <= 19 && <button onClick={onAddContribution} className="flex items-center justify-center text-[14px]">
