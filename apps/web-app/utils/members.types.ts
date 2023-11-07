@@ -18,7 +18,7 @@ export interface IMember {
   name: string | null;
   officeHours: string | null;
   skills: TMemberResponse['skills'];
-  experience: any[],
+  projectContributions: any[],
   teamLead: boolean;
   openForWork?: boolean;
   teams: IMemberTeam[];
@@ -84,7 +84,7 @@ export interface IFormValues {
   comments: string;
   teamAndRoles: Roles[];
   skills: Skill[];
-  experience: any[];
+  projectContributions: any[];
   openToWork: boolean;
   preferences?: IPreferences | null;
 }

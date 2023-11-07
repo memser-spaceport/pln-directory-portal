@@ -54,7 +54,7 @@ import { PreferenceModal } from './preference-modal';
 import Privacy from '../../preference/privacy';
 import { getPreferences } from 'apps/web-app/services/member.service';
 import { SettingsContext } from "apps/web-app/pages/directory/settings";
-import AddMemberExperience from './add-member-experience';
+import ProjectContribution from '../../projects/contribution/project-contribution';
 interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -62,6 +62,7 @@ interface EditMemberModalProps {
   isProfileSettings?: boolean;
   isUserProfile?: boolean;
   userInfo?: any;
+  tabSelection: string;
   setModified?: (boolean) => void;
   setRefreshMemberAutocomplete?: (boolean) => void;
 }
@@ -105,16 +106,16 @@ function validateSkillForm(formValues) {
   return errors;
 }
 
-function validateExperienceForm(fValues) {
+function validateContributionForm(fValues) {
   const formErrors = []
-  const exps = fValues.experience;
+  const exps = fValues.projectContributions;
   exps.forEach((exp, expIndex) => {
-    if(exp.companyName.trim() === '') {
-      formErrors.push({id: expIndex, field: 'companyName', error: "Company Name is Mandatory"})
-    } if(exp.title.trim() === '') {
-      formErrors.push({id: expIndex, field: 'title', error: "Title is Mandatory"})
+    if(exp.projectName.trim() === '') {
+      formErrors.push({id: expIndex, name: `Project ${expIndex + 1}`, field: 'projectName', error: "Project Name is Mandatory"})
+    } if(exp.role.trim() === '') {
+      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'role', error: "Role is Mandatory"})
     } if(exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
-      formErrors.push({id: expIndex, field: 'date', error: "To Date cannot be less than start date"})
+      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "To Date cannot be less than start date"})
     }
   })
 
@@ -136,15 +137,17 @@ function validateForm(formValues, imageUrl, isProfileSettings) {
     errors = [...errors, ...skillFormErrors];
   }
 
-  const experienceFormErrors = validateExperienceForm(formValues);
-  if(experienceFormErrors.length > 0) {
-    errors.push("Please review experience details")
+  const conErrors = validateContributionForm(formValues);
+  const cbErrors = conErrors.map(c => `${c.name} - ${c.error}` )
+  if(conErrors.length > 0) {
+    errors = [...errors, ...cbErrors]
   }
 
   return {
     basicFormErrors,
     skillFormErrors,
-    experienceFormErrors,
+    conErrors,
+    cbErrors,
     errors,
   };
 }
@@ -208,14 +211,19 @@ export function EditMemberModal({
   userInfo,
   isUserProfile = false,
   setModified,
+  tabSelection,
   setRefreshMemberAutocomplete,
 }: EditMemberModalProps) {
-  const [openTab, setOpenTab] = useState(1);
+  const tabs = ['BASIC', 'SKILLS', 'CONTRIBUTIONS', 'SOCIAL']
+  const tabId = tabSelection && tabs.includes(tabSelection.toUpperCase()) ? tabs.indexOf(tabSelection.toUpperCase()) + 1 : 1
+  console.log(tabId, tabSelection)
+  const [openTab, setOpenTab] = useState(tabId);
   const [errors, setErrors] = useState([]);
   const [isErrorPopupOpen, setIsErrorPopupOpen] = useState(false);
   const [basicErrors, setBasicErrors] = useState([]);
   const [skillErrors, setSkillErrors] = useState([]);
-  const [expErrors, setExperienceErrors] = useState([]);
+  const [contributionErrors, setContributionErrors] = useState([]);
+  const [contributionObjErrors, setContributionObjErrors] = useState([]);
   const [dropDownValues, setDropDownValues] = useState({});
   const [imageUrl, setImageUrl] = useState<string>();
   const [emailExists, setEmailExists] = useState<boolean>(false);
@@ -250,7 +258,7 @@ export function EditMemberModal({
     comments: '',
     teamAndRoles: [{ teamUid: '', teamTitle: '', role: '', rowId: 1 }],
     skills: [],
-    experience: [],
+    projectContributions: [],
     openToWork: false,
     preferences: JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))
   });
@@ -364,6 +372,7 @@ export function EditMemberModal({
             mainTeam: item.mainTeam,
           };
         });
+        console.log(member)
         setCurrentEmail(member?.email);
         const formValues = {
           name: member?.name,
@@ -390,12 +399,14 @@ export function EditMemberModal({
           skills: member?.skills?.map((item) => {
             return { value: item.uid, label: item.title };
           }),
-          experience: member?.experience.map(exp => {
+          projectContributions: member?.projectContributions ? member?.projectContributions.map(exp => {
             exp.startDate = new Date(exp.startDate);
             exp.endDate = exp.endDate ? new Date(exp.endDate) : null;
-            exp.logoUrl = exp?.companyLogo?.url
+            exp.projectName = exp?.project?.name;
+            exp.projectLogo = exp?.project?.logo?.url;
+            exp.projectUid = exp?.project?.uid
             return exp;
-          }),
+          }): [],
           preferences: member?.preferences ?? JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))
         };
         // set requestor email
@@ -453,6 +464,8 @@ export function EditMemberModal({
     setErrors([]);
     setBasicErrors([]);
     setSkillErrors([]);
+    setContributionErrors([]);
+    setContributionObjErrors([]);
     setDropDownValues({});
     setImageChanged(false);
     setNameChanged(false);
@@ -478,7 +491,7 @@ export function EditMemberModal({
       comments: '',
       teamAndRoles: [],
       skills: [],
-      experience: [],
+      projectContributions: [],
       openToWork: false,
     });
   }
@@ -510,6 +523,16 @@ export function EditMemberModal({
     const skills = skillValues.map((item) => {
       return { uid: item?.value, title: item?.label };
     });
+
+    const formattedProjectsCon = structuredClone(formValues.projectContributions).map(v => {
+      if(v.project) {
+        delete v.project;
+      }
+      delete v.projectName;
+      delete v.projectLogo;
+      return v
+    })
+
     const formattedData = {
       ...formValues,
       name: formValues.name?.replace(/ +(?= )/g, '').trim(),
@@ -531,15 +554,7 @@ export function EditMemberModal({
         ? new Date(formValues.plnStartDate)?.toISOString()
         : null,
       skills: skills,
-      experience:[...formValues.experience].map(v => {
-        delete v.logoUrl;
-        if (v.logoUid === 0 || v.logoUid === null) {
-          delete v.logoUid
-        }
-
-        delete v.companyLogo
-        return v
-      }),
+      projectContributions:formattedProjectsCon,
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
     };
@@ -576,11 +591,13 @@ export function EditMemberModal({
         }
         setSaveCompleted(false);
         setErrors([]);
-        const { basicFormErrors, skillFormErrors, experienceFormErrors,  errors } = validateForm(
+        const { basicFormErrors, skillFormErrors, conErrors, cbErrors,  errors } = validateForm(
           formValues,
           imageUrl,
           isProfileSettings
         );
+
+        console.log(errors, conErrors)
         // if (!executeRecaptcha) {
         //   console.log('Execute recaptcha not yet available');
         //   return;
@@ -594,7 +611,8 @@ export function EditMemberModal({
           setErrors(errors);
           setBasicErrors(basicFormErrors);
           setSkillErrors(skillFormErrors);
-          setExperienceErrors(experienceFormErrors)
+          setContributionErrors(cbErrors)
+          setContributionObjErrors(conErrors)
           setIsErrorPopupOpen(true);
           return false;
         }
@@ -820,7 +838,11 @@ export function EditMemberModal({
     );
   }, [isUserProfile, id]);
 
-  useEffect(() => {}, []);
+  useEffect(() => {
+    if(tabSelection && tabId) {
+      setOpenTab(tabId)
+    }
+  }, []);
 
   const getMemberPreferences = async () => {
     const memberPreferences = await getPreferences(id,JSON.parse(Cookies.get('authToken')));
@@ -842,9 +864,9 @@ export function EditMemberModal({
             <div className="mx-auto mb-40 h-full">
               {
                 <>
-                <div className="mt-3 flex h-10 w-full w-3/5  justify-start text-slate-400">
+                <div className="mt-3 flex h-10 w-fit gap-[25px] justify-start text-slate-400">
                   <button
-                    className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
+                    className={`w-fit px-[12px] border-b-4 border-transparent text-base font-medium ${
                       openTab == 1 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
                     } ${
                       basicErrors?.length > 0 && openTab == 1
@@ -859,7 +881,7 @@ export function EditMemberModal({
                     BASIC{' '}
                   </button>
                   <button
-                    className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
+                    className={`w-fit px-[12px] border-b-4 border-transparent text-base font-medium ${
                       openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
                     } ${
                       skillErrors?.length > 0 && openTab == 2
@@ -874,16 +896,16 @@ export function EditMemberModal({
                     SKILLS
                   </button>
                   <button
-                    className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
+                    className={`w-fit px-[12px] border-b-4 border-transparent text-base font-medium ${
                       openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
                     }`}
                     onClick={() => onTabClicked(3)}
                   >
                     {' '}
-                    EXPERIENCE{' '}
+                    CONTRIBUTIONS{' '}
                   </button>
                   <button
-                    className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
+                    className={`w-fit px-[12px] border-b-4 border-transparent text-base font-medium ${
                       openTab == 4 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
                     }`}
                     onClick={() => onTabClicked(4)}
@@ -948,10 +970,11 @@ export function EditMemberModal({
                       />
                     </div>
                     <div className={openTab === 3 ? 'block' : 'hidden'}>
-                      <AddMemberExperience
+                      <ProjectContribution
                         formValues={formValues}
+                        showAddProject={true}
                         onChange={handleInputChange}
-                        experienceErrors={expErrors}
+                        contributionErrors={contributionObjErrors}
                       />
                     </div>
                     <div className={openTab === 4 ? 'block' : 'hidden'}>
@@ -1010,6 +1033,7 @@ export function EditMemberModal({
                 errors={{
                   basic: basicErrors,
                   skills: skillErrors,
+                  contribution: contributionErrors,
                 }}
               />
             )}

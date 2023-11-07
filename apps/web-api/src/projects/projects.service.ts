@@ -36,7 +36,7 @@ export class ProjectsService {
   }
 
   async updateProjectByUid(
-    uid: string, 
+    uid: string,
     project: Prisma.ProjectUncheckedUpdateInput,
     userEmail: string
   ) {
@@ -64,7 +64,7 @@ export class ProjectsService {
       this.handleErrors(err, `${uid}`);
     }
   }
- 
+
   async getProjects(queryOptions: Prisma.ProjectFindManyArgs) {
     try {
       queryOptions.where = {

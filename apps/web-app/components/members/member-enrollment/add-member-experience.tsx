@@ -73,7 +73,7 @@ function AddMemberExperience(props) {
                     <p className="hidden">{`Total experiences ${experiences.length}`}</p>
                     <button onClick={onAddExperience} className="flex items-center justify-center">
                         <img src="/assets/images/icons/add-company-icon.svg" />
-                        <span className="text-blue-600 font-[500] text-[13px]" >Click to add company</span>
+                        <span className="text-blue-600 font-[500] text-[13px]" >Click to add Project contributions</span>
                     </button>
 
                 </div>
@@ -84,9 +84,9 @@ function AddMemberExperience(props) {
             {(experiences.length > 0 ) && <div className="flex justify-start">
                  {experiences.length <= 6 && <button onClick={onAddExperience} className="flex items-center justify-center text-[14px]">
                     <img className="" src="/assets/images/icons/expand-blue.svg" />
-                    <span className="text-blue-600 mx-[4px]">Add Company</span>
+                    <span className="text-blue-600 mx-[4px]">Add Contribution</span>
                 </button>}
-                <p className="text-[14px] text-[#94A3B8]">(max 7 companies)</p>
+                <p className="text-[14px] text-[#94A3B8]">(max 7 Contributions)</p>
             </div>}
             {isLoading && <div className="absolute flex items-center justify-center bg-black bg-opacity-40 top-0 left-0 right-0 w-full h-full z-[10]">
             <LoadingIndicator/>
