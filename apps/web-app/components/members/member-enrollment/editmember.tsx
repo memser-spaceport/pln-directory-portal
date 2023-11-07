@@ -62,6 +62,7 @@ interface EditMemberModalProps {
   isProfileSettings?: boolean;
   isUserProfile?: boolean;
   userInfo?: any;
+  tabSelection: string;
   setModified?: (boolean) => void;
   setRefreshMemberAutocomplete?: (boolean) => void;
 }
@@ -210,9 +211,13 @@ export function EditMemberModal({
   userInfo,
   isUserProfile = false,
   setModified,
+  tabSelection,
   setRefreshMemberAutocomplete,
 }: EditMemberModalProps) {
-  const [openTab, setOpenTab] = useState(1);
+  const tabs = ['BASIC', 'SKILLS', 'CONTRIBUTIONS', 'SOCIAL']
+  const tabId = tabSelection && tabs.includes(tabSelection.toUpperCase()) ? tabs.indexOf(tabSelection.toUpperCase()) + 1 : 1
+  console.log(tabId, tabSelection)
+  const [openTab, setOpenTab] = useState(tabId);
   const [errors, setErrors] = useState([]);
   const [isErrorPopupOpen, setIsErrorPopupOpen] = useState(false);
   const [basicErrors, setBasicErrors] = useState([]);
@@ -833,7 +838,11 @@ export function EditMemberModal({
     );
   }, [isUserProfile, id]);
 
-  useEffect(() => {}, []);
+  useEffect(() => {
+    if(tabSelection && tabId) {
+      setOpenTab(tabId)
+    }
+  }, []);
 
   const getMemberPreferences = async () => {
     const memberPreferences = await getPreferences(id,JSON.parse(Cookies.get('authToken')));

@@ -2,9 +2,9 @@ import { useRouter } from "next/router";
 import MemberExperienceDescription from "./member-experience-item";
 
 function MemberExperience(props) {
-    const isUser = props.isUser ?? false;
+    const isEditable = props.isEditable ?? false;
     const contributions = props.contributions ?? [];
-    console.log(contributions)
+    const isOwner = props.isOwner;
     const router = useRouter();
 
     const formatDate = (dateString) => {
@@ -13,7 +13,12 @@ function MemberExperience(props) {
         return `${month} ${year}`
     }
     const onEditOrAdd  = () => {
-        router.push('/directory/settings')
+        if(isOwner) {
+          router.push('/directory/settings?tab=contributions')
+        } else {
+          router.push('/directory/settings')
+        }
+
     }
 
     const onProjectClicked = (proj) => {
@@ -71,7 +76,7 @@ function MemberExperience(props) {
         <div className="my-[20px]">
             <div className="text-[#64748B] text-[15px] font-[500] flex justify-between">
                 <h3 className="text-[15px]">Project Contributions</h3>
-                {(contributions.length > 0 && isUser) && <button className="text-[#156FF7] text-[13px]" onClick={onEditOrAdd}>Edit/Add</button>}
+                {(contributions.length > 0 && isEditable) && <button className="text-[#156FF7] text-[13px]" onClick={onEditOrAdd}>Edit/Add</button>}
             </div>
             <div className="mt-[8px] focus-within:outline-none focus:outline-none focus-visible:outline-none">
                 <div>
@@ -96,7 +101,6 @@ function MemberExperience(props) {
                            <MemberExperienceDescription desc={exp.description}/>
                         </div>}
                     </div>)}
-                    {contributions.length === 0 && <p className="text-[#0F172A] font-[400] text-[12px] p-[16px]"><span onClick={onEditOrAdd} className="text-[#156FF7] cursor-pointer">Click here</span> to add your experience & contribution details.</p>}
                 </div>
 
 
