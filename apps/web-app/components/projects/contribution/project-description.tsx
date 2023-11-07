@@ -1,19 +1,21 @@
 
 import React, {useMemo} from 'react';
 import {InitialConfigType, LexicalComposer} from '@lexical/react/LexicalComposer';
-import {PlainTextPlugin} from "@lexical/react/LexicalPlainTextPlugin";
+import {RichTextPlugin} from "@lexical/react/LexicalRichTextPlugin";
 import {ContentEditable} from '@lexical/react/LexicalContentEditable';
 import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary';
+import { OnChangePlugin } from './onchange-plugin';
 
 function ProjectDescription() {
     const CustomContent = useMemo(() => {
         return (
             <ContentEditable style={{
                 position: 'relative',
-                borderColor: 'rgba(255,211,2,0.68)',
-                border: '2px solid red',
-                borderRadius: '5px',
-                maxWidth: '100%',
+                border: '1px solid #CBD5E1',
+                borderRadius: '8px',
+                height: '200px',
+                width: '100%',
+                fontSize: '13px',
                 padding: '10px'
             }}/>
         )
@@ -36,14 +38,16 @@ function ProjectDescription() {
         }
     }
 
+
     return (
-        <div style={{padding: '20px'}}>
+        <div>
             <LexicalComposer initialConfig={lexicalConfig}>
-                <PlainTextPlugin
+                <RichTextPlugin
                     contentEditable={CustomContent}
                     placeholder={CustomPlaceholder}
                     ErrorBoundary={LexicalErrorBoundary}
                 />
+                <OnChangePlugin/>
             </LexicalComposer>
         </div>
     );
