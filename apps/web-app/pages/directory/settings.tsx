@@ -313,6 +313,7 @@ export default function Settings({
                     setModified={setModifiedMember}
                     setRefreshMemberAutocomplete={setRefreshMemberAutocomplete}
                     userInfo={userInfo}
+                    tabSelection=""
                 />
             )
         } else if (settings === SETTINGS_CONSTANTS.PROFILE_SETTINGS) {
