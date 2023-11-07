@@ -7,16 +7,52 @@ export function AddProjectContextProvider(props) {
     const defaultState = {
         inputs: {
             logoURL: '',
+            logoObject:'',
             name: '',
             tagline: '',
+            maintainedBy: { value: '', label: '', logo: '' },
+            contributingTeams: [],
             desc: '',
-            projectURLs: [],
+            projectURLs: [{
+                name: '',
+                value: '',
+                id: 0
+            }],
             contactEmail: '',
             fundsNeeded: false,
             KPIs: [],
-            readme: ''
+            readme: '',
+            id:'',
+            logo:null,
         },
+        mode: props.mode,
         errors: null
+    }
+
+    if(props.mode === 'EDIT'){
+        const projectDetail = props.data ?? null;
+        if(projectDetail){
+            defaultState.inputs = {
+                id:projectDetail.id,
+                logoURL: projectDetail.image,
+                logoObject:'',
+                name: projectDetail.name,
+                tagline: projectDetail.tagline,
+                maintainedBy: {
+                    value: projectDetail.maintainingTeam?.uid,
+                    label: projectDetail.maintainingTeam?.name,
+                    logo: projectDetail.maintainingTeam?.logo?.url
+                },
+                desc: projectDetail.description,
+                projectURLs: projectDetail.projectLinks,//have to set
+                contactEmail: projectDetail.contactEmail,
+                fundsNeeded: projectDetail.fundingNeeded,
+                KPIs: projectDetail.KPIs,//have to set
+                readme: projectDetail.readMe,
+                contributingTeams: projectDetail.contributingTeams,
+                logo:projectDetail.logo
+            }
+        }
     }
 
     const reducer = (state, action) => {

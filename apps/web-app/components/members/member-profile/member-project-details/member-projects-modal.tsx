@@ -30,7 +30,7 @@ export function MemberProfileProjectsModal({
     >
       <div className="pt-8 slim-scroll">
         <div className="px-8 mb-4 font-bold text-slate-900">
-          {'Projects'} ({repositories?.length})
+          {'Repositories'} ({repositories?.length})
         </div>
         <div className="px-8 rounded-xl github-project-popup overflow-y-auto">
           {repositories?.map((project, i) => {

@@ -13,6 +13,8 @@ export default function ActionButtons(){
     // const { uploadProjectLogo, addProject } = ProjectsService;
     const router = useRouter();
 
+    const mode = addProjectsState.mode;
+
     const validateInputs = () => {
         const errors = {};
 
@@ -29,6 +31,9 @@ export default function ActionButtons(){
         }
         if(!inputs.desc){
             errors['desc'] = 'Description is required';
+        }
+        if(!inputs.maintainedBy.value){
+            errors['maintainedBy'] = 'Maintained By Team is required';
         }
 
         inputs.projectURLs?.map((link,index)=>{
@@ -94,16 +99,25 @@ export default function ActionButtons(){
         return true;
     }
 
-    const onAddProject = async () => {
+    const onSaveProject = async () => {
         if(validateInputs()){
             let image = null;
             try{
                 setIsProcessing(true);
                 image = await ProjectsService.uploadProjectLogo(addProjectsState.inputs);
-                const data = await ProjectsService.addProject(addProjectsState.inputs, image, router.query.teamUid);
-                if(data.status === 201){
-                    toast.info("Project added successfully.")
-                    router.push('/directory/teams/'+data.data.teamUid);
+                if(addProjectsState.mode === 'ADD'){
+                    const data = await ProjectsService.addProject(addProjectsState.inputs, image);
+                    if(data.status === 201){
+                        toast.info("Project added successfully.")
+                        router.push('/directory/projects');
+                    }
+                }else{
+                    const data = await ProjectsService.updateProjectDetails(addProjectsState.inputs, image,addProjectsState.inputs.id);
+                    
+                    if(data.status === 200){
+                        toast.info("Project upadated successfully.")
+                        router.push('/directory/projects/'+data.data.uid);
+                    }
                 }
                 
             }catch(err){
@@ -135,12 +149,14 @@ export default function ActionButtons(){
             )}
             <div className="flex flex-row-reverse gap-[8px] py-[20px] font-[15px] font-semibold">
                 <div className="px-[24px] py-[8px] rounded-[100px] border cursor-pointer border-[#156FF7] bg-[#156FF7] text-white" 
-                onClick={onAddProject}>
-                    Add Project
+                onClick={onSaveProject}>
+                    {
+                        mode === 'ADD' ? 'Add Project' : 'Save Changes'
+                    }
                 </div>
                 <div className="px-[24px] py-[8px] rounded-[100px] border border-[#156FF7]  text-[#156FF7] cursor-pointer"
                 onClick={()=>{
-                    router.push('/directory/teams/' + router.query.teamUid)
+                    router.push('/directory/projects')
                 }}>
                     Cancel
                 </div>

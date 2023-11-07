@@ -77,7 +77,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
             queryParams['lookingForFunding'] = query?.FUNDING === 'true';
         }
         if(query?.TEAM){
-            queryParams['teamUid'] = query?.TEAM;
+            queryParams['maintainingTeamUid'] = query?.TEAM;
         }
         if(query?.sort && query.sort === 'Name,desc'){
             queryParams['orderBy'] = '-name'
