@@ -5,7 +5,7 @@ import { TeamProfileProjectsModal } from "./team-profile-seeall-popop";
 
 export default function TeamProfileProjects({ projects, userInfo, team, hasProjectsEditAccess }) {
 
-    const [teamProjects, setTeamProjects] = useState(projects.slice(0, 3));
+    const [teamProjects, setTeamProjects] = useState((projects && projects.length) ? projects.slice(0, 3): []);
     const [seeAllPopup, setSeeAllPopup] = useState(false);
 
     // const isTeamLead = ((userInfo?.roles?.length > 0 &&
