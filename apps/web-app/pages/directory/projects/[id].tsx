@@ -18,7 +18,7 @@ import { NextSeo } from "next-seo";
 import { destroyCookie } from "nookies";
 import { ReactElement } from "react";
 
-export default function ProjectDetails({ selectedProject, userHasEditRights }) {
+export default function ProjectDetails({ selectedProject, userHasEditRights, userHasDeleteRights }) {
     const { breadcrumbItems } = useProfileBreadcrumb({
         backLink: '/directory/projects',
         directoryName: 'Projects',
@@ -31,7 +31,7 @@ export default function ProjectDetails({ selectedProject, userHasEditRights }) {
             <div className="flex pt-32 ">
                 <div className="flex mx-auto gap-10">
                     <div className="w-[917px] mt-10  bg-white p-[30px] flex flex-col gap-[24px] rounded-[12px]">
-                        <Header project={selectedProject} userHasEditRights={userHasEditRights} />
+                        <Header project={selectedProject} userHasEditRights={userHasEditRights} userHasDeleteRights={userHasDeleteRights}/>
                         <Description content={selectedProject.description} />
                         <ContactAndLinks project={selectedProject} />
                         <KPIs project={selectedProject} />
@@ -92,6 +92,17 @@ const checkForEditRights = async (userInfo, selectedProject) => {
     }
 }
 
+const checkForDeleteRights = (userInfo,selectedProject) => {
+ if(userInfo.roles && userInfo.roles.length && userInfo.roles.includes('DIRECTORYADMIN')){
+    return true;
+ }
+ 
+ if(userInfo.leadingTeams?.length && userInfo.leadingTeams.includes(selectedProject.teamUid) ){
+    return true;
+ }
+ return false;
+}
+
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
     const {
         query,
@@ -112,25 +123,27 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     const selectedProjectResponse = await getProject(query.id);
     let selectedProject = null;
     let userHasEditRights = false;
+    let userHasDeleteRights = false;
+    
     // console.log(selectedProjectResponse);
-
-
+    
     if (selectedProjectResponse.status === 200) {
         selectedProject = ProjectsDataService.getFormattedProject(selectedProjectResponse.body);
         userHasEditRights = await checkForEditRights(userInfo, selectedProject);
-
+        userHasDeleteRights = checkForDeleteRights(userInfo, selectedProject);
     } else if (selectedProjectResponse.status === 404) {
         return {
             notFound: true,
         }
     }
-
+    
     return {
         props: {
             isUserLoggedIn,
             userInfo,
             selectedProject,
-            userHasEditRights
+            userHasEditRights,
+            userHasDeleteRights
         }
     };
 }

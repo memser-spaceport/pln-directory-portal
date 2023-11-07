@@ -5,6 +5,7 @@ import { MdPreview } from 'md-editor-rt';
 import ProjectsService from 'apps/web-app/services/projects';
 import { useRouter } from 'next/router';
 import Cookies from 'js-cookie';
+import { toast } from 'react-toastify';
 
 export default function AdditionalDetails({ project, userHasEditRights }) {
     const initialReadme = project?.readMe;
@@ -34,12 +35,17 @@ export default function AdditionalDetails({ project, userHasEditRights }) {
         setEditorVisible(false)
     }
 
-    const onSaveAction = () => {
+    const onSaveAction = async () => {
         try {
             project['readMe'] = text;
-            ProjectsService.updateProject(query.id, project)
+            const res = await ProjectsService.updateProject(query.id, project);
+            if(res && res.status === 200){
+                toast.success('Additional Details updated successfully.')
+            }
+            
         } catch (er) {
             console.log(er);
+            toast.error('Something went wrong.Please try again later.')
         }
         setEditorVisible(false)
     }
@@ -51,17 +57,17 @@ export default function AdditionalDetails({ project, userHasEditRights }) {
                 </div>
                 {/* Enable edit button only when the corresponding team lead logsin and view */}
                 {
-                    userHasEditRights && !showEditor && initialReadme && <div className="px-[16px] py-[8px] text-white bg-[#156FF7] rounded border border-[#156FF7] cursor-pointer" onClick={onEditAction}>
+                    !project.isDeleted && userHasEditRights && !showEditor && initialReadme && <div className="flex text-base font-semibold text-[#156FF7] cursor-pointer" onClick={onEditAction}>
                         Edit
                     </div>
                 }
                 {
                     showEditor && <div className='flex gap-[8px]'>
-                        <div className="px-[16px] py-[8px] text-[#156FF7] rounded border border-[#156FF7] cursor-pointer" onClick={onCancelAction}>
-                            Cancel
-                        </div>
-                        <div className="px-[16px] py-[8px] text-white bg-[#156FF7] rounded border border-[#156FF7] cursor-pointer" onClick={onSaveAction}>
+                        <div className="flex text-base font-semibold text-[#156FF7] cursor-pointer" onClick={onSaveAction}>
                             Save
+                        </div>
+                        <div className="flex text-base font-semibold text-[#156FF7] cursor-pointer" onClick={onCancelAction}>
+                            Cancel
                         </div>
                     </div>
                 }

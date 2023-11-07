@@ -44,23 +44,27 @@ const addProject = async (inputs,image) => {
 
 const updateProjectDetails = async (inputs, image, uid) => {
     const data = formatToSave(inputs, image?.uid);
-    console.log(data,'FORMATTEED');
-    
     const addedResponse = await api.put(`/v1/projects/${uid}`, data);
     return addedResponse;
 }
 
 const updateProject = async (uid,project) => {
-    const data = formatToSave(project, null);
- const updateResponse = await api.put(`/v1/projects/${uid}`,data);
+    const {readMe} = project;
+ const updateResponse = await api.put(`/v1/projects/${uid}`,{readMe});
  return updateResponse;
+}
+
+const deleteProject = async (uid) => {
+    const delResponse = await api.delete(`/v1/projects/${uid}`);
+    return delResponse;
 }
 const ProjectsService = {
     getTeamsProject,
     uploadProjectLogo,
     addProject,
     updateProject,
-    updateProjectDetails
+    updateProjectDetails,
+    deleteProject
 }
 
 export default ProjectsService;

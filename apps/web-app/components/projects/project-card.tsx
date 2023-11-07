@@ -40,10 +40,10 @@ export function ProjectCard({ project, isGrid = true }) {
                             {
                                 project.maintainingTeamImage === 'default'
                                     ? <UserGroupIcon className="bg-gray-200 fill-white relative inline-block h-6 w-6 rounded-full" />
-                                    : <Image src={project.maintainingTeamImage} alt="project image" width={35} height={35} className='rounded'/>
+                                    : <Image src={project.maintainingTeamImage} alt="project image" width={25} height={25} className='rounded'/>
                             }
                         </div>
-                        <div className='font-[13px] font-medium pl-2 my-auto'>{project.maintainingTeamName}</div>
+                        <div className='font-[13px] font-normal pl-2 my-auto'>{project.maintainingTeamName}</div>
                     </div>
                     {
                         isGrid && <div className='pt-[20px] mx-auto'>
