@@ -24,7 +24,7 @@ export const SettingsContext = React.createContext({state:null, dispatch:null});
 
 export default function Settings({
     backLink,
-    userInfo, teamsDropdown, membersDropdown, teamSelected, memberSelected, settingCategory, preferences }) {
+    userInfo, teamsDropdown, membersDropdown, tabSelection, teamSelected, memberSelected, settingCategory, preferences }) {
 
     const [activeSetting, setActiveSetting] = useState(settingCategory ?? SETTINGS_CONSTANTS.PROFILE_SETTINGS);
     const [selectedTeam, setSelectedTeam] = useState(teamSelected ? teamSelected : (teamsDropdown && teamsDropdown.length) ? teamsDropdown[0] : null);
@@ -48,7 +48,7 @@ export default function Settings({
                 newState.privacyModifiedFlag = action.payload;
                 break;
         }
-    
+
         return newState
     }
     const [state, dispatch] = useReducer(settingsReducer, { preferences: preferences?.isnull ? { ...JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS)), ...preferences }: preferences })
@@ -124,11 +124,11 @@ export default function Settings({
         })
     }
 
-    const  breadcrumbItems :[any] = [{ 
+    const  breadcrumbItems :[any] = [{
         href: `members/`,
         label: `Members`,
     }];
-    breadcrumbItems.push({ 
+    breadcrumbItems.push({
         href: `members/${userInfo.uid}`,
         label: `${userInfo?.name}`,
     });
@@ -313,6 +313,7 @@ export default function Settings({
                     setModified={setModifiedMember}
                     setRefreshMemberAutocomplete={setRefreshMemberAutocomplete}
                     userInfo={userInfo}
+                    tabSelection=""
                 />
             )
         } else if (settings === SETTINGS_CONSTANTS.PROFILE_SETTINGS) {
@@ -323,6 +324,7 @@ export default function Settings({
                     id={userInfo?.uid}
                     isProfileSettings={true}
                     isUserProfile={true}
+                    tabSelection={tabSelection}
                     setModified={setModifiedProfile}
                 />
             );
@@ -437,7 +439,7 @@ export default function Settings({
 
     return (
         <>
-           
+
             <NextSeo {...DIRECTORY_SEO} title={userInfo.name} />
             <Breadcrumb items={breadcrumbItems} classname="max-w-[150px] truncate" />
             <SettingsContext.Provider value={{state, dispatch}}>
@@ -606,11 +608,11 @@ export const getServerSideProps = async (ctx) => {
 
     let preferences = null;
     if(cookies?.authToken){
-    
+
         try{
             let memberPreferences = await getMemberPreferences(userInfo.uid, cookies.authToken);
             if(memberPreferences.status === 200){
-              
+
               if(memberPreferences.body?.['size'] === 0){
                 preferences = JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS));
               }else{
@@ -620,18 +622,18 @@ export const getServerSideProps = async (ctx) => {
             }
         }catch(err){
             console.log(err);
-            
+
         }
       }
 
-      
+
 
     res.setHeader(
         'Cache-Control',
         'no-cache, no-store, max-age=0, must-revalidate'
     );
-
+    console.log(query.preferences)
     return {
-        props: { isUserLoggedIn, userInfo, teamsDropdown, membersDropdown, teamSelected, memberSelected, settingCategory, preferences },
+        props: { isUserLoggedIn, userInfo, teamsDropdown, membersDropdown, teamSelected, memberSelected, settingCategory, preferences, tabSelection: query?.tab ?? '' },
     };
 };

@@ -56,7 +56,7 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   image: ResponseImageWithRelationsSchema.optional(),
   location: LocationResponseSchema.optional(),
   skills: ResponseSkillSchema.array().optional(),
-  teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
+  teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional()
 });
 
 
@@ -77,6 +77,7 @@ export const MemberRelationalFields = ResponseMemberWithRelationsSchema.pick({
   location: true,
   skills: true,
   teamMemberRoles: true,
+  projectContributions: true
 }).strip();
 
 export const MemberQueryableFields = ResponseMemberSchema.keyof();
