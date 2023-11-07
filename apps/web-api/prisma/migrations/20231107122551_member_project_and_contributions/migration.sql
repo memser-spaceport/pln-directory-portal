@@ -1,9 +1,17 @@
 /*
   Warnings:
+
+  - You are about to drop the column `teamUid` on the `Project` table. All the data in the column will be lost.
+  - You are about to drop the `Experience` table. If the table is not empty, all the data it contains will be lost.
   - Added the required column `type` to the `Faq` table without a default value. This is not possible if the table is not empty.
   - Added the required column `maintainingTeamUid` to the `Project` table without a default value. This is not possible if the table is not empty.
 
 */
+-- DropForeignKey
+ALTER TABLE "Experience" DROP CONSTRAINT "Experience_logoUid_fkey";
+
+-- DropForeignKey
+ALTER TABLE "Experience" DROP CONSTRAINT "Experience_memberUid_fkey";
 
 -- DropForeignKey
 ALTER TABLE "Project" DROP CONSTRAINT "Project_teamUid_fkey";
@@ -15,6 +23,9 @@ ALTER TABLE "Faq" ADD COLUMN     "type" TEXT NOT NULL;
 ALTER TABLE "Project" DROP COLUMN "teamUid",
 ADD COLUMN     "isDeleted" BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN     "maintainingTeamUid" TEXT NOT NULL;
+
+-- DropTable
+DROP TABLE "Experience";
 
 -- CreateTable
 CREATE TABLE "ProjectContribution" (
