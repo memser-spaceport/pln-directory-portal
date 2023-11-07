@@ -71,6 +71,15 @@ export default function ProjectsFilter({ filterProperties }) {
 
     return (
         <>
+            <div className="flex ">
+                <div className="m-auto justify-content mt-5 py-[9px] px-[24px] border rounded-[37px] text-white bg-[#156FF7] cursor-pointer"
+                onClick={()=>{
+                    push('/directory/projects/add');
+                }}
+                >
+                Add Project
+                </div>
+            </div>
             <div className="relative flex items-center justify-between bg-white p-5 pl-[37px] before:absolute before:bottom-[-0.2rem] before:left-0 before:h-1 before:w-full before:border-t after:absolute after:bottom-0 after:left-0 after:h-7 after:w-[calc(100%_-_1.23rem)] after:translate-y-full after:bg-gradient-to-b after:from-white">
                 <span className="text-lg font-semibold leading-7">Filters</span>
                 <button
