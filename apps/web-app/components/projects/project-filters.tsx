@@ -58,7 +58,7 @@ export default function ProjectsFilter({ filterProperties }) {
 
     const fetchTeamsWithLogoSearchTerm = async (searchTerm) => {
         try {
-            const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}&select=uid,name,shortDescription,logo.url,industryTags.title`);
+            const response = await api.get(`/v1/teams?name__icontains=${searchTerm}&select=uid,name,shortDescription,logo.url,industryTags.title`);
             if (response.data) {
                 return response.data.map((item) => {
                     return { value: item.uid, label: item.name, logo: item?.logo?.url ? item.logo.url : null };

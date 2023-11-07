@@ -92,6 +92,7 @@ const getFormattedProject = (project) => {
             formattedProject['readMe'] = project.readMe ?? '';
             formattedProject['teamUid'] = project.maintainingTeamUid;
             formattedProject['maintainingTeam'] = project.maintainingTeam;
+            formattedProject['isDeleted'] = project.isDeleted ?? false;
             
             const tempCTeams = [];
             project.contributingTeams.map(team=>{

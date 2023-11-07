@@ -16,7 +16,7 @@ export default function TeamsInvolved({ project }) {
                     </div>
                     {
                         project.contributingTeams
-                        && project.contributingTeams.length
+                        && project.contributingTeams.length > 0 
                         &&
                         project.contributingTeams.map((cteam, index) => {
                             return (

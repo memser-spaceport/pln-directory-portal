@@ -83,7 +83,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
             queryParams['orderBy'] = '-name'
         }
         if(query?.searchBy){
-            queryParams['name'] = query?.searchBy;
+            queryParams['name__icontains'] = query?.searchBy;
         }
     }
     

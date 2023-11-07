@@ -50,7 +50,7 @@ export default function URLDetails({ onInputChange, urlFieldArray, setURLField }
                 />
                 <InputError content={addProjectsState.errors?.projectURLs?.[index]?.['text']}/>
             </div>
-            <div className="w-[340px]">
+            <div className="basis-4/6">
                 <InputField
                     name={"url" + field.id}
                     label=""

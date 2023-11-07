@@ -1,9 +1,32 @@
 import Image from "next/image";
 import { ReactComponent as EditIcon } from '/public/assets/images/icons/edit.svg';
 import { useRouter } from "next/router";
+import { ReactComponent as RemoveIcon } from '/public/assets/images/icons/projects/remove-kpi.svg';
+import ProjectsService from "apps/web-app/services/projects";
+import { toast } from "react-toastify";
+import { DeleteConfirmationModal } from "./delete-confirmation";
+import { useState } from "react";
 
-export default function Header({ project, userHasEditRights }) {
+export default function Header({ project, userHasEditRights, userHasDeleteRights }) {
     const router = useRouter();
+    const [isOpen, setIsModalOpen] = useState(false);
+
+    const delProject = () => {
+        setIsModalOpen(true);
+    }
+
+    const onYes = async () => {
+        try {
+            const res = await ProjectsService.deleteProject(project.id);
+            if (res.status === 200) {
+                toast.success('Project deleted successfully.');
+                setIsModalOpen(false)
+            }
+        } catch (err) {
+            console.error(err);
+            setIsModalOpen(false);
+        }
+    }
 
     return (
         <>
@@ -18,19 +41,37 @@ export default function Header({ project, userHasEditRights }) {
                     </div>
                 </div>
                 {
-                    userHasEditRights 
-                    && 
-                    <div className="flex text-base font-semibold text-[#156FF7] cursor-pointer"
-                    onClick={() => {
-                        
-                        router.push('/directory/projects/edit/' + project.id)
-                    }}
-                >
-                    <EditIcon className="m-1" />{' '}
-                    Edit Project
-                </div>
+                    !project.isDeleted
+                    &&
+                    <div className="flex gap-2">
+                    {
+                        userHasEditRights
+                        &&
+                        <div className="flex text-base font-semibold text-[#156FF7] cursor-pointer"
+                            onClick={() => {
+
+                                router.push('/directory/projects/edit/' + project.id)
+                            }}
+                        >
+                            <EditIcon className="m-1" />{' '}
+                            Edit Project
+                        </div>
+                    }
+                    {
+                        userHasDeleteRights
+                        &&
+                        <div className="flex text-base font-semibold text-[#e74c3c] cursor-pointer gap-2"
+                            onClick={() => {
+                                delProject();
+                            }}
+                        >
+                            <RemoveIcon className="" />{' '}
+                            <div>Delete Project</div>
+                        </div>
+                    }
+                </div> 
                 }
-                
+                <DeleteConfirmationModal isOpen={isOpen} setIsModalOpen={setIsModalOpen} onYes={onYes}/>
             </div>
         </>
     );
