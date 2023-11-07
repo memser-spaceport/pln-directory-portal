@@ -2,7 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["interactiveTransactions"]
 }
 
@@ -15,69 +15,73 @@ datasource db {
 /// TODO: User permissions/grants
 
 model Team {
-  id                Int                @id @default(autoincrement())
-  uid               String             @unique @default(cuid())
-  name              String             @unique
-  logo              Image?             @relation(fields: [logoUid], references: [uid])
-  logoUid           String?
-  blog              String?
-  officeHours       String?
-  website           String?
-  contactMethod     String?
-  twitterHandler    String?
-  linkedinHandler   String?
-  telegramHandler   String?
-  shortDescription  String?
-  longDescription   String?
-  plnFriend         Boolean            @default(false)
-  airtableRecId     String?            @unique
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  teamMemberRoles   TeamMemberRole[]
-  industryTags      IndustryTag[]
-  membershipSources MembershipSource[]
-  fundingStage      FundingStage?      @relation(fields: [fundingStageUid], references: [uid])
-  fundingStageUid   String?
-  technologies      Technology[]
-  moreDetails       String?
+  id                   Int                @id @default(autoincrement())
+  uid                  String             @unique @default(cuid())
+  name                 String             @unique
+  logo                 Image?             @relation(fields: [logoUid], references: [uid])
+  logoUid              String?
+  blog                 String?
+  officeHours          String?
+  website              String?
+  contactMethod        String?
+  twitterHandler       String?
+  linkedinHandler      String?
+  telegramHandler      String?
+  shortDescription     String?
+  longDescription      String?
+  plnFriend            Boolean            @default(false)
+  airtableRecId        String?            @unique
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  teamMemberRoles      TeamMemberRole[]
+  industryTags         IndustryTag[]
+  membershipSources    MembershipSource[]
+  fundingStage         FundingStage?      @relation(fields: [fundingStageUid], references: [uid])
+  fundingStageUid      String?
+  technologies         Technology[]
+  moreDetails          String?
+  maintainingProjects  Project[]          @relation("maintainingTeam")
+  contributingProjects Project[]          @relation("contributingTeams")
 }
 
 model Member {
-  id              Int              @id @default(autoincrement())
-  uid             String           @unique @default(cuid())
-  name            String
-  email           String?          @unique
-  image           Image?           @relation(fields: [imageUid], references: [uid])
-  imageUid        String?
-  githubHandler   String?
-  discordHandler  String?
-  twitterHandler  String?
-  linkedinHandler String?
-  telegramHandler String?
-  officeHours     String?
-  moreDetails     String?
-  plnFriend       Boolean          @default(false)
-  plnStartDate    DateTime?        
-  airtableRecId   String?          @unique
-  externalId      String?          @unique
-  openToWork     Boolean?         @default(false)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  skills          Skill[]
-  location        Location?        @relation(fields: [locationUid], references: [uid])
-  locationUid     String?
-  teamMemberRoles TeamMemberRole[]
-  memberRoles     MemberRole[]
-  preferences     Json?
+  id                   Int                   @id @default(autoincrement())
+  uid                  String                @unique @default(cuid())
+  name                 String
+  email                String?               @unique
+  image                Image?                @relation(fields: [imageUid], references: [uid])
+  imageUid             String?
+  githubHandler        String?
+  discordHandler       String?
+  twitterHandler       String?
+  linkedinHandler      String?
+  telegramHandler      String?
+  officeHours          String?
+  moreDetails          String?
+  plnFriend            Boolean               @default(false)
+  plnStartDate         DateTime?
+  airtableRecId        String?               @unique
+  externalId           String?               @unique
+  openToWork           Boolean?              @default(false)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  skills               Skill[]
+  location             Location?             @relation(fields: [locationUid], references: [uid])
+  locationUid          String?
+  teamMemberRoles      TeamMemberRole[]
+  memberRoles          MemberRole[]
+  preferences          Json?
+  projectContributions ProjectContribution[]
+  projects             Project[]
 }
 
 model MemberRole {
-  id              Int              @id @default(autoincrement())
-  uid             String           @unique @default(cuid())
-  name            String           @unique
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  members         Member[]
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  members   Member[]
 }
 
 enum ParticipantType {
@@ -93,17 +97,17 @@ enum ApprovalStatus {
 }
 
 model ParticipantsRequest {
-   id                    Int                @id @default(autoincrement())
-   uid                   String             @unique @default(cuid())
-   participantType       ParticipantType
-   status                ApprovalStatus     @default(PENDING)
-   oldData               Json?
-   newData               Json
-   referenceUid          String?
-   requesterEmailId      String
-   uniqueIdentifier      String
-   createdAt             DateTime           @default(now())
-   updatedAt             DateTime           @updatedAt
+  id               Int             @id @default(autoincrement())
+  uid              String          @unique @default(cuid())
+  participantType  ParticipantType
+  status           ApprovalStatus  @default(PENDING)
+  oldData          Json?
+  newData          Json
+  referenceUid     String?
+  requesterEmailId String
+  uniqueIdentifier String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 }
 
 model Skill {
@@ -115,7 +119,6 @@ model Skill {
   updatedAt   DateTime @updatedAt
   members     Member[]
 }
-
 
 model Location {
   id                 Int      @id @default(autoincrement())
@@ -168,7 +171,7 @@ model IndustryTag {
   uid                 String            @unique @default(cuid())
   title               String            @unique
   definition          String?
-  airtableRecId   String?             @unique
+  airtableRecId       String?           @unique
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
   industryCategory    IndustryCategory? @relation(fields: [industryCategoryUid], references: [uid])
@@ -204,28 +207,87 @@ model Technology {
 }
 
 model Image {
-  id             Int       @id @default(autoincrement())
-  uid            String    @unique @default(cuid())
+  id                  Int                   @id @default(autoincrement())
+  uid                 String                @unique @default(cuid())
   // The cid is not unique because this id represents an array of multiple images
   // with different sizes that can be accessed trough the cid and filename
-  cid            String
-  width          Int
-  height         Int
-  url            String
-  filename       String
-  size           Int
-  type           String
-  version        ImageSize
+  cid                 String
+  width               Int
+  height              Int
+  url                 String
+  filename            String
+  size                Int
+  type                String
+  version             ImageSize
   // This image can be a thumbnail to other image
-  thumbnailToUid String?
-  thumbnailTo    Image?    @relation("ImageThumbnails", fields: [thumbnailToUid], references: [uid])
+  thumbnailToUid      String?
+  thumbnailTo         Image?                @relation("ImageThumbnails", fields: [thumbnailToUid], references: [uid])
   // This image can have multiple thumbnails
-  thumbnails     Image[]   @relation("ImageThumbnails")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  thumbnails          Image[]               @relation("ImageThumbnails")
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
   // Reverse Relations:
-  Team           Team[]
-  Member         Member[]
+  Team                Team[]
+  Member              Member[]
+  Project             Project[]
+}
+
+model ProjectContribution {
+  id             Int       @id @default(autoincrement())
+  uid            String    @unique @default(cuid())
+  role           String?         
+  description    String?
+  currentProject Boolean   @default(false)
+  startDate      DateTime
+  endDate        DateTime?
+  memberUid      String
+  member         Member?   @relation(fields: [memberUid], references: [uid])
+  projectUid     String
+  project        Project?  @relation(fields: [projectUid], references: [uid])
+}
+
+model Faq {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  email     String   @db.VarChar(100)
+  question  String
+  type      String
+  requestIp String   @db.VarChar(35)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model JoinRequest {
+  id           Int      @id @default(autoincrement())
+  uid          String   @unique @default(cuid())
+  email        String   @db.VarChar(100)
+  introduction String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Project {
+  id                  Int                   @id @default(autoincrement())
+  uid                 String                @unique @default(cuid())
+  logo                Image?                @relation(fields: [logoUid], references: [uid])
+  logoUid             String?
+  name                String
+  tagline             String
+  description         String
+  contactEmail        String
+  lookingForFunding   Boolean               @default(false)
+  projectLinks        Json?
+  kpis                Json?
+  readMe              String?
+  creator             Member?               @relation(fields: [createdBy], references: [uid])
+  createdBy           String
+  maintainingTeam     Team?                 @relation("maintainingTeam", fields: [maintainingTeamUid], references: [uid])
+  maintainingTeamUid  String
+  contributingTeams   Team[]                @relation("contributingTeams")
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  projectContributions ProjectContribution[]
+  isDeleted           Boolean               @default(false)
 }
 
 enum ImageSize {

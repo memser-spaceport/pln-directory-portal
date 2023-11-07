@@ -25,6 +25,7 @@ import axios from 'axios';
 import { EmailOtpService } from '../otp/email-otp.service';
 import { AuthService } from '../auth/auth.service';
 import { LogService } from '../shared/log.service';
+import { DIRECTORYADMIN } from '../utils/constants';
 @Injectable()
 export class MembersService {
   constructor(
@@ -64,6 +65,15 @@ export class MembersService {
             },
           },
         },
+        projectContributions: {
+          include: {
+            project: {
+              include:{
+                logo: true
+              }
+            }
+          }
+        }
       },
     });
   }
@@ -75,6 +85,7 @@ export class MembersService {
         image: true,
         memberRoles: true,
         teamMemberRoles: true,
+        projectContributions: true
       },
     });
   }
@@ -86,6 +97,7 @@ export class MembersService {
         image: true,
         memberRoles: true,
         teamMemberRoles: true,
+        projectContributions: true
       },
     });
   }
@@ -442,8 +454,8 @@ export class MembersService {
       {
         where: { uid: uid },
         select: {
-          email: true, 
-          githubHandler: true, 
+          email: true,
+          githubHandler: true,
           telegramHandler:true,
           discordHandler: true,
           linkedinHandler: true,
@@ -454,9 +466,9 @@ export class MembersService {
     );
     const preferences = {...resp.preferences};
     if (!resp.preferences) {
-      preferences.isnull = true; 
+      preferences.isnull = true;
     } else{
-      preferences.isnull = false; 
+      preferences.isnull = false;
     }
     preferences.email = resp?.email ? true: false;
     preferences.github = resp?.githubHandler ? true: false;
@@ -465,5 +477,26 @@ export class MembersService {
     preferences.linkedin = resp?.linkedinHandler ? true : false;
     preferences.twitter = resp?.twitterHandler ? true: false;
     return preferences;
+  }
+
+  async isMemberLeadTeam(member, teamUid) {
+    const user = await this.memberToUserInfo(member);
+    if (user.leadingTeams.includes(teamUid)) {
+      return true;
+    }
+    return false;
+  }
+
+  checkIfAdminUser = (member) => {
+    const roleFilter = member.memberRoles.filter((roles) => {
+      return roles.name === DIRECTORYADMIN;
+    });
+    return roleFilter.length > 0;
+  };
+
+  async isMemberPartOfTeams(member, teams) {
+    return member.teamMemberRoles.some((role) => {
+      return teams.includes(role.teamUid)
+    });
   }
 }

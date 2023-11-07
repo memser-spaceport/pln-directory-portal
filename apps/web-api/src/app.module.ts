@@ -29,6 +29,9 @@ import { AuthModule } from './auth/auth.module';
 import { SharedModule } from './shared/shared.module';
 import { LogException } from './filters/log-exception.filter';
 import { OtpModule } from './otp/otp.module';
+import { FaqModule } from './faq/faq.module';
+import { ProjectsModule } from './projects/projects.module';
+import { JoinRequestsModule } from './join-requests/join-requests.module';
 
 @Module({
   controllers: [AppController],
@@ -73,7 +76,10 @@ import { OtpModule } from './otp/otp.module';
     AdminModule,
     AuthModule,
     SharedModule,
-    OtpModule
+    OtpModule,
+    FaqModule,
+    ProjectsModule,
+    JoinRequestsModule
   ],
   providers: [
     {

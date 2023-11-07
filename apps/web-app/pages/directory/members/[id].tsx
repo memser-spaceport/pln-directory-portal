@@ -9,7 +9,7 @@ import Cookies from 'js-cookie';
 import { NextSeo } from 'next-seo';
 import { ReactElement, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { ADMIN_ROLE, LOGGED_IN_MSG, PRIVACY_CONSTANTS, SCHEDULE_MEETING_MSG  } from '../../../constants';
+import { ADMIN_ROLE, LOGGED_IN_MSG, PRIVACY_CONSTANTS, SCHEDULE_MEETING_MSG } from '../../../constants';
 import { TagsGroup } from '../../../components/shared/tags-group/tags-group';
 import { MemberProfileDetails } from '../../../components/members/member-profile/member-profile-details/member-profile-details';
 import { MemberProfileHeader } from '../../../components/members/member-profile/member-profile-header/member-profile-header';
@@ -33,6 +33,8 @@ import {
   fetchGitProjectsByMember
 } from '../../../utils/services/members';
 import { MemberProfileLoginStrip } from '../../../components/members/member-profile/member-profile-login-strip/member-profile-login-strip';
+import MemberExperience from 'apps/web-app/components/members/member-profile/member-experience/member-experience';
+import { useRouter } from 'next/router';
 
 interface MemberProps {
   member: IMember;
@@ -58,6 +60,20 @@ export default function Member({
   const description = member.mainTeam
     ? `${member.mainTeam.role} at ${member.mainTeam.name}`
     : 'Contributor';
+  const isEditable = (userInfo.uid === member.id ||
+    (userInfo.roles?.length > 0 &&
+      userInfo.roles.includes('DIRECTORYADMIN')))
+  const isOwner = userInfo?.uid === member?.id;
+  const memberProjectContributions = member?.projectContributions ?? [];
+  const router = useRouter();
+
+  const onEditOrAdd = () => {
+    if (isOwner) {
+      router.push('/directory/settings?tab=contributions')
+    } else {
+      router.push('/directory/settings')
+    }
+  }
 
   useEffect(() => {
     const params = Cookies.get('page_params');
@@ -65,7 +81,7 @@ export default function Member({
       toast.info(LOGGED_IN_MSG + ', ' + SCHEDULE_MEETING_MSG, {
         hideProgressBar: true,
       });
-    } else if(params === 'user_logged_in') {
+    } else if (params === 'user_logged_in') {
       toast.info(LOGGED_IN_MSG, {
         hideProgressBar: true,
       });
@@ -112,6 +128,15 @@ export default function Member({
                 member={member}
               />
             )}
+            {memberProjectContributions.length > 0 && <MemberExperience isOwner={isOwner} isEditable={isEditable} contributions={member.projectContributions} />}
+
+            {(memberProjectContributions.length === 0 && isEditable) && <div className="text-[#64748B] mt-[20px] text-[15px] font-[500]">
+              <h3>Project Experience</h3>
+              <div className="mt-[10px] rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)]">
+                <p className="text-[#0F172A] font-[400] text-[12px] p-[16px]"><span onClick={onEditOrAdd} className="text-[#156FF7] cursor-pointer">Click here</span> to add your experience & contribution details.</p>
+              </div>
+
+            </div>}
           </div>
         </div>
         {/* <div className="w-sidebar shrink-0">
@@ -174,14 +199,14 @@ export const getServerSideProps = async (ctx) => {
 
     return memberUID
       ? {
-          redirect: {
-            permanent: true,
-            destination: `/directory/members/${memberUID}`,
-          },
-        }
+        redirect: {
+          permanent: true,
+          destination: `/directory/members/${memberUID}`,
+        },
+      }
       : {
-          notFound: true,
-        };
+        notFound: true,
+      };
   }
 
   const [memberResponse, memberTeamsResponse] = await Promise.all([
@@ -211,7 +236,7 @@ export const getServerSideProps = async (ctx) => {
 
   let officeHoursFlag = false;
   officeHoursFlag = member['officeHours'] ? true : false;
-  if(!isUserLoggedIn && member['officeHours']){
+  if (!isUserLoggedIn && member['officeHours']) {
     delete member['officeHours'];
   }
 
@@ -239,7 +264,7 @@ export const getServerSideProps = async (ctx) => {
     'no-cache, no-store, max-age=0, must-revalidate'
   );
 
-  if(member?.preferences){
+  if (member?.preferences) {
     delete member.preferences
   }
   return {

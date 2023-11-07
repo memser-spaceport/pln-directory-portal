@@ -18,6 +18,8 @@ import {
   teams,
   technologies,
   memberRoles,
+  projects,
+  projectRelations
 } from './fixtures';
 
 /**
@@ -97,6 +99,10 @@ load([
     },
   },
   { [Prisma.ModelName.TeamMemberRole]: teamMemberRoles },
+  { [Prisma.ModelName.Project]: {
+    fixtures: projects,
+    relations: projectRelations
+  }}
 ])
   .then(async () => {
     await prisma.$disconnect();

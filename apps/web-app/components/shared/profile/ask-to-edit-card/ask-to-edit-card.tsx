@@ -193,6 +193,7 @@ export function AskToEditCard({
       > */}
         {member?.id && (
           <EditMemberModal
+            tabSelection=""
             isOpen={isMemberModalOpen}
             setIsModalOpen={setIsMemberModalOpen}
             id={member?.id}

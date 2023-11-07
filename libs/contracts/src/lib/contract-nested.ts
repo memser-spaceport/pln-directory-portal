@@ -7,6 +7,7 @@ import { apiMembers } from './contract-member';
 import { apiSkills } from './contract-skills';
 import { apiTeam } from './contract-team';
 import { apiTechnologies } from './contract-technology';
+import { apiProjects } from './contract-project';
 
 const contract = initContract();
 
@@ -59,4 +60,5 @@ export const apiNested = contract.router({
    * Technologies API
    */
   technologies: apiTechnologies,
+  projects: apiProjects
 });

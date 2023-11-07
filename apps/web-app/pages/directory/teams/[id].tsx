@@ -25,6 +25,8 @@ import {
 import { ITeam } from '../../../utils/teams.types';
 import { parseTeam } from '../../../utils/teams.utils';
 import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../../utils/services/auth';
+import TeamProfileProjects from 'apps/web-app/components/teams/team-profile/team-profile-projects/team-profile-projects';
+import ProjectsService from 'apps/web-app/services/projects';
 
 interface TeamProps {
   team: ITeam;
@@ -32,9 +34,11 @@ interface TeamProps {
   backLink: string;
   isUserLoggedIn: boolean;
   userInfo: any;
+  teamsProjectList:any;
+  hasProjectsEditAccess: boolean;
 }
 
-export default function Team({ team, members, backLink, userInfo }: TeamProps) {
+export default function Team({ team, members, backLink, userInfo, teamsProjectList, hasProjectsEditAccess }: TeamProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
     directoryName: 'Teams',
@@ -58,6 +62,8 @@ export default function Team({ team, members, backLink, userInfo }: TeamProps) {
             <TeamProfileFunding {...team} />
           ) : null}
           <TeamProfileMembers members={members} />
+          <TeamProfileProjects projects={teamsProjectList} userInfo={userInfo} team={team} hasProjectsEditAccess={hasProjectsEditAccess}/>
+
         </div>
         {/* <div className="w-sidebar shrink-0">
           <AskToEditCard profileType="team" team={team} />
@@ -85,6 +91,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
   }
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
   const isUserLoggedIn = cookies?.authToken &&  cookies?.userInfo ? true : false;
+  let hasProjectsEditAccess = false;
   const { id, backLink = '/directory/teams' } = query as {
     id: string;
     backLink: string;
@@ -115,7 +122,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
     getMembers({
       'teamMemberRoles.team.uid': id,
       select:
-        'uid,name,image.url,skills.title,teamMemberRoles.team.uid,teamMemberRoles.team.name,teamMemberRoles.role,teamMemberRoles.teamLead,teamMemberRoles.mainTeam',
+        'uid,name,image.url,skills.title,teamMemberRoles.team.uid,projectContributions,teamMemberRoles.team.name,teamMemberRoles.role,teamMemberRoles.teamLead,teamMemberRoles.mainTeam',
       pagination: false,
     }),
   ]);
@@ -129,6 +136,26 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
       ['teamLead', 'name'],
       ['desc', 'asc']
     );
+  }
+
+  for(const mem of members){
+    if(mem.id === userInfo.uid){
+      hasProjectsEditAccess = true;
+      break;
+    }
+  }
+  if(userInfo.roles && userInfo.roles.length && userInfo.roles.includes('DIRECTORYADMIN')){
+    hasProjectsEditAccess = true;
+  }
+  
+
+  const { getTeamsProject } = ProjectsService;
+
+  let teamsProjectList = [];
+  try{
+    teamsProjectList = await getTeamsProject(id);
+  }catch(err){
+    console.log(err);
   }
 
   // Redirects user to the 404 page when we're unable to fetch
@@ -147,6 +174,6 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
   );
 
   return {
-    props: { team, members, backLink, isUserLoggedIn, userInfo },
+    props: { team, members, backLink, isUserLoggedIn, userInfo, teamsProjectList, hasProjectsEditAccess },
   };
 };

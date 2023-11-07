@@ -61,15 +61,18 @@ api.interceptors.request.use(async (config) => {
 
             setCookie(null, 'authToken', JSON.stringify(accessToken), {
               maxAge: calculateExpiry(access_token.exp),
-              path: '/'
+              path: '/',
+              domain: process.env.COOKIE_DOMAIN || ''
             });
             setCookie(null, 'refreshToken', JSON.stringify(refreshToken), {
               maxAge: calculateExpiry(refresh_token.exp),
-              path: '/'
+              path: '/',
+              domain: process.env.COOKIE_DOMAIN || ''
             });
             setCookie(null, 'userInfo', JSON.stringify(userInfo), {
               maxAge: calculateExpiry(access_token.exp),
-              path: '/'
+              path: '/',
+              domain: process.env.COOKIE_DOMAIN || ''
             });
             config.headers['Authorization'] = `Bearer ${accessToken}`.replace(
               /"/g,
@@ -100,9 +103,9 @@ api.interceptors.response.use(
     let msg = SOMETHING_WENT_WRONG;
     if (response) {
       if (response.status === 401) {
-        Cookies.remove('authToken');
-        Cookies.remove('refreshToken');
-        Cookies.remove('userInfo');
+        Cookies.remove('authToken', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+        Cookies.remove('refreshToken', { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
+        Cookies.remove('userInfo', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
         toast.info(RETRY_LOGIN_MSG, {
           hideProgressBar: true
         });

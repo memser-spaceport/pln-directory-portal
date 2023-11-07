@@ -28,9 +28,18 @@ function ChangeEmailModal(props) {
         if (refreshToken && accessToken) {
             const accessTokenExpiry = decodeToken(accessToken);
             const refreshTokenExpiry = decodeToken(refreshToken);
-            Cookies.set('authToken', JSON.stringify(accessToken), { expires: calculateExpiry(new Date(accessTokenExpiry.exp)) })
-            Cookies.set('refreshToken', JSON.stringify(refreshToken), { expires: calculateExpiry(new Date(refreshTokenExpiry.exp)) })
-            Cookies.set('userInfo', JSON.stringify(userInfo), { expires: calculateExpiry(new Date(accessTokenExpiry.exp)) })
+            Cookies.set('authToken', JSON.stringify(accessToken), { 
+                expires: calculateExpiry(new Date(accessTokenExpiry.exp)),
+                domain: process.env.COOKIE_DOMAIN || ''
+            });
+            Cookies.set('refreshToken', JSON.stringify(refreshToken), {
+                expires: calculateExpiry(new Date(refreshTokenExpiry.exp)),
+                domain: process.env.COOKIE_DOMAIN || ''
+            });
+            Cookies.set('userInfo', JSON.stringify(userInfo), { 
+                expires: calculateExpiry(new Date(accessTokenExpiry.exp)),
+                domain: process.env.COOKIE_DOMAIN || ''
+            });
         }
     }
 
@@ -176,9 +185,9 @@ function ChangeEmailModal(props) {
 
     const clearAllAuthCookies = () => {
         Cookies.remove('idToken')
-        Cookies.remove('authToken')
-        Cookies.remove('refreshToken')
-        Cookies.remove('userInfo')
+        Cookies.remove('authToken', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+        Cookies.remove('refreshToken', { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
+        Cookies.remove('userInfo', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
     }
 
     const goToError = (errorMessage) => {
