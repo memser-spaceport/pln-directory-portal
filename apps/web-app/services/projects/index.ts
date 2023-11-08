@@ -29,7 +29,6 @@ const uploadProjectLogo = async (inputs) => {
             },
         };
         const imageResponse = await api.post(`/v1/images`, formData, config);
-        console.log(imageResponse.data.image);
         return imageResponse.data.image;
     }else{
         return null;

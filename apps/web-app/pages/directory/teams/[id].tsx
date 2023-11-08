@@ -38,7 +38,7 @@ interface TeamProps {
   hasProjectsEditAccess: boolean;
 }
 
-export default function Team({ team, members, backLink, userInfo, teamsProjectList, hasProjectsEditAccess }: TeamProps) {
+export default function Team({ team, members, backLink, userInfo, teamsProjectList, hasProjectsEditAccess, isUserLoggedIn }: TeamProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
     directoryName: 'Teams',
@@ -62,7 +62,7 @@ export default function Team({ team, members, backLink, userInfo, teamsProjectLi
             <TeamProfileFunding {...team} />
           ) : null}
           <TeamProfileMembers members={members} />
-          <TeamProfileProjects projects={teamsProjectList} userInfo={userInfo} team={team} hasProjectsEditAccess={hasProjectsEditAccess}/>
+          <TeamProfileProjects projects={teamsProjectList} isUserLoggedIn={isUserLoggedIn} team={team} hasProjectsEditAccess={hasProjectsEditAccess}/>
 
         </div>
         {/* <div className="w-sidebar shrink-0">

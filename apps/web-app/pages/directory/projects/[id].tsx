@@ -68,8 +68,12 @@ ProjectDetails.getLayout = function getLayout(page: ReactElement) {
     return <DirectoryLayout>{page}</DirectoryLayout>;
 };
 
-const checkForEditRights = async (userInfo, selectedProject) => {
+const checkForEditRights = async (userInfo, selectedProject, isUserLoggedIn) => {
     try {
+
+        if(!isUserLoggedIn){
+            return false;
+        }
 
         //case 1.validating if the user is ADMIN
         if (userInfo.roles && userInfo.roles.length && userInfo.roles.includes('DIRECTORYADMIN')) {
@@ -95,9 +99,11 @@ const checkForEditRights = async (userInfo, selectedProject) => {
                     return true;
                 }
                 //case 4.Validating if the user belongs to one of the contributing teams 
-                for (const cTeam of selectedProject.contributingTeams) {
-                    if (cTeam.value === team.uid) {
-                        return true;
+                if(selectedProject?.contributingTeams?.length){
+                    for (const cTeam of selectedProject.contributingTeams) {
+                        if (cTeam.value === team.uid) {
+                            return true;
+                        }
                     }
                 }
             }
@@ -109,8 +115,11 @@ const checkForEditRights = async (userInfo, selectedProject) => {
     }
 }
 
-const checkForDeleteRights = (userInfo,selectedProject) => {
- if(userInfo.roles && userInfo.roles.length && userInfo.roles.includes('DIRECTORYADMIN')){
+const checkForDeleteRights = (userInfo,selectedProject,isUserLoggedIn) => {
+    if (!isUserLoggedIn) {
+        return false;
+    }
+    if (userInfo.roles && userInfo.roles.length && userInfo.roles.includes('DIRECTORYADMIN')){
     return true;
  }
  
@@ -146,8 +155,8 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     
     if (selectedProjectResponse.status === 200) {
         selectedProject = ProjectsDataService.getFormattedProject(selectedProjectResponse.body);
-        userHasEditRights = await checkForEditRights(userInfo, selectedProject);
-        userHasDeleteRights = checkForDeleteRights(userInfo, selectedProject);
+        userHasEditRights = await checkForEditRights(userInfo, selectedProject, isUserLoggedIn);
+        userHasDeleteRights = checkForDeleteRights(userInfo, selectedProject, isUserLoggedIn);
     } else if (selectedProjectResponse.status === 404) {
         return {
             notFound: true,

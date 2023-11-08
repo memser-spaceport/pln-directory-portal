@@ -8,6 +8,8 @@ import { LoadingIndicator } from "../shared/loading-indicator/loading-indicator"
 
 export default function ActionButtons(){
     const urlRE = /(^|\s)((https?:\/\/)?[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?)(?![.\S])/gi;
+    const emailRE =
+  /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
     const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
     const [isProcessing, setIsProcessing] = useState<boolean>(false);
     // const { uploadProjectLogo, addProject } = ProjectsService;
@@ -68,6 +70,10 @@ export default function ActionButtons(){
 
         if(!inputs.contactEmail){
             errors['contactEmail'] = 'Contact Email is required';
+        }
+
+        if(inputs.contactEmail && !inputs.contactEmail.match(emailRE)){
+            errors['contactEmail'] = 'Invalid Email';
         }
 
         inputs.KPIs?.map((kpi,index)=>{

@@ -112,7 +112,7 @@ const getFormattedProject = (project) => {
                 const teamObj = {};
                 teamObj['value'] = team.uid;
                 teamObj['label'] = team.name;
-                teamObj['logo'] = team.logo?.url;
+                teamObj['logo'] = team.logo ? team.logo.url : null;
                 tempCTeams.push(teamObj);
             });
             formattedProject['contributingTeams'] = tempCTeams;
