@@ -1,6 +1,7 @@
 import { SingleSelect, Switch } from "@protocol-labs-network/ui";
 import { useEffect, useRef } from "react";
 import ProjectSelection from "./project-selection";
+import ProjectDescription from "./project-description";
 
 function ProjectContributionForm(props) {
     const showAddProject = props.showAddProject;
@@ -59,11 +60,17 @@ function ProjectContributionForm(props) {
             onItemChange(expIndex, 'projectName', item.name);
             onItemChange(expIndex, 'projectUid', item?.uid)
         onItemChange(expIndex, 'projectLogo', item?.logo?.url)
+        onItemChange(expIndex, 'project', item)
         } else {
             onItemChange(expIndex, 'projectName', "");
             onItemChange(expIndex, 'projectLogo', "")
             onItemChange(expIndex, 'projectUid', "");
+            onItemChange(expIndex, 'project', null);
         }
+    }
+
+    const onDescChanged = (newValue) => {
+        onItemChange(expIndex, 'description', newValue)
     }
 
     return <>
@@ -132,7 +139,8 @@ function ProjectContributionForm(props) {
                     {/********************************   DESCRIPTION   ***********************************/}
                     <div className="mt-[20px]">
                         <label className="text-[14px] font-[600]">Description</label>
-                        <textarea rows={5} maxLength={2000} ref={descriptionRef} placeholder="" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" value={exp.description} onChange={(e) => onItemChange(expIndex, 'description', e.target.value)} />
+                        <ProjectDescription content={exp.description} onItemChange={onDescChanged}/>
+                      {/*   <textarea rows={5} maxLength={2000} ref={descriptionRef} placeholder="" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" value={exp.description} onChange={(e) => onItemChange(expIndex, 'description', e.target.value)} /> */}
                         {descriptionRef.current && <p className="text-[#475569] font-[500] text-[12px]">{`${descriptionRef?.current?.value?.length} of 2000 characters used`}</p>}
                     </div>
                 </div>}
