@@ -115,7 +115,7 @@ function validateContributionForm(fValues) {
     } if(exp.role.trim() === '') {
       formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'role', error: "Role is Mandatory"})
     } if(exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
-      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "To Date cannot be less than start date"})
+      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "To date cannot be less than or equal to start date"})
     }
   })
 
@@ -678,6 +678,8 @@ export function EditMemberModal({
             setOpenTab(1);
             setBasicErrors([]);
             setSkillErrors([]);
+            setContributionErrors([]);
+            setContributionObjErrors([]);
             if (
               (imageChanged || isNameChanged) &&
               setRefreshMemberAutocomplete

@@ -71,7 +71,7 @@ function ProjectContribution(props) {
                     <p className="hidden">{`Total experiences ${contributions.length}`}</p>
                     <button onClick={onAddContribution} className="flex items-center justify-center">
                         <img src="/assets/images/icons/add-company-icon.svg" />
-                        <span className="text-blue-600 font-[500] text-[13px]" >Click To Add Project Contributions</span>
+                        <span className="text-blue-600 font-[500] text-[13px]" >Click to add project contributions</span>
                     </button>
 
                 </div>

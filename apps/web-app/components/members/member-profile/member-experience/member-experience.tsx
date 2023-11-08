@@ -1,7 +1,9 @@
 import { useRouter } from "next/router";
 import MemberExperienceDescription from "./member-experience-item";
+import { SETTINGS_CONSTANTS } from "apps/web-app/constants";
 
 function MemberExperience(props) {
+    const member = props?.member;
     const isEditable = props.isEditable ?? false;
     const contributions = props.contributions ?? [];
     const isOwner = props.isOwner;
@@ -14,11 +16,14 @@ function MemberExperience(props) {
     }
     const onEditOrAdd  = () => {
         if(isOwner) {
-          router.push('/directory/settings?tab=contributions')
+          router.push({pathname: '/directory/settings', query: {tab: 'contributions'}}, '/directory/settings')
         } else {
-          router.push('/directory/settings')
+          const query = { id: member?.id, tab: 'contributions', name: member?.name, logo: member?.image, from: SETTINGS_CONSTANTS.MEMBER };
+          router.push({
+            pathname: '/directory/settings',
+            query
+          }, '/directory/settings');
         }
-
     }
 
     const onProjectClicked = (proj) => {
