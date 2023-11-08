@@ -33,7 +33,6 @@ export default function ProjectsFilter({ filterProperties, isUserLoggedIn }) {
     const clearFilters = () => {
         const cleanQuery = { ...query };
         filterProperties.forEach((property) => delete cleanQuery[property]);
-        console.log(cleanQuery);
         
         push({ pathname, query: cleanQuery });
         projectsDispatch({ type: 'CLEAR_FILTER'});

@@ -38,7 +38,13 @@ export default function Header({ project, userHasEditRights, userHasDeleteRights
                     <div className="flex flex-col gap-1 justify-center">
                         <div className="text-[24px] font-bold flex gap-2">
                             <div>{project.name}</div>
-                            <Image src={'/assets/images/icons/projects/funding-with-bg.svg'} alt="project image" width={24} height={24} />
+                            {
+                                project?.fundingNeeded 
+                                &&
+                                <div title="Raising Funds">
+                                    <Image src={'/assets/images/icons/projects/funding-with-bg.svg'} alt="project image" width={24} height={24} />
+                                </div>
+                            }
                         </div>
                         <div className="text-[15px]">{project.tagline}</div>
                     </div>

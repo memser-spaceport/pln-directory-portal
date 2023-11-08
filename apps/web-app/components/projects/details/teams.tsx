@@ -3,11 +3,11 @@ import { AllTeamsModal } from "./all-teams";
 import React, { useState } from "react";
 import { useRouter } from "next/router";
 import { ReactComponent as Core } from '/public/assets/images/icons/projects/core.svg';
+import { UserGroupIcon } from "@heroicons/react/solid";
 
 export default function TeamsInvolved({ project }) {
     const [seeAllPopup, setSeeAllPopup] = useState(false);
     const router = useRouter();
-console.log(project);
 
     return (
         <>
@@ -43,11 +43,16 @@ console.log(project);
                                 <React.Fragment key={'cteam' + index}>
                                     {
                                         index < 3 &&
-                                        <div className="text-[16px] text-[#64748B] flex gap-[10px] cursor-pointer hover:bg-slate-100"
+                                        <div className="text-[16px] text-[#64748B] flex gap-[10px] cursor-pointer hover:bg-slate-100 relative"
                                          key={'cteam' + index}
                                          onClick={() => { router.push('/directory/teams/' + cteam.value  ) }}
                                          >
-                                            <div><Image src={cteam.logo} alt="project image" width={40} height={40} className="rounded" /></div>
+                                            {
+                                                cteam.logo && <div><Image src={cteam.logo} alt="project image" width={40} height={40} className="rounded" /></div>
+                                            }
+                                            {
+                                                !cteam.logo && <UserGroupIcon className="bg-gray-200 fill-white inline inset-y-0 left-2 my-auto h-[40px] w-[40px] rounded mr-[4px]" />
+                                            }
                                             <div className="m-2">{cteam.label}</div>
                                         </div>
                                     }

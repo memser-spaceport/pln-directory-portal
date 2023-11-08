@@ -8,15 +8,11 @@ export function ProjectCard({ project, isGrid = true }) {
 
     const backLink = encodeURIComponent(router.asPath);
 
-    const onProjectClicked = () => {
-        console.log('Clicked');
-    }
-
+    
     return (
         <DirectoryCard
             isGrid={isGrid}
             cardUrl={`/directory/projects/${project.id}?backLink=${backLink}`}
-            handleOnClick={onProjectClicked}
             type="projects"
         >
             <div className={`${isGrid ? 'p-[24px] h-[308px]' : ''} w-full`}>
@@ -27,7 +23,7 @@ export function ProjectCard({ project, isGrid = true }) {
                             <div className='pl-2 my-auto font-semibold text-[16px]'>{project.name}</div>
                         </div>
                         {
-                            project.fundingNeeded && <div className='my-auto px-[8px] py-[3px] bg-[#FFEAC1] rounded-[24px]'>
+                            project.fundingNeeded && <div className='my-auto px-[8px] py-[3px] bg-[#FFEAC1] rounded-[24px]' title='Raising Funds'>
                                 <Image src={'/assets/images/icons/projects/funding.svg'} alt="project image" width={12} height={12} />
                             </div>
                         }
