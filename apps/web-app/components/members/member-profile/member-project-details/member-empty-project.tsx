@@ -14,7 +14,7 @@ export function MemberEmptyProject({
     <>
       {userInfo?.uid == member?.id && member?.githubHandle ? (
         <div className="w-full rounded-xl border bg-gray-50 p-3 text-center">
-          <p>No projects to display</p>
+          <p>No repositories to display</p>
         </div>
       ) : (
         <>
@@ -59,7 +59,7 @@ export function MemberEmptyProject({
                       <p className="flex items-center gap-0.5">
                         {member?.githubHandle ? (
                           <div className="w-full rounded-xl  bg-gray-50 text-center">
-                            <p>No projects to display</p>
+                            <p>No repositories to display</p>
                           </div>
                         ) : (
                           <>
@@ -75,7 +75,7 @@ export function MemberEmptyProject({
                         </>
                         )}
                         <span />
-                 
+
                       </p>
                     </div>
                   )}
