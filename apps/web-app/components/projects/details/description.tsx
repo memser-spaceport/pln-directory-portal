@@ -8,7 +8,7 @@ export default function Description({content}) {
     };
     return (
         <div className="flex flex-col gap-[8px]">
-            <div className="text-[14px] font-medium text-[#64748B] tracking-[1px]">Description</div>
+            <div className="text-[14px] font-semibold text-[#475569] tracking-[1px]">Description</div>
             <div className="text-[15px]">
                 <p
                     className={`overflow-hidden transition-all duration-200 pt-2 ${collapsed ? `read-less` : 'max-h-full'

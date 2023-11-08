@@ -313,7 +313,7 @@ export default function Settings({
                     setModified={setModifiedMember}
                     setRefreshMemberAutocomplete={setRefreshMemberAutocomplete}
                     userInfo={userInfo}
-                    tabSelection=""
+                    tabSelection= {tabSelection}
                 />
             )
         } else if (settings === SETTINGS_CONSTANTS.PROFILE_SETTINGS) {
@@ -632,7 +632,6 @@ export const getServerSideProps = async (ctx) => {
         'Cache-Control',
         'no-cache, no-store, max-age=0, must-revalidate'
     );
-    console.log(query.preferences)
     return {
         props: { isUserLoggedIn, userInfo, teamsDropdown, membersDropdown, teamSelected, memberSelected, settingCategory, preferences, tabSelection: query?.tab ?? '' },
     };

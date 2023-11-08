@@ -1,6 +1,9 @@
 import { SingleSelect, Switch } from "@protocol-labs-network/ui";
 import { useEffect, useRef } from "react";
 import ProjectSelection from "./project-selection";
+import ProjectDescription from "./project-description";
+import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
+import { APP_ANALYTICS_EVENTS } from "apps/web-app/constants";
 
 function ProjectContributionForm(props) {
     const showAddProject = props.showAddProject;
@@ -12,6 +15,7 @@ function ProjectContributionForm(props) {
     const onDeleteContribution = props.onDeleteContribution;
     const expandedId = props.expandedId;
     const onToggleExpansion = props.onToggleExpansion;
+    const analytics = useAppAnalytics();
     const uploadRef = useRef<HTMLInputElement>(null);
     const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
@@ -59,11 +63,23 @@ function ProjectContributionForm(props) {
             onItemChange(expIndex, 'projectName', item.name);
             onItemChange(expIndex, 'projectUid', item?.uid)
         onItemChange(expIndex, 'projectLogo', item?.logo?.url)
+        onItemChange(expIndex, 'project', item)
         } else {
             onItemChange(expIndex, 'projectName', "");
             onItemChange(expIndex, 'projectLogo', "")
             onItemChange(expIndex, 'projectUid', "");
+            onItemChange(expIndex, 'project', null);
         }
+    }
+
+    const onDescChanged = (newValue) => {
+        onItemChange(expIndex, 'description', newValue)
+    }
+
+    const onAddNewProject = () => {
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.PR_CONRTIBUTIONS_LIST_ITEM_ADDPROJECT, {
+            type: showAddProject === false ? 'new' : 'edit'
+        })
     }
 
     return <>
@@ -79,7 +95,7 @@ function ProjectContributionForm(props) {
                     {exp?.projectName.trim() === '' && <h2 className="text-[#0F172A] flex-1 font-[600] text-[14px]">{`Project ${expIndex + 1}`}</h2>}
                     {exp?.projectName.trim() !== '' && <h2 className="text-[#0F172A] flex-1 font-[600] text-[14px]">{`${exp?.projectName.trim()}`}</h2>}
                     <div className="flex flex-row items-center gap-[8px]">
-                        <div title={`${exp.currentProject === false && currentProjectsCount === 5 ? 'Max 5 projects can be set us current': ''} `} ><Switch nonEditable={exp.currentProject === false && currentProjectsCount === 5} initialValue={exp.currentProject} onChange={(val) => onItemChange(expIndex, 'currentProject', val)} key={`${expIndex}-switch`} /></div>
+                        <div title={`${exp.currentProject === false && currentProjectsCount === 5 ? 'Max 5 projects can be set as current': 'On/Off'} `} ><Switch nonEditable={exp.currentProject === false && currentProjectsCount === 5} initialValue={exp.currentProject} onChange={(val) => onItemChange(expIndex, 'currentProject', val)} key={`${expIndex}-switch`} /></div>
                         <label className="text-[12px] font-[600]">Current Project</label>
                     </div>
                 </div>
@@ -92,7 +108,7 @@ function ProjectContributionForm(props) {
                    <div className="flex-1 flex flex-col my-[20px] gap-[12px]">
                             <div className="flex items-center justify-between">
                             <label className="text-[14px] font-[600]">Project Name*</label>
-                            {showAddProject &&  <a target="_blank" href="/directory/projects/add" className="text-[12px] flex gap-[6px] items-center"><img className="w-[10px]" src="/assets/images/icons/expand-blue.svg"/><span className="text-blue-600">Add New Project</span></a>}
+                            {showAddProject &&  <a onClick={onAddNewProject} target="_blank" href="/directory/projects/add" className="text-[12px] flex gap-[6px] items-center"><img className="w-[10px]" src="/assets/images/icons/expand-blue.svg"/><span className="text-blue-600">Add New Project</span></a>}
                             </div>
                            {/*  <input maxLength={100} placeholder="Ex: Filecoin" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" type="text" value={exp.companyName} onChange={(e) => onItemChange(expIndex, 'companyName', e.target.value)} /> */}
                             <ProjectSelection selectedProj={exp?.project} onProjectSelected={onProjectSelected}/>
@@ -132,7 +148,8 @@ function ProjectContributionForm(props) {
                     {/********************************   DESCRIPTION   ***********************************/}
                     <div className="mt-[20px]">
                         <label className="text-[14px] font-[600]">Description</label>
-                        <textarea rows={5} maxLength={2000} ref={descriptionRef} placeholder="" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" value={exp.description} onChange={(e) => onItemChange(expIndex, 'description', e.target.value)} />
+                        <ProjectDescription content={exp.description} onItemChange={onDescChanged}/>
+                      {/*   <textarea rows={5} maxLength={2000} ref={descriptionRef} placeholder="" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" value={exp.description} onChange={(e) => onItemChange(expIndex, 'description', e.target.value)} /> */}
                         {descriptionRef.current && <p className="text-[#475569] font-[500] text-[12px]">{`${descriptionRef?.current?.value?.length} of 2000 characters used`}</p>}
                     </div>
                 </div>}

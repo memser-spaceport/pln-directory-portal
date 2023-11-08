@@ -208,6 +208,14 @@ export const APP_ANALYTICS_EVENTS = {
   TEAM_EDIT_BY_LEAD: 'team-edit-by-lead',
   TEAM_EDIT_BY_ADMIN: 'team-edit-by-admin',
 
+  PR_CONRTIBUTIONS_LIST_ITEM_ADD: 'pr-contributions-list-item-add',
+  PR_CONRTIBUTIONS_LIST_ITEM_DELETE: 'pr-contributions-list-item-delete',
+  PR_CONRTIBUTIONS_LIST_ITEM_ADDPROJECT: 'pr-contributions-list-item-addproject',
+  MEMBER_PR_CONTRIBUTIONS_ADD: 'member-pr-contributions-add',
+  MEMBER_PR_CONTRIBUTIONS_EDIT: 'member-pr-contributions-add',
+  MEMBER_PR_CONTRIBUTIONS_SHOWMORE: 'member-pr-contributions-showmore',
+  MEMBER_PR_CONTRIBUTIONS_SHOWLESS: 'member-pr-contributions-showless',
+
   FILTERS_APPLIED: 'filters-applied',
 
 }

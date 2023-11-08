@@ -85,7 +85,7 @@ function validateContributionForm(fValues) {
     } if(exp.role.trim() === '') {
       formErrors.push({id: expIndex, field: 'role', error: "Role is Mandatory"})
     } if(exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
-      formErrors.push({id: expIndex, field: 'date', error: "To Date cannot be less than start date"})
+      formErrors.push({id: expIndex, field: 'date', error: "To date cannot be less than or equal to start date"})
     }
   })
 
@@ -390,6 +390,7 @@ export function AddMemberModal({
       values.projectContributions = [...values.projectContributions].map(v => {
         delete v.projectName;
         delete v.projectLogo;
+        delete v.project;
         return v
       })
       try {

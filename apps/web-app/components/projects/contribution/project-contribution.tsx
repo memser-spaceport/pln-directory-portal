@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { LoadingIndicator } from "../../shared/loading-indicator/loading-indicator";
 import ProjectContributionForm from "./project-contribution-form";
+import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
+import { APP_ANALYTICS_EVENTS } from "apps/web-app/constants";
 
 function ProjectContribution(props) {
     const showAddProject = props.showAddProject ?? false;
@@ -9,6 +11,7 @@ function ProjectContribution(props) {
     const contributions = formValues.projectContributions;
     const currentProjectsCount = contributions.filter(v => v.currentProject === true).length;
     const onChange = props.onChange;
+    const analytics = useAppAnalytics()
 
     const [expandedId, setExpandedId] = useState(-1);
     const [isLoading, setLoaderStatus] = useState(false)
@@ -35,6 +38,9 @@ function ProjectContribution(props) {
     }
 
     const onAddContribution = () => {
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.PR_CONRTIBUTIONS_LIST_ITEM_ADD, {
+            type: showAddProject === false ? 'new' : 'edit'
+        })
         const newExp = [...contributions];
         newExp.push(defaultValues);
         setExpandedId(newExp.length - 1)
@@ -47,7 +53,9 @@ function ProjectContribution(props) {
         }
         const newExp = [...contributions];
         newExp.splice(index, 1);
-        console.log(index, newExp)
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.PR_CONRTIBUTIONS_LIST_ITEM_ADD, {
+            type: showAddProject === false ? 'new' : 'edit'
+        })
         onChange({ target: { name: 'projectContributions', value: newExp } });
     }
 
@@ -71,7 +79,7 @@ function ProjectContribution(props) {
                     <p className="hidden">{`Total experiences ${contributions.length}`}</p>
                     <button onClick={onAddContribution} className="flex items-center justify-center">
                         <img src="/assets/images/icons/add-company-icon.svg" />
-                        <span className="text-blue-600 font-[500] text-[13px]" >Click To Add Project Contributions</span>
+                        <span className="text-blue-600 font-[500] text-[13px]" >Click to add project contributions</span>
                     </button>
 
                 </div>

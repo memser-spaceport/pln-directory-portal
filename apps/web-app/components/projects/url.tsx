@@ -21,7 +21,7 @@ export default function URLDetails({ onInputChange, urlFieldArray, setURLField }
     }
 
     const addMoreTemplate = () => {
-        return urlFieldArray && urlFieldArray.length && urlFieldArray.map((field, index) => {
+        return urlFieldArray && urlFieldArray.length > 0 && urlFieldArray.map((field, index) => {
             return <React.Fragment key={index}>{getURLTemplate(index, field)}</React.Fragment>
         })
     }

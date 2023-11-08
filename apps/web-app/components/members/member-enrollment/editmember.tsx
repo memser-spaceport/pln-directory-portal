@@ -115,7 +115,7 @@ function validateContributionForm(fValues) {
     } if(exp.role.trim() === '') {
       formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'role', error: "Role is Mandatory"})
     } if(exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
-      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "To Date cannot be less than start date"})
+      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "To date cannot be less than or equal to start date"})
     }
   })
 
@@ -404,7 +404,8 @@ export function EditMemberModal({
             exp.endDate = exp.endDate ? new Date(exp.endDate) : null;
             exp.projectName = exp?.project?.name;
             exp.projectLogo = exp?.project?.logo?.url;
-            exp.projectUid = exp?.project?.uid
+            exp.projectUid = exp?.project?.uid,
+            exp.project = exp?.project
             return exp;
           }): [],
           preferences: member?.preferences ?? JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))
@@ -438,6 +439,8 @@ export function EditMemberModal({
       setErrors([]);
       setBasicErrors([]);
       setSkillErrors([]);
+      setContributionErrors([]);
+      setContributionObjErrors([])
       getMemberDetails();
       setModified(false);
       setModifiedFlag(false);
@@ -678,6 +681,8 @@ export function EditMemberModal({
             setOpenTab(1);
             setBasicErrors([]);
             setSkillErrors([]);
+            setContributionErrors([]);
+            setContributionObjErrors([]);
             if (
               (imageChanged || isNameChanged) &&
               setRefreshMemberAutocomplete
@@ -813,7 +818,7 @@ export function EditMemberModal({
   }
 
   const onTabClicked = (tab) => {
-    const tabs = ['BASIC', 'SKILLS', 'SOCIAL'];
+    const tabs = ['BASIC', 'SKILLS', 'CONTRIBUTIONS', 'SOCIAL'];
     analytics.captureEvent(
       isUserProfile
         ? APP_ANALYTICS_EVENTS.SETTINGS_USER_PROFILE_EDIT_FORM

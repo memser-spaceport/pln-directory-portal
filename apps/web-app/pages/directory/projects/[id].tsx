@@ -28,14 +28,31 @@ export default function ProjectDetails({ selectedProject, userHasEditRights, use
         <>
             <NextSeo {...DIRECTORY_SEO} title="ProjectDetails" />
             <Breadcrumb items={breadcrumbItems} classname="max-w-[150px] truncate" />
-            <div className="flex pt-32 ">
+            <div className="flex pt-32 pb-16">
                 <div className="flex mx-auto gap-10">
-                    <div className="w-[917px] mt-10  bg-white p-[30px] flex flex-col gap-[24px] rounded-[12px]">
-                        <Header project={selectedProject} userHasEditRights={userHasEditRights} userHasDeleteRights={userHasDeleteRights}/>
-                        <Description content={selectedProject.description} />
-                        <ContactAndLinks project={selectedProject} />
-                        <KPIs project={selectedProject} />
+                    <div className="w-[917px] flex flex-col gap-[24px] rounded-[12px]">
+                        <div className=" mt-10 p-[30px] shadow-md flex flex-col gap-[24px] rounded-[12px] bg-white">
+                            <Header project={selectedProject} userHasEditRights={userHasEditRights} userHasDeleteRights={userHasDeleteRights} />
+                            <Description content={selectedProject.description} />
+                        </div>
+                        {
+                            selectedProject.projectLinks?.length > 0
+                            &&
+                            <div className="p-[30px] shadow-md rounded-[12px] bg-white">
+                                <ContactAndLinks project={selectedProject} />
+                            </div>
+                        }
+                        {
+                            selectedProject?.kpis.length > 0
+                            &&
+                            <div className="p-[30px] shadow-md rounded-[12px] bg-white">
+                                <KPIs project={selectedProject} />
+                            </div>
+                        }
+                        
+                        <div className="p-[30px] shadow-md rounded-[12px] bg-white">
                         <AdditionalDetails project={selectedProject} userHasEditRights={userHasEditRights} />
+                        </div>
                     </div>
                     <div className="w-[291px] mt-10 flex flex-col gap-5">
                         <TeamsInvolved project={selectedProject}/>
@@ -51,8 +68,12 @@ ProjectDetails.getLayout = function getLayout(page: ReactElement) {
     return <DirectoryLayout>{page}</DirectoryLayout>;
 };
 
-const checkForEditRights = async (userInfo, selectedProject) => {
+const checkForEditRights = async (userInfo, selectedProject, isUserLoggedIn) => {
     try {
+
+        if(!isUserLoggedIn){
+            return false;
+        }
 
         //case 1.validating if the user is ADMIN
         if (userInfo.roles && userInfo.roles.length && userInfo.roles.includes('DIRECTORYADMIN')) {
@@ -78,9 +99,11 @@ const checkForEditRights = async (userInfo, selectedProject) => {
                     return true;
                 }
                 //case 4.Validating if the user belongs to one of the contributing teams 
-                for (const cTeam of selectedProject.contributingTeams) {
-                    if (cTeam.value === team.uid) {
-                        return true;
+                if(selectedProject?.contributingTeams?.length){
+                    for (const cTeam of selectedProject.contributingTeams) {
+                        if (cTeam.value === team.uid) {
+                            return true;
+                        }
                     }
                 }
             }
@@ -92,8 +115,11 @@ const checkForEditRights = async (userInfo, selectedProject) => {
     }
 }
 
-const checkForDeleteRights = (userInfo,selectedProject) => {
- if(userInfo.roles && userInfo.roles.length && userInfo.roles.includes('DIRECTORYADMIN')){
+const checkForDeleteRights = (userInfo,selectedProject,isUserLoggedIn) => {
+    if (!isUserLoggedIn) {
+        return false;
+    }
+    if (userInfo.roles && userInfo.roles.length && userInfo.roles.includes('DIRECTORYADMIN')){
     return true;
  }
  
@@ -129,8 +155,8 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     
     if (selectedProjectResponse.status === 200) {
         selectedProject = ProjectsDataService.getFormattedProject(selectedProjectResponse.body);
-        userHasEditRights = await checkForEditRights(userInfo, selectedProject);
-        userHasDeleteRights = checkForDeleteRights(userInfo, selectedProject);
+        userHasEditRights = await checkForEditRights(userInfo, selectedProject, isUserLoggedIn);
+        userHasDeleteRights = checkForDeleteRights(userInfo, selectedProject, isUserLoggedIn);
     } else if (selectedProjectResponse.status === 404) {
         return {
             notFound: true,

@@ -66,7 +66,7 @@ function EmailOtpVerificationModal() {
                 setDialogStatus(false);
                 localStorage.removeItem('otp-verification-email');
                 localStorage.setItem('otp-verify', 'success');
-                if (externalRedirectUrl) {
+                if (externalRedirectUrl && externalRedirectUrl != "undefined") {
                   window.location.href = externalRedirectUrl;
                 } else if (data?.userInfo?.isFirstTimeLogin) {
                   window.location.href = PAGE_ROUTES.SETTINGS;

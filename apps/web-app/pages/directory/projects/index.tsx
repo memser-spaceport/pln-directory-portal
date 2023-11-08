@@ -29,7 +29,7 @@ export default function Projects(props) {
                 <ProjectContextProvider>
                     <section className="pl-sidebar flex pt-20">
                         <div className="w-[300px] fixed left-0 z-40 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">
-                            <ProjectsFilter filterProperties={filterProperties} />
+                            <ProjectsFilter filterProperties={filterProperties} isUserLoggedIn={props.isUserLoggedIn}/>
                         </div>
                         <div className="mx-auto p-8">
                             <div className="w-[917px] space-y-10">

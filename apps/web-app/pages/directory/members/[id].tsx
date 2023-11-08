@@ -9,7 +9,7 @@ import Cookies from 'js-cookie';
 import { NextSeo } from 'next-seo';
 import { ReactElement, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { ADMIN_ROLE, LOGGED_IN_MSG, PRIVACY_CONSTANTS, SCHEDULE_MEETING_MSG } from '../../../constants';
+import { ADMIN_ROLE, APP_ANALYTICS_EVENTS, LOGGED_IN_MSG, PRIVACY_CONSTANTS, SCHEDULE_MEETING_MSG, SETTINGS_CONSTANTS } from '../../../constants';
 import { TagsGroup } from '../../../components/shared/tags-group/tags-group';
 import { MemberProfileDetails } from '../../../components/members/member-profile/member-profile-details/member-profile-details';
 import { MemberProfileHeader } from '../../../components/members/member-profile/member-profile-header/member-profile-header';
@@ -35,6 +35,7 @@ import {
 import { MemberProfileLoginStrip } from '../../../components/members/member-profile/member-profile-login-strip/member-profile-login-strip';
 import MemberExperience from 'apps/web-app/components/members/member-profile/member-experience/member-experience';
 import { useRouter } from 'next/router';
+import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 
 interface MemberProps {
   member: IMember;
@@ -66,14 +67,21 @@ export default function Member({
   const isOwner = userInfo?.uid === member?.id;
   const memberProjectContributions = member?.projectContributions ?? [];
   const router = useRouter();
-
-  const onEditOrAdd = () => {
-    if (isOwner) {
-      router.push('/directory/settings?tab=contributions')
+  const analytics = useAppAnalytics();
+  const onEditOrAdd  = () => {
+    if(isOwner) {
+      analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_PR_CONTRIBUTIONS_ADD, {
+        member: member,
+      })
+      router.push({pathname: '/directory/settings', query: {tab: 'contributions'}}, '/directory/settings')
     } else {
-      router.push('/directory/settings')
+      const query = { id: member?.id, tab: 'contributions', name: member?.name, logo: member?.image, from: SETTINGS_CONSTANTS.MEMBER };
+      router.push({
+        pathname: '/directory/settings',
+        query
+      }, '/directory/settings');
     }
-  }
+}
 
   useEffect(() => {
     const params = Cookies.get('page_params');
@@ -128,7 +136,7 @@ export default function Member({
                 member={member}
               />
             )}
-            {memberProjectContributions.length > 0 && <MemberExperience isOwner={isOwner} isEditable={isEditable} contributions={member.projectContributions} />}
+            {memberProjectContributions.length > 0 && <MemberExperience member={member} isOwner={isOwner} isEditable={isEditable} contributions={member.projectContributions} />}
 
             {(memberProjectContributions.length === 0 && isEditable) && <div className="text-[#64748B] mt-[20px] text-[15px] font-[500]">
               <h3>Project Experience</h3>
