@@ -95,7 +95,7 @@ function ProjectContributionForm(props) {
                     {exp?.projectName.trim() === '' && <h2 className="text-[#0F172A] flex-1 font-[600] text-[14px]">{`Project ${expIndex + 1}`}</h2>}
                     {exp?.projectName.trim() !== '' && <h2 className="text-[#0F172A] flex-1 font-[600] text-[14px]">{`${exp?.projectName.trim()}`}</h2>}
                     <div className="flex flex-row items-center gap-[8px]">
-                        <div title={`${exp.currentProject === false && currentProjectsCount === 5 ? 'Max 5 projects can be set us current': 'On/Off'} `} ><Switch nonEditable={exp.currentProject === false && currentProjectsCount === 5} initialValue={exp.currentProject} onChange={(val) => onItemChange(expIndex, 'currentProject', val)} key={`${expIndex}-switch`} /></div>
+                        <div title={`${exp.currentProject === false && currentProjectsCount === 5 ? 'Max 5 projects can be set as current': 'On/Off'} `} ><Switch nonEditable={exp.currentProject === false && currentProjectsCount === 5} initialValue={exp.currentProject} onChange={(val) => onItemChange(expIndex, 'currentProject', val)} key={`${expIndex}-switch`} /></div>
                         <label className="text-[12px] font-[600]">Current Project</label>
                     </div>
                 </div>
