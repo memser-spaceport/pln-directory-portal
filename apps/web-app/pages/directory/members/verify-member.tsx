@@ -137,11 +137,12 @@ export const getServerSideProps = async (
       maxAge: calculateExpiry(accessTokenExpiry.exp),
       path: '/'
     });
-
-    setCookie(ctx, 'external_redirect_url', externalRedirectUrl, {
-      maxAge: calculateExpiry(accessTokenExpiry.exp),
-      path: '/'
-    });
+    if (externalRedirectUrl) {
+      setCookie(ctx, 'external_redirect_url', externalRedirectUrl, {
+        maxAge: calculateExpiry(accessTokenExpiry.exp),
+        path: '/'
+      });
+    }
     return {
       redirect: {
         permanent: false,
