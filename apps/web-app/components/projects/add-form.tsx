@@ -23,22 +23,37 @@ export default function AddForm({mode}) {
         getEmail();
     },[])
 
-    const [enableHover, setEnableHoverFlag] = useState(mode === 'EDIT' ? true : false);
+    const [enableHover, setEnableHoverFlag] = useState(mode === 'EDIT' 
+    && addProjectsState.inputs.logoURL !== '/assets/images/icons/projects/default.svg' 
+    ? true : false);
     const [isHovered, setIsHovered] = useState(false);
     const [isLogoDeleted, setLogoDeletedFlag] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const [kpiFieldArray, setKPIField] = useState(mode === 'ADD'?[{
+    const [kpiFieldArray, setKPIField] = useState(mode === 'ADD' ? [{
         name: '',
         value: '',
         id: 0
-    }]:[...addProjectsState.inputs.KPIs]);
+    }] :
+        addProjectsState.inputs.KPIs.length
+            ?
+            [...addProjectsState.inputs.KPIs]
+            :
+            [{
+                name: '',
+                value: '',
+                id: 0
+            }]);
 
     const [urlFieldArray, setURLField] = useState(mode === 'ADD' ? [{
         text: '',
         url: '',
         id: 0
-    }] : [ ...addProjectsState.inputs.projectURLs ]);
+    }] : addProjectsState.inputs.projectURLs.length?[ ...addProjectsState.inputs.projectURLs ]:[{
+        text: '',
+        url: '',
+        id: 0
+    }]);
 
 
     const onInputChange = (event, id?) => {
@@ -82,13 +97,22 @@ export default function AddForm({mode}) {
             const isValidFormat = ['image/jpeg', 'image/png'].includes(file.type);
             if (isValidFormat) {
                 // setError('');
+                const tempErr = addProjectsState.errors;
+                delete tempErr?.logoError;
+                
             } else {
                 // setError(`Please upload image in jpeg or png format`);
                 // return;
+                const tempErr = { ...addProjectsState.errors };
+                tempErr['logoError'] = 'Invalid File.';
+                addProjectsDispatch({ type: 'SET_ERROR', payload: { ...tempErr } });
+                return;
             }
             const sizeInMB = parseFloat((file.size / 1024 ** 2).toFixed(1));
             if (sizeInMB <= 4) {
                 // onImageChange(file);
+                const tempErr = addProjectsState.errors;
+                delete tempErr?.logoError;
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
                 setLogoDeletedFlag(false);
@@ -96,6 +120,9 @@ export default function AddForm({mode}) {
                 setEnableHoverFlag(true);
                 // setError('');
             } else {
+                const tempErr = { ...addProjectsState.errors };
+                tempErr['logoError'] = 'Size should be less than 4MB';
+                addProjectsDispatch({ type: 'SET_ERROR', payload: { ...tempErr } });
                 // setError(`Please upload a file less than ${maxSize}MB`);
             }
         }
@@ -159,6 +186,7 @@ export default function AddForm({mode}) {
         <>
             <div className="mt-5 bg-white px-[42px] py-[24px] rounded-[8px] flex flex-col gap-4">
                 <div className="flex">
+                    <div className="max-w-[100px]">
                     <div className="w-[100px] h-[100px] border rounded-[8px] border-[3px] border-[#CBD5E1] bg-[#F1F5F9] cursor-pointer flex flex-col relative"
                     onMouseOver={handleMouseEnter} onMouseLeave={handleMouseLeave}>
                     {isHovered && (
@@ -185,18 +213,21 @@ export default function AddForm({mode}) {
                             )}
                         <div className="m-auto relative" >
                             {
-                                addProjectsState.inputs.logoURL && !isLogoDeleted
+                                addProjectsState.inputs.logoURL && !isLogoDeleted && addProjectsState.inputs.logoURL !== '/assets/images/icons/projects/default.svg'
                                 &&
                                 <Image src={addProjectsState.inputs.logoURL} alt="project image" width={100} height={100} />
                             }
                             {
-                                addProjectsState.inputs.logoObject && !isLogoDeleted
+                                addProjectsState.inputs.logoObject 
+                                && !isLogoDeleted 
                                 && <Image src={URL.createObjectURL(addProjectsState.inputs.logoObject)} alt="project image" width={100} height={100} />
 
                             }
                             
                             {
-                                ((!addProjectsState.inputs.logoURL && !addProjectsState.inputs.logoObject) || isLogoDeleted) && <div>
+                                (((!addProjectsState.inputs.logoURL || addProjectsState.inputs.logoURL === '/assets/images/icons/projects/default.svg')
+                                && !addProjectsState.inputs.logoObject) || isLogoDeleted) 
+                                && <div>
                                     <div className="ml-6">
                                         <Image src={'/assets/images/icons/projects/add-img.svg'} alt="project image" width={24} height={24} />
                                     </div>
@@ -215,7 +246,8 @@ export default function AddForm({mode}) {
                                 onChange={onImageUpload}
                             />
                         </div>
-
+                    </div>
+                    <InputError content={addProjectsState.errors?.logoError} />
                     </div>
                     <div className="relative left-[20px] basis-[85%]">
                         <InputField
@@ -230,6 +262,7 @@ export default function AddForm({mode}) {
                         />
                         <InputError content={addProjectsState.errors?.name} />
                     </div>
+                    
                 </div>
                 <div>
                     <InputField
@@ -261,7 +294,7 @@ export default function AddForm({mode}) {
                     <div className="text-sm font-bold">Project Maintained By*</div>
                     <Autocomplete
                     required
-                        name={'project'}
+                        name={'team'}
                         className="custom-grey custom-outline-none border"
                         placeholder="Select Team"
                         selectedOption={addProjectsState.inputs.maintainedBy}
@@ -278,6 +311,7 @@ export default function AddForm({mode}) {
                 </div>
                 <div>
                     <InputField
+                        required
                         name="contactEmail"
                         type="email"
                         label="Contact Email"

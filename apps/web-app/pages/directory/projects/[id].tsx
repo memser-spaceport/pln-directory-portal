@@ -28,14 +28,31 @@ export default function ProjectDetails({ selectedProject, userHasEditRights, use
         <>
             <NextSeo {...DIRECTORY_SEO} title="ProjectDetails" />
             <Breadcrumb items={breadcrumbItems} classname="max-w-[150px] truncate" />
-            <div className="flex pt-32 ">
+            <div className="flex pt-32 pb-16">
                 <div className="flex mx-auto gap-10">
-                    <div className="w-[917px] mt-10  bg-white p-[30px] flex flex-col gap-[24px] rounded-[12px]">
-                        <Header project={selectedProject} userHasEditRights={userHasEditRights} userHasDeleteRights={userHasDeleteRights}/>
-                        <Description content={selectedProject.description} />
-                        <ContactAndLinks project={selectedProject} />
-                        <KPIs project={selectedProject} />
+                    <div className="w-[917px] flex flex-col gap-[24px] rounded-[12px]">
+                        <div className=" mt-10 p-[30px] shadow-md flex flex-col gap-[24px] rounded-[12px] bg-white">
+                            <Header project={selectedProject} userHasEditRights={userHasEditRights} userHasDeleteRights={userHasDeleteRights} />
+                            <Description content={selectedProject.description} />
+                        </div>
+                        {
+                            selectedProject.projectLinks?.length > 0
+                            &&
+                            <div className="p-[30px] shadow-md rounded-[12px] bg-white">
+                                <ContactAndLinks project={selectedProject} />
+                            </div>
+                        }
+                        {
+                            selectedProject?.kpis.length > 0
+                            &&
+                            <div className="p-[30px] shadow-md rounded-[12px] bg-white">
+                                <KPIs project={selectedProject} />
+                            </div>
+                        }
+                        
+                        <div className="p-[30px] shadow-md rounded-[12px] bg-white">
                         <AdditionalDetails project={selectedProject} userHasEditRights={userHasEditRights} />
+                        </div>
                     </div>
                     <div className="w-[291px] mt-10 flex flex-col gap-5">
                         <TeamsInvolved project={selectedProject}/>

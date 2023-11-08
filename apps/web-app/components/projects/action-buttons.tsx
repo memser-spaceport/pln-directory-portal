@@ -66,9 +66,9 @@ export default function ActionButtons(){
             }
         });
 
-        // if(!inputs.contactEmail){
-        //     errors['contactEmail'] = 'Contact Email is required';
-        // }
+        if(!inputs.contactEmail){
+            errors['contactEmail'] = 'Contact Email is required';
+        }
 
         inputs.KPIs?.map((kpi,index)=>{
             if(kpi.name && !kpi.value){
@@ -122,7 +122,7 @@ export default function ActionButtons(){
                 
             }catch(err){
                 console.log(err);
-                toast.error('Something went wrong.Please try again.')
+                // toast.error('Something went wrong.Please try again.')
             }finally{
                 setIsProcessing(false);
             }
