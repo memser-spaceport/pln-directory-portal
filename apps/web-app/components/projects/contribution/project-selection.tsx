@@ -62,7 +62,7 @@ function ProjectSelection(props) {
             setSearchText(selectedProj.name)
             inputRef.current.value = selectedProj.name
         }
-    }, [])
+    }, [selectedProj])
 
     return <>
         <div className="relative w-full flex gap-[8px] border-solid border-[1px] border-[#CBD5E1] px-[8px] py-[8px] rounded-[8px]">

@@ -210,8 +210,11 @@ export const APP_ANALYTICS_EVENTS = {
 
   PR_CONRTIBUTIONS_LIST_ITEM_ADD: 'pr-contributions-list-item-add',
   PR_CONRTIBUTIONS_LIST_ITEM_DELETE: 'pr-contributions-list-item-delete',
-  PR_CONRTIBUTIONS_LIST_ITEM_EXPANDED: 'pr-contributions-list-item-expanded',
-  PR_CONRTIBUTIONS_LIST_ITEM_COLLAPSED: 'pr-contributions-list-item-collapsed',
+  PR_CONRTIBUTIONS_LIST_ITEM_ADDPROJECT: 'pr-contributions-list-item-addproject',
+  MEMBER_PR_CONTRIBUTIONS_ADD: 'member-pr-contributions-add',
+  MEMBER_PR_CONTRIBUTIONS_EDIT: 'member-pr-contributions-add',
+  MEMBER_PR_CONTRIBUTIONS_SHOWMORE: 'member-pr-contributions-showmore',
+  MEMBER_PR_CONTRIBUTIONS_SHOWLESS: 'member-pr-contributions-showless',
 
   FILTERS_APPLIED: 'filters-applied',
 

@@ -82,7 +82,7 @@ export function MemberEmptyProject({
                 </>
               ) : (
                 <div className="w-full rounded-xl border bg-gray-50 p-3 text-center">
-                  <p>No projects to display</p>
+                  <p>No repositories to display</p>
                 </div>
               )}
             </>

@@ -1,17 +1,27 @@
 import { useState } from "react";
 import { sanitize, isSupported } from "isomorphic-dompurify";
 import clip from "text-clipper";
+import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
+import { APP_ANALYTICS_EVENTS } from "apps/web-app/constants";
 function MemberExperienceDescription(props) {
     const fullDesc = props.desc;
+    const exp = props?.exp
     const shortDesc = fullDesc;
     const [isShowMoreActive, showMoreStatus] = useState(false);
     const isBigDesc = fullDesc.length >= 300;
+    const analytics = useAppAnalytics()
 
     const onShowMore = () => {
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_PR_CONTRIBUTIONS_SHOWMORE, {
+            contribution: exp
+        })
         showMoreStatus(true)
     }
 
     const onShowLess = () => {
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_PR_CONTRIBUTIONS_SHOWLESS, {
+            contribution: exp
+        })
         showMoreStatus(false)
     }
 

@@ -1,6 +1,7 @@
 import { useRouter } from "next/router";
 import MemberExperienceDescription from "./member-experience-item";
-import { SETTINGS_CONSTANTS } from "apps/web-app/constants";
+import { APP_ANALYTICS_EVENTS, SETTINGS_CONSTANTS } from "apps/web-app/constants";
+import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
 
 function MemberExperience(props) {
     const member = props?.member;
@@ -8,6 +9,7 @@ function MemberExperience(props) {
     const contributions = props.contributions ?? [];
     const isOwner = props.isOwner;
     const router = useRouter();
+    const analytics = useAppAnalytics()
 
     const formatDate = (dateString) => {
         const month = new Date(dateString).toLocaleDateString(undefined, {month: 'short'});
@@ -16,6 +18,9 @@ function MemberExperience(props) {
     }
     const onEditOrAdd  = () => {
         if(isOwner) {
+          analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_PR_CONTRIBUTIONS_EDIT, {
+            member: member,
+          })
           router.push({pathname: '/directory/settings', query: {tab: 'contributions'}}, '/directory/settings')
         } else {
           const query = { id: member?.id, tab: 'contributions', name: member?.name, logo: member?.image, from: SETTINGS_CONSTANTS.MEMBER };
@@ -119,7 +124,7 @@ function MemberExperience(props) {
                             </div>
                         </div>}
                         {exp?.description !== '' && <div className="p-[16px]">
-                           <MemberExperienceDescription desc={exp.description}/>
+                           <MemberExperienceDescription exp={exp} desc={exp.description}/>
                         </div>}
                     </div>)}
                 </div>
