@@ -438,6 +438,8 @@ export function EditMemberModal({
       setErrors([]);
       setBasicErrors([]);
       setSkillErrors([]);
+      setContributionErrors([]);
+      setContributionObjErrors([])
       getMemberDetails();
       setModified(false);
       setModifiedFlag(false);
@@ -815,7 +817,7 @@ export function EditMemberModal({
   }
 
   const onTabClicked = (tab) => {
-    const tabs = ['BASIC', 'SKILLS', 'SOCIAL'];
+    const tabs = ['BASIC', 'SKILLS', 'CONTRIBUTIONS', 'SOCIAL'];
     analytics.captureEvent(
       isUserProfile
         ? APP_ANALYTICS_EVENTS.SETTINGS_USER_PROFILE_EDIT_FORM
