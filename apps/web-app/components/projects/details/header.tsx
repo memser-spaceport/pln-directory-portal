@@ -36,14 +36,17 @@ export default function Header({ project, userHasEditRights, userHasDeleteRights
                         <Image src={project.image} alt="project image" width={100} height={108} className="rounded" />
                     </div>
                     <div className="flex flex-col gap-1 justify-center">
-                        <div className="text-[24px] font-bold">{project.name}</div>
+                        <div className="text-[24px] font-bold flex gap-2">
+                            <div>{project.name}</div>
+                            <Image src={'/assets/images/icons/projects/funding-with-bg.svg'} alt="project image" width={24} height={24} />
+                        </div>
                         <div className="text-[15px]">{project.tagline}</div>
                     </div>
                 </div>
                 {
                     !project.isDeleted
                     &&
-                    <div className="flex gap-2">
+                    <div className="flex gap-4">
                     {
                         userHasEditRights
                         &&
@@ -54,19 +57,19 @@ export default function Header({ project, userHasEditRights, userHasDeleteRights
                             }}
                         >
                             <EditIcon className="m-1" />{' '}
-                            Edit Project
+                            Edit
                         </div>
                     }
                     {
                         userHasDeleteRights
                         &&
-                        <div className="flex text-base font-semibold text-[#e74c3c] cursor-pointer gap-2"
+                        <div className="flex text-base font-semibold text-[#DD2C5A] cursor-pointer gap-1"
                             onClick={() => {
                                 delProject();
                             }}
                         >
                             <RemoveIcon className="" />{' '}
-                            <div>Delete Project</div>
+                            <div>Delete</div>
                         </div>
                     }
                 </div> 

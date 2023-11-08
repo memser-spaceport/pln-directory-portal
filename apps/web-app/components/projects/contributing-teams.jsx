@@ -79,7 +79,7 @@ export default function ContributingTeams() {
                 <div className="text-sm font-bold">Contributing Teams</div>
                 {getContributingTeamsTeamplate()}
                 <Autocomplete
-                    name={'project'}
+                    name={'team'}
                     className="custom-grey custom-outline-none border"
                     placeholder="Select Team"
                     // selectedOption={

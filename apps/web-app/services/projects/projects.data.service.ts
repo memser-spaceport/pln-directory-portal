@@ -51,25 +51,38 @@ const formatToSave = (inputs, imageUid) => {
     const tempKpi = [];
     inputs.KPIs.forEach(kpi => {
         const kpiObj = {};
-        kpiObj['key'] = kpi.name;
-        kpiObj['value'] = kpi.value;
-        tempKpi.push(kpiObj);
+        if(kpi.name){
+            kpiObj['key'] = kpi.name;
+        }
+        if(kpi.value){
+            kpiObj['value'] = kpi.value;
+        }
+        if(Object.keys(kpiObj).length){
+            tempKpi.push(kpiObj);
+        }
     });
     objectToSave['kpis'] = tempKpi;
 
     if (imageUid) {
         objectToSave['logoUid'] = imageUid;
-    }else if(inputs.logoURL){
+    }else if(inputs.logoURL && inputs.logo){
         objectToSave['logoUid'] = inputs.logo.uid;
     }
 
     const tempProjectlinks = [];
     inputs.projectURLs.forEach(urls => {
         const urlObj = {};
-        urlObj['name'] = urls.text;
-        urlObj['url'] = urls.url;
-        tempProjectlinks.push(urlObj);
+        if(urls.text){
+            urlObj['name'] = urls.text;
+        }
+        if(urls.url){
+            urlObj['url'] = urls.url;
+        }
+        if(Object.keys(urlObj).length){
+            tempProjectlinks.push(urlObj);
+        }
     });
+    
     objectToSave['projectLinks'] = tempProjectlinks;
 
     return objectToSave;

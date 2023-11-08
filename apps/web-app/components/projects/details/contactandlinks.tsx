@@ -14,7 +14,7 @@ export default function ContactAndLinks({ project }) {
                 </div> */}
                 {
                     project.projectLinks?.length > 0 && <div className="flex flex-col gap-[8px]">
-                        <div className="text-[#64748B] text-[14px] font-medium tracking-[1px]">Links</div>
+                        <div className="text-[#475569] text-[14px] font-semibold tracking-[1px]">Links</div>
                         <div className="flex gap-2 cursor-pointer">
                         {
                             project.projectLinks.map((link, index) => {
