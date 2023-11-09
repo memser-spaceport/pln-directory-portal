@@ -269,12 +269,15 @@ export default function AddForm({mode}) {
                         required={true}
                         name="tagline"
                         label="Project Tagline"
-                        maxLength={80}
+                        maxLength={100}
                         value={addProjectsState.inputs.tagline}
                         onChange={onInputChange}
                         placeholder="Enter Your Project Tagline"
                         className="custom-grey custom-outline-none border"
                     />
+                    <div className="px-2 text-sm text-slate-300 flex flex-row-reverse">
+                        <div>{addProjectsState.inputs.tagline.length}/100</div>
+                    </div>
                     <InputError content={addProjectsState.errors?.tagline} />
                 </div>
                 <div>
