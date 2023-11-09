@@ -11,7 +11,7 @@
         "main": "apps/web-api/src/main.ts",
         "tsConfig": "apps/web-api/tsconfig.build.json",
         "tsPlugins": ["@nestjs/swagger/plugin"],
-        "assets": ["apps/web-api/src/shared/contactUs.hbs"]
+        "assets": ["apps/web-api/src/shared/contactUs.hbs", "apps/web-api/src/shared/joinNow.hbs"]
       },
       "configurations": {
         "production": {

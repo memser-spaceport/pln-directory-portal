@@ -63,7 +63,7 @@ export const IMAGE_UPLOAD_MAX_DIMENSION = 2000;
 
 export const DIRECTORYADMIN = 'DIRECTORYADMIN';
 
-export const JOIN_REQUESTS_TEMPLATE = 'JOIN_REQUESTS_TEMPLATE';
+export const JOIN_NOW_SUBJECT = 'A request to be a part of network';
 
 export const ASK_QUESTION = "Ask a Question";
 export const FEEDBACK = "Give Feedback";
