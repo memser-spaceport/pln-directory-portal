@@ -50,7 +50,7 @@ export class AwsService {
     Handlebars.registerHelper('eq', (valueOne, valueTwo) => { return valueOne === valueTwo })
     const template = Handlebars.compile(emailTemplate);
     const renderedHtml = template(data);
-    const AWS_SES = new AWS.SES();
+    const AWS_SES = new AWS.SES(SES_CONFIG);
     const mailOptions = {
       from: fromAddress,
       to: toAddresses,
