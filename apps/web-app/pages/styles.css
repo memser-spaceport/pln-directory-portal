@@ -179,6 +179,15 @@
   white-space: initial;
   display: -webkit-box;
 }
+
+.project-tagline {
+  overflow: hidden;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  white-space: initial;
+  display: -webkit-box;
+}
+
 .github-project-popup{
   max-height: calc(100vh - 380px);
 }

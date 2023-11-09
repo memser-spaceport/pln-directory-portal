@@ -44,7 +44,7 @@ export function ProjectCard({ project, isGrid = true }) {
                         }
                     </div>
                     <div className={`py-[20px] text-left text-[16px] ${isGrid ? 'h-[100px]' : ''}`}>
-                        <div>{project.tagline}</div>
+                        <div className='project-tagline'>{project.tagline}</div>
                     </div>
                     <div className={`flex ${isGrid?'pb-[20px]':''}`}>
                     {/* <div className={`flex`}> */}
