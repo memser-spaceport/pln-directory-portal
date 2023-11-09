@@ -1,5 +1,7 @@
 import { Autocomplete, Switch } from "@protocol-labs-network/ui";
+import { APP_ANALYTICS_EVENTS } from "apps/web-app/constants";
 import { ProjectsContext } from "apps/web-app/context/projects/project.context";
+import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
 import api from "apps/web-app/utils/api";
 import { useRouter } from "next/router";
 import { useContext, useEffect, useState } from "react";
@@ -9,6 +11,7 @@ export default function ProjectsFilter({ filterProperties, isUserLoggedIn }) {
     const { projectsState, projectsDispatch } = useContext(ProjectsContext);
     const { push, pathname, query } = useRouter();
     const [selectedTeam,setSelectedTeam] = useState({ value: '', label: '',logo:'' });
+    const analytics = useAppAnalytics();
 
     useEffect(() => {
         setTeam();
@@ -37,11 +40,20 @@ export default function ProjectsFilter({ filterProperties, isUserLoggedIn }) {
         push({ pathname, query: cleanQuery });
         projectsDispatch({ type: 'CLEAR_FILTER'});
         setSelectedTeam({ value: '', label: '',logo:'' });
+        analytics.captureEvent(
+            APP_ANALYTICS_EVENTS.PROJECTS_FILTERS_CLEARED
+          );
     }
 
     const handleTeamChange = (team) => {
         setSelectedTeam(team);
         projectsDispatch({ type: 'SET_FILTER', payload: { filterType: 'TEAM', value: team?.value } });
+        analytics.captureEvent(
+            APP_ANALYTICS_EVENTS.PROJECTS_FILTERS_APPLIED,
+            {
+              'teamName': team?.label,
+            }
+          );
     }
 
     const getSelectedOptionFromQuery =async (searchTerm) => {
@@ -96,15 +108,21 @@ export default function ProjectsFilter({ filterProperties, isUserLoggedIn }) {
             <div className="h-[calc(100vh_-_148px)] overflow-y-auto p-5 pl-[37px] focus-within:outline-none focus:outline-none focus-visible:outline-none">
                 <div className="py-[20px]">
                     {projectsState?.filterState?.FUNDING}
-                    <Switch label="Projects Raising Fund"
+                    <Switch label="Projects Raising Funds"
                         initialValue={projectsState?.filterState?.FUNDING}
                         onChange={(value) => {
                             projectsDispatch({ type: 'SET_FILTER', payload: { filterType: 'FUNDING', value } });
+                            analytics.captureEvent(
+                                APP_ANALYTICS_EVENTS.PROJECTS_FILTERS_APPLIED,
+                                {
+                                  'raisingFunds': value,
+                                }
+                              );
                         }}
                     />
                 </div>
                 <div>
-                    <div className="text-[14px] font-medium">Team</div>
+                    <div className="text-[14px] font-medium">Maintained By</div>
                     <Autocomplete
                         name={'team'}
                         className="custom-grey custom-outline-none border"

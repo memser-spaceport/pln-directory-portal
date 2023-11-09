@@ -4,10 +4,29 @@ import React, { useState } from "react";
 import { useRouter } from "next/router";
 import { ReactComponent as Core } from '/public/assets/images/icons/projects/core.svg';
 import { UserGroupIcon } from "@heroicons/react/solid";
+import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
+import { APP_ANALYTICS_EVENTS } from "apps/web-app/constants";
 
 export default function TeamsInvolved({ project }) {
     const [seeAllPopup, setSeeAllPopup] = useState(false);
     const router = useRouter();
+    const analytics = useAppAnalytics();
+
+    const onMaintainerTeamClicked = (team) => {
+        router.push('/directory/teams/' + team.uid  );
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_MAINTAINER_TEAM_CLICKED, {
+          teamUid: team.uid,
+          teamName: team.name,
+        });
+      }
+
+      const onContributingTeamClicked = (cteam) => {
+        router.push('/directory/teams/' + cteam.value );
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_CONTRIBUTING_TEAM_CLICKED, {
+          teamUid: cteam.value,
+          teamName: cteam.label,
+        });
+      }
 
     return (
         <>
@@ -21,12 +40,15 @@ export default function TeamsInvolved({ project }) {
                             project.contributingTeams.length > 3
                             &&
                             <div className="text-[12px] leading-[20px] font-semibold text-blue-500 pt-1 cursor-pointer"
-                            onClick={()=>{setSeeAllPopup(true)}}
+                            onClick={()=>{
+                                analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_SEEALL_CLICKED);
+                                setSeeAllPopup(true);
+                            }}
                             >See All</div>
                         }
                     </div>
                     <div className="text-[16px] text-[#64748B] flex cursor-pointer hover:bg-slate-100 justify-between" 
-                            onClick={() => { router.push('/directory/teams/' + project.maintainingTeam.uid  ) }}
+                            onClick={() => { onMaintainerTeamClicked(project.maintainingTeam) }}
                     >
                             <div className="flex gap-[10px] ">
                                 {
@@ -39,7 +61,7 @@ export default function TeamsInvolved({ project }) {
                                 }
                                 <div className="m-2">{project.maintainingTeam.name}</div>
                             </div>
-                            <div className="flex items-center p-2" title="Maintainer"><Core /></div>
+                            <div className="flex p-2" title="Maintainer"><Core /></div>
                     </div>
                     {
                         project.contributingTeams
@@ -52,7 +74,7 @@ export default function TeamsInvolved({ project }) {
                                         index < 3 &&
                                         <div className="text-[16px] text-[#64748B] flex gap-[10px] cursor-pointer hover:bg-slate-100 relative"
                                          key={'cteam' + index}
-                                         onClick={() => { router.push('/directory/teams/' + cteam.value  ) }}
+                                         onClick={() => { onContributingTeamClicked(cteam) }}
                                          >
                                             {
                                                 cteam.logo && <div><Image src={cteam.logo} alt="project image" width={40} height={40} className="rounded" /></div>

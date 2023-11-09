@@ -1,6 +1,8 @@
 import Modal from "apps/web-app/components/layout/navbar/modal/modal";
 import { Dialog, Transition } from "@headlessui/react";
 import { Fragment } from "react";
+import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
+import { APP_ANALYTICS_EVENTS } from "apps/web-app/constants";
 
 
 export function DeleteConfirmationModal({
@@ -8,13 +10,21 @@ export function DeleteConfirmationModal({
     onYes,
     setIsModalOpen
 }) {
+    const analytics = useAppAnalytics();
+
 
     const onAction = (flag) => {
-     if(flag){
-        onYes();
-     }else{
-        setIsModalOpen(false);
-     }
+        if (flag) {
+            analytics.captureEvent(
+                APP_ANALYTICS_EVENTS.PROJECT_DETAIL_DELETE_YES_CLICKED
+            );
+            onYes();
+        } else {
+            analytics.captureEvent(
+                APP_ANALYTICS_EVENTS.PROJECT_DETAIL_DELETE_NO_CLICKED
+            );
+            setIsModalOpen(false);
+        }
     }
 
     return (
