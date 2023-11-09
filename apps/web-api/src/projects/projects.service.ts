@@ -142,17 +142,6 @@ export class ProjectsService {
     return await this.memberService.findMemberByEmail(memberEmail)
   };
 
-  async checkDirectoryAdminOrTeamMember(member, teamUid) {
-    const res = member.teamMemberRoles.filter((role) => {
-      return role.teamUid === teamUid
-    });
-    if (res.length > 0 || this.memberService.checkIfAdminUser(member)) {
-      return true;
-    } else {
-      throw new ForbiddenException(`Member ${member.uid} isn't lead to the team ${teamUid}`);
-    }
-  }
-
   async isMemberAllowedToEdit(member, teams, project ) {
     const res = await this.memberService.isMemberPartOfTeams(member, teams);
     if (res || this.memberService.checkIfAdminUser(member) || member.uid === project.createdBy) {

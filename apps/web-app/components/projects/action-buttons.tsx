@@ -4,6 +4,8 @@ import { useRouter } from "next/router"
 import { useContext, useState } from "react";
 import { toast } from "react-toastify";
 import { LoadingIndicator } from "../shared/loading-indicator/loading-indicator";
+import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
+import { APP_ANALYTICS_EVENTS } from "apps/web-app/constants";
 
 
 export default function ActionButtons(){
@@ -14,6 +16,7 @@ export default function ActionButtons(){
     const [isProcessing, setIsProcessing] = useState<boolean>(false);
     // const { uploadProjectLogo, addProject } = ProjectsService;
     const router = useRouter();
+    const analytics = useAppAnalytics();
 
     const mode = addProjectsState.mode;
 
@@ -106,7 +109,31 @@ export default function ActionButtons(){
     }
 
     const onSaveProject = async () => {
+        if(addProjectsState.mode === 'ADD'){
+            analytics.captureEvent(
+                APP_ANALYTICS_EVENTS.PROJECT_ADD_SAVE_CLICKED
+              );
+        }else{
+            analytics.captureEvent(
+                APP_ANALYTICS_EVENTS.PROJECT_EDIT_SAVE_CLICKED,
+                {
+                    'projectId': addProjectsState.inputs.id,
+                }
+              );
+        }
         if(validateInputs()){
+            if(addProjectsState.mode === 'ADD'){
+                analytics.captureEvent(
+                    APP_ANALYTICS_EVENTS.PROJECT_ADD_SAVE_VALIDATION_SUCCESS
+                  );
+            }else{
+                analytics.captureEvent(
+                    APP_ANALYTICS_EVENTS.PROJECT_EDIT_SAVE_VALIDATION_SUCCESS,
+                    {
+                        'projectId': addProjectsState.inputs.id,
+                    }
+                  );
+            }
             let image = null;
             try{
                 setIsProcessing(true);
@@ -114,6 +141,9 @@ export default function ActionButtons(){
                 if(addProjectsState.mode === 'ADD'){
                     const data = await ProjectsService.addProject(addProjectsState.inputs, image);
                     if(data.status === 201){
+                        analytics.captureEvent(
+                            APP_ANALYTICS_EVENTS.PROJECT_ADD_SAVE_SUCESS
+                          );
                         toast.info("Project added successfully.")
                         router.push('/directory/projects');
                     }
@@ -121,24 +151,54 @@ export default function ActionButtons(){
                     const data = await ProjectsService.updateProjectDetails(addProjectsState.inputs, image,addProjectsState.inputs.id);
                     
                     if(data.status === 200){
-                        toast.info("Project upadated successfully.")
+                        analytics.captureEvent(
+                            APP_ANALYTICS_EVENTS.PROJECT_EDIT_SAVE_SUCESS,
+                            {
+                                'projectId': data.data.uid,
+                            }
+                          );
+                        toast.info("Project updated successfully.")
                         router.push('/directory/projects/'+data.data.uid);
                     }
                 }
                 
             }catch(err){
                 console.log(err);
+                if(addProjectsState.mode === 'ADD'){
+                    analytics.captureEvent(
+                        APP_ANALYTICS_EVENTS.PROJECT_ADD_SAVE_FAIL
+                      );
+                }else{
+                    analytics.captureEvent(
+                        APP_ANALYTICS_EVENTS.PROJECT_EDIT_SAVE_FAIL,
+                        {
+                            'projectId': addProjectsState.inputs.id,
+                        }
+                      );
+                }
                 // toast.error('Something went wrong.Please try again.')
             }finally{
                 setIsProcessing(false);
             }
             // console.log(data);
             //API call
-        }else{
+        } else {
+            if (addProjectsState.mode === 'ADD') {
+                analytics.captureEvent(
+                    APP_ANALYTICS_EVENTS.PROJECT_ADD_SAVE_VALIDATION_FAILED
+                );
+            } else {
+                analytics.captureEvent(
+                    APP_ANALYTICS_EVENTS.PROJECT_EDIT_SAVE_VALIDATION_FAILED,
+                    {
+                        'projectId': addProjectsState.inputs.id,
+                    }
+                );
+            }
             window.scrollTo({
                 top: 0,
                 behavior: "smooth",
-              })
+            })
             toast.error('Validation failed');
 
         }
@@ -162,7 +222,20 @@ export default function ActionButtons(){
                 </div>
                 <div className="px-[24px] py-[8px] rounded-[100px] border border-[#156FF7]  text-[#156FF7] cursor-pointer"
                 onClick={()=>{
-                    router.push('/directory/projects')
+                    if(addProjectsState.mode === 'ADD'){
+                        analytics.captureEvent(
+                            APP_ANALYTICS_EVENTS.PROJECT_ADD_CANCEL
+                          );
+                        router.push('/directory/projects')
+                    }else{
+                        analytics.captureEvent(
+                            APP_ANALYTICS_EVENTS.PROJECT_EDIT_CANCEL,
+                            {
+                              'projectId': addProjectsState.inputs.id,
+                            }
+                          );
+                        router.push('/directory/projects/'+addProjectsState.inputs.id);
+                    }
                 }}>
                     Cancel
                 </div>

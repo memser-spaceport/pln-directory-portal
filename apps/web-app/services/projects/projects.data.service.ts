@@ -67,6 +67,8 @@ const formatToSave = (inputs, imageUid) => {
         objectToSave['logoUid'] = imageUid;
     }else if(inputs.logoURL && inputs.logo){
         objectToSave['logoUid'] = inputs.logo.uid;
+    }else{
+        objectToSave['logoUid'] = null;
     }
 
     const tempProjectlinks = [];

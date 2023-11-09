@@ -4,7 +4,8 @@ import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
 import { isEmails } from '../utils/helper/helper';
 import { AwsService } from '../utils/aws/aws.service';
-import { JOIN_REQUESTS_TEMPLATE } from '../utils/constants';
+import { JOIN_NOW_SUBJECT } from '../utils/constants';
+import * as path from 'path';
 
 @Injectable()
 export class JoinRequestsService {
@@ -43,16 +44,23 @@ export class JoinRequestsService {
 
   async notifyNewJoinRequest(joinRequest) {
     if (this.isSupportEmailsValid) {
-      await this.awsService.sendEmail(
-        JOIN_REQUESTS_TEMPLATE,
-        true,
-        this.supportEmails,
+      const from = process.env.SES_SOURCE_EMAIL;
+      if (!from) {
+        this.logger.error('From email address is not configured.');
+        return ;
+      }
+      const result = await this.awsService.sendEmailWithTemplate(
+        path.join(__dirname, '/shared/joinNow.hbs'),
         {
-          email: joinRequest.email,
-          introduction: joinRequest.introduction
-        }
+          ...joinRequest
+        },
+        '',
+        JOIN_NOW_SUBJECT,
+        from,
+        this.supportEmails,
+        []
       );
-      this.logger.info(`New Join request from ${joinRequest.email} - ${joinRequest.uid} notified to support team`);
+      this.logger.info(`New Join request from ${joinRequest.email} - ${joinRequest.uid} notified to support team ref: ${result.MessageId}`);
     } else {
       this.logger.error(
         `Cannot send new join request content for ${joinRequest.uid} as ${this.supportEmails} does not contain valid email addresses`

@@ -1,7 +1,9 @@
+import { APP_ANALYTICS_EVENTS } from "apps/web-app/constants";
+import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
 import Image from "next/image";
-import Link from "next/link";
 
 export default function ContactAndLinks({ project }) {
+    const analytics = useAppAnalytics();
     return (
         <>
             <div className="flex gap-[32px]">
@@ -20,7 +22,11 @@ export default function ContactAndLinks({ project }) {
                             project.projectLinks.map((link, index) => {
                                 return (
                                     <div key={index}>
-                                        <a href={link.url} target="_blank" rel="noopener noreferrer">
+                                        <a href={link.url} target="_blank" rel="noopener noreferrer" onClick={()=>{
+                                            analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_LINKS_CLICKED, {
+                                                linkURL: link.url,
+                                            });
+                                        }}>
                                             <div className="flex gap-2">
                                                 <div><Image src="/assets/images/icons/projects/link.svg" alt="project image" width={16} height={16} /></div>
                                                 <div className="text-[#156FF7] text-[13px] font-medium">{link.text} </div>

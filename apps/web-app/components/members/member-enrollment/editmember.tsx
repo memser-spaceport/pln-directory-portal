@@ -400,10 +400,13 @@ export function EditMemberModal({
             return { value: item.uid, label: item.title };
           }),
           projectContributions: member?.projectContributions ? member?.projectContributions.map(exp => {
+            if(exp?.project && !exp?.project.logo) {
+              exp.project.logo =  {url: '/assets/images/icons/projects/default.svg'}
+            }
             exp.startDate = new Date(exp.startDate);
             exp.endDate = exp.endDate ? new Date(exp.endDate) : null;
             exp.projectName = exp?.project?.name;
-            exp.projectLogo = exp?.project?.logo?.url;
+            exp.projectLogo = exp?.project?.logo?.url
             exp.projectUid = exp?.project?.uid,
             exp.project = exp?.project
             return exp;

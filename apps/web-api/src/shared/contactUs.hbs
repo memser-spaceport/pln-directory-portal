@@ -1,0 +1,30 @@
+<html>
+<body>
+  <div style="border: 1px solid #ccc; padding: 20px; margin: 20px;">
+  <p>Dear Team,</p>
+  {{#if (eq type "Ask a Question")}}
+  <p>This is to inform that we have received a request for assistance.
+The details of the request are as follows:</p>
+  {{/if}}
+  {{#if (eq type "Give Feedback")}}
+  <p>This is to inform that we have received a new feedback.
+The details of the feedback are as follows</p>
+  {{/if}}
+  {{#if (eq type "Share an Idea")}}
+  <p>This is to inform that we have received a new idea.
+The details of the idea are as follows</p>
+  {{/if}}
+  {{#if (eq type "Get Support")}}
+  <p>This is to inform that we have received a new query.
+The details of the query are as follows</p>
+  {{/if}}
+  <div style="margin-top: 10px;">
+    <p><strong>Category:</strong> {{ type }}</p>
+    <p><strong>Requested By:</strong> <span style> {{ email }} </span></p>
+    <p><strong>Content:</strong> {{ question }}</p>
+  </div>
+  <p>Regards,</p>
+  <p>PLN Support Team.</p>
+  </div>
+  </body>
+</html>

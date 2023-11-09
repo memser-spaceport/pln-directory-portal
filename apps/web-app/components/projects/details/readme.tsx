@@ -6,6 +6,8 @@ import ProjectsService from 'apps/web-app/services/projects';
 import { useRouter } from 'next/router';
 import Cookies from 'js-cookie';
 import { toast } from 'react-toastify';
+import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
+import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
 
 export default function AdditionalDetails({ project, userHasEditRights }) {
     const initialReadme = project?.readMe;
@@ -13,6 +15,7 @@ export default function AdditionalDetails({ project, userHasEditRights }) {
     const { query } = useRouter();
     const [text, setText] = useState(project?.readMe);
     const [showEditor, setEditorVisible] = useState(false);
+    const analytics = useAppAnalytics();
     // const { response } = useMdViewer(text);
 
     useEffect(() => {
@@ -27,23 +30,39 @@ export default function AdditionalDetails({ project, userHasEditRights }) {
     }, [])
 
     const onEditAction = () => {
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_EDIT_CLICKED, {
+            projectId: project.id,
+            from:'project-details'
+        });
         setEditorVisible(true)
     }
 
     const onCancelAction = () => {
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_ADDITIONAL_DETAIL_EDIT_CANCELLED, {
+            projectId: project.id,
+        });
         setText(initialReadme);
         setEditorVisible(false)
     }
 
     const onSaveAction = async () => {
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_ADDITIONAL_DETAIL_EDIT_SAVE, {
+            projectId: project.id,
+        });
         try {
             project['readMe'] = text;
             const res = await ProjectsService.updateProject(query.id, project);
             if(res && res.status === 200){
+                analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_ADDITIONAL_DETAIL_EDIT_SAVE_SUCCESS, {
+                    projectId: project.id,
+                });
                 toast.success('Additional Details updated successfully.')
             }
             
         } catch (er) {
+            analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_ADDITIONAL_DETAIL_EDIT_SAVE_FAILED, {
+                projectId: project.id,
+            });
             console.log(er);
             toast.error('Something went wrong.Please try again later.')
         }
