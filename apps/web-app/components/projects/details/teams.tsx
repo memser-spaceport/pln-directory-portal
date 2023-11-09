@@ -13,7 +13,7 @@ export default function TeamsInvolved({ project }) {
     const analytics = useAppAnalytics();
 
     const onMaintainerTeamClicked = (team) => {
-        router.push('/directory/teams/' + team.uid  );
+        router.push('/teams/' + team.uid  );
         analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_MAINTAINER_TEAM_CLICKED, {
           teamUid: team.uid,
           teamName: team.name,
@@ -21,7 +21,7 @@ export default function TeamsInvolved({ project }) {
       }
 
       const onContributingTeamClicked = (cteam) => {
-        router.push('/directory/teams/' + cteam.value );
+        router.push('/teams/' + cteam.value );
         analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_CONTRIBUTING_TEAM_CLICKED, {
           teamUid: cteam.value,
           teamName: cteam.label,
@@ -47,16 +47,16 @@ export default function TeamsInvolved({ project }) {
                             >See All</div>
                         }
                     </div>
-                    <div className="text-[16px] text-[#64748B] flex cursor-pointer hover:bg-slate-100 justify-between" 
+                    <div className="text-[16px] text-[#64748B] flex cursor-pointer hover:bg-slate-100 justify-between"
                             onClick={() => { onMaintainerTeamClicked(project.maintainingTeam) }}
                     >
                             <div className="flex gap-[10px] ">
                                 {
-                                    !project.maintainingTeam?.logo 
+                                    !project.maintainingTeam?.logo
                                     && <UserGroupIcon className="bg-gray-200 fill-white inline inset-y-0 left-2 my-auto h-[40px] w-[40px] rounded mr-[4px]" />
                                 }
                                 {
-                                    project.maintainingTeam?.logo 
+                                    project.maintainingTeam?.logo
                                     && <div><Image src={project.maintainingTeam?.logo?.url} alt="project image" width={40} height={40} className="rounded" /></div>
                                 }
                                 <div className="m-2">{project.maintainingTeam.name}</div>

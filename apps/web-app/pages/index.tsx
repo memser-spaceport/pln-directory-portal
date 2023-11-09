@@ -106,7 +106,7 @@ export const getServerSideProps: GetServerSideProps = async () => {
     ? {
         redirect: {
           permanent: false,
-          destination: '/directory/teams',
+          destination: '/teams',
         },
       }
     : { props: { videoDetails , playlistDetails , bannerJSON} };

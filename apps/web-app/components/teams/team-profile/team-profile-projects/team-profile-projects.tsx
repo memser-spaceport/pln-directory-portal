@@ -32,7 +32,7 @@ export default function TeamProfileProjects({ projects, isUserLoggedIn, team, ha
             <h3 className="mb-2 mt-6 font-medium text-slate-500 flex justify-between">
                 <div className="flex">
                     <div>Projects {projects.length > 0 && <span>({projects.length})</span>}</div>
-                    {/* <div className="px-2 cursor-pointer" onClick={()=>{router.push('/directory/projects/add')}}>
+                    {/* <div className="px-2 cursor-pointer" onClick={()=>{router.push('/projects/add')}}>
                         <div className="px-[8px] py-[5px] rounded bg-[#156FF7] text-white text-[12px] font-semibold">+Add</div>
                     </div> */}
                 </div>
@@ -47,7 +47,7 @@ export default function TeamProfileProjects({ projects, isUserLoggedIn, team, ha
                                     {
                                         from: 'teams-details'
                                     });
-                                router.push('/directory/projects/add');
+                                router.push('/projects/add');
                             }}>
                                 Add Project
                             </div>
@@ -65,7 +65,7 @@ export default function TeamProfileProjects({ projects, isUserLoggedIn, team, ha
 
             {
                 isUserLoggedIn && projects.length === 0 && <div className="p-[16px] max-h-96 overflow-y-auto rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)] focus-within:outline-none focus:outline-none focus-visible:outline-none">
-                    You have not added any projects. <span className="text-[#156FF7] cursor-pointer" onClick={() => { router.push('/directory/projects/add') }}>Click Here</span> to add a new project.
+                    You have not added any projects. <span className="text-[#156FF7] cursor-pointer" onClick={() => { router.push('/projects/add') }}>Click Here</span> to add a new project.
                 </div>
             }
             {
@@ -79,7 +79,7 @@ export default function TeamProfileProjects({ projects, isUserLoggedIn, team, ha
             </div>
             } */}
 
-            
+
 
             <div className="max-h-96 overflow-y-auto rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)] focus-within:outline-none focus:outline-none focus-visible:outline-none">
                 {

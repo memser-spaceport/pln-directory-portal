@@ -8,23 +8,23 @@ import orderBy from 'lodash/orderBy';
 import { GetServerSideProps } from 'next';
 import { NextSeo } from 'next-seo';
 import { ReactElement } from 'react';
-import { AskToEditCard } from '../../../components/shared/profile/ask-to-edit-card/ask-to-edit-card';
-import { TeamProfileDetails } from '../../../components/teams/team-profile/team-profile-details/team-profile-details';
-import { TeamProfileFunding } from '../../../components/teams/team-profile/team-profile-funding/team-profile-funding';
-import { TeamProfileHeader } from '../../../components/teams/team-profile/team-profile-header/team-profile-header';
-import { TeamProfileMembers } from '../../../components/teams/team-profile/team-profile-members/team-profile-members';
-import { AIRTABLE_REGEX } from '../../../constants';
-import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcrumb.hook';
-import { DirectoryLayout } from '../../../layouts/directory-layout';
-import { DIRECTORY_SEO } from '../../../seo.config';
-import { IMember } from '../../../utils/members.types';
+import { AskToEditCard } from '../../components/shared/profile/ask-to-edit-card/ask-to-edit-card';
+import { TeamProfileDetails } from '../../components/teams/team-profile/team-profile-details/team-profile-details';
+import { TeamProfileFunding } from '../../components/teams/team-profile/team-profile-funding/team-profile-funding';
+import { TeamProfileHeader } from '../../components/teams/team-profile/team-profile-header/team-profile-header';
+import { TeamProfileMembers } from '../../components/teams/team-profile/team-profile-members/team-profile-members';
+import { AIRTABLE_REGEX } from '../../constants';
+import { useProfileBreadcrumb } from '../../hooks/profile/use-profile-breadcrumb.hook';
+import { DirectoryLayout } from '../../layouts/directory-layout';
+import { DIRECTORY_SEO } from '../../seo.config';
+import { IMember } from '../../utils/members.types';
 import {
   restrictMemberInfo,
   parseTeamMember,
-} from '../../../utils/members.utils';
-import { ITeam } from '../../../utils/teams.types';
-import { parseTeam } from '../../../utils/teams.utils';
-import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../../utils/services/auth';
+} from '../../utils/members.utils';
+import { ITeam } from '../../utils/teams.types';
+import { parseTeam } from '../../utils/teams.utils';
+import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../utils/services/auth';
 import TeamProfileProjects from 'apps/web-app/components/teams/team-profile/team-profile-projects/team-profile-projects';
 import ProjectsService from 'apps/web-app/services/projects';
 
@@ -92,7 +92,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
   const isUserLoggedIn = cookies?.authToken &&  cookies?.userInfo ? true : false;
   let hasProjectsEditAccess = false;
-  const { id, backLink = '/directory/teams' } = query as {
+  const { id, backLink = '/teams' } = query as {
     id: string;
     backLink: string;
   };
@@ -107,7 +107,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
       ? {
           redirect: {
             permanent: true,
-            destination: `/directory/teams/${teamUID}`,
+            destination: `/teams/${teamUID}`,
           },
         }
       : {
@@ -147,7 +147,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
   if(userInfo.roles && userInfo.roles.length && userInfo.roles.includes('DIRECTORYADMIN')){
     hasProjectsEditAccess = true;
   }
-  
+
 
   const { getTeamsProject } = ProjectsService;
 

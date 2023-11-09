@@ -14,7 +14,7 @@ import { DIRECTORY_SEO } from "apps/web-app/seo.config";
 import api from "apps/web-app/utils/api";
 import { fetchMember } from "apps/web-app/utils/services/members";
 import { fetchTeam } from "apps/web-app/utils/services/teams";
-import { renewAndStoreNewAccessToken, convertCookiesToJson } from '../../utils/services/auth';
+import { renewAndStoreNewAccessToken, convertCookiesToJson } from '../utils/services/auth';
 import { DiscardChangesPopup } from "libs/ui/src/lib/modals/confirmation";
 import Privacy from "apps/web-app/components/preference/privacy";
 

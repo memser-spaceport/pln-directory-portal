@@ -2,13 +2,13 @@ import { GetServerSideProps } from 'next';
 import nookies from 'nookies';
 import { setCookie } from 'nookies';
 import { ReactElement } from 'react';
-import { LoadingIndicator } from '../../../components/shared/loading-indicator/loading-indicator';
-import { PAGE_ROUTES } from '../../../constants';
+import { LoadingIndicator } from '../../components/shared/loading-indicator/loading-indicator';
+import { PAGE_ROUTES } from '../../constants';
 import {
   getAccessToken,
   decodeToken,
   calculateExpiry,
-} from '../../../utils/services/auth';
+} from '../../utils/services/auth';
 
 type VerifyMember = {
   loading: boolean;

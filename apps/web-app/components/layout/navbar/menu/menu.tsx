@@ -17,17 +17,17 @@ export function Menu() {
     {
       icon: UserGroupIcon,
       name: 'Teams',
-      path: '/directory/teams',
+      path: '/teams',
     },
     {
       icon: UserIcon,
       name: 'Members',
-      path: '/directory/members',
+      path: '/members',
     },
     {
       icon: ProjectsIcon,
       name: 'Projects',
-      path: '/directory/projects',
+      path: '/projects',
     },
   ];
 

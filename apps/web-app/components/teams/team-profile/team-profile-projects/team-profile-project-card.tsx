@@ -6,7 +6,7 @@ import { useRouter } from "next/router";
 export default function TeamProfileProjectCard({ project, hasProjectsEditAccess = false }) {
     const router = useRouter();
     const analytics = useAppAnalytics();
-   
+
     return (
         <div className="py-[16px] pl-[16px] pr-[32px] flex hover:bg-[#F8FAFC] justify-between"
             >
@@ -31,24 +31,24 @@ export default function TeamProfileProjectCard({ project, hasProjectsEditAccess 
                 {
                     hasProjectsEditAccess
                     &&
-                    <div 
+                    <div
                     className="cursor-pointer"
-                    onClick={() => { 
+                    onClick={() => {
                         analytics.captureEvent(
                             APP_ANALYTICS_EVENTS.PROJECT_EDIT_CLICKED,
                             {
                                 from: 'teams-details',
                                 projectId: project.id
                             });
-                        router.push(`/directory/projects/edit/${project.id}`);
+                        router.push(`/projects/edit/${project.id}`);
                      }}
                     >
                         <Image src='/assets/images/icons/projects/edit-project.svg' alt="project image" width={24} height={24} />
-                    </div> 
+                    </div>
                 }
                 <div
                     onClick={() => {
-                         router.push(`/directory/projects/${project.id}`);
+                         router.push(`/projects/${project.id}`);
                          analytics.captureEvent(
                             APP_ANALYTICS_EVENTS.PROJECT_CLICKED,
                             {

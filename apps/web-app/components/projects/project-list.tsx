@@ -30,7 +30,7 @@ export function ProjectList({
                 from: 'list'
               }
             );
-            push('/directory/projects/add');
+            push('/projects/add');
           }}
         >
           {/* <Image
