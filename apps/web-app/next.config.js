@@ -77,6 +77,30 @@ let nextConfig = {
         permanent: false,
       },
       {
+        // Redirect the old members directory URL to the new `/directory` URL
+        source: '/directory/members/verify-member',
+        destination: '/members/verify-member',
+        permanent: false,
+      },
+      {
+        // Redirect the old members directory URL to the new `/directory` URL
+        source: '/directory/projects',
+        destination: '/projects',
+        permanent: false,
+      },
+      {
+        // Redirect the old member profile URLs to the new `/directory` URLs
+        source: '/directory/projects/:id*',
+        destination: '/projects/:id*',
+        permanent: false,
+      },
+      {
+        // Redirect the old members directory URL to the new `/directory` URL
+        source: '/directory/settings',
+        destination: '/settings',
+        permanent: false,
+      },
+      {
         // Redirect the events path to the appropriate Events page
         source: '/events',
         destination: 'https://events.plnetwork.io/',
