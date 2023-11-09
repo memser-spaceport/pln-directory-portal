@@ -82,7 +82,7 @@ export default function TeamsInvolved({ project }) {
                                             {
                                                 !cteam.logo && <UserGroupIcon className="bg-gray-200 fill-white inline inset-y-0 left-2 my-auto h-[40px] w-[40px] rounded mr-[4px]" />
                                             }
-                                            <div className="m-2">{cteam.label}</div>
+                                            <div className="m-2 max-w-[188px]">{cteam.label}</div>
                                         </div>
                                     }
                                 </React.Fragment>
