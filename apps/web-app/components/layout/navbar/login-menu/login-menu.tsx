@@ -16,7 +16,7 @@ export function Login() {
   const handleOpenModal = () => {
     if (Cookies.get("userInfo")) {
       Cookies.set('page_params', 'user_logged_in', { expires: 60, path: '/' });
-      router.push("/directory/members");
+      router.push("/members");
     } else {
       setLoaderFlag(true);
       authenticate(router.asPath);

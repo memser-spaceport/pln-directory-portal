@@ -20,7 +20,7 @@ import { ReactElement } from "react";
 
 export default function ProjectDetails({ selectedProject, userHasEditRights, userHasDeleteRights }) {
     const { breadcrumbItems } = useProfileBreadcrumb({
-        backLink: '/directory/projects',
+        backLink: '/projects',
         directoryName: 'Projects',
         pageName: selectedProject.name,
     });
@@ -49,7 +49,7 @@ export default function ProjectDetails({ selectedProject, userHasEditRights, use
                                 <KPIs project={selectedProject} />
                             </div>
                         }
-                        
+
                         <div className="p-[30px] shadow-md rounded-[12px] bg-white">
                         <AdditionalDetails project={selectedProject} userHasEditRights={userHasEditRights} />
                         </div>
@@ -94,11 +94,11 @@ const checkForEditRights = async (userInfo, selectedProject, isUserLoggedIn) => 
 
         if (getTeamsResponse.status === 200 && getTeamsResponse.body && getTeamsResponse.body.length) {
             for (const team of getTeamsResponse.body) {
-                //case 3.Validating if the user belongs to maintaining team 
+                //case 3.Validating if the user belongs to maintaining team
                 if (team.uid === selectedProject.teamUid) {
                     return true;
                 }
-                //case 4.Validating if the user belongs to one of the contributing teams 
+                //case 4.Validating if the user belongs to one of the contributing teams
                 if(selectedProject?.contributingTeams?.length){
                     for (const cTeam of selectedProject.contributingTeams) {
                         if (cTeam.value === team.uid) {
@@ -122,7 +122,7 @@ const checkForDeleteRights = (userInfo,selectedProject,isUserLoggedIn) => {
     if (userInfo.roles && userInfo.roles.length && userInfo.roles.includes('DIRECTORYADMIN')){
     return true;
  }
- 
+
  if(userInfo.leadingTeams?.length && userInfo.leadingTeams.includes(selectedProject.teamUid) ){
     return true;
  }
@@ -150,9 +150,9 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     let selectedProject = null;
     let userHasEditRights = false;
     let userHasDeleteRights = false;
-    
+
     // console.log(selectedProjectResponse);
-    
+
     if (selectedProjectResponse.status === 200) {
         selectedProject = ProjectsDataService.getFormattedProject(selectedProjectResponse.body);
         userHasEditRights = await checkForEditRights(userInfo, selectedProject, isUserLoggedIn);
@@ -162,7 +162,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
             notFound: true,
         }
     }
-    
+
     return {
         props: {
             isUserLoggedIn,

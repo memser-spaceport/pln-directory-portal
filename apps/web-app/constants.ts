@@ -143,10 +143,10 @@ export const NETWORK_ERR_MSG = 'Network error. please try again';
 export const OFFICE_HOURS_MSG = "Schedule a one on one office hours discussion with"
 
 export const PAGE_ROUTES = {
-  MEMBERS:'/directory/members',
-  TEAMS: '/directory/teams',
-  SETTINGS: '/directory/settings',
-  PROJECTS: '/directory/projects'
+  MEMBERS:'/members',
+  TEAMS: '/teams',
+  SETTINGS: '/settings',
+  PROJECTS: '/projects'
 }
 
 export const SETTINGS_CONSTANTS = {

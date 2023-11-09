@@ -53,7 +53,7 @@ import { ReactComponent as PrefernceIcon } from '../../../public/assets/images/i
 import { PreferenceModal } from './preference-modal';
 import Privacy from '../../preference/privacy';
 import { getPreferences } from 'apps/web-app/services/member.service';
-import { SettingsContext } from "apps/web-app/pages/directory/settings";
+import { SettingsContext } from "apps/web-app/pages/settings";
 import ProjectContribution from '../../projects/contribution/project-contribution';
 interface EditMemberModalProps {
   isOpen: boolean;
@@ -516,7 +516,7 @@ export function EditMemberModal({
   }
 
   const returnToHome = () => {
-    router.push('/directory/members');
+    router.push('/members');
   };
 
   function formatData() {

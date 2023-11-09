@@ -145,11 +145,11 @@ export default function ActionButtons(){
                             APP_ANALYTICS_EVENTS.PROJECT_ADD_SAVE_SUCESS
                           );
                         toast.info("Project added successfully.")
-                        router.push('/directory/projects');
+                        router.push('/projects');
                     }
                 }else{
                     const data = await ProjectsService.updateProjectDetails(addProjectsState.inputs, image,addProjectsState.inputs.id);
-                    
+
                     if(data.status === 200){
                         analytics.captureEvent(
                             APP_ANALYTICS_EVENTS.PROJECT_EDIT_SAVE_SUCESS,
@@ -157,11 +157,11 @@ export default function ActionButtons(){
                                 'projectId': data.data.uid,
                             }
                           );
-                        toast.info("Project updated successfully.")
-                        router.push('/directory/projects/'+data.data.uid);
+                        toast.info("Project upadated successfully.")
+                        router.push('/projects/'+data.data.uid);
                     }
                 }
-                
+
             }catch(err){
                 console.log(err);
                 if(addProjectsState.mode === 'ADD'){
@@ -214,7 +214,7 @@ export default function ActionButtons(){
                 </div>
             )}
             <div className="flex flex-row-reverse gap-[8px] py-[20px] font-[15px] font-semibold">
-                <div className="px-[24px] py-[8px] rounded-[100px] border cursor-pointer border-[#156FF7] bg-[#156FF7] text-white" 
+                <div className="px-[24px] py-[8px] rounded-[100px] border cursor-pointer border-[#156FF7] bg-[#156FF7] text-white"
                 onClick={onSaveProject}>
                     {
                         mode === 'ADD' ? 'Add Project' : 'Save Changes'
@@ -226,7 +226,7 @@ export default function ActionButtons(){
                         analytics.captureEvent(
                             APP_ANALYTICS_EVENTS.PROJECT_ADD_CANCEL
                           );
-                        router.push('/directory/projects')
+                        router.push('/projects')
                     }else{
                         analytics.captureEvent(
                             APP_ANALYTICS_EVENTS.PROJECT_EDIT_CANCEL,
@@ -234,7 +234,7 @@ export default function ActionButtons(){
                               'projectId': addProjectsState.inputs.id,
                             }
                           );
-                        router.push('/directory/projects/'+addProjectsState.inputs.id);
+                        router.push('/projects/'+addProjectsState.inputs.id);
                     }
                 }}>
                     Cancel

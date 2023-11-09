@@ -48,7 +48,7 @@ export function MemberCard({
   return (
     <DirectoryCard
       isGrid={isGrid}
-      cardUrl={`/directory/members/${member.id}?backLink=${backLink}`}
+      cardUrl={`/members/${member.id}?backLink=${backLink}`}
       handleOnClick={onMemberClicked}
       type="member"
     >
@@ -93,7 +93,7 @@ export function MemberCard({
             <div className="max-w-[250px] font-medium">
               {(member.teams.length && (
                 <Tooltip
-                  asChild whitespace-nowrap 
+                  asChild whitespace-nowrap
                   trigger={
                     <p className="select-none truncate">
                       {mainTeam?.name}

@@ -4,7 +4,7 @@ import {
 } from '@protocol-labs-network/members/data-access';
 import { GetServerSideProps } from 'next';
 import { getServerSideSitemap, ISitemapField } from 'next-sitemap';
-import { getSiteUrl } from '../../../utils/sitemap/sitemap.utils';
+import { getSiteUrl } from '../../utils/sitemap/sitemap.utils';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 export default function MembersSitemap() {}
@@ -21,7 +21,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
   if (membersResponse.status === 200) {
     membersProfiles = membersResponse.body.map((member) => ({
-      loc: `${siteUrl}/directory/members/${member.uid}`,
+      loc: `${siteUrl}/members/${member.uid}`,
       lastmod: new Date().toISOString(),
     }));
   }

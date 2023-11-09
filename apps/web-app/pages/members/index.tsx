@@ -6,23 +6,23 @@ import { GetServerSideProps } from 'next';
 import { NextSeo } from 'next-seo';
 import nookies, { destroyCookie } from 'nookies';
 import { ReactElement } from 'react';
-import { LoadingOverlay } from '../../../components/layout/loading-overlay/loading-overlay';
-import { MembersDirectoryFilters } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters';
-import { IMembersFiltersValues } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters.types';
-import { parseMembersFilters } from '../../../components/members/members-directory/members-directory-filters/members-directory-filters.utils';
-import { MembersDirectoryList } from '../../../components/members/members-directory/members-directory-list/members-directory-list';
-import { DirectoryHeader } from '../../../components/shared/directory/directory-header/directory-header';
-import { useViewType } from '../../../components/shared/directory/directory-view/use-directory-view-type.hook';
-import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-directory-filters-fathom-logger.hook';
-import { DirectoryLayout } from '../../../layouts/directory-layout';
-import { DIRECTORY_SEO } from '../../../seo.config';
-import { IMember } from '../../../utils/members.types';
-import { renewAndStoreNewAccessToken, convertCookiesToJson } from '../../../utils/services/auth';
-import { parseMember, restrictMemberInfo } from '../../../utils/members.utils';
+import { LoadingOverlay } from '../../components/layout/loading-overlay/loading-overlay';
+import { MembersDirectoryFilters } from '../../components/members/members-directory/members-directory-filters/members-directory-filters';
+import { IMembersFiltersValues } from '../../components/members/members-directory/members-directory-filters/members-directory-filters.types';
+import { parseMembersFilters } from '../../components/members/members-directory/members-directory-filters/members-directory-filters.utils';
+import { MembersDirectoryList } from '../../components/members/members-directory/members-directory-list/members-directory-list';
+import { DirectoryHeader } from '../../components/shared/directory/directory-header/directory-header';
+import { useViewType } from '../../components/shared/directory/directory-view/use-directory-view-type.hook';
+import { useDirectoryFiltersFathomLogger } from '../../hooks/plugins/use-directory-filters-fathom-logger.hook';
+import { DirectoryLayout } from '../../layouts/directory-layout';
+import { DIRECTORY_SEO } from '../../seo.config';
+import { IMember } from '../../utils/members.types';
+import { renewAndStoreNewAccessToken, convertCookiesToJson } from '../../utils/services/auth';
+import { parseMember, restrictMemberInfo } from '../../utils/members.utils';
 import {
   getMembersListOptions,
   getMembersOptionsFromQuery,
-} from '../../../utils/members.utils';
+} from '../../utils/members.utils';
 
 type MembersProps = {
   members: IMember[];
@@ -56,7 +56,7 @@ export default function Members({
     <>
       <NextSeo {...DIRECTORY_SEO} title="Members" />
       <LoadingOverlay
-        excludeUrlFn={(url) => url.startsWith('/directory/members/')}
+        excludeUrlFn={(url) => url.startsWith('/members/')}
       />
 
       <section className="pl-sidebar flex pt-20">
@@ -113,7 +113,7 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) 
 
   const optionsFromQuery = getMembersOptionsFromQuery(query);
   console.log(optionsFromQuery);
-  
+
   const listOptions = getMembersListOptions(optionsFromQuery);
   const [membersResponse, filtersValues] = await Promise.all([
     getMembers(listOptions),

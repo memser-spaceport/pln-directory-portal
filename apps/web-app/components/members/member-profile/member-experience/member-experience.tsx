@@ -21,19 +21,19 @@ function MemberExperience(props) {
           analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_PR_CONTRIBUTIONS_EDIT, {
             member: member,
           })
-          router.push({pathname: '/directory/settings', query: {tab: 'contributions'}}, '/directory/settings')
+          router.push({pathname: '/settings', query: {tab: 'contributions'}}, '/settings')
         } else {
           const query = { id: member?.id, tab: 'contributions', name: member?.name, logo: member?.image, from: SETTINGS_CONSTANTS.MEMBER };
           router.push({
-            pathname: '/directory/settings',
+            pathname: '/settings',
             query
-          }, '/directory/settings');
+          }, '/settings');
         }
     }
 
     const onProjectClicked = (proj) => {
         /* if(proj && proj.uid) {
-          router.push(`/directory/projects/${proj.uid}`)
+          router.push(`/projects/${proj.uid}`)
         } */
     }
 
@@ -91,7 +91,7 @@ function MemberExperience(props) {
             <div className="mt-[8px] focus-within:outline-none focus:outline-none focus-visible:outline-none">
                 <div>
                     {contributions.map((exp, expIndex) => <div key={`exp-${expIndex}`} className="mb-[10px] rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)]">
-                        {!exp?.project?.isDeleted && <a target="_blank" href={`/directory/projects/${exp?.project?.uid}`} onClick={() => onProjectClicked(exp?.project)} className="flex gap-[16px] cursor-pointer hover:bg-[#f7fbff] rounded-tl-xl rounded-tr-xl p-[16px] border-[1px] items-center border-solid border-[#E2E8F0] border-t-0 border-l-0 border-r-0" rel="noreferrer">
+                        {!exp?.project?.isDeleted && <a target="_blank" href={`/projects/${exp?.project?.uid}`} onClick={() => onProjectClicked(exp?.project)} className="flex gap-[16px] cursor-pointer hover:bg-[#f7fbff] rounded-tl-xl rounded-tr-xl p-[16px] border-[1px] items-center border-solid border-[#E2E8F0] border-t-0 border-l-0 border-r-0" rel="noreferrer">
                             <div>
                                 <img className="w-[70px] h-[70px] object-contain" src={exp?.project?.logo?.url ? exp.project?.logo?.url : '/assets/images/icons/projects/default.svg'} />
                             </div>
