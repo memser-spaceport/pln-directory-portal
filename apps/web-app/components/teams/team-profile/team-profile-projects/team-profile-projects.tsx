@@ -2,11 +2,14 @@ import { useRouter } from "next/router";
 import TeamProfileProjectCard from "./team-profile-project-card";
 import { useState } from "react";
 import { TeamProfileProjectsModal } from "./team-profile-seeall-popop";
+import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
+import { APP_ANALYTICS_EVENTS } from "apps/web-app/constants";
 
 export default function TeamProfileProjects({ projects, isUserLoggedIn, team, hasProjectsEditAccess }) {
 
     const [teamProjects, setTeamProjects] = useState((projects && projects.length) ? projects.slice(0, 3): []);
     const [seeAllPopup, setSeeAllPopup] = useState(false);
+    const analytics = useAppAnalytics();
 
     // const isTeamLead = ((userInfo?.roles?.length > 0 &&
     //     userInfo.roles.includes('DIRECTORYADMIN')) ||
@@ -15,6 +18,11 @@ export default function TeamProfileProjects({ projects, isUserLoggedIn, team, ha
 
     const seeAllAction = () => {
         // setTeamProjects(projects);
+        analytics.captureEvent(
+            APP_ANALYTICS_EVENTS.TEAMS_DETAIL_PROJECTS_SEE_ALL,
+            {
+                from: 'teams-details'
+            });
         setSeeAllPopup(true);
     }
 
@@ -33,7 +41,14 @@ export default function TeamProfileProjects({ projects, isUserLoggedIn, team, ha
                 {
                     projects.length > 0 && <div className="text-[13px] text-[#156FF7] cursor-pointer flex gap-[12px]">
                         {
-                            isUserLoggedIn && <div className=" cursor-pointer" onClick={() => { router.push('/directory/projects/add') }}>
+                            isUserLoggedIn && <div className=" cursor-pointer" onClick={() => {
+                                analytics.captureEvent(
+                                    APP_ANALYTICS_EVENTS.PROJECT_ADD_CLICKED,
+                                    {
+                                        from: 'teams-details'
+                                    });
+                                router.push('/directory/projects/add');
+                            }}>
                                 Add Project
                             </div>
                         }

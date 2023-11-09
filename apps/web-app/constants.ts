@@ -231,7 +231,7 @@ export const APP_ANALYTICS_EVENTS = {
   PROJECT_DETAIL_DELETE_NO_CLICKED: 'project-detail-delete-clicked-canceled',
   PROJECT_DETAIL_DELETE_SUCCESS: 'project-detail-delete-success',
   PROJECT_DETAIL_DELETE_FAILED: 'project-detail-delete-failed',
-  PROJECT_DETAIL_ADDITIONAL_DETAIL_EDIT_CLICKED: 'project-detail-additional-detail-edit-clicked',
+  PROJECT_EDIT_CLICKED: 'project-edit-clicked',
   PROJECT_DETAIL_ADDITIONAL_DETAIL_EDIT_CANCELLED: 'project-detail-additional-detail-edit-cancelled',
   PROJECT_DETAIL_ADDITIONAL_DETAIL_EDIT_SAVE: 'project-detail-additional-detail-edit-save-clicked',
   PROJECT_DETAIL_ADDITIONAL_DETAIL_EDIT_SAVE_SUCCESS: 'project-detail-additional-detail-edit-save-success',
@@ -248,6 +248,8 @@ export const APP_ANALYTICS_EVENTS = {
   PROJECT_ADD_SAVE_FAIL: 'project-add-save-fail',
   PROJECT_EDIT_SAVE_SUCESS: 'project-edit-save-success',
   PROJECT_EDIT_SAVE_FAIL: 'project-edit-save-fail',
+  PROJECT_ADD_CLICKED: 'project-add-click',
+  TEAMS_DETAIL_PROJECTS_SEE_ALL: 'team-detail-projects-see-all-clicked'
 }
 
 export const TAB_CONSTANTS = {

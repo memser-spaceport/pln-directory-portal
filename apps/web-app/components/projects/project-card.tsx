@@ -15,7 +15,7 @@ export function ProjectCard({ project, isGrid = true }) {
         analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_CLICKED, {
           projectUid: project.id,
           projectName: project.name,
-          backLink: backLink
+          from: 'project-list'
         });
       }
     
