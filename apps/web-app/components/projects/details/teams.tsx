@@ -29,7 +29,14 @@ export default function TeamsInvolved({ project }) {
                             onClick={() => { router.push('/directory/teams/' + project.maintainingTeam.uid  ) }}
                     >
                             <div className="flex gap-[10px] ">
-                                <div><Image src={project.maintainingTeam?.logo?.url} alt="project image" width={40} height={40} className="rounded" /></div>
+                                {
+                                    !project.maintainingTeam?.logo 
+                                    && <UserGroupIcon className="bg-gray-200 fill-white inline inset-y-0 left-2 my-auto h-[40px] w-[40px] rounded mr-[4px]" />
+                                }
+                                {
+                                    project.maintainingTeam?.logo 
+                                    && <div><Image src={project.maintainingTeam?.logo?.url} alt="project image" width={40} height={40} className="rounded" /></div>
+                                }
                                 <div className="m-2">{project.maintainingTeam.name}</div>
                             </div>
                             <div className="flex items-center p-2" title="Maintainer"><Core /></div>
