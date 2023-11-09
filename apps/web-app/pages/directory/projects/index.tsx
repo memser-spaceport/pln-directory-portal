@@ -39,7 +39,7 @@ export default function Projects(props) {
                                     searchPlaceholder="Search for a Project"
                                     count={props?.projects?.length}
                                 />
-                                <ProjectList projects={props.projects} isGrid={isGrid} filterProperties={filterProperties} />
+                                <ProjectList projects={props.projects} isGrid={isGrid} filterProperties={filterProperties} isUserLoggedIn={props.isUserLoggedIn}/>
 
                                 {/* <TeamsDirectoryList
                                     teams={teams}

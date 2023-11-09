@@ -15,7 +15,7 @@ export function ProjectCard({ project, isGrid = true }) {
         analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_CLICKED, {
           projectUid: project.id,
           projectName: project.name,
-          backLink: backLink
+          from: 'project-list'
         });
       }
     
@@ -34,8 +34,9 @@ export function ProjectCard({ project, isGrid = true }) {
                             <div className='pl-2 my-auto font-semibold text-[16px]'>{project.name}</div>
                         </div>
                         {
-                            project.fundingNeeded && <div className='my-auto px-[8px] py-[3px] bg-[#FFEAC1] rounded-[24px]' title='Raising Funds'>
-                                <Image src={'/assets/images/icons/projects/funding.svg'} alt="project image" width={12} height={12} />
+                            //className='my-auto px-[8px] py-[3px] bg-[#FFEAC1] rounded-[24px]' 
+                            project.fundingNeeded && <div title='Raising Funds'>
+                                <Image src={'/assets/images/icons/projects/funding-with-bg.svg'} alt="project image" width={24} height={24} />
                             </div>
                         }
                     </div>

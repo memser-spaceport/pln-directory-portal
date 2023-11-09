@@ -3,6 +3,7 @@ import { APP_ANALYTICS_EVENTS } from "apps/web-app/constants";
 import { ProjectsContext } from "apps/web-app/context/projects/project.context";
 import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
 import api from "apps/web-app/utils/api";
+import Image from "next/image";
 import { useRouter } from "next/router";
 import { useContext, useEffect, useState } from "react";
 
@@ -82,7 +83,7 @@ export default function ProjectsFilter({ filterProperties, isUserLoggedIn }) {
 
     return (
         <>
-            {
+            {/* {
                 isUserLoggedIn 
                 &&
                 <div className="flex ">
@@ -94,7 +95,7 @@ export default function ProjectsFilter({ filterProperties, isUserLoggedIn }) {
                 Add Project
                 </div>
             </div>
-            }
+            } */}
             <div className="relative flex items-center justify-between bg-white p-5 pl-[37px] before:absolute before:bottom-[-0.2rem] before:left-0 before:h-1 before:w-full before:border-t after:absolute after:bottom-0 after:left-0 after:h-7 after:w-[calc(100%_-_1.23rem)] after:translate-y-full after:bg-gradient-to-b after:from-white">
                 <span className="text-lg font-semibold leading-7">Filters</span>
                 <button
@@ -106,9 +107,12 @@ export default function ProjectsFilter({ filterProperties, isUserLoggedIn }) {
             </div>
 
             <div className="h-[calc(100vh_-_148px)] overflow-y-auto p-5 pl-[37px] focus-within:outline-none focus:outline-none focus-visible:outline-none">
-                <div className="py-[20px]">
-                    {projectsState?.filterState?.FUNDING}
-                    <Switch label="Projects Raising Funds"
+                <div className="py-[20px] flex justify-between">
+                    <div className="flex gap-2">
+                    <span className="select-none text-sm text-slate-600">Projects Raising Funds</span>
+                    <div className=""><Image src={'/assets/images/icons/projects/funding-with-bg.svg'} alt="project image" width={24} height={24} /></div>
+                    </div>
+                    <Switch 
                         initialValue={projectsState?.filterState?.FUNDING}
                         onChange={(value) => {
                             projectsDispatch({ type: 'SET_FILTER', payload: { filterType: 'FUNDING', value } });

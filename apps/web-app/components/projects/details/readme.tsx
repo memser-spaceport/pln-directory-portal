@@ -30,8 +30,9 @@ export default function AdditionalDetails({ project, userHasEditRights }) {
     }, [])
 
     const onEditAction = () => {
-        analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_ADDITIONAL_DETAIL_EDIT_CLICKED, {
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_EDIT_CLICKED, {
             projectId: project.id,
+            from:'project-details'
         });
         setEditorVisible(true)
     }
