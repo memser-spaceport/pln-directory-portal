@@ -6,10 +6,13 @@ import ProjectsService from "apps/web-app/services/projects";
 import { toast } from "react-toastify";
 import { DeleteConfirmationModal } from "./delete-confirmation";
 import { useState } from "react";
+import { APP_ANALYTICS_EVENTS } from "apps/web-app/constants";
+import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
 
 export default function Header({ project, userHasEditRights, userHasDeleteRights }) {
     const router = useRouter();
     const [isOpen, setIsModalOpen] = useState(false);
+    const analytics = useAppAnalytics();
 
     const delProject = () => {
         setIsModalOpen(true);
@@ -19,10 +22,16 @@ export default function Header({ project, userHasEditRights, userHasDeleteRights
         try {
             const res = await ProjectsService.deleteProject(project.id);
             if (res.status === 200) {
+                analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_DELETE_SUCCESS, {
+                    projectId: project.id,
+                });
                 toast.success('Project deleted successfully.');
                 setIsModalOpen(false)
             }
         } catch (err) {
+            analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_DELETE_FAILED, {
+                projectId: project.id,
+            });
             console.error(err);
             setIsModalOpen(false);
         }
@@ -58,7 +67,9 @@ export default function Header({ project, userHasEditRights, userHasDeleteRights
                         &&
                         <div className="flex text-base font-semibold text-[#156FF7] cursor-pointer"
                             onClick={() => {
-
+                                analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_EDIT_CLICKED, {
+                                    projectId: project.id,
+                                });
                                 router.push('/directory/projects/edit/' + project.id)
                             }}
                         >
@@ -71,6 +82,9 @@ export default function Header({ project, userHasEditRights, userHasDeleteRights
                         &&
                         <div className="flex text-base font-semibold text-[#DD2C5A] cursor-pointer gap-1"
                             onClick={() => {
+                                analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_EDIT_CLICKED, {
+                                    projectId: project.id,
+                                });
                                 delProject();
                             }}
                         >
