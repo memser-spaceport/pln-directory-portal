@@ -157,7 +157,7 @@ export default function ActionButtons(){
                                 'projectId': data.data.uid,
                             }
                           );
-                        toast.info("Project upadated successfully.")
+                        toast.info("Project updated successfully.")
                         router.push('/directory/projects/'+data.data.uid);
                     }
                 }
