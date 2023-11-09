@@ -4,7 +4,17 @@ import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
 import { isEmails } from '../utils/helper/helper';
 import { AwsService } from '../utils/aws/aws.service';
-import { FAQ_NOTIFICATION_TEMPLATE } from '../utils/constants';
+import * as path from 'path';
+import { 
+  ASK_QUESTION,
+  FEEDBACK, 
+  SUPPORT, 
+  SHARE_IDEA,
+  ASK_QUESTION_SUBJECT,
+  FEEDBACK_SUBJECT,
+  SHARE_IDEA_SUBJECT,
+  SUPPORT_SUBJECT
+} from '../utils/constants';
 
 @Injectable()
 export class FaqService {
@@ -44,18 +54,45 @@ export class FaqService {
     }
   }
 
+  getEmailSubjectByType(type) {
+    switch(type) {
+      case ASK_QUESTION:
+        return ASK_QUESTION_SUBJECT;
+      case SUPPORT:
+        return SUPPORT_SUBJECT; 
+      case FEEDBACK:
+        return FEEDBACK_SUBJECT;
+      case SHARE_IDEA:
+        return SHARE_IDEA_SUBJECT;
+      default: 
+        return null;
+    }
+  }
+
   async notifyNewCustomQuestion(faq) {
     if (this.isSupportEmailsValid) {
-      await this.awsService.sendEmail(
-        FAQ_NOTIFICATION_TEMPLATE,
-        true,
-        this.supportEmails,
+      const subject = this.getEmailSubjectByType(faq.type);
+      const from = process.env.SES_SOURCE_EMAIL;
+      if (!from) {
+        this.logger.error('From email address is not configured.');
+        return ;
+      }
+      if (!subject) {
+        this.logger.error(`Unable to send email for type ${faq.type} and id ${faq.id}`);
+        return ;
+      }
+      const result = await this.awsService.sendEmailWithTemplate(
+        path.join(__dirname, '/shared/contactUs.hbs'),
         {
-          email: faq.email,
-          content: faq.question
-        }
+          ...faq
+        },
+        '',
+        subject,
+        from,
+        this.supportEmails,
+        []
       );
-      this.logger.info(`New faq request from ${faq.email} - ${faq.uid} notified to support team`);
+      this.logger.info(`New faq request from ${faq.email} - ${faq.uid} notified to support team ref: ${result.MessageId}`);
     } else {
       this.logger.error(
         `Cannot send custom question content for ${faq.uid} as ${this.supportEmails} does not contain valid email addresses`
