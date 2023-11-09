@@ -36,7 +36,12 @@ function ProjectSelection(props) {
         setLoadingStatus(true)
         findProjectByName(searchText)
             .then(d => {
-                setSearchResult(d)
+                setSearchResult(d.map(d => {
+                    if(!d.logo) {
+                        d.logo = {url: '/assets/images/icons/projects/default.svg'}
+                    }
+                    return d;
+                }))
                 setPaneStatus(true)
             })
             .catch(e => console.log(e))
@@ -48,7 +53,12 @@ function ProjectSelection(props) {
             setLoadingStatus(true)
             findProjectByName(searchQuery)
                 .then(d => {
-                    setSearchResult(d);
+                    setSearchResult(d.map(d => {
+                        if(!d.logo) {
+                            d.logo = {url: '/assets/images/icons/projects/default.svg'}
+                        }
+                        return d;
+                    }));
                     setPaneStatus(true)
                 })
                 .catch(e => console.log(e))
