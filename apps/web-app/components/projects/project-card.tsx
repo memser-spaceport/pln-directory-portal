@@ -30,12 +30,15 @@ export function ProjectCard({ project, isGrid = true }) {
                 <div className='flex flex-col'>
                     <div className='flex justify-between'>
                         <div className='flex'>
-                            <div className='relative w-[41px] h-[41px]'><Image src={project.image} alt="project image" width={41} height={41} className='rounded'/></div>
-                            <div className='pl-2 my-auto font-semibold text-[16px]'>{project.name}</div>
+                            <div className='relative min-w-[41px]! min-h-[41px]!'>
+                                <Image src={project.image} alt="project image" width={41} height={41} className='rounded min-w-[41px]! min-h-[41px]!'/>
+                                {/* <img src={project.image} alt="project image" className='rounded'/> */}
+                                </div>
+                            <div className={`pl-2 my-auto font-semibold text-[16px] text-left ${isGrid?'max-w-[205px]':''} youtube-title`}>{project.name}</div>
                         </div>
                         {
                             //className='my-auto px-[8px] py-[3px] bg-[#FFEAC1] rounded-[24px]' 
-                            project.fundingNeeded && <div title='Raising Funds'>
+                            project.fundingNeeded && <div className="flex" title='Raising Funds'>
                                 <Image src={'/assets/images/icons/projects/funding-with-bg.svg'} alt="project image" width={24} height={24} />
                             </div>
                         }
@@ -49,10 +52,15 @@ export function ProjectCard({ project, isGrid = true }) {
                             {
                                 project.maintainingTeamImage === 'default'
                                     ? <UserGroupIcon className="bg-gray-200 fill-white relative inline-block h-6 w-6 rounded-full" />
-                                    : <Image src={project.maintainingTeamImage} alt="project image" width={25} height={25} className='rounded'/>
+                                    : <Image src={project.maintainingTeamImage} alt="project image" width={36} height={36} className='rounded'/>
                             }
                         </div>
-                        <div className='font-[13px] font-normal pl-2 my-auto'>{project.maintainingTeamName}</div>
+                        <div className='font-[13px] font-normal pl-2 text-left'>
+                            <div className='max-w-[200px] truncate'>
+                            {project.maintainingTeamName}
+                            </div>
+                            <div className='opacity-40'>Maintainer</div>
+                        </div>
                     </div>
                     {/* {
                         isGrid && <div className='pt-[20px] mx-auto'>
