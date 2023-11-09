@@ -109,8 +109,8 @@ export default function ProjectsFilter({ filterProperties, isUserLoggedIn }) {
             <div className="h-[calc(100vh_-_148px)] overflow-y-auto p-5 pl-[37px] focus-within:outline-none focus:outline-none focus-visible:outline-none">
                 <div className="py-[20px] flex justify-between">
                     <div className="flex gap-2 items-center">
-                    <span className="select-none text-sm text-slate-600">Projects Raising Funds</span>
                     <div className="relative top-1"><Image src={'/assets/images/icons/projects/funding-with-bg.svg'} alt="project image" width={24} height={24} /></div>
+                    <span className="select-none text-sm text-slate-600">Projects Raising Funds</span>
                     </div>
                     <Switch 
                         initialValue={projectsState?.filterState?.FUNDING}

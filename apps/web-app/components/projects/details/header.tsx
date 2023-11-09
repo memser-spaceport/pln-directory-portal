@@ -26,7 +26,8 @@ export default function Header({ project, userHasEditRights, userHasDeleteRights
                     projectId: project.id,
                 });
                 toast.success('Project deleted successfully.');
-                setIsModalOpen(false)
+                setIsModalOpen(false);
+                router.push('/directory/projects');
             }
         } catch (err) {
             analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_DELETE_FAILED, {
@@ -50,7 +51,7 @@ export default function Header({ project, userHasEditRights, userHasDeleteRights
                             {
                                 project?.fundingNeeded 
                                 &&
-                                <div title="Raising Funds">
+                                <div title="Raising Funds" className="relative top-1">
                                     <Image src={'/assets/images/icons/projects/funding-with-bg.svg'} alt="project image" width={24} height={24} />
                                 </div>
                             }
