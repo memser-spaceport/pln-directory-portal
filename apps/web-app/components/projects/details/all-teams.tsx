@@ -64,7 +64,6 @@ export function AllTeamsModal({
                             return (
                                 <React.Fragment key={'cteam' + index}>
                                     {
-                                        index < 3 &&
                                         <div className="text-[16px] text-[#64748B] flex gap-[10px] cursor-pointer hover:bg-slate-100"
                                          key={'cteam' + index}
                                          onClick={() => { onContributingTeamClicked(cteam) }}
