@@ -8,11 +8,11 @@ module.exports = {
   generateRobotsTxt: process.env.VERCEL_ENV === 'production',
   sourceDir: 'dist/apps/web-app/.next',
   outDir: 'dist/apps/web-app/public',
-  exclude: ['/directory/members/sitemap.xml', '/directory/teams/sitemap.xml'],
+  exclude: ['/members/sitemap.xml', '/teams/sitemap.xml'],
   robotsTxtOptions: {
     additionalSitemaps: [
-      `${siteUrl}/directory/members/sitemap.xml`,
-      `${siteUrl}/directory/teams/sitemap.xml`,
+      `${siteUrl}/members/sitemap.xml`,
+      `${siteUrl}/teams/sitemap.xml`,
     ],
   },
 };

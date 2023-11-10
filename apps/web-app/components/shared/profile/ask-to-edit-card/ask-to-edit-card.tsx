@@ -135,9 +135,9 @@ export function AskToEditCard({
     }
     trackGoal(urlList[profileType].eventCode, 0);
     router.push({
-      pathname: '/directory/settings',
+      pathname: '/settings',
       query
-    }, '/directory/settings');
+    }, '/settings');
   }
 
   return (

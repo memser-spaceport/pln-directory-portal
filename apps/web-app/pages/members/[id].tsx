@@ -9,30 +9,30 @@ import Cookies from 'js-cookie';
 import { NextSeo } from 'next-seo';
 import { ReactElement, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { ADMIN_ROLE, APP_ANALYTICS_EVENTS, LOGGED_IN_MSG, PRIVACY_CONSTANTS, SCHEDULE_MEETING_MSG, SETTINGS_CONSTANTS } from '../../../constants';
-import { TagsGroup } from '../../../components/shared/tags-group/tags-group';
-import { MemberProfileDetails } from '../../../components/members/member-profile/member-profile-details/member-profile-details';
-import { MemberProfileHeader } from '../../../components/members/member-profile/member-profile-header/member-profile-header';
-import { MemberProfileOfficeHours } from '../../../components/members/member-profile/member-profile-office-hours/member-profile-office-hours';
-import { MemberProfileTeams } from '../../../components/members/member-profile/member-profile-teams';
-import { MemberProfileProjects } from '../../../components/members/member-profile/member-project-details/member-profile-projects';
-import { AskToEditCard } from '../../../components/shared/profile/ask-to-edit-card/ask-to-edit-card';
-import { AIRTABLE_REGEX } from '../../../constants';
-import { useProfileBreadcrumb } from '../../../hooks/profile/use-profile-breadcrumb.hook';
-import { DirectoryLayout } from '../../../layouts/directory-layout';
-import { DIRECTORY_SEO } from '../../../seo.config';
-import { IMember, IGitRepositories } from '../../../utils/members.types';
-import { parseMember, restrictMemberInfo } from '../../../utils/members.utils';
-import { ITeam } from '../../../utils/teams.types';
-import { parseTeam } from '../../../utils/teams.utils';
+import { ADMIN_ROLE, APP_ANALYTICS_EVENTS, LOGGED_IN_MSG, PRIVACY_CONSTANTS, SCHEDULE_MEETING_MSG, SETTINGS_CONSTANTS } from '../../constants';
+import { TagsGroup } from '../../components/shared/tags-group/tags-group';
+import { MemberProfileDetails } from '../../components/members/member-profile/member-profile-details/member-profile-details';
+import { MemberProfileHeader } from '../../components/members/member-profile/member-profile-header/member-profile-header';
+import { MemberProfileOfficeHours } from '../../components/members/member-profile/member-profile-office-hours/member-profile-office-hours';
+import { MemberProfileTeams } from '../../components/members/member-profile/member-profile-teams';
+import { MemberProfileProjects } from '../../components/members/member-profile/member-project-details/member-profile-projects';
+import { AskToEditCard } from '../../components/shared/profile/ask-to-edit-card/ask-to-edit-card';
+import { AIRTABLE_REGEX } from '../../constants';
+import { useProfileBreadcrumb } from '../../hooks/profile/use-profile-breadcrumb.hook';
+import { DirectoryLayout } from '../../layouts/directory-layout';
+import { DIRECTORY_SEO } from '../../seo.config';
+import { IMember, IGitRepositories } from '../../utils/members.types';
+import { parseMember, restrictMemberInfo } from '../../utils/members.utils';
+import { ITeam } from '../../utils/teams.types';
+import { parseTeam } from '../../utils/teams.utils';
 import {
   renewAndStoreNewAccessToken,
   convertCookiesToJson,
-} from '../../../utils/services/auth';
+} from '../../utils/services/auth';
 import {
   fetchGitProjectsByMember
-} from '../../../utils/services/members';
-import { MemberProfileLoginStrip } from '../../../components/members/member-profile/member-profile-login-strip/member-profile-login-strip';
+} from '../../utils/services/members';
+import { MemberProfileLoginStrip } from '../../components/members/member-profile/member-profile-login-strip/member-profile-login-strip';
 import MemberExperience from 'apps/web-app/components/members/member-profile/member-experience/member-experience';
 import { useRouter } from 'next/router';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
@@ -73,13 +73,13 @@ export default function Member({
       analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_PR_CONTRIBUTIONS_ADD, {
         member: member,
       })
-      router.push({pathname: '/directory/settings', query: {tab: 'contributions'}}, '/directory/settings')
+      router.push({pathname: '/settings', query: {tab: 'contributions'}}, '/settings')
     } else {
       const query = { id: member?.id, tab: 'contributions', name: member?.name, logo: member?.image, from: SETTINGS_CONSTANTS.MEMBER };
       router.push({
-        pathname: '/directory/settings',
+        pathname: '/settings',
         query
-      }, '/directory/settings');
+      }, '/settings');
     }
 }
 
@@ -194,7 +194,7 @@ export const getServerSideProps = async (ctx) => {
   }
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
   const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
-  const { id, backLink = '/directory/members' } = query as {
+  const { id, backLink = '/members' } = query as {
     id: string;
     backLink: string;
   };
@@ -209,7 +209,7 @@ export const getServerSideProps = async (ctx) => {
       ? {
         redirect: {
           permanent: true,
-          destination: `/directory/members/${memberUID}`,
+          destination: `/members/${memberUID}`,
         },
       }
       : {

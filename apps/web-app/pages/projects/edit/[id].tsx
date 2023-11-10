@@ -16,7 +16,7 @@ import ActionButtons from "apps/web-app/components/projects/action-buttons";
 
 export default function EditProject({ selectedProject }) {
     const { breadcrumbItems } = useProfileBreadcrumb({
-        backLink: '/directory/projects',
+        backLink: '/projects',
         directoryName: 'Projects',
         pageName: selectedProject.name,
     });

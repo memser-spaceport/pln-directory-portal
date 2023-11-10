@@ -4,7 +4,7 @@ import {
 } from '@protocol-labs-network/teams/data-access';
 import { GetServerSideProps } from 'next';
 import { getServerSideSitemap, ISitemapField } from 'next-sitemap';
-import { getSiteUrl } from '../../../utils/sitemap/sitemap.utils';
+import { getSiteUrl } from '../../utils/sitemap/sitemap.utils';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 export default function TeamsSitemap() {}
@@ -21,7 +21,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
   if (teamsResponse.status === 200) {
     teamsProfiles = teamsResponse.body.map((team) => ({
-      loc: `${siteUrl}/directory/teams/${team.uid}`,
+      loc: `${siteUrl}/teams/${team.uid}`,
       lastmod: new Date().toISOString(),
     }));
   }

@@ -180,7 +180,7 @@ export function ForgotEmailModal({
                               <a
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                href={`/directory/members/${member.id}`}
+                                href={`/members/${member.id}`}
                                 className="m-auto mr-4 text-sm font-semibold text-[#156FF7]"
                                 onClick={handleOnClick}
                               >

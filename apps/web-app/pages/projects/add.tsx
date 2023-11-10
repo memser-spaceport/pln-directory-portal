@@ -24,7 +24,7 @@ export default function AddProject({isUserLoggedIn}) {
     }, [])
 
     const { breadcrumbItems } = useProfileBreadcrumb({
-        backLink:'/directory/projects',
+        backLink:'/projects',
         directoryName: 'Projects',
         pageName: 'Add',
       });
@@ -59,7 +59,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
         req
     } = ctx;
     let cookies = req?.cookies;
-    
+
     if (!cookies?.authToken) {
         await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
         if (ctx.res.getHeader('Set-Cookie'))
@@ -69,7 +69,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
     const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
 
-    // if (!isUserLoggedIn 
+    // if (!isUserLoggedIn
     //     || !((userInfo?.roles?.length > 0 &&
     //     (userInfo.roles.includes('DIRECTORYADMIN')) ||
     //     (userInfo?.leadingTeams?.length > 0 && query.teamUid && userInfo?.leadingTeams.includes(query.teamUid))))

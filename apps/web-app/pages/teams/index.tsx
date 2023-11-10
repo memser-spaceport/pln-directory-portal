@@ -5,23 +5,23 @@ import {
 import { GetServerSideProps } from 'next';
 import { NextSeo } from 'next-seo';
 import { ReactElement } from 'react';
-import { LoadingOverlay } from '../../../components/layout/loading-overlay/loading-overlay';
-import { DirectoryHeader } from '../../../components/shared/directory/directory-header/directory-header';
-import { useViewType } from '../../../components/shared/directory/directory-view/use-directory-view-type.hook';
-import { TeamsDirectoryFilters } from '../../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters';
-import { ITeamsFiltersValues } from '../../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.types';
-import { parseTeamsFilters } from '../../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.utils';
-import { TeamsDirectoryList } from '../../../components/teams/teams-directory/teams-directory-list/teams-directory-list';
-import { useDirectoryFiltersFathomLogger } from '../../../hooks/plugins/use-directory-filters-fathom-logger.hook';
-import { DirectoryLayout } from '../../../layouts/directory-layout';
-import { DIRECTORY_SEO } from '../../../seo.config';
-import { ITeam } from '../../../utils/teams.types';
-import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../../utils/services/auth';
+import { LoadingOverlay } from '../../components/layout/loading-overlay/loading-overlay';
+import { DirectoryHeader } from '../../components/shared/directory/directory-header/directory-header';
+import { useViewType } from '../../components/shared/directory/directory-view/use-directory-view-type.hook';
+import { TeamsDirectoryFilters } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters';
+import { ITeamsFiltersValues } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.types';
+import { parseTeamsFilters } from '../../components/teams/teams-directory/teams-directory-filters/teams-directory-filters.utils';
+import { TeamsDirectoryList } from '../../components/teams/teams-directory/teams-directory-list/teams-directory-list';
+import { useDirectoryFiltersFathomLogger } from '../../hooks/plugins/use-directory-filters-fathom-logger.hook';
+import { DirectoryLayout } from '../../layouts/directory-layout';
+import { DIRECTORY_SEO } from '../../seo.config';
+import { ITeam } from '../../utils/teams.types';
+import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../utils/services/auth';
 import {
   getTeamsListOptions,
   getTeamsOptionsFromQuery,
   parseTeam,
-} from '../../../utils/teams.utils';
+} from '../../utils/teams.utils';
 
 type TeamsProps = {
   teams: ITeam[];
@@ -48,7 +48,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
       <NextSeo {...DIRECTORY_SEO} title="Teams" />
 
       <LoadingOverlay
-        excludeUrlFn={(url) => url.startsWith('/directory/teams/')}
+        excludeUrlFn={(url) => url.startsWith('/teams/')}
       />
 
       <section className="pl-sidebar flex pt-20">
@@ -93,12 +93,12 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) =>
   let cookies = req?.cookies;
   if (!cookies?.authToken) {
     await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
-    if (ctx.res.getHeader('Set-Cookie')) 
+    if (ctx.res.getHeader('Set-Cookie'))
       cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
   }
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
   const isUserLoggedIn = cookies?.authToken &&  cookies?.userInfo ? true : false;
-  
+
   const optionsFromQuery = getTeamsOptionsFromQuery(query);
   const listOptions = getTeamsListOptions(optionsFromQuery);
   const [teamsResponse, filtersValues] = await Promise.all([

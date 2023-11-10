@@ -37,7 +37,7 @@ export default function ProjectsFilter({ filterProperties, isUserLoggedIn }) {
     const clearFilters = () => {
         const cleanQuery = { ...query };
         filterProperties.forEach((property) => delete cleanQuery[property]);
-        
+
         push({ pathname, query: cleanQuery });
         projectsDispatch({ type: 'CLEAR_FILTER'});
         setSelectedTeam({ value: '', label: '',logo:'' });
@@ -59,7 +59,7 @@ export default function ProjectsFilter({ filterProperties, isUserLoggedIn }) {
 
     const getSelectedOptionFromQuery =async (searchTerm) => {
         const response = await fetchTeamsWithLogoSearchTerm(searchTerm);
-        
+
         if (response.length) {
             const item = response[0];
             return item;
@@ -84,12 +84,12 @@ export default function ProjectsFilter({ filterProperties, isUserLoggedIn }) {
     return (
         <>
             {/* {
-                isUserLoggedIn 
+                isUserLoggedIn
                 &&
                 <div className="flex ">
                 <div className="m-auto justify-content mt-5 py-[9px] px-[24px] border rounded-[37px] text-white bg-[#156FF7] cursor-pointer"
                 onClick={()=>{
-                    push('/directory/projects/add');
+                    push('/projects/add');
                 }}
                 >
                 Add Project
@@ -109,10 +109,10 @@ export default function ProjectsFilter({ filterProperties, isUserLoggedIn }) {
             <div className="h-[calc(100vh_-_148px)] overflow-y-auto p-5 pl-[37px] focus-within:outline-none focus:outline-none focus-visible:outline-none">
                 <div className="py-[20px] flex justify-between">
                     <div className="flex gap-2 items-center">
-                    <span className="select-none text-sm text-slate-600">Projects Raising Funds</span>
                     <div className="relative top-1"><Image src={'/assets/images/icons/projects/funding-with-bg.svg'} alt="project image" width={24} height={24} /></div>
+                    <span className="select-none text-sm text-slate-600">Projects Raising Funds</span>
                     </div>
-                    <Switch 
+                    <Switch
                         initialValue={projectsState?.filterState?.FUNDING}
                         onChange={(value) => {
                             projectsDispatch({ type: 'SET_FILTER', payload: { filterType: 'FUNDING', value } });

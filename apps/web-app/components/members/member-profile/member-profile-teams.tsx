@@ -32,7 +32,7 @@ export function MemberProfileTeams({ teams, member }: MemberProfileTeamsProps) {
         return (
           <ProfileCard
             key={`${id}.${team.id}`}
-            url={`/directory/teams/${team.id}`}
+            url={`/teams/${team.id}`}
             imageUrl={teamDetails?.logo}
             avatarIcon={UserGroupIcon}
             name={team.name}

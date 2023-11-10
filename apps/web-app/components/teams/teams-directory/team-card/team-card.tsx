@@ -29,7 +29,7 @@ export function TeamCard({ team, isGrid = true }: TeamCardProps) {
   return (
     <DirectoryCard
       isGrid={isGrid}
-      cardUrl={`/directory/teams/${team.id}?backLink=${backLink}`}
+      cardUrl={`/teams/${team.id}?backLink=${backLink}`}
       handleOnClick={onTeamClicked}
       type="team"
     >

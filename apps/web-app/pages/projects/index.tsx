@@ -12,7 +12,7 @@ import { GetServerSideProps } from "next";
 import { NextSeo } from "next-seo";
 import { destroyCookie } from "nookies";
 import { ReactElement } from "react";
-import { getAllProjects } from '../../../../../libs/projects/data-access/src/index';
+import { getAllProjects } from '../../../../libs/projects/data-access/src/index';
 import ProjectsDataService from "apps/web-app/services/projects/projects.data.service";
 
 export default function Projects(props) {
@@ -86,7 +86,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
             queryParams['name__icontains'] = query?.searchBy;
         }
     }
-    
+
     if (!cookies?.authToken) {
         await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
         if (ctx.res.getHeader('Set-Cookie'))
@@ -99,7 +99,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     // const { getAll } = ProjectsService;
     // const projects = await getAll(queryParams);
     let projects = null;
-    
+
     const allProjects = await getAllProjects(queryParams);
     // const allProjects = await api.get('/v1/projects')
     if (allProjects.status === 200) {

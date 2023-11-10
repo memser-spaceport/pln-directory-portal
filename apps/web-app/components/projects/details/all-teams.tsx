@@ -16,7 +16,7 @@ export function AllTeamsModal({
     const analytics = useAppAnalytics();
 
     const onMaintainerTeamClicked = (team) => {
-        router.push('/directory/teams/' + team.uid);
+        router.push('/teams/' + team.uid);
         analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_MAINTAINER_TEAM_CLICKED, {
             teamUid: team.uid,
             teamName: team.name,
@@ -24,7 +24,7 @@ export function AllTeamsModal({
     }
 
     const onContributingTeamClicked = (cteam) => {
-        router.push('/directory/teams/' + cteam.value);
+        router.push('/teams/' + cteam.value);
         analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_CONTRIBUTING_TEAM_CLICKED, {
             teamUid: cteam.value,
             teamName: cteam.label,

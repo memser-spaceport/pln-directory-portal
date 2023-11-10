@@ -41,7 +41,7 @@ let nextConfig = {
             {
               // Redirect from root to teams directory page
               source: '/',
-              destination: '/directory/teams',
+              destination: '/teams',
               permanent: false,
             },
           ]
@@ -49,31 +49,55 @@ let nextConfig = {
       {
         // Redirect from directory root to teams directory page
         source: '/directory',
-        destination: '/directory/teams',
+        destination: '/teams',
         permanent: false,
       },
       {
         // Redirect the old teams directory URL to the new `/directory` URL
-        source: '/teams',
-        destination: '/directory/teams',
+        source: '/directory/teams',
+        destination: '/teams',
         permanent: false,
       },
       {
         // Redirect the old team profile URLs to the new `/directory` URLs
-        source: '/teams/:id*',
-        destination: '/directory/teams/:id*',
+        source: '/directory/teams/:id*',
+        destination: '/teams/:id*',
         permanent: false,
       },
       {
         // Redirect the old members directory URL to the new `/directory` URL
-        source: '/members',
-        destination: '/directory/members',
+        source: '/directory/members',
+        destination: '/members',
         permanent: false,
       },
       {
         // Redirect the old member profile URLs to the new `/directory` URLs
-        source: '/members/:id*',
-        destination: '/directory/members/:id*',
+        source: '/directory/members/:id*',
+        destination: '/members/:id*',
+        permanent: false,
+      },
+      {
+        // Redirect the old members directory URL to the new `/directory` URL
+        source: '/directory/members/verify-member',
+        destination: '/members/verify-member',
+        permanent: false,
+      },
+      {
+        // Redirect the old members directory URL to the new `/directory` URL
+        source: '/directory/projects',
+        destination: '/projects',
+        permanent: false,
+      },
+      {
+        // Redirect the old member profile URLs to the new `/directory` URLs
+        source: '/directory/projects/:id*',
+        destination: '/projects/:id*',
+        permanent: false,
+      },
+      {
+        // Redirect the old members directory URL to the new `/directory` URL
+        source: '/directory/settings',
+        destination: '/settings',
         permanent: false,
       },
       {

@@ -26,7 +26,8 @@ export default function Header({ project, userHasEditRights, userHasDeleteRights
                     projectId: project.id,
                 });
                 toast.success('Project deleted successfully.');
-                setIsModalOpen(false)
+                setIsModalOpen(false);
+                router.push('/directory/projects');
             }
         } catch (err) {
             analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_DELETE_FAILED, {
@@ -48,9 +49,9 @@ export default function Header({ project, userHasEditRights, userHasDeleteRights
                         <div className="text-[24px] font-bold flex gap-2">
                             <div>{project.name}</div>
                             {
-                                project?.fundingNeeded 
+                                project?.fundingNeeded
                                 &&
-                                <div title="Raising Funds">
+                                <div title="Raising Funds" className="relative top-1">
                                     <Image src={'/assets/images/icons/projects/funding-with-bg.svg'} alt="project image" width={24} height={24} />
                                 </div>
                             }
@@ -70,7 +71,7 @@ export default function Header({ project, userHasEditRights, userHasDeleteRights
                                 analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_EDIT_CLICKED, {
                                     projectId: project.id,
                                 });
-                                router.push('/directory/projects/edit/' + project.id)
+                                router.push('/projects/edit/' + project.id)
                             }}
                         >
                             <EditIcon className="m-1" />{' '}
@@ -92,7 +93,7 @@ export default function Header({ project, userHasEditRights, userHasDeleteRights
                             <div>Delete</div>
                         </div>
                     }
-                </div> 
+                </div>
                 }
                 <DeleteConfirmationModal isOpen={isOpen} setIsModalOpen={setIsModalOpen} onYes={onYes}/>
             </div>

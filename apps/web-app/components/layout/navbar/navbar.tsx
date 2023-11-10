@@ -39,7 +39,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
     {
       icon: CogIcon,
       label: 'Settings',
-      url: `/directory/settings`,
+      url: `/settings`,
       eventCode:  FATHOM_EVENTS.directory.settings,
       onClick: () => {
         analytics.captureEvent(APP_ANALYTICS_EVENTS.NAVBAR_ACCOUNTMENU_ITEM_CLICKED, {
