@@ -1,1 +1,1 @@
-export type TDirectoryType = 'teams' | 'members';
+export type TDirectoryType = 'teams' | 'members' | 'projects';

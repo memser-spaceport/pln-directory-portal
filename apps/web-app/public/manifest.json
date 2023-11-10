@@ -61,11 +61,11 @@
   "shortcuts": [
     {
       "name": "Teams",
-      "url": "/directory/teams"
+      "url": "/teams"
     },
     {
       "name": "Members",
-      "url": "/directory/members"
+      "url": "/members"
     }
   ]
 }

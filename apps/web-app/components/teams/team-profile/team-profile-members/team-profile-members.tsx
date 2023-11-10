@@ -21,7 +21,7 @@ export function TeamProfileMembers({ members }: TeamProfileMembersProps) {
         return (
           <ProfileCard
             key={`${id}.${member.id}`}
-            url={`/directory/members/${member?.id}`}
+            url={`/members/${member?.id}`}
             isImageRounded
             imageUrl={member.image}
             avatarIcon={UserIcon}

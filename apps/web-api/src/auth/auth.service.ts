@@ -192,7 +192,7 @@ export class AuthService implements OnModuleInit {
     let result;
 
     if(grantType === 'authorization_code') {
-      payload['redirect_uri'] = `${process.env.WEB_UI_BASE_URL}/directory/members/verify-member`,
+      payload['redirect_uri'] = `${process.env.WEB_UI_BASE_URL}/members/verify-member`,
       payload['code'] = code;
     } else if (grantType === 'refresh_token') {
       payload['refresh_token'] = refreshToken

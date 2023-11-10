@@ -39,7 +39,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
     {
       icon: CogIcon,
       label: 'Settings',
-      url: `/directory/settings`,
+      url: `/settings`,
       eventCode:  FATHOM_EVENTS.directory.settings,
       onClick: () => {
         analytics.captureEvent(APP_ANALYTICS_EVENTS.NAVBAR_ACCOUNTMENU_ITEM_CLICKED, {
@@ -60,9 +60,9 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
         analytics.captureEvent(APP_ANALYTICS_EVENTS.NAVBAR_ACCOUNTMENU_ITEM_CLICKED, {
           'itemName': 'logout'
         })
-        Cookies.remove('authToken')
-        Cookies.remove('refreshToken')
-        Cookies.remove('userInfo')
+        Cookies.remove('authToken', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+        Cookies.remove('refreshToken', { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
+        Cookies.remove('userInfo', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
         Cookies.set('page_params', 'logout', { expires: 60, path: '/' });
         toast.info(LOGOUT_MSG, {
           hideProgressBar: true

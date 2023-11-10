@@ -324,6 +324,16 @@ export class ParticipantsRequestService {
       },
     };
 
+    // Save Experience if available
+    if(Array.isArray(dataToProcess.projectContributions) 
+      && dataToProcess.projectContributions?.length > 0) {
+      dataToSave['projectContributions'] = {
+        createMany: {
+          data: dataToProcess.projectContributions
+        },
+      };
+    }
+
     // Skills relation mapping
     dataToSave['skills'] = {
       connect: dataToProcess.skills.map((s) => {
@@ -419,6 +429,7 @@ export class ParticipantsRequestService {
         skills: true,
         teamMemberRoles: true,
         memberRoles: true,
+        projectContributions: true
       },
     });
     const dataToProcess = dataFromDB?.newData;
@@ -631,6 +642,49 @@ export class ParticipantsRequestService {
           teamUid: t.teamUid,
           memberUid: dataFromDB.referenceUid,
         };
+      }),
+    });
+
+    const contributionsToCreate: any = dataToProcess.projectContributions
+      ?.filter(contribution => !contribution.uid);
+    const contributionIdsToDelete:any = [];
+    const contributionIdsToUpdate:any = [];
+    const contributionIds = dataToProcess.projectContributions
+      ?.filter(contribution => contribution.uid).map(contribution => contribution.uid);
+
+    existingData.projectContributions?.map((contribution:any)=> {
+      if(!contributionIds.includes(contribution.uid)) {
+        contributionIdsToDelete.push(contribution.uid);
+      } else {
+        contributionIdsToUpdate.push(contribution.uid);
+      }
+    });
+
+    const contributionToDelete = contributionIdsToDelete.map((uid) =>
+      tx.projectContribution.delete({
+        where: {
+          uid
+        }
+      })
+    );
+    const contributions = dataToProcess.projectContributions.
+      filter(contribution => contributionIdsToUpdate.includes(contribution.uid));
+    const contributionsToUpdate = contributions.map((contribution) =>
+      tx.projectContribution.update({
+        where: {
+          uid: contribution.uid
+        },
+        data: {
+          ...contribution
+        }
+      })
+    );
+    await Promise.all(contributionToDelete);
+    await Promise.all(contributionsToUpdate);
+    await tx.projectContribution.createMany({
+      data: contributionsToCreate.map((contribution) => {
+        contribution.memberUid = dataFromDB.referenceUid;
+        return contribution;
       }),
     });
 

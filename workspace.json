@@ -15,6 +15,7 @@
     "storybook-host": "libs/storybook-host",
     "teams-data-access": "libs/teams/data-access",
     "technologies-data-access": "libs/technologies/data-access",
+    "projects-data-access": "libs/projects/data-access",
     "ui": "libs/ui",
     "web-api": "apps/web-api",
     "web-app": "apps/web-app",

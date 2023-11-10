@@ -55,7 +55,7 @@ export const authenticate = async (currentURL) => {
       path: '/',
       maxAge: 60 * 1000,
     });
-    const redirectURL = `${location.protocol + '//' + location.host}/directory/members/verify-member?landingPage=${currentURL.replace(/#$/, "")}`;
+    const redirectURL = `${location.protocol + '//' + location.host}/members/verify-member?landingPage=${currentURL.replace(/#$/, "")}`;
     window.location.href = `${process.env.AUTH_API_URL}/auth?redirect_uri=${redirectURL}&state=${state}&scope=openid profile&client_id=${process.env.NEXT_PUBLIC_AUTH_APP_CLIENT_ID}`;
   } catch (error) {
     console.error(error);
@@ -99,20 +99,23 @@ export const renewAndStoreNewAccessToken = async (refrshToken, ctx) => {
         const refresh_token = decodeToken(refreshToken);
         setCookie(ctx, 'authToken', JSON.stringify(accessToken), {
           maxAge: calculateExpiry(access_token.exp),
-          path: '/'
+          path: '/',
+          domain: process.env.COOKIE_DOMAIN || ''
         });
         setCookie(ctx, 'refreshToken', JSON.stringify(refreshToken), {
           maxAge: calculateExpiry(refresh_token.exp),
-          path: '/'
+          path: '/',
+          domain: process.env.COOKIE_DOMAIN || ''
         });
         setCookie(ctx, 'userInfo', JSON.stringify(userInfo), {
           maxAge: calculateExpiry(access_token.exp),
-          path: '/'
+          path: '/',
+          domain: process.env.COOKIE_DOMAIN || ''
         });
       }
-    } 
+    }
     catch(err) {
-    
+
     }
   }
 };

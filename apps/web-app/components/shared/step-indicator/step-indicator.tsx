@@ -76,6 +76,28 @@ function getFormStepIndicatorShape(step, formStep) {
               } else {
                 return <>{step.number}</>;
               }
+            } else if (formStep === 4) {
+              if (step.number === 1 || step.number === 2 || step.number === 3) {
+                return (
+                  <svg
+                    width="14"
+                    height="11"
+                    viewBox="0 0 14 11"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M13 1L4.75 9.25L1 5.5"
+                      stroke="white"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                );
+              } else {
+                return <>{step.number}</>;
+              }
             } else {
               return <>{step.number}</>;
             }

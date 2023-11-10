@@ -107,6 +107,15 @@ export const FATHOM_EVENTS = {
       editSave: 'GZ6LFEDJ',
     },
   },
+  projects: {
+    directory:{
+      controls:{
+        viewType: '9E11MZ5Q',
+        viewTypeListToGrid: 'KHBW7DAV',
+        viewTypeGridToList: 'RPBE1AWN',
+      }
+    }
+  }
 };
 export const AIRTABLE_REGEX = /^rec[A-Za-z0-9]{14}$/;
 export const LINKEDIN_URL_REGEX = /(?:https?:\/\/)?(?:www\.)?linkedin\.com\/(?:in|profile|company)\/([a-zA-Z0-9-_]+)/;
@@ -134,9 +143,10 @@ export const NETWORK_ERR_MSG = 'Network error. please try again';
 export const OFFICE_HOURS_MSG = "Schedule a one on one office hours discussion with"
 
 export const PAGE_ROUTES = {
-  MEMBERS:'/directory/members',
-  TEAMS: '/directory/teams',
-  SETTINGS: '/directory/settings'
+  MEMBERS:'/members',
+  TEAMS: '/teams',
+  SETTINGS: '/settings',
+  PROJECTS: '/projects'
 }
 
 export const SETTINGS_CONSTANTS = {
@@ -198,8 +208,48 @@ export const APP_ANALYTICS_EVENTS = {
   TEAM_EDIT_BY_LEAD: 'team-edit-by-lead',
   TEAM_EDIT_BY_ADMIN: 'team-edit-by-admin',
 
+  PR_CONRTIBUTIONS_LIST_ITEM_ADD: 'pr-contributions-list-item-add',
+  PR_CONRTIBUTIONS_LIST_ITEM_DELETE: 'pr-contributions-list-item-delete',
+  PR_CONRTIBUTIONS_LIST_ITEM_ADDPROJECT: 'pr-contributions-list-item-addproject',
+  MEMBER_PR_CONTRIBUTIONS_ADD: 'member-pr-contributions-add',
+  MEMBER_PR_CONTRIBUTIONS_EDIT: 'member-pr-contributions-add',
+  MEMBER_PR_CONTRIBUTIONS_SHOWMORE: 'member-pr-contributions-showmore',
+  MEMBER_PR_CONTRIBUTIONS_SHOWLESS: 'member-pr-contributions-showless',
+
   FILTERS_APPLIED: 'filters-applied',
 
+  PROJECTS_FILTERS_APPLIED: 'projects-filters-applied',
+  PROJECTS_FILTERS_CLEARED: 'projects-filters-cleared',
+  PROJECT_CLICKED: 'project-clicked',
+  PROJECT_DETAIL_SEEALL_CLICKED: 'project-detail-teams-seeall-clicked',
+  PROJECT_DETAIL_MAINTAINER_TEAM_CLICKED: 'project-detail-maintainer-team-clicked',
+  PROJECT_DETAIL_CONTRIBUTING_TEAM_CLICKED: 'project-detail-contributing-team-clicked',
+  PROJECT_DETAIL_LINKS_CLICKED: 'project-detail-link-clicked',
+  PROJECT_DETAIL_EDIT_CLICKED: 'project-detail-edit-clicked',
+  PROJECT_DETAIL_DELETE_CLICKED: 'project-detail-delete-clicked',
+  PROJECT_DETAIL_DELETE_YES_CLICKED: 'project-detail-delete-clicked-confirmed',
+  PROJECT_DETAIL_DELETE_NO_CLICKED: 'project-detail-delete-clicked-canceled',
+  PROJECT_DETAIL_DELETE_SUCCESS: 'project-detail-delete-success',
+  PROJECT_DETAIL_DELETE_FAILED: 'project-detail-delete-failed',
+  PROJECT_EDIT_CLICKED: 'project-edit-clicked',
+  PROJECT_DETAIL_ADDITIONAL_DETAIL_EDIT_CANCELLED: 'project-detail-additional-detail-edit-cancelled',
+  PROJECT_DETAIL_ADDITIONAL_DETAIL_EDIT_SAVE: 'project-detail-additional-detail-edit-save-clicked',
+  PROJECT_DETAIL_ADDITIONAL_DETAIL_EDIT_SAVE_SUCCESS: 'project-detail-additional-detail-edit-save-success',
+  PROJECT_DETAIL_ADDITIONAL_DETAIL_EDIT_SAVE_FAILED: 'project-detail-additional-detail-edit-save-failed',
+  PROJECT_EDIT_CANCEL: 'project-edit-cancel-clicked',
+  PROJECT_ADD_CANCEL: 'project-add-cancel-clicked',
+  PROJECT_ADD_SAVE_CLICKED: 'project-add-save-clicked',
+  PROJECT_EDIT_SAVE_CLICKED: 'project-edit-save-clicked',
+  PROJECT_EDIT_SAVE_VALIDATION_SUCCESS: 'project-edit-save-validation-success',
+  PROJECT_ADD_SAVE_VALIDATION_SUCCESS: 'project-add-save-validation-success',
+  PROJECT_EDIT_SAVE_VALIDATION_FAILED: 'project-edit-save-validation-failed',
+  PROJECT_ADD_SAVE_VALIDATION_FAILED: 'project-add-save-validation-failed',
+  PROJECT_ADD_SAVE_SUCESS: 'project-add-save-success',
+  PROJECT_ADD_SAVE_FAIL: 'project-add-save-fail',
+  PROJECT_EDIT_SAVE_SUCESS: 'project-edit-save-success',
+  PROJECT_EDIT_SAVE_FAIL: 'project-edit-save-fail',
+  PROJECT_ADD_CLICKED: 'project-add-click',
+  TEAMS_DETAIL_PROJECTS_SEE_ALL: 'team-detail-projects-see-all-clicked'
 }
 
 export const TAB_CONSTANTS = {

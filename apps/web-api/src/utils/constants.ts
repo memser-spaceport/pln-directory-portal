@@ -62,3 +62,15 @@ export const FILE_UPLOAD_SIZE_LIMIT = 1000000; // 1MB in bytes
 export const IMAGE_UPLOAD_MAX_DIMENSION = 2000;
 
 export const DIRECTORYADMIN = 'DIRECTORYADMIN';
+
+export const JOIN_NOW_SUBJECT = 'A request to be a part of network';
+
+export const ASK_QUESTION = "Ask a Question";
+export const FEEDBACK = "Give Feedback";
+export const SHARE_IDEA = "Share an Idea";
+export const SUPPORT = "Get Support";
+
+export const ASK_QUESTION_SUBJECT = "A new query received";
+export const FEEDBACK_SUBJECT = "A new feedback received";
+export const SHARE_IDEA_SUBJECT = "A new idea received";
+export const SUPPORT_SUBJECT = "A new support request received";

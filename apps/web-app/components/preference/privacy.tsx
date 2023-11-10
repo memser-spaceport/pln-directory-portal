@@ -4,7 +4,7 @@ import { updatePreference } from "apps/web-app/services/member.service";
 import {  useContext, useEffect, useState } from "react";
 import Cookies from 'js-cookie';
 import { toast } from "react-toastify";
-import { SettingsContext } from "apps/web-app/pages/directory/settings";
+import { SettingsContext } from "apps/web-app/pages/settings";
 import { LoadingIndicator } from "../shared/loading-indicator/loading-indicator";
 import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
 import { DiscardChangesPopup } from "libs/ui/src/lib/modals/confirmation";
@@ -150,7 +150,7 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
                         }
                     })
                     dispatch({type: 'SET_PREFERENCE', payload: {...response.preferences}})
-                    
+
                 }
             }finally{
                 setIsProcessing(false);
@@ -160,8 +160,8 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
                 type: 'info',
               });
         }
-    
-        
+
+
     }
 
     const handleReset = () => {
@@ -261,13 +261,13 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
                 </>
             )}
             <DiscardChangesPopup title={MSG_CONSTANTS.GIT_HANDLE_DISABLE_ALERT_TITLE} text={MSG_CONSTANTS.GIT_HANDLE_DISABLE_ALERT_DESC} isOpen={showAlert} onCloseFn={(flag)=> {
-                if (flag) { 
+                if (flag) {
                     setMemberPreference({
                         ...memberPreference,
                         showGithubHandle: false,
                         showGithubProjects: false
                     });
-                    
+
                 } else {
                     setMemberPreference({
                         ...memberPreference,
@@ -277,7 +277,7 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
                 }
                 setShowAlert(false);
             }} />
-            
+
         </>
     );
 }

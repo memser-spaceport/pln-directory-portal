@@ -17,7 +17,6 @@ export default async function login(req, res) {
         const decoded = jwt_decode<DecodedJwtPayload>(
           response.data.accessToken
         );
-        console.log('decoded', decoded);
         const expiry = new Date(decoded?.exp * 1000);
         setCookie({ res }, 'plnadmin', response?.data?.accessToken, {
           expires: expiry,

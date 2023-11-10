@@ -5,6 +5,7 @@ import { LocationResponseSchema } from './location';
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseSkillSchema } from './skill';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
+import { ProjectContributionSchema } from './project-contribution';
 
 export const GitHubRepositorySchema = z.object({
   name: z.string(),
@@ -43,7 +44,8 @@ export const MemberSchema = z.object({
   openToWork: z.boolean(),
   linkedinHandler: z.string().nullish(),
   repositories: GitHubRepositorySchema.array().optional(),
-  preferences: PreferenceSchema.optional()
+  preferences: PreferenceSchema.optional(),
+  projectContributions: z.array(ProjectContributionSchema).optional()
 });
 
 
@@ -54,7 +56,7 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   image: ResponseImageWithRelationsSchema.optional(),
   location: LocationResponseSchema.optional(),
   skills: ResponseSkillSchema.array().optional(),
-  teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
+  teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional()
 });
 
 
@@ -75,6 +77,7 @@ export const MemberRelationalFields = ResponseMemberWithRelationsSchema.pick({
   location: true,
   skills: true,
   teamMemberRoles: true,
+  projectContributions: true
 }).strip();
 
 export const MemberQueryableFields = ResponseMemberSchema.keyof();

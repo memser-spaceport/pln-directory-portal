@@ -179,6 +179,15 @@
   white-space: initial;
   display: -webkit-box;
 }
+
+.project-tagline {
+  overflow: hidden;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  white-space: initial;
+  display: -webkit-box;
+}
+
 .github-project-popup{
   max-height: calc(100vh - 380px);
 }
@@ -247,4 +256,15 @@ nextjs-portal {
 
 .banner-gradiant{
   background: linear-gradient(90deg, #44D5BB 0%, #3EB7EB 14.03%, #427DFF 41.15%, #427DFF 52.59%, #427DFF 64.58%, #3EB7EB 85.42%, #44D5BB 100%);
+}
+
+.read-less {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.no-tailwind,.no-tailwind  *{
+  all: revert;
 }

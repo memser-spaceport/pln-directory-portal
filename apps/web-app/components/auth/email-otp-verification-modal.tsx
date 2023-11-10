@@ -26,9 +26,18 @@ function EmailOtpVerificationModal() {
         if (refreshToken && accessToken) {
             const accessTokenExpiry = decodeToken(accessToken);
             const refreshTokenExpiry = decodeToken(refreshToken);
-            Cookies.set('authToken', JSON.stringify(accessToken), { expires: calculateExpiry(new Date(accessTokenExpiry.exp)) })
-            Cookies.set('refreshToken', JSON.stringify(refreshToken), { expires: calculateExpiry(new Date(refreshTokenExpiry.exp)) })
-            Cookies.set('userInfo', JSON.stringify(userInfo), { expires: calculateExpiry(new Date(accessTokenExpiry.exp)) })
+            Cookies.set('authToken', JSON.stringify(accessToken), { 
+                expires: calculateExpiry(new Date(accessTokenExpiry.exp)),
+                domain: process.env.COOKIE_DOMAIN || ''
+            });
+            Cookies.set('refreshToken', JSON.stringify(refreshToken), {
+                expires: calculateExpiry(new Date(refreshTokenExpiry.exp)),
+                domain: process.env.COOKIE_DOMAIN || ''
+            });
+            Cookies.set('userInfo', JSON.stringify(userInfo), { 
+                expires: calculateExpiry(new Date(accessTokenExpiry.exp)),
+                domain: process.env.COOKIE_DOMAIN || ''
+            });
         }
     }
 
@@ -50,14 +59,17 @@ function EmailOtpVerificationModal() {
             const data = await verifyEmailOtp(otpPayload, header)
             setLoaderStatus(false)
             if (data?.userInfo) {
+                const externalRedirectUrl = Cookies.get('external_redirect_url');
                 setNewTokensAndUserInfo(data);
-                clearAllOtpSessionVaribles()
+                clearAllOtpSessionVaribles();
                 analytics.captureEvent(APP_ANALYTICS_EVENTS.USER_VERIFICATION_SUCCESS, {})
                 setDialogStatus(false);
                 localStorage.removeItem('otp-verification-email');
-                localStorage.setItem('otp-verify', 'success')
-                if (data?.userInfo?.isFirstTimeLogin) {
-                    window.location.href = PAGE_ROUTES.SETTINGS;
+                localStorage.setItem('otp-verify', 'success');
+                if (externalRedirectUrl && externalRedirectUrl != "undefined") {
+                  window.location.href = externalRedirectUrl;
+                } else if (data?.userInfo?.isFirstTimeLogin) {
+                  window.location.href = PAGE_ROUTES.SETTINGS;
                 } else {
                   window.location.reload();
                 }
@@ -193,18 +205,19 @@ function EmailOtpVerificationModal() {
     }
 
     const clearAllOtpSessionVaribles = () => {
-        Cookies.remove('clientToken')
-        Cookies.remove('uniqueEmailVerifyToken')
-        Cookies.remove('show-email-verification-box')
+        Cookies.remove('clientToken');
+        Cookies.remove('uniqueEmailVerifyToken');
+        Cookies.remove('show-email-verification-box');
+        Cookies.remove('external_redirect_url');
         localStorage.removeItem('resend-expiry');
         localStorage.removeItem('otp-verification-step');
     }
 
     const clearAllAuthCookies = () => {
         Cookies.remove('idToken')
-        Cookies.remove('authToken')
-        Cookies.remove('refreshToken')
-        Cookies.remove('userInfo')
+        Cookies.remove('authToken', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+        Cookies.remove('refreshToken', { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
+        Cookies.remove('userInfo', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
     }
 
     useEffect(() => {
