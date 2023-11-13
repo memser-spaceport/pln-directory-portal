@@ -84,10 +84,17 @@ function ProjectContribution(props) {
 
                 </div>
             </div>}
-            <div className="mb-[32px]">
+            {(contributions.length > 0 ) && <div className="flex justify-start">
+                 {contributions.length <= 19 && <button onClick={onAddContribution} className="flex items-center justify-center text-[14px]">
+                    <img className="" src="/assets/images/icons/expand-blue.svg" />
+                    <span className="text-blue-600 mx-[4px]">Add Contribution</span>
+                </button>}
+                <p className="text-[14px] text-[#94A3B8]">(Max 20 contributions)</p>
+            </div>}
+            <div className="">
                 {contributions.map((exp, expIndex) => <ProjectContributionForm showAddProject={showAddProject} currentProjectsCount={currentProjectsCount} errors={errors} setLoaderStatus={setLoaderStatus} onToggleExpansion={onToggleExpansion} expandedId={expandedId} key={`${expIndex}-exp`} onDeleteContribution={onDeleteContribution} exp={exp} expIndex={expIndex} onItemChange={onItemChange} />)}
             </div>
-            {(contributions.length > 0 ) && <div className="flex justify-start">
+            {(contributions.length > 0 && expandedId !== -1 ) && <div className="flex justify-start pt-[10px]">
                  {contributions.length <= 19 && <button onClick={onAddContribution} className="flex items-center justify-center text-[14px]">
                     <img className="" src="/assets/images/icons/expand-blue.svg" />
                     <span className="text-blue-600 mx-[4px]">Add Contribution</span>
