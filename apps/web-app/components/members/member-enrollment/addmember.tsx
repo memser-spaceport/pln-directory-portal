@@ -85,11 +85,11 @@ function validateContributionForm(fValues) {
     } if(exp.role.trim() === '') {
       formErrors.push({id: expIndex, field: 'role', error: "Role is Mandatory"})
     } if(exp.startDate && exp.startDate.getTime() >= new Date().getTime()) {
-      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "Start Date should be less than current time"})
+      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "Your contribution cannot start from a future date"})
     } if(exp.endDate && exp.endDate.getTime() >= new Date().getTime()) {
-      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "End Date should be less than current time"})
+      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "Your contribution cannot end in a future date"})
     } if(exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
-      formErrors.push({id: expIndex, field: 'date', error: "To date cannot be less than or equal to start date"})
+      formErrors.push({id: expIndex, field: 'date', error: "Your contribution cannot start and end in the same month and year"})
     }
   })
 
