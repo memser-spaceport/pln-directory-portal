@@ -407,8 +407,7 @@ export function EditMemberModal({
             exp.endDate = exp.endDate ? new Date(exp.endDate) : null;
             exp.projectName = exp?.project?.name;
             exp.projectLogo = exp?.project?.logo?.url
-            exp.projectUid = exp?.project?.uid,
-            exp.project = exp?.project
+            exp.projectUid = exp?.project?.uid
             return exp;
           }): [],
           preferences: member?.preferences ?? JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))

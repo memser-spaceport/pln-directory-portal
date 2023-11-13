@@ -6,7 +6,10 @@ import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
 function MemberExperience(props) {
     const member = props?.member;
     const isEditable = props.isEditable ?? false;
-    const contributions = props.contributions ?? [];
+    const allContributions = props.contributions ?? [];
+    const presentContributions = [...allContributions].filter(v => v.endDate === null).sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
+    const pastContributions = [...allContributions].filter(v => v.endDate !== null).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())
+    const contributions = [...presentContributions, ...pastContributions]
     const isOwner = props.isOwner;
     const router = useRouter();
     const analytics = useAppAnalytics()

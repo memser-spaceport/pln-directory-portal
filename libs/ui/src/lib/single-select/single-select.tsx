@@ -55,22 +55,7 @@ export function SingleSelect({
     );
 
     if (selectedDropdownOption) {
-
-      if (validateBeforeChange) {
-        if (validationFn) {
-          if(validationFn(selectedDropdownOption)){
-            setValidationPopup(true);
-            setTempOption(selectedDropdownOption);
-          }else{
-            changeOption(selectedDropdownOption, name);
-          }
-        }else{
-          changeOption(selectedDropdownOption, name);
-        }
-      } else {
-        changeOption(selectedDropdownOption, name);
-      }
-
+      changeOption(selectedDropdownOption, name);
     }
   }
 
@@ -131,7 +116,7 @@ export function SingleSelect({
 
             <Listbox.Options
               as="div"
-              className="absolute z-20 mt-2 h-auto max-h-[14rem] border-solid border-[#CBD5E1] border-[1px] w-full space-y-1 overflow-y-auto rounded-lg bg-white p-2 leading-6 focus:outline-none"
+              className="absolute slim-scroll z-20 mt-2 h-auto max-h-[150px] border-solid rounded-[2px] border-[#CBD5E1] border-[1px] w-full space-y-1 overflow-y-auto bg-white p-2 leading-6 focus:outline-none"
             >
               {options?.length ? (
                 options.map((option) => {
@@ -168,6 +153,31 @@ export function SingleSelect({
         )}
       </Listbox>
       <DiscardChangesPopup text={confirmationMessage} isOpen={openValidationPopup} onCloseFn={discardChangesOnClose} />
+      <style jsx global>
+        {
+          `
+          ::-webkit-scrollbar {
+            width: 6px;
+            background: #f7f7f7;
+          }
+
+          ::-webkit-scrollbar-track {
+            background: transparent;
+
+
+          }
+
+          ::-webkit-scrollbar-thumb {
+            background-color: rgba(155, 155, 155, 0.5);
+
+            border: transparent;
+
+
+          }
+
+          `
+        }
+      </style>
     </>
   );
 }
