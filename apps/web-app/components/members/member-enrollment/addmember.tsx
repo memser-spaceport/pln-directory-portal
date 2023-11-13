@@ -89,7 +89,7 @@ function validateContributionForm(fValues) {
     } if(exp.endDate && exp.endDate.getTime() >= new Date().getTime()) {
       formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "Your contribution cannot end in a future date"})
     } if(exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
-      formErrors.push({id: expIndex, field: 'date', error: "Your contribution cannot start and end in the same month and year"})
+      formErrors.push({id: expIndex, field: 'date', error: "Your contribution end date cannot be less than or equal to from date"})
     }
   })
 
