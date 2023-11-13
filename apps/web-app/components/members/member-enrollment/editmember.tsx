@@ -114,6 +114,10 @@ function validateContributionForm(fValues) {
       formErrors.push({id: expIndex, name: `Project ${expIndex + 1}`, field: 'projectName', error: "Project Name is Mandatory"})
     } if(exp.role.trim() === '') {
       formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'role', error: "Role is Mandatory"})
+    } if(exp.startDate && exp.startDate.getTime() >= new Date().getTime()) {
+      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "Start Date should be less than current time"})
+    } if(exp.endDate && exp.endDate.getTime() >= new Date().getTime()) {
+      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "End Date should be less than current time"})
     } if(exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
       formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "To date cannot be less than or equal to start date"})
     }

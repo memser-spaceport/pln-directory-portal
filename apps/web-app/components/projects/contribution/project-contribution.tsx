@@ -63,7 +63,7 @@ function ProjectContribution(props) {
        const newExp =  [...contributions];
        newExp[index][key] = value;
        if(key === 'currentProject' && value === false) {
-          newExp[index].endDate = new Date(new Date().getFullYear() - 50, 0);
+          newExp[index].endDate = new Date(2022, 11);
        } else if (key === 'currentProject' && value === true) {
           newExp[index].endDate = null;
        }
