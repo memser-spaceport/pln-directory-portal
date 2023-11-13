@@ -114,8 +114,12 @@ function validateContributionForm(fValues) {
       formErrors.push({id: expIndex, name: `Project ${expIndex + 1}`, field: 'projectName', error: "Project Name is Mandatory"})
     } if(exp.role.trim() === '') {
       formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'role', error: "Role is Mandatory"})
+    } if(exp.startDate && exp.startDate.getTime() >= new Date().getTime()) {
+      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "Your contribution cannot start from a future date"})
+    } if(exp.endDate && exp.endDate.getTime() >= new Date().getTime()) {
+      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "Your contribution cannot end in a future date"})
     } if(exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
-      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "To date cannot be less than or equal to start date"})
+      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "Your contribution end date cannot be less than or equal to from date"})
     }
   })
 
@@ -407,8 +411,7 @@ export function EditMemberModal({
             exp.endDate = exp.endDate ? new Date(exp.endDate) : null;
             exp.projectName = exp?.project?.name;
             exp.projectLogo = exp?.project?.logo?.url
-            exp.projectUid = exp?.project?.uid,
-            exp.project = exp?.project
+            exp.projectUid = exp?.project?.uid
             return exp;
           }): [],
           preferences: member?.preferences ?? JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))

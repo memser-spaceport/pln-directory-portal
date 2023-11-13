@@ -37,17 +37,10 @@ export function SingleSelect({
   disabled = false,
   placeholder = 'Select a value',
   className = '',
-  validateBeforeChange = false,
-  validationFn,
-  confirmationMessage = ''
 }: SingleSelectProps): JSX.Element {
   const [selectedOption, setSelectedOption] = useState(initialOption);
-  const [openValidationPopup, setValidationPopup] = useState(false);
-  const [tempOption, setTempOption] = useState<ISingleSelectOption>(initialOption);
   const requiredIndicator =
     required && !selectedOption?.value ? 'border custom-red' : '';
-
-  const teamDefaultIcon = (name === 'team') ? <UserGroupIcon className="bg-gray-200 fill-white absolute inline inset-y-0 left-2 my-auto h-6 w-6 rounded-full mr-[4px]" /> : null;
 
   function onChangeHandler(value: string) {
     const selectedDropdownOption = options.find(
@@ -55,22 +48,7 @@ export function SingleSelect({
     );
 
     if (selectedDropdownOption) {
-
-      if (validateBeforeChange) {
-        if (validationFn) {
-          if(validationFn(selectedDropdownOption)){
-            setValidationPopup(true);
-            setTempOption(selectedDropdownOption);
-          }else{
-            changeOption(selectedDropdownOption, name);
-          }
-        }else{
-          changeOption(selectedDropdownOption, name);
-        }
-      } else {
-        changeOption(selectedDropdownOption, name);
-      }
-
+      changeOption(selectedDropdownOption, name);
     }
   }
 
@@ -83,13 +61,6 @@ export function SingleSelect({
     if (value !== undefined) setSelectedOption(value);
   }, [setSelectedOption, value]);
 
-  const discardChangesOnClose = (flag: boolean) => {
-    setValidationPopup(false);
-    if (flag) {
-      setSelectedOption(tempOption);
-      onChange && onChange(tempOption, name);
-    }
-  }
 
   return (
     <>
@@ -114,10 +85,6 @@ export function SingleSelect({
                 buttonContent
               ) : selectedOption?.label ? (
                 <div className="text-left leading-6 flex">
-                    {selectedOption?.icon &&
-                      (<img src={selectedOption?.icon?.toString()} width={25} height={45} className='h-6 w-6 rounded-full mr-[5px]'></img>
-                      )}
-                    {(selectedOption?.icon === null && name === 'team') && <UserGroupIcon className="bg-gray-200 fill-white inline inset-y-0 left-2 my-auto h-6 w-6 rounded-full mr-[4px]" />}
                     <span className='relative'>{selectedOption?.label}</span></div>
               ) : (
                 <div className="text-sm text-slate-600 opacity-50">
@@ -131,24 +98,19 @@ export function SingleSelect({
 
             <Listbox.Options
               as="div"
-              className="absolute z-20 mt-2 h-auto max-h-[14rem] border-solid border-[#CBD5E1] border-[1px] w-full space-y-1 overflow-y-auto rounded-lg bg-white p-2 leading-6 focus:outline-none"
+              className="absolute slim-scroll z-20 mt-2 h-auto max-h-[150px] border-solid rounded-[2px] border-[#CBD5E1] border-[1px] w-full space-y-1 overflow-y-auto bg-white p-2 leading-6 focus:outline-none"
             >
               {options?.length ? (
                 options.map((option) => {
-                  const OptionIcon = option.icon;
                   return (
-                    <Listbox.Option
-                      as={Fragment}
-                      key={option.value}
-                      value={option.value}
-                    >
+                    <Listbox.Option as={Fragment} key={option.value} value={option.value} >
                       {({ active, selected }) => (
                         <div
                           className={`${selected
                             ? 'border-blue-600 bg-blue-600 text-white'
                             : 'border-white bg-white'
                             } ${!selected && active
-                              ? 'border-slate-100 bg-slate-100 active:border-blue-600 active:bg-white active:ring-2 active:ring-blue-300'
+                              ? 'border-slate-100 bg-slate-200 active:border-blue-600 active:bg-white active:ring-2 active:ring-blue-300'
                               : ''
                             }
                       relative cursor-pointer select-none overflow-hidden rounded-lg border py-1 px-[8px] text-[12px] transition duration-150 ease-in-out`}
@@ -167,7 +129,31 @@ export function SingleSelect({
           </div>
         )}
       </Listbox>
-      <DiscardChangesPopup text={confirmationMessage} isOpen={openValidationPopup} onCloseFn={discardChangesOnClose} />
+      <style jsx global>
+        {
+          `
+          ::-webkit-scrollbar {
+            width: 6px;
+            background: #f7f7f7;
+          }
+
+          ::-webkit-scrollbar-track {
+            background: transparent;
+
+
+          }
+
+          ::-webkit-scrollbar-thumb {
+            background-color: rgba(155, 155, 155, 0.5);
+
+            border: transparent;
+
+
+          }
+
+          `
+        }
+      </style>
     </>
   );
 }
