@@ -108,7 +108,7 @@ function ProjectContributionForm(props) {
                    <div className="flex-1 flex flex-col my-[20px] gap-[12px]">
                             <div className="flex items-center justify-between">
                             <label className="text-[14px] font-[600]">Project Name*</label>
-                            {showAddProject &&  <a onClick={onAddNewProject} target="_blank" href="/projects/add" className="text-[12px] flex gap-[6px] items-center"><img className="w-[10px]" src="/assets/images/icons/expand-blue.svg"/><span className="text-blue-600">Add New Project</span></a>}
+                            {showAddProject &&  <p className="text-[12px] flex gap-[6px] items-center">{`Can't find your project?`}<a className="text-blue-600 -ml-[3px]" onClick={onAddNewProject} target="_blank" href="/projects/add">Add here</a></p>}
                             </div>
                            {/*  <input maxLength={100} placeholder="Ex: Filecoin" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" type="text" value={exp.companyName} onChange={(e) => onItemChange(expIndex, 'companyName', e.target.value)} /> */}
                             <ProjectSelection selectedProj={exp?.project} onProjectSelected={onProjectSelected}/>

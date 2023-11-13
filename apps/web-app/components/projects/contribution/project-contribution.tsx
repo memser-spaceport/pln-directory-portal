@@ -23,8 +23,8 @@ function ProjectContribution(props) {
         currentProject: false,
         description: "",
         role: "",
-        startDate: new Date(new Date().getFullYear() - 50, 0),
-        endDate: new Date(new Date().getFullYear() - 50, 1)
+        startDate: new Date(1990, 0),
+        endDate: new Date(2022, 11)
     }
 
     const onToggleExpansion = (index) => {
@@ -63,7 +63,7 @@ function ProjectContribution(props) {
        const newExp =  [...contributions];
        newExp[index][key] = value;
        if(key === 'currentProject' && value === false) {
-          newExp[index].endDate = new Date(new Date().getFullYear() - 50, 0);
+          newExp[index].endDate = new Date(2022, 11);
        } else if (key === 'currentProject' && value === true) {
           newExp[index].endDate = null;
        }
@@ -84,10 +84,17 @@ function ProjectContribution(props) {
 
                 </div>
             </div>}
-            <div className="mb-[32px]">
+            {(contributions.length > 0 ) && <div className={`flex justify-end ${showAddProject ? '': 'mt-[20px]'}`}>
+                 {contributions.length <= 19 && <button onClick={onAddContribution} className="flex items-center justify-center text-[14px]">
+                    <img className="" src="/assets/images/icons/expand-blue.svg" />
+                    <span className="text-blue-600 mx-[4px]">Add Contribution</span>
+                </button>}
+                <p className="text-[14px] text-[#94A3B8]">(Max 20 contributions)</p>
+            </div>}
+            <div className="">
                 {contributions.map((exp, expIndex) => <ProjectContributionForm showAddProject={showAddProject} currentProjectsCount={currentProjectsCount} errors={errors} setLoaderStatus={setLoaderStatus} onToggleExpansion={onToggleExpansion} expandedId={expandedId} key={`${expIndex}-exp`} onDeleteContribution={onDeleteContribution} exp={exp} expIndex={expIndex} onItemChange={onItemChange} />)}
             </div>
-            {(contributions.length > 0 ) && <div className="flex justify-start">
+            {(contributions.length > 0 && expandedId !== -1 ) && <div className="flex justify-end pt-[10px]">
                  {contributions.length <= 19 && <button onClick={onAddContribution} className="flex items-center justify-center text-[14px]">
                     <img className="" src="/assets/images/icons/expand-blue.svg" />
                     <span className="text-blue-600 mx-[4px]">Add Contribution</span>
