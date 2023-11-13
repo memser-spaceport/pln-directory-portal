@@ -84,7 +84,7 @@ function ProjectContribution(props) {
 
                 </div>
             </div>}
-            {(contributions.length > 0 ) && <div className="flex justify-end">
+            {(contributions.length > 0 ) && <div className={`flex justify-end ${showAddProject ? '': 'mt-[20px]'}`}>
                  {contributions.length <= 19 && <button onClick={onAddContribution} className="flex items-center justify-center text-[14px]">
                     <img className="" src="/assets/images/icons/expand-blue.svg" />
                     <span className="text-blue-600 mx-[4px]">Add Contribution</span>
