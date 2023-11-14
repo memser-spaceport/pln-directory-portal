@@ -274,7 +274,7 @@ model Project {
   name                String
   tagline             String
   description         String
-  contactEmail        String
+  contactEmail        String?
   lookingForFunding   Boolean               @default(false)
   projectLinks        Json?
   kpis                Json?
