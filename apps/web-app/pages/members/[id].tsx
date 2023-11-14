@@ -129,13 +129,7 @@ export default function Member({
               officeHoursFlag={officeHoursFlag}
             />
             <MemberProfileTeams teams={teams} member={member} />
-            {userInfo?.uid && (
-              <MemberProfileProjects
-                repositories={member?.repositories}
-                userInfo={userInfo}
-                member={member}
-              />
-            )}
+            
             {memberProjectContributions.length > 0 && <MemberExperience member={member} isOwner={isOwner} isEditable={isEditable} contributions={member.projectContributions} />}
 
             {(memberProjectContributions.length === 0 && isEditable) && <div className="text-[#64748B] mt-[20px] text-[15px] font-[500]">
@@ -145,6 +139,13 @@ export default function Member({
               </div>
 
             </div>}
+            {userInfo?.uid && (
+              <MemberProfileProjects
+                repositories={member?.repositories}
+                userInfo={userInfo}
+                member={member}
+              />
+            )}  
           </div>
         </div>
         {/* <div className="w-sidebar shrink-0">

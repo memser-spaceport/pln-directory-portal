@@ -136,14 +136,15 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
       ['teamLead', 'name'],
       ['desc', 'asc']
     );
-  }
-
-  for(const mem of members){
-    if(mem.id === userInfo.uid){
-      hasProjectsEditAccess = true;
-      break;
+    for(const mem of members){
+      if(mem.id === userInfo.uid){
+        hasProjectsEditAccess = true;
+        break;
+      }
     }
   }
+
+  
   if(userInfo.roles && userInfo.roles.length && userInfo.roles.includes('DIRECTORYADMIN')){
     hasProjectsEditAccess = true;
   }
