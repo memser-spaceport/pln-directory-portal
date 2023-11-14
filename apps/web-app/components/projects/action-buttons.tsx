@@ -71,9 +71,9 @@ export default function ActionButtons(){
             }
         });
 
-        if(!inputs.contactEmail){
-            errors['contactEmail'] = 'Contact Email is required';
-        }
+        // if(!inputs.contactEmail){
+        //     errors['contactEmail'] = 'Contact Email is required';
+        // }
 
         if(inputs.contactEmail && !inputs.contactEmail.match(emailRE)){
             errors['contactEmail'] = 'Invalid Email';

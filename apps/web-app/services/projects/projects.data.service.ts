@@ -32,10 +32,14 @@ const formatToSave = (inputs, imageUid) => {
         "name": inputs.name,
         "tagline": inputs.tagline,
         "description": inputs.desc,
-        "contactEmail": inputs?.contactEmail,
+        // "contactEmail": inputs?.contactEmail,
         "lookingForFunding": inputs.fundsNeeded,
         "readMe": inputs.readme,
         "maintainingTeamUid": inputs?.maintainedBy?.value,
+    }
+
+    if(inputs?.contactEmail){
+        objectToSave['contactEmail'] = inputs?.contactEmail;
     }
 
     const tempCTeam = [];
