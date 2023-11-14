@@ -129,13 +129,15 @@ export default function AddForm({mode}) {
     }
 
     const getEmail = () => {
-        const userInfoFromCookie = Cookies.get('userInfo');
-        let email = ''
-        if (userInfoFromCookie) {
-            const parsedUserInfo = JSON.parse(userInfoFromCookie);
-            email = parsedUserInfo.email;
-        } 
-        addProjectsDispatch({ type: 'SET_INPUT', payload: { ...addProjectsState.inputs, 'contactEmail': email } });
+        if(addProjectsState.mode === 'ADD'){
+            const userInfoFromCookie = Cookies.get('userInfo');
+            let email = ''
+            if (userInfoFromCookie) {
+                const parsedUserInfo = JSON.parse(userInfoFromCookie);
+                email = parsedUserInfo.email;
+            } 
+            addProjectsDispatch({ type: 'SET_INPUT', payload: { ...addProjectsState.inputs, 'contactEmail': email } });
+        }
     }
 
     const handleMaintainedByProjectChange = (team) => {
@@ -314,7 +316,7 @@ export default function AddForm({mode}) {
                 </div>
                 <div>
                     <InputField
-                        required
+                        // required
                         name="contactEmail"
                         type="email"
                         label="Contact Email"
