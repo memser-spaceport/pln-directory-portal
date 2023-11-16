@@ -30,7 +30,6 @@ export default function TeamProfileProjects({ projects, isUserLoggedIn, team, ha
     return (
         <>
             {
-                isUserLoggedIn &&
                 <>
                     <h3 className="mb-2 mt-6 font-medium text-slate-500 flex justify-between">
                         <div className="flex">

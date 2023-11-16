@@ -3,6 +3,7 @@ import { getTeams } from "@protocol-labs-network/teams/data-access";
 import { Breadcrumb } from "@protocol-labs-network/ui";
 import ContactInfos from "apps/web-app/components/projects/details/contact-infos";
 import ContactAndLinks from "apps/web-app/components/projects/details/contactandlinks";
+import Contributors from "apps/web-app/components/projects/details/contributors";
 import Description from "apps/web-app/components/projects/details/description";
 import Header from "apps/web-app/components/projects/details/header";
 import KPIs from "apps/web-app/components/projects/details/kpis";
@@ -57,6 +58,7 @@ export default function ProjectDetails({ selectedProject, userHasEditRights, use
                     <div className="w-[291px] mt-10 flex flex-col gap-5">
                         <TeamsInvolved project={selectedProject}/>
                         <ContactInfos project={selectedProject}/>
+                        {/* <Contributors /> */}
                     </div>
                 </div>
             </div>
