@@ -133,7 +133,7 @@ export default function Member({
             {userInfo?.uid && memberProjectContributions.length > 0 && <MemberExperience member={member} isOwner={isOwner} isEditable={isEditable} contributions={member.projectContributions} />}
 
             {userInfo?.uid && (memberProjectContributions.length === 0 && isEditable) && <div className="text-[#64748B] mt-[20px] text-[15px] font-[500]">
-              <h3>Project Experience</h3>
+              <div className='font-medium text-slate-500'>Project Experience</div>
               <div className="mt-[10px] rounded-xl shadow-[0px_0px_2px_rgba(15,23,42,0.16),0px_2px_2px_rgba(15,23,42,0.04)]">
                 <p className="text-[#0F172A] font-[400] text-[12px] p-[16px]"><span onClick={onEditOrAdd} className="text-[#156FF7] cursor-pointer">Click here</span> to add your experience & contribution details.</p>
               </div>
