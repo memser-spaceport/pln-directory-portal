@@ -40,6 +40,8 @@ const formatToSave = (inputs, imageUid) => {
 
     if(inputs?.contactEmail){
         objectToSave['contactEmail'] = inputs?.contactEmail;
+    }else{
+        objectToSave['contactEmail'] = null;
     }
 
     const tempCTeam = [];
