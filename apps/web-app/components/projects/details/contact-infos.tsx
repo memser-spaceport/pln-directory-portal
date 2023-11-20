@@ -13,7 +13,7 @@ export default function ContactInfos({ project }) {
                         <div>
                             <div className="flex gap-1 pl-[7px] py-[4px] bg-[#F1F5F9]">
                                 <div><Image src="/assets/images/icons/projects/email.svg" alt="project image" width={16} height={16} /></div>
-                                <div className="text-[#156FF7] text-[13px] font-medium truncate" title={project.contactEmail}>{project.contactEmail}</div>
+                                <div className="text-[#156FF7] text-[13px] font-medium truncate max-w-[215px]" title={project.contactEmail}>{project.contactEmail}</div>
                             </div>
                         </div>
                     </div>

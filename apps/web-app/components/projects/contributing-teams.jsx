@@ -11,11 +11,23 @@ export default function ContributingTeams() {
     const [excludeList, setExcludeList] = useState([]);
 
     useEffect(() => {
+        let exclude = [];
+        if(addProjectsState.inputs.maintainedBy.value){
+            exclude = [...exclude,addProjectsState.inputs.maintainedBy.value]
+        }
         if(addProjectsState.mode === 'EDIT'){
-            const exclude = addProjectsState.inputs.contributingTeams.map(t=>t.value);
+            exclude = [...exclude, addProjectsState.inputs.contributingTeams.map(t => t.value)];
+        }
+        setExcludeList(exclude);
+    },[])
+
+    useEffect(() => {
+        let exclude = [];
+        if(addProjectsState.inputs.maintainedBy.value){
+            exclude = [...exclude,addProjectsState.inputs.maintainedBy.value]
             setExcludeList(exclude);
         }
-    },[])
+    },[addProjectsState.inputs?.maintainedBy?.value])
 
 
     const handleContributingTeamsChange = (team) => {
