@@ -6,7 +6,7 @@ const ProjectSchema = z.object({
   name: z.string(),
   tagline: z.string(),
   description: z.string(),
-  contactEmail: z.string().email().optional().transform((email)=> {
+  contactEmail: z.string().email().nullish().transform((email)=> {
     return email && email.toLowerCase()
   }),
   lookingForFunding: z.boolean().default(false),
