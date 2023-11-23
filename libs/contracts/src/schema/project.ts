@@ -1,6 +1,19 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'nestjs-zod/z';
 
+const TypeEnum = z.enum(['MAINTENER', 'COLLABORATOR']);
+
+const ContributorSchema = z.object({
+  uid: z.string().optional(),
+  teamUid: z.string(), 
+  projectUid: z.string().optional(), 
+  memberUid: z.string(),
+  type: z.string().refine((value) => TypeEnum.safeParse(value).success, {
+    message: 'Invalid Contributor type'
+  }),
+  isDeleted: z.boolean().optional()
+});
+
 const ProjectSchema = z.object({
   logoUid: z.string().optional().nullable(),
   name: z.string(),
@@ -14,9 +27,16 @@ const ProjectSchema = z.object({
     name: z.string(),
     url: z.string()
   }).array().optional(),
-  kpis: z.object({ key: z.string(), value: z.string() }).array().optional(),
+  kpis: z.object({ 
+    key: z.string(), 
+    value: z.string() 
+  }).array().optional(),
   maintainingTeamUid: z.string(),
-  contributingTeams: z.object({ uid: z.string(), name: z.string() }).array().optional(),
+  contributingTeams: z.object({ 
+    uid: z.string(), 
+    name: z.string() 
+  }).array().optional(),
+  contributors: ContributorSchema.array().optional(),
   readMe: z.string().optional()
 });
 
