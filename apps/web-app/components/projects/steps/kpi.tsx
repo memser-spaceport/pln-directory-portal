@@ -1,8 +1,8 @@
 import { InputField } from '@protocol-labs-network/ui';
-import { ReactComponent as RemoveKPIIcon } from '../../public/assets/images/icons/projects/remove-kpi.svg';
+import { ReactComponent as RemoveKPIIcon } from '../../../public/assets/images/icons/projects/remove-kpi.svg';
 import { useContext } from 'react';
 import { AddProjectsContext } from 'apps/web-app/context/projects/add.context';
-import InputError from './input-error';
+import InputError from './components/input-error';
 export default function KPI({ onInputChange, kpiFieldArray, setKPIField }) {
 
     const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
@@ -118,13 +118,13 @@ export default function KPI({ onInputChange, kpiFieldArray, setKPIField }) {
     }
 
     const getKPIComponent = (field, index) => {
-        return <div className="flex flex-col" key={index}>
+        return <div className="flex flex-col bg-white p-[16px] rounded-[8px]" key={index}>
             {getKPIHeader(field, index)}
             {getKPILabelHeader()}
             {getKPIInput(field,index)}
         </div>
     }
-    return <div>
+    return <div className='flex flex-col gap-5'>
         {
             kpiFieldArray.length > 0 && kpiFieldArray.map((kpi, index) => {
                 return getKPIComponent(kpi, index)

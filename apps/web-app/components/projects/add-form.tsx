@@ -1,11 +1,11 @@
 import { Autocomplete, InputField, Switch, TextArea } from "@protocol-labs-network/ui";
 import Image from "next/image";
 import { ReactComponent as InformationCircleIcon } from '../../public/assets/images/icons/info_icon.svg';
-import KPI from "./kpi";
+import KPI from "./steps/kpi";
 import React, { useContext, useEffect, useRef, useState } from "react";
-import URLDetails from "./url";
+import URLDetails from "./steps/components/general/url";
 import { AddProjectsContext } from "apps/web-app/context/projects/add.context";
-import InputError from "./input-error";
+import InputError from "./steps/components/input-error";
 import { MdEditor } from "md-editor-rt";
 import 'md-editor-rt/lib/style.css';
 import Cookies from 'js-cookie';
