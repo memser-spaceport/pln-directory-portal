@@ -26,7 +26,8 @@ export function AddProjectContextProvider(props) {
             logo:null,
         },
         mode: props.mode,
-        errors: null
+        errors: null,
+        currentStep: 0
     }
 
     if(props.mode === 'EDIT'){
@@ -62,8 +63,14 @@ export function AddProjectContextProvider(props) {
                 newState.inputs = { ...action.payload };
                 break;
             case 'SET_ERROR':
-                newState.errors = { ...action.payload };
+                if(action.payload){
+                    newState.errors = { ...action.payload };
+                }else{
+                    newState.errors = null;
+                }
                 break;
+            case 'SET_CURRENT_STEP':
+                newState.currentStep = action.payload;
         }
     
         return newState
