@@ -5,6 +5,7 @@ import Contributors from '../details/contributors';
 import KPI from "./kpi";
 import { MdEditor } from "md-editor-rt";
 import 'md-editor-rt/lib/style.css';
+import ProjectContributors from "./project-contributors";
 
 export default function ProjectForms() {
     const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
@@ -82,7 +83,7 @@ export default function ProjectForms() {
             case 1:
                 return (
                     <>
-                        Contributors
+                        <ProjectContributors/>
                     </>
                 );
             case 2:
