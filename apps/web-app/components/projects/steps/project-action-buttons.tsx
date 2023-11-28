@@ -1,6 +1,7 @@
 import { AddProjectsContext } from "apps/web-app/context/projects/add.context";
 import { useRouter } from "next/router";
 import { useContext } from "react";
+import { toast } from "react-toastify";
 
 export default function ProjectActionButtons() {
     const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
@@ -53,11 +54,21 @@ export default function ProjectActionButtons() {
     }
 
     const onNextClick = () => {
-        addProjectsDispatch({ type: 'SET_ERROR', payload: null });
+        // addProjectsDispatch({ type: 'SET_ERROR', payload: null });
         if(addProjectsState.currentStep === 0){
             if(validateStep0()){
                 addProjectsDispatch({ type: 'SET_CURRENT_STEP', payload: addProjectsState.currentStep + 1 });
+            }else{
+                toast.error('Please review the fields with error(s)');
             }
+        }else if(addProjectsState.currentStep === 2){
+            if(validateStep2()){
+                addProjectsDispatch({ type: 'SET_CURRENT_STEP', payload: addProjectsState.currentStep + 1 });
+            }else{
+                toast.error('Please review the fields with error(s)');
+            }
+        }else{
+            addProjectsDispatch({ type: 'SET_CURRENT_STEP', payload: addProjectsState.currentStep + 1 });
         }
     }
 
@@ -118,6 +129,39 @@ export default function ProjectActionButtons() {
             return false;
         }
 
+        return true;
+    }
+
+    const validateStep2 = () => {
+        const errors = {};
+
+        const inputs = addProjectsState.inputs;
+
+        inputs.KPIs?.map((kpi,index)=>{
+            if(kpi.name && !kpi.value){
+                if(!errors['KPIs']){
+                    errors['KPIs'] = new Array(inputs.KPIs.length).fill(null);
+                }
+                if(!errors['KPIs'][index]){
+                    errors['KPIs'][index] = {};
+                }
+                errors['KPIs'][index]['value'] = 'KPI value is required';
+            }
+            if(!kpi.name && kpi.value){
+                if(!errors['KPIs']){
+                    errors['KPIs'] = new Array(inputs.KPIs.length).fill(null);
+                }
+                if(!errors['KPIs'][index]){
+                    errors['KPIs'][index] = {};
+                }
+                errors['KPIs'][index]['name'] = 'KPI name is required';
+            }
+        });
+
+        if(Object.keys(errors).length){
+            addProjectsDispatch({ type: 'SET_ERROR', payload: { ...errors } });
+            return false;
+        }
         return true;
     }
 
