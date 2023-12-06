@@ -102,13 +102,15 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
                                             </div>
                                             {
                                                 showContributor &&
-                                                <div className="flex items-center rounded border border-[color:var(--primary-pl-blue,#156FF7)] px-3 py-1.5 border-solid bg-[#156FF7] cursor-pointer"
+                                                <div className={`flex items-center rounded border border-#156FF7 px-3 py-1.5 border-solid 
+                                                ${selectedTeamAllMembers.length > 0?'bg-[#156FF7] cursor-pointer':'bg-[#757575] cursor-not-allowed'} `}
                                                 onClick={()=>{
-                                                    console.log(selectedMembers);
-                                                    onSave()
+                                                    if(selectedTeamAllMembers.length){
+                                                        onSave()
+                                                    }
                                                 }}
                                                 >
-                                                    <div className="text-white text-sm not-italic font-normal leading-5">Save</div>
+                                                    <div className={`${selectedTeamAllMembers.length > 0?'text-white':'text-white'} text-sm not-italic font-normal leading-5`}>Save</div>
                                                 </div>
                                             }
                                         </div>
@@ -124,7 +126,7 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
                                     </>
                                     <div className="absolute -top-3 -right-3 h-6 w-6 rounded-full bg-white" />
                                     <XCircleIcon
-                                        onClick={onClose}
+                                        onClick={() => { onClose() }}
                                         data-testid={'close-icon'}
                                         className={
                                             'absolute -top-4 -right-4 h-8 w-8 text-slate-600'

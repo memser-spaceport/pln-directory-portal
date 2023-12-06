@@ -1,21 +1,52 @@
-import { useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import ChooseTeamPopup from "./choose-team-popup";
 import { UserGroupIcon, UserIcon } from "@heroicons/react/solid";
 import Image from "next/image";
+import { AddProjectsContext } from "apps/web-app/context/projects/add.context";
+import InputError from "../input-error";
+// import { ReactComponent as RemoveIcon } from '../../../public/assets/images/icons/projects/remove-kpi.svg';
+import { ReactComponent as RemoveIcon } from '../../../../../public/assets/images/icons/projects/remove-kpi.svg';
 
 export default function CollabTeams() {
+
+    const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
 
     const [chooseTeam, setChooseTeamFlag] = useState(false);
     const [chooseTeamMode, setChooseTeamMode] = useState('ADD');
 
-    const [collabTeamsList, setCollabTeamList] = useState([]);
+    const [collabTeamsList, setCollabTeamList] = useState(
+      addProjectsState.inputs.collabTeamsList
+        ? addProjectsState.inputs.collabTeamsList
+        : []
+    );
     const [collabTeamDetails, setCollabDetails] = useState(null);
+
+    // useEffect(() => {
+    //     console.log(addProjectsState.inputs);
+        
+    //     if (collabTeamsList) {
+    //         addProjectsDispatch({
+    //           type: 'SET_INPUT',
+    //           payload: {
+    //             ...addProjectsState.inputs,
+    //             collabTeamsList: collabTeamsList,
+    //           },
+    //         });
+    //     }
+    // }, [collabTeamsList])
 
     const onClosePopup = (dataSelected,details) => {
         if (dataSelected) {
             if(chooseTeamMode === 'ADD'){
                 if(details){
                     setCollabTeamList([...collabTeamsList, details]);
+                    addProjectsDispatch({
+                        type: 'SET_INPUT',
+                        payload: {
+                          ...addProjectsState.inputs,
+                          collabTeamsList: [...collabTeamsList, details],
+                        },
+                      });
                 }
             }else{
                 if(details){
@@ -24,6 +55,13 @@ export default function CollabTeams() {
                         const temp = collabTeamsList;
                         temp[idx] = details;
                         setCollabTeamList([...temp]);
+                        addProjectsDispatch({
+                            type: 'SET_INPUT',
+                            payload: {
+                              ...addProjectsState.inputs,
+                              collabTeamsList: [...temp],
+                            },
+                          });
                     }
                 }
             }
@@ -73,9 +111,10 @@ export default function CollabTeams() {
                     <div className="text-[#156FF7] text-right text-[13px] not-italic font-medium leading-5 cursor-pointer"
                         onClick={() => {
                             // onMaintainerEdit();
+                            deleteCollabTeam(index);
                         }}
                     >
-                        Edit
+                        <RemoveIcon />
                     </div>
                 </div>
                 <div className="px-[20px] flex gap-[8px] pb-[24px] border-b border-[#E2E8F0]">
@@ -128,9 +167,23 @@ export default function CollabTeams() {
                             })
                         }
                     </div>
+                    <InputError content={addProjectsState.errors?.collabContributors?.[index]} />
                 </div>
             </div>
         );
+    }
+
+    const deleteCollabTeam = (index)=>{
+        const tempCollab = [...collabTeamsList];
+        const filtered = tempCollab.filter((ct,inx)=> inx !== index);
+        setCollabTeamList(filtered);
+        addProjectsDispatch({
+            type: 'SET_INPUT',
+            payload: {
+              ...addProjectsState.inputs,
+              collabTeamsList: [...filtered],
+            },
+          });
     }
 
     return (

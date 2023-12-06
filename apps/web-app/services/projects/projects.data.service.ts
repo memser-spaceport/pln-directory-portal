@@ -35,7 +35,8 @@ const formatToSave = (inputs, imageUid) => {
         // "contactEmail": inputs?.contactEmail,
         "lookingForFunding": inputs.fundsNeeded,
         "readMe": inputs.readme,
-        "maintainingTeamUid": inputs?.maintainedBy?.value,
+        // "maintainingTeamUid": inputs?.maintainedBy?.value,
+        "maintainingTeamUid": inputs?.maintainedBy?.uid,
     }
 
     if(inputs?.contactEmail){
@@ -44,15 +45,15 @@ const formatToSave = (inputs, imageUid) => {
         objectToSave['contactEmail'] = null;
     }
 
-    const tempCTeam = [];
-    inputs?.contributingTeams?.map(team=>{
-        const teamObj = {
-            uid:team.value,
-            name:team.label
-        };
-        tempCTeam.push(teamObj);
-    });
-    objectToSave['contributingTeams'] = tempCTeam;
+    // const tempCTeam = [];
+    // inputs?.contributingTeams?.map(team=>{
+    //     const teamObj = {
+    //         uid:team.value,
+    //         name:team.label
+    //     };
+    //     tempCTeam.push(teamObj);
+    // });
+    // objectToSave['contributingTeams'] = tempCTeam;
 
     const tempKpi = [];
     inputs.KPIs.forEach(kpi => {
@@ -92,6 +93,30 @@ const formatToSave = (inputs, imageUid) => {
     });
     
     objectToSave['projectLinks'] = tempProjectlinks;
+
+    const tempContributors = [];
+
+    inputs.maintainedByContributors?.forEach(contributor => {
+        const contriObj = {
+            "type": "MAINTENER",
+            "teamUid": inputs?.maintainedBy?.uid,
+            "memberUid": contributor.uid
+         };
+         tempContributors.push(contriObj);
+    });
+
+    inputs.collabTeamsList?.forEach(collabContributor => {
+        const contriObj = {
+            "type": "COLLABORATOR",
+            "teamUid": collabContributor?.team?.uid,
+            // "memberUid": collabContributor.uid
+         };
+         collabContributor?.members?.forEach(mem => {
+            contriObj['memberUid'] = mem.uid
+            tempContributors.push(contriObj);
+         });
+    });
+    objectToSave['contributors'] = tempContributors;
 
     return objectToSave;
 }

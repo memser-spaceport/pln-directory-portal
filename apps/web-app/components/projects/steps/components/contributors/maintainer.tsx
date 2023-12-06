@@ -1,14 +1,38 @@
 import Image from "next/image";
-import { useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import ChooseTeamPopup from "./choose-team-popup";
 import { UserGroupIcon, UserIcon } from "@heroicons/react/solid";
+import { AddProjectsContext } from "apps/web-app/context/projects/add.context";
+import InputError from "../input-error";
 
 export default function Maintainer() {
     const [maintainerTeam, setMaintainer] = useState(false);
-    const [maintainerTeamDetails, setMaintainerDetails] = useState(null);
 
+    
     const [chooseTeam, setChooseTeamFlag] = useState(false);
     const [chooseTeamMode, setChooseTeamMode] = useState('ADD');
+    
+    const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
+    
+    const [maintainerTeamDetails, setMaintainerDetails] = useState(addProjectsState.inputs?.maintainedBy ?
+        { team: addProjectsState.inputs?.maintainedBy, members: addProjectsState.inputs.maintainedByContributors } : null);
+
+
+    useEffect(() => {
+        if (maintainerTeamDetails) {
+            setMaintainer(true);
+
+            // addProjectsDispatch({ type: 'SET_INPUT', payload: { ...addProjectsState.inputs, 'maintainedBy': maintainerTeamDetails.team } });
+            addProjectsDispatch({
+                type: 'SET_INPUT',
+                payload: {
+                    ...addProjectsState.inputs,
+                    'maintainedBy': maintainerTeamDetails.team,
+                    'maintainedByContributors': maintainerTeamDetails.members
+                }
+            });
+        }
+    }, [maintainerTeamDetails])
 
     const onClosePopup = (dataSelected) => {
         setChooseTeamFlag(false);
@@ -25,6 +49,7 @@ export default function Maintainer() {
                 }}>
                 <div className="">+</div>
                 <div className="">Add Maintaining Team </div>
+                <InputError content={addProjectsState.errors?.maintainedBy} />
             </div>
         );
     }
@@ -85,6 +110,7 @@ export default function Maintainer() {
                             Edit
                         </div>
                     </div>
+                    
                     <div className="flex gap-2">
                         {
                             maintainerTeamDetails.members && maintainerTeamDetails.members.map((mem, index) => {
@@ -104,6 +130,7 @@ export default function Maintainer() {
                             })
                         }
                     </div>
+                    <InputError content={addProjectsState.errors?.maintainedByContributors} />
                 </div>
             </div>
         );

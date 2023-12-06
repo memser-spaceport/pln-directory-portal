@@ -18,7 +18,7 @@ export default function General({ onInputChange, urlFieldArray, setURLField }) {
 
 
     const getEmail = () => {
-        if (addProjectsState.mode === 'ADD') {
+        if (addProjectsState.mode === 'ADD' && !addProjectsState.inputs.contactEmail) {
             const userInfoFromCookie = Cookies.get('userInfo');
             let email = ''
             if (userInfoFromCookie) {
@@ -104,7 +104,7 @@ export default function General({ onInputChange, urlFieldArray, setURLField }) {
                 </div>
                 <div className="flex text-sm font-semibold gap-2 pt-2">
                     <Switch
-                        initialValue={addProjectsState.mode === 'ADD' ? false : addProjectsState.inputs.fundsNeeded}
+                        initialValue={addProjectsState.inputs.fundsNeeded}
                         onChange={(e) => { onInputChange(e, 'fund') }}
                     />
                     <div>
