@@ -41,6 +41,9 @@ export default function MemberList({ list, selectedMembers, setSelectedMembers }
                     />
                 })
             }
+            {
+                list && list.length < 1 && <>No members were added to the team yet to select.</>
+            }
         </div>
     );
 }
