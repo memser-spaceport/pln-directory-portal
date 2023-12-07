@@ -1,25 +1,69 @@
-import { UserIcon } from "@heroicons/react/solid";
-import Image from "next/image";
+import { UserIcon } from '@heroicons/react/solid';
+import Image from 'next/image';
+import { useState } from 'react';
+import AllContributorsPopup from './all-contributors-popup';
 
-export default function Contributors() {
-    return (
-        <>
-            <div className="flex flex-col gap-[10px] bg-white rounded-[12px] p-[16px]">
-                <div className="text-[18px] font-semibold leading-[28px] pb-[14px] border-b border-[#E2E8F0]">
-                    Contributors
-                </div>
-                <div className="flex gap-1">
-                    <div>
-                        <UserIcon className="bg-gray-200 fill-white relative inline-block h-[36px] w-[36px] rounded-full" />
-                    </div>
-                    <div>
-                        <UserIcon className="bg-gray-200 fill-white relative inline-block h-[36px] w-[36px] rounded-full" />
-                    </div>
-                    <div>
-                        <UserIcon className="bg-gray-200 fill-white relative inline-block h-[36px] w-[36px] rounded-full" />
-                    </div>
-                </div>
+export default function Contributors({ project }) {
+  console.log(project);
+  const [allContributorsFlag, setAllContributors] = useState(false);
+  const contributors =
+    project?.contributors?.length > 17
+      ? project.contributors.slice(0, 17)
+      : project.contributors;
+
+  return (
+    <>
+      <div className="flex flex-col gap-[10px] rounded-[12px] bg-white p-[16px]">
+        <div className="flex justify-between border-b border-[#E2E8F0] pb-[14px] text-[18px] font-semibold leading-[28px] cursor-pointer"
+        onClick={
+            ()=>{
+                setAllContributors(true);
+            }
+        }>
+          <div>Contributors</div>
+          <div className="text-xs font-medium not-italic leading-[14px] text-[color:var(--neutral-slate-600,#475569)]">
+            <div className="relative top-[5px] rounded-[24px]  bg-[#F1F5F9] px-[8px] py-[2px] ">
+              {project?.contributors.length}
             </div>
-        </>
-    );
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {project?.contributors.length > 0 &&
+            contributors.map((contri) => {
+              return (
+                <div key={contri.uid} title={contri.member.name} className='cursor-pointer'>
+                  {contri.member?.image?.url && (
+                    <Image
+                      src={contri.member?.image?.url}
+                      alt="contributors image"
+                      width={36}
+                      height={36}
+                      className="rounded-full"
+                    />
+                  )}
+                  {!contri.member?.image?.url && (
+                    <UserIcon className="relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white" />
+                  )}
+                </div>
+              );
+            })}
+          {project?.contributors.length > 17 && (
+            <div className="relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white pt-[5px] text-center">
+              {' '}
+              +{project?.contributors.length - 17}
+            </div>
+          )}
+        </div>
+      </div>
+      {allContributorsFlag && (
+        <AllContributorsPopup
+          isOpen={allContributorsFlag}
+          onClose={() => {
+            setAllContributors(false);
+          }}
+          contributorsList={project?.contributors}
+        />
+      )}
+    </>
+  );
 }
