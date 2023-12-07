@@ -25,7 +25,7 @@ import {
   ENROLLMENT_TYPE,
   FATHOM_EVENTS,
 } from '../../../constants';
-import { ReactComponent as TextImage } from '/public/assets/images/create-member.svg';
+import { ReactComponent as TextImage } from '/public/assets/images/create_member.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
 import useAppAnalytics from '../../../hooks/shared/use-app-analytics';

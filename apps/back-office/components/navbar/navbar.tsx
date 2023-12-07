@@ -22,7 +22,7 @@ export function Navbar() {
             <Link href={ROUTE_CONSTANTS.PENDING_LIST}>
               <a className="on-focus relative left-[15px] top-[20px]">
                 <ProtocolLabsLogo
-                  title="Protocol Labs Network Directory Beta Black Logo"
+                  title="Protocol Labs Directory Beta Black Logo"
                   width="45"
                   height="40"
                 />

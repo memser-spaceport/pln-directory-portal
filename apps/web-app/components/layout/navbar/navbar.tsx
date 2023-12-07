@@ -12,7 +12,7 @@ import { toast } from 'react-toastify';
 import { JoinNetworkMenu } from './join-network-menu/join-network-menu';
 import { Login } from './login-menu/login-menu';
 import { Menu as AppMenu } from './menu/menu';
-import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/Logo_PLN_directory.svg';
+import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/pln_logo.svg';
 import { PAGE_ROUTES, FATHOM_EVENTS, APP_ANALYTICS_EVENTS, LOGOUT_MSG } from '../../../constants';
 import { createLogoutChannel } from '../../../utils/services/auth';
 import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
@@ -77,7 +77,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
       <Link href="/directory">
         <a className="on-focus">
           <ProtocolLabsLogo
-            title="Protocol Labs Network Directory Beta Black Logo"
+            title="Protocol Labs Directory Beta Black Logo"
             width="212"
             height="60"
           />
