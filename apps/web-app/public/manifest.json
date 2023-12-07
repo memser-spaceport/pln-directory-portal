@@ -1,6 +1,6 @@
 {
-  "name": "Protocol Labs Network Directory",
-  "description": "The Protocol Labs Network Directory helps network members orient themselves within the network by making it easy to learn about other teams and members, including their roles, capabilities, and experiences.",
+  "name": "Protocol Labs Directory",
+  "description": "The Protocol Labs Directory helps network members orient themselves within the network by making it easy to learn about other teams and members, including their roles, capabilities, and experiences.",
   "short_name": "PLN Directory",
   "lang": "en-US",
   "start_url": "https://www.plnetwork.io",
