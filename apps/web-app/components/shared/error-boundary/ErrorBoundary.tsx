@@ -1,7 +1,7 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link'
-import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/Logo_PLN_directory.svg';
+import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/pln_logo.svg';
 import { ReactComponent as Thunder } from '/public/assets/images/icons/thunder.svg';
 import { ReactComponent as Error } from '/public/assets/images/icons/error.svg';
 class ErrorBoundary extends React.Component<{}, { hasError: boolean }> {
@@ -27,7 +27,7 @@ class ErrorBoundary extends React.Component<{}, { hasError: boolean }> {
              <Link href="/directory">
               <a className="on-focus w-[150] mx-auto mb-7">
                 <ProtocolLabsLogo
-                  title="Protocol Labs Network Directory Beta Black Logo"
+                  title="Protocol Labs Directory Beta Black Logo"
                   width="212"
                   height="60"
                 />
@@ -46,7 +46,7 @@ class ErrorBoundary extends React.Component<{}, { hasError: boolean }> {
                 </Image>
                 <Thunder className="absolute w-7 h-7 left-18 top-5"/>
                 <Error className="absolute w-6 h-6 right-20 top-20"/>
-              </div>  
+              </div>
               <div className='text-2xl text-center w-[350px] font-bold mt-5'>Oh snap! Something went wrong!</div>
               <button
                 onClick={() => {
@@ -56,13 +56,13 @@ class ErrorBoundary extends React.Component<{}, { hasError: boolean }> {
               > Back to home
               </button>
             </div>
-          </div> 
+          </div>
         );
       }
-   
+
       // Return children components in case of no error
       return this.props.children;
     }
   }
-   
+
   export default ErrorBoundary;

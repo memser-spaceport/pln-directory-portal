@@ -17,8 +17,8 @@ export async function bootstrap() {
 
   // Swagger Documentation
   const config = new DocumentBuilder()
-    .setTitle('Protocol Labs Network Directory API')
-    .setDescription('The Protocol Labs Network Directory API documentation')
+    .setTitle('Protocol Labs Directory API')
+    .setDescription('The Protocol Labs Directory API documentation')
     .setVersion('1.0')
     .addTag('PL')
     .build();
