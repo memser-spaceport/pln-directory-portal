@@ -94,6 +94,7 @@ const formatToSave = (inputs, imageUid) => {
     
     objectToSave['projectLinks'] = tempProjectlinks;
 
+    const tempCTeam = [];
     const tempContributors = [];
 
     inputs.maintainedByContributors?.forEach(contributor => {
@@ -106,6 +107,11 @@ const formatToSave = (inputs, imageUid) => {
     });
 
     inputs.collabTeamsList?.forEach(collabContributor => {
+        const teamObj = {
+            uid:collabContributor?.team?.uid,
+            name:collabContributor?.team?.name
+        };
+        tempCTeam.push(teamObj);
         const contriObj = {
             "type": "COLLABORATOR",
             "teamUid": collabContributor?.team?.uid,
@@ -116,6 +122,7 @@ const formatToSave = (inputs, imageUid) => {
             tempContributors.push(contriObj);
          });
     });
+    objectToSave['contributingTeams'] = tempCTeam;
     objectToSave['contributors'] = tempContributors;
 
     return objectToSave;
@@ -139,6 +146,7 @@ const getFormattedProject = (project) => {
             formattedProject['teamUid'] = project.maintainingTeamUid;
             formattedProject['maintainingTeam'] = project.maintainingTeam;
             formattedProject['isDeleted'] = project.isDeleted ?? false;
+            formattedProject['contributors'] = project.contributors ?? null;
             
             const tempCTeams = [];
             project.contributingTeams.map(team=>{

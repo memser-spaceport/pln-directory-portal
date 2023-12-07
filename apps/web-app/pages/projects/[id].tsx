@@ -58,7 +58,10 @@ export default function ProjectDetails({ selectedProject, userHasEditRights, use
                     <div className="w-[291px] mt-10 flex flex-col gap-5">
                         <TeamsInvolved project={selectedProject}/>
                         <ContactInfos project={selectedProject}/>
-                        {/* <Contributors /> */}
+                        {
+                            selectedProject?.contributors && 
+                            <Contributors project={selectedProject}/>
+                        }
                     </div>
                 </div>
             </div>
