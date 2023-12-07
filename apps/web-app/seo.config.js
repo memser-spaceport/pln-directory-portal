@@ -15,7 +15,7 @@ export const DEFAULT_SEO = {
     url: siteUrl,
     images: [
       {
-        url: `${siteUrl}/assets/images/protocol-labs-network-portal-open-graph.jpg`,
+        url: `${siteUrl}/assets/images/protocol-labs-open-graph.jpg`,
         width: 1280,
         height: 640,
         alt: 'Protocol Labs Network',
@@ -81,7 +81,7 @@ export const DIRECTORY_SEO = {
   openGraph: {
     images: [
       {
-        url: `${siteUrl}/assets/images/protocol-labs-network-open-graph.jpg?v1`,
+        url: `${siteUrl}/assets/images/protocol-labs-open-graph.jpg?v1`,
         width: 1280,
         height: 640,
         alt: 'Protocol Labs Directory',
