@@ -43,19 +43,29 @@ export default function Maintainer() {
 
     const getAddMaintainerTemplate = () => {
         return (
-            <div className="flex cursor-pointer gap-2 font-medium text-[14px] leading-[24px] text-[#156FF7]"
-                onClick={() => {
-                    setChooseTeamFlag(true);
-                }}>
-                <div className="">+</div>
-                <div className="">Add Maintaining Team </div>
-                <InputError content={addProjectsState.errors?.maintainedBy} />
+          <div>
+            <div className="flex justify-between gap-2 bg-white py-[8px] px-[20px]">
+            {/* <div className="">+</div> */}
+            <div className="text-xs font-bold not-italic leading-8 text-[#64748B]">
+              MAINTAINER TEAM{' '}
             </div>
+            <div
+              className="flex gap-2 text-sm font-medium not-italic leading-6 text-[color:var(--elements-link,#156FF7)] cursor-pointer "
+              onClick={() => {
+                setChooseTeamFlag(true);
+              }}
+            >
+              <div className="">+</div>
+              <div>Add</div>
+            </div>
+          </div>
+            <InputError content={addProjectsState.errors?.maintainedBy} />
+          </div>
         );
     }
 
-    const onEdit = () => {
-        setChooseTeamMode('EDIT');
+    const onEdit = async () => {
+        await setChooseTeamMode('EDIT');
         setChooseTeamFlag(true);
     }
 

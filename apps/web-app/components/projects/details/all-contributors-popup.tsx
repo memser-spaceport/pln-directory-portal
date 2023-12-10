@@ -3,10 +3,42 @@ import { UserIcon, XCircleIcon } from "@heroicons/react/solid";
 import { Fragment} from "react";
 import Image from "next/image";
 
-export default function AllContributorsPopup({ isOpen, onClose, contributorsList }) {
+export default function AllContributorsPopup({
+  isOpen,
+  onClose,
+  contributorsList,
+  contributingMembers,
+}) {
   const contriTitle = 'Contributors';
-console.log(contributorsList,'list');
 
+  const getMemberDetailTemplate = (uid, name, url)=>{
+    return (
+      <>
+      <div
+        className="flex items-center gap-2"
+        key={'contributor' + uid}
+      >
+                            <div>
+                              {url && (
+                                <Image
+                                  src={url}
+                                  alt="member image"
+                                  width={40}
+                                  height={40}
+                                  className="shrink-0 rounded-full border border-[#E2E8F0]"
+                                />
+                              )}
+                              {!url && (
+                                <UserIcon className="h-[40px] w-[40px] shrink-0 rounded-full bg-slate-100 fill-slate-200" />
+                              )}
+                            </div>
+                            <div className="text-base font-normal not-italic leading-5 text-black">
+                              {name}
+                            </div>
+                          </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -45,34 +77,30 @@ console.log(contributorsList,'list');
                   >
                     <div className="flex justify-between pr-7">
                       <div className="flex items-center gap-2">
-                        <p className=""> {contriTitle}({contributorsList.length})</p>
+                        <p className="">
+                          {' '}
+                          {contriTitle}({contributorsList.length})
+                        </p>
                       </div>
                     </div>
                   </Dialog.Title>
-                  <div className="overflow-y-scroll h-[94%]">
-                    {
-                        contributorsList && contributorsList.map((contri,index)=>{
-                            return (
-                              <div className="flex items-center gap-2" key={'contributor' + index}>
-                                <div>
-                                  {contri?.member?.image?.url && (
-                                    <Image
-                                      src={contri?.member?.image?.url}
-                                      alt="tea image"
-                                      width={40}
-                                      height={40}
-                                      className="shrink-0 rounded-full border border-[#E2E8F0]"
-                                    />
-                                  )}
-                                  {!contri?.member?.image?.url && (
-                                    <UserIcon className="h-[40px] w-[40px] shrink-0 rounded-full bg-slate-100 fill-slate-200" />
-                                  )}
-                                </div>
-                                <div className="text-black text-base not-italic font-normal leading-5">{contri?.member?.name}</div>
-                              </div>
-                            );
-                        })
-                    }
+                  <div className="h-[94%] overflow-y-scroll">
+                    {contributorsList &&
+                      contributorsList.map((contri, index) => {
+                        return getMemberDetailTemplate(
+                          contri?.uid,
+                          contri?.member?.name,
+                          contri.member?.image?.url
+                        );
+                      })}
+                    {contributingMembers &&
+                      contributingMembers.map((contri) => {
+                        return getMemberDetailTemplate(
+                          contri.uid,
+                          contri.name,
+                          contri.image?.url
+                        );
+                      })}
                   </div>
                   <div className="absolute -top-3 -right-3 h-6 w-6 rounded-full bg-white" />
                   <XCircleIcon
@@ -81,7 +109,7 @@ console.log(contributorsList,'list');
                     }}
                     data-testid={'close-icon'}
                     className={
-                      'absolute -top-4 -right-4 h-8 w-8 text-slate-600'
+                      'absolute -top-4 -right-4 h-8 w-8 text-slate-600 cursor-pointer'
                     }
                   />
                 </Dialog.Panel>
