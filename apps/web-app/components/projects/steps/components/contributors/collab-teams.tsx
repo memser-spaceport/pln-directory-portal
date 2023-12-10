@@ -83,14 +83,23 @@ export default function CollabTeams() {
     
     const getAddCollabTemplate = () => {
         return (
-            <div className="flex cursor-pointer gap-2 font-medium text-[14px] leading-[24px] text-[#156FF7]"
-                onClick={() => {
-                    setChooseTeamMode('ADD');
-                    setChooseTeamFlag(true);
-                }}>
-                <div className="">+</div>
-                <div className="">Add Collaborating Team </div>
+            <div className="flex justify-between gap-2 bg-white py-[8px] px-[20px]">
+            {/* <div className="">+</div> */}
+            <div className="text-xs font-bold not-italic leading-8 text-[#64748B]">
+              COLLABORATING TEAM
             </div>
+            <div
+              className="flex gap-2 text-sm font-medium not-italic leading-6 text-[color:var(--elements-link,#156FF7)] cursor-pointer "
+              onClick={() => {
+                setChooseTeamMode('ADD');
+                setChooseTeamFlag(true);
+            }}
+            >
+              <div className="">+</div>
+              <div>Add</div>
+            </div>
+            {/* <InputError content={addProjectsState.errors?.maintainedBy} /> */}
+          </div>
         );
     }
 

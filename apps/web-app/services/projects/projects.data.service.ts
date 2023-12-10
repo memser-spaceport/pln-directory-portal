@@ -112,12 +112,12 @@ const formatToSave = (inputs, imageUid) => {
             name:collabContributor?.team?.name
         };
         tempCTeam.push(teamObj);
-        const contriObj = {
-            "type": "COLLABORATOR",
-            "teamUid": collabContributor?.team?.uid,
-            // "memberUid": collabContributor.uid
-         };
-         collabContributor?.members?.forEach(mem => {
+        collabContributor?.members?.forEach(mem => {
+             const contriObj = {
+                 "type": "COLLABORATOR",
+                 "teamUid": collabContributor?.team?.uid,
+                 // "memberUid": collabContributor.uid
+              };
             contriObj['memberUid'] = mem.uid
             tempContributors.push(contriObj);
          });

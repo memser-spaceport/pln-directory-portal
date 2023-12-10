@@ -3,48 +3,69 @@ import Image from 'next/image';
 import { useState } from 'react';
 import AllContributorsPopup from './all-contributors-popup';
 
-export default function Contributors({ project }) {
-  console.log(project);
+export default function Contributors({ project, contributingMembers }) {
   const [allContributorsFlag, setAllContributors] = useState(false);
   const contributors =
     project?.contributors?.length > 17
       ? project.contributors.slice(0, 17)
       : project.contributors;
 
+const individualContributors = contributingMembers
+        ? contributors.length < 17
+          ? contributingMembers.slice(0, 17 - contributors.length)
+          : []
+        : [];
+
+  const getMemberDetailTemplate = (uid, name, url) => {
+    return (
+      <div key={uid} title={name} className="cursor-pointer">
+        {url && (
+          <Image
+            src={url}
+            alt="contributors image"
+            width={36}
+            height={36}
+            className="rounded-full"
+          />
+        )}
+        {!url && (
+          <UserIcon className="relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white" />
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
       <div className="flex flex-col gap-[10px] rounded-[12px] bg-white p-[16px]">
-        <div className="flex justify-between border-b border-[#E2E8F0] pb-[14px] text-[18px] font-semibold leading-[28px] cursor-pointer"
-        onClick={
-            ()=>{
-                setAllContributors(true);
-            }
-        }>
+        <div
+          className="flex cursor-pointer justify-between border-b border-[#E2E8F0] pb-[14px] text-[18px] font-semibold leading-[28px]"
+          onClick={() => {
+            setAllContributors(true);
+          }}
+        >
           <div>Contributors</div>
           <div className="text-xs font-medium not-italic leading-[14px] text-[color:var(--neutral-slate-600,#475569)]">
             <div className="relative top-[5px] rounded-[24px]  bg-[#F1F5F9] px-[8px] py-[2px] ">
-              {project?.contributors.length}
+              {project?.contributors.length + contributingMembers?.length}
             </div>
           </div>
         </div>
         <div className="flex flex-wrap gap-1">
           {project?.contributors.length > 0 &&
             contributors.map((contri) => {
-              return (
-                <div key={contri.uid} title={contri.member.name} className='cursor-pointer'>
-                  {contri.member?.image?.url && (
-                    <Image
-                      src={contri.member?.image?.url}
-                      alt="contributors image"
-                      width={36}
-                      height={36}
-                      className="rounded-full"
-                    />
-                  )}
-                  {!contri.member?.image?.url && (
-                    <UserIcon className="relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white" />
-                  )}
-                </div>
+              return getMemberDetailTemplate(
+                contri?.uid,
+                contri?.member?.name,
+                contri.member?.image?.url
+              );
+            })}
+          {contributingMembers &&
+            individualContributors.map((contri) => {
+              return getMemberDetailTemplate(
+                contri.uid,
+                contri.name,
+                contri.image.url
               );
             })}
           {project?.contributors.length > 17 && (
@@ -62,6 +83,7 @@ export default function Contributors({ project }) {
             setAllContributors(false);
           }}
           contributorsList={project?.contributors}
+          contributingMembers={contributingMembers}
         />
       )}
     </>

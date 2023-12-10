@@ -1,3 +1,4 @@
+import { getMember, getMembers } from "@protocol-labs-network/members/data-access";
 import { getProject } from "@protocol-labs-network/projects/data-access";
 import { getTeams } from "@protocol-labs-network/teams/data-access";
 import { Breadcrumb } from "@protocol-labs-network/ui";
@@ -19,7 +20,7 @@ import { NextSeo } from "next-seo";
 import { destroyCookie } from "nookies";
 import { ReactElement } from "react";
 
-export default function ProjectDetails({ selectedProject, userHasEditRights, userHasDeleteRights }) {
+export default function ProjectDetails({ selectedProject, userHasEditRights, userHasDeleteRights, contributingMembers }) {
     const { breadcrumbItems } = useProfileBreadcrumb({
         backLink: '/projects',
         directoryName: 'Projects',
@@ -59,8 +60,8 @@ export default function ProjectDetails({ selectedProject, userHasEditRights, use
                         <TeamsInvolved project={selectedProject}/>
                         <ContactInfos project={selectedProject}/>
                         {
-                            selectedProject?.contributors && 
-                            <Contributors project={selectedProject}/>
+                            (selectedProject?.contributors || contributingMembers) && 
+                            <Contributors project={selectedProject} contributingMembers={contributingMembers}/>
                         }
                     </div>
                 </div>
@@ -152,6 +153,13 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
 
     const selectedProjectResponse = await getProject(query.id);
+    const getMembersResponse = await getMembers({ 'projectContributions.projectUid':query.id,select:'uid,name,image'});
+    
+    let contributingMembers = null;
+    if(getMembersResponse.status === 200){
+        contributingMembers = getMembersResponse.body;
+    }
+
     let selectedProject = null;
     let userHasEditRights = false;
     let userHasDeleteRights = false;
@@ -174,7 +182,8 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
             userInfo,
             selectedProject,
             userHasEditRights,
-            userHasDeleteRights
+            userHasDeleteRights,
+            contributingMembers
         }
     };
 }
