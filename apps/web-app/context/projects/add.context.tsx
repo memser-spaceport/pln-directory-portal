@@ -48,6 +48,8 @@ export function AddProjectContextProvider(props) {
                     logo: projectDetail.maintainingTeam?.logo?.url
                 },
                 desc: projectDetail.description,
+                maintainedByContributors:[],
+                collabTeamsList:[],
                 projectURLs: projectDetail.projectLinks,
                 contactEmail: projectDetail.contactEmail,
                 fundsNeeded: projectDetail.fundingNeeded,
