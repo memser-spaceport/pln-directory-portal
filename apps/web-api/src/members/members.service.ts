@@ -357,6 +357,7 @@ export class MembersService {
   }
 
   async editMemberParticipantsRequest(participantsRequest, userEmail) {
+    this.logger.info(`Member update request  - Processing with values - ${JSON.stringify(participantsRequest)}`)
     const { referenceUid } = participantsRequest;
     const requestorDetails =
       await this.participantsRequestService.findMemberByEmail(userEmail);
@@ -403,6 +404,7 @@ export class MembersService {
           tx
         );
         if (result?.uid) {
+          this.logger.info(`Member update request - Added entry in pariticipants request table, requestId -> ${result.uid}, requestor -> ${userEmail}`)
           await this.participantsRequestService.processMemberEditRequest(
             result.uid,
             true, // disable the notification
@@ -410,8 +412,9 @@ export class MembersService {
             requestorDetails.isDirectoryAdmin,
             tx
           );
+          this.logger.info(`Member update request - completed, requestId -> ${result.uid}, requestor -> ${userEmail}`)
         } else {
-          throw new InternalServerErrorException();
+          throw new InternalServerErrorException(`Error in updating member request`);
         }
       });
     } catch (error) {

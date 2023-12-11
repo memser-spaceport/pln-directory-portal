@@ -35,7 +35,7 @@ export class ParticipantsRequestService {
     private redisService: RedisService,
     private slackService: SlackService,
     private forestAdminService: ForestAdminService,
-    private logService: LogService,
+    private logger: LogService,
     @Inject(CACHE_MANAGER) private cacheService: Cache,
   ) {}
 
@@ -325,7 +325,7 @@ export class ParticipantsRequestService {
     };
 
     // Save Experience if available
-    if(Array.isArray(dataToProcess.projectContributions) 
+    if(Array.isArray(dataToProcess.projectContributions)
       && dataToProcess.projectContributions?.length > 0) {
       dataToSave['projectContributions'] = {
         createMany: {
@@ -447,6 +447,7 @@ export class ParticipantsRequestService {
         throw new BadRequestException("Email already exists. Please try again with different email")
       }
     }
+    this.logger.info(`Member update request - Initiaing update for member uid - ${existingData.uid}, requestId -> ${uidToEdit}`)
     // Mandatory fields
     dataToSave['name'] = dataToProcess.name;
     dataToSave['email'] = dataToProcess.email.toLowerCase().trim();
@@ -693,9 +694,10 @@ export class ParticipantsRequestService {
       where: { uid: dataFromDB.referenceUid },
       data: { ...dataToSave },
     });
-
+    this.logger.info(`Member update request - attibutes updated, requestId -> ${uidToEdit}`)
     if (isEmailChange && isExternalIdAvailable) {
       // try {
+      this.logger.info(`Member update request - Initiating email change - newEmail - ${dataToSave.email}, oldEmail - ${existingData.email}, externalId - ${existingData.externalId}, requestId -> ${uidToEdit}`)
       const response = await axios.post(
         `${process.env.AUTH_API_URL}/auth/token`,
         {
@@ -731,6 +733,7 @@ export class ParticipantsRequestService {
       //     throw e;
       //   }
       // }
+      this.logger.info(`Member update request - Email changed,  requestId -> ${uidToEdit}`)
     }
     // Updating status
     await tx.participantsRequest.update({
