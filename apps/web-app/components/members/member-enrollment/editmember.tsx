@@ -724,6 +724,7 @@ export function EditMemberModal({
             );
           }
         } catch (err) {
+          console.log('Error updating member info', err)
           // if (err?.response?.status === 400) {
           //   toast(err?.response?.data?.message, {
           //     type: 'error',
