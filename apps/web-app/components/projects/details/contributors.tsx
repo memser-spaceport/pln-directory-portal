@@ -11,8 +11,8 @@ export default function Contributors({ project, contributingMembers }) {
       : project.contributors;
 
 const individualContributors = contributingMembers
-        ? contributors.length < 17
-          ? contributingMembers.slice(0, 17 - contributors.length)
+        ? contributors?.length < 17
+          ? contributingMembers.slice(0, 17 - contributors?.length)
           : []
         : [];
 
@@ -47,12 +47,12 @@ const individualContributors = contributingMembers
           <div>Contributors</div>
           <div className="text-xs font-medium not-italic leading-[14px] text-[color:var(--neutral-slate-600,#475569)]">
             <div className="relative top-[5px] rounded-[24px]  bg-[#F1F5F9] px-[8px] py-[2px] ">
-              {project?.contributors.length + contributingMembers?.length}
+              {project?.contributors?.length + contributingMembers?.length}
             </div>
           </div>
         </div>
         <div className="flex flex-wrap gap-1">
-          {project?.contributors.length > 0 &&
+          {project?.contributors?.length > 0 &&
             contributors.map((contri) => {
               return getMemberDetailTemplate(
                 contri?.uid,
@@ -68,10 +68,10 @@ const individualContributors = contributingMembers
                 contri.image.url
               );
             })}
-          {project?.contributors.length > 17 && (
+          {project?.contributors?.length > 17 && (
             <div className="relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white pt-[5px] text-center">
               {' '}
-              +{project?.contributors.length - 17}
+              +{project?.contributors?.length - 17}
             </div>
           )}
         </div>

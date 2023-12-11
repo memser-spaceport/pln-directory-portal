@@ -1,7 +1,8 @@
-import { Dialog, Transition } from "@headlessui/react";
-import { UserIcon, XCircleIcon } from "@heroicons/react/solid";
-import { Fragment} from "react";
-import Image from "next/image";
+import { Dialog, Transition } from '@headlessui/react';
+import { UserIcon, XCircleIcon } from '@heroicons/react/solid';
+import { Fragment } from 'react';
+import Image from 'next/image';
+import { useRouter } from 'next/router';
 
 export default function AllContributorsPopup({
   isOpen,
@@ -10,35 +11,37 @@ export default function AllContributorsPopup({
   contributingMembers,
 }) {
   const contriTitle = 'Contributors';
+  const router = useRouter();
 
-  const getMemberDetailTemplate = (uid, name, url)=>{
+  const getMemberDetailTemplate = (uid, name, url) => {
     return (
       <>
-      <div
-        className="flex items-center gap-2"
-        key={'contributor' + uid}
-      >
-                            <div>
-                              {url && (
-                                <Image
-                                  src={url}
-                                  alt="member image"
-                                  width={40}
-                                  height={40}
-                                  className="shrink-0 rounded-full border border-[#E2E8F0]"
-                                />
-                              )}
-                              {!url && (
-                                <UserIcon className="h-[40px] w-[40px] shrink-0 rounded-full bg-slate-100 fill-slate-200" />
-                              )}
-                            </div>
-                            <div className="text-base font-normal not-italic leading-5 text-black">
-                              {name}
-                            </div>
-                          </div>
+        <div className="flex items-center gap-2 cursor-pointer hover:bg-slate-100" key={'contributor' + uid}
+        onClick={()=>{
+          router.push('/members/' + uid);
+        }}
+        >
+          <div>
+            {url && (
+              <Image
+                src={url}
+                alt="member image"
+                width={40}
+                height={40}
+                className="shrink-0 rounded-full border border-[#E2E8F0]"
+              />
+            )}
+            {!url && (
+              <UserIcon className="h-[40px] w-[40px] shrink-0 rounded-full bg-slate-100 fill-slate-200" />
+            )}
+          </div>
+          <div className="text-base font-normal not-italic leading-5 text-black">
+            {name}
+          </div>
+        </div>
       </>
     );
-  }
+  };
 
   return (
     <>
@@ -109,7 +112,7 @@ export default function AllContributorsPopup({
                     }}
                     data-testid={'close-icon'}
                     className={
-                      'absolute -top-4 -right-4 h-8 w-8 text-slate-600 cursor-pointer'
+                      'absolute -top-4 -right-4 h-8 w-8 cursor-pointer text-slate-600'
                     }
                   />
                 </Dialog.Panel>
