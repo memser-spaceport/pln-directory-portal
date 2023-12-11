@@ -2,7 +2,7 @@ import { XIcon as CloseIcon } from '@heroicons/react/outline';
 import { InputField } from '@protocol-labs-network/ui';
 import { AddProjectsContext } from 'apps/web-app/context/projects/add.context';
 import React, { useContext } from 'react';
-import InputError from './input-error';
+import InputError from '../input-error';
 
 export default function URLDetails({ onInputChange, urlFieldArray, setURLField }) {
 
