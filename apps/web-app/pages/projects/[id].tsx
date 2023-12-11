@@ -153,7 +153,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
 
     const selectedProjectResponse = await getProject(query.id);
-    const getMembersResponse = await getMembers({ 'projectContributions.projectUid':query.id,select:'uid,name,image'});
+    const getMembersResponse = await getMembers({ 'projectContributions.projectUid':query.id+'',select:'uid,name,image'});
     
     let contributingMembers = null;
     if(getMembersResponse.status === 200){
