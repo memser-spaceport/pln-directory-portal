@@ -418,6 +418,7 @@ export class MembersService {
         }
       });
     } catch (error) {
+      this.logger.info(`Member update request - error , requestor -> ${userEmail}, referenceId -> ${referenceUid}, error -> ${JSON.stringify(error)}`)
       if (error?.response?.statusCode && error?.response?.message) {
         throw new HttpException(
           error?.response?.message,
