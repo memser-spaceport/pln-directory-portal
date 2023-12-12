@@ -36,8 +36,8 @@ const individualContributors = contributingMembers
           setContributorHoveruid(uid);
           setContributorHoverFlag(true);
         }}
-        onMouseOut={() => {
-          setContributorHoverFlag(false);
+        onMouseLeave={() => {
+            setContributorHoverFlag(false);
         }}
       >
         {url && (
@@ -98,10 +98,15 @@ const individualContributors = contributingMembers
             })}
           {contributingMembers &&
             individualContributors.map((contri) => {
+              const mainTeam = contri.teamMemberRoles?.filter(teamRoles=>{
+                return teamRoles?.mainTeam === true;
+              });
               return getMemberDetailTemplate(
                 contri.uid,
                 contri.name,
-                contri.image.url
+                contri.image.url,
+                mainTeam?.length ? mainTeam[0]?.role : '',
+                mainTeam?.length ? mainTeam[0]?.team?.name : '',
               );
             })}
           {project?.contributors?.length > 17 && (

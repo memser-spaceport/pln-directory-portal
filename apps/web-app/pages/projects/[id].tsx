@@ -155,7 +155,8 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     const selectedProjectResponse = await getProject(query.id);
     const getMembersResponse = await getMembers({
       'projectContributions.projectUid': query.id + '',
-      select: 'uid,name,image,teamMemberRoles.mainTeam,teamMemberRoles.role',
+      select: 'uid,name,image,teamMemberRoles.team,teamMemberRoles.mainTeam,teamMemberRoles.role',
+      pagination:false
     });
     
     let contributingMembers = null;
