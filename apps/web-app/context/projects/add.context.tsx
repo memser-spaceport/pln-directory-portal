@@ -10,7 +10,10 @@ export function AddProjectContextProvider(props) {
             logoObject:'',
             name: '',
             tagline: '',
-            maintainedBy: { value: '', label: '', logo: '' },
+            // maintainedBy: { value: '', label: '', logo: '' },
+            maintainedBy:null,
+            maintainedByContributors: [],
+            collabTeamsList: [],
             contributingTeams: [],
             desc: '',
             projectURLs: [{
@@ -26,7 +29,8 @@ export function AddProjectContextProvider(props) {
             logo:null,
         },
         mode: props.mode,
-        errors: null
+        errors: null,
+        currentStep: 0
     }
 
     if(props.mode === 'EDIT'){
@@ -44,10 +48,12 @@ export function AddProjectContextProvider(props) {
                     logo: projectDetail.maintainingTeam?.logo?.url
                 },
                 desc: projectDetail.description,
-                projectURLs: projectDetail.projectLinks,//have to set
+                maintainedByContributors:[],
+                collabTeamsList:[],
+                projectURLs: projectDetail.projectLinks,
                 contactEmail: projectDetail.contactEmail,
                 fundsNeeded: projectDetail.fundingNeeded,
-                KPIs: projectDetail.KPIs,//have to set
+                KPIs: projectDetail.KPIs,
                 readme: projectDetail.readMe,
                 contributingTeams: projectDetail.contributingTeams,
                 logo:projectDetail.logo
@@ -62,8 +68,14 @@ export function AddProjectContextProvider(props) {
                 newState.inputs = { ...action.payload };
                 break;
             case 'SET_ERROR':
-                newState.errors = { ...action.payload };
+                if(action.payload){
+                    newState.errors = { ...action.payload };
+                }else{
+                    newState.errors = null;
+                }
                 break;
+            case 'SET_CURRENT_STEP':
+                newState.currentStep = action.payload;
         }
     
         return newState
