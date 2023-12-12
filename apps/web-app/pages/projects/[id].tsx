@@ -60,7 +60,7 @@ export default function ProjectDetails({ selectedProject, userHasEditRights, use
                         <TeamsInvolved project={selectedProject}/>
                         <ContactInfos project={selectedProject}/>
                         {
-                            (selectedProject?.contributors || contributingMembers) && 
+                            (selectedProject?.contributors?.length>0 || contributingMembers?.length > 0) && 
                             <Contributors project={selectedProject} contributingMembers={contributingMembers}/>
                         }
                     </div>
@@ -153,7 +153,10 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
 
     const selectedProjectResponse = await getProject(query.id);
-    const getMembersResponse = await getMembers({ 'projectContributions.projectUid':query.id+'',select:'uid,name,image'});
+    const getMembersResponse = await getMembers({
+      'projectContributions.projectUid': query.id + '',
+      select: 'uid,name,image,teamMemberRoles.mainTeam,teamMemberRoles.role',
+    });
     
     let contributingMembers = null;
     if(getMembersResponse.status === 200){
@@ -164,7 +167,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     let userHasEditRights = false;
     let userHasDeleteRights = false;
 
-    // console.log(selectedProjectResponse);
+    // console.log(selectedProjectResponse.body['contributors']);
 
     if (selectedProjectResponse.status === 200) {
         selectedProject = ProjectsDataService.getFormattedProject(selectedProjectResponse.body);

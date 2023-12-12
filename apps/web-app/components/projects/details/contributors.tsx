@@ -2,9 +2,13 @@ import { UserIcon } from '@heroicons/react/solid';
 import Image from 'next/image';
 import { useState } from 'react';
 import AllContributorsPopup from './all-contributors-popup';
+import ContributorProfileCard from './contributor-profile-card';
 
 export default function Contributors({ project, contributingMembers }) {
   const [allContributorsFlag, setAllContributors] = useState(false);
+  const [contributorHoverFlag, setContributorHoverFlag] = useState(false);
+  const [contributorHoveruid, setContributorHoveruid] = useState('');
+
   const contributors =
     project?.contributors?.length > 17
       ? project.contributors.slice(0, 17)
@@ -16,9 +20,26 @@ const individualContributors = contributingMembers
           : []
         : [];
 
-  const getMemberDetailTemplate = (uid, name, url) => {
+  const getMemberDetailTemplate = (
+    uid,
+    name,
+    url,
+    role = '',
+    teamName = ''
+  ) => {
     return (
-      <div key={uid} title={name} className="cursor-pointer">
+      <div
+        key={uid}
+        title={name}
+        className="relative cursor-pointer"
+        onMouseOver={() => {
+          setContributorHoveruid(uid);
+          setContributorHoverFlag(true);
+        }}
+        onMouseOut={() => {
+          setContributorHoverFlag(false);
+        }}
+      >
         {url && (
           <Image
             src={url}
@@ -30,6 +51,15 @@ const individualContributors = contributingMembers
         )}
         {!url && (
           <UserIcon className="relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white" />
+        )}
+        {contributorHoverFlag && contributorHoveruid === uid && (
+          <ContributorProfileCard
+            uid={uid}
+            name={name}
+            url={url}
+            role={role}
+            teamName={teamName}
+          />
         )}
       </div>
     );
@@ -54,10 +84,16 @@ const individualContributors = contributingMembers
         <div className="flex flex-wrap gap-1">
           {project?.contributors?.length > 0 &&
             contributors.map((contri) => {
+              const mainTeam = contri.member?.teamMemberRoles?.filter(teamRoles=>{
+                return teamRoles?.mainTeam === true;
+              });
+              
               return getMemberDetailTemplate(
-                contri?.uid,
+                contri?.member?.uid,
                 contri?.member?.name,
-                contri.member?.image?.url
+                contri.member?.image?.url,
+                mainTeam?.length ? mainTeam[0]?.role : '',
+                mainTeam?.length ? mainTeam[0]?.team?.name : '',
               );
             })}
           {contributingMembers &&

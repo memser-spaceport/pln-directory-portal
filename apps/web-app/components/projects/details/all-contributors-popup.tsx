@@ -91,7 +91,7 @@ export default function AllContributorsPopup({
                     {contributorsList &&
                       contributorsList.map((contri, index) => {
                         return getMemberDetailTemplate(
-                          contri?.uid,
+                          contri?.member?.uid,
                           contri?.member?.name,
                           contri.member?.image?.url
                         );
