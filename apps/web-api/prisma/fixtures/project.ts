@@ -62,7 +62,7 @@ const ProjectFactory = Factory.define<Omit<Project, 'id'>>(
 export const projects = async () => await ProjectFactory.createList(25);
 
 export const projectRelations = async (projects) => {
-  const teamUids = await getUidsFrom(Prisma.ModelName.Team);
+  const teamUids = await (await getUidsFrom(Prisma.ModelName.Team));
 
   return projects.map((project) => {
     const randomTeams = sampleSize(teamUids, random(0, 5));
