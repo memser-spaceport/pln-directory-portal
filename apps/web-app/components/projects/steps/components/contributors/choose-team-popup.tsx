@@ -139,6 +139,7 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
                           list={selectedTeamAllMembers}
                           selectedMembers={selectedMembers}
                           setSelectedMembers={setSelectedMembers}
+                          originalSelectedMembers={teamDetails?.members}
                         />
                       )}
                     </>

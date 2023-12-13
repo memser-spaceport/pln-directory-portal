@@ -74,6 +74,13 @@ export default function Maintainer() {
         setChooseTeamFlag(true);
     }
 
+    const getMembersCount = () => {
+        const counterArr = maintainerTeamDetails.members?.filter((member) => {
+          return !member?.isDeleted;
+        });
+        return counterArr?.length;
+      };
+
     const getDisplayMaintainerTemplate = () => {
         return (
             <div className="flex flex-col gap-[10px] pt-[8px] pb-[16px] bg-white rounded-[8px] ">
@@ -110,7 +117,7 @@ export default function Maintainer() {
                 <div className="flex flex-col px-5 py-0">
                     <div className="flex justify-between items-center self-stretch ">
                         <div className="text-xs not-italic font-bold leading-8 text-[#64748B]">
-                            CONTRIBUTORS ({maintainerTeamDetails.members?.length})
+                            CONTRIBUTORS ({getMembersCount()})
                         </div>
                         <div className="text-[#156FF7] text-right text-[13px] not-italic font-medium leading-5 cursor-pointer"
                             onClick={() => {
@@ -125,7 +132,9 @@ export default function Maintainer() {
                         {
                             maintainerTeamDetails.members && maintainerTeamDetails.members.map((mem, index) => {
                                 return (
-                                    <div key={'mem' + index}>
+                                    <>
+                                    {
+                                        mem && !mem.isDeleted && <div key={'mem' + index}>
                                         {
                                             mem.logo &&
                                             <Image src={mem.logo} alt="tea image" width={32} height={32}
@@ -136,6 +145,8 @@ export default function Maintainer() {
                                             <UserIcon className="w-[32px] h-[32px] fill-slate-200 bg-slate-100 rounded-full" />
                                         }
                                     </div>
+                                    }
+                                    </>
                                 );
                             })
                         }

@@ -103,6 +103,12 @@ const formatToSave = (inputs, imageUid) => {
             "teamUid": inputs?.maintainedBy?.uid,
             "memberUid": contributor.uid
          };
+         if(contributor.cuid){
+            contriObj['uid'] = contributor.cuid;
+        }
+        if(contributor.isDeleted){
+            contriObj['isDeleted'] = contributor.isDeleted;
+        }
          tempContributors.push(contriObj);
     });
 
@@ -118,7 +124,13 @@ const formatToSave = (inputs, imageUid) => {
                  "teamUid": collabContributor?.team?.uid,
                  // "memberUid": collabContributor.uid
               };
-            contriObj['memberUid'] = mem.uid
+            contriObj['memberUid'] = mem.uid;
+            if(mem.cuid){
+                contriObj['uid'] = mem.cuid;
+            }
+            if(mem.isDeleted){
+                contriObj['isDeleted'] = mem.isDeleted;
+            }
             tempContributors.push(contriObj);
          });
     });
