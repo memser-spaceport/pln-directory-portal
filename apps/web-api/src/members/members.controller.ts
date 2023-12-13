@@ -28,6 +28,7 @@ import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { AuthGuard } from '../guards/auth.guard';
 import { UserAccessTokenValidateGuard } from '../guards/user-access-token-validate.guard';
+import { LogService } from '../shared/log.service';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
@@ -35,7 +36,10 @@ type RouteShape = typeof server.routeShapes;
 @Controller()
 @NoCache()
 export class MemberController {
-  constructor(private readonly membersService: MembersService) {}
+  constructor(
+    private readonly membersService: MembersService,
+    private logger: LogService
+  ) {}
 
   @Api(server.route.getMembers)
   @ApiQueryFromZod(MemberQueryParams)
@@ -73,6 +77,7 @@ export class MemberController {
   @Api(server.route.modifyMember)
   @UseGuards(UserTokenValidation)
   async updateOne(@Param('id') id, @Body() body, @Req() req) {
+    this.logger.info(`Member update request - Initated by -> ${req.userEmail}`)
     const participantsRequest = body;
     return await this.membersService.editMemberParticipantsRequest(
       participantsRequest,
