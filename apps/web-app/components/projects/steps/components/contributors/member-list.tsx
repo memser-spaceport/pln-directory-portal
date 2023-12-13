@@ -85,7 +85,17 @@ export default function MemberList({
     if (!event.target.checked) {
       setSelectedMembers([]);
     } else {
-      setSelectedMembers(list);
+      const tempArray = [...list];
+      selectedMembers?.map((mem)=>{
+        for (let index = 0; index < tempArray.length; index++) {
+          const element = tempArray[index];
+          if(mem.uid === element.uid){
+            tempArray[index] = mem;
+            break;
+          }
+        }
+      })
+      setSelectedMembers(tempArray);
     }
   };
 

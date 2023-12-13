@@ -106,6 +106,9 @@ const formatToSave = (inputs, imageUid) => {
          if(contributor.cuid){
             contriObj['uid'] = contributor.cuid;
         }
+        if(contributor.isDeleted){
+            contriObj['isDeleted'] = contributor.isDeleted;
+        }
          tempContributors.push(contriObj);
     });
 
