@@ -20,11 +20,12 @@ export default function ProjectActionButtons() {
 
     const getAddProjectTemplate = () => {
         return (
-            <div className="px-[24px] py-[8px] rounded-[100px] border cursor-pointer border-[#156FF7] bg-[#156FF7] text-white"
-                onClick={onSaveProject}
-            >
-                Add Project
-            </div>
+          <div
+            className="cursor-pointer rounded-[100px] border border-[#156FF7] bg-[#156FF7] px-[24px] py-[8px] text-white"
+            onClick={onSaveProject}
+          >
+            {addProjectsState?.mode === 'ADD' ? 'Add Project' : 'Save Changes'}
+          </div>
         );
     }
 
@@ -87,12 +88,27 @@ export default function ProjectActionButtons() {
         let image = null;
         try {
             image = await ProjectsService.uploadProjectLogo(addProjectsState.inputs);
-            const data = await ProjectsService.addProject(addProjectsState.inputs, image);
-            console.log(data);
-            
-            if (data.status === 201) {
-                toast.info("Project added successfully.")
-                router.push('/projects');
+            if(addProjectsState.mode === 'ADD'){
+                const data = await ProjectsService.addProject(addProjectsState.inputs, image);
+                console.log(data);
+                
+                if (data.status === 201) {
+                    toast.info("Project added successfully.")
+                    router.push('/projects');
+                }
+            }else{
+                const data = await ProjectsService.updateProjectDetails(addProjectsState.inputs, image,addProjectsState.inputs.id);
+
+                    if(data.status === 200){
+                        // analytics.captureEvent(
+                        //     APP_ANALYTICS_EVENTS.PROJECT_EDIT_SAVE_SUCESS,
+                        //     {
+                        //         'projectId': data.data.uid,
+                        //     }
+                        //   );
+                        toast.info("Project updated successfully.");
+                        router.push('/projects/'+data.data.uid);
+                    }
             }
         } catch (err) {
             console.log(err);

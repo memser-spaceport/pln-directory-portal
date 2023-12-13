@@ -4,7 +4,6 @@ import Image from "next/image";
 export default function MemberRow({ data, onselect, onDeselect, defaultValue }) {
 
     const onSelect = (event) => {
-        console.log('Checked', event.target.checked);
         if (event.target.checked) {
             onselect(data);
         }else{

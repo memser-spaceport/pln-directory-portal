@@ -42,9 +42,14 @@ export function AddProjectContextProvider(props) {
                 logoObject:'',
                 name: projectDetail.name,
                 tagline: projectDetail.tagline,
+                // maintainedBy: {
+                //     value: projectDetail.maintainingTeam?.uid,
+                //     label: projectDetail.maintainingTeam?.name,
+                //     logo: projectDetail.maintainingTeam?.logo?.url
+                // },
                 maintainedBy: {
-                    value: projectDetail.maintainingTeam?.uid,
-                    label: projectDetail.maintainingTeam?.name,
+                    uid: projectDetail.maintainingTeam?.uid,
+                    name: projectDetail.maintainingTeam?.name,
                     logo: projectDetail.maintainingTeam?.logo?.url
                 },
                 desc: projectDetail.description,
@@ -58,6 +63,50 @@ export function AddProjectContextProvider(props) {
                 contributingTeams: projectDetail.contributingTeams,
                 logo:projectDetail.logo
             }
+
+            const tempCollab = [];
+            if(projectDetail.contributors && projectDetail.contributors.length > 0){
+                const tempMaintainer = [];
+                projectDetail.contributors.map(contri=>{
+                    if(contri?.type === "MAINTENER"){
+                        const copyTeam = {
+                          uid: contri.member?.uid,
+                          name: contri.member?.name,
+                          logo: contri.member?.image?.url,
+                          cuid: contri.uid,
+                        };
+                        tempMaintainer.push(copyTeam);  
+                    }else if(contri?.type === "COLLABORATOR"){
+                        tempCollab.push(contri);  
+                    }
+                });
+                if(tempMaintainer.length){
+                    defaultState.inputs.maintainedByContributors = [...tempMaintainer];
+                }
+            }
+
+            projectDetail.contributingTeams?.map((team)=>{
+                const temp = {
+                    team:{
+                        uid: team?.value,
+                        name:team?.label,
+                        logo:team?.logo
+                    },
+                    members:[]
+                };
+                tempCollab?.map(collab=>{
+                    if(collab.teamUid === team?.value){
+                        const copyTeam = {
+                            uid : collab.member?.uid,
+                            name: collab.member?.name,
+                            logo: collab.member?.image?.url,
+                            cuid:collab.uid
+                        };
+                        temp.members.push(copyTeam);
+                    }
+                });
+                defaultState.inputs.collabTeamsList.push(temp);
+            })
         }
     }
 
