@@ -14,18 +14,20 @@ export default function Contributors({ project, contributingMembers }) {
       ? project.contributors.slice(0, 17)
       : project.contributors;
 
-const individualContributors = contributingMembers
-        ? contributors?.length < 17
-          ? contributingMembers.slice(0, 17 - contributors?.length)
-          : []
-        : [];
+  const individualContributors = contributingMembers
+    ? contributors?.length < 17
+      ? contributingMembers.slice(0, 17 - contributors?.length)
+      : []
+    : [];
 
+  console.log(individualContributors);
   const getMemberDetailTemplate = (
     uid,
     name,
     url,
     role = '',
-    teamName = ''
+    teamName = '',
+    isTeamLead = false
   ) => {
     return (
       <div
@@ -59,6 +61,7 @@ const individualContributors = contributingMembers
             url={url}
             role={role}
             teamName={teamName}
+            isTeamLead={isTeamLead}
           />
         )}
       </div>
@@ -87,6 +90,10 @@ const individualContributors = contributingMembers
               const mainTeam = contri.member?.teamMemberRoles?.filter(teamRoles=>{
                 return teamRoles?.mainTeam === true;
               });
+
+              const teamLeadArr = contri.member?.teamMemberRoles?.filter(teamRoles=>{
+                return teamRoles?.teamLead === true;
+              });
               
               return getMemberDetailTemplate(
                 contri?.member?.uid,
@@ -94,6 +101,7 @@ const individualContributors = contributingMembers
                 contri.member?.image?.url,
                 mainTeam?.length ? mainTeam[0]?.role : '',
                 mainTeam?.length ? mainTeam[0]?.team?.name : '',
+                teamLeadArr?.length > 0
               );
             })}
           {contributingMembers &&
@@ -101,12 +109,17 @@ const individualContributors = contributingMembers
               const mainTeam = contri.teamMemberRoles?.filter(teamRoles=>{
                 return teamRoles?.mainTeam === true;
               });
+
+              const teamLeadArr = contri.teamMemberRoles?.filter(teamRoles=>{
+                return teamRoles?.teamLead === true;
+              });
               return getMemberDetailTemplate(
                 contri.uid,
                 contri.name,
                 contri.image.url,
                 mainTeam?.length ? mainTeam[0]?.role : '',
                 mainTeam?.length ? mainTeam[0]?.team?.name : '',
+                teamLeadArr?.length > 0
               );
             })}
           {project?.contributors?.length > 17 && (

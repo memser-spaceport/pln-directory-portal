@@ -22,7 +22,7 @@ export default function MemberList({
         const tempList = [];
         for (let index = 0; index < list.length; index++) {
           const element = list[index];
-          if (element.name.includes(searchTerm)) {
+          if (element.name.toLowerCase().includes(searchTerm.toLowerCase())) {
             tempList.push(element);
           }
         }
@@ -85,7 +85,7 @@ export default function MemberList({
     if (!event.target.checked) {
       setSelectedMembers([]);
     } else {
-      const tempArray = [...list];
+      const tempArray = [...filteredList];
       selectedMembers?.map((mem)=>{
         for (let index = 0; index < tempArray.length; index++) {
           const element = tempArray[index];
@@ -107,7 +107,7 @@ export default function MemberList({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 h-[95%] overflow-y-scroll">
       <div className="pr-5 pb-3">
         <InputField
           label="Search"
