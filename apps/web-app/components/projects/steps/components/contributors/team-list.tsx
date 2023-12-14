@@ -15,7 +15,7 @@ export default function TeamList({ onSelect, list }) {
           const tempList = [];
           for (let index = 0; index < list.length; index++) {
             const element = list[index];
-            if(element.name.includes(searchTerm)){
+            if(element.name.toLowerCase().includes(searchTerm.toLowerCase())){
               tempList.push(element);
             }
           }

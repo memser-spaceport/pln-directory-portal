@@ -1,11 +1,13 @@
 import { AddProjectsContext } from "apps/web-app/context/projects/add.context";
 import ProjectsService from "apps/web-app/services/projects";
 import { useRouter } from "next/router";
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { toast } from "react-toastify";
+import { LoadingIndicator } from "../../shared/loading-indicator/loading-indicator";
 
 export default function ProjectActionButtons() {
     const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
+    const [isProcessing, setIsProcessing] = useState<boolean>(false);
     const router = useRouter();
 
     const getNextTemplate = () => {
@@ -84,14 +86,12 @@ export default function ProjectActionButtons() {
     }
 
     const onSaveProject = async () => {
-        console.log(addProjectsState.inputs);
         let image = null;
         try {
+            setIsProcessing(true);
             image = await ProjectsService.uploadProjectLogo(addProjectsState.inputs);
             if(addProjectsState.mode === 'ADD'){
                 const data = await ProjectsService.addProject(addProjectsState.inputs, image);
-                console.log(data);
-                
                 if (data.status === 201) {
                     toast.info("Project added successfully.")
                     router.push('/projects');
@@ -113,6 +113,8 @@ export default function ProjectActionButtons() {
         } catch (err) {
             console.log(err);
             // toast.error('Something went wrong.Please try again.')
+        } finally{
+            setIsProcessing(false);
         }
     }
 
@@ -270,8 +272,17 @@ export default function ProjectActionButtons() {
     }
 
     return (
-        <div className="flex flex-row-reverse gap-2 mb-12">
-            {getActionButtons()}
+      <>
+        {isProcessing && (
+          <div
+            className={`fixed inset-0 z-[3000] flex h-screen w-screen items-center justify-center bg-gray-500 bg-opacity-75 outline-none transition-opacity`}
+          >
+            <LoadingIndicator />
+          </div>
+        )}
+        <div className="mb-12 flex flex-row-reverse gap-2">
+          {getActionButtons()}
         </div>
+      </>
     );
 }
