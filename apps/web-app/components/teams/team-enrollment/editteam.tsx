@@ -37,6 +37,7 @@ import { toast } from 'react-toastify';
 import { ValidationErrorMessages } from '../../shared/account-setttings/validation-error-message';
 import { DiscardChangesPopup } from 'libs/ui/src/lib/modals/confirmation';
 import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
+import { cookiePrefix } from "../../../utils/common.utils";
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface EditTeamModalProps {
@@ -260,7 +261,7 @@ export function EditTeamModal({
           officeHours: team.officeHours,
         };
         // set requestor email
-        const userInfoFromCookie = Cookies.get('userInfo');
+        const userInfoFromCookie = Cookies.get(`${cookiePrefix()}userInfo`);
         if (userInfoFromCookie) {
           const parsedUserInfo = JSON.parse(userInfoFromCookie);
           formValues['requestorEmail'] = parsedUserInfo.email;

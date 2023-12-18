@@ -13,6 +13,7 @@ import { Breadcrumb } from "@protocol-labs-network/ui";
 import AddForm from "apps/web-app/components/projects/add-form";
 import { AddProjectContextProvider } from "apps/web-app/context/projects/add.context";
 import ActionButtons from "apps/web-app/components/projects/action-buttons";
+import { cookiePrefix } from '../../../utils/common.utils'; 
 
 export default function EditProject({ selectedProject }) {
     const { breadcrumbItems } = useProfileBreadcrumb({
@@ -52,14 +53,14 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     } = ctx;
     let cookies = req?.cookies;
 
-    if (!cookies?.authToken) {
+    if (!cookies[`${cookiePrefix()}authToken`]) {
         await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
         if (ctx.res.getHeader('Set-Cookie'))
             cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
     }
-    destroyCookie(null, 'state');
-    const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
-    const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
+    destroyCookie(null, `${cookiePrefix()}state`);
+    const userInfo = cookies[`${cookiePrefix()}userInfo`] ? JSON.parse(cookies[`${cookiePrefix()}userInfo`]) : {};
+    const isUserLoggedIn = cookies[`${cookiePrefix()}authToken`] && cookies[`${cookiePrefix()}userInfo`] ? true : false;
 
     if (!isUserLoggedIn) {
         return {

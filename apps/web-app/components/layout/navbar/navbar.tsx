@@ -17,6 +17,7 @@ import { PAGE_ROUTES, FATHOM_EVENTS, APP_ANALYTICS_EVENTS, LOGOUT_MSG } from '..
 import { createLogoutChannel } from '../../../utils/services/auth';
 import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
 // import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
+import { cookiePrefix } from "../../../utils/common.utils";
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
 type INavbarProbs = {
@@ -45,8 +46,8 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
         analytics.captureEvent(APP_ANALYTICS_EVENTS.NAVBAR_ACCOUNTMENU_ITEM_CLICKED, {
           'itemName': 'settings'
         })
-        if (!Cookies.get('refreshToken')) {
-          Cookies.set('page_params', 'user_logged_out', { expires: 60, path: '/' });
+        if (!Cookies.get(`${cookiePrefix()}refreshToken`)) {
+          Cookies.set(`${cookiePrefix()}page_params`, 'user_logged_out', { expires: 60, path: '/' });
           window.location.href = PAGE_ROUTES.TEAMS;
         }
       }
@@ -60,10 +61,10 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
         analytics.captureEvent(APP_ANALYTICS_EVENTS.NAVBAR_ACCOUNTMENU_ITEM_CLICKED, {
           'itemName': 'logout'
         })
-        Cookies.remove('authToken', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
-        Cookies.remove('refreshToken', { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
-        Cookies.remove('userInfo', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
-        Cookies.set('page_params', 'logout', { expires: 60, path: '/' });
+        Cookies.remove(`${cookiePrefix()}authToken`, { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+        Cookies.remove(`${cookiePrefix()}refreshToken`, { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
+        Cookies.remove(`${cookiePrefix()}userInfo`, { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+        Cookies.set(`${cookiePrefix()}page_params`, 'logout', { expires: 60, path: '/' });
         toast.info(LOGOUT_MSG, {
           hideProgressBar: true
         });

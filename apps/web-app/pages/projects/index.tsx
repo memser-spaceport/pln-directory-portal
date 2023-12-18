@@ -14,7 +14,7 @@ import { destroyCookie } from "nookies";
 import { ReactElement } from "react";
 import { getAllProjects } from '../../../../libs/projects/data-access/src/index';
 import ProjectsDataService from "apps/web-app/services/projects/projects.data.service";
-
+import { cookiePrefix } from '../../utils/common.utils'; 
 export default function Projects(props) {
     const { selectedViewType } = useViewType();
     const isGrid = selectedViewType === 'grid';
@@ -87,14 +87,14 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
         }
     }
 
-    if (!cookies?.authToken) {
+    if (!cookies[`${cookiePrefix()}authToken`]) {
         await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
         if (ctx.res.getHeader('Set-Cookie'))
             cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
     }
-    destroyCookie(null, 'state');
-    const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
-    const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
+    destroyCookie(null, `${cookiePrefix()}state`);
+    const userInfo = cookies[`${cookiePrefix()}userInfo`] ? JSON.parse(cookies[`${cookiePrefix()}userInfo`]) : {};
+    const isUserLoggedIn = cookies[`${cookiePrefix()}authToken`] && cookies[`${cookiePrefix()}userInfo`] ? true : false;
 
     // const { getAll } = ProjectsService;
     // const projects = await getAll(queryParams);

@@ -55,6 +55,7 @@ import Privacy from '../../preference/privacy';
 import { getPreferences } from 'apps/web-app/services/member.service';
 import { SettingsContext } from "apps/web-app/pages/settings";
 import ProjectContribution from '../../projects/contribution/project-contribution';
+import { cookiePrefix } from "../../../utils/common.utils";
 interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -301,10 +302,10 @@ export function EditMemberModal({
 
   const logoutAndRedirect = (path) => {
      // If no token.. then logout user
-    Cookies.remove('authToken', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
-    Cookies.remove('refreshToken', { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
-    Cookies.remove('userInfo', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
-    Cookies.set('page_params', 'user_logged_out', {
+    Cookies.remove(`${cookiePrefix()}authToken`, { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+    Cookies.remove(`${cookiePrefix()}refreshToken`, { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
+    Cookies.remove(`${cookiePrefix()}userInfo`, { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+    Cookies.set(`${cookiePrefix()}page_params`, 'user_logged_out', {
       expires: 60,
       path: '/',
     });
@@ -318,7 +319,7 @@ export function EditMemberModal({
         APP_ANALYTICS_EVENTS.SETTINGS_USER_CHANGE_EMAIL_CLICKED,
         {}
       );
-      const authToken = Cookies.get('authToken');
+      const authToken = Cookies.get(`${cookiePrefix()}authToken`);
       if (!authToken) {
         logoutAndRedirect(PAGE_ROUTES.MEMBERS)
       }
@@ -417,7 +418,7 @@ export function EditMemberModal({
           preferences: member?.preferences ?? JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))
         };
         // set requestor email
-        const userInfoFromCookie = Cookies.get('userInfo');
+        const userInfoFromCookie = Cookies.get(`${cookiePrefix()}userInfo`);
         if (userInfoFromCookie) {
           const parsedUserInfo = JSON.parse(userInfoFromCookie);
           formValues['requestorEmail'] = parsedUserInfo.email;
@@ -664,9 +665,9 @@ export function EditMemberModal({
             // captchaToken,
           };
           if (!isProfileSettings) {
-            const userInfoFromCookie = Cookies.get('userInfo');
+            const userInfoFromCookie = Cookies.get(`${cookiePrefix()}userInfo`);
             if (!userInfoFromCookie) {
-              Cookies.set('page_params', 'user_logged_out', {
+              Cookies.set(`${cookiePrefix()}page_params`, 'user_logged_out', {
                 expires: 60,
                 path: '/',
               });
@@ -857,7 +858,7 @@ export function EditMemberModal({
   }, []);
 
   const getMemberPreferences = async () => {
-    const memberPreferences = await getPreferences(id,JSON.parse(Cookies.get('authToken')));
+    const memberPreferences = await getPreferences(id,JSON.parse(Cookies.get(`${cookiePrefix()}authToken`)));
     setFormValues({ ...formValues, preferences: (!memberPreferences?.isnull  ? memberPreferences : { ...JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS)), ...memberPreferences })});
   }
 

@@ -3,6 +3,7 @@ import { setCookie } from 'nookies';
 import * as Cookie from 'cookie'
 import * as jwt from 'jsonwebtoken';
 import { BroadcastChannel } from 'broadcast-channel';
+import { cookiePrefix } from '../common.utils'; 
 
 export const createLogoutChannel = () => {
   try {
@@ -51,7 +52,7 @@ export const generateOAuth2State = () => {
 export const authenticate = async (currentURL) => {
   try {
     const state = generateOAuth2State();
-    setCookie(null, 'state', state, {
+    setCookie(null, `${cookiePrefix()}state`, state, {
       path: '/',
       maxAge: 60 * 1000,
     });
@@ -97,17 +98,17 @@ export const renewAndStoreNewAccessToken = async (refrshToken, ctx) => {
       if (accessToken && refreshToken && userInfo) {
         const access_token = decodeToken(accessToken);
         const refresh_token = decodeToken(refreshToken);
-        setCookie(ctx, 'authToken', JSON.stringify(accessToken), {
+        setCookie(ctx, `${cookiePrefix()}authToken`, JSON.stringify(accessToken), {
           maxAge: calculateExpiry(access_token.exp),
           path: '/',
           domain: process.env.COOKIE_DOMAIN || ''
         });
-        setCookie(ctx, 'refreshToken', JSON.stringify(refreshToken), {
+        setCookie(ctx, `${cookiePrefix()}refreshToken`, JSON.stringify(refreshToken), {
           maxAge: calculateExpiry(refresh_token.exp),
           path: '/',
           domain: process.env.COOKIE_DOMAIN || ''
         });
-        setCookie(ctx, 'userInfo', JSON.stringify(userInfo), {
+        setCookie(ctx, `${cookiePrefix()}userInfo`, JSON.stringify(userInfo), {
           maxAge: calculateExpiry(access_token.exp),
           path: '/',
           domain: process.env.COOKIE_DOMAIN || ''

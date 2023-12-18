@@ -22,6 +22,7 @@ import { VerifyEmailModal } from '../components/layout/navbar/login-menu/verify-
 import { ReactComponent as SuccessIcon } from '../public/assets/images/icons/success.svg';
 import { logoutAllTabs } from '../utils/services/auth';
 import { decodeToken } from '../utils/services/auth';
+import { cookiePrefix } from "../utils/common.utils";
 // Check that PostHog is client-side (used to handle Next.js SSR)
 if (typeof window !== 'undefined') {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
@@ -55,8 +56,8 @@ export default function CustomApp({
     // Track page views
     const handleRouteChange = () => posthog?.capture('$pageview');
     router.events.on('routeChangeComplete', handleRouteChange);
-    const isVerified = Cookies.get('verified');
-    const params = Cookies.get('page_params');
+    const isVerified = Cookies.get(`${cookiePrefix()}verified`);
+    const params = Cookies.get(`${cookiePrefix()}page_params`);
     if(isVerified === 'true') {
       toast.success(LOGIN_MSG, {
         icon: <SuccessIcon />
@@ -94,9 +95,9 @@ export default function CustomApp({
       default:
         break;
     }
-    Cookies.remove('page_params');
-    Cookies.remove('verified');
-    Cookies.remove('state');
+    Cookies.remove(`${cookiePrefix()}page_params`);
+    Cookies.remove(`${cookiePrefix()}verified`);
+    Cookies.remove(`${cookiePrefix()}state`);
     return () => {
       router.events.off('routeChangeComplete', handleRouteChange)
     }
@@ -107,7 +108,7 @@ export default function CustomApp({
     const interval = !isNaN(intervalEnv) ? intervalEnv * 60 * 1000 : 60 * 60 * 1000;
     console.log(`Token interval from env: ${interval}`); 
     const intervalId = setInterval(() => {
-      const refreshToken = Cookies.get('refreshToken');
+      const refreshToken = Cookies.get(`${cookiePrefix()}refreshToken`);
       // Check cookie on every one hour and refresh the page if it doesn't exist.
       console.log(`Token expiry checked at: ${new Date()}`);
       console.log(`${refreshToken ? 'Token will be expired at:' + new Date(decodeToken(JSON.parse(refreshToken))?.exp * 1000) : "Token expired!"}`)

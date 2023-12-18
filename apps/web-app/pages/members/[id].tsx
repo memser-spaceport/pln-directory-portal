@@ -36,6 +36,7 @@ import { MemberProfileLoginStrip } from '../../components/members/member-profile
 import MemberExperience from 'apps/web-app/components/members/member-profile/member-experience/member-experience';
 import { useRouter } from 'next/router';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
+import { cookiePrefix } from "../../utils/common.utils";
 
 interface MemberProps {
   member: IMember;
@@ -84,7 +85,7 @@ export default function Member({
 }
 
   useEffect(() => {
-    const params = Cookies.get('page_params');
+    const params = Cookies.get(`${cookiePrefix()}page_params`);
     if (params === 'schedule_meeting') {
       toast.info(LOGGED_IN_MSG + ', ' + SCHEDULE_MEETING_MSG, {
         hideProgressBar: true,
@@ -94,7 +95,7 @@ export default function Member({
         hideProgressBar: true,
       });
     }
-    Cookies.remove('page_params');
+    Cookies.remove(`${cookiePrefix()}page_params`);
   }, []);
 
   return (

@@ -6,7 +6,7 @@ import { decodeToken, calculateExpiry } from '../utils/services/auth';
 import { toast } from 'react-toastify';
 import { createLogoutChannel } from '../utils/services/auth';
 import { PAGE_ROUTES , FORBIDDEN_ERR_MSG, BAD_REQUEST_ERR_MSG, NETWORK_ERR_MSG, SOMETHING_WENT_WRONG, RETRY_LOGIN_MSG } from '../constants';
-
+import { cookiePrefix } from './common.utils'; 
 // Ignore auth to urls
 const authIgnoreURLS = ["/v1/auth/token", "/v1/participants-request/unique-identifier"];
 
@@ -37,8 +37,9 @@ api.interceptors.request.use(async (config) => {
     if (authIgnoreURLS.includes(config.url) || config.method === "get"){
       return config;
     }
-    const { authToken } = nookies.get();
-    let { refreshToken } = nookies.get();
+    const cookies = nookies.get();
+    const authToken  = cookies[`${cookiePrefix()}authToken`];
+    let refreshToken = cookies[`${cookiePrefix()}refreshToken`];;
     if (authToken && authToken.length > 0) {
       config.headers['Authorization'] = `Bearer ${authToken}`.replace(
         /"/g,
@@ -59,17 +60,17 @@ api.interceptors.request.use(async (config) => {
             const access_token = decodeToken(accessToken);
             const refresh_token = decodeToken(refreshToken);
 
-            setCookie(null, 'authToken', JSON.stringify(accessToken), {
+            setCookie(null, `${cookiePrefix()}authToken`, JSON.stringify(accessToken), {
               maxAge: calculateExpiry(access_token.exp),
               path: '/',
               domain: process.env.COOKIE_DOMAIN || ''
             });
-            setCookie(null, 'refreshToken', JSON.stringify(refreshToken), {
+            setCookie(null, `${cookiePrefix()}refreshToken`, JSON.stringify(refreshToken), {
               maxAge: calculateExpiry(refresh_token.exp),
               path: '/',
               domain: process.env.COOKIE_DOMAIN || ''
             });
-            setCookie(null, 'userInfo', JSON.stringify(userInfo), {
+            setCookie(null, `${cookiePrefix()}userInfo`, JSON.stringify(userInfo), {
               maxAge: calculateExpiry(access_token.exp),
               path: '/',
               domain: process.env.COOKIE_DOMAIN || ''
@@ -103,9 +104,9 @@ api.interceptors.response.use(
     let msg = SOMETHING_WENT_WRONG;
     if (response) {
       if (response.status === 401) {
-        Cookies.remove('authToken', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
-        Cookies.remove('refreshToken', { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
-        Cookies.remove('userInfo', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+        Cookies.remove(`${cookiePrefix()}authToken`, { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+        Cookies.remove(`${cookiePrefix()}refreshToken`, { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
+        Cookies.remove(`${cookiePrefix()}userInfo`, { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
         toast.info(RETRY_LOGIN_MSG, {
           hideProgressBar: true
         });

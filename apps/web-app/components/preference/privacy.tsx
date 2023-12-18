@@ -9,8 +9,7 @@ import { LoadingIndicator } from "../shared/loading-indicator/loading-indicator"
 import useAppAnalytics from "apps/web-app/hooks/shared/use-app-analytics";
 import { DiscardChangesPopup } from "libs/ui/src/lib/modals/confirmation";
 import { ReactComponent as InformationCircleIcon } from '../../public/assets/images/icons/info_icon.svg';
-
-
+import { cookiePrefix } from "../../utils/common.utils";
 interface IPrivacyProps {
     memberPreferences?: any;
     from: string;
@@ -133,7 +132,7 @@ export default function Privacy({memberPreferences,from}:IPrivacyProps) {
         if (checkIfModified(memberPreference,state.preferences)) {
             setIsProcessing(true);
             try{
-                const response = await updatePreference(JSON.parse(Cookies.get('userInfo')).uid, memberPreference, JSON.parse(Cookies.get('authToken')));
+                const response = await updatePreference(JSON.parse(Cookies.get(`${cookiePrefix()}userInfo`)).uid, memberPreference, JSON.parse(Cookies.get(`${cookiePrefix()}authToken`)));
                 if(response){
                     toast(MSG_CONSTANTS.MEMBER_UPDATE_MESSAGE);
                     dispatch({ type: 'SET_PRIVACY_MODIFIED', payload: false });

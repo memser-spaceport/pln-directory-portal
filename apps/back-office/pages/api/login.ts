@@ -1,6 +1,7 @@
 import api from '../../utils/api';
 import { setCookie } from 'nookies';
 import jwt_decode from 'jwt-decode';
+import { cookiePrefix } from '../../utils/common.utils'; 
 
 interface DecodedJwtPayload {
   exp: number;
@@ -18,7 +19,7 @@ export default async function login(req, res) {
           response.data.accessToken
         );
         const expiry = new Date(decoded?.exp * 1000);
-        setCookie({ res }, 'plnadmin', response?.data?.accessToken, {
+        setCookie({ res }, `${cookiePrefix()}plnadmin`, response?.data?.accessToken, {
           expires: expiry,
           path: '/',
         });

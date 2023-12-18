@@ -5,6 +5,7 @@ import { ReactComponent as LockIcon } from '../../../../public/assets/images/ico
 import { trackGoal } from 'fathom-client';
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
+import { cookiePrefix } from "../../../../utils/common.utils";
 
 export function MemberProfileLoginStrip({
   member,
@@ -17,8 +18,8 @@ export function MemberProfileLoginStrip({
   const loginAsUserCode = FATHOM_EVENTS.directory.loginAsUser;
 
   const handleOnClick = () => {
-    if (Cookies.get('userInfo')) {
-      Cookies.set('page_params', 'user_logged_in', { expires: 60, path: '/' });
+    if (Cookies.get(`${cookiePrefix()}userInfo`)) {
+      Cookies.set(`${cookiePrefix()}page_params`, 'user_logged_in', { expires: 60, path: '/' });
       router.reload();
     } else {
       authenticate(router.asPath);

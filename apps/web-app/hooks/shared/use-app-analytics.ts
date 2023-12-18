@@ -1,12 +1,14 @@
 import { usePostHog } from 'posthog-js/react'
 import Cookies from 'js-cookie'
+import { cookiePrefix } from "../../utils/common.utils";
+
 function useAppAnalytics() {
     const postHogProps = usePostHog();
     const getUserInfo = () => {
         try {
             let userInfo;
             if (typeof window !== 'undefined') {
-                const rawUserInfo = Cookies.get('userInfo');
+                const rawUserInfo = Cookies.get(`${cookiePrefix()}userInfo`);
                 if(rawUserInfo) {
                     userInfo = JSON.parse(rawUserInfo);
                 }
