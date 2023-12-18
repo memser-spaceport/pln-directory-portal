@@ -6,6 +6,7 @@ import { FATHOM_EVENTS } from '../../../../constants';
 // import { LoginModal } from './login-modal';
 // import { ForgotEmailModal } from './forgot-email-modal';
 import { authenticate } from '../../../../utils/services/auth';
+import { cookiePrefix } from "../../../../utils/common.utils";
 import { LoadingIndicator } from 'apps/web-app/components/shared/loading-indicator/loading-indicator';
 export function Login() {
   const [loaderFlag, setLoaderFlag] = useState(false);
@@ -14,8 +15,8 @@ export function Login() {
   // const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   // const [isForgotEmailModalOpen, setIsForgotEmailModalOpen] = useState(false);
   const handleOpenModal = () => {
-    if (Cookies.get("userInfo")) {
-      Cookies.set('page_params', 'user_logged_in', { expires: 60, path: '/' });
+    if (Cookies.get(`${cookiePrefix()}userInfo`)) {
+      Cookies.set(`${cookiePrefix()}page_params`, 'user_logged_in', { expires: 60, path: '/' });
       router.push("/members");
     } else {
       setLoaderFlag(true);

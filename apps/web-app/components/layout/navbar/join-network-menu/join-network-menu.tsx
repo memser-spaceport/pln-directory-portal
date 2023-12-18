@@ -9,6 +9,7 @@ import { FATHOM_EVENTS, PAGE_ROUTES } from '../../../../constants';
 import { AddMemberModal } from '../../../members/member-enrollment/addmember';
 import { AddTeamModal } from '../../../teams/team-enrollment/addteam';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
+import { cookiePrefix } from "../../../../utils/common.utils";
 
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
@@ -61,8 +62,8 @@ export function JoinNetworkMenu() {
   }
 
   const onJoinMenuItemClicked = (label) => {
-    if (Cookies.get('userInfo')) {
-      Cookies.set('page_params', 'user_logged_in', { expires: 60, path: '/' });
+    if (Cookies.get(`${cookiePrefix()}userInfo`)) {
+      Cookies.set(`${cookiePrefix()}page_params`, 'user_logged_in', { expires: 60, path: '/' });
       window.location.href = PAGE_ROUTES.TEAMS;
     } else {
       handleOpenModal(label)

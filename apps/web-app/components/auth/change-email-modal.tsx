@@ -10,6 +10,7 @@ import ErrorBox from "./error-box";
 import { APP_ANALYTICS_EVENTS, EMAIL_OTP_CONSTANTS } from "../../constants";
 import useAppAnalytics from "../../hooks/shared/use-app-analytics";
 import { sendOtpToChangeEmail, verifyAndProcessEmailChange } from "../../services/member.service";
+import { cookiePrefix } from "../../utils/common.utils";
 function ChangeEmailModal(props) {
     // States
     const [verificationStep, setVerificationStep] = useState(1)
@@ -28,15 +29,15 @@ function ChangeEmailModal(props) {
         if (refreshToken && accessToken) {
             const accessTokenExpiry = decodeToken(accessToken);
             const refreshTokenExpiry = decodeToken(refreshToken);
-            Cookies.set('authToken', JSON.stringify(accessToken), { 
+            Cookies.set(`${cookiePrefix()}authToken`, JSON.stringify(accessToken), { 
                 expires: calculateExpiry(new Date(accessTokenExpiry.exp)),
                 domain: process.env.COOKIE_DOMAIN || ''
             });
-            Cookies.set('refreshToken', JSON.stringify(refreshToken), {
+            Cookies.set(`${cookiePrefix()}refreshToken`, JSON.stringify(refreshToken), {
                 expires: calculateExpiry(new Date(refreshTokenExpiry.exp)),
                 domain: process.env.COOKIE_DOMAIN || ''
             });
-            Cookies.set('userInfo', JSON.stringify(userInfo), { 
+            Cookies.set(`${cookiePrefix()}userInfo`, JSON.stringify(userInfo), { 
                 expires: calculateExpiry(new Date(accessTokenExpiry.exp)),
                 domain: process.env.COOKIE_DOMAIN || ''
             });
@@ -47,8 +48,8 @@ function ChangeEmailModal(props) {
     const onOtpVerify = async (otp) => {
         try {
             setErrorMessage('')
-            const otpToken = Cookies.get('uniqueEmailVerifyToken');
-            const accessToken = Cookies.get('authToken');
+            const otpToken = Cookies.get(`${cookiePrefix()}uniqueEmailVerifyToken`);
+            const accessToken = Cookies.get(`${cookiePrefix()}authToken`);
 
             if (!accessToken) {
                 goToError('Invalid attempt. Please login and try again');
@@ -74,7 +75,7 @@ function ChangeEmailModal(props) {
                 clearAllOtpSessionVaribles()
                 analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_USER_CHANGE_EMAIL_SUCCESS, {})
                 onClose(null);
-                Cookies.set('page_params', 'email_changed', { expires: 60, path: '/' });
+                Cookies.set(`${cookiePrefix()}page_params`, 'email_changed', { expires: 60, path: '/' });
                 window.location.reload()
             } else if (!data?.valid) {
                 setResendInSeconds(30);
@@ -90,8 +91,8 @@ function ChangeEmailModal(props) {
 
     const onResendOtp = async () => {
         setErrorMessage('')
-        const otpToken = Cookies.get('uniqueEmailVerifyToken');
-        const accessToken = Cookies.get('authToken');
+        const otpToken = Cookies.get(`${cookiePrefix()}uniqueEmailVerifyToken`);
+        const accessToken = Cookies.get(`${cookiePrefix()}authToken`);
         if (!accessToken) {
             goToError('Invalid attempt. Please login and try again');
             return;
@@ -112,7 +113,7 @@ function ChangeEmailModal(props) {
 
             // Reset resend timer and set unique token for verification
             const uniqueEmailVerifyToken = d.token;
-            Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime()  + 20 * 60 * 1000) })
+            Cookies.set(`${cookiePrefix()}uniqueEmailVerifyToken`, uniqueEmailVerifyToken, { expires: new Date(new Date().getTime()  + 20 * 60 * 1000) })
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
            // setResendTimer()
            setResendInSeconds(30)
@@ -127,7 +128,7 @@ function ChangeEmailModal(props) {
 
     const onEmailSubmitted = async (email) => {
         try {
-            const accessToken = Cookies.get('authToken');
+            const accessToken = Cookies.get(`${cookiePrefix()}authToken`);
             const otpPayload = { newEmail: email }
             const header = {headers: {Authorization: `Bearer ${JSON.parse(accessToken)}`}}
             setErrorMessage('')
@@ -136,7 +137,7 @@ function ChangeEmailModal(props) {
             const d = await sendOtpToChangeEmail(otpPayload, memberUid, header);
             setLoaderStatus(false)
             const uniqueEmailVerifyToken = d.token;
-            Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 20 * 60 * 1000) })
+            Cookies.set(`${cookiePrefix()}uniqueEmailVerifyToken`, uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 20 * 60 * 1000) })
             localStorage.setItem('otp-verification-email', email);
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
             setVerificationStep(2);
@@ -184,10 +185,10 @@ function ChangeEmailModal(props) {
     }
 
     const clearAllAuthCookies = () => {
-        Cookies.remove('idToken')
-        Cookies.remove('authToken', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
-        Cookies.remove('refreshToken', { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
-        Cookies.remove('userInfo', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+        Cookies.remove(`${cookiePrefix()}idToken`)
+        Cookies.remove(`${cookiePrefix()}authToken`, { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+        Cookies.remove(`${cookiePrefix()}refreshToken`, { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
+        Cookies.remove(`${cookiePrefix()}userInfo`, { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
     }
 
     const goToError = (errorMessage) => {
@@ -206,8 +207,8 @@ function ChangeEmailModal(props) {
     }
 
     const clearAllOtpSessionVaribles = () => {
-        Cookies.remove('clientAccessToken')
-        Cookies.remove('uniqueEmailVerifyToken')
+        Cookies.remove(`${cookiePrefix()}clientAccessToken`)
+        Cookies.remove(`${cookiePrefix()}uniqueEmailVerifyToken`)
         localStorage.removeItem('resend-expiry');
         localStorage.removeItem('otp-verification-email');
     }
@@ -224,7 +225,7 @@ function ChangeEmailModal(props) {
     }, [resendInSeconds]);
 
     useEffect(() => {
-        const userInfoFromCookie = Cookies.get('userInfo');
+        const userInfoFromCookie = Cookies.get(`${cookiePrefix()}userInfo`);
         if (userInfoFromCookie) {
           const parsedUserInfo = JSON.parse(userInfoFromCookie);
           setMemberUid(parsedUserInfo.uid)

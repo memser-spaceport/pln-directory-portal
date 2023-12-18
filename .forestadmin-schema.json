@@ -2728,7 +2728,7 @@
       },
       {
         "defaultValue": null,
-        "enums": null,
+        "enums": ["MAINTENER", "COLLABORATOR"],
         "field": "type",
         "integration": null,
         "inverseOf": null,
@@ -2739,7 +2739,7 @@
         "isSortable": true,
         "isVirtual": false,
         "reference": null,
-        "type": "String",
+        "type": "Enum",
         "validations": [
           {"type": "is present", "message": "Failed validation rule: 'Present'"}
         ]

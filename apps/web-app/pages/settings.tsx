@@ -17,6 +17,7 @@ import { fetchTeam } from "apps/web-app/utils/services/teams";
 import { renewAndStoreNewAccessToken, convertCookiesToJson } from '../utils/services/auth';
 import { DiscardChangesPopup } from "libs/ui/src/lib/modals/confirmation";
 import Privacy from "apps/web-app/components/preference/privacy";
+import { cookiePrefix } from '../utils/common.utils'; 
 
 
 
@@ -530,7 +531,7 @@ export const getServerSideProps = async (ctx) => {
     }
 
     if (!userInfo?.uid) {
-        setCookie(ctx, "page_params", "user-logged-out", {
+        setCookie(ctx, `${cookiePrefix()}page_params`, "user-logged-out", {
             path: '/',
             maxAge: (Math.floor(Date.now() / 1000) + 60)
         });

@@ -4,6 +4,7 @@ import nookies from 'nookies';
 import { ParsedUrlQuery } from 'querystring';
 import { getSortFromQuery, stringifyQueryValues } from './list.utils';
 import { IMember } from './members.types';
+import { cookiePrefix } from './common.utils'; 
 
 /**
  * Returns the options for requesting the members on the members directory,
@@ -215,7 +216,9 @@ export const parseTeamMember = (
 export const getMemberFromCookie = (
   res?
 ): { isUserLoggedIn: boolean; member?} => {
-  const { member, refreshToken } = nookies.get(res);
+  const cookies = nookies.get(res);
+  const member = cookies[`${cookiePrefix()}member`];
+  const refreshToken = cookies[`${cookiePrefix()}refreshToken`];
   if (member && member.length) {
     const memberDetails: IMember = JSON.parse(member);
     memberDetails.id = JSON.parse(member).uid;

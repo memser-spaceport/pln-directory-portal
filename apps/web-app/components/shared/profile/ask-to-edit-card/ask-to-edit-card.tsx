@@ -13,6 +13,7 @@ import { ReactComponent as EditIcon } from '/public/assets/images/icons/edit.svg
 import { Router, useRouter } from 'next/router';
 import Cookies from 'js-cookie';
 import useAppAnalytics from '../../../../hooks/shared/use-app-analytics';
+import { cookiePrefix } from "../../../../utils/common.utils";
 // import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 
 type TAskToEditProfileType = 'team' | 'member';
@@ -74,7 +75,7 @@ export function AskToEditCard({
 
   const logPosthogAnalytics = () => {
     try {
-      const loggedInUser = Cookies.get('userInfo');
+      const loggedInUser = Cookies.get(`${cookiePrefix()}userInfo`);
       if(loggedInUser) {
         const parsedLoggedInUser = JSON.parse(loggedInUser);
         const isAdmin = parsedLoggedInUser.roles.includes('DIRECTORYADMIN');

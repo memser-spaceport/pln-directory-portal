@@ -11,6 +11,8 @@ import { toast } from "react-toastify";
 import { ReactComponent as SuccessIcon } from '../../public/assets/images/icons/success.svg';
 import { APP_ANALYTICS_EVENTS, EMAIL_OTP_CONSTANTS, PAGE_ROUTES } from "../../constants";
 import useAppAnalytics from "../../hooks/shared/use-app-analytics";
+import { cookiePrefix } from "../../utils/common.utils";
+
 function EmailOtpVerificationModal() {
     // States
     const [showDialog, setDialogStatus] = useState(false);
@@ -26,15 +28,15 @@ function EmailOtpVerificationModal() {
         if (refreshToken && accessToken) {
             const accessTokenExpiry = decodeToken(accessToken);
             const refreshTokenExpiry = decodeToken(refreshToken);
-            Cookies.set('authToken', JSON.stringify(accessToken), { 
+            Cookies.set(`${cookiePrefix()}authToken`, JSON.stringify(accessToken), { 
                 expires: calculateExpiry(new Date(accessTokenExpiry.exp)),
                 domain: process.env.COOKIE_DOMAIN || ''
             });
-            Cookies.set('refreshToken', JSON.stringify(refreshToken), {
+            Cookies.set(`${cookiePrefix()}refreshToken`, JSON.stringify(refreshToken), {
                 expires: calculateExpiry(new Date(refreshTokenExpiry.exp)),
                 domain: process.env.COOKIE_DOMAIN || ''
             });
-            Cookies.set('userInfo', JSON.stringify(userInfo), { 
+            Cookies.set(`${cookiePrefix()}userInfo`, JSON.stringify(userInfo), { 
                 expires: calculateExpiry(new Date(accessTokenExpiry.exp)),
                 domain: process.env.COOKIE_DOMAIN || ''
             });
@@ -44,9 +46,9 @@ function EmailOtpVerificationModal() {
 
     const onOtpVerify = async (otp) => {
         try {
-            const authToken = Cookies.get('authToken');
-            const otpToken = Cookies.get('uniqueEmailVerifyToken');
-            const idToken = Cookies.get('idToken');
+            const authToken = Cookies.get(`${cookiePrefix()}authToken`);
+            const otpToken = Cookies.get(`${cookiePrefix()}uniqueEmailVerifyToken`);
+            const idToken = Cookies.get(`${cookiePrefix()}idToken`);
             if (!authToken || !otpToken || !idToken) {
                 goToError('Invalid attempt. Please login and try again');
                 return;
@@ -59,7 +61,7 @@ function EmailOtpVerificationModal() {
             const data = await verifyEmailOtp(otpPayload, header)
             setLoaderStatus(false)
             if (data?.userInfo) {
-                const externalRedirectUrl = Cookies.get('external_redirect_url');
+                const externalRedirectUrl = Cookies.get(`${cookiePrefix()}external_redirect_url`);
                 setNewTokensAndUserInfo(data);
                 clearAllOtpSessionVaribles();
                 analytics.captureEvent(APP_ANALYTICS_EVENTS.USER_VERIFICATION_SUCCESS, {})
@@ -87,9 +89,9 @@ function EmailOtpVerificationModal() {
 
     const onResendOtp = async () => {
         setErrorMessage('')
-        const otpToken = Cookies.get('uniqueEmailVerifyToken');
+        const otpToken = Cookies.get(`${cookiePrefix()}uniqueEmailVerifyToken`);
         const email = localStorage.getItem('otp-verification-email');
-        const authToken = Cookies.get('authToken');
+        const authToken = Cookies.get(`${cookiePrefix()}authToken`);
         if (!authToken || !email || !otpToken) {
             goToError('Invalid attempt. Please login and try again');
             return;
@@ -106,7 +108,7 @@ function EmailOtpVerificationModal() {
 
             // Reset resend timer and set unique token for verification
             const uniqueEmailVerifyToken = d.token;
-            Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 20 * 60 * 1000) })
+            Cookies.set(`${cookiePrefix()}uniqueEmailVerifyToken`, uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 20 * 60 * 1000) })
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
 
             //setResendTimer()
@@ -125,7 +127,7 @@ function EmailOtpVerificationModal() {
         try {
 
             // Validation
-            const authToken = Cookies.get('authToken');
+            const authToken = Cookies.get(`${cookiePrefix()}authToken`);
             if (!authToken) {
                 goToError('Invalid attempt. Please login and try again');
                 return;
@@ -142,7 +144,7 @@ function EmailOtpVerificationModal() {
             // Handle Success
             setLoaderStatus(false)
             const uniqueEmailVerifyToken = d.token;
-            Cookies.set('uniqueEmailVerifyToken', uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 20 * 60 * 1000) })
+            Cookies.set(`${cookiePrefix()}uniqueEmailVerifyToken`, uniqueEmailVerifyToken, { expires: new Date(new Date().getTime() + 20 * 60 * 1000) })
             localStorage.setItem('otp-verification-email', email);
             localStorage.setItem('otp-verification-step', '2');
             localStorage.setItem('resend-expiry', `${new Date(d.resendIn).getTime()}`)
@@ -205,23 +207,23 @@ function EmailOtpVerificationModal() {
     }
 
     const clearAllOtpSessionVaribles = () => {
-        Cookies.remove('clientToken');
-        Cookies.remove('uniqueEmailVerifyToken');
-        Cookies.remove('show-email-verification-box');
-        Cookies.remove('external_redirect_url');
-        localStorage.removeItem('resend-expiry');
-        localStorage.removeItem('otp-verification-step');
+        Cookies.remove(`${cookiePrefix()}clientToken`);
+        Cookies.remove(`${cookiePrefix()}uniqueEmailVerifyToken`);
+        Cookies.remove(`${cookiePrefix()}show-email-verification-box`);
+        Cookies.remove(`${cookiePrefix()}external_redirect_url`);
+        localStorage.removeItem(`${cookiePrefix()}resend-expiry`);
+        localStorage.removeItem(`${cookiePrefix()}otp-verification-step`);
     }
 
     const clearAllAuthCookies = () => {
-        Cookies.remove('idToken')
-        Cookies.remove('authToken', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
-        Cookies.remove('refreshToken', { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
-        Cookies.remove('userInfo', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+        Cookies.remove(`${cookiePrefix()}idToken`)
+        Cookies.remove(`${cookiePrefix()}authToken`, { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+        Cookies.remove(`${cookiePrefix()}refreshToken`, { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
+        Cookies.remove(`${cookiePrefix()}userInfo`, { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
     }
 
     useEffect(() => {
-        const verifyBox = Cookies.get('show-email-verification-box');
+        const verifyBox = Cookies.get(`${cookiePrefix()}show-email-verification-box`);
         const otpVerify = localStorage.getItem('otp-verify')
         if (verifyBox) {
             if (localStorage.getItem('otp-verification-step') === '2') {
@@ -229,12 +231,12 @@ function EmailOtpVerificationModal() {
                 //setResendTimer()
                 setResendInSeconds(30)
             }
-            Cookies.remove('show-email-verification-box')
+            Cookies.remove(`${cookiePrefix()}show-email-verification-box`)
             analytics.captureEvent(APP_ANALYTICS_EVENTS.USER_VERIFICATION_INIT, {})
             setDialogStatus(true)
         } else {
             clearAllOtpSessionVaribles();
-            const userInfo = Cookies.get('userInfo');
+            const userInfo = Cookies.get(`${cookiePrefix()}userInfo`);
             if(!userInfo) {
                 clearAllAuthCookies();
             }

@@ -53,7 +53,7 @@ export class ProjectsService {
       const { contributingTeams, contributors } : any = project;
       const contributorToCreate:any = [];
       const contributorUidsToDelete:any = [];
-      contributors.map((contributor) => {
+      contributors?.map((contributor) => {
         if (!contributor.uid) {
           contributorToCreate.push(contributor);
         }

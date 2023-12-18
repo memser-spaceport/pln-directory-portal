@@ -23,6 +23,7 @@ import {
   getMembersListOptions,
   getMembersOptionsFromQuery,
 } from '../../utils/members.utils';
+import { cookiePrefix } from '../../utils/common.utils'; 
 
 type MembersProps = {
   members: IMember[];
@@ -101,15 +102,15 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) 
     req
   } = ctx;
   let cookies = req?.cookies;
-  if (!cookies?.authToken) {
-    await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
+  if (!cookies[`${cookiePrefix()}authToken`]) {
+    await renewAndStoreNewAccessToken(cookies[`${cookiePrefix()}refreshToken`], ctx);
     if (ctx.res.getHeader('Set-Cookie'))
       cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
   }
-  destroyCookie(null, 'state');
+  destroyCookie(null, `${cookiePrefix()}state`);
   const { verified } = query;
-  const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
-  const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
+  const userInfo = cookies[`${cookiePrefix()}userInfo`] ? JSON.parse(cookies[`${cookiePrefix()}userInfo`]) : {};
+  const isUserLoggedIn = cookies[`${cookiePrefix()}authToken`] && cookies[`${cookiePrefix()}userInfo`] ? true : false;
 
   const optionsFromQuery = getMembersOptionsFromQuery(query);
   console.log(optionsFromQuery);

@@ -14,7 +14,7 @@ import api from "apps/web-app/utils/api";
 import ContributingTeams from "./contributing-teams";
 import { ReactComponent as RemoveIcon } from '../../public/assets/images/icons/trash_icon.svg';
 import { ReactComponent as RecycleIcon } from '../../public/assets/images/icons/recycle.svg';
-
+import { cookiePrefix } from "../../utils/common.utils";
 export default function AddForm({mode}) {
 
     const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
@@ -130,7 +130,7 @@ export default function AddForm({mode}) {
 
     const getEmail = () => {
         if(addProjectsState.mode === 'ADD'){
-            const userInfoFromCookie = Cookies.get('userInfo');
+            const userInfoFromCookie = Cookies.get(`${cookiePrefix()}userInfo`);
             let email = ''
             if (userInfoFromCookie) {
                 const parsedUserInfo = JSON.parse(userInfoFromCookie);

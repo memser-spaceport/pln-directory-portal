@@ -9,6 +9,7 @@ import {
   decodeToken,
   calculateExpiry,
 } from '../../utils/services/auth';
+import { cookiePrefix } from '../../utils/common.utils'; 
 
 type VerifyMember = {
   loading: boolean;
@@ -39,7 +40,7 @@ export const getServerSideProps = async (
   const { state, code, error, landingPage=PAGE_ROUTES.TEAMS, externalRedirectUrl, source} = query;
   const cookies = nookies.get(ctx);
   // validating state which we gave to auth service to get auth code.
-  if (cookies.state && cookies.state != state && source != "direct") {
+  if (cookies[`${cookiePrefix()}state`] != state && source != "direct") {
     return {
       redirect: {
         permanent: false,
@@ -49,7 +50,7 @@ export const getServerSideProps = async (
   }
   // it will trigger when we get error from auth service.
   if (error?.length > 0) {
-    setCookie(ctx, 'page_params', 'auth_error' , {
+    setCookie(ctx, `${cookiePrefix()}page_params`, 'auth_error' , {
       maxAge: Math.round((Date.now() + (60 * 1))/1000),
       path: '/',
     });
@@ -62,7 +63,7 @@ export const getServerSideProps = async (
   }
   const authResp = await getAccessToken(code);
   if (authResp.status === 403) {
-    setCookie(ctx, 'verified', 'false' , {
+    setCookie(ctx, `${cookiePrefix()}verified`, 'false' , {
       path: '/',
     });
     return {
@@ -72,7 +73,7 @@ export const getServerSideProps = async (
       },
     };
   } else if(authResp.status === 400 || authResp.status === 500 || authResp.status === 404 ) {
-    setCookie(ctx, 'page_params', 'server_error' , {
+    setCookie(ctx, `${cookiePrefix()}page_params`, 'server_error' , {
       maxAge: Math.round((Date.now() + (60 * 1))/1000),
       path: '/',
     });
@@ -88,22 +89,22 @@ export const getServerSideProps = async (
   if (accessToken && refreshToken && userInfo) {
     const accessTokenExpiry = decodeToken(accessToken);
     const refreshTokenExpiry = decodeToken(refreshToken);
-    setCookie(ctx, 'authToken', JSON.stringify(accessToken), {
+    setCookie(ctx, `${cookiePrefix()}authToken`, JSON.stringify(accessToken), {
       maxAge: calculateExpiry(accessTokenExpiry.exp),
       path: '/',
       domain: process.env.COOKIE_DOMAIN || ''
     });
-    setCookie(ctx, 'refreshToken', JSON.stringify(refreshToken), {
+    setCookie(ctx, `${cookiePrefix()}refreshToken`, JSON.stringify(refreshToken), {
       maxAge: calculateExpiry(refreshTokenExpiry.exp),
       path: '/',
       domain: process.env.COOKIE_DOMAIN || ''
     });
-    setCookie(ctx, 'userInfo', JSON.stringify(userInfo), {
+    setCookie(ctx, `${cookiePrefix()}userInfo`, JSON.stringify(userInfo), {
       maxAge: calculateExpiry(accessTokenExpiry.exp),
       path: '/',
       domain: process.env.COOKIE_DOMAIN || ''
     });
-    setCookie(ctx, 'verified', 'true' , {
+    setCookie(ctx, `${cookiePrefix()}verified`, 'true' , {
       path: '/'
     });
     if (userInfo?.isFirstTimeLogin) {
@@ -118,27 +119,27 @@ export const getServerSideProps = async (
     const accessTokenExpiry = decodeToken(accessToken);
     const refreshTokenExpiry = decodeToken(refreshToken);
 
-    setCookie(ctx, 'authToken', accessToken, {
+    setCookie(ctx, `${cookiePrefix()}authToken`, accessToken, {
       maxAge: calculateExpiry(accessTokenExpiry.exp),
       path: '/',
       domain: process.env.COOKIE_DOMAIN || ''
     });
-    setCookie(ctx, 'idToken', idToken, {
+    setCookie(ctx, `${cookiePrefix()}idToken`, idToken, {
       maxAge: calculateExpiry(accessTokenExpiry.exp),
       path: '/'
     });
-    setCookie(ctx, 'refreshToken', refreshToken, {
+    setCookie(ctx, `${cookiePrefix()}refreshToken`, refreshToken, {
       maxAge: calculateExpiry(refreshTokenExpiry.exp),
       path: '/',
       domain: process.env.COOKIE_DOMAIN || ''
     });
 
-    setCookie(ctx, 'show-email-verification-box', 'true', {
+    setCookie(ctx, `${cookiePrefix()}show-email-verification-box`, 'true', {
       maxAge: calculateExpiry(accessTokenExpiry.exp),
       path: '/'
     });
     if (externalRedirectUrl) {
-      setCookie(ctx, 'external_redirect_url', externalRedirectUrl, {
+      setCookie(ctx, `${cookiePrefix()}external_redirect_url`, externalRedirectUrl, {
         maxAge: calculateExpiry(accessTokenExpiry.exp),
         path: '/'
       });

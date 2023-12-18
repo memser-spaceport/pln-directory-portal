@@ -8,6 +8,7 @@ import Cookies from 'js-cookie';
 import { toast } from 'react-toastify';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
+import { cookiePrefix } from "../../../utils/common.utils";
 
 export default function AdditionalDetails({ project, userHasEditRights }) {
     const initialReadme = project?.readMe;
@@ -19,7 +20,7 @@ export default function AdditionalDetails({ project, userHasEditRights }) {
     // const { response } = useMdViewer(text);
 
     useEffect(() => {
-        const userInfoFromCookie = Cookies.get('userInfo');
+        const userInfoFromCookie = Cookies.get(`${cookiePrefix()}userInfo`);
         if (userInfoFromCookie) {
             const parsedUserInfo = JSON.parse(userInfoFromCookie);
             if (parsedUserInfo?.leadingTeams?.length > 0 &&

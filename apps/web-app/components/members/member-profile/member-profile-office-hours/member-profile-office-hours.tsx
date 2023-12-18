@@ -12,6 +12,7 @@ import { authenticate } from '../../../../utils/services/auth';
 import { IMember } from '../../../../../web-app/utils/members.types';
 import useAppAnalytics from '../../../../../web-app/hooks/shared/use-app-analytics';
 import {ReactComponent as CalendarIcon} from '../../../../public/assets/images/icons/ScheduleCalendar.svg'
+import { cookiePrefix } from "../../../../utils/common.utils";
 
 type MemberProfileOfficeHoursProps = {
   url?: string;
@@ -33,8 +34,8 @@ export function MemberProfileOfficeHours({
   const router = useRouter();
   const analytics = useAppAnalytics();
   const handleOnClick = () => {
-    if (Cookies.get('userInfo')) {
-      Cookies.set('page_params', 'schedule_meeting', { expires: 60, path: '/' });
+    if (Cookies.get(`${cookiePrefix()}userInfo`)) {
+      Cookies.set(`${cookiePrefix()}page_params`, 'schedule_meeting', { expires: 60, path: '/' });
       router.reload();
     } else {
       authenticate(router.asPath);
