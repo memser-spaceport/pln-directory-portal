@@ -178,6 +178,20 @@ export default function ProjectActionButtons() {
         return true;
     }
 
+    const checkMaintainedBycontributors = () => {
+        const filtered = addProjectsState.inputs?.maintainedByContributors?.filter(contri=>{
+            return !contri?.isDeleted
+        });
+        return filtered?.length > 0;
+    }
+
+    const checkCollaboratingcontributors = (members) => {
+        const filtered = members?.filter(contri=>{
+            return !contri?.isDeleted
+        });
+        return filtered?.length > 0;
+    }
+
     const validateStep1 = () => {
         const errors = {};
 
@@ -187,13 +201,13 @@ export default function ProjectActionButtons() {
 
         if(!inputs.maintainedBy){
             errors['maintainedBy'] = 'Please add maintainer team details';
-        }else if (!inputs.maintainedByContributors || inputs.maintainedByContributors.length < 1) {
+        }else if (!inputs.maintainedByContributors || inputs.maintainedByContributors.length < 1 || !checkMaintainedBycontributors()) {
             errors['maintainedByContributors'] = 'Please add contributors to maintainer team';
         }
 
         if(inputs.collabTeamsList && inputs.collabTeamsList.length){
             inputs.collabTeamsList.map((cteam,index)=>{
-                if(!cteam.members.length){
+                if(!cteam.members.length || !checkCollaboratingcontributors(cteam?.members)){
                     if(!errors['collabContributors']){
                         errors['collabContributors'] = [];
                     }

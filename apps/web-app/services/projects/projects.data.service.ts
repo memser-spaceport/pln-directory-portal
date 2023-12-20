@@ -159,7 +159,8 @@ const getFormattedProject = (project) => {
             formattedProject['maintainingTeam'] = project.maintainingTeam;
             formattedProject['isDeleted'] = project.isDeleted ?? false;
             formattedProject['contributors'] = project.contributors ?? null;
-            
+            formattedProject['createdBy'] = project.createdBy ?? null;
+
             const tempCTeams = [];
             project.contributingTeams.map(team=>{
                 const teamObj = {};

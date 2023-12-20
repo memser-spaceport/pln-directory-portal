@@ -1,10 +1,12 @@
 import { InputField } from "@protocol-labs-network/ui";
 import TeamRow from "./team-row";
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { SearchIcon } from "@heroicons/react/solid";
+import { AddProjectsContext } from "apps/web-app/context/projects/add.context";
 
 export default function TeamList({ onSelect, list }) {
-
+    const { addProjectsState, addProjectsDispatch } =
+      useContext(AddProjectsContext);
 
     const [searchTerm,setSearchTerm] = useState(null);
     const [filteredList,setFilteredList] = useState(list);
@@ -26,7 +28,19 @@ export default function TeamList({ onSelect, list }) {
 
     useEffect(()=>{
       setFilteredList(list);
-    },[list])
+    },[list]);
+
+
+    const shouldExclude = (team) => {
+      
+      for (let index = 0; index < addProjectsState.inputs.collabTeamsList.length; index++) {
+        const element = addProjectsState.inputs.collabTeamsList[index];
+        if(element?.team?.uid === team.uid){
+          return true;
+        }
+      }
+      return false;
+    }
 
     return (
       <div className="h-[95%] overflow-y-scroll">
@@ -41,7 +55,7 @@ export default function TeamList({ onSelect, list }) {
             value={searchTerm}
             onKeyUp={(event) => {
               // if (event.key === 'Enter' || event.keyCode === 13) {
-                setSearchTerm(event.currentTarget.value);
+              setSearchTerm(event.currentTarget.value);
               // }
             }}
             hasClear
@@ -52,10 +66,15 @@ export default function TeamList({ onSelect, list }) {
           filteredList.map((team, index) => {
             return (
               <React.Fragment key={index}>
-                <TeamRow onSelect={onSelect} team={team} />
+                {!shouldExclude(team) && (
+                  <TeamRow onSelect={onSelect} team={team} />
+                )}
               </React.Fragment>
             );
           })}
+        {filteredList && filteredList.length < 1 && (
+          <>No search results.</>
+        )}
       </div>
     );
 }

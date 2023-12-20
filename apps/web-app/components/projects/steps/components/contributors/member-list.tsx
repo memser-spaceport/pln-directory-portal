@@ -150,7 +150,7 @@ export default function MemberList({
           );
         })}
       {filteredList && filteredList.length < 1 && (
-        <>No members were added to the team yet to select.</>
+        <>No member available with that search criteria.</>
       )}
     </div>
   );
