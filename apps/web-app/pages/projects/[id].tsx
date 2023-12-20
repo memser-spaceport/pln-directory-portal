@@ -87,7 +87,7 @@ const checkForEditRights = async (userInfo, selectedProject, isUserLoggedIn) => 
         }
 
         //case 2. If the logged in user is the creator of the project.
-        if (selectedProject.creator && userInfo.uid === selectedProject.creator.uid) {
+        if (selectedProject.createdBy && userInfo.uid === selectedProject.createdBy) {
             return true;
         }
 
@@ -168,7 +168,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     let userHasEditRights = false;
     let userHasDeleteRights = false;
 
-    // console.log(selectedProjectResponse.body['contributors']);
+    console.log(selectedProjectResponse);
 
     if (selectedProjectResponse.status === 200) {
         selectedProject = ProjectsDataService.getFormattedProject(selectedProjectResponse.body);

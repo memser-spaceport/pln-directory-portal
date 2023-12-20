@@ -88,7 +88,7 @@ function MemberExperience(props) {
     return <>
         <div className="my-[20px]">
             <div className="text-[#64748B] text-[15px] font-[500] flex justify-between">
-                <h3 className="text-[15px]">Project Contributions</h3>
+                <h3 className="text-[15px]">Project Contributions ({contributions?.length})</h3>
                 {(contributions.length > 0 && isEditable) && <button className="text-[#156FF7] text-[13px]" onClick={onEditOrAdd}>Edit/Add</button>}
             </div>
             <div className="mt-[8px] focus-within:outline-none focus:outline-none focus-visible:outline-none">

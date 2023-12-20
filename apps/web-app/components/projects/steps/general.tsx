@@ -80,9 +80,9 @@ export default function General({ onInputChange, urlFieldArray, setURLField }) {
                         maxLength={1000}
                         value={addProjectsState.inputs.desc}
                         name="desc"
-                        label="Detailed description of your project"
+                        label="Detailed Description Of Your Project"
                         className="custom-grey custom-outline-none min-h-[200px] border"
-                        placeholder="Enter description of your project"
+                        placeholder="Detailed Description Of Your Project"
                     />
                     <InputError content={addProjectsState.errors?.desc} />
                 </div>
