@@ -112,9 +112,7 @@ export class ProjectsService {
           contributingTeams: { select: { uid: true, name: true, logo: true }},
           contributors: { 
             select: { 
-              uid: true, 
-              type: true, 
-              teamUid: true,
+              uid: true,
               member: { 
                 select: { 
                   uid: true, 
