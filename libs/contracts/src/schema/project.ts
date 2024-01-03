@@ -4,13 +4,9 @@ import { z } from 'nestjs-zod/z';
 const TypeEnum = z.enum(['MAINTENER', 'COLLABORATOR']);
 
 const ContributorSchema = z.object({
-  uid: z.string().optional(),
-  teamUid: z.string(), 
+  uid: z.string().optional(), 
   projectUid: z.string().optional(), 
   memberUid: z.string(),
-  type: z.string().refine((value) => TypeEnum.safeParse(value).success, {
-    message: 'Invalid Contributor type'
-  }),
   isDeleted: z.boolean().optional()
 });
 
