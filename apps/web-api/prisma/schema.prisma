@@ -42,7 +42,6 @@ model Team {
   moreDetails          String?
   maintainingProjects  Project[]            @relation("maintainingTeam")
   contributingProjects Project[]            @relation("contributingTeams")
-  contributedProjects  ProjectContributor[]
 }
 
 model Member {
@@ -96,11 +95,6 @@ enum ApprovalStatus {
   APPROVED
   REJECTED
   AUTOAPPROVED
-}
-
-enum ProjectContributorType {
-  MAINTENER
-  COLLABORATOR
 }
 
 model ParticipantsRequest {
@@ -301,11 +295,8 @@ model Project {
 model ProjectContributor {
   id         Int      @id @default(autoincrement())
   uid        String   @unique @default(cuid())
-  type       ProjectContributorType
   project    Project? @relation(fields: [projectUid], references: [uid])
   projectUid String
-  team       Team?    @relation(fields: [teamUid], references: [uid])
-  teamUid    String
   member     Member?  @relation(fields: [memberUid], references: [uid])
   memberUid  String
 }
