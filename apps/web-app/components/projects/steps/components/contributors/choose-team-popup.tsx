@@ -1,33 +1,57 @@
 import { Dialog, Transition } from "@headlessui/react";
 import { XCircleIcon } from "@heroicons/react/solid";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useContext, useEffect, useState } from "react";
 import TeamList from "./team-list";
 import MemberList from "./member-list";
 import Image from "next/image";
 import ProjectsService from "apps/web-app/services/projects";
+import { ContributorsContext } from "apps/web-app/context/projects/contributors.context";
+import { AddProjectsContext } from "apps/web-app/context/projects/add.context";
 
-export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails, mode, teamDetails }) {
+export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails, mode }) {
 
     const contriTitle = 'Select Contributors';
 
-    const [showContributor, setContributorsFlag] = useState(mode === 'EDIT' ? true : false);
-    const [popupTitle, setPopupTitle] = useState(mode === 'EDIT' ? contriTitle : title);
+    const { contributorsState, contributorsDispatch } =
+    useContext(ContributorsContext);
+
+    const { addProjectsState, addProjectsDispatch } =
+    useContext(AddProjectsContext);
+
+    const [showContributor, setContributorsFlag] = useState(contributorsState.chooseTeamPopup.UIType === 'MEMBER'  ? true : false);
+    const [popupTitle, setPopupTitle] = useState(contributorsState.chooseTeamPopup.UIType === 'MEMBER' ? contriTitle : title);
     const [allTeams, setAllTeams] = useState(null);
     const [selectedTeamAllMembers, setMembers] = useState(null);
     const [selectedTeam, setTeam] = useState(null);
     const [selectedMembers, setSelectedMembers] = useState([]);
 
     useEffect(() => {
-        if(mode === 'ADD'){
-            ProjectsService.fetchTeams().then(res => {
-                setAllTeams(res);
+        if (mode === 'ADD') {
+          setPopupTitle(title);
+          ProjectsService.fetchTeams().then((res) => {
+            setAllTeams(res);
+            setSelectedMembers(addProjectsState.inputs.contributors);
+          });
+        } else {
+          if (contributorsState.chooseTeamPopup.UIType === 'TEAM') {
+            ProjectsService.fetchTeams().then((res) => {
+              setAllTeams(res);
             });
-        }else{
-            setTeam(teamDetails?.team);
-            ProjectsService.fetchMembers(teamDetails?.team.uid).then((members)=>{
-                setMembers(members);
-                setSelectedMembers(teamDetails?.members);
+            setTeam(contributorsState.chooseTeamPopup.selectedTeam);
+            ProjectsService.fetchMembers(
+              contributorsState.chooseTeamPopup.selectedTeam?.uid
+            ).then((members) => {
+              setMembers(members);
+              console.log(addProjectsState.inputs.contributors);
+              
+              setSelectedMembers(addProjectsState.inputs.contributors);
             });
+          } else {
+            ProjectsService.fetchMembers().then((members) => {
+              setMembers(members);
+              setSelectedMembers(addProjectsState.inputs.contributors);
+            });
+          }
         }
     }, []);
 
@@ -39,14 +63,22 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
         setPopupTitle(contriTitle);
     }
 
-    const onSave = () => {
-        const details = {
-            team:selectedTeam,
-            members:selectedMembers
-        }
-        setTeamDetails(details);
-        onClose(true,details);
-    }
+    const onSave = (skipFlag = false) => {
+      let details;
+      if(skipFlag){
+        details = {
+          team: selectedTeam,
+          members: [],
+        };
+      }else{
+        details = {
+          team: selectedTeam,
+          members: selectedMembers,
+        };
+      }
+      setTeamDetails(details);
+      onClose(true, details);
+    };
 
 
     return (
@@ -86,49 +118,72 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
                     >
                       <div className="flex justify-between pr-7">
                         <div className="flex items-center gap-2">
-                          {showContributor && mode === 'ADD' && (
-                            <Image
-                              src="/assets/images/icons/projects/back.svg"
-                              alt="back image"
-                              width={16}
-                              height={16}
-                              className="shrink-0 cursor-pointer"
-                              onClick={() => {
-                                setSelectedMembers([]);
-                                setContributorsFlag(false);
-                                setPopupTitle(title);
-                              }}
-                            />
-                          )}
+                          {showContributor &&
+                            contributorsState.chooseTeamPopup.UIType ===
+                              'TEAM' && (
+                              <Image
+                                src="/assets/images/icons/projects/back.svg"
+                                alt="back image"
+                                width={16}
+                                height={16}
+                                className="shrink-0 cursor-pointer"
+                                onClick={() => {
+                                  setSelectedMembers([]);
+                                  setContributorsFlag(false);
+                                  setPopupTitle(title);
+                                }}
+                              />
+                            )}
                           <p className=""> {popupTitle}</p>
                         </div>
                         {showContributor && (
-                          <div
-                            className={`border-#156FF7 flex items-center rounded border border-solid px-3 py-1.5 
-                                                ${
-                                                  selectedTeamAllMembers?.length >
-                                                  0
-                                                    ? 'cursor-pointer bg-[#156FF7]'
-                                                    : 'cursor-not-allowed bg-[#757575]'
-                                                } `}
-                            onClick={() => {
-                              if (selectedTeamAllMembers?.length) {
-                                onSave();
-                              }
-                            }}
-                          >
+                          <div className="flex gap-2">
+                            {contributorsState.chooseTeamPopup.UIType ===
+                              'TEAM' && (
+                              <div
+                                className={`flex cursor-pointer items-center rounded border border-solid border-[color:var(--Primary-PL-Blue,#156FF7)] px-3 py-1.5`}
+                                onClick={() => {
+                                  if (selectedTeamAllMembers?.length) {
+                                    onSave(true);
+                                  }
+                                }}
+                              >
+                                <div
+                                  className={`text-sm font-normal not-italic leading-5 text-[color:var(--Primary-PL-Blue,#156FF7)]`}
+                                >
+                                  Skip & Save
+                                </div>
+                              </div>
+                            )}
                             <div
-                              className={`${
-                                selectedTeamAllMembers?.length > 0
-                                  ? 'text-white'
-                                  : 'text-white'
-                              } text-sm font-normal not-italic leading-5`}
+                              className={`border-#156FF7 flex items-center rounded border border-solid px-3 py-1.5 cursor-pointer bg-[#156FF7]
+                                                `}
+                              onClick={() => {
+                                if (selectedTeamAllMembers?.length) {
+                                  onSave();
+                                }
+                              }}
                             >
-                              Save
+                              <div
+                                className={`${
+                                  selectedTeamAllMembers?.length > 0
+                                    ? 'text-white'
+                                    : 'text-white'
+                                } text-sm font-normal not-italic leading-5`}
+                              >
+                                Save
+                              </div>
                             </div>
                           </div>
                         )}
                       </div>
+                      {contributorsState.chooseTeamPopup.UIType === 'TEAM' &&
+                        showContributor && (
+                          <div className="text-sm font-normal not-italic leading-7 text-[color:var(--Neutral-Slate-900,#0F172A)]">
+                            Have any of these members contributed to this
+                            project?
+                          </div>
+                        )}
                     </Dialog.Title>
                     <>
                       {!showContributor && (
@@ -139,7 +194,9 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
                           list={selectedTeamAllMembers}
                           selectedMembers={selectedMembers}
                           setSelectedMembers={setSelectedMembers}
-                          originalSelectedMembers={teamDetails?.members}
+                          originalSelectedMembers={
+                            addProjectsState.inputs.contributors
+                          }
                         />
                       )}
                     </>
