@@ -2,6 +2,7 @@ import { InputField } from "@protocol-labs-network/ui";
 import MemberRow from "./member-row";
 import { SearchIcon } from '@heroicons/react/outline';
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 
 export default function MemberList({
   list,
@@ -15,6 +16,8 @@ export default function MemberList({
   const [selectAllFlag, setSelectAll] = useState(
     selectedMembers?.length === list?.length
   );
+
+  const route = useRouter();
 
   useEffect(() => {
     if (list) {
@@ -37,14 +40,18 @@ export default function MemberList({
 
   const onselect = (member) => {
     if (checkForExistance(member) === 'no-data') {
+      console.log(selectedMembers);
+      
       setSelectedMembers([...selectedMembers, member]);
-      if (selectedMembers.length + 1 === list.length) {
-        setSelectAll(true);
-      }
+      // if (selectedMembers.length + 1 === list.length) {
+      //   setSelectAll(true);
+      // }
     }
   };
 
   const onDeselect = (member) => {
+    // console.log(route.pathname);"/projects/add"
+    
     const checker = checkForExistance(member);
     if (checker !== 'no-data') {
       const temp = [...selectedMembers];
@@ -107,7 +114,7 @@ export default function MemberList({
   }
 
   return (
-    <div className="flex flex-col gap-3 h-[95%] overflow-y-scroll">
+    <div className="flex h-[89%] flex-col gap-3 overflow-y-scroll">
       <div className="pr-5 pb-3">
         <InputField
           label="Search"
@@ -126,15 +133,26 @@ export default function MemberList({
           onClear={() => setSearchTerm('')}
         />
       </div>
-      <div className="flex gap-3">
-        <input
+      <div className="flex justify-between border-b pb-3 pr-5">
+        {/* <input
           type="checkbox"
           className="cursor-pointer"
           onChange={onSelectAll}
           checked={selectAllFlag}
-        />
+        /> */}
         <div className="text-[10px] font-semibold not-italic leading-5 text-[#0F172A]">
           {selectedMembers && getSelectedCount()} SELECTED
+        </div>
+        <div className="flex gap-2 text-sm font-normal not-italic leading-5 text-[color:var(--Neutral-Slate-900,#0F172A)]">
+          <div className="">
+            <input
+              type="checkbox"
+              className="cursor-pointer top-[2px] relative"
+              onChange={onSelectAll}
+              checked={selectAllFlag}
+            />
+          </div>
+          <div>Show selected contributors</div>
         </div>
       </div>
       {filteredList &&
@@ -149,8 +167,11 @@ export default function MemberList({
             />
           );
         })}
-      {filteredList && filteredList.length < 1 && (
+      {filteredList && filteredList.length < 1 && (searchTerm !== '' && searchTerm !== null ) &&(
         <>No member available with that search criteria.</>
+      )}
+      {filteredList && filteredList.length < 1 && (searchTerm === null || searchTerm === '') && (
+        <>No member available.</>
       )}
     </div>
   );
