@@ -165,13 +165,13 @@ export default function CollabTeams() {
                             Edit
                         </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                         {
                             members && members.map((mem, index) => {
                                 return (
                                     <>
                                     {mem && !mem.isDeleted &&
-                                        <div key={'mem' + index}>
+                                        <div key={'mem' + index} className="min-w-[32px] shrink-0">
                                         {
                                             mem.logo &&
                                             <Image src={mem.logo} alt="tea image" width={32} height={32}
@@ -179,7 +179,7 @@ export default function CollabTeams() {
                                         }
                                         {
                                             !mem.logo &&
-                                            <UserIcon className="w-[32px] h-[32px] fill-slate-200 bg-slate-100 rounded-full" />
+                                            <UserIcon className="w-[32px] h-[32px] fill-slate-200 bg-slate-100 rounded-full min-w-[32px] shrink-0" />
                                         }
                                     </div>
                                     }
@@ -223,7 +223,7 @@ export default function CollabTeams() {
                     title='Select Collaborating Team'
                     mode={chooseTeamMode}
                     setTeamDetails={setCollabDetails}
-                    teamDetails={collabTeamDetails}
+                    // teamDetails={collabTeamDetails}
                 />
             }
         </>

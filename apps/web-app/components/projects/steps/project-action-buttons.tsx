@@ -178,6 +178,20 @@ export default function ProjectActionButtons() {
         return true;
     }
 
+    const checkMaintainedBycontributors = () => {
+        const filtered = addProjectsState.inputs?.maintainedByContributors?.filter(contri=>{
+            return !contri?.isDeleted
+        });
+        return filtered?.length > 0;
+    }
+
+    const checkCollaboratingcontributors = (members) => {
+        const filtered = members?.filter(contri=>{
+            return !contri?.isDeleted
+        });
+        return filtered?.length > 0;
+    }
+
     const validateStep1 = () => {
         const errors = {};
 
@@ -186,21 +200,22 @@ export default function ProjectActionButtons() {
         
 
         if(!inputs.maintainedBy){
-            errors['maintainedBy'] = 'Please add maintainer team details';
-        }else if (!inputs.maintainedByContributors || inputs.maintainedByContributors.length < 1) {
-            errors['maintainedByContributors'] = 'Please add contributors to maintainer team';
+            errors['maintainedBy'] = 'Please add maintainer team details.';
         }
+        // else if (!inputs.maintainedByContributors || inputs.maintainedByContributors.length < 1 || !checkMaintainedBycontributors()) {
+        //     errors['maintainedByContributors'] = 'Please add contributors to maintainer team';
+        // }
 
-        if(inputs.collabTeamsList && inputs.collabTeamsList.length){
-            inputs.collabTeamsList.map((cteam,index)=>{
-                if(!cteam.members.length){
-                    if(!errors['collabContributors']){
-                        errors['collabContributors'] = [];
-                    }
-                    errors['collabContributors'][index] = 'Please add contributors to collaborating team';
-                }
-            });
-        }
+        // if(inputs.collabTeamsList && inputs.collabTeamsList.length){
+        //     inputs.collabTeamsList.map((cteam,index)=>{
+        //         if(!cteam.members.length || !checkCollaboratingcontributors(cteam?.members)){
+        //             if(!errors['collabContributors']){
+        //                 errors['collabContributors'] = [];
+        //             }
+        //             errors['collabContributors'][index] = 'Please add contributors to collaborating team';
+        //         }
+        //     });
+        // }
 
         if (Object.keys(errors).length) {
             addProjectsDispatch({ type: 'SET_ERROR', payload: { ...errors } });
@@ -222,7 +237,7 @@ export default function ProjectActionButtons() {
                 if (!errors['KPIs'][index]) {
                     errors['KPIs'][index] = {};
                 }
-                errors['KPIs'][index]['value'] = 'KPI value is required';
+                errors['KPIs'][index]['value'] = 'KPI value is required.';
             }
             if (!kpi.name && kpi.value) {
                 if (!errors['KPIs']) {
@@ -231,7 +246,7 @@ export default function ProjectActionButtons() {
                 if (!errors['KPIs'][index]) {
                     errors['KPIs'][index] = {};
                 }
-                errors['KPIs'][index]['name'] = 'KPI name is required';
+                errors['KPIs'][index]['name'] = 'KPI name is required.';
             }
         });
 
