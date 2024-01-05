@@ -75,7 +75,7 @@ export default function ContributorTeamsList() {
                     {team.name}
                   </div>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-3 items-center">
                   {type === 'Maintainer' && (
                     <>
                       <Core />
@@ -101,7 +101,7 @@ export default function ContributorTeamsList() {
                   }
                   <div onClick={()=>{
                     onEdit(team,type);
-                  }}>
+                  }} className='relative top-[3px]'>
                     <Image
                       src="/assets/images/icons/projects/edit-team.svg"
                       alt="edit team"

@@ -10,6 +10,7 @@ import ContributorTeamsList from './list';
 import Image from 'next/image';
 import DefaultMemberUI from '../members/default';
 import ContributingMembers from '../members/list';
+import InputError from '../../input-error';
 
 export default function TeamsContributors() {
   const { contributorsState, contributorsDispatch } =
@@ -56,10 +57,7 @@ export default function TeamsContributors() {
   };
 
   const setTeamAndContributors = (details) => {
-    console.log(details);
-    
     if (contributorsState.chooseTeamPopup.UIType === 'TEAM') {
-      console.log(checkDuplicatesAndRemove(addProjectsState.inputs.contributors,details.members));
       if (contributorsState.type === 'Maintainer') {
         addProjectsDispatch({
           type: 'SET_INPUT',
@@ -76,21 +74,22 @@ export default function TeamsContributors() {
         
         let tempTeams;
         let tempMembers;
-        if(index >= 0){
-          tempTeams =  [
-            ...addProjectsState.inputs.contributingTeams
-          ];
+        if (index >= 0) { //Edit team
+          tempTeams = [...addProjectsState.inputs.contributingTeams];
           tempTeams[index] = details.team;
+          tempMembers = [...details.members];
+        } else {
+          tempTeams = [
+            ...addProjectsState.inputs.contributingTeams,
+            details.team,
+          ];
           tempMembers = [
+            ...checkDuplicatesAndRemove(
+              addProjectsState.inputs.contributors,
+              details.members
+            ),
             ...details.members,
-          ]
-        }else{
-          
-          tempTeams =  [
-              ...addProjectsState.inputs.contributingTeams,
-              details.team,
-            ];
-          tempMembers = [...checkDuplicatesAndRemove(addProjectsState.inputs.contributors,details.members),...details.members]
+          ];
         }
         
         addProjectsDispatch({
@@ -134,11 +133,37 @@ export default function TeamsContributors() {
     });
   };
 
+
+  const getTeamsCount = () => {
+    let count = 0;
+    if(addProjectsState?.inputs?.maintainedBy){
+      count++;
+    }
+    if(addProjectsState?.inputs?.contributingTeams.length){
+      count += addProjectsState?.inputs?.contributingTeams.length;
+    }
+    return count;
+  }
+
+  const getContributorsCount = () => {
+    if(addProjectsState?.inputs?.contributors){
+      const active = addProjectsState?.inputs?.contributors.filter(member => !member?.isDeleted);
+      return active? active.length : 0;
+    }
+    return 0;
+  }
+
   return (
     <>
       <div className="flex flex-col gap-3">
         <div className="flex justify-between text-[12px] font-bold leading-[32px] text-[#64748B]">
-          <div>TEAMS ({3})</div>
+          <div>
+            TEAMS
+            {
+              // getTeamsCount() > 0 &&
+              <span>({getTeamsCount()})</span>
+            }
+          </div>
           {(addProjectsState?.inputs?.maintainedBy ||
             addProjectsState?.inputs?.contributingTeams.length > 0) && (
             <div
@@ -205,6 +230,7 @@ export default function TeamsContributors() {
             <ContributorTeamsList />
           )}
         </div>
+        <InputError content={addProjectsState.errors?.maintainedBy} />
         <div className="flex gap-1">
           <div>
             <Image
@@ -222,25 +248,29 @@ export default function TeamsContributors() {
         <div className="flex cursor-pointer justify-between text-[12px] font-bold leading-[32px] text-[#64748B]">
           <div>
             CONTRIBUTORS{' '}
-            {addProjectsState?.inputs?.contributors?.length > 0 && (
+            {
+              <span>({getContributorsCount()})</span>
+            }
+            {/* {addProjectsState?.inputs?.contributors?.length > 0 && (
               <span>({addProjectsState?.inputs?.contributors?.length})</span>
-            )}
+            )} */}
           </div>
           {addProjectsState?.inputs?.contributors?.length > 0 && (
-            <div className="text-sm font-medium not-italic leading-6 text-[color:var(--Elements-Link,#156FF7)]"
-            onClick={()=>{
-              onContributorAddClick()
-            }}
+            <div
+              className="text-sm font-medium not-italic leading-6 text-[color:var(--Elements-Link,#156FF7)]"
+              onClick={() => {
+                onContributorAddClick();
+              }}
             >
               Add/Remove
             </div>
           )}
         </div>
         <div className="w-full rounded-lg bg-white">
-          {addProjectsState?.inputs?.contributors?.length < 1 && (
-            <DefaultMemberUI onContributorAddClick={onContributorAddClick}/>
+          {getContributorsCount() < 1 && (
+            <DefaultMemberUI onContributorAddClick={onContributorAddClick} />
           )}
-          {addProjectsState?.inputs?.contributors?.length > 0 && (
+          {getContributorsCount() > 0 && (
             <ContributingMembers />
           )}
         </div>
