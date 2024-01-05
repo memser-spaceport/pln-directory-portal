@@ -20,7 +20,6 @@ export default function Contributors({ project, contributingMembers }) {
       : []
     : [];
 
-  console.log(individualContributors);
   const getMemberDetailTemplate = (
     uid,
     name,
@@ -125,7 +124,7 @@ export default function Contributors({ project, contributingMembers }) {
           {project?.contributors?.length > 17 && (
             <div className="relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white pt-[5px] text-center">
               {' '}
-              +{project?.contributors?.length - 17}
+              +{(project?.contributors?.length - 17 + contributingMembers?.length)}
             </div>
           )}
         </div>

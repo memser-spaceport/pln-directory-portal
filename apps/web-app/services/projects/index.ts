@@ -36,6 +36,8 @@ const uploadProjectLogo = async (inputs) => {
 }
 
 const addProject = async (inputs,image) => {
+    // const data = formatToSave(inputs,image?.uid);
+    // return data;
     const data = formatToSave(inputs,image?.uid);
     const addedResponse = await api.post(`/v1/projects`, data);
     return addedResponse;
@@ -76,16 +78,26 @@ const fetchTeams = async () => {
     }
 };
 
-const fetchMembers = async (teamId) => {
+const fetchMembers = async (teamId = null) => {
     try {
-        const response = await api.get(`/v1/members?teamMemberRoles.team.uid=${teamId}&&select=uid,name,image.url,teamMemberRoles&&pagination=false`);
+        let response;
+        if(teamId){
+             response = await api.get(`/v1/members?teamMemberRoles.team.uid=${teamId}&&select=uid,name,image.url,teamMemberRoles.teamLead,teamMemberRoles.mainTeam,teamMemberRoles.team,teamMemberRoles.role&&pagination=false`);
+        }else{
+            response = await api.get(`/v1/members?select=uid,name,image.url,teamMemberRoles.teamLead,teamMemberRoles.mainTeam,teamMemberRoles.team,teamMemberRoles.role&&pagination=false`);
+        }
         if (response.data) {
+            // console.log(response.data);
             return response.data.map((member)=>{
+                const mainTeam = member.teamMemberRoles.find((team) => team.mainTeam) || null;
+                const teamLead = member.teamMemberRoles.some((team) => team.teamLead);
                 return {
                     uid:member.uid,
                     name:member.name,
                     logo: member.image?.url ? member.image.url : null,
-                    // logo:null
+                    teamMemberRoles: member?.teamMemberRoles,
+                    mainTeam:mainTeam,
+                    teamLead,
                 }
             });
         }

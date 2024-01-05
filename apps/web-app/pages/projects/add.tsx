@@ -18,7 +18,7 @@ export default function NewProject() {
     const { breadcrumbItems } = useProfileBreadcrumb({
         backLink: '/projects',
         directoryName: 'Projects',
-        pageName: 'Add',
+        pageName: 'Add Projects',
     });
 
     return (

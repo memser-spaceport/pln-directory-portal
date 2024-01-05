@@ -15,6 +15,7 @@ export function AddProjectContextProvider(props) {
             maintainedByContributors: [],
             collabTeamsList: [],
             contributingTeams: [],
+            contributors: [],
             desc: '',
             projectURLs: [{
                 name: '',
@@ -55,6 +56,7 @@ export function AddProjectContextProvider(props) {
                 desc: projectDetail.description,
                 maintainedByContributors:[],
                 collabTeamsList:[],
+                contributors: projectDetail.contributors,
                 projectURLs: projectDetail.projectLinks,
                 contactEmail: projectDetail.contactEmail,
                 fundsNeeded: projectDetail.fundingNeeded,

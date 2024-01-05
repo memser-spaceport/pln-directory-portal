@@ -128,13 +128,13 @@ export default function Maintainer() {
                         </div>
                     </div>
                     
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                         {
                             maintainerTeamDetails.members && maintainerTeamDetails.members.map((mem, index) => {
                                 return (
                                     <>
                                     {
-                                        mem && !mem.isDeleted && <div key={'mem' + index}>
+                                        mem && !mem.isDeleted && <div key={'mem' + index} className="min-w-[32px] shrink-0">
                                         {
                                             mem.logo &&
                                             <Image src={mem.logo} alt="tea image" width={32} height={32}
@@ -175,7 +175,7 @@ export default function Maintainer() {
                         title='Select Maintaining Team'
                         mode={chooseTeamMode}
                         setTeamDetails={setMaintainerDetails}
-                        teamDetails={maintainerTeamDetails}
+                        // teamDetails={maintainerTeamDetails}
                     />
                 }
             </div>

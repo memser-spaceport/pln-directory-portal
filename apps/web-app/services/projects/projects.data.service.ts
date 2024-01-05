@@ -25,6 +25,8 @@ const getAllFormattedProjects = (data) => {
 }
 
 const formatToSave = (inputs, imageUid) => {
+    console.log(inputs);
+    
 
     // const userInfo = Cookies.get('userInfo') ? JSON.parse(Cookies.get('userInfo')) : null;
     const objectToSave = {
@@ -94,53 +96,82 @@ const formatToSave = (inputs, imageUid) => {
     
     objectToSave['projectLinks'] = tempProjectlinks;
 
-    const tempCTeam = [];
-    const tempContributors = [];
+    let tempCTeam = [];
+    let tempContributors = [];
 
-    inputs.maintainedByContributors?.forEach(contributor => {
-        const contriObj = {
-            "type": "MAINTENER",
-            "teamUid": inputs?.maintainedBy?.uid,
-            "memberUid": contributor.uid
-         };
-         if(contributor.cuid){
-            contriObj['uid'] = contributor.cuid;
-        }
-        if(contributor.isDeleted){
-            contriObj['isDeleted'] = contributor.isDeleted;
-        }
-         tempContributors.push(contriObj);
+    // inputs.maintainedByContributors?.forEach(contributor => {
+    //     const contriObj = {
+    //         "type": "MAINTENER",
+    //         "teamUid": inputs?.maintainedBy?.uid,
+    //         "memberUid": contributor.uid
+    //      };
+    //      if(contributor.cuid){
+    //         contriObj['uid'] = contributor.cuid;
+    //     }
+    //     if(contributor.isDeleted){
+    //         contriObj['isDeleted'] = contributor.isDeleted;
+    //     }
+    //      tempContributors.push(contriObj);
+    // });
+
+    // inputs.collabTeamsList?.forEach(collabContributor => {
+    //     const teamObj = {
+    //         uid:collabContributor?.team?.uid,
+    //         name:collabContributor?.team?.name
+    //     };
+    //     tempCTeam.push(teamObj);
+    //     collabContributor?.members?.forEach(mem => {
+    //          const contriObj = {
+    //              "type": "COLLABORATOR",
+    //              "teamUid": collabContributor?.team?.uid,
+    //              // "memberUid": collabContributor.uid
+    //           };
+    //         contriObj['memberUid'] = mem.uid;
+    //         if(mem.cuid){
+    //             contriObj['uid'] = mem.cuid;
+    //         }
+    //         if(mem.isDeleted){
+    //             contriObj['isDeleted'] = mem.isDeleted;
+    //         }
+    //         tempContributors.push(contriObj);
+    //      });
+    // });
+
+    // tempContributors = inputs.contributors?.map(member=>{
+    //     if(!member?.isDeleted){
+    //         return {
+    //             "memberUid":member.uid
+    //         }
+    //     }
+    // });
+
+    inputs.contributors?.forEach((element) => {
+      if (!element?.isDeleted) {
+        tempContributors.push({
+          memberUid: element.uid,
+        });
+      }
     });
 
-    inputs.collabTeamsList?.forEach(collabContributor => {
-        const teamObj = {
-            uid:collabContributor?.team?.uid,
-            name:collabContributor?.team?.name
-        };
-        tempCTeam.push(teamObj);
-        collabContributor?.members?.forEach(mem => {
-             const contriObj = {
-                 "type": "COLLABORATOR",
-                 "teamUid": collabContributor?.team?.uid,
-                 // "memberUid": collabContributor.uid
-              };
-            contriObj['memberUid'] = mem.uid;
-            if(mem.cuid){
-                contriObj['uid'] = mem.cuid;
-            }
-            if(mem.isDeleted){
-                contriObj['isDeleted'] = mem.isDeleted;
-            }
-            tempContributors.push(contriObj);
-         });
+    tempCTeam = inputs.contributingTeams?.map((team) => {
+      return {
+        uid: team?.uid,
+        name: team?.name,
+      };
     });
+    
     objectToSave['contributingTeams'] = tempCTeam;
     objectToSave['contributors'] = tempContributors;
+
+    console.log(objectToSave);
+    
 
     return objectToSave;
 }
 
 const getFormattedProject = (project) => {
+    
+    console.log(project);
     
     try {
         const formattedProject = {};
@@ -159,12 +190,13 @@ const getFormattedProject = (project) => {
             formattedProject['maintainingTeam'] = project.maintainingTeam;
             formattedProject['isDeleted'] = project.isDeleted ?? false;
             formattedProject['contributors'] = project.contributors ?? null;
-            
+            formattedProject['createdBy'] = project.createdBy ?? null;
+
             const tempCTeams = [];
             project.contributingTeams.map(team=>{
                 const teamObj = {};
-                teamObj['value'] = team.uid;
-                teamObj['label'] = team.name;
+                teamObj['uid'] = team.uid;
+                teamObj['name'] = team.name;
                 teamObj['logo'] = team.logo ? team.logo.url : null;
                 tempCTeams.push(teamObj);
             });

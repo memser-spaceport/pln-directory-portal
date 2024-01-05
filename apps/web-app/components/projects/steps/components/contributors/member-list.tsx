@@ -2,6 +2,8 @@ import { InputField } from "@protocol-labs-network/ui";
 import MemberRow from "./member-row";
 import { SearchIcon } from '@heroicons/react/outline';
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
+import Image from "next/image";
 
 export default function MemberList({
   list,
@@ -11,10 +13,14 @@ export default function MemberList({
 }) {
 
   const [searchTerm, setSearchTerm] = useState(null);
+  const [seeMore, setSeeMore] = useState(false);
+  const [showSelected, setShowSelected] = useState(false);
   const [filteredList, setFilteredList] = useState(list);
   const [selectAllFlag, setSelectAll] = useState(
     selectedMembers?.length === list?.length
   );
+
+  const route = useRouter();
 
   useEffect(() => {
     if (list) {
@@ -37,14 +43,18 @@ export default function MemberList({
 
   const onselect = (member) => {
     if (checkForExistance(member) === 'no-data') {
+      // console.log(selectedMembers);
+      
       setSelectedMembers([...selectedMembers, member]);
-      if (selectedMembers.length + 1 === list.length) {
-        setSelectAll(true);
-      }
+      // if (selectedMembers.length + 1 === list.length) {
+      //   setSelectAll(true);
+      // }
     }
   };
 
   const onDeselect = (member) => {
+    // console.log(route.pathname);"/projects/add"
+    
     const checker = checkForExistance(member);
     if (checker !== 'no-data') {
       const temp = [...selectedMembers];
@@ -99,6 +109,10 @@ export default function MemberList({
     }
   };
 
+  const onShowSelected = (event) => {
+    setShowSelected(event.target.checked);
+  }
+
   const getSelectedCount = () => {
     const counterArr = selectedMembers?.filter(member=>{
       return !member?.isDeleted
@@ -107,7 +121,7 @@ export default function MemberList({
   }
 
   return (
-    <div className="flex flex-col gap-3 h-[95%] overflow-y-scroll">
+    <div className="flex h-[89%] flex-col gap-3 overflow-y-scroll">
       <div className="pr-5 pb-3">
         <InputField
           label="Search"
@@ -126,17 +140,77 @@ export default function MemberList({
           onClear={() => setSearchTerm('')}
         />
       </div>
-      <div className="flex gap-3">
-        <input
+      <div className="mr-5 flex justify-between border-b pb-3">
+        {/* <input
           type="checkbox"
           className="cursor-pointer"
           onChange={onSelectAll}
           checked={selectAllFlag}
-        />
+        /> */}
         <div className="text-[10px] font-semibold not-italic leading-5 text-[#0F172A]">
           {selectedMembers && getSelectedCount()} SELECTED
         </div>
+        <div className="flex gap-2 text-sm font-normal not-italic leading-5 text-[color:var(--Neutral-Slate-900,#0F172A)]">
+          <div className="">
+            <input
+              type="checkbox"
+              className="relative top-[2px] cursor-pointer"
+              onChange={onShowSelected}
+              checked={showSelected}
+            />
+          </div>
+          <div>Show selected contributors</div>
+        </div>
       </div>
+      {showSelected && selectedMembers.length > 0 &&(
+        <div className="relative mr-5 border-b pb-3">
+          {selectedMembers &&
+            selectedMembers.slice(0, 3).map((member, index) => {
+              return (
+                <MemberRow
+                  key={member + index}
+                  data={member}
+                  onselect={onselect}
+                  onDeselect={onDeselect}
+                  defaultValue={checkForExistance(member) !== 'no-data'}
+                />
+              );
+            })}
+          {selectedMembers &&
+            seeMore &&
+            selectedMembers
+              .slice(3, selectedMembers.length)
+              .map((member, index) => {
+                return (
+                  <MemberRow
+                    key={member + index}
+                    data={member}
+                    onselect={onselect}
+                    onDeselect={onDeselect}
+                    defaultValue={checkForExistance(member) !== 'no-data'}
+                  />
+                );
+              })}
+          {selectedMembers && selectedMembers.length > 3 && !seeMore && (
+            <div
+              className="absolute bottom-[-11px] left-[41%] cursor-pointer"
+              onClick={() => {
+                setSeeMore(true);
+              }}
+            >
+              <div className="h-[22px] rounded-[43px] border border-solid border-[#E2E8F0] bg-white px-2 text-xs font-medium not-italic leading-5 text-[#156FF7]">
+                <span className="pr-1">See more</span>
+                <Image
+                  src={'/assets/images/icons/projects/see-more.svg'}
+                  alt="info image"
+                  width={8}
+                  height={8}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       {filteredList &&
         filteredList.map((member, index) => {
           return (
@@ -149,9 +223,15 @@ export default function MemberList({
             />
           );
         })}
-      {filteredList && filteredList.length < 1 && (
-        <>No members were added to the team yet to select.</>
-      )}
+      {filteredList &&
+        filteredList.length < 1 &&
+        searchTerm !== '' &&
+        searchTerm !== null && (
+          <>No member available with that search criteria.</>
+        )}
+      {filteredList &&
+        filteredList.length < 1 &&
+        (searchTerm === null || searchTerm === '') && <>No member available.</>}
     </div>
   );
 }
