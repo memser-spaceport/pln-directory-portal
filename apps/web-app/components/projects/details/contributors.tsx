@@ -9,6 +9,9 @@ export default function Contributors({ project, contributingMembers }) {
   const [contributorHoverFlag, setContributorHoverFlag] = useState(false);
   const [contributorHoveruid, setContributorHoveruid] = useState('');
 
+  console.log(project);
+  
+
   const contributors =
     project?.contributors?.length > 17
       ? project.contributors.slice(0, 17)
@@ -86,21 +89,30 @@ export default function Contributors({ project, contributingMembers }) {
         <div className="flex flex-wrap gap-1">
           {project?.contributors?.length > 0 &&
             contributors.map((contri) => {
-              const mainTeam = contri.member?.teamMemberRoles?.filter(teamRoles=>{
-                return teamRoles?.mainTeam === true;
-              });
+              // const mainTeam = contri.member?.teamMemberRoles?.filter(teamRoles=>{
+              //   return teamRoles?.mainTeam === true;
+              // });
 
-              const teamLeadArr = contri.member?.teamMemberRoles?.filter(teamRoles=>{
-                return teamRoles?.teamLead === true;
-              });
+              // const teamLeadArr = contri.member?.teamMemberRoles?.filter(teamRoles=>{
+              //   return teamRoles?.teamLead === true;
+              // });
               
+              // return getMemberDetailTemplate(
+              //   contri?.member?.uid,
+              //   contri?.member?.name,
+              //   contri.member?.image?.url,
+              //   mainTeam?.length ? mainTeam[0]?.role : '',
+              //   mainTeam?.length ? mainTeam[0]?.team?.name : '',
+              //   teamLeadArr?.length > 0
+              // );
+
               return getMemberDetailTemplate(
-                contri?.member?.uid,
-                contri?.member?.name,
-                contri.member?.image?.url,
-                mainTeam?.length ? mainTeam[0]?.role : '',
-                mainTeam?.length ? mainTeam[0]?.team?.name : '',
-                teamLeadArr?.length > 0
+                contri?.uid,
+                contri?.name,
+                contri?.logo,
+                contri?.mainTeam?.role? contri?.mainTeam?.role : 'Contributor',
+                contri?.mainTeam?.team?.name? contri?.mainTeam?.team?.name : '',
+                contri?.teamLead
               );
             })}
           {contributingMembers &&

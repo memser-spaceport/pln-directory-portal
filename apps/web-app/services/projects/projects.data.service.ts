@@ -97,7 +97,7 @@ const formatToSave = (inputs, imageUid) => {
     objectToSave['projectLinks'] = tempProjectlinks;
 
     let tempCTeam = [];
-    let tempContributors = [];
+    const tempContributors = [];
 
     // inputs.maintainedByContributors?.forEach(contributor => {
     //     const contriObj = {
@@ -147,9 +147,12 @@ const formatToSave = (inputs, imageUid) => {
 
     inputs.contributors?.forEach((element) => {
       if (!element?.isDeleted) {
-        tempContributors.push({
-          memberUid: element.uid,
-        });
+        const tempContri = {};
+        tempContri['memberUid'] = element.uid;
+        if(element?.cuid){
+            tempContri['uid'] = element.cuid;
+        }
+        tempContributors.push(tempContri);
       }
     });
 
@@ -162,17 +165,11 @@ const formatToSave = (inputs, imageUid) => {
     
     objectToSave['contributingTeams'] = tempCTeam;
     objectToSave['contributors'] = tempContributors;
-
-    console.log(objectToSave);
-    
-
     return objectToSave;
 }
 
 const getFormattedProject = (project) => {
-    
-    console.log(project);
-    
+   
     try {
         const formattedProject = {};
         if (project) {
@@ -189,8 +186,26 @@ const getFormattedProject = (project) => {
             formattedProject['teamUid'] = project.maintainingTeamUid;
             formattedProject['maintainingTeam'] = project.maintainingTeam;
             formattedProject['isDeleted'] = project.isDeleted ?? false;
-            formattedProject['contributors'] = project.contributors ?? null;
+            // formattedProject['contributors'] = project.contributors ?? null;
             formattedProject['createdBy'] = project.createdBy ?? null;
+
+            const tempContributors = [];
+            project.contributors?.map((mem)=>{
+                const memberObj = {};
+                memberObj['logo'] = mem?.member?.image?.url;
+                const mainTeam = mem?.member?.teamMemberRoles?.filter(teamRoles=>{
+                    return teamRoles?.mainTeam === true;
+                  });
+                memberObj['mainTeam'] = mainTeam ? mainTeam[0] : null;
+                memberObj['name'] = mem?.member?.name;
+                const teamLead = mem?.member?.teamMemberRoles.some((team) => team.teamLead);
+                memberObj['teamLead'] =  teamLead,
+                memberObj['teamMemberRoles'] = mem?.member?.teamMemberRoles;
+                memberObj['uid'] = mem?.member?.uid,
+                memberObj['cuid'] = mem?.uid;
+                tempContributors.push(memberObj);
+            });
+            formattedProject['contributors'] = tempContributors;
 
             const tempCTeams = [];
             project.contributingTeams.map(team=>{
