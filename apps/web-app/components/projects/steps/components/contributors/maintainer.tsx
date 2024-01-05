@@ -175,7 +175,7 @@ export default function Maintainer() {
                         title='Select Maintaining Team'
                         mode={chooseTeamMode}
                         setTeamDetails={setMaintainerDetails}
-                        teamDetails={maintainerTeamDetails}
+                        // teamDetails={maintainerTeamDetails}
                     />
                 }
             </div>
