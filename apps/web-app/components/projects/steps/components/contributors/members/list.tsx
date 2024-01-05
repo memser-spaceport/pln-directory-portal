@@ -2,7 +2,7 @@ import { UserGroupIcon } from '@heroicons/react/solid';
 import ContributorProfileCard from 'apps/web-app/components/projects/details/contributor-profile-card';
 import { AddProjectsContext } from 'apps/web-app/context/projects/add.context';
 import Image from 'next/image';
-import { useContext, useState } from 'react';
+import React, { useContext, useState } from 'react';
 
 export default function ContributingMembers() {
   const { addProjectsState, addProjectsDispatch } =
@@ -16,10 +16,9 @@ export default function ContributingMembers() {
       {addProjectsState?.inputs?.contributors?.length > 0 &&
         addProjectsState?.inputs?.contributors.map((member) => {
           return (
-            <>
+            <React.Fragment key={member.uid}>
               {!member?.isDeleted && (
                 <div
-                  key={'uid' + member.uid}
                   className="relative"
                   onMouseOver={() => {
                     setContributorHoveruid(member?.uid);
@@ -58,7 +57,7 @@ export default function ContributingMembers() {
                     )}
                 </div>
               )}
-            </>
+            </React.Fragment>
           );
         })}
     </div>
