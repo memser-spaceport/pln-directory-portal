@@ -223,7 +223,7 @@ export default function CollabTeams() {
                     title='Select Collaborating Team'
                     mode={chooseTeamMode}
                     setTeamDetails={setCollabDetails}
-                    teamDetails={collabTeamDetails}
+                    // teamDetails={collabTeamDetails}
                 />
             }
         </>

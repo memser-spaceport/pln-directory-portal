@@ -10,13 +10,15 @@ import { AddProjectsContext } from "apps/web-app/context/projects/add.context";
 
 export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails, mode }) {
 
-    const contriTitle = 'Select Contributors';
-
+    const contriTitle = 'Edit Contributors';
+    
+    
     const { contributorsState, contributorsDispatch } =
     useContext(ContributorsContext);
-
+    
     const { addProjectsState, addProjectsDispatch } =
     useContext(AddProjectsContext);
+    console.log(contributorsState.chooseTeamPopup.UIType,title);
 
     const [showContributor, setContributorsFlag] = useState(contributorsState.chooseTeamPopup.UIType === 'MEMBER'  ? true : false);
     const [popupTitle, setPopupTitle] = useState(contributorsState.chooseTeamPopup.UIType === 'MEMBER' ? contriTitle : title);
@@ -42,7 +44,6 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
               contributorsState.chooseTeamPopup.selectedTeam?.uid
             ).then((members) => {
               setMembers(members);
-              console.log(addProjectsState.inputs.contributors);
               
               setSelectedMembers(addProjectsState.inputs.contributors);
             });
@@ -60,7 +61,7 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
         const members = await ProjectsService.fetchMembers(team.uid);
         setMembers(members);
         setContributorsFlag(true);
-        setPopupTitle(contriTitle);
+        setPopupTitle('Select Contributors');
     }
 
     const onSave = (skipFlag = false) => {
@@ -68,7 +69,7 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
       if(skipFlag){
         details = {
           team: selectedTeam,
-          members: [],
+          members: selectedMembers,
         };
       }else{
         details = {

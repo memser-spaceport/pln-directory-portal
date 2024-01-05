@@ -20,7 +20,6 @@ export default function Contributors({ project, contributingMembers }) {
       : []
     : [];
 
-  console.log(individualContributors);
   const getMemberDetailTemplate = (
     uid,
     name,

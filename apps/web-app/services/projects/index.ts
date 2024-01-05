@@ -36,6 +36,8 @@ const uploadProjectLogo = async (inputs) => {
 }
 
 const addProject = async (inputs,image) => {
+    // const data = formatToSave(inputs,image?.uid);
+    // return data;
     const data = formatToSave(inputs,image?.uid);
     const addedResponse = await api.post(`/v1/projects`, data);
     return addedResponse;
