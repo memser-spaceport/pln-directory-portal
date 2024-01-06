@@ -18,7 +18,6 @@ import ProjectForms from "apps/web-app/components/projects/steps/steps-form";
 import ProjectActionButtons from "apps/web-app/components/projects/steps/project-action-buttons";
 
 export default function EditProject({ selectedProject }) {
-    console.log(selectedProject);
     
     const { breadcrumbItems } = useProfileBreadcrumb({
         backLink: '/projects',

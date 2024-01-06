@@ -18,7 +18,6 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
     
     const { addProjectsState, addProjectsDispatch } =
     useContext(AddProjectsContext);
-    console.log(contributorsState.chooseTeamPopup.UIType,title);
 
     const [showContributor, setContributorsFlag] = useState(contributorsState.chooseTeamPopup.UIType === 'MEMBER'  ? true : false);
     const [popupTitle, setPopupTitle] = useState(contributorsState.chooseTeamPopup.UIType === 'MEMBER' ? contriTitle : title);

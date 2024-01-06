@@ -11,8 +11,6 @@ export default function ContributorTeamsList() {
   const { contributorsState, contributorsDispatch } =
     useContext(ContributorsContext);
 
-  console.log(addProjectsState.inputs);
-
   const onEdit = (team,type) => {
     contributorsDispatch({
         type: 'SET_CHOOSE_TEAM_POPUP',
@@ -24,6 +22,10 @@ export default function ContributorTeamsList() {
           selectedTeam: team,
           UIType: 'TEAM'
         },
+      });
+      contributorsDispatch({
+        type: 'SET_TYPE',
+        payload: type,
       });
   }
 
