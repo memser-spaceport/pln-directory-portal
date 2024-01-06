@@ -25,8 +25,6 @@ const getAllFormattedProjects = (data) => {
 }
 
 const formatToSave = (inputs, imageUid) => {
-    console.log(inputs);
-    
 
     // const userInfo = Cookies.get('userInfo') ? JSON.parse(Cookies.get('userInfo')) : null;
     const objectToSave = {

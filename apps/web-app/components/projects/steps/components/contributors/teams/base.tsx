@@ -58,7 +58,9 @@ export default function TeamsContributors() {
 
   const setTeamAndContributors = (details) => {
     if (contributorsState.chooseTeamPopup.UIType === 'TEAM') {
+      debugger
       if (contributorsState.type === 'Maintainer') {
+        
         addProjectsDispatch({
           type: 'SET_INPUT',
           payload: {

@@ -9,9 +9,6 @@ export default function Contributors({ project, contributingMembers }) {
   const [contributorHoverFlag, setContributorHoverFlag] = useState(false);
   const [contributorHoveruid, setContributorHoveruid] = useState('');
 
-  console.log(project);
-  
-
   const contributors =
     project?.contributors?.length > 17
       ? project.contributors.slice(0, 17)
