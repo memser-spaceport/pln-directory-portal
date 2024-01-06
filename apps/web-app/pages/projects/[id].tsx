@@ -168,8 +168,6 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     let userHasEditRights = false;
     let userHasDeleteRights = false;
 
-    console.log(selectedProjectResponse);
-
     if (selectedProjectResponse.status === 200) {
         selectedProject = ProjectsDataService.getFormattedProject(selectedProjectResponse.body);
         userHasEditRights = await checkForEditRights(userInfo, selectedProject, isUserLoggedIn);
