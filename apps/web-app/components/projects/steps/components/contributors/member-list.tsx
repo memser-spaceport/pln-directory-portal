@@ -10,9 +10,13 @@ export default function MemberList({
   selectedMembers,
   setSelectedMembers,
   originalSelectedMembers = [],
+  selectedTeam
 }) {
 
   const [searchTerm, setSearchTerm] = useState(null);
+  const [showSelectedMembers, setShowSelectedMembers] = useState(
+    selectedMembers ? selectedMembers : null
+  );
   const [seeMore, setSeeMore] = useState(false);
   const [showSelected, setShowSelected] = useState(false);
   const [filteredList, setFilteredList] = useState(list);
@@ -38,6 +42,21 @@ export default function MemberList({
   useEffect(() => {
     setFilteredList(list);
   }, [list]);
+
+  const getShowSelectedMembers = () => {
+    let memberArr = [];
+    if (selectedTeam) {
+      memberArr = selectedMembers?.filter((member) => {
+        const teamArr = member?.teamMemberRoles?.filter((teamMem) => {
+          return selectedTeam?.uid === teamMem.team?.uid;
+        });
+        return !member?.isDeleted && teamArr?.length >0 ;
+      });
+      setShowSelectedMembers(memberArr);
+    }else{
+      setShowSelectedMembers(selectedMembers);
+    }
+  };
 
   const onselect = (member) => {
     if (checkForExistance(member) === 'no-data') {
@@ -108,15 +127,30 @@ export default function MemberList({
   };
 
   const onShowSelected = (event) => {
+    if(event.target.checked){
+      getShowSelectedMembers();
+    }
     setShowSelected(event.target.checked);
   }
 
   const getSelectedCount = () => {
-    const counterArr = selectedMembers?.filter(member=>{
-      return !member?.isDeleted
-    });
+    let counterArr = [];
+    if (!selectedTeam) {
+      counterArr = selectedMembers?.filter((member) => {
+        return !member?.isDeleted;
+      });
+    } else {
+      counterArr = selectedMembers?.filter((member) => {
+        const teamArr = member?.teamMemberRoles?.filter((teamMem) => {
+          return selectedTeam?.uid === teamMem.team?.uid;
+        });
+        return !member?.isDeleted && teamArr?.length;
+      });
+    }
     return counterArr?.length;
-  }
+  };
+
+  
 
   return (
     <div className="flex h-[89%] flex-col gap-3 overflow-y-scroll">
@@ -160,10 +194,10 @@ export default function MemberList({
           <div>Show selected contributors</div>
         </div>
       </div>
-      {showSelected && selectedMembers.length > 0 && (
+      {showSelected && showSelectedMembers.length > 0 && (
         <div className="relative mr-5 border-b pb-3">
-          {selectedMembers &&
-            selectedMembers.slice(0, 3).map((member, index) => {
+          {showSelectedMembers &&
+            showSelectedMembers.slice(0, 3).map((member, index) => {
               return (
                 <React.Fragment key={member + index}>
                   {!member?.isDeleted && (
@@ -178,10 +212,10 @@ export default function MemberList({
                 </React.Fragment>
               );
             })}
-          {selectedMembers &&
+          {showSelectedMembers &&
             seeMore &&
-            selectedMembers
-              .slice(3, selectedMembers.length)
+            showSelectedMembers
+              .slice(3, showSelectedMembers.length)
               .map((member, index) => {
                 return (
                   <React.Fragment key={member + index}>
@@ -197,7 +231,7 @@ export default function MemberList({
                   </React.Fragment>
                 );
               })}
-          {selectedMembers && selectedMembers.length > 3 && !seeMore && (
+          {showSelectedMembers && showSelectedMembers.length > 3 && !seeMore && (
             <div
               className="absolute bottom-[-11px] left-[41%] cursor-pointer"
               onClick={() => {

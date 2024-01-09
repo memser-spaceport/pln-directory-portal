@@ -40,7 +40,7 @@ export default function TeamProfileProjectCard({ project, hasProjectsEditAccess 
                                 from: 'teams-details',
                                 projectId: project.id
                             });
-                        router.push(`/projects/edit/${project.id}`);
+                        router.push(`/projects/update/${project.id}`);
                      }}
                     >
                         <Image src='/assets/images/icons/projects/edit-project.svg' alt="project image" width={24} height={24} />

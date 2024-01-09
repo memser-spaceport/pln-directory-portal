@@ -3,37 +3,64 @@ import Image from "next/image";
 
 export default function TeamRow({ onSelect, team }) {
     return (
-        <>
-            <div className="flex justify-between items-center self-stretch pr-3 py-2.5">
-                <div className="flex gap-2 items-center">
-                    {
-                        team.logo &&
-                        <Image src={team.logo} alt="tea image" width={40} height={40}
-                            className='w-10 h-10 shrink-0 rounded-full border border-[#E2E8F0] border-solid' />
-                    }
-                    {
-                        !team.logo &&
-                        <UserGroupIcon className="w-[40px] h-[40px] fill-slate-200 bg-slate-100 rounded-full" />
-                    }
-                    <div className="text-black text-base not-italic font-normal leading-5">
-                        {team.name}
-                    </div>
-                </div>
-                <div>
-                    <div className={`flex items-center rounded border border-[color:var(--primary-pl-blue,#156FF7)] px-3 py-1.5 border-solid cursor-pointer 
-                    ${team?.added?'cursor-not-allowed border-slate-600':''}`}
-                        onClick={() => { 
-                            if(!team?.added){
-                                onSelect(team)
-                            }
-                         }}
-                    >
-                        <div className={` text-sm not-italic font-normal leading-5 ${team?.added ? 'text-slate-600':'text-[color:var(--primary-pl-blue,#156FF7)]'}`}>
-                            Select
-                        </div>
-                    </div>
-                </div>
+      <>
+        <div className="flex items-center justify-between self-stretch py-2.5 pr-3">
+          <div className="flex items-center gap-2">
+            {team.logo && (
+              <Image
+                src={team.logo}
+                alt="tea image"
+                width={40}
+                height={40}
+                className="h-10 w-10 shrink-0 rounded-full border border-solid border-[#E2E8F0]"
+              />
+            )}
+            {!team.logo && (
+              <UserGroupIcon className="h-[40px] w-[40px] rounded-full bg-slate-100 fill-slate-200" />
+            )}
+            <div className="text-base font-normal not-italic leading-5 text-black">
+              {team.name}
             </div>
-        </>
+          </div>
+          <div>
+            <div
+              className={`flex cursor-pointer items-center  rounded border-solid px-3 py-1.5 
+                    ${
+                      team?.added
+                        ? 'cursor-not-allowed '
+                        : 'border border-[color:var(--primary-pl-blue,#156FF7)] '
+                    }`}
+              onClick={() => {
+                if (!team?.added) {
+                  onSelect(team);
+                }
+              }}
+            >
+              <div
+                className={` text-sm font-normal not-italic leading-5 ${
+                  team?.added
+                    ? 'text-slate-600'
+                    : 'text-[color:var(--primary-pl-blue,#156FF7)]'
+                }`}
+              >
+                {!team?.added ? (
+                  'Select'
+                ) : (
+                  <>
+                    <span className="relative top-[3px]"><Image
+                      src="/assets/images/icons/projects/added.svg"
+                      alt="tea image"
+                      className="relative top-[3px]"
+                      width={16}
+                      height={16}
+                    /></span>
+                    <span>Added</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
     );
 }

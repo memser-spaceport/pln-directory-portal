@@ -144,13 +144,22 @@ const formatToSave = (inputs, imageUid) => {
     // });
 
     inputs.contributors?.forEach((element) => {
+      const tempContri = {};
       if (!element?.isDeleted) {
-        const tempContri = {};
         tempContri['memberUid'] = element.uid;
-        if(element?.cuid){
-            tempContri['uid'] = element.cuid;
+        if (element?.cuid) {
+          tempContri['uid'] = element.cuid;
         }
         tempContributors.push(tempContri);
+      } else {
+          if (element?.cuid) {
+            tempContri['memberUid'] = element.uid;
+          tempContri['uid'] = element.cuid;
+          tempContri['isDeleted'] = element?.isDeleted
+            ? element?.isDeleted
+            : false;
+            tempContributors.push(tempContri);
+        }
       }
     });
 
@@ -187,14 +196,15 @@ const getFormattedProject = (project) => {
             // formattedProject['contributors'] = project.contributors ?? null;
             formattedProject['createdBy'] = project.createdBy ?? null;
 
+            
             const tempContributors = [];
             project.contributors?.map((mem)=>{
                 const memberObj = {};
                 memberObj['logo'] = mem?.member?.image?.url;
                 const mainTeam = mem?.member?.teamMemberRoles?.filter(teamRoles=>{
                     return teamRoles?.mainTeam === true;
-                  });
-                memberObj['mainTeam'] = mainTeam ? mainTeam[0] : null;
+                });
+                memberObj['mainTeam'] = mainTeam && mainTeam.length > 0 ? mainTeam[0] : null;
                 memberObj['name'] = mem?.member?.name;
                 const teamLead = mem?.member?.teamMemberRoles.some((team) => team.teamLead);
                 memberObj['teamLead'] =  teamLead,
