@@ -27,9 +27,7 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
     const [selectedMembers, setSelectedMembers] = useState([]);
 
     useEffect(() => {
-        if (mode === 'ADD') {
-          setPopupTitle(title);
-          let teams = [];
+      let teams = [];
           if (addProjectsState.inputs.maintainedBy) {
             teams.push(addProjectsState.inputs.maintainedBy);
           }
@@ -39,14 +37,15 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
           ) {
             teams = [...teams, ...addProjectsState.inputs.contributingTeams];
           }
-            
+        if (mode === 'ADD') {
+          setPopupTitle(title);
           ProjectsService.fetchTeams(true,teams).then((res) => {
             setAllTeams(res);
             setSelectedMembers(addProjectsState.inputs.contributors);
           });
         } else {
           if (contributorsState.chooseTeamPopup.UIType === 'TEAM') {
-            ProjectsService.fetchTeams().then((res) => {
+            ProjectsService.fetchTeams(true,teams).then((res) => {
               setAllTeams(res);
             });
             setTeam(contributorsState.chooseTeamPopup.selectedTeam);
@@ -154,9 +153,9 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
                               <div
                                 className={`flex cursor-pointer items-center rounded border border-solid border-[color:var(--Primary-PL-Blue,#156FF7)] px-3 py-1.5`}
                                 onClick={() => {
-                                  if (selectedTeamAllMembers?.length) {
+                                  // if (selectedTeamAllMembers?.length) {
                                     onSave(true);
-                                  }
+                                  // }
                                 }}
                               >
                                 <div
@@ -172,6 +171,8 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
                               onClick={() => {
                                 if (selectedTeamAllMembers?.length) {
                                   onSave();
+                                }else{
+                                  onSave(true);
                                 }
                               }}
                             >
@@ -208,6 +209,7 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
                           originalSelectedMembers={
                             addProjectsState.inputs.contributors
                           }
+                          selectedTeam={selectedTeam}
                         />
                       )}
                     </>
