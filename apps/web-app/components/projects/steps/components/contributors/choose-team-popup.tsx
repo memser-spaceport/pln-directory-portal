@@ -29,7 +29,18 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
     useEffect(() => {
         if (mode === 'ADD') {
           setPopupTitle(title);
-          ProjectsService.fetchTeams().then((res) => {
+          let teams = [];
+          if (addProjectsState.inputs.maintainedBy) {
+            teams.push(addProjectsState.inputs.maintainedBy);
+          }
+          if (
+            addProjectsState.inputs.contributingTeams &&
+            addProjectsState.inputs.contributingTeams.length
+          ) {
+            teams = [...teams, ...addProjectsState.inputs.contributingTeams];
+          }
+            
+          ProjectsService.fetchTeams(true,teams).then((res) => {
             setAllTeams(res);
             setSelectedMembers(addProjectsState.inputs.contributors);
           });
@@ -68,7 +79,7 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
       if(skipFlag){
         details = {
           team: selectedTeam,
-          members: selectedMembers,
+          members: addProjectsState.inputs.contributors,
         };
       }else{
         details = {

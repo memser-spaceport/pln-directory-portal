@@ -20,10 +20,15 @@ export default function TeamRow({ onSelect, team }) {
                     </div>
                 </div>
                 <div>
-                    <div className="flex items-center rounded border border-[color:var(--primary-pl-blue,#156FF7)] px-3 py-1.5 border-solid cursor-pointer"
-                        onClick={() => { onSelect(team) }}
+                    <div className={`flex items-center rounded border border-[color:var(--primary-pl-blue,#156FF7)] px-3 py-1.5 border-solid cursor-pointer 
+                    ${team?.added?'cursor-not-allowed border-slate-600':''}`}
+                        onClick={() => { 
+                            if(!team?.added){
+                                onSelect(team)
+                            }
+                         }}
                     >
-                        <div className="text-[color:var(--primary-pl-blue,#156FF7)] text-sm not-italic font-normal leading-5">
+                        <div className={` text-sm not-italic font-normal leading-5 ${team?.added ? 'text-slate-600':'text-[color:var(--primary-pl-blue,#156FF7)]'}`}>
                             Select
                         </div>
                     </div>
