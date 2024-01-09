@@ -64,6 +64,7 @@ export const getServerSideProps = async (
   if (authResp.status === 403) {
     setCookie(ctx, 'verified', 'false' , {
       path: '/',
+      domain: process.env.COOKIE_DOMAIN || ''
     });
     return {
       redirect: {
@@ -104,7 +105,8 @@ export const getServerSideProps = async (
       domain: process.env.COOKIE_DOMAIN || ''
     });
     setCookie(ctx, 'verified', 'true' , {
-      path: '/'
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN || ''
     });
     if (userInfo?.isFirstTimeLogin) {
       return {
