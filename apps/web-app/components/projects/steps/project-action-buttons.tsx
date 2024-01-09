@@ -93,8 +93,9 @@ export default function ProjectActionButtons() {
             if(addProjectsState.mode === 'ADD'){
                 const data = await ProjectsService.addProject(addProjectsState.inputs, image);
                 if (data.status === 201) {
-                    toast.info("Project added successfully.")
                     router.push('/projects');
+                    setIsProcessing(false);
+                    toast.info("Project added successfully.")
                 }
             }else{
                 const data = await ProjectsService.updateProjectDetails(addProjectsState.inputs, image,addProjectsState.inputs.id);
@@ -106,16 +107,16 @@ export default function ProjectActionButtons() {
                         //         'projectId': data.data.uid,
                         //     }
                         //   );
-                        toast.info("Project updated successfully.");
                         router.push('/projects/'+data.data.uid);
+                        setIsProcessing(false);
+                        toast.info("Project updated successfully.");
                     }
             }
         } catch (err) {
+            setIsProcessing(false);
             console.log(err);
             // toast.error('Something went wrong.Please try again.')
-        } finally{
-            setIsProcessing(false);
-        }
+        } 
     }
 
     const validateStep0 = () => {
