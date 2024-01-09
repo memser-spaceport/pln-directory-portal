@@ -12,6 +12,9 @@ export function AllTeamsModal({
     setIsModalOpen,
     project,
 }) {
+
+    console.log(project.contributingTeams);
+    
     const router = useRouter();
     const analytics = useAppAnalytics();
 
@@ -24,10 +27,10 @@ export function AllTeamsModal({
     }
 
     const onContributingTeamClicked = (cteam) => {
-        router.push('/teams/' + cteam.value);
+        router.push('/teams/' + cteam.uid);
         analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_CONTRIBUTING_TEAM_CLICKED, {
-            teamUid: cteam.value,
-            teamName: cteam.label,
+            teamUid: cteam.uid,
+            teamName: cteam.name,
         });
     }
 
@@ -74,7 +77,7 @@ export function AllTeamsModal({
                                             {
                                                 !cteam.logo && <UserGroupIcon className="bg-gray-200 fill-white inline inset-y-0 left-2 my-auto h-[40px] w-[40px] rounded mr-[4px]" />
                                             }
-                                            <div className="m-2">{cteam.label}</div>
+                                            <div className="m-2">{cteam.name}</div>
                                         </div>
                                     }
                                 </React.Fragment>
