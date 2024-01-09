@@ -60,16 +60,36 @@ const deleteProject = async (uid) => {
     return delResponse;
 }
 
-const fetchTeams = async () => {
+const fetchTeams = async (checkforExistingTeam=false,teams = null) => {
     try {
         const response = await api.get(`/v1/teams?select=uid,name,shortDescription,logo.url&&pagination=false&&with=teamMemberRoles`);
         if (response.data) {
             return response.data.map((team)=>{
-                return {
-                    uid:team.uid,
-                    name:team.name,
-                    logo: team.logo?.url ? team.logo.url : null,
-                    // logo:null
+                if(checkforExistingTeam){
+                    const filtered = teams?.filter(({uid})=>uid === team?.uid);
+                    if(filtered?.length){
+                        return {
+                            uid:team.uid,
+                            name:team.name,
+                            logo: team.logo?.url ? team.logo.url : null,
+                            added: true
+                            // logo:null
+                        }
+                    }else{
+                        return {
+                            uid:team.uid,
+                            name:team.name,
+                            logo: team.logo?.url ? team.logo.url : null,
+                            // logo:null
+                        }
+                    }
+                }else{
+                    return {
+                        uid:team.uid,
+                        name:team.name,
+                        logo: team.logo?.url ? team.logo.url : null,
+                        // logo:null
+                    }
                 }
             });
         }
