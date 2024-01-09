@@ -60,7 +60,7 @@ export default function DefaultUI({ onAddClick, onMenuClick,showMenu, setMenuFla
                 height={16}
               />
               <div
-                className="absolute right-0 flex w-max flex-col items-start self-stretch rounded bg-white px-[8px] py-[4px] px-2 py-1 text-[13px] 
+                className="absolute flex w-max flex-col items-start self-stretch rounded bg-white text-[13px] 
             font-normal not-italic leading-5 shadow-[0px_0px_6px_0px_rgba(0,0,0,0.14)]"
               >
                 <div

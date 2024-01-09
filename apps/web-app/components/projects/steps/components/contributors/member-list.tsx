@@ -1,7 +1,7 @@
 import { InputField } from "@protocol-labs-network/ui";
 import MemberRow from "./member-row";
 import { SearchIcon } from '@heroicons/react/outline';
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Image from "next/image";
 
@@ -19,8 +19,6 @@ export default function MemberList({
   const [selectAllFlag, setSelectAll] = useState(
     selectedMembers?.length === list?.length
   );
-
-  const route = useRouter();
 
   useEffect(() => {
     if (list) {
@@ -162,18 +160,22 @@ export default function MemberList({
           <div>Show selected contributors</div>
         </div>
       </div>
-      {showSelected && selectedMembers.length > 0 &&(
+      {showSelected && selectedMembers.length > 0 && (
         <div className="relative mr-5 border-b pb-3">
           {selectedMembers &&
             selectedMembers.slice(0, 3).map((member, index) => {
               return (
-                <MemberRow
-                  key={member + index}
-                  data={member}
-                  onselect={onselect}
-                  onDeselect={onDeselect}
-                  defaultValue={checkForExistance(member) !== 'no-data'}
-                />
+                <React.Fragment key={member + index}>
+                  {!member?.isDeleted && (
+                    <MemberRow
+                      key={member + index}
+                      data={member}
+                      onselect={onselect}
+                      onDeselect={onDeselect}
+                      defaultValue={checkForExistance(member) !== 'no-data'}
+                    />
+                  )}
+                </React.Fragment>
               );
             })}
           {selectedMembers &&
@@ -182,13 +184,17 @@ export default function MemberList({
               .slice(3, selectedMembers.length)
               .map((member, index) => {
                 return (
-                  <MemberRow
-                    key={member + index}
-                    data={member}
-                    onselect={onselect}
-                    onDeselect={onDeselect}
-                    defaultValue={checkForExistance(member) !== 'no-data'}
-                  />
+                  <React.Fragment key={member + index}>
+                    {!member?.isDeleted && (
+                      <MemberRow
+                        key={member + index}
+                        data={member}
+                        onselect={onselect}
+                        onDeselect={onDeselect}
+                        defaultValue={checkForExistance(member) !== 'no-data'}
+                      />
+                    )}
+                  </React.Fragment>
                 );
               })}
           {selectedMembers && selectedMembers.length > 3 && !seeMore && (
