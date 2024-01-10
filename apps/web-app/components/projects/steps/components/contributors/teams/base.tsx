@@ -241,7 +241,7 @@ export default function TeamsContributors() {
               height={16}
             />
           </div>
-          <div className="flex-[1_0_0] text-[13px] font-medium not-italic leading-[18px] text-[color:var(--Text-Dark,#0F172A)] opacity-40">
+          <div className="relative flex-[1_0_0] z-[-1] text-[13px] font-medium not-italic leading-[18px] text-[color:var(--Text-Dark,#0F172A)] opacity-40">
             Adding a maintainer team is mandatory, and only one team can serve
             as the maintainer.
           </div>
