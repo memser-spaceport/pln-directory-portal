@@ -102,9 +102,9 @@ const fetchMembers = async (teamId = null) => {
     try {
         let response;
         if(teamId){
-             response = await api.get(`/v1/members?teamMemberRoles.team.uid=${teamId}&&select=uid,name,image.url,teamMemberRoles.teamLead,teamMemberRoles.mainTeam,teamMemberRoles.team,teamMemberRoles.role&&pagination=false`);
+             response = await api.get(`/v1/members?teamMemberRoles.team.uid=${teamId}&&select=uid,name,image.url,teamMemberRoles.teamLead,teamMemberRoles.mainTeam,teamMemberRoles.team,teamMemberRoles.role&&pagination=false&&orderBy=name,asc`);
         }else{
-            response = await api.get(`/v1/members?select=uid,name,image.url,teamMemberRoles.teamLead,teamMemberRoles.mainTeam,teamMemberRoles.team,teamMemberRoles.role&&pagination=false`);
+            response = await api.get(`/v1/members?select=uid,name,image.url,teamMemberRoles.teamLead,teamMemberRoles.mainTeam,teamMemberRoles.team,teamMemberRoles.role&&pagination=false&orderBy=name,asc`);
         }
         if (response.data) {
             // console.log(response.data);
