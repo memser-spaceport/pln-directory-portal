@@ -196,6 +196,14 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
                             project?
                           </div>
                         )}
+                        {
+                          contributorsState.chooseTeamPopup.UIType === 'MEMBER' &&
+                          showContributor && (
+                            <div className="text-sm font-normal not-italic leading-7 text-[color:var(--Neutral-Slate-900,#0F172A)]">
+                              Select or remove contributors for this project
+                            </div>
+                          )
+                        }
                     </Dialog.Title>
                     <>
                       {!showContributor && (

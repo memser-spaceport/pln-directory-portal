@@ -153,7 +153,7 @@ export default function MemberList({
   
 
   return (
-    <div className="flex h-[89%] flex-col gap-3 overflow-y-scroll">
+    <div className="flex h-full flex-col gap-3">
       <div className="pr-5 pb-3">
         <InputField
           label="Search"
@@ -194,6 +194,7 @@ export default function MemberList({
           <div>Show selected contributors</div>
         </div>
       </div>
+      <div className=" overflow-y-scroll h-[63%]">
       {showSelected && showSelectedMembers.length > 0 && (
         <div className="relative mr-5 border-b pb-3">
           {showSelectedMembers &&
@@ -272,6 +273,7 @@ export default function MemberList({
       {filteredList &&
         filteredList.length < 1 &&
         (searchTerm === null || searchTerm === '') && <>No member available.</>}
+      </div>
     </div>
   );
 }
