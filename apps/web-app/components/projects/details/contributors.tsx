@@ -124,7 +124,7 @@ export default function Contributors({ project, contributingMembers }) {
               return getMemberDetailTemplate(
                 contri.uid,
                 contri.name,
-                contri.image.url,
+                contri.image?.url,
                 mainTeam?.length ? mainTeam[0]?.role : '',
                 mainTeam?.length ? mainTeam[0]?.team?.name : '',
                 teamLeadArr?.length > 0
