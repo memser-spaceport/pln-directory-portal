@@ -12,9 +12,6 @@ export function AllTeamsModal({
     setIsModalOpen,
     project,
 }) {
-
-    console.log(project.contributingTeams);
-    
     const router = useRouter();
     const analytics = useAppAnalytics();
 
