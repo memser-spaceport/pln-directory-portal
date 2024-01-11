@@ -169,6 +169,10 @@ export default function AllContributorsPopup({
                           teamLeadArr?.length > 0
                         );
                       })}
+                      {
+                        filteredContriList.length === 0 && filteredContriMembers.length === 0 && <>
+                       No results found for the search criteria.</>
+                      }
                   </div>
                   <div className="absolute -top-3 -right-3 h-6 w-6 rounded-full bg-white" />
                   <XCircleIcon

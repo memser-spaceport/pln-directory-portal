@@ -1,9 +1,10 @@
-import { InputField } from "@protocol-labs-network/ui";
+import { Autocomplete, InputField } from "@protocol-labs-network/ui";
 import MemberRow from "./member-row";
 import { SearchIcon } from '@heroicons/react/outline';
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Image from "next/image";
+import api from "apps/web-app/utils/api";
 
 export default function MemberList({
   list,
@@ -20,6 +21,7 @@ export default function MemberList({
   const [seeMore, setSeeMore] = useState(false);
   const [showSelected, setShowSelected] = useState(false);
   const [filteredList, setFilteredList] = useState(list);
+  const [selectedTeamToFitler,setSelectedTeam] = useState({ value: '', label: '',logo:'' });
   const [selectAllFlag, setSelectAll] = useState(
     selectedMembers?.length === list?.length
   );
@@ -54,7 +56,10 @@ export default function MemberList({
       });
       setShowSelectedMembers(memberArr);
     }else{
-      setShowSelectedMembers(selectedMembers);
+      memberArr = selectedMembers?.filter((member) => {
+        return !member?.isDeleted;
+      });
+      setShowSelectedMembers(memberArr);
     }
   };
 
@@ -150,11 +155,47 @@ export default function MemberList({
     return counterArr?.length;
   };
 
-  
+  const handleTeamChange = (team) => {
+    // setSelectedTeam(team);
+    // if(team){
+    //   const tempList = [];
+    //     for (let index = 0; index < filteredList.length; index++) {
+    //       const element = filteredList[index];
+    //       const tempRoles = element?.teamMemberRoles;
+    //       const filtered = tempRoles.filter(teamRole=>{
+    //         return teamRole?.team?.uid === team.value
+    //       });
+    //       if(filtered && filtered.length){
+    //         tempList.push(element);
+    //       }
+    //     }
+    //     setFilteredList(tempList);
+    //   }
+  };
+
+  const fetchTeamsWithLogoSearchTerm = async (searchTerm) => {
+    try {
+      const response = await api.get(
+        `/v1/teams?name__icontains=${searchTerm}&select=uid,name,shortDescription,logo.url,industryTags.title`
+      );
+      if (response.data) {
+        return response.data.map((item) => {
+          return {
+            value: item.uid,
+            label: item.name,
+            logo: item?.logo?.url ? item.logo.url : null,
+          };
+        });
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className="pr-5 pb-3">
+      <div className="pr-5 pb-3 flex gap-2">
+        <div className="w-[60%]">
         <InputField
           label="Search"
           name="searchBy"
@@ -170,6 +211,19 @@ export default function MemberList({
           }}
           hasClear
           onClear={() => setSearchTerm('')}
+        />
+        </div>
+        <Autocomplete
+          name={'team'}
+          className="custom-grey custom-outline-none border"
+          // key={selectedTeam.label}
+          placeholder="Select Team"
+          selectedOption={selectedTeamToFitler}
+          onSelectOption={handleTeamChange}
+          debounceCall={fetchTeamsWithLogoSearchTerm}
+          // validateBeforeChange={true}
+          // validationFnBeforeChange={beforeChangeValidation}
+          // confirmationMessage={MSG_CONSTANTS.CHANGE_CONF_MSG}
         />
       </div>
       <div className="mr-5 flex justify-between border-b pb-3">
@@ -194,30 +248,11 @@ export default function MemberList({
           <div>Show selected contributors</div>
         </div>
       </div>
-      <div className=" overflow-y-scroll h-[63%]">
-      {showSelected && showSelectedMembers.length > 0 && (
-        <div className="relative mr-5 border-b pb-3">
-          {showSelectedMembers &&
-            showSelectedMembers.slice(0, 3).map((member, index) => {
-              return (
-                <React.Fragment key={member + index}>
-                  {!member?.isDeleted && (
-                    <MemberRow
-                      key={member + index}
-                      data={member}
-                      onselect={onselect}
-                      onDeselect={onDeselect}
-                      defaultValue={checkForExistance(member) !== 'no-data'}
-                    />
-                  )}
-                </React.Fragment>
-              );
-            })}
-          {showSelectedMembers &&
-            seeMore &&
-            showSelectedMembers
-              .slice(3, showSelectedMembers.length)
-              .map((member, index) => {
+      <div className=" h-[63%] overflow-y-scroll">
+        {showSelected && showSelectedMembers.length > 0 && (
+          <div className="relative mr-5 border-b pb-3">
+            {showSelectedMembers &&
+              showSelectedMembers.slice(0, 3).map((member, index) => {
                 return (
                   <React.Fragment key={member + index}>
                     {!member?.isDeleted && (
@@ -232,47 +267,68 @@ export default function MemberList({
                   </React.Fragment>
                 );
               })}
-          {showSelectedMembers && showSelectedMembers.length > 3 && !seeMore && (
-            <div
-              className="absolute bottom-[-11px] left-[41%] cursor-pointer"
-              onClick={() => {
-                setSeeMore(true);
-              }}
-            >
-              <div className="h-[22px] rounded-[43px] border border-solid border-[#E2E8F0] bg-white px-2 text-xs font-medium not-italic leading-5 text-[#156FF7]">
-                <span className="pr-1">See more</span>
-                <Image
-                  src={'/assets/images/icons/projects/see-more.svg'}
-                  alt="info image"
-                  width={8}
-                  height={8}
-                />
+            {showSelectedMembers &&
+              seeMore &&
+              showSelectedMembers
+                .slice(3, showSelectedMembers.length)
+                .map((member, index) => {
+                  return (
+                    <React.Fragment key={member + index}>
+                      {!member?.isDeleted && (
+                        <MemberRow
+                          key={member + index}
+                          data={member}
+                          onselect={onselect}
+                          onDeselect={onDeselect}
+                          defaultValue={checkForExistance(member) !== 'no-data'}
+                        />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+            {showSelectedMembers && showSelectedMembers.length > 3 && !seeMore && (
+              <div
+                className="absolute bottom-[-11px] left-[41%] cursor-pointer"
+                onClick={() => {
+                  setSeeMore(true);
+                }}
+              >
+                <div className="h-[22px] rounded-[43px] border border-solid border-[#E2E8F0] bg-white px-2 text-xs font-medium not-italic leading-5 text-[#156FF7]">
+                  <span className="pr-1">See more</span>
+                  <Image
+                    src={'/assets/images/icons/projects/see-more.svg'}
+                    alt="info image"
+                    width={8}
+                    height={8}
+                  />
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
-      {filteredList &&
-        filteredList.map((member, index) => {
-          return (
-            <MemberRow
-              key={member + index}
-              data={member}
-              onselect={onselect}
-              onDeselect={onDeselect}
-              defaultValue={checkForExistance(member) !== 'no-data'}
-            />
-          );
-        })}
-      {filteredList &&
-        filteredList.length < 1 &&
-        searchTerm !== '' &&
-        searchTerm !== null && (
-          <>No member available with that search criteria.</>
+            )}
+          </div>
         )}
-      {filteredList &&
-        filteredList.length < 1 &&
-        (searchTerm === null || searchTerm === '') && <>No member available.</>}
+        {filteredList &&
+          filteredList.map((member, index) => {
+            return (
+              <MemberRow
+                key={member + index}
+                data={member}
+                onselect={onselect}
+                onDeselect={onDeselect}
+                defaultValue={checkForExistance(member) !== 'no-data'}
+              />
+            );
+          })}
+        {filteredList &&
+          filteredList.length < 1 &&
+          searchTerm !== '' &&
+          searchTerm !== null && (
+            <>No member available with that search criteria.</>
+          )}
+        {filteredList &&
+          filteredList.length < 1 &&
+          (searchTerm === null || searchTerm === '') && (
+            <>No member available.</>
+          )}
       </div>
     </div>
   );

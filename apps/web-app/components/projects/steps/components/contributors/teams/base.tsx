@@ -275,6 +275,19 @@ export default function TeamsContributors() {
             <ContributingMembers />
           )}
         </div>
+        <div className="flex gap-1">
+          <div>
+            <Image
+              src={'/assets/images/icons/info_icon.svg'}
+              alt="info image"
+              width={16}
+              height={16}
+            />
+          </div>
+          <div className="relative flex-[1_0_0] z-[-1] text-[13px] font-medium not-italic leading-[18px] text-[color:var(--Text-Dark,#0F172A)] opacity-40">
+          Contributors are individuals who have made past contributions or are currently actively contributing to a project in various ways.
+          </div>
+        </div>
       </div>
       {contributorsState.chooseTeamPopup.showChooseTeamPopup && (
         <ChooseTeamPopup

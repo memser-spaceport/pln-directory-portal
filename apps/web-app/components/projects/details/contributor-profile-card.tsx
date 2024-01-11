@@ -10,12 +10,13 @@ export default function ContributorProfileCard({
   teamName,
   isTeamLead = false
 }) {
-    const router = useRouter();
+    // const router = useRouter();
   return (
     <>
       <div className="absolute left-[-100%] cursor-pointer bottom-[35px] mx-auto flex w-[295px] flex-col rounded-[12px] bg-white shadow-[0px_0px_8px_0px_rgba(0,0,0,0.14)]"
       onClick={() => {
-        router.push('/members/' + uid);
+        // router.push('/members/' + uid);
+        window.open('/members/' + uid, '_blank');
       }}
       >
         <div className="h-[104px]">
