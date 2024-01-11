@@ -27,7 +27,7 @@ export default function EditProject({ selectedProject }) {
     return (
       <>
         <>
-          <NextSeo {...DIRECTORY_SEO} title="AddProject" />
+          <NextSeo {...DIRECTORY_SEO} title="EditProject" />
           <Breadcrumb
             items={breadcrumbItems}
             classname="max-w-[150px] truncate"

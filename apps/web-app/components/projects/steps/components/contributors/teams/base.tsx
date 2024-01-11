@@ -159,7 +159,7 @@ export default function TeamsContributors() {
       <div className="flex flex-col gap-3">
         <div className="flex justify-between text-[12px] font-bold leading-[32px] text-[#64748B]">
           <div>
-            TEAMS
+            TEAMS{' '}
             {
               // getTeamsCount() > 0 &&
               <span>({getTeamsCount()})</span>
@@ -256,7 +256,7 @@ export default function TeamsContributors() {
               <span>({addProjectsState?.inputs?.contributors?.length})</span>
             )} */}
           </div>
-          {addProjectsState?.inputs?.contributors?.length > 0 && (
+          {getContributorsCount() > 0 && (
             <div
               className="text-sm font-medium not-italic leading-6 text-[color:var(--Elements-Link,#156FF7)]"
               onClick={() => {

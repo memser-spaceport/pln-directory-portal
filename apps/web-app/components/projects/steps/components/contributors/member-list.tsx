@@ -306,6 +306,7 @@ export default function MemberList({
             )}
           </div>
         )}
+        <div className=" flex flex-col gap-2">
         {filteredList &&
           filteredList.map((member, index) => {
             return (
@@ -318,6 +319,7 @@ export default function MemberList({
               />
             );
           })}
+        </div>
         {filteredList &&
           filteredList.length < 1 &&
           searchTerm !== '' &&
