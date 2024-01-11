@@ -58,8 +58,13 @@ export default function MemberRow({
           </div>
           <div className="text-blacknot-italic flex flex-col font-normal leading-5">
             <div className=" text-[16px]">{data.name}</div>
-            <div className="text-sm font-normal not-italic leading-5 text-[#64748B]">
+            <div className="flex gap-3 text-sm font-normal not-italic leading-5 text-[#64748B]">
               {getSubtext()}
+              {data?.teamMemberRoles?.length > 1 && (
+                <div className="relative rounded-[24px]  bg-[#F1F5F9] px-[8px] py-[2px] ">
+                  +{data?.teamMemberRoles?.length-1}
+                </div>
+              )}
             </div>
           </div>
         </div>

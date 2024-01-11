@@ -1,8 +1,10 @@
 import { Dialog, Transition } from '@headlessui/react';
 import { UserIcon, XCircleIcon } from '@heroicons/react/solid';
-import { Fragment } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
+import { InputField } from '@protocol-labs-network/ui';
+import { SearchIcon } from '@heroicons/react/outline';
 
 export default function AllContributorsPopup({
   isOpen,
@@ -12,16 +14,38 @@ export default function AllContributorsPopup({
 }) {
   const contriTitle = 'Contributors';
   const router = useRouter();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredContriList, setFilteredContriList] = useState(contributorsList);
+  const [filteredContriMembers, setFilteredContriMembers] = useState(contributingMembers);
 
-  const getMemberDetailTemplate = (uid, name, url) => {
+  useEffect(() => {
+    if (searchTerm) {
+      const tempContri = contributorsList.filter((contri)=>{
+        return contri?.name.toLowerCase().includes(searchTerm.toLowerCase())
+      });
+      setFilteredContriList(tempContri);
+
+      const tempMembers = contributingMembers.filter((contri)=>{
+        return contri?.name.toLowerCase().includes(searchTerm.toLowerCase())
+      });
+      setFilteredContriMembers(tempMembers);
+    } else {
+      setFilteredContriList(contributorsList);
+      setFilteredContriMembers(contributingMembers);
+    }
+  }, [searchTerm]);
+
+  const getMemberDetailTemplate = (uid, name, url, isTeamLead) => {
     return (
       <>
-        <div className="flex items-center gap-2 cursor-pointer hover:bg-slate-100" key={'contributor' + uid}
-        onClick={()=>{
-          router.push('/members/' + uid);
-        }}
+        <div
+          className="flex cursor-pointer items-center gap-2 hover:bg-slate-100"
+          key={'contributor' + uid}
+          onClick={() => {
+            router.push('/members/' + uid);
+          }}
         >
-          <div>
+          <div className='relative'>
             {url && (
               <Image
                 src={url}
@@ -34,6 +58,16 @@ export default function AllContributorsPopup({
             {!url && (
               <UserIcon className="h-[40px] w-[40px] shrink-0 rounded-full bg-slate-100 fill-slate-200" />
             )}
+            {isTeamLead && (
+                  <div className="absolute top-[-3px] right-[-7px]">
+                    <Image
+                      src="/assets/images/icons/projects/team-lead.svg"
+                      alt="team lead image"
+                      width={16}
+                      height={16}
+                    />
+                  </div>
+                )}
           </div>
           <div className="text-base font-normal not-italic leading-5 text-black">
             {name}
@@ -75,33 +109,64 @@ export default function AllContributorsPopup({
               >
                 <Dialog.Panel className="slim-scroll relative h-[645px] w-full max-w-2xl transform rounded-md bg-white py-8 pl-8 text-left align-middle shadow-xl transition-all">
                   <Dialog.Title
-                    as="h2"
+                    as="div"
                     className="pb-3 text-base font-semibold not-italic leading-[22px]"
                   >
-                    <div className="flex justify-between pr-7">
-                      <div className="flex items-center gap-2">
+                    <div className="">
+                      <div className="flex flex-col gap-2">
                         <p className="">
                           {' '}
-                          {contriTitle}({contributorsList.length+contributingMembers?.length})
+                          {contriTitle}(
+                          {contributorsList.length +
+                            contributingMembers?.length}
+                          )
                         </p>
+                        <div className="w-full pr-5">
+                          <InputField
+                            label="Search"
+                            name="searchBy"
+                            showLabel={false}
+                            icon={SearchIcon}
+                            placeholder={'Search'}
+                            className="rounded-[8px] border"
+                            value={searchTerm}
+                            onKeyUp={(event) => {
+                              // if (
+                              //   event.key === 'Enter' ||
+                              //   event.keyCode === 13
+                              // ) {
+                                setSearchTerm(event.currentTarget.value);
+                              // }
+                            }}
+                            hasClear
+                            onClear={() => setSearchTerm('')}
+                          />
+                        </div>
                       </div>
                     </div>
                   </Dialog.Title>
-                  <div className="h-[94%] overflow-y-scroll">
-                    {contributorsList &&
-                      contributorsList.map((contri, index) => {
+                  <div className="h-[87%] overflow-y-scroll">
+                    {filteredContriList &&
+                      filteredContriList.map((contri, index) => {
                         return getMemberDetailTemplate(
                           contri?.uid,
                           contri?.name,
-                          contri?.logo
+                          contri?.logo,
+                          contri?.teamLead
                         );
                       })}
-                    {contributingMembers &&
-                      contributingMembers.map((contri) => {
+                    {filteredContriMembers &&
+                      filteredContriMembers.map((contri) => {
+                        const teamLeadArr = contri.teamMemberRoles?.filter(
+                          (teamRoles) => {
+                            return teamRoles?.teamLead === true;
+                          }
+                        );
                         return getMemberDetailTemplate(
                           contri.uid,
                           contri.name,
-                          contri.image?.url
+                          contri.image?.url,
+                          teamLeadArr?.length > 0
                         );
                       })}
                   </div>
