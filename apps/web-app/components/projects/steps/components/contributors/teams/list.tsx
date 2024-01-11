@@ -103,7 +103,7 @@ export default function ContributorTeamsList() {
                   }
                   <div onClick={()=>{
                     onEdit(team,type);
-                  }} className='relative top-[3px]'>
+                  }} className='relative '>
                     <Image
                       src="/assets/images/icons/projects/edit-team.svg"
                       alt="edit team"

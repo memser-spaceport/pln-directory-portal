@@ -56,7 +56,7 @@ export default function MemberRow({
               <UserIcon className="h-[40px] w-[40px] shrink-0 rounded-full bg-slate-100 fill-slate-200" />
             )}
           </div>
-          <div className="text-blacknot-italic flex flex-col font-normal leading-5">
+          <div className="text-blacknot-italic flex flex-col font-normal leading-5" title={data.teamLead ? 'Team Lead':''}>
             <div className=" text-[16px]">{data.name}</div>
             <div className="flex gap-3 text-sm font-normal not-italic leading-5 text-[#64748B]">
               {getSubtext()}

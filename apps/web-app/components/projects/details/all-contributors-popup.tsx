@@ -116,7 +116,7 @@ export default function AllContributorsPopup({
                       <div className="flex flex-col gap-2">
                         <p className="">
                           {' '}
-                          {contriTitle}(
+                          {contriTitle} (
                           {contributorsList.length +
                             contributingMembers?.length}
                           )

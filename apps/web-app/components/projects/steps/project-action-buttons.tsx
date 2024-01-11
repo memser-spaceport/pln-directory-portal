@@ -64,21 +64,21 @@ export default function ProjectActionButtons() {
                 addProjectsDispatch({ type: 'SET_ERROR', payload: null });
                 addProjectsDispatch({ type: 'SET_CURRENT_STEP', payload: addProjectsState.currentStep + 1 });
             } else {
-                toast.error('Please review the fields with error(s)');
+                toast.error('Please review the error field(s)');
             }
         }else if (addProjectsState.currentStep === 1) {
             if (validateStep1()) {
                 addProjectsDispatch({ type: 'SET_ERROR', payload: null });
                 addProjectsDispatch({ type: 'SET_CURRENT_STEP', payload: addProjectsState.currentStep + 1 });
             }else {
-                toast.error('Please review the fields with error(s)');
+                toast.error('Please review the error field(s)');
             }
         } else if (addProjectsState.currentStep === 2) {
             if (validateStep2()) {
                 addProjectsDispatch({ type: 'SET_ERROR', payload: null });
                 addProjectsDispatch({ type: 'SET_CURRENT_STEP', payload: addProjectsState.currentStep + 1 });
             } else {
-                toast.error('Please review the fields with error(s)');
+                toast.error('Please review the error field(s)');
             }
         } else {
             addProjectsDispatch({ type: 'SET_CURRENT_STEP', payload: addProjectsState.currentStep + 1 });
@@ -154,7 +154,7 @@ export default function ProjectActionButtons() {
                 if (!errors['projectURLs'][index]) {
                     errors['projectURLs'][index] = {};
                 }
-                errors['projectURLs'][index]['url'] = 'Link url is required';
+                errors['projectURLs'][index]['url'] = 'Link is required';
             }
             if (link.url && !link.url.match(urlRE)) {
                 if (!errors['projectURLs']) {

@@ -23,8 +23,8 @@ export default function KPI({ onInputChange, kpiFieldArray, setKPIField }) {
 
     const getKPILabelHeader = () => {
         return <div className="flex gap-2 text-sm font-bold">
-            <div className='basis-1/2'>KPI Name</div>
-            <div className='basis-1/2'>KPI Value</div>
+            <div className='basis-1/2'>Enter KPI Name</div>
+            <div className='basis-1/2'>Enter KPI Value</div>
         </div>
     }
 
