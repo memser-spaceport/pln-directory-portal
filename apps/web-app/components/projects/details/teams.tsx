@@ -42,7 +42,7 @@ export default function TeamsInvolved({ project }) {
             <div className="text-[18px] font-semibold">
               <div>Teams</div>
             </div>
-            <div className="flex justify-between ">
+            <div className="flex gap-3 ">
               <div className="text-xs font-medium not-italic leading-[14px] text-[color:var(--neutral-slate-600,#475569)]">
                 <div className="relative top-[5px] rounded-[24px]  bg-[#F1F5F9] px-[8px] py-[2px] ">
                   {project.contributingTeams.length + 1}
