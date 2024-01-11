@@ -1,4 +1,4 @@
-import { UserGroupIcon } from "@heroicons/react/solid";
+import { UserGroupIcon, XCircleIcon } from "@heroicons/react/solid";
 import { InputField } from "@protocol-labs-network/ui";
 import Modal from "apps/web-app/components/layout/navbar/modal/modal";
 import { APP_ANALYTICS_EVENTS } from "apps/web-app/constants";
@@ -83,7 +83,7 @@ export function AllTeamsModal({
         enableFooter={false}
         enableHeader={false}
       >
-        <div className="slim-scroll pt-8">
+        <div className="slim-scroll pt-8 pb-4">
           <div className="mb-4 px-8 font-bold text-slate-900">
             {'Teams'} ({project.contributingTeams.length + 1})
             <div className="w-full pr-5">
@@ -108,7 +108,7 @@ export function AllTeamsModal({
               />
             </div>
           </div>
-          <div className="github-project-popup overflow-y-auto rounded-xl px-8">
+          <div className="github-project-popup min-h-[200px] overflow-y-auto rounded-xl px-8">
             {searchTerm &&
               project.maintainingTeam?.name
                 .toLowerCase()
@@ -149,6 +149,14 @@ export function AllTeamsModal({
                   </React.Fragment>
                 );
               })}
+
+            {searchTerm &&
+              !(project.maintainingTeam?.name
+                .toLowerCase()
+                .includes(searchTerm.toLowerCase())) &&
+              contributingTeams.length === 0 && (
+                <>No results found for the search criteria.</>
+              )}
             {/* {project?.map((project, i) => {
             return (
                 <>
@@ -157,7 +165,7 @@ export function AllTeamsModal({
             );
           })} */}
           </div>
-          <div className="w-full border-t-2 p-4">
+          {/* <div className="w-full border-t-2 p-4">
             <div className="flex place-content-end  ">
               <button
                 className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-[90px] w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8] disabled:bg-slate-400"
@@ -166,7 +174,16 @@ export function AllTeamsModal({
                 Close
               </button>
             </div>
-          </div>
+          </div> */}
+          <XCircleIcon
+            onClick={() => {
+              setIsModalOpen(false);
+            }}
+            data-testid={'close-icon'}
+            className={
+              'absolute -top-4 -right-4 h-8 w-8 cursor-pointer text-slate-600'
+            }
+          />
         </div>
       </Modal>
     );
