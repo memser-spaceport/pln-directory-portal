@@ -125,7 +125,7 @@ export default function Contributors({ project, contributingMembers }) {
                 contri.uid,
                 contri.name,
                 contri.image?.url,
-                mainTeam?.length ? mainTeam[0]?.role : '',
+                mainTeam?.length ? mainTeam[0]?.role : 'Contributor',
                 mainTeam?.length ? mainTeam[0]?.team?.name : '',
                 teamLeadArr?.length > 0
               );
