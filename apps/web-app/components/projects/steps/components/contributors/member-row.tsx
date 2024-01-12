@@ -33,7 +33,7 @@ export default function MemberRow({
           />
           <div className="relative">
             {data.teamLead && (
-              <div className="absolute right-[-8px] z-[1]">
+              <div className="absolute right-[-8px] z-[1] cursor-pointer" title='Team Lead'>
                 <Image
                   src="/assets/images/icons/projects/team-lead.svg"
                   alt="team lead image"
@@ -56,12 +56,12 @@ export default function MemberRow({
               <UserIcon className="h-[40px] w-[40px] shrink-0 rounded-full bg-slate-100 fill-slate-200" />
             )}
           </div>
-          <div className="text-blacknot-italic flex flex-col font-normal leading-5" title={data.teamLead ? 'Team Lead':''}>
+          <div className="text-blacknot-italic flex flex-col font-normal leading-5">
             <div className=" text-[16px]">{data.name}</div>
             <div className="flex gap-3 text-sm font-normal not-italic leading-5 text-[#64748B]">
               {getSubtext()}
               {data?.teamMemberRoles?.length > 1 && (
-                <div className="relative rounded-[24px]  bg-[#F1F5F9] px-[8px] py-[2px] ">
+                <div className="relative rounded-[24px]  bg-[#F1F5F9] px-[6px] ">
                   +{data?.teamMemberRoles?.length-1}
                 </div>
               )}

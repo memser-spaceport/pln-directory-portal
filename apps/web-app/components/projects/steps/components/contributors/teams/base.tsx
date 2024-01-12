@@ -181,10 +181,10 @@ export default function TeamsContributors() {
               />
               <span className="relative px-2 text-[#156FF7] ">Add</span>
               {showMenu && (
-                <div className="relative">
+                <div className="relative top-[3px]">
                   <Image
                     src={'/assets/images/icons/projects/chevron-down.svg'}
-                    alt="project image"
+                    alt="chevron down image"
                     width={16}
                     height={16}
                   />

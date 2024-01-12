@@ -194,26 +194,26 @@ export default function MemberList({
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className="pr-5 pb-3 flex gap-2">
-        <div className="w-[60%]">
-        <InputField
-          label="Search"
-          name="searchBy"
-          showLabel={false}
-          icon={SearchIcon}
-          placeholder={'Search'}
-          className="rounded-[8px] border"
-          value={searchTerm}
-          onKeyUp={(event) => {
-            //   if (event.key === 'Enter' || event.keyCode === 13) {
-            setSearchTerm(event.currentTarget.value);
-            //   }
-          }}
-          hasClear
-          onClear={() => setSearchTerm('')}
-        />
+      <div className="flex gap-2 pr-5 pb-3">
+        <div className="w-full">
+          <InputField
+            label="Search"
+            name="searchBy"
+            showLabel={false}
+            icon={SearchIcon}
+            placeholder={'Search'}
+            className="rounded-[8px] border"
+            value={searchTerm}
+            onKeyUp={(event) => {
+              //   if (event.key === 'Enter' || event.keyCode === 13) {
+              setSearchTerm(event.currentTarget.value);
+              //   }
+            }}
+            hasClear
+            onClear={() => setSearchTerm('')}
+          />
         </div>
-        <Autocomplete
+        {/* <Autocomplete
           name={'team'}
           className="custom-grey custom-outline-none border"
           // key={selectedTeam.label}
@@ -224,7 +224,7 @@ export default function MemberList({
           // validateBeforeChange={true}
           // validationFnBeforeChange={beforeChangeValidation}
           // confirmationMessage={MSG_CONSTANTS.CHANGE_CONF_MSG}
-        />
+        /> */}
       </div>
       <div className="mr-5 flex justify-between border-b pb-3">
         {/* <input
@@ -251,22 +251,25 @@ export default function MemberList({
       <div className=" h-[63%] overflow-y-scroll">
         {showSelected && showSelectedMembers.length > 0 && (
           <div className="relative mr-5 border-b pb-3">
-            {showSelectedMembers &&
-              showSelectedMembers.slice(0, 3).map((member, index) => {
-                return (
-                  <React.Fragment key={member + index}>
-                    {!member?.isDeleted && (
-                      <MemberRow
-                        key={member + index}
-                        data={member}
-                        onselect={onselect}
-                        onDeselect={onDeselect}
-                        defaultValue={checkForExistance(member) !== 'no-data'}
-                      />
-                    )}
-                  </React.Fragment>
-                );
-              })}
+            <div className="flex flex-col gap-2">
+              {showSelectedMembers &&
+                showSelectedMembers.slice(0, 3).map((member, index) => {
+                  return (
+                    <React.Fragment key={member + index}>
+                      {!member?.isDeleted && (
+                        <MemberRow
+                          key={member + index}
+                          data={member}
+                          onselect={onselect}
+                          onDeselect={onDeselect}
+                          defaultValue={checkForExistance(member) !== 'no-data'}
+                        />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+            </div>
+            <div className="flex flex-col gap-2">
             {showSelectedMembers &&
               seeMore &&
               showSelectedMembers
@@ -286,6 +289,7 @@ export default function MemberList({
                     </React.Fragment>
                   );
                 })}
+            </div>
             {showSelectedMembers && showSelectedMembers.length > 3 && !seeMore && (
               <div
                 className="absolute bottom-[-11px] left-[41%] cursor-pointer"
@@ -307,25 +311,23 @@ export default function MemberList({
           </div>
         )}
         <div className=" flex flex-col gap-2">
-        {filteredList &&
-          filteredList.map((member, index) => {
-            return (
-              <MemberRow
-                key={member + index}
-                data={member}
-                onselect={onselect}
-                onDeselect={onDeselect}
-                defaultValue={checkForExistance(member) !== 'no-data'}
-              />
-            );
-          })}
+          {filteredList &&
+            filteredList.map((member, index) => {
+              return (
+                <MemberRow
+                  key={member + index}
+                  data={member}
+                  onselect={onselect}
+                  onDeselect={onDeselect}
+                  defaultValue={checkForExistance(member) !== 'no-data'}
+                />
+              );
+            })}
         </div>
         {filteredList &&
           filteredList.length < 1 &&
           searchTerm !== '' &&
-          searchTerm !== null && (
-            <>No member available with that search criteria.</>
-          )}
+          searchTerm !== null && <>No search results found.</>}
         {filteredList &&
           filteredList.length < 1 &&
           (searchTerm === null || searchTerm === '') && (

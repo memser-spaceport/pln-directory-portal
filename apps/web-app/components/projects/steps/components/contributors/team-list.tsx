@@ -43,7 +43,7 @@ export default function TeamList({ onSelect, list }) {
     }
 
     return (
-      <div className="h-[95%] overflow-y-scroll">
+      <div className="h-full">
         <div className="pr-3 pb-3">
           <InputField
             label="Search"
@@ -62,6 +62,7 @@ export default function TeamList({ onSelect, list }) {
             onClear={() => setSearchTerm('')}
           />
         </div>
+        <div  className="h-[84%] overflow-y-scroll">
         {filteredList &&
           filteredList.map((team, index) => {
             return (
@@ -72,6 +73,7 @@ export default function TeamList({ onSelect, list }) {
               </React.Fragment>
             );
           })}
+        </div>
         {filteredList && filteredList.length < 1 && (
           <>No search results.</>
         )}
