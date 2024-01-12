@@ -40,6 +40,9 @@ export default function Contributors({ project, contributingMembers }) {
         onMouseLeave={() => {
             setContributorHoverFlag(false);
         }}
+        onClick={() => {
+          window.open('/members/' + uid, '_blank');
+        }}
       >
         {url && (
           <Image

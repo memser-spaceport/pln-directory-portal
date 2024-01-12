@@ -238,7 +238,7 @@ export default function ProjectActionButtons() {
                 if (!errors['KPIs'][index]) {
                     errors['KPIs'][index] = {};
                 }
-                errors['KPIs'][index]['value'] = 'Please enter KPI name';
+                errors['KPIs'][index]['value'] = 'Please enter KPI value';
             }
             if (!kpi.name && kpi.value) {
                 if (!errors['KPIs']) {
@@ -247,7 +247,7 @@ export default function ProjectActionButtons() {
                 if (!errors['KPIs'][index]) {
                     errors['KPIs'][index] = {};
                 }
-                errors['KPIs'][index]['name'] = 'Please enter KPI value';
+                errors['KPIs'][index]['name'] = 'Please enter KPI name';
             }
         });
 
