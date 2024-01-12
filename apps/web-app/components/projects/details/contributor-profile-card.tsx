@@ -13,7 +13,7 @@ export default function ContributorProfileCard({
     // const router = useRouter();
   return (
     <>
-      <div className="absolute left-[-100%] cursor-pointer bottom-[35px] mx-auto flex w-[295px] flex-col rounded-[12px] bg-white shadow-[0px_0px_8px_0px_rgba(0,0,0,0.14)]"
+      <div className="absolute left-[-100%] cursor-pointer bottom-[50px] mx-auto flex w-[295px] flex-col rounded-[12px] bg-white shadow-[0px_0px_8px_0px_rgba(0,0,0,0.14)]"
       onClick={() => {
         // router.push('/members/' + uid);
         window.open('/members/' + uid, '_blank');

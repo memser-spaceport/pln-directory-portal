@@ -53,7 +53,9 @@ export default function Contributors({ project, contributingMembers }) {
         {!url && (
           <UserIcon className="relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white" />
         )}
-        {contributorHoverFlag && contributorHoveruid === uid && (
+        {
+        contributorHoverFlag && contributorHoveruid === uid &&
+         (
           <ContributorProfileCard
             uid={uid}
             name={name}
@@ -93,7 +95,7 @@ export default function Contributors({ project, contributingMembers }) {
               // const teamLeadArr = contri.member?.teamMemberRoles?.filter(teamRoles=>{
               //   return teamRoles?.teamLead === true;
               // });
-              
+
               // return getMemberDetailTemplate(
               //   contri?.member?.uid,
               //   contri?.member?.name,
@@ -107,20 +109,24 @@ export default function Contributors({ project, contributingMembers }) {
                 contri?.uid,
                 contri?.name,
                 contri?.logo,
-                contri?.mainTeam?.role? contri?.mainTeam?.role : 'Contributor',
-                contri?.mainTeam?.team?.name? contri?.mainTeam?.team?.name : '',
+                contri?.mainTeam?.role ? contri?.mainTeam?.role : 'Contributor',
+                contri?.mainTeam?.team?.name
+                  ? contri?.mainTeam?.team?.name
+                  : '',
                 contri?.teamLead
               );
             })}
           {contributingMembers &&
             individualContributors.map((contri) => {
-              const mainTeam = contri.teamMemberRoles?.filter(teamRoles=>{
+              const mainTeam = contri.teamMemberRoles?.filter((teamRoles) => {
                 return teamRoles?.mainTeam === true;
               });
 
-              const teamLeadArr = contri.teamMemberRoles?.filter(teamRoles=>{
-                return teamRoles?.teamLead === true;
-              });
+              const teamLeadArr = contri.teamMemberRoles?.filter(
+                (teamRoles) => {
+                  return teamRoles?.teamLead === true;
+                }
+              );
               return getMemberDetailTemplate(
                 contri.uid,
                 contri.name,
@@ -131,9 +137,15 @@ export default function Contributors({ project, contributingMembers }) {
               );
             })}
           {project?.contributors?.length > 17 && (
-            <div className="relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white pt-[5px] text-center">
+            <div
+              className="cursor-pointer relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white pt-[5px] text-center"
+              onClick={() => {
+                setAllContributors(true);
+              }}
+            >
               {' '}
-              +{(project?.contributors?.length - 17 + contributingMembers?.length)}
+              +
+              {project?.contributors?.length - 17 + contributingMembers?.length}
             </div>
           )}
         </div>
