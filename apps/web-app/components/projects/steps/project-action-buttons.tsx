@@ -128,13 +128,13 @@ export default function ProjectActionButtons() {
         const inputs = addProjectsState.inputs;
 
         if (!inputs.name) {
-            errors['name'] = 'Name is required';
+            errors['name'] = 'Please enter a project name';
         }
         if (!inputs.tagline) {
-            errors['tagline'] = 'Tagline is required';
+            errors['tagline'] = "Please enter the project's tagline";
         }
         if (!inputs.desc) {
-            errors['desc'] = 'Description is required';
+            errors['desc'] = 'Please enter a detailed description for the project';
         }
 
         inputs.projectURLs?.map((link, index) => {
@@ -145,7 +145,7 @@ export default function ProjectActionButtons() {
                 if (!errors['projectURLs'][index]) {
                     errors['projectURLs'][index] = {};
                 }
-                errors['projectURLs'][index]['text'] = 'Link text is required';
+                errors['projectURLs'][index]['text'] = 'Please enter the Project link text';
             }
             if (!link.url && link.text) {
                 if (!errors['projectURLs']) {
@@ -154,7 +154,7 @@ export default function ProjectActionButtons() {
                 if (!errors['projectURLs'][index]) {
                     errors['projectURLs'][index] = {};
                 }
-                errors['projectURLs'][index]['url'] = 'Link is required';
+                errors['projectURLs'][index]['url'] = 'Please enter the Project link';
             }
             if (link.url && !link.url.match(urlRE)) {
                 if (!errors['projectURLs']) {
@@ -163,12 +163,12 @@ export default function ProjectActionButtons() {
                 if (!errors['projectURLs'][index]) {
                     errors['projectURLs'][index] = {};
                 }
-                errors['projectURLs'][index]['url'] = 'Invalid Link.';
+                errors['projectURLs'][index]['url'] = 'Please enter a valid Project link';
             }
         });
 
         if (inputs.contactEmail && !inputs.contactEmail.match(emailRE)) {
-            errors['contactEmail'] = 'Invalid Email';
+            errors['contactEmail'] = 'Please enter a valid email address';
         }
 
         if (Object.keys(errors).length) {
@@ -238,7 +238,7 @@ export default function ProjectActionButtons() {
                 if (!errors['KPIs'][index]) {
                     errors['KPIs'][index] = {};
                 }
-                errors['KPIs'][index]['value'] = 'KPI value is required.';
+                errors['KPIs'][index]['value'] = 'Please enter KPI name';
             }
             if (!kpi.name && kpi.value) {
                 if (!errors['KPIs']) {
@@ -247,7 +247,7 @@ export default function ProjectActionButtons() {
                 if (!errors['KPIs'][index]) {
                     errors['KPIs'][index] = {};
                 }
-                errors['KPIs'][index]['name'] = 'KPI name is required.';
+                errors['KPIs'][index]['name'] = 'Please enter KPI value';
             }
         });
 

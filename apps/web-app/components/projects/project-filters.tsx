@@ -28,6 +28,17 @@ export default function ProjectsFilter({ filterProperties, isUserLoggedIn }) {
         }
     }
 
+    useEffect(() => {
+      if (Object.entries(query).length) {
+        setTeam();
+      } else {
+        projectsDispatch({ type: 'CLEAR_FILTER' });
+        setSelectedTeam({ value: '', label: '', logo: '' });
+        analytics.captureEvent(
+            APP_ANALYTICS_EVENTS.PROJECTS_FILTERS_CLEARED
+          );
+      }
+    }, [query]);
     // useEffect(() => {
     //     setSelectedOption().then(option=>{
     //         setSelectedTeam(option);
@@ -58,15 +69,28 @@ export default function ProjectsFilter({ filterProperties, isUserLoggedIn }) {
     }
 
     const getSelectedOptionFromQuery =async (searchTerm) => {
-        const response = await fetchTeamsWithLogoSearchTerm(searchTerm);
+        const response = await fetchTeamsById(searchTerm);
 
-        if (response.length) {
-            const item = response[0];
+        if (response) {
+            const item = response;
             return item;
         }else{
             return { value: '', label: '',logo:'' }
         }
     }
+
+    const fetchTeamsById = async (id) => {
+        try {
+            const response = await api.get(`/v1/teams/${id}`);
+            if (response.data) {
+                // return response.data.map((item) => {
+                    return { value: response.data.uid, label: response.data.name, logo: response.data?.logo?.url ? response.data.logo.url : null };
+                // });
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
 
     const fetchTeamsWithLogoSearchTerm = async (searchTerm) => {
         try {

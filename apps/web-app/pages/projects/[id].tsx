@@ -58,11 +58,11 @@ export default function ProjectDetails({ selectedProject, userHasEditRights, use
                     </div>
                     <div className="w-[291px] mt-10 flex flex-col gap-5">
                         <TeamsInvolved project={selectedProject}/>
-                        <ContactInfos project={selectedProject}/>
                         {
                             (selectedProject?.contributors?.length>0 || contributingMembers?.length > 0) && 
                             <Contributors project={selectedProject} contributingMembers={contributingMembers}/>
                         }
+                        <ContactInfos project={selectedProject}/>
                     </div>
                 </div>
             </div>

@@ -27,6 +27,9 @@ export default function ContributingMembers() {
                   onMouseLeave={() => {
                     setContributorHoverFlag(false);
                   }}
+                  onClick={() => {
+                    window.open('/members/' + member?.uid, '_blank');
+                  }}
                 >
                   {member?.logo && (
                     <Image

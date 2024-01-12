@@ -90,7 +90,9 @@ export default function ContributorTeamsList() {
                     type === 'Contributing' && (
                         <div onClick={()=>{
                             onDelete(team);
-                          }}>
+                          }}
+                          className='relative top-[3px]'
+                          >
                             <Image
                               src="/assets/images/icons/projects/delete-team.svg"
                               alt="delete team"
@@ -103,7 +105,7 @@ export default function ContributorTeamsList() {
                   }
                   <div onClick={()=>{
                     onEdit(team,type);
-                  }} className='relative '>
+                  }} className='relative top-[3px]'>
                     <Image
                       src="/assets/images/icons/projects/edit-team.svg"
                       alt="edit team"
