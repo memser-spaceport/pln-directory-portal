@@ -29,7 +29,10 @@ export default function ProjectsFilter({ filterProperties, isUserLoggedIn }) {
     }
 
     useEffect(() => {
-      if (Object.entries(query).length) {
+        const checker = filterProperties.every((ppty)=>{
+            return !query[ppty]
+        })
+      if (Object.entries(query).length && !checker) {
         setTeam();
       } else {
         projectsDispatch({ type: 'CLEAR_FILTER' });

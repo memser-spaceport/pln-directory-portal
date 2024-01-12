@@ -33,7 +33,7 @@ export default function MemberRow({
           />
           <div className="relative">
             {data.teamLead && (
-              <div className="absolute right-[-8px] z-[1] cursor-pointer" title='Team Lead'>
+              <div className="absolute right-[-8px] z-[1]" title='Team Lead'>
                 <Image
                   src="/assets/images/icons/projects/team-lead.svg"
                   alt="team lead image"
