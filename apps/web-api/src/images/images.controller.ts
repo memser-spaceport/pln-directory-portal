@@ -18,6 +18,7 @@ import { THUMBNAIL_SIZES } from '../utils/constants';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { hashFileName } from '../utils/hashing';
 import { ImagesService } from './images.service';
+import { IPFS } from '../../src/utils/constants';
 
 const server = initNestServer(apiImages);
 type RouteShape = typeof server.routeShapes;
@@ -231,31 +232,35 @@ export class ImagesController {
       encoding: '7bit',
     };
 
-    // Store all files in web3.storage
-    const cid = await this.fileUploadService.storeFiles([
+    // Store all files in web3.storage or s3 based on env config
+    const resp = await this.fileUploadService.storeFiles([
       expressCompressedOriginalFile,
       ...filesToStore,
     ]);
     // Update thumbnails with the cid and url of the image
     thumbnails.map(async (thumbnail) => {
-      thumbnail.cid = cid;
-      thumbnail.url = await this.fileUploadService.getDecryptedFileUrl(
-        cid,
-        thumbnail.filename
-      );
+      thumbnail.cid = resp;
+      if (process.env.FILE_STORAGE === IPFS) {
+        thumbnail.url = await this.fileUploadService.getDecryptedFileUrl(
+          resp,
+          thumbnail.filename
+        );
+      } else {
+        thumbnail.url = resp;
+      }
     });
 
     const hasThumbnails = thumbnails.length > 0;
     const createdImages = await this.imagesService.bulkCreate(
       {
-        cid: cid,
+        cid: resp,
         filename: compressedFileName,
         size: originalImage.size,
         height: originalImage.height,
-        url: await this.fileUploadService.getDecryptedFileUrl(
-          cid,
+        url: process.env.FILE_STORAGE === 'ipfs' ? await this.fileUploadService.getDecryptedFileUrl(
+          resp,
           compressedFileName
-        ),
+        ): resp,
         width: originalImage.width,
         version: 'ORIGINAL',
         type: originalImage.format,
