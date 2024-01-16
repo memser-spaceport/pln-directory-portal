@@ -2694,25 +2694,6 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Team",
-        "integration": null,
-        "inverseOf": "ProjectContributors",
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": "Team.uid",
-        "relationship": "BelongsTo",
-        "type": "String",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
         "field": "id",
         "integration": null,
         "inverseOf": null,
@@ -2725,24 +2706,6 @@
         "reference": null,
         "type": "Number",
         "validations": []
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "type",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "String",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
       },
       {
         "defaultValue": null,
@@ -2952,23 +2915,6 @@
         "reference": "Image.uid",
         "relationship": "BelongsTo",
         "type": "String",
-        "validations": []
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "ProjectContributors",
-        "integration": null,
-        "inverseOf": "Team",
-        "isFilterable": false,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": false,
-        "isSortable": false,
-        "isVirtual": false,
-        "reference": "ProjectContributor.uid",
-        "relationship": "HasMany",
-        "type": ["String"],
         "validations": []
       },
       {
@@ -3937,156 +3883,6 @@
     "isSearchable": true,
     "isVirtual": false,
     "name": "_contributingTeams",
-    "onlyForRelationships": false,
-    "paginationType": "page",
-    "segments": []
-  },
-  {
-    "actions": [],
-    "fields": [
-      {
-        "defaultValue": 0,
-        "enums": null,
-        "field": "applied_steps_count",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Number",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "checksum",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "String",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "finished_at",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": false,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Date",
-        "validations": []
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "id",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": true,
-        "isReadOnly": false,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "String",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "logs",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": false,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "String",
-        "validations": []
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "migration_name",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "String",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "rolled_back_at",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": false,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Date",
-        "validations": []
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "started_at",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": false,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Date",
-        "validations": []
-      }
-    ],
-    "icon": null,
-    "integration": null,
-    "isReadOnly": false,
-    "isSearchable": true,
-    "isVirtual": false,
-    "name": "_prisma_migrations",
     "onlyForRelationships": false,
     "paginationType": "page",
     "segments": []
