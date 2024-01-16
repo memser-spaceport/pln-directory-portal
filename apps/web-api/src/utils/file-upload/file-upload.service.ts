@@ -5,10 +5,12 @@ import { File, Web3Storage } from 'web3.storage';
 // https://github.com/DefinitelyTyped/DefinitelyTyped/issues/47780
 import 'multer';
 import { FileEncryptionService } from '../file-encryption/file-encryption.service';
+import { AwsService } from '../aws/aws.service';
+import { IPFS } from '../constants';
 
 @Injectable()
 export class FileUploadService {
-  constructor(private fileEcryptionService: FileEncryptionService) {}
+  constructor(private fileEcryptionService: FileEncryptionService, private awsService:AwsService) {}
 
   private makeStorageClient() {
     console.log("Inside makeStorageClient");
@@ -34,13 +36,25 @@ export class FileUploadService {
   }
 
   async storeFiles(uploadedFiles: Array<Express.Multer.File>) {
-    console.log("Inside storeFiles");
-    const client = this.makeStorageClient();
-    const encryptedFiles = this.encryptFiles(uploadedFiles);
-    const fileObjects = this.makeFileObjects(encryptedFiles);
-    const cid = await client.put(fileObjects);
-    console.log("Inside storeFiles");
-    return cid;
+    if (process.env.FILE_STORAGE === IPFS) {
+      console.log("Inside storeFiles");
+      const client = this.makeStorageClient();
+      const encryptedFiles = this.encryptFiles(uploadedFiles);
+      const fileObjects = this.makeFileObjects(encryptedFiles);
+      const cid = await client.put(fileObjects);
+      console.log("Inside storeFiles");
+      return cid;
+    } else {
+      let response; 
+      for (const file of uploadedFiles) {
+        if (!response) {
+          response = await this.awsService.uploadFileToS3(file, process.env.AWS_S3_BUCKET_NAME , file.originalname);
+        } else {
+          await this.awsService.uploadFileToS3(file, process.env.AWS_S3_BUCKET_NAME , file.originalname);
+        }
+      } 
+      return response.Location;
+    }
   }
 
   async getDecryptedFileUrl(cid: string, filename: string) {

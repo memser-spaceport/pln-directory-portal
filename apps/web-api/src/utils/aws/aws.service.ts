@@ -80,4 +80,15 @@ export class AwsService {
     // Send the email with attachment using RawMessage
     return await AWS_SES.sendRawEmail(params).promise();
   }
+
+  async uploadFileToS3(file, bucketName, fileName: string) {
+    const s3 = new AWS.S3();
+    const params = {
+      Bucket: bucketName,
+      Key: fileName,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+    };
+    return await s3.upload(params).promise();
+  }
 }
