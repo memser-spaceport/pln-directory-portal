@@ -6,6 +6,8 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.WITH_BUNDLE_ANALYZER === 'true',
 });
 
+const AWS_S3_DOMAIN = process.env.AWS_S3_DOMAIN || '';
+
 /**
  * @type {import('@nrwl/next/plugins/with-nx').WithNxOptions}
  **/
@@ -22,7 +24,7 @@ let nextConfig = {
   images: {
     // List remote domains that have access to Next.js Image Optimization API,
     // to protect the app from malicious users
-    domains: ['loremflickr.com', 'files.plnetwork.io','i.ytimg.com'],
+    domains: ['loremflickr.com', 'files.plnetwork.io','i.ytimg.com', AWS_S3_DOMAIN],
     // Enable `dangerouslyAllowSVG` and `contentSecurityPolicy` to serve
     // SVG images using the default Image Optimization API
     dangerouslyAllowSVG: true,
