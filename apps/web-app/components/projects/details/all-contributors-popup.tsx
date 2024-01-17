@@ -82,7 +82,7 @@ export default function AllContributorsPopup({
       <Transition appear show={isOpen} as={Fragment}>
         <Dialog
           as="div"
-          className="fixed relative inset-0 left-0 top-0 z-[1000] w-full grow overflow-x-hidden outline-none"
+          className="fixed relative inset-0 left-0 top-0 z-[1000] grow overflow-x-hidden outline-none"
           onClose={() => onClose}
         >
           <Transition.Child
@@ -107,7 +107,7 @@ export default function AllContributorsPopup({
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <Dialog.Panel className="slim-scroll relative h-[645px] w-full max-w-2xl transform rounded-md bg-white py-8 pl-8 text-left align-middle shadow-xl transition-all">
+                <Dialog.Panel className="slim-scroll relative h-[445px] w-[450px] max-w-2xl transform rounded-md bg-white py-8 pl-8 text-left align-middle shadow-xl transition-all">
                   <Dialog.Title
                     as="div"
                     className="pb-3 text-base font-semibold not-italic leading-[22px]"
@@ -145,7 +145,7 @@ export default function AllContributorsPopup({
                       </div>
                     </div>
                   </Dialog.Title>
-                  <div className="h-[87%] overflow-y-scroll">
+                  <div className="h-[72%] overflow-y-scroll">
                     {filteredContriList &&
                       filteredContriList.map((contri, index) => {
                         return getMemberDetailTemplate(

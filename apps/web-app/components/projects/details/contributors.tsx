@@ -45,13 +45,15 @@ export default function Contributors({ project, contributingMembers }) {
         }}
       >
         {url && (
-          <Image
+          <div className='w-[36px] h-[36px] rounded-full hover:border-[2px] hover:border-[#156FF7]'>
+            <Image
             src={url}
             alt="contributors image"
             width={36}
             height={36}
             className="rounded-full"
           />
+          </div>
         )}
         {!url && (
           <UserIcon className="relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white" />
@@ -76,7 +78,7 @@ export default function Contributors({ project, contributingMembers }) {
     <>
       <div className="flex flex-col gap-[10px] rounded-[12px] bg-white p-[16px]">
         <div
-          className="flex cursor-pointer justify-between border-b border-[#E2E8F0] pb-[14px] text-[18px] font-semibold leading-[28px]"
+          className="flex cursor-pointer justify-between border-b border-[#E2E8F0] pb-[14px] text-[18px] font-semibold leading-[28px]  hover:text-[#156FF7]"
           onClick={() => {
             setAllContributors(true);
           }}

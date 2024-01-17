@@ -38,7 +38,15 @@ export default function TeamsInvolved({ project }) {
     <>
       {project && (
         <div className="flex flex-col gap-[10px] rounded-[12px] bg-white p-[16px]">
-          <div className="flex justify-between border-b border-[#E2E8F0] pb-[14px] leading-[28px]">
+          <div
+            className="flex cursor-pointer justify-between border-b border-[#E2E8F0] pb-[14px] leading-[28px]  hover:text-[#156FF7]"
+            onClick={() => {
+              analytics.captureEvent(
+                APP_ANALYTICS_EVENTS.PROJECT_DETAIL_SEEALL_CLICKED
+              );
+              setSeeAllPopup(true);
+            }}
+          >
             <div className="text-[18px] font-semibold">
               <div>Teams</div>
             </div>
@@ -48,19 +56,19 @@ export default function TeamsInvolved({ project }) {
                   {project.contributingTeams.length + 1}
                 </div>
               </div>
-              {project.contributingTeams.length > 3 && (
-                <div
-                  className="cursor-pointer pt-1 text-[12px] font-semibold leading-[20px] text-blue-500"
-                  onClick={() => {
-                    analytics.captureEvent(
-                      APP_ANALYTICS_EVENTS.PROJECT_DETAIL_SEEALL_CLICKED
-                    );
-                    setSeeAllPopup(true);
-                  }}
-                >
-                  See All
-                </div>
-              )}
+              {/* {project.contributingTeams.length > 3 && (
+                  <div
+                    className="cursor-pointer pt-1 text-[12px] font-semibold leading-[20px] text-blue-500"
+                    onClick={() => {
+                      analytics.captureEvent(
+                        APP_ANALYTICS_EVENTS.PROJECT_DETAIL_SEEALL_CLICKED
+                      );
+                      setSeeAllPopup(true);
+                    }}
+                  >
+                    See All
+                  </div>
+                )} */}
             </div>
           </div>
           <div
