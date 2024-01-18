@@ -74,3 +74,5 @@ export const ASK_QUESTION_SUBJECT = "A new query received";
 export const FEEDBACK_SUBJECT = "A new feedback received";
 export const SHARE_IDEA_SUBJECT = "A new idea received";
 export const SUPPORT_SUBJECT = "A new support request received";
+export const IPFS = 'ipfs';
+export const S3 = 's3';

@@ -5,7 +5,7 @@ import MailComposer from 'nodemailer/lib/mail-composer';
 import * as fs from 'fs';
 import Handlebars from 'handlebars';
 
-const SES_CONFIG = {
+const CONFIG = {
   accessKeyId: process.env.AWS_ACCESS_KEY,
   secretAccessKey: process.env.AWS_SECRET_KEY,
   region: process.env.AWS_REGION,
@@ -15,7 +15,7 @@ const SES_CONFIG = {
 export class AwsService {
   async sendEmail(templateName, includeAdmins, toAddresses, data) {
     try {
-      const AWS_SES = new AWS.SES(SES_CONFIG);
+      const AWS_SES = new AWS.SES(CONFIG);
       const adminEmailIdsFromEnv = process.env.SES_ADMIN_EMAIL_IDS;
       const adminEmailIds = adminEmailIdsFromEnv?.split('|') ?? [];
       const additionalEmailIds = includeAdmins ? [...adminEmailIds] : [];
@@ -50,7 +50,7 @@ export class AwsService {
     Handlebars.registerHelper('eq', (valueOne, valueTwo) => { return valueOne === valueTwo })
     const template = Handlebars.compile(emailTemplate);
     const renderedHtml = template(data);
-    const AWS_SES = new AWS.SES(SES_CONFIG);
+    const AWS_SES = new AWS.SES(CONFIG);
     const mailOptions = {
       from: fromAddress,
       to: toAddresses,
@@ -79,5 +79,16 @@ export class AwsService {
     };
     // Send the email with attachment using RawMessage
     return await AWS_SES.sendRawEmail(params).promise();
+  }
+
+  async uploadFileToS3(file, bucketName, fileName: string) {
+    const s3 = new AWS.S3(CONFIG);
+    const params = {
+      Bucket: bucketName,
+      Key: fileName,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+    };
+    return await s3.upload(params).promise();
   }
 }
