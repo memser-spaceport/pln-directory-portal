@@ -1,5 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const withNx = require('@nrwl/next/plugins/with-nx');
+const AWS_S3_DOMAIN = process.env.AWS_S3_DOMAIN || '';
 
 /**
  * @type {import('@nrwl/next/plugins/with-nx').WithNxOptions}
@@ -17,7 +18,7 @@ const nextConfig = {
   images: {
     // List remote domains that have access to Next.js Image Optimization API,
     // to protect the app from malicious users
-    domains: ['loremflickr.com', 'files.plnetwork.io'],
+    domains: ['loremflickr.com', 'files.plnetwork.io', AWS_S3_DOMAIN],
     // Enable `dangerouslyAllowSVG` and `contentSecurityPolicy` to serve
     // SVG images using the default Image Optimization API
     dangerouslyAllowSVG: true,
