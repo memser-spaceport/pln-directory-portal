@@ -32,16 +32,18 @@ export default function ContributingMembers() {
                   }}
                 >
                   {member?.logo && (
-                    <Image
-                      src={member.logo}
-                      alt="member image"
-                      width={28}
-                      height={28}
-                      className="shrink-0 rounded-full cursor-pointer"
-                    />
+                    <div className='w-[28px] h-[28px] rounded-full hover:border-[2px] hover:border-[#156FF7]'>
+                      <Image
+                        src={member.logo}
+                        alt="member image"
+                        width={28}
+                        height={28}
+                        className="shrink-0 rounded-full cursor-pointer"
+                      />
+                    </div>
                   )}
                   {!member?.logo && (
-                    <UserGroupIcon className="h-[28px] w-[28px] shrink-0 rounded-full bg-slate-100 fill-slate-200 cursor-pointer" />
+                    <UserGroupIcon className="h-[28px] w-[28px] shrink-0 rounded-full bg-slate-100 fill-slate-200 cursor-pointer hover:border-[2px] hover:border-[#156FF7]" />
                   )}
                   {contributorHoverFlag &&
                     contributorHoveruid === member?.uid && (
