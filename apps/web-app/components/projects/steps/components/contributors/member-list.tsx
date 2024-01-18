@@ -234,7 +234,7 @@ export default function MemberList({
             <div>
               <Autocomplete
                 name={'team'}
-                className="custom-grey custom-outline-none border"
+                className="custom-grey custom-outline-none border focus:outline-none focus:ring-transparent"
                 // key={selectedTeam.label}
                 placeholder="All Teams"
                 selectedOption={selectedTeamToFitler}
@@ -249,11 +249,12 @@ export default function MemberList({
           <div className={`${!selectedTeam?'':'w-full'}`}>
             <InputField
               label="Search"
+              tabIndex={-1}
               name="searchBy"
               showLabel={false}
               icon={SearchIcon}
               placeholder={'Search'}
-              className="rounded-[8px] border"
+              className="rounded-[8px] border custom-outline-none focus:outline-none"
               value={searchTerm}
               onKeyUp={(event) => {
                 //   if (event.key === 'Enter' || event.keyCode === 13) {
@@ -290,7 +291,7 @@ export default function MemberList({
           <div className="">
             <input
               type="checkbox"
-              className="relative top-[2px] cursor-pointer"
+              className="relative top-[2px] cursor-pointer focus:outline-none"
               onChange={onShowSelected}
               checked={showSelected}
             />
