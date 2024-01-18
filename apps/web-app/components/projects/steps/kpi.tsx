@@ -3,6 +3,7 @@ import { ReactComponent as RemoveKPIIcon } from '../../../public/assets/images/i
 import { useContext } from 'react';
 import { AddProjectsContext } from 'apps/web-app/context/projects/add.context';
 import InputError from './components/input-error';
+import Image from 'next/image';
 export default function KPI({ onInputChange, kpiFieldArray, setKPIField }) {
 
     const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
@@ -111,10 +112,23 @@ export default function KPI({ onInputChange, kpiFieldArray, setKPIField }) {
     }
 
     const getAddMoreTemplate = () => {
-        return <div className="font-medium text-sm pt-2 cursor-pointer" onClick={addKPIRow}>
-            <span className="text-[#156FF7]">+ Add KPI</span>
-            <span className="text-[#94A3B8] pl-1">(max 5)</span>
-        </div>
+        return (
+          <div
+            className="cursor-pointer pt-2 text-sm font-medium flex"
+            onClick={addKPIRow}
+          >
+            <span className="flex text-[#156FF7] gap-2">
+              <Image
+                src={'/assets/images/icons/projects/add-new.svg'}
+                alt="project image"
+                width={12}
+                height={12}
+              />
+              <div>Add KPI</div>
+            </span>
+            <span className="pl-1 text-[#94A3B8]">(max 5)</span>
+          </div>
+        );
     }
 
     const getKPIComponent = (field, index) => {

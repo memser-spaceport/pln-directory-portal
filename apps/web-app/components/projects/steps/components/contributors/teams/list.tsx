@@ -57,10 +57,10 @@ export default function ContributorTeamsList() {
           teams.map((team) => {
             return (
               <div
-                className="flex justify-between border-b px-[20px] py-[8px]"
+                className="flex justify-between border-b last:border-b-0 px-[20px] py-[8px] shrink-0 "
                 key={team?.uid + 'id'}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0 ">
                   {team?.logo && (
                     <Image
                       src={team.logo}
@@ -73,7 +73,7 @@ export default function ContributorTeamsList() {
                   {!team?.logo && (
                     <UserGroupIcon className="h-[20px] w-[20px] shrink-0 rounded bg-slate-100 fill-slate-200" />
                   )}
-                  <div className="text-sm font-normal not-italic leading-8 text-[#64748B]">
+                  <div className="text-sm font-normal not-italic leading-8 text-[#64748B] max-w-[665px] truncate" title={team.name}>
                     {team.name}
                   </div>
                 </div>

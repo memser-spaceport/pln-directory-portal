@@ -21,7 +21,7 @@ export default function DefaultMemberUI({onContributorAddClick}) {
 
   return (
     <>
-      <div className="flex items-center justify-between px-[20px] py-[8px]">
+      <div className="flex items-center justify-between px-[20px] py-[20px]">
         <div className="text-sm font-normal not-italic leading-5 text-[#64748B]">
           No contributors added
         </div>
@@ -35,10 +35,10 @@ export default function DefaultMemberUI({onContributorAddClick}) {
             <Image
               src={'/assets/images/icons/projects/add-new.svg'}
               alt="project image"
-              width={16}
-              height={16}
+              width={12}
+              height={12}
             />
-            <span className="relative top-[-3px] px-2">Add</span>
+            <span className="relative  px-2">Add</span>
           </div>
         </div>
       </div>
