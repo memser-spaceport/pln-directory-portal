@@ -12,7 +12,7 @@ export default function ProjectActionButtons() {
 
     const getNextTemplate = () => {
         return (
-            <div className="px-[24px] py-[8px] rounded-[100px] border cursor-pointer border-[#156FF7] bg-[#156FF7] text-white"
+            <div className="px-[24px] py-[8px] rounded-[100px] border cursor-pointer border-[#156FF7] bg-[#156FF7] text-white shadow font-semibold"
                 onClick={onNextClick}
             >
                 Next
@@ -23,7 +23,7 @@ export default function ProjectActionButtons() {
     const getAddProjectTemplate = () => {
         return (
           <div
-            className="cursor-pointer rounded-[100px] border border-[#156FF7] bg-[#156FF7] px-[24px] py-[8px] text-white"
+            className="cursor-pointer rounded-[100px] border border-[#156FF7] bg-[#156FF7] px-[24px] py-[8px] text-white shadow font-semibold"
             onClick={onSaveProject}
           >
             {addProjectsState?.mode === 'ADD' ? 'Add Project' : 'Save Changes'}
@@ -33,7 +33,7 @@ export default function ProjectActionButtons() {
 
     const getCancelTemplate = () => {
         return (
-            <div className="px-[24px] py-[8px] rounded-[100px] border border-[#156FF7]  text-[#156FF7] cursor-pointer"
+            <div className="px-[24px] py-[8px] rounded-[100px] border border-[#156FF7]  text-[#156FF7] cursor-pointer shadow font-semibold"
                 onClick={() => {
                     if (addProjectsState.mode === 'ADD') {
                         router.push('/projects')
@@ -48,7 +48,7 @@ export default function ProjectActionButtons() {
 
     const getBackTemplate = () => {
         return (
-            <div className="px-[24px] py-[8px] rounded-[100px] border border-[#156FF7]  text-[#156FF7] cursor-pointer"
+            <div className="px-[24px] py-[8px] rounded-[100px] border border-[#156FF7]  text-[#156FF7] cursor-pointer shadow font-semibold"
                 onClick={() => {
                     addProjectsDispatch({ type: 'SET_CURRENT_STEP', payload: addProjectsState.currentStep - 1 });
                 }}>

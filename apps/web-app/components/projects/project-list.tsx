@@ -37,7 +37,7 @@ export function ProjectList({
        src={'/assets/images/icons/projects/add-new.svg'} alt="project image" width={295} height={228} /> */}
           <div className="flex items-center flex-col gap-1">
             <Image
-              src={'/assets/images/icons/projects/add-new.svg'} alt="project image" width={20} height={20} />
+              src={'/assets/images/icons/projects/add-new.svg'} alt="project image" width={16} height={16} />
             <div className="text-[#156FF7] text-[16px] font-medium">Add Project</div>
             <div className="text-[#64748B] text-[14px] font-normal">List your project here</div>
           </div>

@@ -6,7 +6,7 @@ const { getAllFormattedProjects,formatToSave } = ProjectsDataService;
 
 const getTeamsProject = async (uid) => {
     try {
-        const response = await api.get(`/v1/projects?maintainingTeamUid=${uid}`);
+        const response = await api.get(`/v1/projects?maintainingTeamUid=${uid}&pagination=false`);
         if (response.status === 200) {
 
             const formattedData = getAllFormattedProjects(response.data);

@@ -175,6 +175,7 @@ export function AllTeamsModal({
               </button>
             </div>
           </div> */}
+          <div className="absolute -top-3 -right-3 h-6 w-6 rounded-full bg-white" />
           <XCircleIcon
             onClick={() => {
               setIsModalOpen(false);

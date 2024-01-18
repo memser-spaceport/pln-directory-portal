@@ -3,6 +3,7 @@ import { InputField } from '@protocol-labs-network/ui';
 import { AddProjectsContext } from 'apps/web-app/context/projects/add.context';
 import React, { useContext } from 'react';
 import InputError from '../input-error';
+import Image from 'next/image';
 
 export default function URLDetails({ onInputChange, urlFieldArray, setURLField }) {
 
@@ -28,7 +29,14 @@ export default function URLDetails({ onInputChange, urlFieldArray, setURLField }
 
     const getAddMoreLinkTemplate = () => {
         return <div className="font-medium text-sm pt-2 cursor-pointer" onClick={addURLRow}>
-            <span className="text-[#156FF7]">+ Add project URL</span>
+            <span className="text-[#156FF7]">
+            <Image
+                src={'/assets/images/icons/projects/add-new.svg'}
+                alt="project image"
+                width={12}
+                height={12}
+              />
+                 {'  '}Add project URL</span>
             <span className="text-[#94A3B8] pl-1">(max 3)</span>
         </div>
     }
