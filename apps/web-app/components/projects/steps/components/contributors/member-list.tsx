@@ -161,26 +161,26 @@ export default function MemberList({
     return counterArr?.length;
   };
 
-  const handleTeamChange = (team,from) => {
+  const handleTeamChange = (team, from = null) => {
     setSelectedTeam(team);
-    if(team){
-      if(!from){
+    if (team) {
+      if (!from) {
         setSearchTerm('');
       }
       const tempList = [];
-        for (let index = 0; index < list.length; index++) {
-          const element = list[index];
-          const tempRoles = element?.teamMemberRoles;
-          const filtered = tempRoles.filter(teamRole=>{
-            return teamRole?.team?.uid === team.value
-          });
-          if(filtered && filtered.length){
-            tempList.push(element);
-          }
+      for (let index = 0; index < list.length; index++) {
+        const element = list[index];
+        const tempRoles = element?.teamMemberRoles;
+        const filtered = tempRoles.filter((teamRole) => {
+          return teamRole?.team?.uid === team.value;
+        });
+        if (filtered && filtered.length) {
+          tempList.push(element);
         }
-        setFilteredList(tempList);
-        return tempList;
       }
+      setFilteredList(tempList);
+      return tempList;
+    }
   };
 
   const fetchTeamsWithLogoSearchTerm = async (searchTerm) => {
