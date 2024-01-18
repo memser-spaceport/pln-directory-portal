@@ -57,7 +57,7 @@ export default function ContributorTeamsList() {
           teams.map((team) => {
             return (
               <div
-                className="flex justify-between border-b last:border-b-0 px-[20px] py-[8px] shrink-0 "
+                className="flex justify-between border-b last:border-b-0 px-[20px] py-[20px] shrink-0 "
                 key={team?.uid + 'id'}
               >
                 <div className="flex items-center gap-2 shrink-0 ">
