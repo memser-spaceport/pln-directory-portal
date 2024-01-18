@@ -13,7 +13,7 @@ export default function ContributorProfileCard({
     // const router = useRouter();
   return (
     <>
-      <div className="absolute left-[-100%] cursor-pointer bottom-[50px] mx-auto flex w-[295px] flex-col rounded-[12px] bg-white shadow-[0px_0px_8px_0px_rgba(0,0,0,0.14)]"
+      <div className="absolute left-[-100%] cursor-pointer bottom-[50px] mx-auto flex w-[295px] flex-col rounded-[12px] bg-white shadow-[0px_0px_8px_0px_rgba(0,0,0,0.14)] min-h-[189px]"
       onClick={() => {
         // router.push('/members/' + uid);
         window.open('/members/' + uid, '_blank');
@@ -53,7 +53,7 @@ export default function ContributorProfileCard({
         <div className="px-[20px] text-center text-sm font-medium not-italic leading-5 text-[#0F172A]">
           {teamName}
         </div>
-        <div className="border-b border-[#E2E8F0] pb-[16px] text-center text-sm font-normal not-italic leading-5 text-[#0F172A]">
+        <div className="border-[#E2E8F0] pb-[16px] text-center text-sm font-normal not-italic leading-5 text-[#0F172A]">
           {role}
         </div>
         {/* <div className="py-[16px] px-[20px] ">
