@@ -201,7 +201,7 @@ export default function ProjectActionButtons() {
         
 
         if(!inputs.maintainedBy){
-            errors['maintainedBy'] = 'Please add maintainer team details.';
+            errors['maintainedBy'] = 'Please add maintainer team details';
         }
         // else if (!inputs.maintainedByContributors || inputs.maintainedByContributors.length < 1 || !checkMaintainedBycontributors()) {
         //     errors['maintainedByContributors'] = 'Please add contributors to maintainer team';

@@ -30,8 +30,14 @@ export default function MemberList({
     if (list) {
       if (searchTerm !== null) {
         const tempList = [];
-        for (let index = 0; index < list.length; index++) {
-          const element = list[index];
+        let comparingList;
+        if(selectedTeamToFitler?.value){
+          comparingList = handleTeamChange(selectedTeamToFitler,'fromSearch');
+        }else{
+          comparingList = list;
+        }
+        for (let index = 0; index < comparingList.length; index++) {
+          const element = comparingList[index];
           if (element.name.toLowerCase().includes(searchTerm.toLowerCase())) {
             tempList.push(element);
           }
@@ -155,22 +161,26 @@ export default function MemberList({
     return counterArr?.length;
   };
 
-  const handleTeamChange = (team) => {
-    // setSelectedTeam(team);
-    // if(team){
-    //   const tempList = [];
-    //     for (let index = 0; index < filteredList.length; index++) {
-    //       const element = filteredList[index];
-    //       const tempRoles = element?.teamMemberRoles;
-    //       const filtered = tempRoles.filter(teamRole=>{
-    //         return teamRole?.team?.uid === team.value
-    //       });
-    //       if(filtered && filtered.length){
-    //         tempList.push(element);
-    //       }
-    //     }
-    //     setFilteredList(tempList);
-    //   }
+  const handleTeamChange = (team, from = null) => {
+    setSelectedTeam(team);
+    if (team) {
+      if (!from) {
+        setSearchTerm('');
+      }
+      const tempList = [];
+      for (let index = 0; index < list.length; index++) {
+        const element = list[index];
+        const tempRoles = element?.teamMemberRoles;
+        const filtered = tempRoles.filter((teamRole) => {
+          return teamRole?.team?.uid === team.value;
+        });
+        if (filtered && filtered.length) {
+          tempList.push(element);
+        }
+      }
+      setFilteredList(tempList);
+      return tempList;
+    }
   };
 
   const fetchTeamsWithLogoSearchTerm = async (searchTerm) => {
@@ -192,39 +202,55 @@ export default function MemberList({
     }
   };
 
+  const onClearFilter = () => {
+    setSelectedTeam({ value: '', label: '',logo:'' });
+    setSearchTerm(null);
+    setFilteredList(list);
+  }
+
   return (
     <div className="flex h-full flex-col gap-3">
       <div className="flex gap-2 pr-5 pb-3">
-        <div className="w-full">
-          <InputField
-            label="Search"
-            name="searchBy"
-            showLabel={false}
-            icon={SearchIcon}
-            placeholder={'Search'}
-            className="rounded-[8px] border"
-            value={searchTerm}
-            onKeyUp={(event) => {
-              //   if (event.key === 'Enter' || event.keyCode === 13) {
-              setSearchTerm(event.currentTarget.value);
-              //   }
-            }}
-            hasClear
-            onClear={() => setSearchTerm('')}
-          />
+        <div className="flex w-full">
+          <div>
+            <Autocomplete
+              name={'team'}
+              className="custom-grey custom-outline-none border"
+              // key={selectedTeam.label}
+              placeholder="All Teams"
+              selectedOption={selectedTeamToFitler}
+              onSelectOption={handleTeamChange}
+              debounceCall={fetchTeamsWithLogoSearchTerm}
+              // validateBeforeChange={true}
+              // validationFnBeforeChange={beforeChangeValidation}
+              // confirmationMessage={MSG_CONSTANTS.CHANGE_CONF_MSG}
+            />
+          </div>
+          <div>
+            <InputField
+              label="Search"
+              name="searchBy"
+              showLabel={false}
+              icon={SearchIcon}
+              placeholder={'Search'}
+              className="rounded-[8px] border"
+              value={searchTerm}
+              onKeyUp={(event) => {
+                //   if (event.key === 'Enter' || event.keyCode === 13) {
+                setSearchTerm(event.currentTarget.value);
+                //   }
+              }}
+              hasClear
+              onClear={() => setSearchTerm('')}
+            />
+          </div>
+          <div className="text-sky-600 text-[12px] cursor-pointer p-3 relative top-[10px]" 
+          onClick={()=>{
+            onClearFilter()
+          }}>
+            Clear filters
+          </div>
         </div>
-        {/* <Autocomplete
-          name={'team'}
-          className="custom-grey custom-outline-none border"
-          // key={selectedTeam.label}
-          placeholder="Select Team"
-          selectedOption={selectedTeamToFitler}
-          onSelectOption={handleTeamChange}
-          debounceCall={fetchTeamsWithLogoSearchTerm}
-          // validateBeforeChange={true}
-          // validationFnBeforeChange={beforeChangeValidation}
-          // confirmationMessage={MSG_CONSTANTS.CHANGE_CONF_MSG}
-        /> */}
       </div>
       <div className="mr-5 flex justify-between border-b pb-3">
         {/* <input
@@ -270,25 +296,27 @@ export default function MemberList({
                 })}
             </div>
             <div className="flex flex-col gap-2">
-            {showSelectedMembers &&
-              seeMore &&
-              showSelectedMembers
-                .slice(3, showSelectedMembers.length)
-                .map((member, index) => {
-                  return (
-                    <React.Fragment key={member + index}>
-                      {!member?.isDeleted && (
-                        <MemberRow
-                          key={member + index}
-                          data={member}
-                          onselect={onselect}
-                          onDeselect={onDeselect}
-                          defaultValue={checkForExistance(member) !== 'no-data'}
-                        />
-                      )}
-                    </React.Fragment>
-                  );
-                })}
+              {showSelectedMembers &&
+                seeMore &&
+                showSelectedMembers
+                  .slice(3, showSelectedMembers.length)
+                  .map((member, index) => {
+                    return (
+                      <React.Fragment key={member + index}>
+                        {!member?.isDeleted && (
+                          <MemberRow
+                            key={member + index}
+                            data={member}
+                            onselect={onselect}
+                            onDeselect={onDeselect}
+                            defaultValue={
+                              checkForExistance(member) !== 'no-data'
+                            }
+                          />
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
             </div>
             {showSelectedMembers && showSelectedMembers.length > 3 && !seeMore && (
               <div
