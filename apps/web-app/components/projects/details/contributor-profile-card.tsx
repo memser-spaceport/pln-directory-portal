@@ -50,10 +50,10 @@ export default function ContributorProfileCard({
         <div className="relative px-[20px] text-center text-lg font-semibold not-italic leading-7 text-[color:var(--neutral-slate-900,#0F172A)] truncate" title={name}>
           {name}
         </div>
-        <div className="px-[20px] text-center text-sm font-medium not-italic leading-5 text-[#0F172A]">
+        <div className="px-[20px] text-center text-sm font-medium not-italic leading-5 text-[#0F172A] truncate" title={teamName}>
           {teamName}
         </div>
-        <div className="border-[#E2E8F0] pb-[16px] text-center text-sm font-normal not-italic leading-5 text-[#0F172A]">
+        <div className="border-[#E2E8F0] pb-[16px] text-center text-sm font-normal not-italic leading-5 text-[#0F172A] truncate" title={role}>
           {role}
         </div>
         {/* <div className="py-[16px] px-[20px] ">

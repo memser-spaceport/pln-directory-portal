@@ -56,7 +56,7 @@ export default function Contributors({ project, contributingMembers }) {
           </div>
         )}
         {!url && (
-          <UserIcon className="relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white" />
+          <UserIcon className="relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white hover:border-[2px] hover:border-[#156FF7]" />
         )}
         {
         contributorHoverFlag && contributorHoveruid === uid &&

@@ -200,7 +200,7 @@ const getFormattedProject = (project) => {
             const tempContributors = [];
             project.contributors?.map((mem)=>{
                 const memberObj = {};
-                memberObj['logo'] = mem?.member?.image?.url;
+                memberObj['logo'] = mem?.member?.image ? mem?.member?.image?.url : null;
                 const mainTeam = mem?.member?.teamMemberRoles?.filter(teamRoles=>{
                     return teamRoles?.mainTeam === true;
                 });

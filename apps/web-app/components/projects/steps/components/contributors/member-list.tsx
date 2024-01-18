@@ -61,6 +61,14 @@ export default function MemberList({
         return !member?.isDeleted && teamArr?.length >0 ;
       });
       setShowSelectedMembers(memberArr);
+    }else if(selectedTeamToFitler?.value){
+      memberArr = selectedMembers?.filter((member) => {
+        const teamArr = member?.teamMemberRoles?.filter((teamMem) => {
+          return selectedTeamToFitler?.value === teamMem.team?.uid;
+        });
+        return !member?.isDeleted && teamArr?.length >0 ;
+      });
+      setShowSelectedMembers(memberArr);
     }else{
       memberArr = selectedMembers?.filter((member) => {
         return !member?.isDeleted;
@@ -167,6 +175,14 @@ export default function MemberList({
       if (!from) {
         setSearchTerm('');
       }
+      const memberArr = selectedMembers?.filter((member) => {
+        const teamArr = member?.teamMemberRoles?.filter((teamMem) => {
+          return team?.value === teamMem.team?.uid;
+        });
+        return !member?.isDeleted && teamArr?.length > 0;
+      });
+      setShowSelectedMembers(memberArr);
+
       const tempList = [];
       for (let index = 0; index < list.length; index++) {
         const element = list[index];
@@ -178,6 +194,8 @@ export default function MemberList({
           tempList.push(element);
         }
       }
+
+
       setFilteredList(tempList);
       return tempList;
     }
@@ -212,21 +230,23 @@ export default function MemberList({
     <div className="flex h-full flex-col gap-3">
       <div className="flex gap-2 pr-5 pb-3">
         <div className="flex w-full">
-          <div>
-            <Autocomplete
-              name={'team'}
-              className="custom-grey custom-outline-none border"
-              // key={selectedTeam.label}
-              placeholder="All Teams"
-              selectedOption={selectedTeamToFitler}
-              onSelectOption={handleTeamChange}
-              debounceCall={fetchTeamsWithLogoSearchTerm}
-              // validateBeforeChange={true}
-              // validationFnBeforeChange={beforeChangeValidation}
-              // confirmationMessage={MSG_CONSTANTS.CHANGE_CONF_MSG}
-            />
-          </div>
-          <div>
+          {!selectedTeam && (
+            <div>
+              <Autocomplete
+                name={'team'}
+                className="custom-grey custom-outline-none border"
+                // key={selectedTeam.label}
+                placeholder="All Teams"
+                selectedOption={selectedTeamToFitler}
+                onSelectOption={handleTeamChange}
+                debounceCall={fetchTeamsWithLogoSearchTerm}
+                // validateBeforeChange={true}
+                // validationFnBeforeChange={beforeChangeValidation}
+                // confirmationMessage={MSG_CONSTANTS.CHANGE_CONF_MSG}
+              />
+            </div>
+          )}
+          <div className={`${!selectedTeam?'':'w-full'}`}>
             <InputField
               label="Search"
               name="searchBy"
@@ -244,12 +264,16 @@ export default function MemberList({
               onClear={() => setSearchTerm('')}
             />
           </div>
-          <div className="text-sky-600 text-[12px] cursor-pointer p-3 relative top-[10px]" 
-          onClick={()=>{
-            onClearFilter()
-          }}>
-            Clear filters
-          </div>
+          {!selectedTeam && (
+            <div
+              className="relative top-[10px] cursor-pointer p-3 text-[12px] text-sky-600"
+              onClick={() => {
+                onClearFilter();
+              }}
+            >
+              Clear filters
+            </div>
+          )}
         </div>
       </div>
       <div className="mr-5 flex justify-between border-b pb-3">

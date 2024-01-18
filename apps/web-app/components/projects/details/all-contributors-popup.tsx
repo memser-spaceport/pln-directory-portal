@@ -97,7 +97,8 @@ export default function AllContributorsPopup({
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75" />
           </Transition.Child>
           <div className="fixed inset-0 overflow-y-auto">
-            <div className="flex min-h-full items-center justify-center p-4">
+            {/* <div className="flex min-h-full items-center justify-center p-4"> */}
+            <div className="flex mt-20 items-center justify-center p-4">
               <Transition.Child
                 as={Fragment}
                 enter="ease-out duration-300"
@@ -107,7 +108,7 @@ export default function AllContributorsPopup({
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <Dialog.Panel className="slim-scroll relative h-[445px] w-[450px] max-w-2xl transform rounded-md bg-white py-8 pl-8 text-left align-middle shadow-xl transition-all">
+                <Dialog.Panel className="slim-scroll relative h-[416px] w-[500px] max-w-2xl transform rounded-md bg-white py-8 pl-8 text-left align-middle shadow-xl transition-all">
                   <Dialog.Title
                     as="div"
                     className="pb-3 text-base font-semibold not-italic leading-[22px]"
