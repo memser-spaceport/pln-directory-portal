@@ -176,8 +176,8 @@ export default function TeamsContributors() {
               <Image
                 src={'/assets/images/icons/projects/add-new.svg'}
                 alt="project image"
-                width={16}
-                height={16}
+                width={12}
+                height={12}
               />
               <span className="relative px-2 text-[#156FF7] ">Add</span>
               {showMenu && (
@@ -242,7 +242,7 @@ export default function TeamsContributors() {
             />
           </div>
           <div className="relative flex-[1_0_0] z-[-1] text-[13px] font-medium not-italic leading-[18px] text-[color:var(--Text-Dark,#0F172A)] opacity-40">
-            Adding a maintainer team is mandatory, and only one team can serve
+            Adding a maintainer team is required, and only one team can serve
             as the maintainer.
           </div>
         </div>
