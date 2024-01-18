@@ -80,6 +80,7 @@ export function InputField({
         ></img>
       ) : null}
       <input
+      autoFocus={false}
         {...props}
         type={showPassword ? 'text' : props.type}
         className={`mt-[12px] block w-full rounded-lg bg-white text-sm leading-6 text-slate-900  shadow-slate-300 transition duration-150 ease-in-out placeholder:text-sm placeholder:text-slate-600 placeholder:opacity-50
