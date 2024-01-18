@@ -47,7 +47,7 @@ export default function ContributorProfileCard({
             )}
           </div>
         </div>
-        <div className="relative px-[20px] text-center text-lg font-semibold not-italic leading-7 text-[color:var(--neutral-slate-900,#0F172A)]">
+        <div className="relative px-[20px] text-center text-lg font-semibold not-italic leading-7 text-[color:var(--neutral-slate-900,#0F172A)] truncate" title={name}>
           {name}
         </div>
         <div className="px-[20px] text-center text-sm font-medium not-italic leading-5 text-[#0F172A]">
