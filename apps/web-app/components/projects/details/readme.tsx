@@ -71,7 +71,7 @@ export default function AdditionalDetails({ project, userHasEditRights }) {
     return (
         <>
             <div className="flex justify-between">
-                <div className="text-[14px] font-medium text-[#64748B] tracking-[1px]">
+                <div className="text-[14px] font-semibold text-[#475569] tracking-[1px]">
                     Additional Details
                 </div>
                 {/* Enable edit button only when the corresponding team lead logsin and view */}
