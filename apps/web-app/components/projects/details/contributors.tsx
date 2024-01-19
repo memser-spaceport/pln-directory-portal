@@ -141,7 +141,7 @@ export default function Contributors({ project, contributingMembers }) {
                 teamLeadArr?.length > 0
               );
             })}
-          {project?.contributors?.length > 17 && (
+          {project?.contributors?.length + contributingMembers?.length > 17 && (
             <div
               className="cursor-pointer relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white pt-[5px] text-center"
               onClick={() => {

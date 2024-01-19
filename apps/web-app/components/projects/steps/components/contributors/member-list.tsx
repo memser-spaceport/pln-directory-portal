@@ -146,10 +146,10 @@ export default function MemberList({
   };
 
   const onShowSelected = (event) => {
+    setShowSelected(event.target.checked);
     if(event.target.checked){
       getShowSelectedMembers();
     }
-    setShowSelected(event.target.checked);
   }
 
   const getSelectedCount = () => {
@@ -301,10 +301,10 @@ export default function MemberList({
       </div>
       <div className=" h-[63%] overflow-y-scroll">
         {showSelected && showSelectedMembers.length > 0 && (
-          <div className="relative mr-5 border-b pb-3">
+          <div className="relative mr-5 pb-3">
             <div className="flex flex-col gap-2">
               {showSelectedMembers &&
-                showSelectedMembers.slice(0, 3).map((member, index) => {
+                showSelectedMembers.map((member, index) => {
                   return (
                     <React.Fragment key={member + index}>
                       {!member?.isDeleted && (
@@ -320,7 +320,7 @@ export default function MemberList({
                   );
                 })}
             </div>
-            <div className="flex flex-col gap-2">
+            {/* <div className="flex flex-col gap-2">
               {showSelectedMembers &&
                 seeMore &&
                 showSelectedMembers
@@ -342,8 +342,8 @@ export default function MemberList({
                       </React.Fragment>
                     );
                   })}
-            </div>
-            {showSelectedMembers && showSelectedMembers.length > 3 && !seeMore && (
+            </div> */}
+            {/* {showSelectedMembers && showSelectedMembers.length > 3 && !seeMore && (
               <div
                 className="absolute bottom-[-11px] left-[41%] cursor-pointer"
                 onClick={() => {
@@ -360,11 +360,11 @@ export default function MemberList({
                   />
                 </div>
               </div>
-            )}
+            )} */}
           </div>
         )}
         <div className=" flex flex-col gap-2">
-          {filteredList &&
+          {filteredList && !showSelected &&
             filteredList.map((member, index) => {
               return (
                 <MemberRow
@@ -377,7 +377,7 @@ export default function MemberList({
               );
             })}
         </div>
-        {filteredList &&
+        {filteredList && !showSelected &&
           filteredList.length < 1 &&
           searchTerm !== '' &&
           searchTerm !== null && <>No search results found.</>}
