@@ -30,6 +30,7 @@ export default function MemberList({
     if (list) {
       if (searchTerm !== null) {
         const tempList = [];
+
         let comparingList;
         if(selectedTeamToFitler?.value){
           comparingList = handleTeamChange(selectedTeamToFitler,'fromSearch');
@@ -43,6 +44,28 @@ export default function MemberList({
           }
         }
         setFilteredList(tempList);
+
+        if(showSelected){
+          let memberArr = [];
+          if(selectedTeamToFitler?.value){
+            memberArr = selectedMembers?.filter((member) => {
+              const teamArr = member?.teamMemberRoles?.filter((teamMem) => {
+                return selectedTeamToFitler?.value === teamMem.team?.uid;
+              });
+              return (
+                !member?.isDeleted &&
+                teamArr?.length > 0 &&
+                member.name.toLowerCase().includes(searchTerm.toLowerCase())
+              );
+              //return !member?.isDeleted && member.name.toLowerCase().includes(searchTerm.toLowerCase() && member.team.uid === selectedTeamToFitler?.value);
+            });
+          }else{
+            memberArr = selectedMembers?.filter((member) => {
+              return !member?.isDeleted && member.name.toLowerCase().includes(searchTerm.toLowerCase());
+            });
+          }
+          setShowSelectedMembers(memberArr);
+        }
       }
     }
   }, [searchTerm]);
@@ -149,6 +172,8 @@ export default function MemberList({
     setShowSelected(event.target.checked);
     if(event.target.checked){
       getShowSelectedMembers();
+    }else{
+      onClearFilter();
     }
   }
 
@@ -224,6 +249,7 @@ export default function MemberList({
     setSelectedTeam({ value: '', label: '',logo:'' });
     setSearchTerm(null);
     setFilteredList(list);
+    setShowSelectedMembers(selectedMembers ? selectedMembers : null);
   }
 
   return (
@@ -363,6 +389,9 @@ export default function MemberList({
             )} */}
           </div>
         )}
+        {showSelected && showSelectedMembers.length === 0 && 
+              <>No search results found.</>
+            }
         <div className=" flex flex-col gap-2">
           {filteredList && !showSelected &&
             filteredList.map((member, index) => {
