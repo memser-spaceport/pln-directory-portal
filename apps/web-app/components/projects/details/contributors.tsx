@@ -32,7 +32,7 @@ export default function Contributors({ project, contributingMembers }) {
       <div
         key={uid}
         title={name}
-        className="relative cursor-pointer"
+        className="relative"
         onMouseOver={() => {
           setContributorHoveruid(uid);
           setContributorHoverFlag(true);
@@ -45,7 +45,7 @@ export default function Contributors({ project, contributingMembers }) {
         }}
       >
         {url && (
-          <div className='w-[36px] h-[36px] rounded-full hover:border-[2px] hover:border-[#156FF7]'>
+          <div className='w-[36px] h-[36px] rounded-full hover:border-[2px] hover:border-[#156FF7] cursor-pointer'>
             <Image
             src={url}
             alt="contributors image"
@@ -56,7 +56,7 @@ export default function Contributors({ project, contributingMembers }) {
           </div>
         )}
         {!url && (
-          <UserIcon className="relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white hover:border-[2px] hover:border-[#156FF7]" />
+          <UserIcon className="relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white hover:border-[2px] hover:border-[#156FF7] cursor-pointer" />
         )}
         {
         contributorHoverFlag && contributorHoveruid === uid &&

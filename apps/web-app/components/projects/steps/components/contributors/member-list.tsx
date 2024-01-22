@@ -360,13 +360,13 @@ export default function MemberList({
           <div className="">
             <input
               type="checkbox"
-              className={`relative top-[2px] focus:outline-none ${(selectedMembers.length === 0 || disableFlag) ? '':'cursor-pointer '} `}
+              className={`relative top-[2px] focus:outline-none ${(selectedMembers.length === 0 || disableFlag || getSelectedCount() === 0) ? '':'cursor-pointer '} `}
               onChange={onShowSelected}
               checked={showSelected}
-              disabled={selectedMembers.length === 0 || disableFlag}
+              disabled={selectedMembers.length === 0 || disableFlag || getSelectedCount() === 0}
             />
           </div>
-          <div className={`${(selectedMembers.length === 0 || disableFlag) ? 'text-slate-200':''}`}>Show selected contributors</div>
+          <div className={`${(selectedMembers.length === 0 || disableFlag || getSelectedCount() === 0) ? 'text-slate-200':''}`}>Show selected contributors</div>
         </div>
       </div>
       <div className=" h-[63%] overflow-y-scroll">
