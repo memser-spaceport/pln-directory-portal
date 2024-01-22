@@ -21,6 +21,7 @@ export default function MemberList({
   const [seeMore, setSeeMore] = useState(false);
   const [showSelected, setShowSelected] = useState(false);
   const [filteredList, setFilteredList] = useState(list);
+  const [disableFlag, setDisableFlag] = useState(false);
   const [selectedTeamToFitler,setSelectedTeam] = useState({ value: '', label: '',logo:'' });
   const [selectAllFlag, setSelectAll] = useState(
     selectedMembers?.length === list?.length
@@ -91,7 +92,18 @@ export default function MemberList({
         });
         return !member?.isDeleted && teamArr?.length >0 ;
       });
-      setShowSelectedMembers(memberArr);
+      if(searchTerm !== null){
+        const tempList = [];
+        for (let index = 0; index < memberArr.length; index++) {
+          const element = memberArr[index];
+          if (element.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+            tempList.push(element);
+          }
+        }
+        setShowSelectedMembers(tempList);
+      }else{
+        setShowSelectedMembers(memberArr);
+      }
     }else{
       memberArr = selectedMembers?.filter((member) => {
         return !member?.isDeleted;
@@ -173,7 +185,7 @@ export default function MemberList({
     if(event.target.checked){
       getShowSelectedMembers();
     }else{
-      onClearFilter();
+      // onClearFilter();
     }
   }
 
@@ -207,6 +219,12 @@ export default function MemberList({
         return !member?.isDeleted && teamArr?.length > 0;
       });
       setShowSelectedMembers(memberArr);
+        if(memberArr.length ===0){
+          setDisableFlag(true);
+        }
+        else{
+          setDisableFlag(false);
+        }
 
       const tempList = [];
       for (let index = 0; index < list.length; index++) {
@@ -250,6 +268,11 @@ export default function MemberList({
     setSearchTerm(null);
     setFilteredList(list);
     setShowSelectedMembers(selectedMembers ? selectedMembers : null);
+    if(selectedMembers.length ===0){
+      setDisableFlag(true);
+    }else{
+      setDisableFlag(false);
+    }
   }
 
   return (
@@ -320,6 +343,7 @@ export default function MemberList({
               className="relative top-[2px] cursor-pointer focus:outline-none"
               onChange={onShowSelected}
               checked={showSelected}
+              disabled={selectedMembers.length === 0 || disableFlag}
             />
           </div>
           <div>Show selected contributors</div>
@@ -389,7 +413,8 @@ export default function MemberList({
             )} */}
           </div>
         )}
-        {showSelected && showSelectedMembers.length === 0 && 
+        {showSelected && showSelectedMembers.length === 0 &&
+          (searchTerm !== null && searchTerm !== '') && 
               <>No search results found.</>
             }
         <div className=" flex flex-col gap-2">
