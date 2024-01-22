@@ -61,9 +61,23 @@ export default function MemberList({
               //return !member?.isDeleted && member.name.toLowerCase().includes(searchTerm.toLowerCase() && member.team.uid === selectedTeamToFitler?.value);
             });
           }else{
-            memberArr = selectedMembers?.filter((member) => {
-              return !member?.isDeleted && member.name.toLowerCase().includes(searchTerm.toLowerCase());
-            });
+            if(selectedTeam){
+              memberArr = selectedMembers?.filter((member) => {
+                const teamArr = member?.teamMemberRoles?.filter((teamMem) => {
+                  return selectedTeam?.uid === teamMem.team?.uid;
+                });
+                return (
+                  !member?.isDeleted &&
+                  teamArr?.length > 0 &&
+                  member.name.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+              });
+            }else{
+              memberArr = selectedMembers?.filter((member) => {
+                return !member?.isDeleted && member.name.toLowerCase().includes(searchTerm.toLowerCase());
+              });
+            }
+            
           }
           setShowSelectedMembers(memberArr);
         }
@@ -105,9 +119,15 @@ export default function MemberList({
         setShowSelectedMembers(memberArr);
       }
     }else{
-      memberArr = selectedMembers?.filter((member) => {
-        return !member?.isDeleted;
-      });
+      if(searchTerm !== null){
+        memberArr = selectedMembers?.filter((member) => {
+          return !member?.isDeleted && member.name.toLowerCase().includes(searchTerm.toLowerCase());
+        });
+      }else{
+        memberArr = selectedMembers?.filter((member) => {
+          return !member?.isDeleted;
+        });
+      }
       setShowSelectedMembers(memberArr);
     }
   };
@@ -340,13 +360,13 @@ export default function MemberList({
           <div className="">
             <input
               type="checkbox"
-              className="relative top-[2px] cursor-pointer focus:outline-none"
+              className={`relative top-[2px] focus:outline-none ${(selectedMembers.length === 0 || disableFlag) ? '':'cursor-pointer '} `}
               onChange={onShowSelected}
               checked={showSelected}
               disabled={selectedMembers.length === 0 || disableFlag}
             />
           </div>
-          <div>Show selected contributors</div>
+          <div className={`${(selectedMembers.length === 0 || disableFlag) ? 'text-slate-200':''}`}>Show selected contributors</div>
         </div>
       </div>
       <div className=" h-[63%] overflow-y-scroll">
