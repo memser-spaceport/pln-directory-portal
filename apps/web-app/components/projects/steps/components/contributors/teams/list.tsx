@@ -84,6 +84,17 @@ export default function ContributorTeamsList() {
                       <div className="text-center text-[13px] font-normal not-italic leading-5 text-[#0F172A]">
                         Maintainer Team
                       </div>
+                      <div onClick={()=>{
+                    onEdit(team,type);
+                  }} className='relative top-[3px]'>
+                    <Image
+                      src="/assets/images/icons/projects/edit-team.svg"
+                      alt="edit team"
+                      width={24}
+                      height={24}
+                      className="shrink-0 cursor-pointer"
+                    />
+                  </div>
                     </>
                   )}
                   {
@@ -103,17 +114,7 @@ export default function ContributorTeamsList() {
                           </div>
                     )
                   }
-                  <div onClick={()=>{
-                    onEdit(team,type);
-                  }} className='relative top-[3px]'>
-                    <Image
-                      src="/assets/images/icons/projects/edit-team.svg"
-                      alt="edit team"
-                      width={24}
-                      height={24}
-                      className="shrink-0 cursor-pointer"
-                    />
-                  </div>
+                  
                 </div>
               </div>
             );

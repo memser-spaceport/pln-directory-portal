@@ -13,8 +13,9 @@ export default function ContributorProfileCard({
     // const router = useRouter();
   return (
     <>
-      <div className="absolute left-[-100%] cursor-pointer bottom-[50px] mx-auto flex w-[295px] flex-col rounded-[12px] bg-white shadow-[0px_0px_8px_0px_rgba(0,0,0,0.14)] min-h-[189px]"
-      onClick={() => {
+      <div className="absolute left-[-100%] bottom-[50px] mx-auto flex w-[295px] flex-col rounded-[12px] bg-white shadow-[0px_0px_8px_0px_rgba(0,0,0,0.14)] min-h-[189px]"
+      onClick={(event) => {
+        event.stopPropagation();
         // router.push('/members/' + uid);
         //window.open('/members/' + uid, '_blank');
       }}

@@ -21,6 +21,7 @@ export default function MemberList({
   const [seeMore, setSeeMore] = useState(false);
   const [showSelected, setShowSelected] = useState(false);
   const [filteredList, setFilteredList] = useState(list);
+  const [disableFlag, setDisableFlag] = useState(false);
   const [selectedTeamToFitler,setSelectedTeam] = useState({ value: '', label: '',logo:'' });
   const [selectAllFlag, setSelectAll] = useState(
     selectedMembers?.length === list?.length
@@ -30,6 +31,7 @@ export default function MemberList({
     if (list) {
       if (searchTerm !== null) {
         const tempList = [];
+
         let comparingList;
         if(selectedTeamToFitler?.value){
           comparingList = handleTeamChange(selectedTeamToFitler,'fromSearch');
@@ -43,6 +45,42 @@ export default function MemberList({
           }
         }
         setFilteredList(tempList);
+
+        if(showSelected){
+          let memberArr = [];
+          if(selectedTeamToFitler?.value){
+            memberArr = selectedMembers?.filter((member) => {
+              const teamArr = member?.teamMemberRoles?.filter((teamMem) => {
+                return selectedTeamToFitler?.value === teamMem.team?.uid;
+              });
+              return (
+                !member?.isDeleted &&
+                teamArr?.length > 0 &&
+                member.name.toLowerCase().includes(searchTerm.toLowerCase())
+              );
+              //return !member?.isDeleted && member.name.toLowerCase().includes(searchTerm.toLowerCase() && member.team.uid === selectedTeamToFitler?.value);
+            });
+          }else{
+            if(selectedTeam){
+              memberArr = selectedMembers?.filter((member) => {
+                const teamArr = member?.teamMemberRoles?.filter((teamMem) => {
+                  return selectedTeam?.uid === teamMem.team?.uid;
+                });
+                return (
+                  !member?.isDeleted &&
+                  teamArr?.length > 0 &&
+                  member.name.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+              });
+            }else{
+              memberArr = selectedMembers?.filter((member) => {
+                return !member?.isDeleted && member.name.toLowerCase().includes(searchTerm.toLowerCase());
+              });
+            }
+            
+          }
+          setShowSelectedMembers(memberArr);
+        }
       }
     }
   }, [searchTerm]);
@@ -68,11 +106,28 @@ export default function MemberList({
         });
         return !member?.isDeleted && teamArr?.length >0 ;
       });
-      setShowSelectedMembers(memberArr);
+      if(searchTerm !== null){
+        const tempList = [];
+        for (let index = 0; index < memberArr.length; index++) {
+          const element = memberArr[index];
+          if (element.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+            tempList.push(element);
+          }
+        }
+        setShowSelectedMembers(tempList);
+      }else{
+        setShowSelectedMembers(memberArr);
+      }
     }else{
-      memberArr = selectedMembers?.filter((member) => {
-        return !member?.isDeleted;
-      });
+      if(searchTerm !== null){
+        memberArr = selectedMembers?.filter((member) => {
+          return !member?.isDeleted && member.name.toLowerCase().includes(searchTerm.toLowerCase());
+        });
+      }else{
+        memberArr = selectedMembers?.filter((member) => {
+          return !member?.isDeleted;
+        });
+      }
       setShowSelectedMembers(memberArr);
     }
   };
@@ -80,7 +135,7 @@ export default function MemberList({
   const onselect = (member) => {
     if (checkForExistance(member) === 'no-data') {
       // console.log(selectedMembers);
-      
+      setDisableFlag(false);
       setSelectedMembers([...selectedMembers, member]);
       // if (selectedMembers.length + 1 === list.length) {
       //   setSelectAll(true);
@@ -149,15 +204,46 @@ export default function MemberList({
     setShowSelected(event.target.checked);
     if(event.target.checked){
       getShowSelectedMembers();
+    }else{
+      // onClearFilter();
     }
   }
 
   const getSelectedCount = () => {
     let counterArr = [];
     if (!selectedTeam) {
-      counterArr = selectedMembers?.filter((member) => {
-        return !member?.isDeleted;
-      });
+      if (selectedTeamToFitler?.value) {
+        let tempList = [];
+        tempList = selectedMembers?.filter((member) => {
+          const teamArr = member?.teamMemberRoles?.filter((teamMem) => {
+            return selectedTeamToFitler?.value === teamMem.team?.uid;
+          });
+          return !member?.isDeleted && teamArr?.length > 0;
+        });
+        if (searchTerm !== null) {
+          for (let index = 0; index < tempList.length; index++) {
+            const element = tempList[index];
+            if (element.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+              counterArr.push(element);
+            }
+          }
+        } else {
+          counterArr = tempList;
+        }
+      } else {
+        if (searchTerm !== null) {
+          for (let index = 0; index < selectedMembers.length; index++) {
+            const element = selectedMembers[index];
+            if (element.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+              counterArr.push(element);
+            }
+          }
+        } else {
+          counterArr = selectedMembers?.filter((member) => {
+            return !member?.isDeleted;
+          });
+        }
+      }
     } else {
       counterArr = selectedMembers?.filter((member) => {
         const teamArr = member?.teamMemberRoles?.filter((teamMem) => {
@@ -182,6 +268,12 @@ export default function MemberList({
         return !member?.isDeleted && teamArr?.length > 0;
       });
       setShowSelectedMembers(memberArr);
+        if(memberArr.length ===0){
+          setDisableFlag(true);
+        }
+        else{
+          setDisableFlag(false);
+        }
 
       const tempList = [];
       for (let index = 0; index < list.length; index++) {
@@ -224,6 +316,12 @@ export default function MemberList({
     setSelectedTeam({ value: '', label: '',logo:'' });
     setSearchTerm(null);
     setFilteredList(list);
+    setShowSelectedMembers(selectedMembers ? selectedMembers : null);
+    if(selectedMembers.length ===0){
+      setDisableFlag(true);
+    }else{
+      setDisableFlag(false);
+    }
   }
 
   return (
@@ -291,12 +389,13 @@ export default function MemberList({
           <div className="">
             <input
               type="checkbox"
-              className="relative top-[2px] cursor-pointer focus:outline-none"
+              className={`relative top-[2px] focus:outline-none ${(selectedMembers.length === 0 || disableFlag || getSelectedCount() === 0) ? '':'cursor-pointer '} `}
               onChange={onShowSelected}
               checked={showSelected}
+              disabled={selectedMembers.length === 0 || disableFlag || getSelectedCount() === 0}
             />
           </div>
-          <div>Show selected contributors</div>
+          <div className={`${(selectedMembers.length === 0 || disableFlag || getSelectedCount() === 0) ? 'text-slate-200':''}`}>Show selected contributors</div>
         </div>
       </div>
       <div className=" h-[63%] overflow-y-scroll">
@@ -363,6 +462,10 @@ export default function MemberList({
             )} */}
           </div>
         )}
+        {showSelected && showSelectedMembers.length === 0 &&
+          (searchTerm !== null && searchTerm !== '') && 
+              <>No search results found.</>
+            }
         <div className=" flex flex-col gap-2">
           {filteredList && !showSelected &&
             filteredList.map((member, index) => {

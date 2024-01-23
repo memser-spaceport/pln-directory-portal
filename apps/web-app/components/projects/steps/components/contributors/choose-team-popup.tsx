@@ -68,6 +68,7 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
     const onTeamSelect = async (team) => {
         setTeam(team);
         const members = await ProjectsService.fetchMembers(team.uid);
+        setSelectedMembers(addProjectsState.inputs.contributors);
         setMembers(members);
         setContributorsFlag(true);
         setPopupTitle('Select Contributors');
