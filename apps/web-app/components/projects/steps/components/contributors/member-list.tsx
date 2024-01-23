@@ -135,7 +135,7 @@ export default function MemberList({
   const onselect = (member) => {
     if (checkForExistance(member) === 'no-data') {
       // console.log(selectedMembers);
-      
+      setDisableFlag(false);
       setSelectedMembers([...selectedMembers, member]);
       // if (selectedMembers.length + 1 === list.length) {
       //   setSelectAll(true);
@@ -212,9 +212,38 @@ export default function MemberList({
   const getSelectedCount = () => {
     let counterArr = [];
     if (!selectedTeam) {
-      counterArr = selectedMembers?.filter((member) => {
-        return !member?.isDeleted;
-      });
+      if (selectedTeamToFitler?.value) {
+        let tempList = [];
+        tempList = selectedMembers?.filter((member) => {
+          const teamArr = member?.teamMemberRoles?.filter((teamMem) => {
+            return selectedTeamToFitler?.value === teamMem.team?.uid;
+          });
+          return !member?.isDeleted && teamArr?.length > 0;
+        });
+        if (searchTerm !== null) {
+          for (let index = 0; index < tempList.length; index++) {
+            const element = tempList[index];
+            if (element.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+              counterArr.push(element);
+            }
+          }
+        } else {
+          counterArr = tempList;
+        }
+      } else {
+        if (searchTerm !== null) {
+          for (let index = 0; index < selectedMembers.length; index++) {
+            const element = selectedMembers[index];
+            if (element.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+              counterArr.push(element);
+            }
+          }
+        } else {
+          counterArr = selectedMembers?.filter((member) => {
+            return !member?.isDeleted;
+          });
+        }
+      }
     } else {
       counterArr = selectedMembers?.filter((member) => {
         const teamArr = member?.teamMemberRoles?.filter((teamMem) => {
