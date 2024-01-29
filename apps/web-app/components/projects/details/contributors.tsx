@@ -58,7 +58,7 @@ export default function Contributors({ project, contributingMembers }) {
         {!url && (
           <UserIcon className="relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white hover:border-[2px] hover:border-[#156FF7] cursor-pointer" />
         )}
-        {
+        {/* {
         contributorHoverFlag && contributorHoveruid === uid &&
          (
           <ContributorProfileCard
@@ -69,7 +69,7 @@ export default function Contributors({ project, contributingMembers }) {
             teamName={teamName}
             isTeamLead={isTeamLead}
           />
-        )}
+        )} */}
       </div>
     );
   };
@@ -143,7 +143,7 @@ export default function Contributors({ project, contributingMembers }) {
             })}
           {project?.contributors?.length + contributingMembers?.length > 17 && (
             <div
-              className="cursor-pointer relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white pt-[5px] text-center"
+              className="cursor-pointer relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white pt-[5px] text-center rounded-full hover:border-[2px] hover:border-[#156FF7]"
               onClick={() => {
                 setAllContributors(true);
               }}
