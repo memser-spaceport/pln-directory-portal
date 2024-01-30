@@ -84,8 +84,8 @@ export default function Contributors({ project, contributingMembers }) {
           }}
         >
           <div>Contributors</div>
-          <div className="text-xs font-medium not-italic leading-[14px] text-[color:var(--neutral-slate-600,#475569)]">
-            <div className="relative top-[5px] rounded-[24px]  bg-[#F1F5F9] px-[8px] py-[2px] ">
+          <div className="text-xs font-medium not-italic leading-[14px] text-[#156FF7]">
+            <div className="relative top-[5px] rounded-[24px]  bg-[#DBEAFE] px-[8px] py-[2px] ">
               {project?.contributors?.length + contributingMembers?.length}
             </div>
           </div>
@@ -143,7 +143,7 @@ export default function Contributors({ project, contributingMembers }) {
             })}
           {project?.contributors?.length + contributingMembers?.length > 17 && (
             <div
-              className="cursor-pointer relative inline-block h-[36px] w-[36px] rounded-full bg-gray-200 fill-white pt-[5px] text-center rounded-full hover:border-[2px] hover:border-[#156FF7]"
+              className="text-black cursor-pointer relative inline-block h-[36px] w-[36px] bg-gray-200 rounded-full fill-white pt-[5px] text-center rounded-full hover:bg-[#156FF7] hover:text-[#DBEAFE]"
               onClick={() => {
                 setAllContributors(true);
               }}

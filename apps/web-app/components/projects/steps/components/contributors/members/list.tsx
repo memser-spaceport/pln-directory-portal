@@ -20,6 +20,7 @@ export default function ContributingMembers() {
               {!member?.isDeleted && (
                 <div
                   className="relative"
+                  title={member.name}
                   onMouseOver={() => {
                     setContributorHoveruid(member?.uid);
                     setContributorHoverFlag(true);
