@@ -81,18 +81,18 @@ export default function TeamsInvolved({ project }) {
           >
             <div className="flex gap-[10px] shrink-0">
               {!project.maintainingTeam?.logo && (
-                <div className='rounded hover:border-[2px] hover:border-[#156FF7] hover:w-[44px] hover:h-[44px] w-[40px] h-[40px]'>
-                  <UserGroupIcon className="inset-y-0 left-2 my-auto mr-[4px] inline h-[40px] w-[40px] rounded bg-gray-200 fill-white" />
+                <div className='rounded hover:border-[2px] hover:border-[#156FF7] w-[40px] h-[40px]'>
+                  <UserGroupIcon className="inset-y-0 left-2 my-auto mr-[4px] inline h-[40px] w-[40px] hover:h-[36px] hover:w-[36px] rounded bg-gray-200 fill-white" />
                 </div>
               )}
               {project.maintainingTeam?.logo && (
-                <div className='relative rounded hover:border-[2px] hover:border-[#156FF7] hover:w-[44px] hover:h-[44px] w-[40px] h-[40px]'>
+                <div className='relative rounded hover:border-[2px] hover:border-[#156FF7] w-[40px] h-[40px]'>
                   <Image
                     src={project.maintainingTeam?.logo?.url}
                     alt="project image"
                     width={40}
                     height={40}
-                    className="rounded"
+                    className="rounded hover:h-[36px] hover:w-[36px] hover:rounded-[0px]"
                   />
                 </div>
               )}
@@ -123,19 +123,19 @@ export default function TeamsInvolved({ project }) {
                       }}
                     >
                       {cteam.logo && (
-                        <div className='rounded hover:border-[2px] hover:border-[#156FF7] hover:w-[44px] hover:h-[44px] w-[40px] h-[40px]'>
+                        <div className='rounded hover:border-[2px] hover:border-[#156FF7] w-[40px] h-[40px]'>
                           <Image
                             src={cteam.logo}
                             alt="project image"
                             width={40}
                             height={40}
-                            className="rounded"
+                            className="rounded hover:h-[36px] hover:w-[36px] hover:rounded-[0px]"
                           />
                         </div>
                       )}
                       {!cteam.logo && (
-                        <div className='rounded hover:border-[2px] hover:border-[#156FF7] hover:w-[44px] hover:h-[44px] w-[40px] h-[40px]'>
-                          <UserGroupIcon className="inset-y-0 left-2 my-auto mr-[4px] inline h-[40px] w-[40px] rounded bg-gray-200 fill-white" />
+                        <div className='rounded hover:border-[2px] hover:border-[#156FF7] w-[40px] h-[40px]'>
+                          <UserGroupIcon className="inset-y-0 left-2 my-auto mr-[4px] inline h-[40px] w-[40px] hover:h-[36px] hover:w-[36px] rounded bg-gray-200 fill-white" />
                         </div>
                       )}
                       <div className="m-2 max-w-[188px]">{cteam.name}</div>
