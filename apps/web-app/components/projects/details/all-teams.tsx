@@ -44,7 +44,7 @@ export function AllTeamsModal({
               <UserGroupIcon className="inset-y-0 left-2 my-auto mr-[4px] inline h-[40px] w-[40px] rounded bg-gray-200 fill-white" />
             )}
             {project.maintainingTeam?.logo && (
-              <div>
+              // <div>
                 <Image
                   src={project.maintainingTeam?.logo?.url}
                   alt="project image"
@@ -52,7 +52,7 @@ export function AllTeamsModal({
                   height={40}
                   className="rounded"
                 />
-              </div>
+              // </div>
             )}
             <div className="m-2">{project.maintainingTeam.name}</div>
           </div>
@@ -110,7 +110,7 @@ export function AllTeamsModal({
               />
             </div>
           </div>
-          <div className="github-project-popup min-h-[200px] overflow-y-auto rounded-xl px-8">
+          <div className="github-project-popup min-h-[200px] overflow-y-auto rounded-xl px-8 flex flex-col gap-[10px]">
             {searchTerm &&
               project.maintainingTeam?.name
                 .toLowerCase()
@@ -132,7 +132,7 @@ export function AllTeamsModal({
                         }}
                       >
                         {cteam.logo && (
-                          <div>
+                          // <div>
                             <Image
                               src={cteam.logo}
                               alt="project image"
@@ -140,10 +140,12 @@ export function AllTeamsModal({
                               height={40}
                               className="rounded"
                             />
-                          </div>
+                          // </div>
                         )}
                         {!cteam.logo && (
-                          <UserGroupIcon className="inset-y-0 left-2 my-auto mr-[4px] inline h-[40px] w-[40px] rounded bg-gray-200 fill-white" />
+                          <div>
+                            <UserGroupIcon className="inset-y-0 left-2 my-auto mr-[4px] inline h-[40px] w-[40px] rounded bg-gray-200 fill-white" />
+                          </div>
                         )}
                         <div className="m-2">{cteam.name}</div>
                       </div>

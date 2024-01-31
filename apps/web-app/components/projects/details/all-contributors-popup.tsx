@@ -147,7 +147,7 @@ export default function AllContributorsPopup({
                       </div>
                     </div>
                   </Dialog.Title>
-                  <div className="h-[72%] overflow-y-scroll">
+                  <div className="h-[72%] overflow-y-scroll flex flex-col gap-2">
                     {filteredContriList &&
                       filteredContriList.map((contri, index) => {
                         return getMemberDetailTemplate(
