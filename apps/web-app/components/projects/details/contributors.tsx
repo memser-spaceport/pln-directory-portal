@@ -148,9 +148,9 @@ export default function Contributors({ project, contributingMembers }) {
                 setAllContributors(true);
               }}
             >
-              {' '}
+              <span className='relative top-[1px]'>{' '}
               +
-              {project?.contributors?.length - 17 + contributingMembers?.length}
+              {project?.contributors?.length - 17 + contributingMembers?.length}</span>
             </div>
           )}
         </div>
