@@ -42,7 +42,8 @@ export default function AllContributorsPopup({
           className="flex cursor-pointer items-center gap-2 hover:bg-slate-100"
           key={'contributor' + uid}
           onClick={() => {
-            router.push('/members/' + uid);
+            window.open('/members/' + uid);
+            // router.push('/members/' + uid);
           }}
         >
           <div className='relative'>
@@ -146,7 +147,7 @@ export default function AllContributorsPopup({
                       </div>
                     </div>
                   </Dialog.Title>
-                  <div className="h-[72%] overflow-y-scroll">
+                  <div className="h-[72%] overflow-y-scroll flex flex-col gap-2">
                     {filteredContriList &&
                       filteredContriList.map((contri, index) => {
                         return getMemberDetailTemplate(

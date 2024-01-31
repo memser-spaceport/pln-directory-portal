@@ -44,7 +44,7 @@ export function AllTeamsModal({
               <UserGroupIcon className="inset-y-0 left-2 my-auto mr-[4px] inline h-[40px] w-[40px] rounded bg-gray-200 fill-white" />
             )}
             {project.maintainingTeam?.logo && (
-              <div>
+              // <div>
                 <Image
                   src={project.maintainingTeam?.logo?.url}
                   alt="project image"
@@ -52,7 +52,7 @@ export function AllTeamsModal({
                   height={40}
                   className="rounded"
                 />
-              </div>
+              // </div>
             )}
             <div className="m-2">{project.maintainingTeam.name}</div>
           </div>
@@ -61,7 +61,8 @@ export function AllTeamsModal({
     };
 
     const onMaintainerTeamClicked = (team) => {
-        router.push('/teams/' + team.uid);
+        // router.push('/teams/' + team.uid);
+        window.open('/teams/' + team.uid);
         analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_MAINTAINER_TEAM_CLICKED, {
             teamUid: team.uid,
             teamName: team.name,
@@ -69,7 +70,8 @@ export function AllTeamsModal({
     }
 
     const onContributingTeamClicked = (cteam) => {
-        router.push('/teams/' + cteam.uid);
+        // router.push('/teams/' + cteam.uid);
+        window.open('/teams/' + cteam.uid);
         analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_CONTRIBUTING_TEAM_CLICKED, {
             teamUid: cteam.uid,
             teamName: cteam.name,
@@ -108,7 +110,7 @@ export function AllTeamsModal({
               />
             </div>
           </div>
-          <div className="github-project-popup min-h-[200px] overflow-y-auto rounded-xl px-8">
+          <div className="github-project-popup min-h-[200px] overflow-y-auto rounded-xl px-8 flex flex-col gap-[10px]">
             {searchTerm &&
               project.maintainingTeam?.name
                 .toLowerCase()
@@ -130,7 +132,7 @@ export function AllTeamsModal({
                         }}
                       >
                         {cteam.logo && (
-                          <div>
+                          // <div>
                             <Image
                               src={cteam.logo}
                               alt="project image"
@@ -138,10 +140,12 @@ export function AllTeamsModal({
                               height={40}
                               className="rounded"
                             />
-                          </div>
+                          // </div>
                         )}
                         {!cteam.logo && (
-                          <UserGroupIcon className="inset-y-0 left-2 my-auto mr-[4px] inline h-[40px] w-[40px] rounded bg-gray-200 fill-white" />
+                          <div>
+                            <UserGroupIcon className="inset-y-0 left-2 my-auto mr-[4px] inline h-[40px] w-[40px] rounded bg-gray-200 fill-white" />
+                          </div>
                         )}
                         <div className="m-2">{cteam.name}</div>
                       </div>

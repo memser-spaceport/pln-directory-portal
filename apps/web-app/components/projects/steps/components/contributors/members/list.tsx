@@ -1,4 +1,4 @@
-import { UserGroupIcon } from '@heroicons/react/solid';
+import { UserGroupIcon, UserIcon } from '@heroicons/react/solid';
 import ContributorProfileCard from 'apps/web-app/components/projects/details/contributor-profile-card';
 import { AddProjectsContext } from 'apps/web-app/context/projects/add.context';
 import Image from 'next/image';
@@ -20,6 +20,7 @@ export default function ContributingMembers() {
               {!member?.isDeleted && (
                 <div
                   className="relative"
+                  title={member.name}
                   onMouseOver={() => {
                     setContributorHoveruid(member?.uid);
                     setContributorHoverFlag(true);
@@ -43,9 +44,9 @@ export default function ContributingMembers() {
                     </div>
                   )}
                   {!member?.logo && (
-                    <UserGroupIcon className="h-[28px] w-[28px] shrink-0 rounded-full bg-slate-100 fill-slate-200 cursor-pointer hover:border-[2px] hover:border-[#156FF7]" />
+                    <UserIcon className="h-[28px] w-[28px] shrink-0 rounded-full bg-slate-100 fill-slate-200 cursor-pointer hover:border-[2px] hover:border-[#156FF7]" />
                   )}
-                  {contributorHoverFlag &&
+                  {/* {contributorHoverFlag &&
                     contributorHoveruid === member?.uid && (
                       <ContributorProfileCard
                         uid={member.uid}
@@ -59,7 +60,7 @@ export default function ContributingMembers() {
                         teamName={member.mainTeam?.team?.name}
                         isTeamLead={member.teamLead}
                       />
-                    )}
+                    )} */}
                 </div>
               )}
             </React.Fragment>

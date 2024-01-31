@@ -13,7 +13,8 @@ export default function TeamsInvolved({ project }) {
   const analytics = useAppAnalytics();
 
   const onMaintainerTeamClicked = (team) => {
-    router.push('/teams/' + team.uid);
+    // router.push('/teams/' + team.uid);
+    window.open('/teams/' + team.uid);
     analytics.captureEvent(
       APP_ANALYTICS_EVENTS.PROJECT_DETAIL_MAINTAINER_TEAM_CLICKED,
       {
@@ -24,7 +25,8 @@ export default function TeamsInvolved({ project }) {
   };
 
   const onContributingTeamClicked = (cteam) => {
-    router.push('/teams/' + cteam.uid);
+    // router.push('/teams/' + cteam.uid);
+    window.open('/teams/' + cteam.uid);
     analytics.captureEvent(
       APP_ANALYTICS_EVENTS.PROJECT_DETAIL_CONTRIBUTING_TEAM_CLICKED,
       {
@@ -51,8 +53,8 @@ export default function TeamsInvolved({ project }) {
               <div>Teams</div>
             </div>
             <div className="flex gap-3 ">
-              <div className="text-xs font-medium not-italic leading-[14px] text-[color:var(--neutral-slate-600,#475569)]">
-                <div className="relative top-[5px] rounded-[24px]  bg-[#F1F5F9] px-[8px] py-[2px] ">
+              <div className="text-xs font-medium not-italic leading-[14px] text-[#156FF7]">
+                <div className="relative top-[5px] rounded-[24px]  bg-[#DBEAFE] px-[8px] py-[2px] ">
                   {project.contributingTeams.length + 1}
                 </div>
               </div>
@@ -77,25 +79,34 @@ export default function TeamsInvolved({ project }) {
               onMaintainerTeamClicked(project.maintainingTeam);
             }}
           >
-            <div className="flex gap-[10px] ">
+            <div className="flex gap-[10px] shrink-0">
               {!project.maintainingTeam?.logo && (
-                <UserGroupIcon className="inset-y-0 left-2 my-auto mr-[4px] inline h-[40px] w-[40px] rounded bg-gray-200 fill-white" />
+                <div className='rounded hover:border-[2px] hover:border-[#156FF7] w-[40px] h-[40px]'>
+                  <UserGroupIcon className="inset-y-0 left-2 my-auto mr-[4px] inline h-[40px] w-[40px] hover:h-[36px] hover:w-[36px] rounded bg-gray-200 fill-white" />
+                </div>
               )}
               {project.maintainingTeam?.logo && (
-                <div>
+                <div className='relative rounded hover:border-[2px] hover:border-[#156FF7] w-[40px] h-[40px]'>
                   <Image
                     src={project.maintainingTeam?.logo?.url}
                     alt="project image"
                     width={40}
                     height={40}
-                    className="rounded"
+                    className="rounded hover:h-[36px] hover:w-[36px] hover:rounded-[0px]"
                   />
                 </div>
               )}
-              <div className="m-2">{project.maintainingTeam.name}</div>
+              <div className="m-2  max-w-[168px]">{project.maintainingTeam.name}</div>
             </div>
-            <div className="flex p-2" title="Maintainer">
-              <Core />
+            <div className="flex hover:border-[2px] hover:border-[#156FF7]  w-[20px] h-[20px] rounded-full relative top-2 shrink-0" title="Maintainer">
+              {/* <Core /> */}
+              <Image
+                    src='/assets/images/icons/projects/core.svg'
+                    alt="maintainer image"
+                    width={20}
+                    height={20}
+                    className="rounded"
+                  />
             </div>
           </div>
           {project.contributingTeams &&
@@ -112,18 +123,20 @@ export default function TeamsInvolved({ project }) {
                       }}
                     >
                       {cteam.logo && (
-                        <div>
+                        <div className='rounded hover:border-[2px] hover:border-[#156FF7] w-[40px] h-[40px]'>
                           <Image
                             src={cteam.logo}
                             alt="project image"
                             width={40}
                             height={40}
-                            className="rounded"
+                            className="rounded hover:h-[36px] hover:w-[36px] hover:rounded-[0px]"
                           />
                         </div>
                       )}
                       {!cteam.logo && (
-                        <UserGroupIcon className="inset-y-0 left-2 my-auto mr-[4px] inline h-[40px] w-[40px] rounded bg-gray-200 fill-white" />
+                        <div className='rounded hover:border-[2px] hover:border-[#156FF7] w-[40px] h-[40px]'>
+                          <UserGroupIcon className="inset-y-0 left-2 my-auto mr-[4px] inline h-[40px] w-[40px] hover:h-[36px] hover:w-[36px] rounded bg-gray-200 fill-white" />
+                        </div>
                       )}
                       <div className="m-2 max-w-[188px]">{cteam.name}</div>
                     </div>
@@ -131,6 +144,21 @@ export default function TeamsInvolved({ project }) {
                 </React.Fragment>
               );
             })}
+          {
+            project.contributingTeams.length > 3 &&
+            <div className='bg-[#F1F5F9] flex justify-center items-center  rounded 
+              text-[color:var(--Text-text-menu,#475569)] text-sm not-italic font-normal leading-8
+              hover:text-[#FFFFFF] hover:bg-[#156FF7] cursor-pointer'
+              onClick={() => {
+                analytics.captureEvent(
+                  APP_ANALYTICS_EVENTS.PROJECT_DETAIL_SEEALL_CLICKED
+                );
+                setSeeAllPopup(true);
+              }}
+              >
+              +{project.contributingTeams.length - 3} more
+            </div>
+          }
           <AllTeamsModal
             isOpen={seeAllPopup}
             setIsModalOpen={setSeeAllPopup}
