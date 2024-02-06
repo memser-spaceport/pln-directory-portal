@@ -71,7 +71,7 @@ export default function Header({ project, userHasEditRights, userHasDeleteRights
                                 analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_DETAIL_EDIT_CLICKED, {
                                     projectId: project.id,
                                 });
-                                router.push('/projects/edit/' + project.id)
+                                router.push('/projects/update/' + project.id)
                             }}
                         >
                             <EditIcon className="m-1" />{' '}

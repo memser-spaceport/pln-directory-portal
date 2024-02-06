@@ -6,7 +6,7 @@ const { getAllFormattedProjects,formatToSave } = ProjectsDataService;
 
 const getTeamsProject = async (uid) => {
     try {
-        const response = await api.get(`/v1/projects?maintainingTeamUid=${uid}`);
+        const response = await api.get(`/v1/projects?maintainingTeamUid=${uid}&pagination=false`);
         if (response.status === 200) {
 
             const formattedData = getAllFormattedProjects(response.data);
@@ -36,6 +36,8 @@ const uploadProjectLogo = async (inputs) => {
 }
 
 const addProject = async (inputs,image) => {
+    // const data = formatToSave(inputs,image?.uid);
+    // return data;
     const data = formatToSave(inputs,image?.uid);
     const addedResponse = await api.post(`/v1/projects`, data);
     return addedResponse;
@@ -57,13 +59,81 @@ const deleteProject = async (uid) => {
     const delResponse = await api.delete(`/v1/projects/${uid}`);
     return delResponse;
 }
+
+const fetchTeams = async (checkforExistingTeam=false,teams = null) => {
+    try {
+        const response = await api.get(`/v1/teams?select=uid,name,shortDescription,logo.url&&pagination=false&&with=teamMemberRoles`);
+        if (response.data) {
+            return response.data.map((team)=>{
+                if(checkforExistingTeam){
+                    const filtered = teams?.filter(({uid})=>uid === team?.uid);
+                    if(filtered?.length){
+                        return {
+                            uid:team.uid,
+                            name:team.name,
+                            logo: team.logo?.url ? team.logo.url : null,
+                            added: true
+                            // logo:null
+                        }
+                    }else{
+                        return {
+                            uid:team.uid,
+                            name:team.name,
+                            logo: team.logo?.url ? team.logo.url : null,
+                            // logo:null
+                        }
+                    }
+                }else{
+                    return {
+                        uid:team.uid,
+                        name:team.name,
+                        logo: team.logo?.url ? team.logo.url : null,
+                        // logo:null
+                    }
+                }
+            });
+        }
+    } catch (error) {
+        console.error(error);
+    }
+};
+
+const fetchMembers = async (teamId = null) => {
+    try {
+        let response;
+        if(teamId){
+             response = await api.get(`/v1/members?teamMemberRoles.team.uid=${teamId}&&select=uid,name,image.url,teamMemberRoles.teamLead,teamMemberRoles.mainTeam,teamMemberRoles.team,teamMemberRoles.role&&pagination=false&&orderBy=name,asc`);
+        }else{
+            response = await api.get(`/v1/members?select=uid,name,image.url,teamMemberRoles.teamLead,teamMemberRoles.mainTeam,teamMemberRoles.team,teamMemberRoles.role&&pagination=false&orderBy=name,asc`);
+        }
+        if (response.data) {
+            // console.log(response.data);
+            return response.data.map((member)=>{
+                const mainTeam = member.teamMemberRoles.find((team) => team.mainTeam) || null;
+                const teamLead = member.teamMemberRoles.some((team) => team.teamLead);
+                return {
+                    uid:member.uid,
+                    name:member.name,
+                    logo: member.image?.url ? member.image.url : null,
+                    teamMemberRoles: member?.teamMemberRoles,
+                    mainTeam:mainTeam,
+                    teamLead,
+                }
+            });
+        }
+    } catch (error) {
+        console.error(error);
+    }
+};
 const ProjectsService = {
     getTeamsProject,
     uploadProjectLogo,
     addProject,
     updateProject,
     updateProjectDetails,
-    deleteProject
+    deleteProject,
+    fetchTeams,
+    fetchMembers
 }
 
 export default ProjectsService;

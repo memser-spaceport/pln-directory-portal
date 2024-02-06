@@ -10,8 +10,12 @@ export function AddProjectContextProvider(props) {
             logoObject:'',
             name: '',
             tagline: '',
-            maintainedBy: { value: '', label: '', logo: '' },
+            // maintainedBy: { value: '', label: '', logo: '' },
+            maintainedBy:null,
+            maintainedByContributors: [],
+            collabTeamsList: [],
             contributingTeams: [],
+            contributors: [],
             desc: '',
             projectURLs: [{
                 name: '',
@@ -26,7 +30,8 @@ export function AddProjectContextProvider(props) {
             logo:null,
         },
         mode: props.mode,
-        errors: null
+        errors: null,
+        currentStep: 0
     }
 
     if(props.mode === 'EDIT'){
@@ -38,20 +43,72 @@ export function AddProjectContextProvider(props) {
                 logoObject:'',
                 name: projectDetail.name,
                 tagline: projectDetail.tagline,
+                // maintainedBy: {
+                //     value: projectDetail.maintainingTeam?.uid,
+                //     label: projectDetail.maintainingTeam?.name,
+                //     logo: projectDetail.maintainingTeam?.logo?.url
+                // },
                 maintainedBy: {
-                    value: projectDetail.maintainingTeam?.uid,
-                    label: projectDetail.maintainingTeam?.name,
+                    uid: projectDetail.maintainingTeam?.uid,
+                    name: projectDetail.maintainingTeam?.name,
                     logo: projectDetail.maintainingTeam?.logo?.url
                 },
                 desc: projectDetail.description,
-                projectURLs: projectDetail.projectLinks,//have to set
+                maintainedByContributors:[],
+                collabTeamsList:[],
+                contributors: projectDetail.contributors,
+                projectURLs: projectDetail.projectLinks,
                 contactEmail: projectDetail.contactEmail,
                 fundsNeeded: projectDetail.fundingNeeded,
-                KPIs: projectDetail.KPIs,//have to set
+                KPIs: projectDetail.KPIs,
                 readme: projectDetail.readMe,
                 contributingTeams: projectDetail.contributingTeams,
                 logo:projectDetail.logo
             }
+
+            const tempCollab = [];
+            if(projectDetail.contributors && projectDetail.contributors.length > 0){
+                const tempMaintainer = [];
+                projectDetail.contributors.map(contri=>{
+                    if(contri?.type === "MAINTENER"){
+                        const copyTeam = {
+                          uid: contri.member?.uid,
+                          name: contri.member?.name,
+                          logo: contri.member?.image?.url,
+                          cuid: contri.uid,
+                        };
+                        tempMaintainer.push(copyTeam);  
+                    }else if(contri?.type === "COLLABORATOR"){
+                        tempCollab.push(contri);  
+                    }
+                });
+                if(tempMaintainer.length){
+                    defaultState.inputs.maintainedByContributors = [...tempMaintainer];
+                }
+            }
+
+            projectDetail.contributingTeams?.map((team)=>{
+                const temp = {
+                    team:{
+                        uid: team?.value,
+                        name:team?.label,
+                        logo:team?.logo
+                    },
+                    members:[]
+                };
+                tempCollab?.map(collab=>{
+                    if(collab.teamUid === team?.value){
+                        const copyTeam = {
+                            uid : collab.member?.uid,
+                            name: collab.member?.name,
+                            logo: collab.member?.image?.url,
+                            cuid:collab.uid
+                        };
+                        temp.members.push(copyTeam);
+                    }
+                });
+                defaultState.inputs.collabTeamsList.push(temp);
+            })
         }
     }
 
@@ -62,8 +119,14 @@ export function AddProjectContextProvider(props) {
                 newState.inputs = { ...action.payload };
                 break;
             case 'SET_ERROR':
-                newState.errors = { ...action.payload };
+                if(action.payload){
+                    newState.errors = { ...action.payload };
+                }else{
+                    newState.errors = null;
+                }
                 break;
+            case 'SET_CURRENT_STEP':
+                newState.currentStep = action.payload;
         }
     
         return newState

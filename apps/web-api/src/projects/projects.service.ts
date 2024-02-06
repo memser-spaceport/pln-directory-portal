@@ -18,13 +18,18 @@ export class ProjectsService {
   async createProject(project: Prisma.ProjectUncheckedCreateInput, userEmail: string) {
     try {
       const member:any = await this.getMemberInfo(userEmail);
-      const { contributingTeams } : any = project;
+      const { contributingTeams, contributors } : any = project;
       project.createdBy = member.uid;
       const result = await this.prisma.project.create({
         data: {
           ...project,
           contributingTeams: {
-            connect: contributingTeams.map(team => { return { uid: team.uid }})
+            connect: contributingTeams?.map(team => { return { uid: team.uid }})
+          },
+          contributors: {
+            create: contributors?.map((contributor) => {
+              return contributor;
+            })
           }
         }
       });
@@ -44,8 +49,18 @@ export class ProjectsService {
       const member:any = await this.getMemberInfo(userEmail);
       const existingData = await this.getProjectByUid(uid);
       const contributingTeamsUid = existingData?.contributingTeams?.map(team => team.uid) || [];
-      await this.isMemberAllowedToEdit(member, [ existingData?.maintainingTeamUid, ...contributingTeamsUid], existingData);
-      const { contributingTeams } : any = project;
+      await this.isMemberAllowedToEdit(member, [existingData?.maintainingTeamUid, ...contributingTeamsUid], existingData);
+      const { contributingTeams, contributors } : any = project;
+      const contributorToCreate:any = [];
+      const contributorUidsToDelete:any = [];
+      contributors?.map((contributor) => {
+        if (!contributor.uid) {
+          contributorToCreate.push(contributor);
+        }
+        if (contributor.isDeleted) {
+          contributorUidsToDelete.push({ uid: contributor.uid });
+        }
+      });
       const result = await this.prisma.project.update({
         where: {
           uid
@@ -53,8 +68,12 @@ export class ProjectsService {
         data: {
           ...project,
           contributingTeams: {
-            disconnect: contributingTeamsUid.map(uid => { return { uid }}),
+            disconnect: contributingTeamsUid?.map(uid => { return { uid }}),
             connect: contributingTeams?.map(team => { return { uid: team.uid }}) || []
+          },
+          contributors: {
+            create: contributorToCreate,
+            deleteMany: contributorUidsToDelete
           }
         }
       });
@@ -91,6 +110,32 @@ export class ProjectsService {
         include: {
           maintainingTeam: { select: { uid: true, name: true, logo: true }},
           contributingTeams: { select: { uid: true, name: true, logo: true }},
+          contributors: { 
+            select: { 
+              uid: true,
+              member: { 
+                select: { 
+                  uid: true, 
+                  name: true, 
+                  image: true ,
+                  teamMemberRoles:{
+                    select:{
+                      mainTeam:true,
+                      teamLead:true,
+                      role:true,
+                      team:{
+                        select:{
+                          uid: true,
+                          name: true
+                        }
+                      }
+                    }
+                  }
+                }
+              }, 
+              projectUid: true
+            }
+          },
           creator: { select: { uid: true, name: true, image: true }},
           logo: true
         }

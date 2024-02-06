@@ -7,6 +7,7 @@ export type TMemberListOptions = TListOptions & {
   'location.country__with'?: string;
   'location.metroarea__with'?: string;
   'teamMemberRoles.team.uid'?: string;
+  'projectContributions.projectUid'?: string;
   plnFriend?: boolean;
   openToWork?: boolean;
 };

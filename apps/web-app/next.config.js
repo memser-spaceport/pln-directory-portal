@@ -14,7 +14,7 @@ const AWS_S3_DOMAIN = process.env.AWS_S3_DOMAIN || '';
 let nextConfig = {
   env: {
     AUTH_API_URL: process.env.AUTH_API_URL,
-    COOKIE_DOMAIN: process.env.COOKIE_DOMAIN
+    COOKIE_DOMAIN: process.env.COOKIE_DOMAIN,
   },
   nx: {
     // Set this to true if you would like to to use SVGR

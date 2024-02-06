@@ -1,8 +1,9 @@
 import { InputField } from '@protocol-labs-network/ui';
-import { ReactComponent as RemoveKPIIcon } from '../../public/assets/images/icons/projects/remove-kpi.svg';
+import { ReactComponent as RemoveKPIIcon } from '../../../public/assets/images/icons/projects/remove-kpi.svg';
 import { useContext } from 'react';
 import { AddProjectsContext } from 'apps/web-app/context/projects/add.context';
-import InputError from './input-error';
+import InputError from './components/input-error';
+import Image from 'next/image';
 export default function KPI({ onInputChange, kpiFieldArray, setKPIField }) {
 
     const { addProjectsState, addProjectsDispatch } = useContext(AddProjectsContext);
@@ -23,8 +24,8 @@ export default function KPI({ onInputChange, kpiFieldArray, setKPIField }) {
 
     const getKPILabelHeader = () => {
         return <div className="flex gap-2 text-sm font-bold">
-            <div className='basis-1/2'>KPI Name</div>
-            <div className='basis-1/2'>KPI Value</div>
+            <div className='basis-1/2'>Enter KPI Name</div>
+            <div className='basis-1/2'>Enter KPI Value</div>
         </div>
     }
 
@@ -111,20 +112,33 @@ export default function KPI({ onInputChange, kpiFieldArray, setKPIField }) {
     }
 
     const getAddMoreTemplate = () => {
-        return <div className="font-medium text-sm pt-2 cursor-pointer" onClick={addKPIRow}>
-            <span className="text-[#156FF7]">+ Add KPI</span>
-            <span className="text-[#94A3B8] pl-1">(max 5)</span>
-        </div>
+        return (
+          <div
+            className="cursor-pointer pt-2 text-sm font-medium flex"
+            onClick={addKPIRow}
+          >
+            <span className="flex text-[#156FF7] gap-2">
+              <Image
+                src={'/assets/images/icons/projects/add-new.svg'}
+                alt="project image"
+                width={12}
+                height={12}
+              />
+              <div>Add KPI</div>
+            </span>
+            <span className="pl-1 text-[#94A3B8]">(max 5)</span>
+          </div>
+        );
     }
 
     const getKPIComponent = (field, index) => {
-        return <div className="flex flex-col" key={index}>
+        return <div className="flex flex-col bg-white p-[16px] rounded-[8px]" key={index}>
             {getKPIHeader(field, index)}
             {getKPILabelHeader()}
             {getKPIInput(field,index)}
         </div>
     }
-    return <div>
+    return <div className='flex flex-col gap-5'>
         {
             kpiFieldArray.length > 0 && kpiFieldArray.map((kpi, index) => {
                 return getKPIComponent(kpi, index)

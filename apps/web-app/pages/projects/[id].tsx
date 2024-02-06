@@ -1,8 +1,10 @@
+import { getMember, getMembers } from "@protocol-labs-network/members/data-access";
 import { getProject } from "@protocol-labs-network/projects/data-access";
 import { getTeams } from "@protocol-labs-network/teams/data-access";
 import { Breadcrumb } from "@protocol-labs-network/ui";
 import ContactInfos from "apps/web-app/components/projects/details/contact-infos";
 import ContactAndLinks from "apps/web-app/components/projects/details/contactandlinks";
+import Contributors from "apps/web-app/components/projects/details/contributors";
 import Description from "apps/web-app/components/projects/details/description";
 import Header from "apps/web-app/components/projects/details/header";
 import KPIs from "apps/web-app/components/projects/details/kpis";
@@ -18,7 +20,7 @@ import { NextSeo } from "next-seo";
 import { destroyCookie } from "nookies";
 import { ReactElement } from "react";
 
-export default function ProjectDetails({ selectedProject, userHasEditRights, userHasDeleteRights }) {
+export default function ProjectDetails({ selectedProject, userHasEditRights, userHasDeleteRights, contributingMembers }) {
     const { breadcrumbItems } = useProfileBreadcrumb({
         backLink: '/projects',
         directoryName: 'Projects',
@@ -56,6 +58,10 @@ export default function ProjectDetails({ selectedProject, userHasEditRights, use
                     </div>
                     <div className="w-[291px] mt-10 flex flex-col gap-5">
                         <TeamsInvolved project={selectedProject}/>
+                        {
+                            (selectedProject?.contributors?.length>0 || contributingMembers?.length > 0) && 
+                            <Contributors project={selectedProject} contributingMembers={contributingMembers}/>
+                        }
                         <ContactInfos project={selectedProject}/>
                     </div>
                 </div>
@@ -81,7 +87,7 @@ const checkForEditRights = async (userInfo, selectedProject, isUserLoggedIn) => 
         }
 
         //case 2. If the logged in user is the creator of the project.
-        if (selectedProject.creator && userInfo.uid === selectedProject.creator.uid) {
+        if (selectedProject.createdBy && userInfo.uid === selectedProject.createdBy) {
             return true;
         }
 
@@ -147,11 +153,20 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
 
     const selectedProjectResponse = await getProject(query.id);
+    const getMembersResponse = await getMembers({
+      'projectContributions.projectUid': query.id + '',
+      select: 'uid,name,image,teamMemberRoles.team,teamMemberRoles.mainTeam,teamMemberRoles.role,teamMemberRoles.teamLead',
+      pagination:false
+    });
+    
+    let contributingMembers = null;
+    if(getMembersResponse.status === 200){
+        contributingMembers = getMembersResponse.body;
+    }
+
     let selectedProject = null;
     let userHasEditRights = false;
     let userHasDeleteRights = false;
-
-    // console.log(selectedProjectResponse);
 
     if (selectedProjectResponse.status === 200) {
         selectedProject = ProjectsDataService.getFormattedProject(selectedProjectResponse.body);
@@ -169,7 +184,8 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
             userInfo,
             selectedProject,
             userHasEditRights,
-            userHasDeleteRights
+            userHasDeleteRights,
+            contributingMembers
         }
     };
 }

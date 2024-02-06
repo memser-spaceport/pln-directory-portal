@@ -95,7 +95,7 @@ export default function CustomApp({
         break;
     }
     Cookies.remove('page_params');
-    Cookies.remove('verified');
+    Cookies.remove('verified', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
     Cookies.remove('state');
     return () => {
       router.events.off('routeChangeComplete', handleRouteChange)
