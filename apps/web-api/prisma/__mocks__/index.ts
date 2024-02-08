@@ -5,6 +5,8 @@ import { join } from 'path';
 import { URL } from 'url';
 import { v4 } from 'uuid';
 
+process.env.DATABASE_URL = "postgres://postgres:postgres@localhost:5432/plnd"
+// console.log('DB',process.env.DATABASE_URL)
 const defaultPrisma = new PrismaClient({
   datasources: { db: { url: process.env.DATABASE_URL } },
 });
