@@ -105,6 +105,7 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) =>
     getTeams(listOptions),
     getTeamsFilters(optionsFromQuery),
   ]);
+ 
 
   const teams: ITeam[] =
     teamsResponse.status === 200

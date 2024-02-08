@@ -1,27 +1,72 @@
 version: '3.7'
 services:
-  postgres:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "4200:4200"
+    env_file:
+      - .env
+    depends_on:
+      - api
+    networks:
+      - backend
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/web-api:/app
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    networks:
+      - backend
+    stdin_open: true
+    tty: true
+
+  db:
     image: postgres:13.8
     ports:
-      - '${DB_HOST_PORT}:5432'
+      - '5432:5432'
     restart: always
+    env_file:
+      - .env
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
+    networks:
+      - backend
+  
   redis:
-    image: redis:7.0.5
+    image: redis:latest
     restart: always
     ports:
       - '6379:6379'
+    env_file:
+      - .env
     environment:
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
     volumes:
       - redis:/data
+    networks:
+      - backend
+
 volumes:
   db_data:
   redis:
     driver: local
+
+networks:
+  backend:
+    driver: bridge

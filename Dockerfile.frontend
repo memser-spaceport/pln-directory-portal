@@ -1,0 +1,20 @@
+# Use an appropriate Node.js image as the base image
+FROM node:16 AS builder
+
+# Create app directory.
+WORKDIR /app
+
+# Copy project files.
+COPY . .
+
+# RUN file="$(ls -1 /app)" && echo $file
+
+# Install app dependencies
+RUN yarn install
+
+# Build app & its dependencies
+RUN yarn nx build web-app 
+
+EXPOSE 4200
+
+CMD [ "npm", "run", "start" ]

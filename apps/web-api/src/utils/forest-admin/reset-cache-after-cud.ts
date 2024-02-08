@@ -25,7 +25,6 @@ export async function resetCacheAfterCreateOrUpdateOrDelete(
   const redisCache = cacheManager.caching({
     store: redisStore,
     host: process.env.REDIS_HOST,
-    url: process.env.REDIS_TLS_URL,
     port: Number(process.env.REDIS_PORT),
     password: process.env.REDIS_PASSWORD,
     tls: process.env.REDIS_WITH_TLS

@@ -42,7 +42,8 @@ import { JoinRequestsModule } from './join-requests/join-requests.module';
     }),
    CacheModule.register<ClientOpts>({
       store: redisStore,
-      url: process.env.REDIS_TLS_URL,
+      host: process.env.REDIS_HOST,
+      port: Number(process.env.REDIS_PORT),
       isGlobal: true,
       ttl: 86400, // 1 day in seconds
       max: 100, // maximum number of items in cache
