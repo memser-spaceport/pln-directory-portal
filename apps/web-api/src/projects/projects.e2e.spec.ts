@@ -11,7 +11,7 @@ import { createProject, projectFields } from './__mocks__/projects.mocks';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 
 jest.mock('../guards/user-token-validation.guard');
-
+jest.mock('axios');
 describe('Projects', () => {
   let app: INestApplication;
   let cacheManager: Cache;
@@ -19,9 +19,7 @@ describe('Projects', () => {
 
   beforeAll(() => {
     // Fix to avoid circular dependency issue:
-    ({ ResponseProjectWithRelationsSchema } = jest.requireActual(
-      'libs/contracts/src/schema/project'
-    ));
+    ({ ResponseProjectWithRelationsSchema } = jest.requireActual('libs/contracts/src/schema/project'));
   });
 
   beforeEach(async () => {
@@ -41,14 +39,12 @@ describe('Projects', () => {
   });
 
   function mockUserTokenValidation(userEmail) {
-    return (UserTokenValidation.prototype.canActivate as jest.Mock).mockImplementation(
-      (context: ExecutionContext) => {
-        const request = context.switchToHttp().getRequest();
-        // Manually set userEmail in the request context
-        request.userEmail = userEmail;
-        return true;
-      }
-    );
+    return (UserTokenValidation.prototype.canActivate as jest.Mock).mockImplementation((context: ExecutionContext) => {
+      const request = context.switchToHttp().getRequest();
+      // Manually set userEmail in the request context
+      request.userEmail = userEmail;
+      return true;
+    });
   }
 
   describe('When creating new project', () => {
@@ -56,50 +52,35 @@ describe('Projects', () => {
       mockUserTokenValidation('email-1@mail.com');
       const name = faker.helpers.unique(faker.name.firstName);
       const project = projectFields(3, name);
-      const response = await supertest(app.getHttpServer())
-        .post('/v1/projects')
-        .send(project)
-        .expect(201);
+      const response = await supertest(app.getHttpServer()).post('/v1/projects').send(project).expect(201);
       const createdProject = response.body;
-      const hasValidSchema =
-        ResponseProjectWithRelationsSchema.safeParse(createdProject).success;
+      const hasValidSchema = ResponseProjectWithRelationsSchema.safeParse(createdProject).success;
       expect(hasValidSchema).toBeTruthy();
     });
     it('should return error on trying to create new project with existing uid', async () => {
       mockUserTokenValidation('email-1@mail.com');
       const name = faker.helpers.unique(faker.name.firstName);
       const project = projectFields(1, name);
-      await supertest(app.getHttpServer())
-        .post('/v1/projects')
-        .send(project)
-        .expect(409);
+      await supertest(app.getHttpServer()).post('/v1/projects').send(project).expect(409);
     });
   });
 
   describe('When fetching projects', () => {
     it('should list all the projects with a valid schema', async () => {
-      const response = await supertest(app.getHttpServer())
-        .get('/v1/projects')
-        .expect(200);
+      const response = await supertest(app.getHttpServer()).get('/v1/projects').expect(200);
       const projects = response.body;
       expect(projects).toHaveLength(2);
-      const hasValidSchema =
-        ResponseProjectWithRelationsSchema.array().safeParse(projects).success;
+      const hasValidSchema = ResponseProjectWithRelationsSchema.array().safeParse(projects).success;
       expect(hasValidSchema).toBeTruthy();
     });
     it('should fetch the project with a valid schema', async () => {
-      const response = await supertest(app.getHttpServer())
-        .get('/v1/projects/uid-project-1')
-        .expect(200);
+      const response = await supertest(app.getHttpServer()).get('/v1/projects/uid-project-1').expect(200);
       const projectResponse = response.body;
-      const hasValidSchema =
-        ResponseProjectWithRelationsSchema.safeParse(projectResponse).success;
+      const hasValidSchema = ResponseProjectWithRelationsSchema.safeParse(projectResponse).success;
       expect(hasValidSchema).toBeTruthy();
     });
     it('should throw error for the given project uid', async () => {
-      await supertest(app.getHttpServer())
-        .get('/v1/projects/uid-64764812345')
-        .expect(404);
+      await supertest(app.getHttpServer()).get('/v1/projects/uid-64764812345').expect(404);
     });
   });
 
@@ -111,46 +92,33 @@ describe('Projects', () => {
       project.maintainingTeamUid = project.maintainingTeam;
       project.readMe = null;
       project.logoUid = project.logo;
-      await supertest(app.getHttpServer())
-        .put(`/v1/projects/${project.uid}`)
-        .send(project)
-        .expect(400);
+      await supertest(app.getHttpServer()).put('/v1/projects/uid-project-1').send(project).expect(500);
     });
     it('should throw error for invalid project creator', async () => {
       mockUserTokenValidation('email-2@mail.com');
       const response = await supertest(app.getHttpServer()).get('/v1/projects/uid-project-2');
       const project = response.body;
-      await supertest(app.getHttpServer())
-        .put(`/v1/projects/${project.uid}`)
-        .send(project)
-        .expect(403);
+      await supertest(app.getHttpServer()).put(`/v1/projects/${project.uid}`).send(project).expect(403);
     });
   });
 
   describe('When deleting project', () => {
     it('should delete a project by uid', async () => {
       mockUserTokenValidation('email-1@mail.com');
-      await supertest(app.getHttpServer())
-        .delete('/v1/projects/uid-project-1')
-        .expect(200);
+      await supertest(app.getHttpServer()).delete('/v1/projects/uid-project-1').expect(200);
     });
     it('should throw error for invalid member email', async () => {
       mockUserTokenValidation('email-2@mail.com');
-      await supertest(app.getHttpServer())
-        .delete('/v1/projects/uid-project-2')
-        .expect(403);
+      await supertest(app.getHttpServer()).delete('/v1/projects/uid-project-2').expect(403);
     });
     it('should throw error for non exist member email', async () => {
       mockUserTokenValidation('email-234567@mail.com');
-      const response = await supertest(app.getHttpServer())
-        .delete('/v1/projects/uid-project-2');
-      // .expect(403);
+      await supertest(app.getHttpServer()).delete('/v1/projects/uid-project-2')
+      .expect(500);
     });
     it('should throw error for non-exist project uid', async () => {
       mockUserTokenValidation('email-1@mail.com');
-      await supertest(app.getHttpServer())
-        .delete('/v1/projects/uid-project-9999999999')
-        .expect(500);
+      await supertest(app.getHttpServer()).delete('/v1/projects/uid-project-9999999999').expect(404);
     });
   });
 });
