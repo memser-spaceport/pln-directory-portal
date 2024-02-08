@@ -56,9 +56,10 @@ export const MemberSchema = z.object({
 export const ResponseMemberSchema = MemberSchema.omit({ id: true }).strict();
 
 export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
-  image: ResponseImageWithRelationsSchema.optional(),
+  image: ResponseImageWithRelationsSchema.nullable().optional(),
   location: LocationResponseSchema.optional(),
   skills: ResponseSkillSchema.array().optional(),
+  memberRoles: ResponseSkillSchema.array().optional(),
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
   projectContributions: ResponseProjectContributionSchema.array().optional()
 });
