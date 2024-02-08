@@ -29,6 +29,8 @@ export const TeamSchema = z.object({
   fundingStageUid: z.string().nullish(),
   linkedinHandler: z.string().nullish(),
   officeHours: z.string().nullish(),
+  moreDetails: z.string().nullish(),
+  telegramHandler: z.string().nullish(),
 });
 
 export const CreateTeamSchema = TeamSchema.pick({
@@ -47,7 +49,7 @@ export const CreateTeamSchema = TeamSchema.pick({
 export const ResponseTeamSchema = TeamSchema.omit({ id: true }).strict();
 
 export const ResponseTeamWithRelationsSchema = ResponseTeamSchema.extend({
-  logo: ResponseImageWithRelationsSchema.optional(),
+  logo: ResponseImageWithRelationsSchema.nullable().optional(),
   membershipSources: ResponseMembershipSourceSchema.array().optional(),
   industryTags: ResponseIndustryTagSchema.array().optional(),
   fundingStage: ResponseFundingStageSchema.optional(),
