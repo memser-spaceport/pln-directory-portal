@@ -166,8 +166,7 @@ export class MemberController {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
     const builder = new PrismaQueryBuilder(queryableFields, ENABLED_RETRIEVAL_PROFILE);
     const builtQuery = builder.build(request.query);
-    const member = await this.membersService.findOne(uid, builtQuery);
-    return member;
+    return await this.membersService.findOne(uid, builtQuery);
   }
 
   /**
