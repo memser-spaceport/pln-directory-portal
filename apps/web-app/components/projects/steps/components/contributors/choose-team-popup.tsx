@@ -29,7 +29,6 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
     const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-      try {
         setIsLoading(true);
       let teams = [];
           if (addProjectsState.inputs.maintainedBy) {
@@ -46,7 +45,7 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
           ProjectsService.fetchTeams(true,teams).then((res) => {
             setAllTeams(res);
             setSelectedMembers(addProjectsState.inputs.contributors);
-          }).finally(() => setIsLoading(false))
+          }).finally(() => setIsLoading(false)).catch();
         } else {
           if (contributorsState.chooseTeamPopup.UIType === 'TEAM') {
             Promise.all([
@@ -60,19 +59,15 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
               setAllTeams(teamResponse);
               setMembers(membersResponse);
               setSelectedMembers(addProjectsState.inputs.contributors);
-            }).finally (() => setIsLoading(false));        
+            }).finally (() => setIsLoading(false)).catch();       
             setTeam(contributorsState.chooseTeamPopup.selectedTeam);
           } else {
             ProjectsService.fetchMembers().then((members) => {
               setMembers(members);
               setSelectedMembers(addProjectsState.inputs.contributors);
-            }).finally(() => setIsLoading(false))
+            }).finally(() => setIsLoading(false)).catch();
           }
         }
-      } catch (error) {
-        setIsLoading(false);
-        console.error(error);
-      }
     }, []);
 
     const onTeamSelect = async (team) => {
