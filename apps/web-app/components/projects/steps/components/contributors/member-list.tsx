@@ -349,6 +349,7 @@ export default function MemberList({
               label="Search"
               tabIndex={-1}
               name="searchBy"
+              autoComplete="off"
               showLabel={false}
               icon={SearchIcon}
               placeholder={'Search'}
