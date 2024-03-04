@@ -30,7 +30,7 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
 
     useEffect(() => {
         setIsLoading(true);
-      let teams = [];
+        let teams = [];
           if (addProjectsState.inputs.maintainedBy) {
             teams.push(addProjectsState.inputs.maintainedBy);
           }
@@ -45,7 +45,7 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
           ProjectsService.fetchTeams(true,teams).then((res) => {
             setAllTeams(res);
             setSelectedMembers(addProjectsState.inputs.contributors);
-          }).finally(() => setIsLoading(false)).catch();
+          }).finally(() => setIsLoading(false))
         } else {
           if (contributorsState.chooseTeamPopup.UIType === 'TEAM') {
             Promise.all([
@@ -59,13 +59,13 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
               setAllTeams(teamResponse);
               setMembers(membersResponse);
               setSelectedMembers(addProjectsState.inputs.contributors);
-            }).finally (() => setIsLoading(false)).catch();       
+            }).finally (() => setIsLoading(false));      
             setTeam(contributorsState.chooseTeamPopup.selectedTeam);
           } else {
             ProjectsService.fetchMembers().then((members) => {
               setMembers(members);
               setSelectedMembers(addProjectsState.inputs.contributors);
-            }).finally(() => setIsLoading(false)).catch();
+            }).finally(() => setIsLoading(false));
           }
         }
     }, []);
