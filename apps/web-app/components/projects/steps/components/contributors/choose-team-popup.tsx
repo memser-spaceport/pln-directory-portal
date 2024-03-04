@@ -7,6 +7,7 @@ import Image from "next/image";
 import ProjectsService from "apps/web-app/services/projects";
 import { ContributorsContext } from "apps/web-app/context/projects/contributors.context";
 import { AddProjectsContext } from "apps/web-app/context/projects/add.context";
+import { LoadingIndicator } from "apps/web-app/components/shared/loading-indicator/loading-indicator";
 
 export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails, mode }) {
 
@@ -25,8 +26,11 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
     const [selectedTeamAllMembers, setMembers] = useState(null);
     const [selectedTeam, setTeam] = useState(null);
     const [selectedMembers, setSelectedMembers] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
+      try {
+        setIsLoading(true);
       let teams = [];
           if (addProjectsState.inputs.maintainedBy) {
             teams.push(addProjectsState.inputs.maintainedBy);
@@ -42,27 +46,33 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
           ProjectsService.fetchTeams(true,teams).then((res) => {
             setAllTeams(res);
             setSelectedMembers(addProjectsState.inputs.contributors);
-          });
+          }).finally(() => setIsLoading(false))
         } else {
           if (contributorsState.chooseTeamPopup.UIType === 'TEAM') {
-            ProjectsService.fetchTeams(true,teams).then((res) => {
-              setAllTeams(res);
-            });
-            setTeam(contributorsState.chooseTeamPopup.selectedTeam);
-            ProjectsService.fetchMembers(
-              contributorsState.chooseTeamPopup.selectedTeam?.uid
-            ).then((members) => {
-              setMembers(members);
-              
+            Promise.all([
+              ProjectsService.fetchTeams(true,teams),
+              ProjectsService.fetchMembers(
+                contributorsState.chooseTeamPopup.selectedTeam?.uid
+              )
+            ]).then((args) => {
+              const teamResponse:any = args[0];
+              const  membersResponse:any = args[1];         
+              setAllTeams(teamResponse);
+              setMembers(membersResponse);
               setSelectedMembers(addProjectsState.inputs.contributors);
-            });
+            }).finally (() => setIsLoading(false));        
+            setTeam(contributorsState.chooseTeamPopup.selectedTeam);
           } else {
             ProjectsService.fetchMembers().then((members) => {
               setMembers(members);
               setSelectedMembers(addProjectsState.inputs.contributors);
-            });
+            }).finally(() => setIsLoading(false))
           }
         }
+      } catch (error) {
+        setIsLoading(false);
+        console.error(error);
+      }
     }, []);
 
     const onTeamSelect = async (team) => {
@@ -94,6 +104,11 @@ export default function ChooseTeamPopup({ isOpen, onClose, title, setTeamDetails
 
     return (
       <>
+      {isLoading && (
+      <div className={`fixed left-0 top-0 z-[10001] flex h-[calc(100%_-_0px)] w-full items-center justify-center bg-slate-100/50 transition-[visibility,_opacity] duration-[0s,_300ms] ease-[linear,_linear]`}>
+        <LoadingIndicator />
+        </div>
+      )}
         <Transition appear show={isOpen} as={Fragment}>
           <Dialog
             as="div"
