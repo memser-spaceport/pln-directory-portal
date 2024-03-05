@@ -27,6 +27,7 @@ import { parseTeam } from '../../utils/teams.utils';
 import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../utils/services/auth';
 import TeamProfileProjects from 'apps/web-app/components/teams/team-profile/team-profile-projects/team-profile-projects';
 import ProjectsService from 'apps/web-app/services/projects';
+import { getAllFormattedProjects } from 'apps/web-app/services/projects/projects.data.service';
 
 interface TeamProps {
   team: ITeam;
@@ -150,11 +151,10 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
   }
 
 
-  const { getTeamsProject } = ProjectsService;
-
   let teamsProjectList = [];
+  const currentTeam = teamResponse?.body as ITeam
   try{
-    teamsProjectList = await getTeamsProject(id);
+    teamsProjectList = getAllFormattedProjects([...currentTeam.maintainingProjects, ...currentTeam.contributingProjects])
   }catch(err){
     console.log(err);
   }

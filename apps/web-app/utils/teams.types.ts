@@ -1,4 +1,5 @@
 import { TTeamResponse } from '@protocol-labs-network/contracts';
+import { IProject } from './projects.types';
 
 export interface ITeam {
   id: string;
@@ -15,6 +16,8 @@ export interface ITeam {
   technologies: TTeamResponse['technologies'];
   members: string[];
   linkedinHandle: string | null;
+  maintainingProjects?: IProject[];
+  contributingProjects?: IProject[];
 }
 
 interface DropDownProps {
