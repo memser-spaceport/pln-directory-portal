@@ -50,6 +50,7 @@ export default function TeamList({ onSelect, list }) {
             name="searchBy"
             showLabel={false}
             icon={SearchIcon}
+            autoComplete="off"
             placeholder={'Search'}
             className="rounded-[8px] border"
             value={searchTerm}
@@ -62,7 +63,7 @@ export default function TeamList({ onSelect, list }) {
             onClear={() => setSearchTerm('')}
           />
         </div>
-        <div  className="h-[84%] overflow-y-scroll">
+        <div  className=" max-h-[84%] overflow-y-scroll">
         {filteredList &&
           filteredList.map((team, index) => {
             return (
