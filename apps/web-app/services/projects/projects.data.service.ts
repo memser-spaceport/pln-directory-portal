@@ -1,7 +1,7 @@
 import Cookies from 'js-cookie';
 import KPIs from '../../components/projects/details/kpis';
 /* eslint-disable @typescript-eslint/no-unused-expressions */
-const getAllFormattedProjects = (data) => {
+export const getAllFormattedProjects = (data) => {
     try {
         const formattedArray = [];
         data.forEach(project => {

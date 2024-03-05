@@ -46,6 +46,8 @@ export class TeamsService {
         logo: true,
         membershipSources: true,
         technologies: true,
+        maintainingProjects: true,
+        contributingProjects: true
       },
     });
   }
