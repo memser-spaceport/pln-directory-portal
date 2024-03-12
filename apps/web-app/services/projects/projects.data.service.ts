@@ -1,7 +1,7 @@
 import Cookies from 'js-cookie';
 import KPIs from '../../components/projects/details/kpis';
 /* eslint-disable @typescript-eslint/no-unused-expressions */
-export const getAllFormattedProjects = (data) => {
+export const getAllFormattedProjects = (data, isAdmin) => {
     try {
         const formattedArray = [];
         data.forEach(project => {
@@ -17,6 +17,7 @@ export const getAllFormattedProjects = (data) => {
                 formattedProject['fundingNeeded'] = project.lookingForFunding ?? false;
                 formattedProject['isDeleted'] = project.isDeleted ?? false;
                 formattedProject['isMaintainingProject'] = project.isMaintainingProject ?? false;
+                formattedProject['hasEditAccess'] = (project.hasEditAccess || isAdmin) ? true : false;
                 formattedArray.push(formattedProject);
             }
         });

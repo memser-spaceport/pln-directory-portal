@@ -10,8 +10,20 @@ export default function TeamProfileProjectCard({
   const router = useRouter();
   const analytics = useAppAnalytics();
 
+  const onCardClickHandler = () => {
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_CLICKED, {
+      projectUid: project.id,
+      projectName: project.name,
+      from: 'team-details',
+    });
+  };
+
   return (
-    <div className="flex justify-between py-[16px] pl-[16px] pr-[32px] hover:bg-[#F8FAFC]">
+    <a
+    href={`/projects/${project.id}`}
+      onClick={onCardClickHandler}
+      className="flex justify-between py-[16px] pl-[16px] pr-[32px]  hover:bg-[#F8FAFC] focus-visible:outline-none"
+    >
       <div className="flex ">
         <div className="relative h-[41px] w-[41px]">
           <Image
@@ -24,20 +36,20 @@ export default function TeamProfileProjectCard({
         </div>
         <div className="pl-4">
           <div className="flex items-center gap-[10px] text-[14px] font-semibold">
-            <p className='max-w-[500px] overflow-hidden'>{project?.name}</p>
+            <p className="max-w-[500px] overflow-hidden">{project?.name}</p>
             {project?.isMaintainingProject && (
-            <div
-              className="relative  flex h-[20px] w-[20px] shrink-0 rounded-full"
-              title="Maintainer"
-            >
-              <Image
-                src="/assets/images/icons/projects/core.svg"
-                alt="maintainer image"
-                width={20}
-                height={20}
-                className="rounded"
-              />
-            </div>
+              <div
+                className="relative  flex h-[20px] w-[20px] shrink-0 rounded-full"
+                title="Maintainer"
+              >
+                <Image
+                  src="/assets/images/icons/projects/core.svg"
+                  alt="maintainer image"
+                  width={20}
+                  height={20}
+                  className="rounded"
+                />
+              </div>
             )}
 
             {project.fundingNeeded && (
@@ -55,12 +67,14 @@ export default function TeamProfileProjectCard({
           <div className="text-[12px]">{project.tagline}</div>
         </div>
       </div>
-      <div className="my-auto flex gap-2">
+      <div className="my-auto flex gap-2 items-center">
         {/* Edit and pin */}
-        {hasProjectsEditAccess && (
-          <div
-            className="cursor-pointer"
-            onClick={() => {
+        {hasProjectsEditAccess && !project?.isDeleted && (
+          <button
+            className="cursor-pointer z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
               analytics.captureEvent(
                 APP_ANALYTICS_EVENTS.PROJECT_EDIT_CLICKED,
                 {
@@ -77,19 +91,9 @@ export default function TeamProfileProjectCard({
               width={24}
               height={24}
             />
-          </div>
+          </button>
         )}
-        <div
-          onClick={() => {
-            router.push(`/projects/${project.id}`);
-            analytics.captureEvent(APP_ANALYTICS_EVENTS.PROJECT_CLICKED, {
-              projectUid: project.id,
-              projectName: project.name,
-              from: 'team-details',
-            });
-          }}
-          className="cursor-pointer"
-        >
+        <div className="cursor-pointer">
           <Image
             src="/assets/images/icons/projects/more-details.svg"
             alt="project image"
@@ -98,6 +102,6 @@ export default function TeamProfileProjectCard({
           />
         </div>
       </div>
-    </div>
+    </a>
   );
 }

@@ -145,8 +145,8 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
     }
   }
 
-  
-  if(userInfo.roles && userInfo.roles.length && userInfo.roles.includes('DIRECTORYADMIN')){
+  const isAdmin = userInfo.roles && userInfo.roles.length && userInfo.roles.includes('DIRECTORYADMIN')
+  if(isAdmin){
     hasProjectsEditAccess = true;
   }
 
@@ -156,9 +156,10 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
   try{
     const maintainingProjects = currentTeam?.maintainingProjects?.map((project) => {
       return {
-      ...project, isMaintainingProject: true
+      ...project, isMaintainingProject: true,
+      hasEditAccess: hasProjectsEditAccess,
     }})
-      teamsProjectList = getAllFormattedProjects([...maintainingProjects, ...currentTeam.contributingProjects])
+      teamsProjectList = getAllFormattedProjects([...maintainingProjects, ...currentTeam.contributingProjects], isAdmin)
   }catch(err){
     console.log(err);
   }
