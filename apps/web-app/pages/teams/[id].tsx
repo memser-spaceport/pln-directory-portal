@@ -154,7 +154,11 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
   let teamsProjectList = [];
   const currentTeam = teamResponse?.body as ITeam
   try{
-    teamsProjectList = getAllFormattedProjects([...currentTeam.maintainingProjects, ...currentTeam.contributingProjects])
+    const maintainingProjects = currentTeam?.maintainingProjects?.map((project) => {
+      return {
+      ...project, isMaintainingProject: true
+    }})
+      teamsProjectList = getAllFormattedProjects([...maintainingProjects, ...currentTeam.contributingProjects])
   }catch(err){
     console.log(err);
   }
