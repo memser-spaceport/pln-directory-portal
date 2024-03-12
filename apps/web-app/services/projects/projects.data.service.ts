@@ -15,6 +15,8 @@ export const getAllFormattedProjects = (data) => {
                 formattedProject['maintainingTeamName'] = project.maintainingTeam?.name ?? '',
                 formattedProject['maintainingTeamImage'] = project.maintainingTeam?.logo?.url ? project.maintainingTeam?.logo?.url : 'default',
                 formattedProject['fundingNeeded'] = project.lookingForFunding ?? false;
+                formattedProject['isDeleted'] = project.isDeleted ?? false;
+                formattedProject['isMaintainingProject'] = project.isMaintainingProject ?? false;
                 formattedArray.push(formattedProject);
             }
         });
