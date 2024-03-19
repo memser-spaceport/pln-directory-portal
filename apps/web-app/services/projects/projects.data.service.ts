@@ -17,7 +17,9 @@ export const getAllFormattedProjects = (data, isAdmin) => {
                 formattedProject['fundingNeeded'] = project.lookingForFunding ?? false;
                 formattedProject['isDeleted'] = project.isDeleted ?? false;
                 formattedProject['isMaintainingProject'] = project.isMaintainingProject ?? false;
-                formattedProject['hasEditAccess'] = (project.hasEditAccess || isAdmin) ? true : false;
+                formattedProject['contributingTeams'] = project.contributingTeams ?? [];
+                formattedProject['createdBy'] = project.createdBy ?? '';
+                formattedProject['maintainingTeamUid'] = project.maintainingTeamUid ?? '';
                 formattedArray.push(formattedProject);
             }
         });

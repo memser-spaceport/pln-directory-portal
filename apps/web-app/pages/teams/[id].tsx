@@ -2,6 +2,7 @@ import { getMembers } from '@protocol-labs-network/members/data-access';
 import {
   getTeam,
   getTeamUIDByAirtableId,
+  getTeams,
 } from '@protocol-labs-network/teams/data-access';
 import { Breadcrumb } from '@protocol-labs-network/ui';
 import orderBy from 'lodash/orderBy';
@@ -116,7 +117,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
         };
   }
 
-  const [teamResponse, teamMembersResponse] = await Promise.all([
+  const [teamResponse, teamMembersResponse, teamsResponse] = await Promise.all([
     getTeam(id, {
       with: 'logo,technologies,membershipSources,industryTags,fundingStage,teamMemberRoles.member',
     }),
@@ -126,6 +127,12 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
         'uid,name,image.url,skills.title,teamMemberRoles.team.uid,projectContributions,teamMemberRoles.team.name,teamMemberRoles.role,teamMemberRoles.teamLead,teamMemberRoles.mainTeam',
       pagination: false,
     }),
+     getTeams({
+      'teamMemberRoles.member.uid': userInfo.uid,
+      select:
+          'uid,name,logo.url,industryTags.title,teamMemberRoles.role,teamMemberRoles.mainTeam',
+      pagination: false,
+  })
   ]);
 
   if (teamResponse.status === 200 && teamMembersResponse.status === 200) {
@@ -145,6 +152,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
     }
   }
 
+
   const isAdmin = userInfo.roles && userInfo.roles.length && userInfo.roles.includes('DIRECTORYADMIN')
   if(isAdmin){
     hasProjectsEditAccess = true;
@@ -152,14 +160,20 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
 
 
   let teamsProjectList = [];
-  const currentTeam = teamResponse?.body as ITeam
+  const currentTeam = teamResponse?.body as ITeam;
+
   try{
     const maintainingProjects = currentTeam?.maintainingProjects?.map((project) => {
       return {
       ...project, isMaintainingProject: true,
-      hasEditAccess: hasProjectsEditAccess,
     }})
-      teamsProjectList = getAllFormattedProjects([...maintainingProjects, ...currentTeam.contributingProjects], isAdmin)
+      const formattedProjects = getAllFormattedProjects([...maintainingProjects, ...currentTeam.contributingProjects], isAdmin);
+      teamsProjectList = formattedProjects?.map((project) => {
+        return {
+          ...project,
+          hasEditAccess: checkForEditRights(userInfo, project, isUserLoggedIn, teamsResponse),
+        }
+      })
   }catch(err){
     console.log(err);
   }
@@ -183,3 +197,39 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
     props: { team, members, backLink, isUserLoggedIn, userInfo, teamsProjectList, hasProjectsEditAccess },
   };
 };
+
+
+const checkForEditRights = (userInfo, selectedProject, isUserLoggedIn, teamsResponse) => {
+  try {
+      if(!isUserLoggedIn){
+          return false;
+      }
+
+      if (userInfo.roles && userInfo.roles.length && userInfo.roles.includes('DIRECTORYADMIN')) {
+          return true;
+      }
+
+      if (selectedProject.createdBy && userInfo.uid === selectedProject.createdBy) {
+          return true;
+      }
+
+      if (teamsResponse.status === 200 && teamsResponse.body && teamsResponse.body.length) {
+          for (const team of teamsResponse.body) {
+              if (team.uid === selectedProject.maintainingTeamUid) {
+                  return true;
+              }
+              if(selectedProject?.contributingTeams?.length){
+                  for (const cTeam of selectedProject.contributingTeams) {
+                      if (cTeam.value === team.uid) {
+                          return true;
+                      }
+                  }
+              }
+          }
+      }
+      return false;
+
+  } catch (err) {
+      console.log(err);
+  }
+}

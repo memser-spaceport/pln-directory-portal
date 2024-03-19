@@ -27,7 +27,7 @@ export default function TeamProfileProjectCard({
       <div className="flex ">
         <div className="relative h-[41px] w-[41px]">
           <Image
-            src={project.image}
+            src={project?.isDeleted ? "/assets/images/icons/company-logo-default.svg" : project.image}
             alt="project image"
             width={41}
             height={41}

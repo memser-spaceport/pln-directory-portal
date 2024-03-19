@@ -60,6 +60,7 @@ export class TeamsService {
                 logo: { select: { url: true, uid: true } },
               },
             },
+            contributingTeams: true
           }
         },
         contributingProjects: {
@@ -76,6 +77,7 @@ export class TeamsService {
                 logo: { select: { url: true, uid: true } },
               },
             },
+            contributingTeams: true
           }
         }
       },
