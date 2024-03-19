@@ -214,17 +214,12 @@ const checkForEditRights = (userInfo, selectedProject, isUserLoggedIn, teamsResp
       }
 
       if (teamsResponse.status === 200 && teamsResponse.body && teamsResponse.body.length) {
-          for (const team of teamsResponse.body) {
-              if (team.uid === selectedProject.maintainingTeamUid) {
-                  return true;
-              }
-              if(selectedProject?.contributingTeams?.length){
-                  for (const cTeam of selectedProject.contributingTeams) {
-                      if (cTeam.value === team.uid) {
-                          return true;
-                      }
-                  }
-              }
+          if(teamsResponse.body.some(team => team.uid === selectedProject.maintainingTeamUid)) {
+            return true;
+          }
+
+          if(selectedProject?.contributingTeams?.length) {
+            return selectedProject.contributingTeams.some(cteam => teamsResponse.body.some(team => team.uid === cteam.value))
           }
       }
       return false;
