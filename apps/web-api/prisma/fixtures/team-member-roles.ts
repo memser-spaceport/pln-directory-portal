@@ -28,6 +28,7 @@ export const teamMemberRoles = async () => {
         teamLead: faker.datatype.boolean(),
         startDate: faker.date.past(),
         endDate: faker.date.recent(),
+        roleTags: [faker.name.jobType(), faker.name.jobType()],
       }))
     )
   );

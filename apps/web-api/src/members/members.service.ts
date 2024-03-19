@@ -503,4 +503,65 @@ export class MembersService {
       return teams.includes(role.teamUid)
     });
   }
+
+  buildRoleFilters(request) {
+    const { memberRoles } : any = request.query;
+    if (memberRoles?.split(',')?.length > 0) {
+      return {
+        teamMemberRoles: {
+          some: {
+            roleTags: { hasSome: memberRoles.split(',') }
+          }
+        }
+      }
+    }
+    return {};
+  }
+
+  buildNameFilters(request) {
+    const { name__icontains } = request.query;
+    if (name__icontains) {
+      return { 
+        OR : [
+          { name: {
+              contains: name__icontains,
+              mode: 'insensitive'
+            }
+          },
+          { teamMemberRoles : {
+              some: {
+                team: {  
+                  name: {
+                    contains: name__icontains,
+                    mode: 'insensitive'
+                  } 
+                } 
+              }      
+            }
+          },
+          { createdProjects : {
+              some: {
+                name: {
+                  contains: name__icontains,
+                  mode: 'insensitive'
+                } 
+              }
+            }
+          },
+          { contributedProjects : {
+              some: {
+                project: {  
+                  name: {
+                    contains: name__icontains,
+                    mode: 'insensitive'
+                  } 
+                } 
+              }      
+            }
+          }
+        ]
+      }
+    }
+    return {};
+  }
 }
