@@ -50,6 +50,17 @@ export class MemberController {
     );
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
+    const { name__icontains } = request.query;
+    if (name__icontains) {
+      delete builtQuery.where?.name;
+    }
+    builtQuery.where = {
+      AND: [
+        builtQuery.where,
+        this.membersService.buildNameFilters(request),
+        this.membersService.buildRoleFilters(request)
+      ]
+    }
     return this.membersService.findAll(builtQuery);
   }
 
@@ -124,8 +135,4 @@ export class MemberController {
     );
   }
 
-  @Api(server.route.getMemberGitHubProjects)
-  async getGitProjects(@Param('uid') uid) {
-    return await this.membersService.getGitProjects(uid);
-  }
 }
