@@ -43,7 +43,7 @@ export default function Header({ project, userHasEditRights, userHasDeleteRights
             <div className="flex justify-between">
                 <div className="flex gap-[16px]">
                     <div>
-                        <Image src={project.image} alt="project image" width={100} height={108} className="rounded" />
+                        <Image src={project?.isDeleted ? "/assets/images/icons/company-logo-default.svg" : project.image}alt="project image" width={100} height={108} className="rounded" />
                     </div>
                     <div className="flex flex-col gap-1 justify-center">
                         <div className="text-[24px] font-bold flex gap-2">
