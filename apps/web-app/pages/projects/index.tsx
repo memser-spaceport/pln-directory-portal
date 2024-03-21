@@ -103,7 +103,8 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     const allProjects = await getAllProjects(queryParams);
     // const allProjects = await api.get('/v1/projects')
     if (allProjects.status === 200) {
-        projects = ProjectsDataService.getAllFormattedProjects(allProjects.body);
+        const isAdmin = userInfo?.roles && userInfo?.roles.length && userInfo?.roles.includes('DIRECTORYADMIN')
+        projects = ProjectsDataService.getAllFormattedProjects(allProjects.body, isAdmin);
     }
     return {
         props: {

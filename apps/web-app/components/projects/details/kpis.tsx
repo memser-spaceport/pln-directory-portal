@@ -14,10 +14,10 @@ export default function KPIs({ project }) {
                                         <div
                                             key={index}
                                             className={`p-[10px] h-[88px] flex flex-col rounded border border-[#E2E8F0] ${project.kpis.length === 1 ? 'w-1/2 ':'w-full'} justify-center items-center min-w-[163px]`}>
-                                            <div className="text-[24px] font-bold">
+                                            <div className="text-[24px] font-bold truncate max-w-full">
                                                 {kpi.value}
                                             </div>
-                                            <div className="text-[#64748B] text-[13px] leading-[18px] text-center">
+                                            <div className="text-[#64748B] text-[13px] leading-[18px] text-center  truncate max-w-full">
                                                 {kpi.key}
                                             </div>
                                         </div>

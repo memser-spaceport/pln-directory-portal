@@ -46,6 +46,40 @@ export class TeamsService {
         logo: true,
         membershipSources: true,
         technologies: true,
+        maintainingProjects:{
+          orderBy: [
+            {
+              name: 'asc'
+            }
+          ],
+          include: {
+            logo: { select: { url: true, uid: true } },     
+            maintainingTeam: {
+              select: {
+                name: true,
+                logo: { select: { url: true, uid: true } },
+              },
+            },
+            contributingTeams: true
+          }
+        },
+        contributingProjects: {
+          orderBy: [
+            {
+              name: 'asc'
+            }
+          ],
+          include: {
+            logo: { select: { url: true, uid: true } },     
+            maintainingTeam: {
+              select: {
+                name: true,
+                logo: { select: { url: true, uid: true } },
+              },
+            },
+            contributingTeams: true
+          }
+        }
       },
     });
   }

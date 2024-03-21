@@ -15,10 +15,10 @@ datasource db {
 /// TODO: User permissions/grants
 
 model Team {
-  id                   Int                @id @default(autoincrement())
-  uid                  String             @unique @default(cuid())
-  name                 String             @unique
-  logo                 Image?             @relation(fields: [logoUid], references: [uid])
+  id                   Int                  @id @default(autoincrement())
+  uid                  String               @unique @default(cuid())
+  name                 String               @unique
+  logo                 Image?               @relation(fields: [logoUid], references: [uid])
   logoUid              String?
   blog                 String?
   officeHours          String?
@@ -29,19 +29,19 @@ model Team {
   telegramHandler      String?
   shortDescription     String?
   longDescription      String?
-  plnFriend            Boolean            @default(false)
-  airtableRecId        String?            @unique
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  plnFriend            Boolean              @default(false)
+  airtableRecId        String?              @unique
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
   teamMemberRoles      TeamMemberRole[]
   industryTags         IndustryTag[]
   membershipSources    MembershipSource[]
-  fundingStage         FundingStage?      @relation(fields: [fundingStageUid], references: [uid])
+  fundingStage         FundingStage?        @relation(fields: [fundingStageUid], references: [uid])
   fundingStageUid      String?
   technologies         Technology[]
   moreDetails          String?
-  maintainingProjects  Project[]          @relation("maintainingTeam")
-  contributingProjects Project[]          @relation("contributingTeams")
+  maintainingProjects  Project[]            @relation("maintainingTeam")
+  contributingProjects Project[]            @relation("contributingTeams")
 }
 
 model Member {
@@ -72,7 +72,8 @@ model Member {
   memberRoles          MemberRole[]
   preferences          Json?
   projectContributions ProjectContribution[]
-  projects             Project[]
+  createdProjects      Project[]
+  contributedProjects  ProjectContributor[]
 }
 
 model MemberRole {
@@ -207,43 +208,29 @@ model Technology {
 }
 
 model Image {
-  id                  Int                   @id @default(autoincrement())
-  uid                 String                @unique @default(cuid())
-  // The cid is not unique because this id represents an array of multiple images
-  // with different sizes that can be accessed trough the cid and filename
-  cid                 String
-  width               Int
-  height              Int
-  url                 String
-  filename            String
-  size                Int
-  type                String
-  version             ImageSize
-  // This image can be a thumbnail to other image
-  thumbnailToUid      String?
-  thumbnailTo         Image?                @relation("ImageThumbnails", fields: [thumbnailToUid], references: [uid])
-  // This image can have multiple thumbnails
-  thumbnails          Image[]               @relation("ImageThumbnails")
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  // Reverse Relations:
-  Team                Team[]
-  Member              Member[]
-  Project             Project[]
-}
-
-model ProjectContribution {
   id             Int       @id @default(autoincrement())
   uid            String    @unique @default(cuid())
-  role           String?         
-  description    String?
-  currentProject Boolean   @default(false)
-  startDate      DateTime
-  endDate        DateTime?
-  memberUid      String
-  member         Member?   @relation(fields: [memberUid], references: [uid])
-  projectUid     String
-  project        Project?  @relation(fields: [projectUid], references: [uid])
+  // The cid is not unique because this id represents an array of multiple images
+  // with different sizes that can be accessed trough the cid and filename
+  cid            String
+  width          Int
+  height         Int
+  url            String
+  filename       String
+  size           Int
+  type           String
+  version        ImageSize
+  // This image can be a thumbnail to other image
+  thumbnailToUid String?
+  thumbnailTo    Image?    @relation("ImageThumbnails", fields: [thumbnailToUid], references: [uid])
+  // This image can have multiple thumbnails
+  thumbnails     Image[]   @relation("ImageThumbnails")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  // Reverse Relations:
+  Team           Team[]
+  Member         Member[]
+  Project        Project[]
 }
 
 model Faq {
@@ -266,28 +253,52 @@ model JoinRequest {
   updatedAt    DateTime @updatedAt
 }
 
+model ProjectContribution {
+  id             Int       @id @default(autoincrement())
+  uid            String    @unique @default(cuid())
+  role           String?
+  description    String?
+  currentProject Boolean   @default(false)
+  startDate      DateTime
+  endDate        DateTime?
+  memberUid      String
+  member         Member?   @relation(fields: [memberUid], references: [uid])
+  projectUid     String
+  project        Project?  @relation(fields: [projectUid], references: [uid])
+}
+
 model Project {
-  id                  Int                   @id @default(autoincrement())
-  uid                 String                @unique @default(cuid())
-  logo                Image?                @relation(fields: [logoUid], references: [uid])
-  logoUid             String?
-  name                String
-  tagline             String
-  description         String
-  contactEmail        String
-  lookingForFunding   Boolean               @default(false)
-  projectLinks        Json?
-  kpis                Json?
-  readMe              String?
-  creator             Member?               @relation(fields: [createdBy], references: [uid])
-  createdBy           String
-  maintainingTeam     Team?                 @relation("maintainingTeam", fields: [maintainingTeamUid], references: [uid])
-  maintainingTeamUid  String
-  contributingTeams   Team[]                @relation("contributingTeams")
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  projectContributions ProjectContribution[]
-  isDeleted           Boolean               @default(false)
+  id                 Int                   @id @default(autoincrement())
+  uid                String                @unique @default(cuid())
+  logo               Image?                @relation(fields: [logoUid], references: [uid])
+  logoUid            String?
+  name               String
+  tagline            String
+  description        String
+  contactEmail       String?
+  lookingForFunding  Boolean               @default(false)
+  projectLinks       Json?
+  kpis               Json?
+  readMe             String?
+  creator            Member?               @relation(fields: [createdBy], references: [uid])
+  createdBy          String
+  maintainingTeam    Team?                 @relation("maintainingTeam", fields: [maintainingTeamUid], references: [uid])
+  maintainingTeamUid String
+  contributingTeams  Team[]                @relation("contributingTeams")
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  contributions      ProjectContribution[]
+  contributors       ProjectContributor[]
+  isDeleted          Boolean               @default(false)
+}
+
+model ProjectContributor {
+  id         Int      @id @default(autoincrement())
+  uid        String   @unique @default(cuid())
+  project    Project? @relation(fields: [projectUid], references: [uid])
+  projectUid String
+  member     Member?  @relation(fields: [memberUid], references: [uid])
+  memberUid  String
 }
 
 enum ImageSize {

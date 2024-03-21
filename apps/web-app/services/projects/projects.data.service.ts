@@ -1,7 +1,7 @@
 import Cookies from 'js-cookie';
 import KPIs from '../../components/projects/details/kpis';
 /* eslint-disable @typescript-eslint/no-unused-expressions */
-const getAllFormattedProjects = (data) => {
+export const getAllFormattedProjects = (data, isAdmin) => {
     try {
         const formattedArray = [];
         data.forEach(project => {
@@ -15,6 +15,11 @@ const getAllFormattedProjects = (data) => {
                 formattedProject['maintainingTeamName'] = project.maintainingTeam?.name ?? '',
                 formattedProject['maintainingTeamImage'] = project.maintainingTeam?.logo?.url ? project.maintainingTeam?.logo?.url : 'default',
                 formattedProject['fundingNeeded'] = project.lookingForFunding ?? false;
+                formattedProject['isDeleted'] = project.isDeleted ?? false;
+                formattedProject['isMaintainingProject'] = project.isMaintainingProject ?? false;
+                formattedProject['contributingTeams'] = project.contributingTeams ?? [];
+                formattedProject['createdBy'] = project.createdBy ?? '';
+                formattedProject['maintainingTeamUid'] = project.maintainingTeamUid ?? '';
                 formattedArray.push(formattedProject);
             }
         });
@@ -32,21 +37,28 @@ const formatToSave = (inputs, imageUid) => {
         "name": inputs.name,
         "tagline": inputs.tagline,
         "description": inputs.desc,
-        "contactEmail": inputs?.contactEmail,
+        // "contactEmail": inputs?.contactEmail,
         "lookingForFunding": inputs.fundsNeeded,
         "readMe": inputs.readme,
-        "maintainingTeamUid": inputs?.maintainedBy?.value,
+        // "maintainingTeamUid": inputs?.maintainedBy?.value,
+        "maintainingTeamUid": inputs?.maintainedBy?.uid,
     }
 
-    const tempCTeam = [];
-    inputs?.contributingTeams?.map(team=>{
-        const teamObj = {
-            uid:team.value,
-            name:team.label
-        };
-        tempCTeam.push(teamObj);
-    });
-    objectToSave['contributingTeams'] = tempCTeam;
+    if(inputs?.contactEmail){
+        objectToSave['contactEmail'] = inputs?.contactEmail;
+    }else{
+        objectToSave['contactEmail'] = null;
+    }
+
+    // const tempCTeam = [];
+    // inputs?.contributingTeams?.map(team=>{
+    //     const teamObj = {
+    //         uid:team.value,
+    //         name:team.label
+    //     };
+    //     tempCTeam.push(teamObj);
+    // });
+    // objectToSave['contributingTeams'] = tempCTeam;
 
     const tempKpi = [];
     inputs.KPIs.forEach(kpi => {
@@ -87,11 +99,89 @@ const formatToSave = (inputs, imageUid) => {
     
     objectToSave['projectLinks'] = tempProjectlinks;
 
+    let tempCTeam = [];
+    const tempContributors = [];
+
+    // inputs.maintainedByContributors?.forEach(contributor => {
+    //     const contriObj = {
+    //         "type": "MAINTENER",
+    //         "teamUid": inputs?.maintainedBy?.uid,
+    //         "memberUid": contributor.uid
+    //      };
+    //      if(contributor.cuid){
+    //         contriObj['uid'] = contributor.cuid;
+    //     }
+    //     if(contributor.isDeleted){
+    //         contriObj['isDeleted'] = contributor.isDeleted;
+    //     }
+    //      tempContributors.push(contriObj);
+    // });
+
+    // inputs.collabTeamsList?.forEach(collabContributor => {
+    //     const teamObj = {
+    //         uid:collabContributor?.team?.uid,
+    //         name:collabContributor?.team?.name
+    //     };
+    //     tempCTeam.push(teamObj);
+    //     collabContributor?.members?.forEach(mem => {
+    //          const contriObj = {
+    //              "type": "COLLABORATOR",
+    //              "teamUid": collabContributor?.team?.uid,
+    //              // "memberUid": collabContributor.uid
+    //           };
+    //         contriObj['memberUid'] = mem.uid;
+    //         if(mem.cuid){
+    //             contriObj['uid'] = mem.cuid;
+    //         }
+    //         if(mem.isDeleted){
+    //             contriObj['isDeleted'] = mem.isDeleted;
+    //         }
+    //         tempContributors.push(contriObj);
+    //      });
+    // });
+
+    // tempContributors = inputs.contributors?.map(member=>{
+    //     if(!member?.isDeleted){
+    //         return {
+    //             "memberUid":member.uid
+    //         }
+    //     }
+    // });
+
+    inputs.contributors?.forEach((element) => {
+      const tempContri = {};
+      if (!element?.isDeleted) {
+        tempContri['memberUid'] = element.uid;
+        if (element?.cuid) {
+          tempContri['uid'] = element.cuid;
+        }
+        tempContributors.push(tempContri);
+      } else {
+          if (element?.cuid) {
+            tempContri['memberUid'] = element.uid;
+          tempContri['uid'] = element.cuid;
+          tempContri['isDeleted'] = element?.isDeleted
+            ? element?.isDeleted
+            : false;
+            tempContributors.push(tempContri);
+        }
+      }
+    });
+
+    tempCTeam = inputs.contributingTeams?.map((team) => {
+      return {
+        uid: team?.uid,
+        name: team?.name,
+      };
+    });
+    
+    objectToSave['contributingTeams'] = tempCTeam;
+    objectToSave['contributors'] = tempContributors;
     return objectToSave;
 }
 
 const getFormattedProject = (project) => {
-    
+   
     try {
         const formattedProject = {};
         if (project) {
@@ -108,12 +198,33 @@ const getFormattedProject = (project) => {
             formattedProject['teamUid'] = project.maintainingTeamUid;
             formattedProject['maintainingTeam'] = project.maintainingTeam;
             formattedProject['isDeleted'] = project.isDeleted ?? false;
+            // formattedProject['contributors'] = project.contributors ?? null;
+            formattedProject['createdBy'] = project.createdBy ?? null;
+
             
+            const tempContributors = [];
+            project.contributors?.map((mem)=>{
+                const memberObj = {};
+                memberObj['logo'] = mem?.member?.image ? mem?.member?.image?.url : null;
+                const mainTeam = mem?.member?.teamMemberRoles?.filter(teamRoles=>{
+                    return teamRoles?.mainTeam === true;
+                });
+                memberObj['mainTeam'] = mainTeam && mainTeam.length > 0 ? mainTeam[0] : null;
+                memberObj['name'] = mem?.member?.name;
+                const teamLead = mem?.member?.teamMemberRoles.some((team) => team.teamLead);
+                memberObj['teamLead'] =  teamLead,
+                memberObj['teamMemberRoles'] = mem?.member?.teamMemberRoles;
+                memberObj['uid'] = mem?.member?.uid,
+                memberObj['cuid'] = mem?.uid;
+                tempContributors.push(memberObj);
+            });
+            formattedProject['contributors'] = tempContributors;
+
             const tempCTeams = [];
             project.contributingTeams.map(team=>{
                 const teamObj = {};
-                teamObj['value'] = team.uid;
-                teamObj['label'] = team.name;
+                teamObj['uid'] = team.uid;
+                teamObj['name'] = team.name;
                 teamObj['logo'] = team.logo ? team.logo.url : null;
                 tempCTeams.push(teamObj);
             });

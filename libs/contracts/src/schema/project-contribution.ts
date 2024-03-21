@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ProjectContributionSchema = z.object({
+const ProjectContribution = z.object({
   role: z.string(),
   currentProject: z.boolean(),
   startDate: z.string(),
@@ -8,8 +8,9 @@ export const ProjectContributionSchema = z.object({
   description: z.string().optional(),
   projectUid: z.string(),
   uid: z.string().optional()
-}).superRefine((data, ctx) => {
-  
+});
+
+export const ProjectContributionSchema = ProjectContribution.superRefine((data, ctx) => {
   if(!data.currentProject && !data.endDate) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -44,3 +45,5 @@ export const ProjectContributionSchema = z.object({
 
   return z.never;
 });
+
+export const ResponseProjectContributionSchema = ProjectContribution.strict();

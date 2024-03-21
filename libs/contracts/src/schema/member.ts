@@ -5,7 +5,7 @@ import { LocationResponseSchema } from './location';
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseSkillSchema } from './skill';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
-import { ProjectContributionSchema } from './project-contribution';
+import { ProjectContributionSchema, ResponseProjectContributionSchema } from './project-contribution';
 
 export const GitHubRepositorySchema = z.object({
   name: z.string(),
@@ -56,7 +56,8 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   image: ResponseImageWithRelationsSchema.optional(),
   location: LocationResponseSchema.optional(),
   skills: ResponseSkillSchema.array().optional(),
-  teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional()
+  teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
+  projectContributions: ResponseProjectContributionSchema.array().optional()
 });
 
 
