@@ -1,7 +1,8 @@
 import { TMembersFiltersValues } from '@protocol-labs-network/members/data-access';
 import { ParsedUrlQuery } from 'querystring';
-import { getTagsFromValues } from '../../../shared/directory/directory-filters/directory-filters.utils';
+import { getRoleTagsFromValues, getTagsFromValues } from '../../../shared/directory/directory-filters/directory-filters.utils';
 import { IMembersFiltersValues } from './members-directory-filters.types';
+import { ROLES_FILTER_VALUES } from 'apps/web-app/constants';
 
 /**
  * Parse members filter values into each filter component's consumable format
@@ -33,6 +34,10 @@ export function parseMembersFilters(
       filtersValues.valuesByFilter.metroArea,
       filtersValues.availableValuesByFilter.metroArea,
       query.metroArea
+    ),
+    memberRoles: getRoleTagsFromValues(
+      ROLES_FILTER_VALUES,
+      query.memberRoles
     ),
   };
 }
