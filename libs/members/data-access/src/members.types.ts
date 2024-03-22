@@ -17,4 +17,10 @@ export type TMembersFiltersValues = {
   region: string[];
   country: string[];
   metroArea: string[];
+  memberRoles?: string[];
 };
+
+export type TMembersRoleFilterValues = {
+  label: string,
+  value: string
+}

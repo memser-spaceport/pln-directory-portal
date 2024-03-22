@@ -268,3 +268,51 @@ nextjs-portal {
 .no-tailwind,.no-tailwind  *{
   all: revert;
 }
+
+.checkbox {
+  display: inline-flex;
+  cursor: pointer;
+  position: relative;
+}
+
+.checkbox > span {
+  color: #34495E;
+}
+
+.checkbox > input {
+  height: 20px;
+  width: 20px;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  -o-appearance: none;
+  appearance: none;
+  border: 1px solid #CBD5E1;
+  border-radius: 4px;
+  outline: none;
+  transition-duration: 0.3s;
+  background-color: white;
+  cursor: pointer;
+}
+
+.checkbox > input:checked {
+  border: 1px solid blue;
+  background-color: blue;
+}
+
+.checkbox > input:checked + span::before {
+  content: '';
+  display: block;
+  width: 5px; 
+  height: 12px;
+  border-style: solid;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  position: absolute;
+  left: 8px; 
+  top: 3px;
+  color: white;
+}
+
+.checkbox > input:active {
+  border: 2px solid #34495E;
+}

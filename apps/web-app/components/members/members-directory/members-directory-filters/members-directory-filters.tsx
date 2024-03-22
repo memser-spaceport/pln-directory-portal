@@ -7,6 +7,7 @@ import { SkillsFilter } from '../../../../components/members/members-directory/m
 import { DirectoryFilters } from '../../../shared/directory/directory-filters/directory-filters';
 import { FriendOfPLNFilter } from '../../../shared/directory/directory-filters/friend-of-pln-filter/friend-of-pln-filter';
 import { IMembersFiltersValues } from './members-directory-filters.types';
+import { RolesFilter } from './roles-filter/roles-filter';
 
 export interface MembersDirectoryFiltersProps {
   filtersValues: IMembersFiltersValues;
@@ -28,6 +29,8 @@ export function MembersDirectoryFilters({
         {isOpenToWorkEnabled && <OpenToWorkFilter />}
         <FriendOfPLNFilter />
       </div>
+      <div className="my-5 h-px bg-slate-200" />
+      <RolesFilter memberRoles={filtersValues.memberRoles}/>
       <div className="my-5 h-px bg-slate-200" />
       <SkillsFilter skillsTags={filtersValues.skills} />
       <div className="my-5 h-px bg-slate-200" />
