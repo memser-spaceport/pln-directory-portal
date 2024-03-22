@@ -22,6 +22,7 @@ export function getMembersOptionsFromQuery(
     officeHoursOnly,
     includeFriends,
     openToWork,
+    memberRoles,
   } = queryParams;
 
   const sortFromQuery = getSortFromQuery(sort?.toString());
@@ -32,8 +33,8 @@ export function getMembersOptionsFromQuery(
     ...(skills ? { 'skills.title__with': stringifyQueryValues(skills) } : {}),
     ...(region
       ? {
-        'location.continent__with': stringifyQueryValues(region),
-      }
+          'location.continent__with': stringifyQueryValues(region),
+        }
       : {}),
     ...(country
       ? { 'location.country__with': stringifyQueryValues(country) }
@@ -46,6 +47,7 @@ export function getMembersOptionsFromQuery(
     ...(searchBy
       ? { name__icontains: stringifyQueryValues(searchBy).trim() }
       : {}),
+    ...(memberRoles ? { 'memberRoles': stringifyQueryValues(memberRoles) } : {}),
     orderBy: `${sortFromQuery.direction === 'desc' ? '-' : ''}${sortField}`,
   };
 }
@@ -67,7 +69,7 @@ export function getMembersListOptions(
 /**
  * Parse member fields values into a member object.
  **/
-export const parseMember = (member: TMemberResponse,): IMember => {
+export const parseMember = (member: TMemberResponse): IMember => {
   const location = parseMemberLocation(member.location);
   const teams =
     member.teamMemberRoles?.map((teamMemberRole) => ({
@@ -99,26 +101,33 @@ export const parseMember = (member: TMemberResponse,): IMember => {
     openToWork: member.openToWork || false,
     linkedinHandle: member.linkedinHandler || null,
     repositories: member.repositories ?? [],
-    preferences: member.preferences ?? null
+    preferences: member.preferences ?? null,
   };
 };
 
 export function restrictMemberInfo(member) {
-  const disAllowedKeys = ["discordHandle", "email", "githubHandle", "twitter", "repositories", "telegramHandle", "linkedinHandle", "location"];
+  const disAllowedKeys = [
+    'discordHandle',
+    'email',
+    'githubHandle',
+    'twitter',
+    'repositories',
+    'telegramHandle',
+    'linkedinHandle',
+    'location',
+  ];
   const allKeys = Object.keys(member);
-  allKeys.forEach(key => {
-    if(disAllowedKeys.includes(key)) {
+  allKeys.forEach((key) => {
+    if (disAllowedKeys.includes(key)) {
       delete member[key];
     }
-  })
+  });
   return member;
 }
 
 export function maskMemberDetails(member) {
   // Mask Member details when user is not logged In (when accessToken not available in cookie).
-  member.email = member.email
-    ? maskEmail(member.email)
-    : member.email
+  member.email = member.email ? maskEmail(member.email) : member.email;
   member.githubHandle = member.githubHandle
     ? maskText(member.githubHandle)
     : member.githubHandle;
@@ -126,30 +135,31 @@ export function maskMemberDetails(member) {
   member.discordHandle = member.discordHandle
     ? maskText(member.discordHandle)
     : member.discordHandle;
-  member.twitter = member.twitter
-    ? maskText(member.twitter)
-    : member.twitter;
-  return member
+  member.twitter = member.twitter ? maskText(member.twitter) : member.twitter;
+  return member;
 }
 
 export function maskEmail(email: string): string {
-  const maskedEmail = email.replace(/([^@\.])/g, "*").split('');
-  let previous = "";
+  const maskedEmail = email.replace(/([^@\.])/g, '*').split('');
+  let previous = '';
   let counter = 0;
   for (let i = 0; i < maskedEmail.length; i++) {
-    if ((counter > 3 && counter < 6) || counter == 0 || (counter > 1 && (email[i + 1] == "." || email[i + 1] == "@"))) {
+    if (
+      (counter > 3 && counter < 6) ||
+      counter == 0 ||
+      (counter > 1 && (email[i + 1] == '.' || email[i + 1] == '@'))
+    ) {
       maskedEmail[i] = email[i];
     }
-    if (email[i - 1] == "." || email[i - 1] == "@") {
+    if (email[i - 1] == '.' || email[i - 1] == '@') {
       counter = 0;
     }
 
-    if (email[i + 1] == "." || email[i + 1] == "@") {
+    if (email[i + 1] == '.' || email[i + 1] == '@') {
       i++;
       counter = -1;
     }
     counter++;
-
 
     previous = email[i];
   }
@@ -214,7 +224,7 @@ export const parseTeamMember = (
  **/
 export const getMemberFromCookie = (
   res?
-): { isUserLoggedIn: boolean; member?} => {
+): { isUserLoggedIn: boolean; member? } => {
   const { member, refreshToken } = nookies.get(res);
   if (member && member.length) {
     const memberDetails: IMember = JSON.parse(member);
