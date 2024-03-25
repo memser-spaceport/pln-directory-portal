@@ -15,10 +15,10 @@ datasource db {
 /// TODO: User permissions/grants
 
 model Team {
-  id                   Int                  @id @default(autoincrement())
-  uid                  String               @unique @default(cuid())
-  name                 String               @unique
-  logo                 Image?               @relation(fields: [logoUid], references: [uid])
+  id                   Int                @id @default(autoincrement())
+  uid                  String             @unique @default(cuid())
+  name                 String             @unique
+  logo                 Image?             @relation(fields: [logoUid], references: [uid])
   logoUid              String?
   blog                 String?
   officeHours          String?
@@ -29,19 +29,20 @@ model Team {
   telegramHandler      String?
   shortDescription     String?
   longDescription      String?
-  plnFriend            Boolean              @default(false)
-  airtableRecId        String?              @unique
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
+  plnFriend            Boolean            @default(false)
+  airtableRecId        String?            @unique
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
   teamMemberRoles      TeamMemberRole[]
   industryTags         IndustryTag[]
   membershipSources    MembershipSource[]
-  fundingStage         FundingStage?        @relation(fields: [fundingStageUid], references: [uid])
+  fundingStage         FundingStage?      @relation(fields: [fundingStageUid], references: [uid])
   fundingStageUid      String?
   technologies         Technology[]
   moreDetails          String?
-  maintainingProjects  Project[]            @relation("maintainingTeam")
-  contributingProjects Project[]            @relation("contributingTeams")
+  maintainingProjects  Project[]          @relation("maintainingTeam")
+  contributingProjects Project[]          @relation("contributingTeams")
+  focusAreas           FocusArea[]        @relation("teamFocusAreas")
 }
 
 model Member {
@@ -153,7 +154,8 @@ model TeamMemberRole {
   memberUid String
   team      Team      @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
   teamUid   String
-  roleTags  String[]  
+  roleTags  String[]
+
   // One member can only have one role per team
   @@unique([memberUid, teamUid])
 }
@@ -299,6 +301,19 @@ model ProjectContributor {
   projectUid String
   member     Member?  @relation(fields: [memberUid], references: [uid])
   memberUid  String
+}
+
+model FocusArea {
+  id             Int             @id @default(autoincrement())
+  uid            String          @unique @default(cuid())
+  title          String          @unique
+  description    String?  
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  parentUid      String?
+  parent         FocusArea?      @relation("parentAreas", fields: [parentUid], references: [uid])
+  children       FocusArea[]     @relation("parentAreas")
+  teams          Team[]          @relation("teamFocusAreas")
 }
 
 enum ImageSize {
