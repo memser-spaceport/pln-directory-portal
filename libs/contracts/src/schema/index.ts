@@ -14,3 +14,4 @@ export * from './faq';
 export * from './project';
 export * from './project-contribution';
 export * from './join-requests';
+export * from './focus-areas';
