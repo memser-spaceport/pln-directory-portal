@@ -48,6 +48,7 @@ export default function Members({
     'officeHoursOnly',
     'includeFriends',
     'openToWork',
+    'memberRoles',
   ];
 
   useDirectoryFiltersFathomLogger('members', filterProperties);
@@ -112,7 +113,6 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) 
   const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
 
   const optionsFromQuery = getMembersOptionsFromQuery(query);
-  console.log(optionsFromQuery);
 
   const listOptions = getMembersListOptions(optionsFromQuery);
   const [membersResponse, filtersValues] = await Promise.all([
@@ -128,7 +128,6 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) 
     filtersValues,
     query
   );
-
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
