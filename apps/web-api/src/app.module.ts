@@ -32,6 +32,7 @@ import { OtpModule } from './otp/otp.module';
 import { FaqModule } from './faq/faq.module';
 import { ProjectsModule } from './projects/projects.module';
 import { JoinRequestsModule } from './join-requests/join-requests.module';
+import { FocusAreasModule } from './focus-areas/focus-areas.module';
 
 @Module({
   controllers: [AppController],
@@ -79,7 +80,8 @@ import { JoinRequestsModule } from './join-requests/join-requests.module';
     OtpModule,
     FaqModule,
     ProjectsModule,
-    JoinRequestsModule
+    JoinRequestsModule,
+    FocusAreasModule
   ],
   providers: [
     {
