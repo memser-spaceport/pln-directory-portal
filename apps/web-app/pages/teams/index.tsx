@@ -108,12 +108,8 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) =>
   const [teamsResponse, filtersValues, focusAreaResult] = await Promise.all([
     getTeams(listOptions),
     getTeamsFilters(optionsFromQuery, includeFriends.toString()),
-    api.get(`${FILTER_API_ROUTES.FOCUS_AREA}?isPlnFriend=true`),
+    api.get(`${FILTER_API_ROUTES.FOCUS_AREA}?isPlnFriend=${includeFriends}`),
   ]);
-
-  console.log(focusAreaResult.data)
-
- 
 
   const teams: ITeam[] =
     teamsResponse.status === 200
