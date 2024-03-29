@@ -16,6 +16,7 @@ export function getTeamsOptionsFromQuery(queryParams: ParsedUrlQuery) {
     searchBy,
     technology,
     includeFriends,
+    focusAreas,
   } = queryParams;
 
   const sortFromQuery = getSortFromQuery(sort?.toString());
@@ -39,6 +40,7 @@ export function getTeamsOptionsFromQuery(queryParams: ParsedUrlQuery) {
     ...(searchBy
       ? { name__icontains: stringifyQueryValues(searchBy).trim() }
       : {}),
+      ...(focusAreas ? { 'focusAreas': stringifyQueryValues(focusAreas) } : {}),
     orderBy: `${sortFromQuery.direction === 'desc' ? '-' : ''}${sortField}`,
   };
 }
