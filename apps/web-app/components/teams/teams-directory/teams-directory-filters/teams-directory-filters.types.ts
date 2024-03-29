@@ -5,4 +5,5 @@ export interface ITeamsFiltersValues {
   membershipSources: IFilterTag[];
   fundingStage: IFilterTag[];
   technology: IFilterTag[];
+  focusAreas: any;
 }

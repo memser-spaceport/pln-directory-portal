@@ -39,6 +39,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
     'fundingStage',
     'technology',
     'includeFriends',
+    'focusAreas'
   ];
 
   useDirectoryFiltersFathomLogger('teams', filterProperties);
@@ -98,12 +99,12 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) =>
   }
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
   const isUserLoggedIn = cookies?.authToken &&  cookies?.userInfo ? true : false;
-
+  const includeFriends = query?.includeFriends ?? 'false';
   const optionsFromQuery = getTeamsOptionsFromQuery(query);
   const listOptions = getTeamsListOptions(optionsFromQuery);
   const [teamsResponse, filtersValues] = await Promise.all([
     getTeams(listOptions),
-    getTeamsFilters(optionsFromQuery),
+    getTeamsFilters(optionsFromQuery, includeFriends.toString()),
   ]);
 
   const teams: ITeam[] =
