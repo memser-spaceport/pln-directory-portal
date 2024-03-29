@@ -120,7 +120,7 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) =>
     query
   );
 
-  parsedFilters.focusAreas = focusAreaResult.data;
+  parsedFilters.focusAreas = focusAreaResult.data?.filter(item=>item.parentUid === null);
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
