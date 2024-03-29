@@ -10,6 +10,7 @@ export function parseTeamsFilters(
   filtersValues: {
     valuesByFilter: TTeamsFiltersValues;
     availableValuesByFilter: TTeamsFiltersValues;
+    focusAreaFilter: any;
   },
   query: ParsedUrlQuery
 ): ITeamsFiltersValues {
@@ -34,5 +35,6 @@ export function parseTeamsFilters(
       filtersValues.availableValuesByFilter.technology,
       query.technology
     ),
+    focusAreas: filtersValues.focusAreaFilter ?? [],
   };
 }

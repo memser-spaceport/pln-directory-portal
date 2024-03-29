@@ -4,6 +4,9 @@ import {
   TGetRequestOptions,
 } from '@protocol-labs-network/shared/data-access';
 import { TTeamListOptions, TTeamsFiltersValues } from './teams.types';
+import api from "apps/web-app/utils/api"
+import { FILTER_API_ROUTES } from 'apps/web-app/constants';
+import { isNull } from 'lodash';
 
 /**
  * Get teams list from API
@@ -41,38 +44,35 @@ export const getTeamUIDByAirtableId = async (id: string) => {
 /**
  * Get values and available values for teams filters
  */
-export const getTeamsFilters = async (options: TTeamListOptions) => {
-  console.log('calling getTeamsFilters');
-  const [valuesByFilter, availableValuesByFilter] = await Promise.all([
+export const getTeamsFilters = async (options: TTeamListOptions, includeFriends: string) => {
+  const [valuesByFilter, availableValuesByFilter, focusAreaFilterValues] = await Promise.all([
     getTeamsFiltersValues({
       plnFriend: false,
     }),
     getTeamsFiltersValues(options),
+    api.get(`${FILTER_API_ROUTES.FOCUS_AREA}?isPlnFriend=${includeFriends}`)
   ]);
 
-  // console.log(
-  //   'valuesByFilter, availableValuesByFilter>>>>',
-  //   valuesByFilter,
-  //   availableValuesByFilter
-  // );
-
-  if (valuesByFilter.status !== 200 || availableValuesByFilter.status !== 200) {
+  if (valuesByFilter.status !== 200 || availableValuesByFilter.status !== 200 || focusAreaFilterValues.status !== 200) {
     const emptyFilters = {
       tags: [],
       membershipSources: [],
       fundingStage: [],
       technology: [],
+      focusArea: [],
     };
 
     return {
       valuesByFilter: emptyFilters,
       availableValuesByFilter: emptyFilters,
+      focusAreaFilter: emptyFilters
     };
   }
 
   return {
     valuesByFilter: parseTeamsFilters(valuesByFilter.body),
     availableValuesByFilter: parseTeamsFilters(availableValuesByFilter.body),
+    focusAreaFilter: focusAreaFilterValues?.data?.filter((item:any)=> item.parentUid === null)
   };
 };
 

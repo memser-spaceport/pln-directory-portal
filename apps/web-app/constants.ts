@@ -210,6 +210,7 @@ export const APP_ANALYTICS_EVENTS = {
   TEAM_JOIN_NETWORK_FORM_STEPS: 'team-join-network-form-steps',
   TEAM_EDIT_BY_LEAD: 'team-edit-by-lead',
   TEAM_EDIT_BY_ADMIN: 'team-edit-by-admin',
+  TEAM_FOCUS_AREA_HELP_CLICKED: 'team-filter-focus-area-help-clicked',
 
   PR_CONRTIBUTIONS_LIST_ITEM_ADD: 'pr-contributions-list-item-add',
   PR_CONRTIBUTIONS_LIST_ITEM_DELETE: 'pr-contributions-list-item-delete',
@@ -375,3 +376,7 @@ export const ROLES_FILTER_VALUES = [
   {label:'CTO', value: 'CTO'},
   {label:'COO', value: 'COO'}
 ];
+
+export const FILTER_API_ROUTES = {
+  FOCUS_AREA: '/v1/focus-areas'
+}
