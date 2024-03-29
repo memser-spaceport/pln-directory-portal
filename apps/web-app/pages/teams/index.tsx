@@ -22,6 +22,9 @@ import {
   getTeamsOptionsFromQuery,
   parseTeam,
 } from '../../utils/teams.utils';
+import { FILTER_API_ROUTES } from 'apps/web-app/constants';
+import api from 'apps/web-app/utils/api';
+
 
 type TeamsProps = {
   teams: ITeam[];
@@ -102,10 +105,15 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) =>
   const includeFriends = query?.includeFriends ?? 'false';
   const optionsFromQuery = getTeamsOptionsFromQuery(query);
   const listOptions = getTeamsListOptions(optionsFromQuery);
-  const [teamsResponse, filtersValues] = await Promise.all([
+  const [teamsResponse, filtersValues, focusAreaResult] = await Promise.all([
     getTeams(listOptions),
     getTeamsFilters(optionsFromQuery, includeFriends.toString()),
+    api.get(`${FILTER_API_ROUTES.FOCUS_AREA}?isPlnFriend=true`),
   ]);
+
+  console.log(focusAreaResult.data)
+
+ 
 
   const teams: ITeam[] =
     teamsResponse.status === 200
@@ -115,6 +123,8 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) =>
     filtersValues,
     query
   );
+
+  parsedFilters.focusAreas = focusAreaResult.data;
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
