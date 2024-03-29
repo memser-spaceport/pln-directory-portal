@@ -16,7 +16,10 @@ import { useDirectoryFiltersFathomLogger } from '../../hooks/plugins/use-directo
 import { DirectoryLayout } from '../../layouts/directory-layout';
 import { DIRECTORY_SEO } from '../../seo.config';
 import { ITeam } from '../../utils/teams.types';
-import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../utils/services/auth';
+import {
+  renewAndStoreNewAccessToken,
+  convertCookiesToJson,
+} from '../../utils/services/auth';
 import {
   getTeamsListOptions,
   getTeamsOptionsFromQuery,
@@ -25,12 +28,11 @@ import {
 import { FILTER_API_ROUTES } from 'apps/web-app/constants';
 import api from 'apps/web-app/utils/api';
 
-
 type TeamsProps = {
   teams: ITeam[];
   filtersValues: ITeamsFiltersValues;
   isUserLoggedIn: boolean;
-  userInfo: any
+  userInfo: any;
 };
 
 export default function Teams({ teams, filtersValues }: TeamsProps) {
@@ -42,7 +44,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
     'fundingStage',
     'technology',
     'includeFriends',
-    'focusAreas'
+    'focusAreas',
   ];
 
   useDirectoryFiltersFathomLogger('teams', filterProperties);
@@ -51,9 +53,7 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
     <>
       <NextSeo {...DIRECTORY_SEO} title="Teams" />
 
-      <LoadingOverlay
-        excludeUrlFn={(url) => url.startsWith('/teams/')}
-      />
+      <LoadingOverlay excludeUrlFn={(url) => url.startsWith('/teams/')} />
 
       <section className="pl-sidebar flex pt-20">
         <div className="w-sidebar fixed left-0 z-40 h-full flex-shrink-0 border-r border-r-slate-200 bg-white">
@@ -88,12 +88,10 @@ Teams.getLayout = function getLayout(page: ReactElement) {
   return <DirectoryLayout>{page}</DirectoryLayout>;
 };
 
-export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) => {
-  const {
-    query,
-    res,
-    req
-  } = ctx;
+export const getServerSideProps: GetServerSideProps<TeamsProps> = async (
+  ctx
+) => {
+  const { query, res, req } = ctx;
   let cookies = req?.cookies;
   if (!cookies?.authToken) {
     await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
@@ -101,7 +99,7 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) =>
       cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
   }
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
-  const isUserLoggedIn = cookies?.authToken &&  cookies?.userInfo ? true : false;
+  const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
   const includeFriends = query?.includeFriends ?? 'false';
   const optionsFromQuery = getTeamsOptionsFromQuery(query);
   const listOptions = getTeamsListOptions(optionsFromQuery);
@@ -120,7 +118,9 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) =>
     query
   );
 
-  parsedFilters.focusAreas = focusAreaResult.data;
+  parsedFilters.focusAreas = focusAreaResult.data?.filter(
+    (item) => item.parentUid === null
+  );
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
@@ -134,7 +134,7 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) =>
       teams,
       filtersValues: parsedFilters,
       isUserLoggedIn,
-      userInfo
+      userInfo,
     },
   };
 };
