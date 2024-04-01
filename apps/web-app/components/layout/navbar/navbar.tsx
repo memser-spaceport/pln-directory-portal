@@ -16,6 +16,7 @@ import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/pln_lo
 import { PAGE_ROUTES, FATHOM_EVENTS, APP_ANALYTICS_EVENTS, LOGOUT_MSG } from '../../../constants';
 import { createLogoutChannel } from '../../../utils/services/auth';
 import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
+import { HelperMenu } from './helper-menu/helper-menu';
 // import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
@@ -94,6 +95,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
           nonce: undefined,
         }}
       > */}
+      <div  className='flex gap-4 items-center'>
         {isUserLoggedIn ? (
           <div className="flex h-14 w-full justify-end">
             {userInfo.name && (
@@ -120,7 +122,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
             ) : (
               <UserIcon className="h-full w-14 fill-white bg-slate-200 rounded-full" />
             )}
-            <Menu as="div" className="relative w-16">
+            <Menu as="div" className="relative w-auto">
               {({ open }) => (
                 <>
                   <Menu.Button onClick={() => !open} className=" ml-4 h-full w-full">
@@ -167,11 +169,13 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
             </Menu>
           </div>
         ) : (
-          <div className="mr-12 flex justify-center">
+          <div className="flex justify-center">
             <JoinNetworkMenu />
             <Login />
           </div>
         )}
+      <HelperMenu userInfo={userInfo}/>
+        </div>
       {/* </GoogleReCaptchaProvider> */}
     </nav>
   );
