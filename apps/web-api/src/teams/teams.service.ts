@@ -252,4 +252,19 @@ export class TeamsService {
     }
     return result;
   }
+
+  buildFocusAreaFilters(focusAreas) {
+    if (focusAreas?.split(',')?.length > 0) {
+      return {
+        focusAreas: {
+          some: {
+            title: {
+              in: focusAreas.split(',')
+            }
+          }
+        }
+      }
+    }
+    return {};
+  }
 }

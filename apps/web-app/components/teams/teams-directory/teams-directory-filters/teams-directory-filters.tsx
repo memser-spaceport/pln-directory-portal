@@ -3,6 +3,7 @@ import { FriendOfPLNFilter } from '../../../shared/directory/directory-filters/f
 import { FundingStageFilter } from './funding-stage-filter/funding-stage-filter';
 import { MembershipSourcesFilter } from './membership-sources-filter/membership-sources-filter';
 import { TagsFilter } from './tags-filter/tags-filter';
+import { FocusAreaFilter } from './focus-area-filter/focus-area-filter';
 import { ITeamsFiltersValues } from './teams-directory-filters.types';
 import { TechnologyFilter } from './technology-filter/technology-filter';
 
@@ -18,6 +19,8 @@ export function TeamsDirectoryFilters({
   return (
     <DirectoryFilters filterProperties={filterProperties}>
       <FriendOfPLNFilter />
+      <div className="my-5 h-px bg-slate-200" />
+      <FocusAreaFilter focusArea={filtersValues.focusAreas}/>
       <div className="my-5 h-px bg-slate-200" />
       <TagsFilter tagsTags={filtersValues.tags} />
       <div className="my-5 h-px bg-slate-200" />

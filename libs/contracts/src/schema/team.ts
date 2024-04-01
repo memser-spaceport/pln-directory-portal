@@ -50,7 +50,7 @@ export const ResponseTeamWithRelationsSchema = ResponseTeamSchema.extend({
   industryTags: ResponseIndustryTagSchema.array().optional(),
   fundingStage: ResponseFundingStageSchema.optional(),
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
-  technologies: ResponseTechnologySchema.array().optional(),
+  technologies: ResponseTechnologySchema.array().optional()
 });
 
 export const TeamQueryableFields = ResponseTeamSchema.keyof();

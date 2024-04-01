@@ -35,6 +35,13 @@ export class TeamsController {
     );
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
+    const { focusAreas } : any = request.query;
+    builtQuery.where = {
+      AND: [
+        builtQuery.where ? builtQuery.where : {},
+        this.teamsService.buildFocusAreaFilters(focusAreas)
+      ]
+    }
     return this.teamsService.findAll(builtQuery);
   }
 
