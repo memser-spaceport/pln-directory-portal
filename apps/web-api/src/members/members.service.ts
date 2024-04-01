@@ -539,15 +539,6 @@ export class MembersService {
               }      
             }
           },
-          { createdProjects : {
-              some: {
-                name: {
-                  contains: name__icontains,
-                  mode: 'insensitive'
-                } 
-              }
-            }
-          },
           { contributedProjects : {
               some: {
                 project: {  
