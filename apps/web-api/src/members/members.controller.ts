@@ -135,4 +135,9 @@ export class MemberController {
     );
   }
 
+  @Api(server.route.getMemberGitHubProjects)
+  async getGitProjects(@Param('uid') uid) {
+    return await this.membersService.getGitProjects(uid);
+  }
+
 }
