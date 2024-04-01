@@ -172,6 +172,7 @@ export const APP_ANALYTICS_EVENTS = {
 
   NAVBAR_MENU_ITEM_CLICKED: 'navbar-menu-item-clicked',
   NAVBAR_ACCOUNTMENU_ITEM_CLICKED: 'navbar-accountmenu-item-clicked',
+  NAVBAR_GET_HELP_ITEM_CLICKED: 'navbar-get-help-item-clicked',
 
   MEMBER_OFFICEHOURS_CLICKED: 'member-officehours-clicked',
   MEMBER_CLICKED: 'member-clicked',
@@ -371,10 +372,60 @@ export const ANNOUNCEMENT_BANNER = {
 };
 
 export const ROLES_FILTER_VALUES = [
-  {label:'Founder/Co-Founder', value: 'Founder'},
-  {label:'CEO', value: 'CEO'},
-  {label:'CTO', value: 'CTO'},
-  {label:'COO', value: 'COO'}
+  { label: 'Founder/Co-Founder', value: 'Founder' },
+  { label: 'CEO', value: 'CEO' },
+  { label: 'CTO', value: 'CTO' },
+  { label: 'COO', value: 'COO' },
+];
+
+export const ChangeLogList = [
+  {
+    title: "Version 2.0.2 - Filters based on Teams' Focus areas",
+    tag: 'New Feature',
+    date: '29, Mar 2024',
+    shortContent: `<div>
+      <ul style="list-style: disc; font-size: 16px">
+      <li>Added a new filter in Team's page to search teams based on the focus areas/sub focus areas that they contribute to.</li>
+      <li>Teams are categorized into one of these categories-
+      <ul style="list-style: lower-alpha; padding:revert; font-size: 16px; line-height:24px">
+      <li> Digital Human Rights: Building a foundation of freedom and safety in the digital age.</li>
+      <li>Public Goods: Creating more efficient and equitable structures for global progress.</li>
+      <li>Advanced Technologies: Ensuring responsible advancement in AI, AR, VR, BCI, and other emerging fields.</li>
+      <li>Innovation Network: Teams, members, and projects that facilitate collaboration, offer technical and financial support to drive research and development.</li>
+      </ul>
+      </li>
+      </ul></div>`,
+  },
+  {
+    title: 'Version 2.0.1 - Filters based on Member roles',
+    tag: 'New Feature',
+    date: '22, Mar 2024 ',
+    shortContent: `<div>
+      <ul style="list-style: disc; font-size: 16px; line-height:24px;">
+      <li>Added a new filter in Member's page to search members based on their role.</li>
+      <li>Roles that are currently supported in the filter are
+      <ul style="list-style: lower-alpha; padding:revert; font-size: 16px">
+      <li>Founder/Co-Founder</li>
+      <li>CEO</li>
+      <li>CTO</li>
+      <li>COO</li>
+      </ul>
+      </li>
+      </ul></div>`,
+  },
+];
+
+export const tagColors = [
+  {
+    name: 'New Feature',
+    color: '#2ABC76',
+  },
+  {
+    name: 'Improvement',
+    color: '#475569',
+  },
+  { name: 'Beta', color: '#C169D7' },
+  { name: 'Fixed', color: '#4871D9' },
 ];
 
 //API route for filters in home page
