@@ -377,6 +377,7 @@ export const ROLES_FILTER_VALUES = [
   {label:'COO', value: 'COO'}
 ];
 
+//API route for filters in home page
 export const FILTER_API_ROUTES = {
   FOCUS_AREA: '/v1/focus-areas'
 }
