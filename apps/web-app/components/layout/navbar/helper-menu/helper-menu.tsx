@@ -79,7 +79,6 @@ export function HelperMenu(props: IHelperMenu) {
                         height={16}
                         src="/assets/images/icons/changelog.svg"
                         alt="icon"
-                        className="mb-[2px]"
                       />
                       <span className="text-sm text-[#0F172A] ">Changelog</span>
                     </div>
@@ -99,7 +98,7 @@ export function HelperMenu(props: IHelperMenu) {
                       height={16}
                       src="/assets/images/icons/message.svg"
                       alt="icon"
-                      className="mb-[2px] h-4 w-4"
+                      className="h-4 w-4"
                     />
                     <span className="text-sm text-[#0F172A] ">ProtoSphere</span>
                   </a>
