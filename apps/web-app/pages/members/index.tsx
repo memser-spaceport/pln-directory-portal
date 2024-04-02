@@ -74,7 +74,7 @@ export default function Members({
             <DirectoryHeader
               title="Members"
               directoryType="members"
-              searchPlaceholder="Search for a member"
+              searchPlaceholder="Search by Member or Team Name"
               count={members.length}
             />
 
