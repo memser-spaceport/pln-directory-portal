@@ -538,21 +538,10 @@ export class MembersService {
                 } 
               }      
             }
-          },
-          { contributedProjects : {
-              some: {
-                project: {  
-                  name: {
-                    contains: name__icontains,
-                    mode: 'insensitive'
-                  } 
-                } 
-              }      
-            }
           }
         ]
       }
     }
-    return {};
+    return { };
   }
 }
