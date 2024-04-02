@@ -50,9 +50,9 @@ export function HelperMenu(props: IHelperMenu) {
         <>
           <Menu.Button
             onClick={onInfoClick}
-            className="flex h-6 w-6 items-center justify-center rounded-full bg-[#E2E8F0]"
+            className="flex w-6 h-6"
           >
-            <img src="/assets/images/icons/question.svg" />
+            <img  src="/assets/images/icons/question.svg" />
           </Menu.Button>
           <Transition
             as={Fragment}
@@ -75,8 +75,8 @@ export function HelperMenu(props: IHelperMenu) {
                       onClick={onClickChangeLog}
                     >
                       <img
-                        width={13}
-                        height={13}
+                        width={16}
+                        height={16}
                         src="/assets/images/icons/changelog.svg"
                         alt="icon"
                         className="mb-[2px]"
@@ -95,11 +95,11 @@ export function HelperMenu(props: IHelperMenu) {
                     onClick={onForumLinkClick}
                   >
                     <img
-                      width={13}
-                      height={13}
+                      width={16}
+                      height={16}
                       src="/assets/images/icons/message.svg"
                       alt="icon"
-                      className="mb-[2px]"
+                      className="mb-[2px] h-4 w-4"
                     />
                     <span className="text-sm text-[#0F172A] ">ProtoSphere</span>
                   </a>

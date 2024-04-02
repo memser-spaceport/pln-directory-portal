@@ -95,7 +95,8 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
           nonce: undefined,
         }}
       > */}
-      <div  className='flex gap-4 items-center'>
+      <div  className="flex gap-4 items-center">
+        <HelperMenu userInfo={userInfo}/>
         {isUserLoggedIn ? (
           <div className="flex h-14 w-full justify-end">
             {userInfo.name && (
@@ -174,7 +175,6 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
             <Login />
           </div>
         )}
-      <HelperMenu userInfo={userInfo}/>
         </div>
       {/* </GoogleReCaptchaProvider> */}
     </nav>
