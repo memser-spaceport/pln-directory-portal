@@ -7,7 +7,7 @@ export const TeamMemberRoleSchema = z.object({
   mainTeam: z.boolean(),
   teamLead: z.boolean(),
   memberUid: z.string(),
-  teamUid: z.string(),
+  teamUid: z.string()
 });
 
 export const ResponseTeamMemberRoleSchema = TeamMemberRoleSchema.extend({

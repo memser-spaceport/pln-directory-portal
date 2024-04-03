@@ -1,34 +1,34 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class FocusAreasService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(isPlnFriend) {
+  async findAll(query: Prisma.FocusAreaFindManyArgs) {
+    const teamFilter : any = query.where?.teams?.some || {};
     const result = await this.prisma.focusArea.findMany({
       include: {
-        children: this.buildQueryByLevel(5, isPlnFriend), // level denotes depth of children.
+        children: this.buildQueryByLevel(5, teamFilter), // level denotes depth of children.
         teams: {
-          where: isPlnFriend === "true" ?  { } : { plnFriend: false },
-          select: {
-            uid: true
+          where: {
+            ...teamFilter
           }
-        },
+        }
       }
     });
     return result;
   }
 
-  private buildQueryByLevel(level: number, isPlnFriend) {
+  private buildQueryByLevel(level: number, teamFilter) {
     if (level === 0) {
       return {
         include: {
           children: true,
           teams: {
-            where: isPlnFriend === "true" ?  { } : { plnFriend: false },
-            select: {
-              uid: true
+            where: {
+              ...teamFilter
             }
           }
         }
@@ -36,14 +36,27 @@ export class FocusAreasService {
     }
     return {
       include: {
-        children: this.buildQueryByLevel(level - 1, isPlnFriend),
+        children: this.buildQueryByLevel(level - 1, teamFilter),
         teams: {
-          where: isPlnFriend === "true" ?  { } : { plnFriend: false },
-          select: {
-            uid: true
+          where: {
+            ...teamFilter
           }
         }
       }
     };
+  }
+
+  extractSelectedAreas(data, parentUid = null) {
+    const selectedAreas:any = [];
+    const filteredData = data.filter(item => item.parentUid === parentUid);
+    filteredData.forEach((item:any) => {
+      const children = data.filter(child => child.parentUid === item.uid);
+      if (children.length === 0) {
+        selectedAreas.push(item.title);
+      } else {
+        selectedAreas.push(...this.extractSelectedAreas(data, item.uid));
+      }
+    });
+    return selectedAreas;
   }
 }

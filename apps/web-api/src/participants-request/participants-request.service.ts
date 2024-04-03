@@ -26,6 +26,7 @@ import axios from 'axios';
 import { LogService } from '../shared/log.service';
 import { Cache } from 'cache-manager';
 import { DEFAULT_MEMBER_ROLES } from '../utils/constants';
+import { UPDATE, CREATE} from './../utils/constants';
 
 @Injectable()
 export class ParticipantsRequestService {
@@ -816,6 +817,11 @@ export class ParticipantsRequestService {
       };
     }
 
+    // focusAreas Mapping
+    dataToSave['focusAreas'] = {
+      ...await this.connectTeamWithFocusAreas(dataToProcess, CREATE)
+    };
+   
     // Membership Sources Mapping
     dataToSave['membershipSources'] = {
       connect: dataToProcess.membershipSources.map((m) => {
@@ -945,6 +951,10 @@ export class ParticipantsRequestService {
       }),
     };
 
+    // focusAreas Mapping
+    dataToSave['focusAreas'] = {
+      ...await this.connectTeamWithFocusAreas(dataToProcess, UPDATE)
+    };
     if (transactionType === this.prisma) {
       await this.prisma.$transaction(async (tx) => {
         // Update data
@@ -998,6 +1008,37 @@ export class ParticipantsRequestService {
     await this.cacheService.reset()
     await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
+  }
+
+  async connectTeamWithFocusAreas(dataToProcess, type) {
+    let focusAreasToCreate:any = [];
+    if (dataToProcess.focusAreas && dataToProcess.focusAreas.length > 0) {
+      const focusAreaUids: any = [];
+      focusAreasToCreate = dataToProcess.focusAreas.map(area => { 
+        focusAreaUids.push(area.uid);
+        return { uid : area.uid } 
+      });
+      const focusAreas = await this.prisma.focusArea.findMany({
+        where: {
+          uid: {
+            in: focusAreaUids
+          }
+        },
+        select: {
+          parents: true
+        }
+      });
+      focusAreas.map((area: any) => { 
+        area?.parents?.map(parentUid => {
+          focusAreasToCreate.push({ uid: parentUid })
+        });
+      });
+    }
+    return type === CREATE ? {
+      connect: focusAreasToCreate
+    }: {
+      set: focusAreasToCreate
+    };  
   }
 
   generateMemberProfileURL(value) {
