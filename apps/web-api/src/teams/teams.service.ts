@@ -15,13 +15,15 @@ import { FileMigrationService } from '../utils/file-migration/file-migration.ser
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { hashFileName } from '../utils/hashing';
 import { ParticipantRequestTeamSchema } from 'libs/contracts/src/schema/participants-request';
+import { FocusAreasService } from './../focus-areas/focus-areas.service';
 
 @Injectable()
 export class TeamsService {
   constructor(
     private prisma: PrismaService,
     private fileMigrationService: FileMigrationService,
-    private participantsRequestService: ParticipantsRequestService
+    private participantsRequestService: ParticipantsRequestService,
+    private focusAreasService: FocusAreasService
   ) {}
 
   async findAll(queryOptions: Prisma.TeamFindManyArgs) {
@@ -33,11 +35,11 @@ export class TeamsService {
     });
   }
 
-  findOne(
+  async findOne(
     uid: string,
     queryOptions: Omit<Prisma.TeamFindUniqueArgsBase, 'where'> = {}
   ) {
-    return this.prisma.team.findUniqueOrThrow({
+    const team = await this.prisma.team.findUniqueOrThrow({
       where: { uid },
       ...queryOptions,
       include: {
@@ -79,9 +81,12 @@ export class TeamsService {
             },
             contributingTeams: true
           }
-        }
+        },
+        focusAreas: true
       },
     });
+    team.focusAreas = this.focusAreasService.extractSelectedAreas(team.focusAreas);
+    return team;
   }
 
   async insertManyFromAirtable(
