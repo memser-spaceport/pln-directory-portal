@@ -136,6 +136,7 @@ export default function MemberView(props) {
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
+      projectContributions:formValues.projectContributions,
       oldName: name,
     };
     delete formattedData.requestorEmail;
@@ -210,7 +211,7 @@ export default function MemberView(props) {
             imageUrl: image?.url ?? imageUrl,
           },
         };
-        const configuration = {
+                const configuration = {
           headers: {
             authorization: `Bearer ${props.plnadmin}`,
           },
@@ -489,6 +490,7 @@ export const getServerSideProps = async (context) => {
         return { value: item.uid, label: item.title };
       }),
       openToWork: requestData?.openToWork ?? '',
+      projectContributions:requestData?.projectContributions ?? []
     };
     imageUrl = requestData?.imageUrl ?? '';
 
