@@ -38,6 +38,13 @@ export interface Skill {
   title?: string;
 }
 
+interface IProjectContribution {
+  projectUid: string;
+  currentProject: boolean;
+  description: string;
+  role: string;
+}
+
 export interface IFormValues {
   name: string;
   email: string;
@@ -58,4 +65,5 @@ export interface IFormValues {
   teamAndRoles: Roles[];
   skills: Skill[];
   openToWork: boolean;
+  projectContributions: IProjectContribution[];
 }
