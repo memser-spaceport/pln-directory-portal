@@ -40,7 +40,7 @@ const TreeNode = ({
 
   return (
     node.teams?.length > 0 && (
-      <div className="ml-5 w-full">
+      <div className="pl-5 w-full">
         <label
           key={node.title}
           className={`mt-[10px] h-[20px] flex w-full items-center ${
