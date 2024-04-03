@@ -36,6 +36,7 @@ const ProjectFactory = Factory.define<Omit<Project, 'id'>>(
       uid: faker.helpers.slugify(`uid-${name.toLowerCase()}`),
       logoUid: '',
       name: name,
+      score: parseInt(faker.random.numeric(), 10),
       tagline: faker.lorem.words(3),
       description: faker.lorem.paragraph(),
       contactEmail: faker.internet.email().toLowerCase(),
