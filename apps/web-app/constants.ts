@@ -380,6 +380,15 @@ export const ROLES_FILTER_VALUES = [
 
 export const ChangeLogList = [
   {
+    title: 'Version 2.0.3 - Improved Member Search',
+    tag: 'Improvements',
+    date: '03, Apr 2024',
+    shortContent: `<div>
+      <ul style="list-style: disc; font-size: 16px">
+      With this update, in addition to the current capability of searching by member name, this enhancement will allow the members to be searched using a team name as well. Every member of the team would be returned in the search result.
+      </ul></div>`,
+  },
+  {
     title: "Version 2.0.2 - Filters based on Teams' Focus areas",
     tag: 'New Feature',
     date: '29, Mar 2024',
@@ -421,8 +430,8 @@ export const tagColors = [
     color: '#2ABC76',
   },
   {
-    name: 'Improvement',
-    color: '#475569',
+    name: 'Improvements',
+    color: '#35BAE4',
   },
   { name: 'Beta', color: '#C169D7' },
   { name: 'Fixed', color: '#4871D9' },
@@ -430,5 +439,5 @@ export const tagColors = [
 
 //API route for filters in home page
 export const FILTER_API_ROUTES = {
-  FOCUS_AREA: '/v1/focus-areas'
-}
+  FOCUS_AREA: '/v1/focus-areas',
+};
