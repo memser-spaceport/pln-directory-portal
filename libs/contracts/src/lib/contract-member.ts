@@ -19,6 +19,15 @@ export const apiMembers = contract.router({
     },
     summary: 'Get all members',
   },
+  getMemberRoles: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members/roles`,
+    query: MemberQueryParams,
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Get member roles',
+  },
   getMember: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/members/:uid`,
