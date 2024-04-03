@@ -282,6 +282,7 @@ model Project {
   projectLinks       Json?
   kpis               Json?
   readMe             String?
+  score              Int?
   creator            Member?               @relation(fields: [createdBy], references: [uid])
   createdBy          String
   maintainingTeam    Team?                 @relation("maintainingTeam", fields: [maintainingTeamUid], references: [uid])

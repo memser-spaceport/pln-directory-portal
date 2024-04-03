@@ -14,6 +14,7 @@ const ProjectSchema = z.object({
   logoUid: z.string().optional().nullable(),
   name: z.string(),
   tagline: z.string(),
+  score: z.number().optional().nullable(),
   description: z.string(),
   contactEmail: z.string().email().nullish().transform((email)=> {
     return email && email.toLowerCase()
@@ -38,6 +39,6 @@ const ProjectSchema = z.object({
 
 export const ResponseProjectWithRelationsSchema = ProjectSchema.extend({});
 export const ResponseProjectSuccessSchema = z.object({ success: z.boolean()});
-export class UpdateProjectDto extends createZodDto(ProjectSchema.partial()) {}
-export class CreateProjectDto extends createZodDto(ProjectSchema) {}
+export class UpdateProjectDto extends createZodDto(ProjectSchema.partial().omit({ score: true })) {}
+export class CreateProjectDto extends createZodDto(ProjectSchema.omit({ score: true })) {}
 
