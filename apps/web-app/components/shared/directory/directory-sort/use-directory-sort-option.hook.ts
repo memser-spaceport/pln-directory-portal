@@ -1,18 +1,18 @@
 import { useRouter } from 'next/router';
 import { useCallback } from 'react';
-import { DEFAULT_SORT_OPTION } from './directory-sort.constants';
 import {
   directorySortOptions,
   TDirectorySortOption,
 } from './directory-sort.types';
 
-export function useDirectorySortOption() {
+export function useDirectorySortOption(defaultSort) {
   const { query, push, pathname } = useRouter();
   const querySortOption = query.sort as TDirectorySortOption;
+
   const selectedDirectorySortOption: TDirectorySortOption =
     querySortOption && directorySortOptions.includes(querySortOption)
       ? querySortOption
-      : DEFAULT_SORT_OPTION;
+      : defaultSort;
 
   const changeDirectorySortOption = useCallback(
     (sortOption: TDirectorySortOption) => {
@@ -22,7 +22,7 @@ export function useDirectorySortOption() {
         pathname,
         query: {
           ...restQuery,
-          ...(sortOption !== DEFAULT_SORT_OPTION && { sort: sortOption }),
+          ...(sortOption !== defaultSort && { sort: sortOption }),
         },
       });
     },
