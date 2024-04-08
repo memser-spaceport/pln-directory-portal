@@ -32,7 +32,7 @@ export function DirectoryHeader({
       <div className="flex items-center space-x-4">
         <DirectorySearch onSearch={onSearch} placeholder={searchPlaceholder} />
         <span className="h-6 w-px bg-slate-300" />
-        <DirectorySort />
+        <DirectorySort directoryType= {directoryType}/>
         <DirectoryView directoryType={directoryType} />
       </div>
     </div>
