@@ -39,6 +39,7 @@ const ProjectSchema = z.object({
 
 export const ResponseProjectWithRelationsSchema = ProjectSchema.extend({});
 export const ResponseProjectSuccessSchema = z.object({ success: z.boolean()});
+// omit score to avoid update from request
 export class UpdateProjectDto extends createZodDto(ProjectSchema.partial().omit({ score: true })) {}
 export class CreateProjectDto extends createZodDto(ProjectSchema.omit({ score: true })) {}
 
