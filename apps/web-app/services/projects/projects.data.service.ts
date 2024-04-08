@@ -20,6 +20,7 @@ export const getAllFormattedProjects = (data, isAdmin) => {
                 formattedProject['contributingTeams'] = project.contributingTeams ?? [];
                 formattedProject['createdBy'] = project.createdBy ?? '';
                 formattedProject['maintainingTeamUid'] = project.maintainingTeamUid ?? '';
+                formattedProject['score'] = project.score ?? null;
                 formattedArray.push(formattedProject);
             }
         });
@@ -200,6 +201,7 @@ const getFormattedProject = (project) => {
             formattedProject['isDeleted'] = project.isDeleted ?? false;
             // formattedProject['contributors'] = project.contributors ?? null;
             formattedProject['createdBy'] = project.createdBy ?? null;
+            formattedProject['score'] = project.score ?? null;
 
             
             const tempContributors = [];

@@ -262,6 +262,8 @@ export const APP_ANALYTICS_EVENTS = {
   PROJECT_EDIT_SAVE_FAIL: 'project-edit-save-fail',
   PROJECT_ADD_CLICKED: 'project-add-click',
   TEAMS_DETAIL_PROJECTS_SEE_ALL: 'team-detail-projects-see-all-clicked',
+
+  DIRECTORY_LIST_SORTBY_CHANGED: 'directory-list-sortby-changed',
 };
 
 export const TAB_CONSTANTS = {
