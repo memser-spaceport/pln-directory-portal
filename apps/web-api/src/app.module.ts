@@ -33,6 +33,7 @@ import { FaqModule } from './faq/faq.module';
 import { ProjectsModule } from './projects/projects.module';
 import { JoinRequestsModule } from './join-requests/join-requests.module';
 import { FocusAreasModule } from './focus-areas/focus-areas.module';
+import { PLEventsModule } from './pl-events/pl-events.module';
 
 @Module({
   controllers: [AppController],
@@ -81,7 +82,8 @@ import { FocusAreasModule } from './focus-areas/focus-areas.module';
     FaqModule,
     ProjectsModule,
     JoinRequestsModule,
-    FocusAreasModule
+    FocusAreasModule,
+    PLEventsModule
   ],
   providers: [
     {
