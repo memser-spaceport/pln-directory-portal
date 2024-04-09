@@ -27,3 +27,12 @@ export const isEmails = (emails: string[]) => {
   }
   return isValid;
 }
+
+export const slugify = (name: string) => {
+  return name.toLowerCase()                   // Convert the name to lowercase
+    .replace(/\s+/g, '-')            // Replace spaces with hyphens
+    .replace(/[^\w-]+/g, '')         // Remove non-word characters
+    .replace(/--+/g, '-')            // Replace multiple hyphens with single hyphen
+    .replace(/^-+/, '')              // Trim hyphens from start of string
+    .replace(/-+$/, '');             // Trim hyphens from end of string
+}
