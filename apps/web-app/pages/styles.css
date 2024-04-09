@@ -417,3 +417,7 @@ nextjs-portal {
   } 
   
 }
+
+#md-editor-rt-preview {
+  word-break: break-word;
+}

@@ -66,12 +66,13 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
         res,
         req
     } = ctx;
-    let cookies = req?.cookies;
+        let cookies = req?.cookies;
 
     const queryParams = {
-        orderBy:'name',
+        orderBy:'score,name',
         pagination: false
     };
+
     if(query){
         if(query?.FUNDING){
             queryParams['lookingForFunding'] = query?.FUNDING === 'true';
@@ -81,6 +82,9 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
         }
         if(query?.sort && query.sort === 'Name,desc'){
             queryParams['orderBy'] = '-name'
+        }
+        if(query?.sort && query.sort === 'Name,asc'){
+            queryParams['orderBy'] = 'name'
         }
         if(query?.searchBy){
             queryParams['name__icontains'] = query?.searchBy;
