@@ -26,7 +26,6 @@ import axios from 'axios';
 import { LogService } from '../shared/log.service';
 import { Cache } from 'cache-manager';
 import { DEFAULT_MEMBER_ROLES } from '../utils/constants';
-import { UPDATE, CREATE} from './../utils/constants';
 
 @Injectable()
 export class ParticipantsRequestService {
@@ -818,8 +817,8 @@ export class ParticipantsRequestService {
     }
 
     // focusAreas Mapping
-    dataToSave['focusAreas'] = {
-      ...await this.connectTeamWithFocusAreas(dataToProcess, CREATE)
+    dataToSave['teamFocusAreas'] = {
+      ...await this.createTeamWithFocusAreas(dataToProcess)
     };
    
     // Membership Sources Mapping
@@ -952,8 +951,8 @@ export class ParticipantsRequestService {
     };
 
     // focusAreas Mapping
-    dataToSave['focusAreas'] = {
-      ...await this.connectTeamWithFocusAreas(dataToProcess, UPDATE)
+    dataToSave['teamFocusAreas'] = {
+      ...await this.updateTeamWithFocusAreas(dataFromDB.referenceUid, dataToProcess)
     };
     if (transactionType === this.prisma) {
       await this.prisma.$transaction(async (tx) => {
@@ -1010,37 +1009,55 @@ export class ParticipantsRequestService {
     return { code: 1, message: 'Success' };
   }
 
-  async connectTeamWithFocusAreas(dataToProcess, type) {
-    let focusAreasToCreate:any = [];
+  async createTeamWithFocusAreas(dataToProcess) {
     if (dataToProcess.focusAreas && dataToProcess.focusAreas.length > 0) {
-      const focusAreaUids: any = [];
-      focusAreasToCreate = dataToProcess.focusAreas.map(area => { 
-        focusAreaUids.push(area.uid);
-        return { uid : area.uid } 
-      });
-      const focusAreas = await this.prisma.focusArea.findMany({
+      let teamFocusAreas:any = [];
+      const focusAreaHierarchies = await this.prisma.focusAreaHierarchy.findMany({
         where: {
-          uid: {
-            in: focusAreaUids
+          subFocusAreaUid: {
+            in: dataToProcess.focusAreas.map(area => area.uid)
           }
-        },
-        select: {
-          parents: true
         }
       });
-      focusAreas.map((area: any) => { 
-        area?.parents?.map(parentUid => {
-          focusAreasToCreate.push({ uid: parentUid })
+      focusAreaHierarchies.map(areaHierarchy => {
+        teamFocusAreas.push({
+          focusAreaUid: areaHierarchy.subFocusAreaUid,
+          ancestorAreaUid: areaHierarchy.focusAreaUid
         });
       });
+      dataToProcess.focusAreas.map(area => {
+        teamFocusAreas.push({
+          focusAreaUid: area.uid,
+          ancestorAreaUid: area.uid
+        });
+      });
+      return {
+        createMany: {
+          data: teamFocusAreas
+        }
+      }
     }
-    return type === CREATE ? {
-      connect: focusAreasToCreate
-    }: {
-      set: focusAreasToCreate
-    };  
+    return {};
   }
 
+  async updateTeamWithFocusAreas(teamId, dataToProcess) {
+    if (dataToProcess.focusAreas && dataToProcess.focusAreas.length > 0) {
+      await this.prisma.teamFocusArea.deleteMany({
+        where: {
+          teamUid: teamId
+        }
+      });
+      return await this.createTeamWithFocusAreas(dataToProcess)
+    } else {
+      await this.prisma.teamFocusArea.deleteMany({
+        where: {
+          teamUid: teamId
+        }
+      });
+    }
+    return {};
+  }
+  
   generateMemberProfileURL(value) {
     return generateProfileURL(value);
   }
