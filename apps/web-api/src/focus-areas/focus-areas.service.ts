@@ -1,19 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
-import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class FocusAreasService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(query: Prisma.FocusAreaFindManyArgs) {
-    const teamFilter : any = query.where?.teams?.some || {};
+  async findAll(query: any) {
+    const teamFilter = query.where?.team || {};
     const result = await this.prisma.focusArea.findMany({
       include: {
         children: this.buildQueryByLevel(5, teamFilter), // level denotes depth of children.
-        teams: {
+        teamAncestorFocusAreas: {
           where: {
-            ...teamFilter
+            team: {
+              ...teamFilter
+            }
           }
         }
       }
@@ -26,9 +27,11 @@ export class FocusAreasService {
       return {
         include: {
           children: true,
-          teams: {
+          teamAncestorFocusAreas: {
             where: {
-              ...teamFilter
+              team: {
+                ...teamFilter
+              }
             }
           }
         }
@@ -37,26 +40,24 @@ export class FocusAreasService {
     return {
       include: {
         children: this.buildQueryByLevel(level - 1, teamFilter),
-        teams: {
+        teamAncestorFocusAreas: {
           where: {
-            ...teamFilter
+            team: {
+              ...teamFilter
+            }
           }
         }
       }
     };
   }
 
-  extractSelectedAreas(data, parentUid = null) {
-    const selectedAreas:any = [];
-    const filteredData = data.filter(item => item.parentUid === parentUid);
-    filteredData.forEach((item:any) => {
-      const children = data.filter(child => child.parentUid === item.uid);
-      if (children.length === 0) {
-        selectedAreas.push(item.title);
-      } else {
-        selectedAreas.push(...this.extractSelectedAreas(data, item.uid));
-      }
+  removeDuplicateFocusAreas(focusAreas): any {
+    const uniqueFocusAreas = {};
+    focusAreas.forEach(item => {
+        const uid = item.focusArea.uid;
+        const title = item.focusArea.title;
+        uniqueFocusAreas[uid] = { uid, title };
     });
-    return selectedAreas;
+    return Object.values(uniqueFocusAreas);
   }
 }

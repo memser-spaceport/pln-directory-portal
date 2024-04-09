@@ -82,10 +82,19 @@ export class TeamsService {
             contributingTeams: true
           }
         },
-        focusAreas: true
+        teamFocusAreas: {
+          select: {
+            focusArea: {
+              select: { 
+                uid: true,
+                title: true 
+              }
+            }
+          }
+        }
       },
     });
-    team.focusAreas = this.focusAreasService.extractSelectedAreas(team.focusAreas);
+    team.teamFocusAreas = this.focusAreasService.removeDuplicateFocusAreas(team.teamFocusAreas);
     return team;
   }
 
@@ -261,10 +270,12 @@ export class TeamsService {
   buildFocusAreaFilters(focusAreas) {
     if (focusAreas?.split(',')?.length > 0) {
       return {
-        focusAreas: {
+        teamFocusAreas: {
           some: {
-            title: {
-              in: focusAreas.split(',')
+            focusArea:{
+              title: {
+                in: focusAreas?.split(',')
+              }
             }
           }
         }
