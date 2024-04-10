@@ -25,25 +25,23 @@ export class UserAuthValidateGuard implements CanActivate {
 
     try {
       const validationResult: any = await axios.post(
-        `${process.env.AUTH_API_URL}/auth/validate`,
+        `${process.env.AUTH_API_URL}/auth/introspect`,
         { token: token }
       );
-
-      if (!validationResult?.data?.isTokenValid && request.method !== 'GET') {
-        throw new UnauthorizedException();
-      }
-
-      if (validationResult?.data?.isTokenValid) {
+      if (
+        validationResult?.data?.active &&
+        validationResult?.data?.email
+      ) {
         request['isUserLoggedIn'] = true;
       }
+
+      if (!validationResult?.data?.active && request.method !== 'GET') {
+        throw new UnauthorizedException();
+      }
     } catch (error) {
-      if (error?.response?.data?.message && error?.response?.status) {
-        throw new HttpException(
-          error?.response?.data?.message,
-          error?.response?.status
-        );
-      } else if (error?.response?.message && error?.status) {
-        throw new HttpException(error?.response?.message, error?.status);
+      if ( error instanceof UnauthorizedException || error?.response?.status === 400
+        || error?.response?.status === 401) {
+        throw new UnauthorizedException('Invalid Session. Please login and try again');
       }
       throw new InternalServerErrorException('Unexpected Error');
     }
