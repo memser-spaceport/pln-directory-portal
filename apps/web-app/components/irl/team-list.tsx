@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const TeamList = (props: any) => {
   const items = props?.items ?? [];
   const onLogin = props.onLogin
@@ -9,7 +11,9 @@ const TeamList = (props: any) => {
            <div className="bg-gray-200 h-[32px] w-[32px]">
            {item?.teamLogo && <img src={item.teamLogo}   className="bg-gray-200 h-[32px] w-[32px]"/>}
            </div>
-             <p className="text-clamp flex-1 break-words">{item.teamName}</p>
+             <Link href={`/teams/${item.teamUid}`}>
+             <a target="_blank" className="text-clamp flex-1 break-words">{item.teamName}</a>
+             </Link>
           </div>
           <div className="hidden lg:flex gap-[4px] w-[180px] items-center justify-start">
              <div className="bg-gray-200 h-[32px] w-[32px] rounded-[58px]"></div>
