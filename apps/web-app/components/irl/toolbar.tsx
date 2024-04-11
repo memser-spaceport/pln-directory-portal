@@ -13,6 +13,7 @@ const Toolbar = (props: any) => {
   );
 
   const [updatedUser, setUpdatedUser] = useState(registeredGuest);
+  const [allGuest, setAllGuest] = useState(eventDetails.guests)
 
   const [isOpen, setIsOpen] = useState(false);
 
@@ -31,7 +32,7 @@ const Toolbar = (props: any) => {
       const registeredGuest = eventDetails.guests.find(
         (guest) => guest.memberUid === userInfo.uid
       );
-      console.log(registeredGuest)
+      setAllGuest(eventDetails.guests);
       setUpdatedUser(registeredGuest);
     };
     document.addEventListener('updateGuests', handler);
@@ -43,11 +44,12 @@ const Toolbar = (props: any) => {
   return (
     <>
       <div className="flex w-[100%] flex-col justify-between lg:flex-row">
-        <p className="pb-[4px] text-[18px] font-[700] lg:pb-0 lg:text-[20px]">{`Guest List (${eventDetails.guests.length})`}</p>
+        <p className="pb-[4px] text-[18px] font-[700] lg:pb-0 lg:text-[20px]">{`Guest List (${allGuest.length})`}</p>
         <div className="flex flex-wrap gap-[8px]">
           <a
             href={eventDetails.telegram}
             target="_blank"
+             rel="noreferrer"
             className="flex cursor-pointer items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-white p-[10px]  text-[14px] font-[500] text-[#156FF7] lg:px-[24px] lg:py-[10px]"
           >
             <img

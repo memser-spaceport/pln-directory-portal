@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 const MemberList = (props: any) => {
@@ -53,9 +54,11 @@ const MemberList = (props: any) => {
                   />
                 )}
               </div>
-              <p title={item.memberName} className="text-clamp flex-1 break-words pr-[3px]">
+              <Link href={`/members/${item.memberUid}`}>
+              <a target='_blank' title={item.memberName} className="text-clamp flex-1 break-words pr-[3px]">
                 {item.memberName}
-              </p>
+              </a>
+              </Link>
             </div>
             <div className="flex w-[200px] items-center justify-start gap-[4px]">
               <div className="h-[32px] w-[32px] bg-gray-200">
@@ -67,9 +70,11 @@ const MemberList = (props: any) => {
                   />
                 )}
               </div>
-              <p title={item.teamName} className="text-clamp flex-1 break-words pr-[2px]">
+              <Link href={`/teams/${item.teamUid}`}>
+              <a target='_blank' title={item.teamName} className="text-clamp flex-1 break-words pr-[2px]">
                 {item.teamName}
-              </p>
+              </a>
+              </Link>
             </div>
             <div className="flex w-[150px] items-center justify-start">
               <p className="text-clamp break-words pr-[2px]">

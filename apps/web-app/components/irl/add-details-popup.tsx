@@ -81,7 +81,7 @@ const AddDetailsPopup = (props: any) => {
       await getEventDetails();
       onClose();
       setIsLoader(false);
-      toast.success('Guest Updated Successfully');
+      toast.success('Your details has been updated successfully');
     }
   };
 
@@ -94,11 +94,11 @@ const AddDetailsPopup = (props: any) => {
     };
     const response = await createEventGuest(eventDetails?.slugUrl, payload);
     if (response.status === 201) {
-      router.push('/irl/labweek-24pgf', undefined, { scroll: false });
+      // router.push('/irl/labweek-24pgf', undefined, { scroll: false });
       await getEventDetails();
       onClose();
       setIsLoader(false);
-      toast.success('Guest Added Successfully');
+      toast.success('Your details has been added successfully');
     }
   };
 
@@ -200,13 +200,13 @@ const AddDetailsPopup = (props: any) => {
                         placeholder="Enter details here"
                         className="placeholder:text-[500] h-[80px] w-full resize-none rounded-lg border border-[#CBD5E1] px-2 py-3 text-sm font-[500] leading-6 text-[#475569] placeholder:text-sm placeholder:leading-6 placeholder:text-[#475569] placeholder:opacity-40 focus:outline-none"
                       />
-                      {formValues.reason.length >= 100 ? (
+                      {formValues?.reason?.length >= 100 ? (
                         <span className="text-[13px] leading-[18px] text-red-500">
                           Character limit reached
                         </span>
                       ) : (
                         <span className="text-[13px] leading-[18px] text-[#0F172A]">
-                          {100 - formValues.reason.length} characters remaining
+                          {100 - formValues?.reason?.length} characters remaining
                         </span>
                       )}
                     </div>
