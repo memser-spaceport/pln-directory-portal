@@ -264,6 +264,19 @@ export const APP_ANALYTICS_EVENTS = {
   TEAMS_DETAIL_PROJECTS_SEE_ALL: 'team-detail-projects-see-all-clicked',
 
   DIRECTORY_LIST_SORTBY_CHANGED: 'directory-list-sortby-changed',
+
+  IRL_HEADER_REQUEST_TO_ACCESS_BTN_CLICKED:'irl-header-request-to-access-btn-clicked',
+  IRL_GUEST_LIST_HEADER_TELEGRAM_BTN_CLICKED:'irl-guest-list-header-telegram-btn-clicked',
+  IRL_GUEST_LIST_HEADER_VIEW_SCHEDULE_BTN_CLICKED:"irl-guest-list-header-view-schedule-btn-clicked",
+  IRL_GUEST_LIST_HEADER_LOGIN_BTN_CLICKED:'irl-guest-list-header-login-btn-clicked',
+  IRL_GUEST_LIST_HEADER_IAM_GOING_BTN_CLICKED:"irl-guest-list-header-iam-btn-clicked",
+  IRL_GUEST_LIST_HEADER_EDIT_RESPONSE_BTN_CLICKED:"irl-guest-list-header-edit-response-btn-clicked",
+  IRL_GUEST_LIST_TABLE_LOGIN_BTN_CLICKED:"irl-guest-list-table-login-btn-clicked",
+  IRL_GUEST_LIST_TABLE_TEAM_CLICKED:"irl-guest-list-table-team-clicked",
+  IRL_GUEST_LIST_TABLE_MEMBER_CLICKED:"irl-guest-list-member-clicked",
+  IRL_GUEST_LIST_TABLE_TELEGRAM_LINK_CLICKED:'irl-guest-list-table-telegram-link-clicked',
+  IRL_RSVP_POPUP_SAVE_BTN_CLICKED:'irl-rsvp-popup-save-btn-clicked',
+  IRL_RSVP_POPUP_EDIT_BTN_CLICKED:'irl-rsvp-popup-edit-btn-clicked',
 };
 
 export const TAB_CONSTANTS = {

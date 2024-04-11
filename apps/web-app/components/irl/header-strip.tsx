@@ -1,26 +1,21 @@
 import { useState } from 'react';
-import JoinInfoPopup from './join-info-popup';
+import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
+import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
 
 function HeaderStrip(props) {
   const onJoin = props.onJoin;
-  const [isLoading, setIsLoading] = useState(false);
+  const analytics = useAppAnalytics();
 
-  const [url, setUrl] = useState('');
-
-  const onClose = () => {
-    setUrl('');
-  };
-
-  const onOpen = () => {
-    setUrl(
-      'https://airtable.com/embed/appELZxScIpW1f8Fd/shrkNpd5j4I1iF02C?backgroundColor=blueDusty'
+  const onNavigate = () => {
+    analytics.captureEvent(
+      APP_ANALYTICS_EVENTS.IRL_HEADER_REQUEST_TO_ACCESS_BTN_CLICKED,
+      {
+        url: 'https://airtable.com/embed/appHT5ErKdHcsFznj/pagndJEJUpSoMD6LM/form',
+      }
     );
-    setIsLoading(true);
+    window.open('https://airtable.com/embed/appHT5ErKdHcsFznj/pagndJEJUpSoMD6LM/form', '_blank');
   };
 
-  const handleLoad = () => {
-    setIsLoading(false);
-  };
 
   return (
     <>
@@ -30,23 +25,15 @@ function HeaderStrip(props) {
             className="mr-[4px] -mt-[2px] inline"
             src="/assets/images/icons/info.svg"
           />
-          Joining this event but not in the network?
+          Joining this event but you aren&apos;t a network member yet?{` `}
           <button
-            onClick={onOpen}
+            onClick={onNavigate}
             className="ml-[4px] rounded-[8px] bg-white px-[10px] py-[6px] text-[14px] font-[500]"
           >
-           Request to access
+            Request To Access
           </button>
         </div>
       </div>
-      {url && (
-        <JoinInfoPopup
-          isLoading={isLoading}
-          handleLoad={handleLoad}
-          url={url}
-          onClose={onClose}
-        />
-      )}
     </>
   );
 }
