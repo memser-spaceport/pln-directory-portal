@@ -1,3 +1,6 @@
+import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
+import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
+import { getUserInfo } from 'apps/web-app/utils/shared.utils';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -5,7 +8,42 @@ const MemberList = (props: any) => {
   const items = props?.items ?? [];
   const userInfo = props?.userInfo;
 
+  const analytics = useAppAnalytics();
+  const user = getUserInfo();
   const [guests, setGuests] = useState(items);
+
+  const onTeamClick = (teamUid: string, teamName: string) => {
+    analytics.captureEvent(
+      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_TEAM_CLICKED,
+      {
+        teamUid,
+        teamName,
+        user,
+      }
+    );
+  };
+
+  const onMemberClick = (memberUid: string, memberName: string) => {
+    analytics.captureEvent(
+      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_TELEGRAM_LINK_CLICKED,
+      {
+        memberUid,
+        memberName,
+        user,
+      }
+    );
+  };
+
+  const onTelegramClick = (telegramUrl: string) => {
+    analytics.captureEvent(
+      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_TELEGRAM_LINK_CLICKED,
+      {
+        telegramUrl,
+        user,
+      }
+    );
+  };
+
   useEffect(() => {
     const handler = (e: any) => {
       const eventDetails = e.detail.eventDetails;
@@ -55,9 +93,16 @@ const MemberList = (props: any) => {
                 )}
               </div>
               <Link href={`/members/${item.memberUid}`}>
-              <a target='_blank' title={item.memberName} className="text-clamp flex-1 break-words pr-[3px]">
-                {item.memberName}
-              </a>
+                <a
+                  target="_blank"
+                  title={item.memberName}
+                  className="text-clamp flex-1 break-words pr-[3px]"
+                  onClick={() =>
+                    onMemberClick(item?.memberUid, item?.memberName)
+                  }
+                >
+                  {item.memberName}
+                </a>
               </Link>
             </div>
             <div className="flex w-[200px] items-center justify-start gap-[4px]">
@@ -71,15 +116,30 @@ const MemberList = (props: any) => {
                 )}
               </div>
               <Link href={`/teams/${item.teamUid}`}>
-              <a target='_blank' title={item.teamName} className="text-clamp flex-1 break-words pr-[2px]">
-                {item.teamName}
-              </a>
+                <a
+                  target="_blank"
+                  title={item.teamName}
+                  className="text-clamp flex-1 break-words pr-[2px]"
+                  onClick={() => onTeamClick(item?.teamUid, item?.teamName)}
+                >
+                  {item.teamName}
+                </a>
               </Link>
             </div>
             <div className="flex w-[150px] items-center justify-start">
-              <p className="text-clamp break-words pr-[2px]">
+              {/* <p className="text-clamp break-words pr-[2px]">
                 {item.telegramId}
-              </p>
+              </p> */}
+              <Link href={`https://t.me/${item.telegramId}`}>
+                <a
+                  target="_blank"
+                  title={item.telegramId}
+                  className="text-clamp flex-1 break-words pr-[2px]"
+                  onClick={() => onTelegramClick(`https://t.me/${item.telegramId}`)}
+                >
+                  {item.telegramId}
+                </a>
+              </Link>
             </div>
             <div className="flex w-[330px] items-center justify-start pr-[20px]">
               <p className="text-clamp break-words">{item.reason}</p>
