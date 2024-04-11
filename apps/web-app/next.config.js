@@ -109,6 +109,11 @@ let nextConfig = {
         destination: 'https://events.plnetwork.io/',
         permanent: false,
       },
+      {
+        source: '/irl',
+        destination: '/irl/labweek-24pg',
+        permanent: false,
+      },
     ];
   },
 };

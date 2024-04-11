@@ -14,7 +14,7 @@ interface IMenuItem {
   version: string;
 }
 
-export function Menu() {
+export function MobileMenu() {
   const MENU_ITEMS: IMenuItem[] = [
     {
       icon: UserGroupIcon,
@@ -52,7 +52,7 @@ export function Menu() {
   };
 
   return (
-    <ul className="flex space-x-4 text-sm text-gray-700">
+    <ul className="flex justify-between w-full text-sm text-gray-700">
       {MENU_ITEMS.map((item) => {
         const Icon = item.icon;
 
@@ -60,33 +60,30 @@ export function Menu() {
           <li key={item.path}>
             <Link href={item.path}>
               <a
-                className={`on-focus group flex items-center rounded-lg px-3 py-2.5 text-sm hover:text-slate-900 focus:text-slate-900 ${
+                className={`on-focus group flex flex-col items-center rounded-lg px-3 py-2.5 text-sm hover:text-slate-900 focus:text-slate-900 ${
                   router.asPath.includes(item.path)
-                    ? 'bg-slate-100 text-slate-900'
+                    ? 'bg-slate-200 text-slate-900'
                     : 'text-slate-600'
                 }`}
                 onClick={(e) => onMenuItemClicked(item.name)}
               >
                 <Icon
                   data-testid={`${item.name}-icon`}
-                  className={`mr-2 h-5 w-5 group-hover:fill-slate-900 ${
+                  className={` h-5 w-5 group-hover:fill-slate-900 ${
                     router.asPath.includes(item.path)
                       ? 'fill-slate-900'
                       : 'fill-slate-600'
                   }`}
                 />
-                {item.name}
+                <span className='text-[8px]'>{item.name}</span>
 
-                {item.version === 'BETA' && (
-                  <div className=" ml-[8px] flex h-[16px] w-[34px] items-center justify-center rounded-[2px] bg-gradient-to-br from-blue-500 to-teal-500 text-[10px] font-[500] text-white">
-                    Beta
-                  </div>
-                )}
+               
               </a>
             </Link>
           </li>
         );
       })}
+      
     </ul>
   );
 }
