@@ -1,6 +1,21 @@
+import { useEffect, useState } from "react";
+
 const Banner = (props: any) => {
   const eventCount = props?.eventCount;
   const peopleCount = props?.peopleCount;
+
+  const [memberCount, setMemberCount] = useState(peopleCount);
+  useEffect(() => {
+    const handler = (e: any) => {
+      const eventDetails = e.detail.eventDetails;
+      setMemberCount(eventDetails?.guests?.length ?? 0);
+    };
+    document.addEventListener('updateGuests', handler);
+    return () => {
+      document.removeEventListener('updateGuests', handler);
+    };
+  }, []);
+
   return (
     <div className="p-[20px]">
       <div className="h-[153px] w-[100%] rounded-[8px] bg-gray-400">
@@ -13,7 +28,7 @@ const Banner = (props: any) => {
         <div className="flex gap-[8px]">
           <div className="py-[6px] px-[12px] bg-[#F1F5F9] text-[12px] font-[500] flex gap-[6px] rounded-[24px] items-center">
             <img src="/assets/images/icons/thumbs-up.svg"/>
-            <p>{peopleCount} Going</p>
+            <p>{memberCount} Going</p>
           </div>
           <div className="py-[6px] px-[12px] bg-[#F1F5F9] text-[12px] font-[500] flex gap-[6px] rounded-[24px] items-center">
             <img src="/assets/images/icons/flat_calendar.svg"/>
