@@ -9,12 +9,12 @@ const Toolbar = (props: any) => {
   const eventDetails = props?.eventDetails;
   const userInfo = props?.userInfo;
   const onLogin = props.onLogin;
-  const isUserGoing = props?.isUserGoing;
   const isUserLoggedIn = props?.isUserLoggedIn;
   const registeredGuest = eventDetails.guests.find(
     (guest) => guest.memberUid === userInfo.uid
   );
-
+  
+  const [isUserGoing, setIsGoing] = useState(props.isUserGoing);
   const [updatedUser, setUpdatedUser] = useState(registeredGuest);
   const [allGuest, setAllGuest] = useState(eventDetails.guests);
   const [isOpen, setIsOpen] = useState(false);
@@ -82,6 +82,9 @@ const Toolbar = (props: any) => {
         (guest) => guest.memberUid === userInfo.uid
       );
       setAllGuest(eventDetails.guests);
+      if(registeredGuest) {
+        setIsGoing(true);
+      }
       setUpdatedUser(registeredGuest);
     };
     document.addEventListener('updateGuests', handler);
@@ -92,7 +95,7 @@ const Toolbar = (props: any) => {
 
   return (
     <>
-      <div className="flex w-[100%] flex-col justify-between lg:flex-row">
+      <div className="flex w-[100%] flex-col justify-between lg:flex-row lg:items-center">
         <p className="pb-[4px] text-[18px] font-[700] lg:pb-0 lg:text-[20px]">{`Guest List (${allGuest.length})`}</p>
         <div className="flex flex-wrap gap-[8px]">
           <a

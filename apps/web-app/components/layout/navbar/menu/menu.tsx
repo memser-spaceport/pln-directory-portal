@@ -37,7 +37,7 @@ export function Menu() {
     {
       icon: IRLGatheringIcon,
       name: 'IRL Gatherings',
-      path: '/irl/labweek-24pg',
+      path: '/irl/lw24-pg',
       version: 'BETA',
     },
   ];
