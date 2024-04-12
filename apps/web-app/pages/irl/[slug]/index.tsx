@@ -23,27 +23,32 @@ export default function IrlDetails({
   isUserGoing,
   isUserLoggedIn,
 }) {
-  const router = useRouter()
+  const router = useRouter();
   const onLogin = () => {
-    authenticate(router.asPath)
-  }
+    authenticate(router.asPath);
+  };
 
   const onJoin = (value) => {
-    document.dispatchEvent(new CustomEvent('open-join-modal', {detail: value}))
-  }
+    document.dispatchEvent(
+      new CustomEvent('open-join-modal', { detail: value })
+    );
+  };
 
   return (
     <>
       <div className="flex justify-center pt-[70px] lg:pt-[100px]">
-        <div className="flex w-[calc(100%_-_1px)] lg:px-0 flex-col items-center lg:w-[900px]">
-          <div className='w-full'>{!isUserLoggedIn && <HeaderStrip onJoin={onJoin}/>}</div>
-          <div className="h-[345px] w-[calc(100%_-_2px)] lg:rounded-[8px] bg-white shadow-sm lg:h-[291px]">
-            <Banner
-              eventCount={eventDetails.eventCount}
-              peopleCount={eventDetails.guests.length}
-            />
+        <div className="flex w-[calc(100%_-_1px)] flex-col items-center lg:w-[900px] lg:px-0">
+          <div className="h-[345px] w-[calc(100%_-_2px)] bg-white shadow-sm lg:h-[291px] lg:rounded-[8px]">
+            <Banner eventDetails={eventDetails} />
           </div>
-          <div className={`${isUserLoggedIn ? 'h-[110px]': 'h-[152px]'} w-[100%] bg-slate-100 px-[16px] pt-[16px] lg:h-[76px] lg:px-0 lg:py-[18px]`}>
+          <div className="sticky top-[40px] mt-[0px] w-full lg:top-[83px] lg:mt-[16px]">
+            {!isUserLoggedIn && <HeaderStrip onJoin={onJoin} />}
+          </div>
+          <div
+            className={`${
+              isUserLoggedIn ? 'h-[110px]' : 'h-[152px]'
+            } w-[100%] bg-slate-100 px-[16px] pt-[16px] lg:h-[76px] lg:px-0 lg:py-[18px]`}
+          >
             <Toolbar
               eventDetails={eventDetails}
               teams={teams}
@@ -53,12 +58,20 @@ export default function IrlDetails({
               onLogin={onLogin}
             />
           </div>
-          <div className="slim-scroll h-[calc(100svh_-_220px)] w-[calc(100%_-_2px)] overflow-x-scroll overflow-y-auto lg-rounded-tl-[8px] lg-rounded-tr-[8px] lg:h-[calc(100vh_-_155px)] lg:overflow-x-hidden mb-[8px]">
+          <div className="slim-scroll lg-rounded-tl-[8px] lg-rounded-tr-[8px] mb-[8px] h-[calc(100svh_-_310px)] w-[calc(100%_-_2px)] overflow-y-auto overflow-x-scroll lg:h-[calc(100vh_-_220px)] lg:overflow-x-hidden">
             <TableHeader isUserLoggedIn={isUserLoggedIn} />
 
-            <div className={`relative -mt-[4px] ${isUserLoggedIn ? 'w-fit': 'w-full'} lg-rounded-[8px] bg-white shadow-sm lg:w-[calc(100%_-_2px)]`}>
-              {isUserLoggedIn && <MemberList userInfo={userInfo} items={eventDetails.guests} />}
-              {!isUserLoggedIn && <TeamList onLogin={onLogin} items={eventDetails.guests} />}
+            <div
+              className={`relative -mt-[4px] ${
+                isUserLoggedIn ? 'w-fit' : 'w-full'
+              } lg-rounded-[8px] bg-white shadow-sm lg:w-[calc(100%_-_2px)]`}
+            >
+              {isUserLoggedIn && (
+                <MemberList userInfo={userInfo} items={eventDetails.guests} />
+              )}
+              {!isUserLoggedIn && (
+                <TeamList onLogin={onLogin} items={eventDetails.guests} />
+              )}
             </div>
           </div>
         </div>
@@ -109,7 +122,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
     }
   };
 
-  const authToken = getAuthToken(cookies?.authToken)
+  const authToken = getAuthToken(cookies?.authToken);
 
   if (isUserLoggedIn) {
     const { uid } = userInfo;
@@ -133,21 +146,32 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
 
   const eventDetails = await getEventDetailBySlug(slug, authToken);
 
-  const isUserGoing = eventDetails.guests.some(
+  const notAvailableTeams = eventDetails?.guests?.filter(
+    (item) => item.teamUid === 'cleeky1re000202tx3kex3knn'
+  );
+  const otherTeams = eventDetails?.guests?.filter(
+    (item) => item.teamUid !== 'cleeky1re000202tx3kex3knn'
+  );
+  const combinedTeams = [...otherTeams, ...notAvailableTeams];
+  eventDetails.guests = combinedTeams;
+
+  const isUserGoing = combinedTeams?.some(
     (guest) => guest.memberUid === userInfo.uid && guest.memberUid
   );
 
-  if(isUserGoing) {
-    const currentUser = [...eventDetails.guests].find(v => v.memberUid === userInfo.uid);
-    if(currentUser) {
-      currentUser.memberName = `(You) ${currentUser.memberName}`
-      const filteredList = [...eventDetails.guests].filter(v => v.memberUid !== userInfo.uid);
+  if (isUserGoing) {
+    const currentUser = [...combinedTeams].find(
+      (v) => v.memberUid === userInfo.uid
+    );
+    if (currentUser) {
+      currentUser.memberName = `(You) ${currentUser.memberName}`;
+      const filteredList = [...combinedTeams].filter(
+        (v) => v.memberUid !== userInfo.uid
+      );
       const formattedGuests = [currentUser, ...filteredList];
       eventDetails.guests = formattedGuests;
     }
   }
-
-  
 
   const pageProps = JSON.parse(
     JSON.stringify({
