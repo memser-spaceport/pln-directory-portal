@@ -102,14 +102,12 @@ const MemberList = (props: any) => {
                   }
                 >
                   <span className="flex items-center w-fit gap-1">
-                    <div className="h-[32px] w-[32px] rounded-[58px] bg-gray-200">
-                      {item?.memberLogo && (
+                    <div className="h-[32px] w-[32px] rounded-[58px] ">
                         <img
                           alt="member image"
-                          src={item?.memberLogo}
+                          src={item?.memberLogo || '/assets/images/icons/memberDefault.svg'}
                           className="h-[32px] w-[32px] rounded-[58px] bg-gray-200 object-cover"
                         />
-                      )}
                     </div>
                     <span className='w-fit'>{item.memberName}</span>
                   </span>
@@ -126,14 +124,13 @@ const MemberList = (props: any) => {
                     onClick={() => onTeamClick(item?.teamUid, item?.teamName)}
                   >
                     <span className="flex items-center gap-1">
-                      <div className="h-[32px] w-[32px] bg-gray-200">
-                        {item?.teamLogo && (
+                      <div className="h-[32px] w-[32px]">
                           <img
                             alt="team logo"
-                            src={item?.teamLogo}
-                            className="h-[32px] w-[32px] bg-gray-200"
+                            src={item?.teamLogo || '/assets/images/icons/teamDefault.svg'}
+                            className="h-[32px] w-[32px] "
                           />
-                        )}
+                        
                       </div>
                       <span>{item.teamName}</span>
                     </span>

@@ -1,10 +1,24 @@
 import api from '../utils/api';
 
 export const getEventDetailBySlug = async (slug, token) => {
-  const result = await api.get(
-    `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/irl/events/${slug}`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
+  let result;
+  try {
+    result = await api.get(
+      `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/irl/events/${slug}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );  
+  } catch (e) {
+    if(e.response.status) {
+      return {
+        errorCode: 404
+      }
+    } else {
+      return {
+        errorCode: 500
+      }
+    }
+   
+  }
 
   const output = result.data;
   
