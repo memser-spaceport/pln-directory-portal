@@ -69,7 +69,7 @@ const AddDetailsPopup = (props: any) => {
 
   const onEditGuestDetails = async () => {
     analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_EDIT_BTN_CLICKED,
+      APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED,
       {
         type: 'clicked',
         user,
@@ -78,14 +78,14 @@ const AddDetailsPopup = (props: any) => {
 
     const payload = {
       ...formValues,
-      telegramId: `@${formValues.telegramId}`,
+      telegramId: removeAt(formValues?.telegramId),
       memberUid: userInfo?.uid,
       eventUid: eventDetails?.id,
       uid: registeredGuest.uid,
     };
 
     analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_EDIT_BTN_CLICKED,
+      APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED,
       {
         type: 'api_initiated',
         user,
@@ -101,7 +101,7 @@ const AddDetailsPopup = (props: any) => {
 
     if (response.status === 200 || response.status === 201) {
       analytics.captureEvent(
-        APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_EDIT_BTN_CLICKED,
+        APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED,
         {
           type: 'api_sucess',
           user,
@@ -134,11 +134,10 @@ const AddDetailsPopup = (props: any) => {
 
     const payload = {
       ...formValues,
-      telegramId: `@${formValues.telegramId}`,
+      telegramId: removeAt(formValues?.telegramId),
       memberUid: userInfo?.uid,
       eventUid: eventDetails?.id,
     };
-    console.log(formErrors);
 
     const isValid = validateForm(payload);
 
@@ -192,11 +191,17 @@ const AddDetailsPopup = (props: any) => {
     }
   };
 
+  function removeAt(text: string) {
+    const textToBeModified = text?.trim();
+    const modifiedText = textToBeModified?.replace(/\B@/g, '');
+    return modifiedText;
+  }
+
   useEffect(() => {
     if (isUserGoing) {
       const data = {
         teamUid: registeredGuest.teamUid,
-        telegramId: registeredGuest.telegramId?.replace(/\B@/g, ''),
+        telegramId: registeredGuest.telegramId,
         reason: registeredGuest.reason,
       };
       setFormValues(data);
@@ -279,16 +284,16 @@ const AddDetailsPopup = (props: any) => {
                         placeholder="Enter details here"
                         className="placeholder:text-[500] h-[80px] w-full resize-none rounded-lg border border-[#CBD5E1] px-2 py-3 text-sm font-[500] leading-6 text-[#475569] placeholder:text-sm placeholder:leading-6 placeholder:text-[#475569] placeholder:opacity-40 focus:outline-none"
                       />
-                      {formValues?.reason?.length >= 100 ? (
+                      {/* {formValues?.reason?.length >= 100 ? (
                         <span className="text-[13px] leading-[18px] text-red-500">
                           Character limit reached
                         </span>
-                      ) : (
+                      ) : ( */}
                         <span className="text-[13px] leading-[18px] text-[#0F172A]">
                           {100 - formValues?.reason?.length} characters
                           remaining
                         </span>
-                      )}
+                      {/* )} */}
                     </div>
                   </div>
                   {/* FOOTER */}
