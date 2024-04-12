@@ -13,7 +13,7 @@ const Toolbar = (props: any) => {
   const registeredGuest = eventDetails.guests.find(
     (guest) => guest.memberUid === userInfo.uid
   );
-  
+
   const [isUserGoing, setIsGoing] = useState(props.isUserGoing);
   const [updatedUser, setUpdatedUser] = useState(registeredGuest);
   const [allGuest, setAllGuest] = useState(eventDetails.guests);
@@ -82,7 +82,7 @@ const Toolbar = (props: any) => {
         (guest) => guest.memberUid === userInfo.uid
       );
       setAllGuest(eventDetails.guests);
-      if(registeredGuest) {
+      if (registeredGuest) {
         setIsGoing(true);
       }
       setUpdatedUser(registeredGuest);
@@ -102,20 +102,22 @@ const Toolbar = (props: any) => {
             href={eventDetails?.telegram}
             target="_blank"
             rel="noreferrer"
-            className="flex cursor-pointer items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-white p-[10px]  text-[14px] font-[500] text-[#156FF7] lg:px-[24px] lg:py-[10px]"
+            className="mb-btn flex h-[40px]  cursor-pointer items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-white p-[10px]  text-[14px] font-[500] text-[#156FF7] lg:px-[24px] lg:py-[10px]"
             onClick={onTelegramLinkClick}
           >
             <img
               className="h-[21px] w-[21px]"
               src="/assets/images/icons/telegram-contact-logo.svg"
             />
-            <span className="hidden text-[#0F172A] text-sm font-[500] lg:block">Telegram</span>
+            <span className="hidden text-sm font-[500] text-[#0F172A] lg:block">
+              Telegram
+            </span>
           </a>
           <a
             target="_blank"
             rel="noreferrer"
             href={eventDetails?.websiteUrl}
-            className="flex flex-1 cursor-pointer items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-white px-[16px] py-[10px] text-[14px]  font-[500] text-[#0F172A] text-sm lg:flex-auto lg:px-[24px] lg:py-[10px]"
+            className="mb-btn flex flex-1 h-[40px] cursor-pointer items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-white px-[16px] py-[10px] text-[14px]  text-sm font-[500] text-[#0F172A] lg:flex-auto lg:px-[24px] lg:py-[10px]"
             onClick={onScheduleClick}
           >
             View Schedule
@@ -123,7 +125,7 @@ const Toolbar = (props: any) => {
           {!isUserGoing && isUserLoggedIn && (
             <button
               onClick={onIAmGoingClick}
-              className="flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] px-[24px]  py-[10px] text-[14px] font-[500] text-[#fff]"
+              className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] px-[24px]  py-[10px] text-[14px] font-[500] text-[#fff]"
             >
               I am Going
             </button>
@@ -131,7 +133,7 @@ const Toolbar = (props: any) => {
           {!isUserLoggedIn && (
             <button
               onClick={onLoginClick}
-              className="flex h-[40px] w-full items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] px-[24px] py-[10px] text-[14px]  font-[500] text-[#fff] lg:w-fit lg:flex-auto"
+              className="mb-btn flex h-[40px] w-full items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] px-[24px] py-[10px] text-[14px]  font-[500] text-[#fff] lg:w-fit lg:flex-auto"
             >
               Login to Respond
             </button>
@@ -139,7 +141,7 @@ const Toolbar = (props: any) => {
           {isUserGoing && isUserLoggedIn && (
             <button
               onClick={onEditResponse}
-              className="flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] px-[24px]  py-[10px] text-[14px] font-[500] text-[#fff]"
+              className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] px-[24px]  py-[10px] text-[14px] font-[500] text-[#fff]"
             >
               Edit Response
             </button>
@@ -157,6 +159,15 @@ const Toolbar = (props: any) => {
           registeredGuest={updatedUser}
         />
       )}
+      <style jsx>
+        {`
+          @media (max-width: 375px) {
+            .mb-btn {
+              font-size: 12px;
+            }
+          }
+        `}
+      </style>
     </>
   );
 };
