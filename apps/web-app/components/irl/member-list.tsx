@@ -105,7 +105,7 @@ const MemberList = (props: any) => {
                     <div className="h-[32px] w-[32px] rounded-[58px] ">
                         <img
                           alt="member image"
-                          src={item?.memberLogo || '/assets/images/icons/memberDefault.svg'}
+                          src={item?.memberLogo || '/assets/images/icons/memberdefault.svg'}
                           className="h-[32px] w-[32px] rounded-[58px] bg-gray-200 object-cover"
                         />
                     </div>
@@ -127,7 +127,7 @@ const MemberList = (props: any) => {
                       <div className="h-[32px] w-[32px]">
                           <img
                             alt="team logo"
-                            src={item?.teamLogo || '/assets/images/icons/teamDefault.svg'}
+                            src={item?.teamLogo || '/assets/images/icons/teamdefault.svg'}
                             className="h-[32px] w-[32px] "
                           />
                         
