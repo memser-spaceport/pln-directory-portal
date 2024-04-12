@@ -28,6 +28,9 @@ const ChangeLogs = (props: any) => {
                 />
                 <span className="text-xs text-[#475569]">{changeLog.tag}</span>
               </span>
+              {changeLog.isBeta && <span>
+              <img src='/assets/images/icons/beta-logo.svg' alt='beta logo'/>
+              </span>}
             </div>
             <div className="flex flex-col gap-5">
               <h6 className="text-[24px] font-bold leading-5 text-[#0F172A]">

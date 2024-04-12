@@ -15,7 +15,8 @@ let nextConfig = {
   env: {
     AUTH_API_URL: process.env.AUTH_API_URL,
     COOKIE_DOMAIN: process.env.COOKIE_DOMAIN,
-    PROTOSPHERE_URL:process.env.PROTOSPHERE_URL
+    PROTOSPHERE_URL:process.env.PROTOSPHERE_URL,
+    IRL_PGF_FORM_URL:process.env.IRL_PGF_FORM_URL,
   },
   nx: {
     // Set this to true if you would like to to use SVGR
@@ -111,7 +112,7 @@ let nextConfig = {
       },
       {
         source: '/irl',
-        destination: '/irl/labweek-24pg',
+        destination: '/irl/lw24-pg',
         permanent: false,
       },
     ];

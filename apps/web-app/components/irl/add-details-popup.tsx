@@ -11,6 +11,9 @@ import { toast } from 'react-toastify';
 import { LoadingIndicator } from '../shared/loading-indicator/loading-indicator';
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
+import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
+import { getUserInfo } from 'apps/web-app/utils/shared.utils';
+import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
 
 const AddDetailsPopup = (props: any) => {
   const isOpen = props.isOpen;
@@ -33,14 +36,16 @@ const AddDetailsPopup = (props: any) => {
   };
 
   const userCookie = getAuthToken(Cookies.get('authToken'));
-
   const [isLoader, setIsLoader] = useState(false);
   const [formValues, setFormValues] = useState({
     teamUid: '',
     telegramId: '',
     reason: '',
   });
-
+  const [formErrors, setFormErrors] = useState<any>({});
+  const analytics = useAppAnalytics();
+  const user = getUserInfo();
+  
   const intialTeamValue = teams.find((team) => team.id === formValues.teamUid);
   const handleChange = (event: any) => {
     const { name, value } = event.target;
@@ -63,21 +68,45 @@ const AddDetailsPopup = (props: any) => {
   };
 
   const onEditGuestDetails = async () => {
+    analytics.captureEvent(
+      APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED,
+      {
+        type: 'clicked',
+        user,
+      }
+    );
+
     const payload = {
       ...formValues,
-      telegramId: `@${formValues.telegramId}`,
+      telegramId: removeAt(formValues?.telegramId),
       memberUid: userInfo?.uid,
       eventUid: eventDetails?.id,
       uid: registeredGuest.uid,
     };
+
+    analytics.captureEvent(
+      APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED,
+      {
+        type: 'api_initiated',
+        user,
+        ...payload,
+      }
+    );
+
     const response = await editEventGuest(
       eventDetails?.slugUrl,
       registeredGuest.uid,
       payload
     );
-    
+
     if (response.status === 200 || response.status === 201) {
-      // router.push('/irl/labweek-24pgf', undefined, { scroll: false });
+      analytics.captureEvent(
+        APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED,
+        {
+          type: 'api_sucess',
+          user,
+        }
+      );
       await getEventDetails();
       onClose();
       setIsLoader(false);
@@ -85,20 +114,59 @@ const AddDetailsPopup = (props: any) => {
     }
   };
 
+  const validateForm = (formValues: any) => {
+    const errors = {} as any;
+    if (!formValues?.teamUid?.trim()) {
+      errors.teamUid = 'Team is required';
+    }
+    setFormErrors(errors);
+    return Object.keys(errors)?.length === 0;
+  };
+
   const onAddGuestDetails = async () => {
+    analytics.captureEvent(
+      APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_SAVE_BTN_CLICKED,
+      {
+        type: 'clicked',
+        user,
+      }
+    );
+
     const payload = {
       ...formValues,
-      telegramId: `@${formValues.telegramId}`,
+      telegramId: removeAt(formValues?.telegramId),
       memberUid: userInfo?.uid,
       eventUid: eventDetails?.id,
     };
-    const response = await createEventGuest(eventDetails?.slugUrl, payload);
-    if (response.status === 201) {
-      // router.push('/irl/labweek-24pgf', undefined, { scroll: false });
-      await getEventDetails();
-      onClose();
+
+    const isValid = validateForm(payload);
+
+    if (isValid) {
+      analytics.captureEvent(
+        APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_SAVE_BTN_CLICKED,
+        {
+          type: 'api_initiated',
+          user,
+          ...payload,
+        }
+      );
+
+      const response = await createEventGuest(eventDetails?.slugUrl, payload);
+      if (response.status === 201) {
+        analytics.captureEvent(
+          APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_SAVE_BTN_CLICKED,
+          {
+            type: 'api_success',
+            user,
+          }
+        );
+        await getEventDetails();
+        onClose();
+        setIsLoader(false);
+        toast.success('Your details has been added successfully');
+      }
+    } else {
       setIsLoader(false);
-      toast.success('Your details has been added successfully');
     }
   };
 
@@ -117,11 +185,23 @@ const AddDetailsPopup = (props: any) => {
     }
   };
 
+  const handleKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault(); // Prevent form submission
+    }
+  };
+
+  function removeAt(text: string) {
+    const textToBeModified = text?.trim();
+    const modifiedText = textToBeModified?.replace(/\B@/g, '');
+    return modifiedText;
+  }
+
   useEffect(() => {
     if (isUserGoing) {
       const data = {
         teamUid: registeredGuest.teamUid,
-        telegramId: registeredGuest.telegramId?.replace(/\B@/g, ''),
+        telegramId: registeredGuest.telegramId,
         reason: registeredGuest.reason,
       };
       setFormValues(data);
@@ -168,6 +248,9 @@ const AddDetailsPopup = (props: any) => {
                             getValue={onTeamsChange}
                             initialOption={intialTeamValue}
                           />
+                          <span className="text-[13px] leading-[18px] text-red-500">
+                            {formErrors?.teamUid}
+                          </span>
                         </div>
                       </div>
                       <div className="flex flex-1  flex-col gap-3">
@@ -181,6 +264,7 @@ const AddDetailsPopup = (props: any) => {
                             name="telegramId"
                             placeholder="Enter link here"
                             className="h-10 w-full rounded-lg border border-[#CBD5E1] py-[8px] pl-6 pr-[12px] text-[#475569] placeholder:text-sm placeholder:leading-6 placeholder:text-[#475569] placeholder:opacity-40 focus:outline-none"
+                            onKeyDown={handleKeyDown}
                           />
                           <span className="absolute left-2  top-[19px] -translate-y-1/2 transform text-[#475569] ">
                             @
@@ -200,15 +284,16 @@ const AddDetailsPopup = (props: any) => {
                         placeholder="Enter details here"
                         className="placeholder:text-[500] h-[80px] w-full resize-none rounded-lg border border-[#CBD5E1] px-2 py-3 text-sm font-[500] leading-6 text-[#475569] placeholder:text-sm placeholder:leading-6 placeholder:text-[#475569] placeholder:opacity-40 focus:outline-none"
                       />
-                      {formValues?.reason?.length >= 100 ? (
+                      {/* {formValues?.reason?.length >= 100 ? (
                         <span className="text-[13px] leading-[18px] text-red-500">
                           Character limit reached
                         </span>
-                      ) : (
+                      ) : ( */}
                         <span className="text-[13px] leading-[18px] text-[#0F172A]">
-                          {100 - formValues?.reason?.length} characters remaining
+                          {100 - formValues?.reason?.length} characters
+                          remaining
                         </span>
-                      )}
+                      {/* )} */}
                     </div>
                   </div>
                   {/* FOOTER */}

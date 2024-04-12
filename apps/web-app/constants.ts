@@ -264,6 +264,19 @@ export const APP_ANALYTICS_EVENTS = {
   TEAMS_DETAIL_PROJECTS_SEE_ALL: 'team-detail-projects-see-all-clicked',
 
   DIRECTORY_LIST_SORTBY_CHANGED: 'directory-list-sortby-changed',
+
+  IRL_HEADER_JOIN_BTN_CLICKED:'irl-header-join-btn-clicked',
+  IRL_GUEST_LIST_HEADER_TELEGRAM_BTN_CLICKED:'irl-guest-list-header-telegram-btn-clicked',
+  IRL_GUEST_LIST_HEADER_VIEW_SCHEDULE_BTN_CLICKED:"irl-guest-list-header-view-schedule-btn-clicked",
+  IRL_GUEST_LIST_HEADER_LOGIN_BTN_CLICKED:'irl-guest-list-header-login-btn-clicked',
+  IRL_GUEST_LIST_HEADER_IAM_GOING_BTN_CLICKED:"irl-guest-list-header-iam-going-btn-clicked",
+  IRL_GUEST_LIST_HEADER_EDIT_RESPONSE_BTN_CLICKED:"irl-guest-list-header-edit-response-btn-clicked",
+  IRL_GUEST_LIST_TABLE_LOGIN_BTN_CLICKED:"irl-guest-list-table-login-btn-clicked",
+  IRL_GUEST_LIST_TABLE_TEAM_CLICKED:"irl-guest-list-table-team-clicked",
+  IRL_GUEST_LIST_TABLE_MEMBER_CLICKED:"irl-guest-list-table-member-clicked",
+  IRL_GUEST_LIST_TABLE_TELEGRAM_LINK_CLICKED:'irl-guest-list-table-telegram-link-clicked',
+  IRL_RSVP_POPUP_SAVE_BTN_CLICKED:'irl-rsvp-popup-save-btn-clicked',
+  IRL_RSVP_POPUP_UPDATE_BTN_CLICKED:'irl-rsvp-popup-update-btn-clicked',
 };
 
 export const TAB_CONSTANTS = {
@@ -381,6 +394,16 @@ export const ROLES_FILTER_VALUES = [
 ];
 
 export const ChangeLogList = [
+  {
+    title: 'Version 2.0.4 - IRL Gatherings',
+    tag: 'New Feature',
+    date: '12, Apr 2024',
+    isBeta:true,
+    shortContent: `<div>
+      <ul style="list-style: disc; font-size: 16px">
+      Exciting news! We've rolled out a feature (Beta) that brings detailed participation information to our IRL Gatherings. Network members can now view a list of attendees for upcoming conferences and events, empowering them to see who else is attending and facilitating networking opportunities. With this new feature, network members can now connect with like-minded individuals, plan meetups, and maximize their conference experience.
+      </ul></div>`,
+  },
   {
     title: 'Version 2.0.3 - Improved Member Search',
     tag: 'Improvements',

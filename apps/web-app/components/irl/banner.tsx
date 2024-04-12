@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 
 const Banner = (props: any) => {
-  const eventCount = props?.eventCount;
-  const peopleCount = props?.peopleCount;
+
+  const eventDetails = props?.eventDetails;
+
+  const eventCount = eventDetails?.eventCount;
+  const peopleCount = eventDetails?.guests.length;
+  const description = eventDetails?.description;
+  const name = eventDetails?.name;
 
   const [memberCount, setMemberCount] = useState(peopleCount);
   useEffect(() => {
@@ -23,7 +28,7 @@ const Banner = (props: any) => {
       </div>
       <div className="mt-[24px] flex flex-col lg:flex-row justify-between items-start lg:items-center">
         <p className="text-[24px] font-[700]">
-          LabWeek24 Public Goods
+          {name}
         </p>
         <div className="flex gap-[8px]">
           <div className="py-[6px] px-[12px] bg-[#F1F5F9] text-[12px] font-[500] flex gap-[6px] rounded-[24px] items-center">
@@ -37,8 +42,7 @@ const Banner = (props: any) => {
         </div>
       </div>
       <p className="mt-[10px] text-[15px] font-[400]">
-        A Decentralized Conference by Protocol Labs | San Francisco Bay Area
-         Apr 11-16, 2024
+        {description}
       </p>
     </div>
   );
