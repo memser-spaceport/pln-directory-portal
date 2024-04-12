@@ -146,6 +146,12 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
 
   const eventDetails = await getEventDetailBySlug(slug, authToken);
 
+  if (eventDetails.errorCode === 404) {
+    return {
+      notFound: true,
+    };
+  }
+
   const notAvailableTeams = eventDetails?.guests?.filter(
     (item) => item.teamUid === 'cleeky1re000202tx3kex3knn'
   );

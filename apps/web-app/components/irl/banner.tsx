@@ -8,6 +8,7 @@ const Banner = (props: any) => {
   const peopleCount = eventDetails?.guests.length;
   const description = eventDetails?.description;
   const name = eventDetails?.name;
+  const bannerUrl = eventDetails?.bannerUrl;
 
   const [memberCount, setMemberCount] = useState(peopleCount);
   useEffect(() => {
@@ -24,7 +25,7 @@ const Banner = (props: any) => {
   return (
     <div className="p-[20px]">
       <div className="h-[153px] w-[100%] rounded-[8px] bg-gray-400">
-        <img src="https://www.labweek.io/images/banner-1024.jpg" className="h-[153px] w-[100%] rounded-[8px] object-cover object-bottom" />
+        <img src={bannerUrl} className="h-[153px] w-[100%] rounded-[8px] object-cover object-bottom" />
       </div>
       <div className="mt-[24px] flex flex-col lg:flex-row justify-between items-start lg:items-center">
         <p className="text-[24px] font-[700]">
