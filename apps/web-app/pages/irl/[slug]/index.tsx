@@ -158,7 +158,10 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
   const otherTeams = eventDetails?.guests?.filter(
     (item) => item.teamUid !== 'cleeky1re000202tx3kex3knn'
   );
-  const combinedTeams = [...otherTeams, ...notAvailableTeams];
+
+  const sortedGuests = otherTeams.sort((a, b) => a.memberName?.localeCompare(b.memberName));
+
+  const combinedTeams = [...sortedGuests, ...notAvailableTeams];
   eventDetails.guests = combinedTeams;
 
   const isUserGoing = combinedTeams?.some(
