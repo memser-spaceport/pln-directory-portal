@@ -160,8 +160,9 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
   );
 
   const sortedGuests = otherTeams.sort((a, b) => a.memberName?.localeCompare(b.memberName));
+  const sortedNotAvailableTeamGuests = notAvailableTeams.sort((a, b) => a.memberName?.localeCompare(b.memberName));
 
-  const combinedTeams = [...sortedGuests, ...notAvailableTeams];
+  const combinedTeams = [...sortedGuests, ...sortedNotAvailableTeamGuests];
   eventDetails.guests = combinedTeams;
 
   const isUserGoing = combinedTeams?.some(
