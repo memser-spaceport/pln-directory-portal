@@ -45,7 +45,7 @@ const AddDetailsPopup = (props: any) => {
   const [formErrors, setFormErrors] = useState<any>({});
   const analytics = useAppAnalytics();
   const user = getUserInfo();
-  
+
   const intialTeamValue = teams.find((team) => team.id === formValues.teamUid);
   const handleChange = (event: any) => {
     const { name, value } = event.target;
@@ -84,12 +84,16 @@ const AddDetailsPopup = (props: any) => {
       uid: registeredGuest.uid,
     };
 
+    const team = teams.find((team) => team.id === payload?.teamUid);
+    const teamName = team?.name;
+
     analytics.captureEvent(
       APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED,
       {
         type: 'api_initiated',
         user,
         ...payload,
+        teamName,
       }
     );
 
@@ -105,6 +109,8 @@ const AddDetailsPopup = (props: any) => {
         {
           type: 'api_sucess',
           user,
+          ...payload,
+          teamName,
         }
       );
       await getEventDetails();
@@ -139,6 +145,8 @@ const AddDetailsPopup = (props: any) => {
       eventUid: eventDetails?.id,
     };
 
+    const team = teams.find((team) => team.id === payload?.teamUid);
+    const teamName = team?.name;
     const isValid = validateForm(payload);
 
     if (isValid) {
@@ -148,6 +156,7 @@ const AddDetailsPopup = (props: any) => {
           type: 'api_initiated',
           user,
           ...payload,
+          teamName,
         }
       );
 
@@ -158,6 +167,8 @@ const AddDetailsPopup = (props: any) => {
           {
             type: 'api_success',
             user,
+            ...payload,
+            teamName,
           }
         );
         await getEventDetails();
@@ -202,7 +213,7 @@ const AddDetailsPopup = (props: any) => {
       const data = {
         teamUid: registeredGuest.teamUid,
         telegramId: registeredGuest.telegramId,
-        reason: registeredGuest.reason,
+        reason: registeredGuest.reason?.trim(),
       };
       setFormValues(data);
     }
@@ -289,10 +300,9 @@ const AddDetailsPopup = (props: any) => {
                           Character limit reached
                         </span>
                       ) : ( */}
-                        <span className="text-[13px] leading-[18px] text-[#0F172A]">
-                          {100 - formValues?.reason?.length} characters
-                          remaining
-                        </span>
+                      <span className="text-[13px] leading-[18px] text-[#0F172A]">
+                        {100 - formValues?.reason?.length} characters remaining
+                      </span>
                       {/* )} */}
                     </div>
                   </div>
