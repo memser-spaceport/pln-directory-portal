@@ -28,11 +28,14 @@ const TeamList = (props: any) => {
       {items.map((item, itemIndex) => (
         <div key={`${itemIndex}-event-list`} className="flex w-[100%] text-[13px] font-[400] py-[12px] border-b-[1px] border-b-[#CBD5E1]">
            <div className="flex w-full lg:w-[200px] items-center gap-[4px] justify-start pl-[20px]">
-           <div className="bg-gray-200 h-[32px] w-[32px]">
-           <img src={item.teamLogo || '/assets/images/icons/teamdefault.svg'}   className="bg-gray-200 h-[32px] w-[32px]"/>
-           </div>
              <Link href={`/teams/${item.teamUid}`}>
-             <a target="_blank" className="text-clamp flex-1 break-words" onClick={()=> onTeamClick(item?.teamUid,item?.teamName)}>{item.teamName}</a>
+             <a target="_blank" className="text-clamp w-fit break-words" onClick={()=> onTeamClick(item?.teamUid,item?.teamName)}>
+              <span className="items-center gap-1 inline-flex">
+             <div className=" h-[32px] w-[32px]">
+                <img src={item.teamLogo || '/assets/images/icons/teamdefault.svg'} className=" h-[32px] w-[32px]"/>
+              </div>
+              <span className="w-fit">{item.teamName}</span>
+              </span></a>
              </Link>
           </div>
           <div className="hidden lg:flex gap-[4px] w-[180px] items-center justify-start">

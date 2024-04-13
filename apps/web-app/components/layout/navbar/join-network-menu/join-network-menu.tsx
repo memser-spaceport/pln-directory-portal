@@ -4,7 +4,7 @@ import { ArrowIcon } from '@protocol-labs-network/ui';
 import { trackGoal } from 'fathom-client';
 import Cookies from 'js-cookie';
 import Link from 'next/link';
-import React, { forwardRef, Fragment, useEffect, useState } from 'react';
+import React, { forwardRef, Fragment, useState } from 'react';
 import { FATHOM_EVENTS, PAGE_ROUTES } from '../../../../constants';
 import { AddMemberModal } from '../../../members/member-enrollment/addmember';
 import { AddTeamModal } from '../../../teams/team-enrollment/addteam';
@@ -79,16 +79,6 @@ export function JoinNetworkMenu() {
     //
   }
 
-  useEffect(() => {
-    const handler = (e) => {
-       const value = e.detail;
-       handleOpenModal(value);
-    }
-    document.addEventListener('open-join-modal', handler);
-    return function() {
-      document.removeEventListener('open-join-modal', handler)
-    }
-  }, [])
 
   return (
     <>
