@@ -74,7 +74,7 @@ export const getMemberRoleValues = async (options: TMemberListOptions) => {
 export const getMemberRoles = async (options: TMemberListOptions) => {
   const valuesByFilter = await getMemberRoleValues(options);
   if (valuesByFilter.status !== 200) {
-    return [] as unknown as TMembersRoleFilterValues[];
+    return [];
   }
   return valuesByFilter.body as TMembersRoleFilterValues[];
 };
