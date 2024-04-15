@@ -83,7 +83,7 @@ export class MemberController {
         this.membersService.buildNameFilters(queryParams),
       ],
     };
-    return await this.membersService.getRoles(builtQuery, queryParams);
+    return await this.membersService.getRolesWithCount(builtQuery, queryParams);
   }
 
   @Api(server.route.getMember)

@@ -66,6 +66,7 @@ export function RolesFilter({ memberRoles }: RolesFilterProps) {
         {
           page: 'Members',
           filterName: 'Roles',
+          searchText: searchQuery,
         }
       );
     } else {
