@@ -7,7 +7,7 @@ import {
   useCallback,
   Fragment,
   useRef,
-  useContext
+  useContext,
 } from 'react';
 import { trackGoal } from 'fathom-client';
 import Cookies from 'js-cookie';
@@ -53,8 +53,9 @@ import { ReactComponent as PrefernceIcon } from '../../../public/assets/images/i
 import { PreferenceModal } from './preference-modal';
 import Privacy from '../../preference/privacy';
 import { getPreferences } from 'apps/web-app/services/member.service';
-import { SettingsContext } from "apps/web-app/pages/settings";
+import { SettingsContext } from 'apps/web-app/pages/settings';
 import ProjectContribution from '../../projects/contribution/project-contribution';
+import { ModalHeader } from '../../shared/modal-header/modal-header';
 interface EditMemberModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -107,23 +108,53 @@ function validateSkillForm(formValues) {
 }
 
 function validateContributionForm(fValues) {
-  const formErrors = []
+  const formErrors = [];
   const exps = fValues.projectContributions;
   exps.forEach((exp, expIndex) => {
-    if(exp.projectName.trim() === '') {
-      formErrors.push({id: expIndex, name: `Project ${expIndex + 1}`, field: 'projectName', error: "Project Name is Mandatory"})
-    } if(exp.role.trim() === '') {
-      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'role', error: "Role is Mandatory"})
-    } if(exp.startDate && exp.startDate.getTime() >= new Date().getTime()) {
-      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "Your contribution cannot start from a future date"})
-    } if(exp.endDate && exp.endDate.getTime() >= new Date().getTime()) {
-      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "Your contribution cannot end in a future date"})
-    } if(exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
-      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "Your contribution end date cannot be less than or equal to start date"})
+    if (exp.projectName.trim() === '') {
+      formErrors.push({
+        id: expIndex,
+        name: `Project ${expIndex + 1}`,
+        field: 'projectName',
+        error: 'Project Name is Mandatory',
+      });
     }
-  })
+    if (exp.role.trim() === '') {
+      formErrors.push({
+        id: expIndex,
+        name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`,
+        field: 'role',
+        error: 'Role is Mandatory',
+      });
+    }
+    if (exp.startDate && exp.startDate.getTime() >= new Date().getTime()) {
+      formErrors.push({
+        id: expIndex,
+        name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`,
+        field: 'date',
+        error: 'Your contribution cannot start from a future date',
+      });
+    }
+    if (exp.endDate && exp.endDate.getTime() >= new Date().getTime()) {
+      formErrors.push({
+        id: expIndex,
+        name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`,
+        field: 'date',
+        error: 'Your contribution cannot end in a future date',
+      });
+    }
+    if (exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
+      formErrors.push({
+        id: expIndex,
+        name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`,
+        field: 'date',
+        error:
+          'Your contribution end date cannot be less than or equal to start date',
+      });
+    }
+  });
 
-  return formErrors
+  return formErrors;
 }
 
 function validateForm(formValues, imageUrl, isProfileSettings) {
@@ -142,9 +173,9 @@ function validateForm(formValues, imageUrl, isProfileSettings) {
   }
 
   const conErrors = validateContributionForm(formValues);
-  const cbErrors = conErrors.map(c => `${c.name} - ${c.error}` )
-  if(conErrors.length > 0) {
-    errors = [...errors, ...cbErrors]
+  const cbErrors = conErrors.map((c) => `${c.name} - ${c.error}`);
+  if (conErrors.length > 0) {
+    errors = [...errors, ...cbErrors];
   }
 
   return {
@@ -218,9 +249,11 @@ export function EditMemberModal({
   tabSelection,
   setRefreshMemberAutocomplete,
 }: EditMemberModalProps) {
-  const tabs = ['BASIC', 'SKILLS', 'CONTRIBUTIONS', 'SOCIAL']
-  const tabId = tabSelection && tabs.includes(tabSelection.toUpperCase()) ? tabs.indexOf(tabSelection.toUpperCase()) + 1 : 1
-  console.log(tabId, tabSelection)
+  const tabs = ['BASIC', 'SKILLS', 'CONTRIBUTIONS', 'SOCIAL'];
+  const tabId =
+    tabSelection && tabs.includes(tabSelection.toUpperCase())
+      ? tabs.indexOf(tabSelection.toUpperCase()) + 1
+      : 1;
   const [openTab, setOpenTab] = useState(tabId);
   const [errors, setErrors] = useState([]);
   const [isErrorPopupOpen, setIsErrorPopupOpen] = useState(false);
@@ -264,7 +297,7 @@ export function EditMemberModal({
     skills: [],
     projectContributions: [],
     openToWork: false,
-    preferences: JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))
+    preferences: JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS)),
   });
 
   const [isPendingRequestModalOpen, setIsPendingRequestModalOpen] =
@@ -273,7 +306,7 @@ export function EditMemberModal({
   const router = useRouter();
   const [resetImg, setResetImg] = useState(false);
   const analytics = useAppAnalytics();
-  const {state, dispatch} = useContext(SettingsContext);
+  const { state, dispatch } = useContext(SettingsContext);
   const divRef = useRef<HTMLDivElement>(null);
 
   const onCancelEmailChange = () => {
@@ -300,17 +333,26 @@ export function EditMemberModal({
   };
 
   const logoutAndRedirect = (path) => {
-     // If no token.. then logout user
-    Cookies.remove('authToken', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
-    Cookies.remove('refreshToken', { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
-    Cookies.remove('userInfo', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
+    // If no token.. then logout user
+    Cookies.remove('authToken', {
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN || '',
+    });
+    Cookies.remove('refreshToken', {
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN || '',
+    });
+    Cookies.remove('userInfo', {
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN || '',
+    });
     Cookies.set('page_params', 'user_logged_out', {
       expires: 60,
       path: '/',
     });
-     createLogoutChannel().postMessage('logout');
-     window.location.href = path;
-  }
+    createLogoutChannel().postMessage('logout');
+    window.location.href = path;
+  };
 
   const onEmailChange = () => {
     if (isUserProfile) {
@@ -320,11 +362,10 @@ export function EditMemberModal({
       );
       const authToken = Cookies.get('authToken');
       if (!authToken) {
-        logoutAndRedirect(PAGE_ROUTES.MEMBERS)
+        logoutAndRedirect(PAGE_ROUTES.MEMBERS);
       }
 
       setEmailEditStatus(true);
-
     } else {
       analytics.captureEvent(
         APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_CHANGE_EMAIL_CLICKED,
@@ -376,7 +417,6 @@ export function EditMemberModal({
             mainTeam: item.mainTeam,
           };
         });
-        console.log(member)
         setCurrentEmail(member?.email);
         const formValues = {
           name: member?.name,
@@ -403,18 +443,24 @@ export function EditMemberModal({
           skills: member?.skills?.map((item) => {
             return { value: item.uid, label: item.title };
           }),
-          projectContributions: member?.projectContributions ? member?.projectContributions.map(exp => {
-            if(exp?.project && !exp?.project.logo) {
-              exp.project.logo =  {url: '/assets/images/icons/projects/default.svg'}
-            }
-            exp.startDate = new Date(exp.startDate);
-            exp.endDate = exp.endDate ? new Date(exp.endDate) : null;
-            exp.projectName = exp?.project?.name;
-            exp.projectLogo = exp?.project?.logo?.url
-            exp.projectUid = exp?.project?.uid
-            return exp;
-          }): [],
-          preferences: member?.preferences ?? JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS))
+          projectContributions: member?.projectContributions
+            ? member?.projectContributions.map((exp) => {
+                if (exp?.project && !exp?.project.logo) {
+                  exp.project.logo = {
+                    url: '/assets/images/icons/projects/default.svg',
+                  };
+                }
+                exp.startDate = new Date(exp.startDate);
+                exp.endDate = exp.endDate ? new Date(exp.endDate) : null;
+                exp.projectName = exp?.project?.name;
+                exp.projectLogo = exp?.project?.logo?.url;
+                exp.projectUid = exp?.project?.uid;
+                return exp;
+              })
+            : [],
+          preferences:
+            member?.preferences ??
+            JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS)),
         };
         // set requestor email
         const userInfoFromCookie = Cookies.get('userInfo');
@@ -446,7 +492,7 @@ export function EditMemberModal({
       setBasicErrors([]);
       setSkillErrors([]);
       setContributionErrors([]);
-      setContributionObjErrors([])
+      setContributionObjErrors([]);
       getMemberDetails();
       setModified(false);
       setModifiedFlag(false);
@@ -533,14 +579,16 @@ export function EditMemberModal({
       return { uid: item?.value, title: item?.label };
     });
 
-    const formattedProjectsCon = structuredClone(formValues.projectContributions).map(v => {
-      if(v.project) {
+    const formattedProjectsCon = structuredClone(
+      formValues.projectContributions
+    ).map((v) => {
+      if (v.project) {
         delete v.project;
       }
       delete v.projectName;
       delete v.projectLogo;
-      return v
-    })
+      return v;
+    });
 
     const formattedData = {
       ...formValues,
@@ -563,7 +611,7 @@ export function EditMemberModal({
         ? new Date(formValues.plnStartDate)?.toISOString()
         : null,
       skills: skills,
-      projectContributions:formattedProjectsCon,
+      projectContributions: formattedProjectsCon,
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
     };
@@ -600,13 +648,15 @@ export function EditMemberModal({
         }
         setSaveCompleted(false);
         setErrors([]);
-        const { basicFormErrors, skillFormErrors, conErrors, cbErrors,  errors } = validateForm(
-          formValues,
-          imageUrl,
-          isProfileSettings
-        );
+        const {
+          basicFormErrors,
+          skillFormErrors,
+          conErrors,
+          cbErrors,
+          errors,
+        } = validateForm(formValues, imageUrl, isProfileSettings);
 
-        console.log(errors, conErrors)
+        console.log(errors, conErrors);
         // if (!executeRecaptcha) {
         //   console.log('Execute recaptcha not yet available');
         //   return;
@@ -620,8 +670,8 @@ export function EditMemberModal({
           setErrors(errors);
           setBasicErrors(basicFormErrors);
           setSkillErrors(skillFormErrors);
-          setContributionErrors(cbErrors)
-          setContributionObjErrors(conErrors)
+          setContributionErrors(cbErrors);
+          setContributionObjErrors(conErrors);
           setIsErrorPopupOpen(true);
           return false;
         }
@@ -703,16 +753,17 @@ export function EditMemberModal({
                 {}
               );
             }
-            dispatch({type: 'SET_PREFERENCE',
+            dispatch({
+              type: 'SET_PREFERENCE',
               payload: {
                 ...values.preferences,
-                email: values.email != "" ? true : false,
-                github: values.githubHandler != "" ? true : false,
-                linkedin: values.linkedinHandler != "" ? true : false,
-                twitter: values.twitterHandler != ""? true : false,
-                telegram: values.telegramHandler != ""? true : false,
-                discord: values.discordHandler != ""? true: false
-              }
+                email: values.email != '' ? true : false,
+                github: values.githubHandler != '' ? true : false,
+                linkedin: values.linkedinHandler != '' ? true : false,
+                twitter: values.twitterHandler != '' ? true : false,
+                telegram: values.telegramHandler != '' ? true : false,
+                discord: values.discordHandler != '' ? true : false,
+              },
             });
             analytics.captureEvent(
               isUserProfile
@@ -724,7 +775,7 @@ export function EditMemberModal({
             );
           }
         } catch (err) {
-          console.log('Error updating member info', err)
+          console.log('Error updating member info', err);
           // if (err?.response?.status === 400) {
           //   toast(err?.response?.data?.message, {
           //     type: 'error',
@@ -851,15 +902,26 @@ export function EditMemberModal({
   }, [isUserProfile, id]);
 
   useEffect(() => {
-    if(tabSelection && tabId) {
-      setOpenTab(tabId)
+    if (tabSelection && tabId) {
+      setOpenTab(tabId);
     }
   }, []);
 
   const getMemberPreferences = async () => {
-    const memberPreferences = await getPreferences(id,JSON.parse(Cookies.get('authToken')));
-    setFormValues({ ...formValues, preferences: (!memberPreferences?.isnull  ? memberPreferences : { ...JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS)), ...memberPreferences })});
-  }
+    const memberPreferences = await getPreferences(
+      id,
+      JSON.parse(Cookies.get('authToken'))
+    );
+    setFormValues({
+      ...formValues,
+      preferences: !memberPreferences?.isnull
+        ? memberPreferences
+        : {
+            ...JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS)),
+            ...memberPreferences,
+          },
+    });
+  };
 
   return (
     <>
@@ -876,75 +938,84 @@ export function EditMemberModal({
             <div className="mx-auto mb-40 h-full">
               {
                 <>
-                <div className="mt-3 flex h-10 w-fit gap-[25px] justify-start text-slate-400">
-                  <button
-                    className={`w-fit px-[12px] border-b-4 border-transparent text-base font-medium ${
-                      openTab == 1 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
-                    } ${
-                      basicErrors?.length > 0 && openTab == 1
-                        ? 'border-b-[#DD2C5A] text-[#DD2C5A]'
-                        : basicErrors?.length > 0
-                        ? 'text-[#DD2C5A]'
-                        : ''
-                    }`}
-                    onClick={() => onTabClicked(1)}
+                  <div className="mt-3 flex h-10 w-fit justify-start gap-[25px] text-slate-400">
+                    <button
+                      className={`w-fit border-b-4 border-transparent px-[12px] text-base font-medium ${
+                        openTab == 1 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                      } ${
+                        basicErrors?.length > 0 && openTab == 1
+                          ? 'border-b-[#DD2C5A] text-[#DD2C5A]'
+                          : basicErrors?.length > 0
+                          ? 'text-[#DD2C5A]'
+                          : ''
+                      }`}
+                      onClick={() => onTabClicked(1)}
+                    >
+                      {' '}
+                      BASIC{' '}
+                    </button>
+                    <button
+                      className={`w-fit border-b-4 border-transparent px-[12px] text-base font-medium ${
+                        openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                      } ${
+                        skillErrors?.length > 0 && openTab == 2
+                          ? 'border-b-[#DD2C5A] text-[#DD2C5A]'
+                          : skillErrors?.length > 0
+                          ? 'text-[#DD2C5A]'
+                          : ''
+                      }`}
+                      onClick={() => onTabClicked(2)}
+                    >
+                      {' '}
+                      SKILLS
+                    </button>
+                    <button
+                      className={`w-fit border-b-4 border-transparent px-[12px] text-base font-medium ${
+                        openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                      }`}
+                      onClick={() => onTabClicked(3)}
+                    >
+                      {' '}
+                      CONTRIBUTIONS{' '}
+                    </button>
+                    <button
+                      className={`w-fit border-b-4 border-transparent px-[12px] text-base font-medium ${
+                        openTab == 4 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
+                      }`}
+                      onClick={() => onTabClicked(4)}
+                    >
+                      {' '}
+                      SOCIAL{' '}
+                    </button>
+                  </div>
+                  <div
+                    className="relative top-[-33px] float-right cursor-pointer text-[13px] font-medium leading-[20px] text-[#156FF7]"
+                    onClick={async () => {
+                      await getMemberPreferences();
+                      setOpenPreferenceFlag(true);
+                    }}
                   >
-                    {' '}
-                    BASIC{' '}
-                  </button>
-                  <button
-                    className={`w-fit px-[12px] border-b-4 border-transparent text-base font-medium ${
-                      openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
-                    } ${
-                      skillErrors?.length > 0 && openTab == 2
-                        ? 'border-b-[#DD2C5A] text-[#DD2C5A]'
-                        : skillErrors?.length > 0
-                        ? 'text-[#DD2C5A]'
-                        : ''
-                    }`}
-                    onClick={() => onTabClicked(2)}
+                    {!isUserProfile && (
+                      <>
+                        <PrefernceIcon className="inline-block" />
+                        <span className="relative pl-[5px]">
+                          {SETTINGS_CONSTANTS.VIEW_PREFERNCES}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <PreferenceModal
+                    isOpen={openPreference}
+                    onCloseFn={setOpenPreferenceFlag}
                   >
-                    {' '}
-                    SKILLS
-                  </button>
-                  <button
-                    className={`w-fit px-[12px] border-b-4 border-transparent text-base font-medium ${
-                      openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
-                    }`}
-                    onClick={() => onTabClicked(3)}
-                  >
-                    {' '}
-                    CONTRIBUTIONS{' '}
-                  </button>
-                  <button
-                    className={`w-fit px-[12px] border-b-4 border-transparent text-base font-medium ${
-                      openTab == 4 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
-                    }`}
-                    onClick={() => onTabClicked(4)}
-                  >
-                    {' '}
-                    SOCIAL{' '}
-                  </button>
-                </div>
-                <div className='relative float-right text-[13px] leading-[20px] text-[#156FF7] font-medium cursor-pointer top-[-33px]' onClick={async () => {
-                  await getMemberPreferences();
-                  setOpenPreferenceFlag(true);
-                }}>
-                    {
-                      !isUserProfile && (
-                        <>
-                          <PrefernceIcon className='inline-block' />
-                          <span className='relative pl-[5px]'>{SETTINGS_CONSTANTS.VIEW_PREFERNCES}</span>
-                        </>
-                      )
-                    }
-              </div>
-                <PreferenceModal isOpen={openPreference} onCloseFn={setOpenPreferenceFlag}>
-                  <Privacy from={SETTINGS_CONSTANTS.VIEW_PREFERNCES} memberPreferences={formValues.preferences}/>
+                    <Privacy
+                      from={SETTINGS_CONSTANTS.VIEW_PREFERNCES}
+                      memberPreferences={formValues.preferences}
+                    />
                   </PreferenceModal>
-              </>
+                </>
               }
-              <div className="mt-3 w-full relative rounded-md border bg-white  px-6 py-10">
+              <div className="relative mt-3 w-full rounded-md border bg-white  px-6 py-10">
                 {
                   <Fragment>
                     <div className={openTab === 1 ? 'block' : 'hidden'}>
@@ -1063,103 +1134,106 @@ export function EditMemberModal({
         <Modal
           isOpen={isOpen}
           onClose={() => handleModalClose()}
-          enableFooter={false}
-          image={<TextImage />}
           modalRef={divRef}
         >
-          {saveCompleted ? (
-            <div>
-              <div className="mb-3 text-center text-2xl font-bold">
-                Your changes has been saved successfully.
-              </div>
-              <div className="text-center">
-                <button
-                  className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
-                  onClick={() => handleModalClose()}
-                >
-                  Return to home
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div className="px-8">
-                <span className="font-size-14 text-sm">
-                  Please fill out only the fields you would like to change for
-                  this member. If there is something you want to change that is
-                  not available, please leave a detailed explanation in
-                  &quot;Additional Notes&quot;. If you don&apos;t want to change
-                  a field, leave it blank.
-                </span>
-              </div>
-              {errors?.length > 0 && (
-                <div className="w-full rounded-lg bg-white p-5 ">
-                  <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
-                    {errors.map((item, index) => (
-                      <li key={index}>{item}</li>
-                    ))}
-                  </ul>
+          <div className="w-[500px] rounded-lg bg-white">
+            <ModalHeader onClose={handleModalClose} image={<TextImage />} />
+            <div className='mt-40'>
+              {saveCompleted ? (
+                <div>
+                  <div className="mb-3 text-center text-2xl font-bold">
+                    Your changes has been saved successfully.
+                  </div>
+                  <div className="text-center">
+                    <button
+                      className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
+                      onClick={() => handleModalClose()}
+                    >
+                      Return to home
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="px-8">
+                    <span className="font-size-14 text-sm">
+                      Please fill out only the fields you would like to change
+                      for this member. If there is something you want to change
+                      that is not available, please leave a detailed explanation
+                      in &quot;Additional Notes&quot;. If you don&apos;t want to
+                      change a field, leave it blank.
+                    </span>
+                  </div>
+                  {errors?.length > 0 && (
+                    <div className="w-full rounded-lg bg-white p-5 ">
+                      <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
+                        {errors.map((item, index) => (
+                          <li key={index}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <div className="inputfield px-8 pb-10 pt-4">
+                    <InputField
+                      required
+                      name="requestorEmail"
+                      type="email"
+                      label="Requestor Email"
+                      value={userInfo?.email}
+                      onChange={handleInputChange}
+                      disabled={userInfo ? true : false}
+                      placeholder="Enter your email address"
+                      className="custom-grey custom-outline-none border"
+                    />
+                  </div>
+                  <div className="overflow-y-auto px-11">
+                    <AddMemberBasicForm
+                      formValues={formValues}
+                      onChange={handleInputChange}
+                      handleImageChange={handleImageChange}
+                      imageUrl={imageUrl}
+                      isEditMode={true}
+                      setDisableNext={setDisableSubmit}
+                      // emailExists={emailExists}
+                      disableEmail={true}
+                      isEmailEditActive={isEmailEditActive}
+                      onCancelEmailChange={onCancelEmailChange}
+                      isUserProfile={isUserProfile}
+                      isProfileSettings={isProfileSettings}
+                      onEmailChange={onEmailChange}
+                    />
+                    <AddMemberSkillForm
+                      formValues={formValues}
+                      dropDownValues={dropDownValues}
+                      handleDropDownChange={handleDropDownChange}
+                      handleAddNewRole={handleAddNewRole}
+                      updateParentTeamValue={updateParentTeamValue}
+                      updateParentRoleValue={updateParentRoleValue}
+                      handleDeleteRolesRow={handleDeleteRolesRow}
+                      onChange={handleInputChange}
+                    />
+                    <AddMemberSocialForm
+                      formValues={formValues}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="footerdiv flow-root w-full px-8">
+                    <div className="float-left">
+                      {getCancelOrBackButton(handleModalClose)}
+                    </div>
+                    <div className="float-right">
+                      {getSubmitOrNextButton(
+                        handleSubmit,
+                        isProcessing,
+                        isProfileSettings,
+                        disableSubmit
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
-              <div className="inputfield px-8 pb-10 pt-4">
-                <InputField
-                  required
-                  name="requestorEmail"
-                  type="email"
-                  label="Requestor Email"
-                  value={userInfo?.email}
-                  onChange={handleInputChange}
-                  disabled={userInfo ? true : false}
-                  placeholder="Enter your email address"
-                  className="custom-grey custom-outline-none border"
-                />
-              </div>
-              <div className="overflow-y-auto px-11">
-                <AddMemberBasicForm
-                  formValues={formValues}
-                  onChange={handleInputChange}
-                  handleImageChange={handleImageChange}
-                  imageUrl={imageUrl}
-                  isEditMode={true}
-                  setDisableNext={setDisableSubmit}
-                  // emailExists={emailExists}
-                  disableEmail={true}
-                  isEmailEditActive={isEmailEditActive}
-                  onCancelEmailChange={onCancelEmailChange}
-                  isUserProfile={isUserProfile}
-                  isProfileSettings={isProfileSettings}
-                  onEmailChange={onEmailChange}
-                />
-                <AddMemberSkillForm
-                  formValues={formValues}
-                  dropDownValues={dropDownValues}
-                  handleDropDownChange={handleDropDownChange}
-                  handleAddNewRole={handleAddNewRole}
-                  updateParentTeamValue={updateParentTeamValue}
-                  updateParentRoleValue={updateParentRoleValue}
-                  handleDeleteRolesRow={handleDeleteRolesRow}
-                  onChange={handleInputChange}
-                />
-                <AddMemberSocialForm
-                  formValues={formValues}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="footerdiv flow-root w-full px-8">
-                <div className="float-left">
-                  {getCancelOrBackButton(handleModalClose)}
-                </div>
-                <div className="float-right">
-                  {getSubmitOrNextButton(
-                    handleSubmit,
-                    isProcessing,
-                    isProfileSettings,
-                    disableSubmit
-                  )}
-                </div>
-              </div>
             </div>
-          )}
+          </div>
         </Modal>
       )}
     </>

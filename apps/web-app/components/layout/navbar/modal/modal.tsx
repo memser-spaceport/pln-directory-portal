@@ -70,27 +70,16 @@ function ModalFooter({ onClose }: ModalHeaderProps) {
 
 function Modal({
   isOpen,
-  title,
   children,
-  image,
   onClose,
-  enableHeader = true,
-  enableFooter = true,
-  modalClassName,
-  modalRef,
+  modalRef
 }: ModalProps) {
-  // const modalRef = useRef(null);
-  const zIndex = !modalClassName ? 'z-50' : modalClassName;
 
   return (
-    <Transition appear show={isOpen} as={Fragment}>
-      <Dialog
-        as="div"
-        ref={modalRef}
-        className={`fixed inset-0 left-0 top-0 w-full grow overflow-x-hidden outline-none ${zIndex}`}
-        onClose={() => onClose()}
-      >
-        <div className="">
+    <>
+      <Transition show={isOpen} as={Fragment}>
+        <Dialog open={isOpen} onClose={onClose} ref={modalRef} className="relative z-50">
+          {/* The backdrop, rendered as a fixed sibling to the panel container */}
           <Transition.Child
             as={Fragment}
             enter="ease-out duration-300"
@@ -100,33 +89,32 @@ function Modal({
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <div className="fixed left-0 top-0 h-full w-full overflow-y-auto overflow-x-hidden bg-gray-500 bg-opacity-75  outline-none transition-opacity" />
+            <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
           </Transition.Child>
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0 scale-95"
-            enterTo="opacity-100 scale-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100 scale-100"
-            leaveTo="opacity-0 scale-95"
-          >
-            <div className="dia relative my-8 h-auto w-[500px] transform rounded-lg bg-white text-left align-middle shadow-xl transition-all ">
-              {enableHeader && (
-                <ModalHeader
-                  onClose={onClose}
-                  title={title}
-                  image={image}
-                  headerStyleClass="h-10"
-                />
-              )}
-              <div className={enableHeader ? 'mt-40' : 'mt-20'}>{children}</div>
-              {enableFooter && <ModalFooter onClose={onClose} />}
+
+          {/* Full-screen scrollable container */}
+          <div className="fixed inset-0 w-screen overflow-y-auto">
+            {/* Container to center the panel */}
+            <div className="flex min-h-full items-center justify-center p-4">
+              {/* The actual dialog panel  */}
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="mx-auto rounded-lg bg-white">
+                  <div>{children}</div>
+                </Dialog.Panel>
+              </Transition.Child>
             </div>
-          </Transition.Child>
-        </div>
-      </Dialog>
-    </Transition>
+          </div>
+        </Dialog>
+      </Transition>
+    </>
   );
 }
 

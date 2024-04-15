@@ -15,8 +15,6 @@ export function RequestPending({
       <Modal
         isOpen={isOpen}
         onClose={() => setIsModalOpen(false)}
-        enableHeader={false}
-        enableFooter={false}
       >
         <div className="p-5">
           <div className="mb-3 text-center text-xl font-bold">
