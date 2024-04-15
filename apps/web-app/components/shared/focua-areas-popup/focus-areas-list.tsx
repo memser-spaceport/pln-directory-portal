@@ -2,13 +2,14 @@
 import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { getUserInfo } from 'apps/web-app/utils/shared.utils';
-import { TFocusArea } from 'apps/web-app/utils/teams.types';
+import { ITeam, TFocusArea } from 'apps/web-app/utils/teams.types';
 
 interface IFocusAreasList {
   selectedItems: TFocusArea[];
-  onOpen: () => void;
+  onOpen: (mode: string) => void;
   rawData: TFocusArea[];
   from: string;
+  teamDetails: ITeam
 }
 
 interface ISelectedAreas {
@@ -23,6 +24,7 @@ const FocusAreasList = (props: IFocusAreasList) => {
   const onOpen = props.onOpen;
   const rawData = props.rawData ?? [];
   const from = props?.from;
+  const teamDetails = props?.teamDetails;
   const analytics = useAppAnalytics();
   const formattedRawData = getFormattedFocusArea(rawData);
   const selectedFocusAreas = getSelectedItems(
@@ -121,8 +123,9 @@ const FocusAreasList = (props: IFocusAreasList) => {
     analytics.captureEvent(APP_ANALYTICS_EVENTS.FOCUS_AREA_EDIT_BTN_CLICKED, {
       from,
       user,
+      team: teamDetails
     });
-    onOpen();
+    onOpen("Edit");
   }
 
   return (
@@ -145,7 +148,7 @@ const FocusAreasList = (props: IFocusAreasList) => {
       </div>
       {selectedItems?.length === 0 && (
         <button
-          onClick={onOpen}
+          onClick={() => onOpen("Select")}
           className="flex h-10 w-full items-center justify-center rounded-lg border border-[#156FF7] px-2 py-3 text-sm
           font-[500] leading-6 text-[#156FF7]"
         >

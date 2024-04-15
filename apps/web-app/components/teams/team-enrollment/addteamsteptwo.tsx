@@ -18,11 +18,17 @@ export default function AddTeamStepTwo(props) {
   const analytics = useAppAnalytics();
   const userInfo = getUserInfo();
 
-  const onOpenFocusAreaModal = () => {
-    analytics.captureEvent(APP_ANALYTICS_EVENTS.SELECT_FOCUS_AREA_BTN_CLICKED, {
-      from,
-      user: userInfo,
-    });
+  const onOpenFocusAreaModal = (mode) => {
+    if (mode === 'Select') {
+      analytics.captureEvent(
+        APP_ANALYTICS_EVENTS.SELECT_FOCUS_AREA_BTN_CLICKED,
+        {
+          from,
+          user: userInfo,
+          team: values
+        }
+      );
+    }
     setIsFocusAreaModalOpen(true);
   };
 
@@ -96,24 +102,35 @@ export default function AddTeamStepTwo(props) {
           </span>
         </div>
 
-            <FocusAreasList
-              rawData={focusAreas}
-              selectedItems={values.focusAreas}
-              onOpen={onOpenFocusAreaModal}
-              from={from}
-            />
-            <div className="flex pt-3">
-              <div>
-                <InformationCircleIcon />
-              </div>
-              <p className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] ">
-                <span className='opacity-40'>
-                Protocol Labs&apos;s vision for the future is built on three core
-                focus areas that aim to harness humanity&apos;s potential for good,
-                navigate potential pitfalls, and ensure a future where
-                technology empowers humanity</span> - <a className='text-[#156FF7]' href={ABOUT_PLN_LINK} target='_blank' rel="noreferrer">Learn more.</a>
-              </p>
-            </div>
+        <FocusAreasList
+          rawData={focusAreas}
+          selectedItems={values.focusAreas}
+          onOpen={onOpenFocusAreaModal}
+          teamDetails={values}
+          from={from}
+        />
+        <div className="flex pt-3">
+          <div>
+            <InformationCircleIcon />
+          </div>
+          <p className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] ">
+            <span className="opacity-40">
+              Protocol Labs&apos;s vision for the future is built on three core
+              focus areas that aim to harness humanity&apos;s potential for
+              good, navigate potential pitfalls, and ensure a future where
+              technology empowers humanity
+            </span>{' '}
+            -{' '}
+            <a
+              className="text-[#156FF7]"
+              href={ABOUT_PLN_LINK}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Learn more.
+            </a>
+          </p>
+        </div>
       </div>
       {isFocusAreaModalOpen && (
         <FocusAreasPopup
