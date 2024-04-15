@@ -1,8 +1,7 @@
-import { TMembersFiltersValues } from '@protocol-labs-network/members/data-access';
+import { TMembersFiltersValues, TMembersRoleFilterValues } from '@protocol-labs-network/members/data-access';
 import { ParsedUrlQuery } from 'querystring';
 import { getRoleTagsFromValues, getTagsFromValues } from '../../../shared/directory/directory-filters/directory-filters.utils';
 import { IMembersFiltersValues } from './members-directory-filters.types';
-import { ROLES_FILTER_VALUES } from 'apps/web-app/constants';
 
 /**
  * Parse members filter values into each filter component's consumable format
@@ -12,7 +11,8 @@ export function parseMembersFilters(
     valuesByFilter: TMembersFiltersValues;
     availableValuesByFilter: TMembersFiltersValues;
   },
-  query: ParsedUrlQuery
+  query: ParsedUrlQuery,
+  roleValues: TMembersRoleFilterValues[]
 ): IMembersFiltersValues {
   return {
     skills: getTagsFromValues(
@@ -36,7 +36,7 @@ export function parseMembersFilters(
       query.metroArea
     ),
     memberRoles: getRoleTagsFromValues(
-      ROLES_FILTER_VALUES,
+      roleValues,
       query.memberRoles
     ),
   };

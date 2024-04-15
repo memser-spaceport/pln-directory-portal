@@ -76,3 +76,23 @@ export const SHARE_IDEA_SUBJECT = "A new idea received";
 export const SUPPORT_SUBJECT = "A new support request received";
 export const IPFS = 'ipfs';
 export const S3 = 's3';
+
+export const DEFAULT_MEMBER_ROLES = {
+  Founder: {
+    role: 'Founder',
+    alias: 'Founder/Co-Founder',
+    default: true
+  },
+  CEO: {
+    role: 'CEO',
+    default: true
+  },
+  CTO: {
+    role: 'CTO',
+    default: true
+  },
+  COO: {
+    role: 'COO',
+    default: true
+  }
+};

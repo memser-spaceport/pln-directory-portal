@@ -21,6 +21,8 @@ export type TMembersFiltersValues = {
 };
 
 export type TMembersRoleFilterValues = {
-  label: string,
-  value: string
+  role: string,
+  count: number,
+  default?: boolean,
+  alias?: string
 }

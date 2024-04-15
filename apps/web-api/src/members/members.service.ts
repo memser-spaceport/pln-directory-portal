@@ -25,7 +25,7 @@ import axios from 'axios';
 import { EmailOtpService } from '../otp/email-otp.service';
 import { AuthService } from '../auth/auth.service';
 import { LogService } from '../shared/log.service';
-import { DIRECTORYADMIN } from '../utils/constants';
+import { DIRECTORYADMIN, DEFAULT_MEMBER_ROLES } from '../utils/constants';
 @Injectable()
 export class MembersService {
   constructor(
@@ -42,6 +42,108 @@ export class MembersService {
 
   findAll(queryOptions: Prisma.MemberFindManyArgs) {
     return this.prisma.member.findMany(queryOptions);
+  }
+
+  /**
+   * This method retrieves the default(Founder, CEO, CTO and COO) and user selected(memberRoles) role's count
+   * @param defaultAndUserSelectedRoles An array of role name(default & user selected roles)
+   * @param memberRef Array of member UID's
+   *   - This member UID's are retrieved from Prisma ORM by applying standard query filters in member & team member role
+   * @returns Array of role with count
+   */
+  private async getRoleCountForDefaultAndUserSelectedRoles(defaultAndUserSelectedRoles, memberRef) {
+    try {
+      return await this.prisma.$queryRaw`
+      SELECT CAST(count(*) as INTEGER) AS count, role 
+      FROM (
+        SELECT unnest("roleTags") AS role, "memberUid" 
+        FROM "TeamMemberRole"
+      ) AS roles WHERE role IN (SELECT unnest(string_to_array(${defaultAndUserSelectedRoles?.toString()}, ','))) AND 
+      "memberUid" IN (
+        SELECT unnest(string_to_array(${memberRef?.toString()}, ','))
+      ) GROUP BY role;
+    `;
+    } catch (error) {
+      this.logger.error('Error while retrieving member role count for default and user selected roles. Error: ', error);
+      return {
+        statusCode: 500,
+        message: 'Error while retrieving member role count for default and user selected roles'
+      };
+    }
+  }
+
+  /**
+   * This method retrieves the non default and non user selected(memberRoles) role's count where user search term matches
+   * @param defaultAndUserSelectedRoles An array of role name(default & user selected roles)
+   * @param memberRef Array of member UID's
+   *   - This member UID's are retrieved from Prisma ORM by applying standard query filters in member & team member role
+   * @param searchTerm Search text extracted from query params
+   * @returns Array of role with count
+   */
+  private async getRoleCountForExcludedAndNonSelectedRoles(defaultAndUserSelectedRoles, memberRef, searchTerm) {
+    try {
+      return await this.prisma.$queryRaw`
+        SELECT CAST(count(*) as INTEGER) AS count, role 
+        FROM (
+          SELECT unnest("roleTags") AS role, "memberUid" 
+          FROM "TeamMemberRole"
+        ) AS roles WHERE role NOT IN (SELECT unnest(string_to_array(${defaultAndUserSelectedRoles?.toString()}, ','))) 
+        AND "memberUid" IN (
+          SELECT unnest(string_to_array(${memberRef?.toString()}, ','))
+        ) 
+        AND role ILIKE '%' || ${searchTerm} || '%' 
+        GROUP BY role;
+    `;
+    } catch (error) {
+      this.logger.error('Error while retrieving member role count for excluded and non selected roles. Error: ', error);
+      return {
+        statusCode: 500,
+        message: 'Error while retrieving member role count for excluded and non selected roles'
+      };
+    }
+  }
+
+  /**
+   * Retrieves the roles associated with members
+   * @param queryOptions 
+   * @returns 
+   */
+  async getRolesWithCount(queryOptions: Prisma.MemberFindManyArgs, queryParams: any) {
+    try {
+      const memberRoles = queryParams?.memberRoles?.split(',') || [];
+      const searchTerm = queryParams?.searchText || '';
+      let members = await this.prisma.member.findMany({
+        select: { uid: true },
+        where: queryOptions.where,
+      });
+      members = members?.map((member: any) => member.uid);
+      const selectedRoles = Array.from(new Set(Object.keys(DEFAULT_MEMBER_ROLES).concat(memberRoles)));
+      const selectedRolesResult: any = await this.getRoleCountForDefaultAndUserSelectedRoles(selectedRoles, members);
+      const formattedDefaultRoles: any = [];
+      const references = selectedRolesResult.reduce((obj: any, value: any) => {
+        obj[value.role] = value;
+        return obj;
+      }, {});
+      selectedRoles.forEach((role: string) => {
+        const filtered = references[role];
+        const defaultRole = DEFAULT_MEMBER_ROLES[role];
+        if (filtered && defaultRole) {
+          formattedDefaultRoles.push({ ...defaultRole, ...filtered });
+        } else if (filtered && !defaultRole) {
+          formattedDefaultRoles.push({ ...filtered });
+        } else if (!filtered && defaultRole) {
+          formattedDefaultRoles.push({ ...defaultRole, count: 0 });
+        }
+      });
+      const result: any = await this.getRoleCountForExcludedAndNonSelectedRoles(selectedRoles, members, searchTerm);
+      return [...formattedDefaultRoles, ...result];
+    } catch (error) {
+      this.logger.error('Error while retrieving member role filters with count. Error: ', error);
+      return {
+        statusCode: 500,
+        message: 'Error while retrieving member role filters with count'
+      };
+    }
   }
 
   findOne(
@@ -504,25 +606,38 @@ export class MembersService {
     });
   }
 
-  buildRoleFilters(request) {
-    const { memberRoles } : any = request.query;
-    if (memberRoles?.split(',')?.length > 0) {
+  /**
+   * This method construct the dynamic query to search either by roleTags or
+   * by role name from the teamMemberRole table from query params
+   * @param queryParams HTTP request query params object
+   * @returns Constructed query based on given member role input
+   */
+  buildRoleFilters(queryParams) {
+    const { memberRoles } : any = queryParams;
+    const roles = memberRoles?.split(',');
+    if (roles?.length > 0) {
       return {
         teamMemberRoles: {
           some: {
-            roleTags: { hasSome: memberRoles.split(',') }
+            roleTags: { hasSome: roles }
           }
         }
-      }
+      };
     }
     return {};
   }
 
-  buildNameFilters(request) {
-    const { name__icontains } = request.query;
+  /**
+   * This method construct the dynamic query to search the given text in either
+   * by member name or by team name from query params
+   * @param queryParams HTTP request query params object
+   * @returns Constructed query based on given text(name) input
+   */
+  buildNameFilters(queryParams) {
+    const { name__icontains } = queryParams;
     if (name__icontains) {
-      return { 
-        OR : [
+      return {
+        OR: [
           { name: {
               contains: name__icontains,
               mode: 'insensitive'
