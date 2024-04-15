@@ -2,7 +2,6 @@ import { TMembersFiltersValues, TMembersRoleFilterValues } from '@protocol-labs-
 import { ParsedUrlQuery } from 'querystring';
 import { getRoleTagsFromValues, getTagsFromValues } from '../../../shared/directory/directory-filters/directory-filters.utils';
 import { IMembersFiltersValues } from './members-directory-filters.types';
-import { ROLES_FILTER_VALUES } from 'apps/web-app/constants';
 
 /**
  * Parse members filter values into each filter component's consumable format
