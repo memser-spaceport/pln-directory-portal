@@ -3,7 +3,7 @@ import {
   client,
   TGetRequestOptions,
 } from '@protocol-labs-network/shared/data-access';
-import { TMemberListOptions, TMembersFiltersValues } from './members.types';
+import { TMemberListOptions, TMembersFiltersValues, TMembersRoleFilterValues } from './members.types';
 
 /**
  * Get members list from API
@@ -54,6 +54,29 @@ export const getMemberUIDByAirtableId = async (id: string) => {
   });
 
   return res.status === 200 && res.body[0] ? res.body[0].uid : null;
+};
+
+
+/**
+ * Get members roles from API
+ */
+export const getMemberRoleValues = async (options: TMemberListOptions) => {
+  return await client.members.getMemberRoles({
+    query: {
+      ...options,
+    } as any,
+  });
+};
+
+/**
+ * Get member roles values
+ */
+export const getMemberRoles = async (options: TMemberListOptions) => {
+  const valuesByFilter = await getMemberRoleValues(options);
+  if (valuesByFilter.status !== 200) {
+    return [] as unknown as TMembersRoleFilterValues[];
+  }
+  return valuesByFilter.body as TMembersRoleFilterValues[];
 };
 
 /**

@@ -1,4 +1,5 @@
 import {
+  getMemberRoles,
   getMembers,
   getMembersFilters,
 } from '@protocol-labs-network/members/data-access';
@@ -115,9 +116,10 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) 
   const optionsFromQuery = getMembersOptionsFromQuery(query);
 
   const listOptions = getMembersListOptions(optionsFromQuery);
-  const [membersResponse, filtersValues] = await Promise.all([
+  const [membersResponse, filtersValues, roleValues] = await Promise.all([
     getMembers(listOptions),
     getMembersFilters(optionsFromQuery),
+    getMemberRoles(optionsFromQuery),
   ]);
 
   let members: IMember[] =
@@ -126,7 +128,8 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) 
       : [];
   const parsedFilters: IMembersFiltersValues = parseMembersFilters(
     filtersValues,
-    query
+    query,
+    roleValues 
   );
 
   // Cache response data in the browser for 1 minute,
