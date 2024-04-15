@@ -5,5 +5,5 @@ export interface IMembersFiltersValues {
   region: IFilterTag[];
   country: IFilterTag[];
   metroArea: IFilterTag[];
-  memberRoles: IFilterTag[];
+  memberRoles: any;
 }

@@ -28,14 +28,16 @@ export function getTagsFromValues(
 export function getRoleTagsFromValues(
   allValues: TMembersRoleFilterValues[],
   queryValues: string | string[] = []
-): IFilterTag[] {
+): any {
   const queryValuesArr = Array.isArray(queryValues)
     ? queryValues
     : queryValues.split(URL_QUERY_VALUE_SEPARATOR);
 
-  return allValues.map((item) => {
-    const value = item.value
-    const selected = queryValuesArr.includes(item.value);
-    return { label:item.label, value, selected, disabled:false };
+  const newValues = allValues?.map((item) => {
+    const role = item.role
+    const selected = queryValuesArr.includes(item.role);
+    return { role, selected, default:item.default ?? false, alias:item.alias ?? null, count: item.count };
   });
+
+  return newValues.filter((item)=>item?.selected||item?.default);
 }
