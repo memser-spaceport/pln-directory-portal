@@ -54,7 +54,7 @@ export class MembersService {
   private async getRoleCountForDefaultAndUserSelectedRoles(defaultAndUserSelectedRoles, memberRef) {
     try {
       return await this.prisma.$queryRaw`
-      SELECT CAST(count(*) as INTEGER) AS count, role 
+      SELECT CAST(count(DISTINCT "memberUid") as INTEGER) AS count, role 
       FROM (
         SELECT unnest("roleTags") AS role, "memberUid" 
         FROM "TeamMemberRole"
@@ -83,7 +83,7 @@ export class MembersService {
   private async getRoleCountForExcludedAndNonSelectedRoles(defaultAndUserSelectedRoles, memberRef, searchTerm) {
     try {
       return await this.prisma.$queryRaw`
-        SELECT CAST(count(*) as INTEGER) AS count, role 
+        SELECT CAST(count(DISTINCT "memberUid") as INTEGER) AS count, role 
         FROM (
           SELECT unnest("roleTags") AS role, "memberUid" 
           FROM "TeamMemberRole"
