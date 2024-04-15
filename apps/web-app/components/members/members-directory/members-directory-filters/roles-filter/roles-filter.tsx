@@ -36,12 +36,14 @@ export function RolesFilter({ memberRoles }: RolesFilterProps) {
     roles.filter((item) => !item.default).every((item) => item.selected);
 
   const handleRoleToggle = (role: any) => {
-    analytics.captureEvent(APP_ANALYTICS_EVENTS.FILTERS_APPLIED, {
-      page: 'Members',
-      name: 'Roles',
-      value: role.label,
-      nameAndValue: `Roles-${role.label}`,
-    });
+    if(!role?.selected){
+      analytics.captureEvent(APP_ANALYTICS_EVENTS.FILTERS_APPLIED, {
+        page: 'Members',
+        name: 'Roles',
+        value: role.label,
+        nameAndValue: `Roles-${role.label}`,
+      });
+    }
     toggleRole(role);
   };
 
@@ -156,14 +158,14 @@ export function RolesFilter({ memberRoles }: RolesFilterProps) {
         <div className="flex max-h-[180px] flex-col gap-2 overflow-y-auto">
           {displayResults.length === 0 &&
             searchTextRef?.current?.value &&
-            !isProcessing && (
+            !isProcessing && !customSelected && (
               <p className="flex w-full items-center justify-center rounded-[4px] bg-[#F1F5F9] py-[6px] text-[#0F172A]">
                 <span className="text-[12px] font-[500] leading-[14px]">
                   No roles found
                 </span>
               </p>
             )}
-          {(displayResults.length > 0 || isAllCustomRoleSelected) && (
+          {(displayResults.length > 0 || customSelected) && (
             <label className="checkbox flex items-center">
               <input
                 type="checkbox"
