@@ -309,7 +309,7 @@ nextjs-portal {
   transform: rotate(45deg);
   position: absolute;
   left: 8px; 
-  top: 3px;
+  top: calc(50% - 8px); /* Center vertically */
   color: white;
 }
 

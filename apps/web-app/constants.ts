@@ -223,6 +223,9 @@ export const APP_ANALYTICS_EVENTS = {
   MEMBER_PR_CONTRIBUTIONS_SHOWLESS: 'member-pr-contributions-showless',
 
   FILTERS_APPLIED: 'filters-applied',
+  MEMBER_ROLE_FILTER_SEARCH_CALLED: 'member-role-filter-search-called',
+  MEMBER_ROLE_FILTER_SELECT_ALL: 'member-role-filter-select-all',
+  MEMBER_ROLE_FILTER_SEARCH_ERROR: 'member-role-filter-search-error',
 
   PROJECTS_FILTERS_APPLIED: 'projects-filters-applied',
   PROJECTS_FILTERS_CLEARED: 'projects-filters-cleared',
@@ -387,10 +390,14 @@ export const ANNOUNCEMENT_BANNER = {
 };
 
 export const ROLES_FILTER_VALUES = [
-  { label: 'Founder/Co-Founder', value: 'Founder' },
-  { label: 'CEO', value: 'CEO' },
-  { label: 'CTO', value: 'CTO' },
-  { label: 'COO', value: 'COO' },
+  { alias: 'Founder/Co-Founder', role: 'Founder', default:true, count: 40 },
+  { role: 'CEO', default:true, count: 14 },
+  { role: 'CTO', default:true, count: 54  },
+  { role: 'COO', default:true, count: 20  },
+  { role: 'Engineer', count: 5  },
+  { role: 'Associate', count: 6  },
+  { role: 'Director', count: 1  },
+  { role: 'Test Engineer', count: 2  },
 ];
 
 export const ChangeLogList = [
@@ -466,3 +473,5 @@ export const tagColors = [
 export const FILTER_API_ROUTES = {
   FOCUS_AREA: '/v1/focus-areas',
 };
+
+export const ROLE_FILTER_QUERY_NAME = "memberRoles";
