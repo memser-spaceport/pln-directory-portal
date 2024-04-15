@@ -48,10 +48,7 @@ export function useRolesFilter(filterRoles: any[]) {
   const unSelectAllRole = useCallback(
     () => {
       const { [ROLE_FILTER_QUERY_NAME]: queryFilterValue, ...restQuery } = query;
-      const updatedRoles = roles.filter(role=>!role.default).map(role=>{
-        role.selected=false;
-        return role;
-      })
+      const updatedRoles = roles.filter(role=>role.default)
       const newroles = updatedRoles
         ?.filter((role) => role.selected)
         .map((item) => item.role);
