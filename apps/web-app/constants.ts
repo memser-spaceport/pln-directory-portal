@@ -389,17 +389,6 @@ export const ANNOUNCEMENT_BANNER = {
   LEARN_MORE: 'Learn More',
 };
 
-export const ROLES_FILTER_VALUES = [
-  { alias: 'Founder/Co-Founder', role: 'Founder', default:true, count: 40 },
-  { role: 'CEO', default:true, count: 14 },
-  { role: 'CTO', default:true, count: 54  },
-  { role: 'COO', default:true, count: 20  },
-  { role: 'Engineer', count: 5  },
-  { role: 'Associate', count: 6  },
-  { role: 'Director', count: 1  },
-  { role: 'Test Engineer', count: 2  },
-];
-
 export const ChangeLogList = [
   {
     title: 'Version 2.0.4 - IRL Gatherings',
