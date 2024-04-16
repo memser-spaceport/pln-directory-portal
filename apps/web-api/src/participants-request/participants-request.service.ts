@@ -320,7 +320,7 @@ export class ParticipantsRequestService {
             mainTeam: false,
             teamLead: false,
             teamUid: t.teamUid,
-            roleTags: [t.role]
+            roleTags: t.role?.split(',')
           };
         }),
       },
@@ -611,7 +611,7 @@ export class ParticipantsRequestService {
               if (foundDefaultRoleTag) {
                 dataToProcess.teamAndRoles[index].roleTags = foundValue.roleTags;
               } else {
-                dataToProcess.teamAndRoles[index].roleTags = [ dataToProcess.teamAndRoles[index].role];
+                dataToProcess.teamAndRoles[index].roleTags = dataToProcess.teamAndRoles[index].role?.split(',');
               }
               return true;
             }
@@ -643,7 +643,7 @@ export class ParticipantsRequestService {
             memberUid: dataFromDB.referenceUid,
           },
         },
-        data: { role: v.role, roleTags: v.roleTags },
+        data: { role: v.role, roleTags: v.role?.split(',') },
       })
     );
     await Promise.all(promisesToDelete);
