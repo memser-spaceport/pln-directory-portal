@@ -15,6 +15,9 @@ export function DirectoryFilters({
     const cleanQuery = { ...query };
 
     filterProperties.forEach((property) => delete cleanQuery[property]);
+    if (pathname.includes('members')) {
+      document.dispatchEvent(new CustomEvent('clearSearchText'));
+    }
 
     push({ pathname, query: cleanQuery });
   }
@@ -31,8 +34,10 @@ export function DirectoryFilters({
         </button>
       </div>
 
-      <div className="h-[calc(100vh_-_148px)] overflow-y-auto p-5 pl-[37px] focus-within:outline-none focus:outline-none focus-visible:outline-none">
-        {children}
+      <div className="slim-scroll">
+        <div className="h-[calc(100vh_-_148px)] overflow-y-auto p-5 pl-[37px] focus-within:outline-none focus:outline-none focus-visible:outline-none">
+          {children}
+        </div>
       </div>
     </>
   );
