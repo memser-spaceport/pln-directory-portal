@@ -134,6 +134,19 @@ export function RolesFilter({ memberRoles }: RolesFilterProps) {
     }
   }, [roles]);
 
+  useEffect(() => {
+    const handler = (e: any) => {
+      setSearchText("");
+      if(searchTextRef?.current){
+        searchTextRef.current.value = "";
+      }
+    };
+    document.addEventListener('clearSearchText', handler);
+    return () => {
+      document.removeEventListener('clearSearchText', handler);
+    };
+  }, []);
+
   return (
     <div className="flex w-[100%] flex-col">
       <p className="mb-3 text-sm font-semibold leading-5">Roles</p>
