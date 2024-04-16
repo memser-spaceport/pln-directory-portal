@@ -163,11 +163,11 @@ const FocusAreasList = (props: IFocusAreasList) => {
                 key={`${path} + ${index}`}
                 className="flex flex-col gap-2 rounded border border-[#CBD5E1] py-[14px] px-[13px]"
               >
-                <div className="text-sm font-semibold leading-[14px] text-[#0F172A]">
+                <div className="text-sm font-semibold leading-[14px] text-[#0F172A] break-words">
                   {path.title}
                 </div>
                 {path.title !== path.path && (
-                  <div className="text-sm  font-[500] leading-[14px] text-[#4D4D4D] opacity-60">
+                  <div className="text-sm  font-[500] leading-[14px] text-[#4D4D4D] opacity-60 break-words">
                     {path.path}
                   </div>
                 )}

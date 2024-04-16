@@ -74,12 +74,14 @@ const FocusArea = (props: IFocusArea) => {
             )}
           </button>
 
+          <div className='max-w-[85%] break-words'>
           <p className="text-[14px] font-[500] leading-[24px]">{focusArea.title}</p>
+          </div>
 
-          {focusArea?.teams?.length > 0 && (
+          {focusArea?.teamAncestorFocusAreas?.length > 0 && (
             <div className="w-fit rounded-[2px] bg-[#F1F5F9]">
               <p className="px-[5px] text-[10px] font-[500] leading-[14px] text-[#475569]">
-                {focusArea?.teams?.length}{' '}
+                {focusArea?.teamAncestorFocusAreas?.length}
               </p>
             </div>
           )}
@@ -88,7 +90,7 @@ const FocusArea = (props: IFocusArea) => {
         {isGrandParent && (
           <>
             {description && (
-              <p className="px-[16px] text-[12px] font-[500] text-[#4D4D4D] ">
+              <p className="px-[16px] text-[12px] font-[500] text-[#4D4D4D] break-words">
                 <span className="font-[600]">Selected:</span> {description}
               </p>
             )}
