@@ -57,5 +57,5 @@ export type TFocusArea = {
   parentUid: string;
   parents: any[];
   children: TFocusArea[];
-  teams: ITeam[];
+  teamAncestorFocusAreas: ITeam[];
 }
