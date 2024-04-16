@@ -25,6 +25,7 @@ import { getRandomId, generateProfileURL } from '../utils/helper/helper';
 import axios from 'axios';
 import { LogService } from '../shared/log.service';
 import { Cache } from 'cache-manager';
+import { DEFAULT_MEMBER_ROLES } from '../utils/constants';
 
 @Injectable()
 export class ParticipantsRequestService {
@@ -319,6 +320,7 @@ export class ParticipantsRequestService {
             mainTeam: false,
             teamLead: false,
             teamUid: t.teamUid,
+            roleTags: [t.role]
           };
         }),
       },
@@ -591,7 +593,7 @@ export class ParticipantsRequestService {
       ...existingData.teamMemberRoles,
     ].filter((t) => !newTeamUids.includes(t.teamUid));
     const teamAndRolesUidsToUpdate = [...dataToProcess.teamAndRoles].filter(
-      (t) => {
+      (t, index) => {
         if (oldTeamUids.includes(t.teamUid)) {
           const foundIndex = [...existingData.teamMemberRoles].findIndex(
             (v) => v.teamUid === t.teamUid
@@ -599,6 +601,18 @@ export class ParticipantsRequestService {
           if (foundIndex > -1) {
             const foundValue = [...existingData.teamMemberRoles][foundIndex];
             if (foundValue.role !== t.role) {
+              let foundDefaultRoleTag = false;
+              foundValue.roleTags?.some(tag => {
+                if (Object.keys(DEFAULT_MEMBER_ROLES).includes(tag)) {
+                  foundDefaultRoleTag = true;
+                  return true
+                }
+              });
+              if (foundDefaultRoleTag) {
+                dataToProcess.teamAndRoles[index].roleTags = foundValue.roleTags;
+              } else {
+                dataToProcess.teamAndRoles[index].roleTags = [ dataToProcess.teamAndRoles[index].role];
+              }
               return true;
             }
           }
@@ -629,7 +643,7 @@ export class ParticipantsRequestService {
             memberUid: dataFromDB.referenceUid,
           },
         },
-        data: { role: v.role },
+        data: { role: v.role, roleTags: v.roleTags },
       })
     );
     await Promise.all(promisesToDelete);
@@ -642,6 +656,7 @@ export class ParticipantsRequestService {
           teamLead: false,
           teamUid: t.teamUid,
           memberUid: dataFromDB.referenceUid,
+          roleTags: [t.role]
         };
       }),
     });
