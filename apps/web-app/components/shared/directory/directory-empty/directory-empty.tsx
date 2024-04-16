@@ -11,6 +11,9 @@ export function DirectoryEmpty({ filterProperties }: DirectoryEmptyProps) {
     const cleanQuery = { ...query };
 
     filterProperties.forEach((property) => delete cleanQuery[property]);
+    if (pathname.includes('members')) {
+      document.dispatchEvent(new CustomEvent('clearSearchText'));
+    }
 
     push({ pathname, query: cleanQuery });
   }

@@ -18,6 +18,8 @@ export function RolesFilter({ memberRoles }: RolesFilterProps) {
   const [searchText, setSearchText] = useState<string>('');
   const [searchResults, setSearchResults] = useState([]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isSearchResultsEmpty, setSearchResultsEmpty] =
+    useState<boolean>(false);
   const { query } = useRouter();
 
   const [roles, toggleRole, selectAllRole, unSelectAllRole] =
@@ -36,7 +38,7 @@ export function RolesFilter({ memberRoles }: RolesFilterProps) {
     roles.filter((item) => !item.default).every((item) => item.selected);
 
   const handleRoleToggle = (role: any) => {
-    if(!role?.selected){
+    if (!role?.selected) {
       analytics.captureEvent(APP_ANALYTICS_EVENTS.FILTERS_APPLIED, {
         page: 'Members',
         name: 'Roles',
@@ -78,6 +80,16 @@ export function RolesFilter({ memberRoles }: RolesFilterProps) {
     const optionsFromQuery = getMembersOptionsFromQuery(query);
     findRoleByName({ params: { ...optionsFromQuery, searchText: searchQuery } })
       .then((newRoles) => {
+        const matchingRoles = newRoles.filter((item) => {
+          const iRole = item.role.toLowerCase();
+          const searchText = searchQuery.toLowerCase();
+          return !item.default && iRole.includes(searchText);
+        });
+        if (matchingRoles?.length === 0) {
+          setSearchResultsEmpty(true);
+        } else {
+          setSearchResultsEmpty(false);
+        }
         const selectedRoles = newRoles.filter(
           (newRole) => !roles.some((role) => role.role === newRole.role)
         );
@@ -136,10 +148,11 @@ export function RolesFilter({ memberRoles }: RolesFilterProps) {
 
   useEffect(() => {
     const handler = (e: any) => {
-      setSearchText("");
-      if(searchTextRef?.current){
-        searchTextRef.current.value = "";
+      setSearchText('');
+      if (searchTextRef?.current) {
+        searchTextRef.current.value = '';
       }
+      setSearchResults([]);
     };
     document.addEventListener('clearSearchText', handler);
     return () => {
@@ -169,16 +182,16 @@ export function RolesFilter({ memberRoles }: RolesFilterProps) {
         )}
       </div>
       <div className="flex flex-col gap-2">
+        {isSearchResultsEmpty &&
+          searchTextRef?.current?.value &&
+          !isProcessing && (
+            <p className="flex w-full items-center justify-center rounded-[4px] bg-[#F1F5F9] py-[6px] text-[#0F172A]">
+              <span className="text-[12px] font-[500] leading-[14px]">
+                No roles found
+              </span>
+            </p>
+          )}
         <div className="flex max-h-[180px] flex-col gap-2 overflow-y-auto">
-          {displayResults.length === 0 &&
-            searchTextRef?.current?.value &&
-            !isProcessing && !customSelected && (
-              <p className="flex w-full items-center justify-center rounded-[4px] bg-[#F1F5F9] py-[6px] text-[#0F172A]">
-                <span className="text-[12px] font-[500] leading-[14px]">
-                  No roles found
-                </span>
-              </p>
-            )}
           {(displayResults.length > 0 || customSelected) && (
             <label className="checkbox flex items-center">
               <input
