@@ -338,7 +338,6 @@ export default function TeamView(props) {
                     focusAreas={focusAreas}
                     handleFoucsAreaSave={handleFocusSubmit}
                     from="Edit team"
-                    isRequired
                   />
                   <TeamStepThree
                     formValues={formValues}
@@ -463,7 +462,7 @@ export const getServerSideProps = async (context) => {
       telegramHandler: team.telegramHandler ?? '',
       blog: team.blog ?? '',
       officeHours: team.officeHours ?? '',
-      focusAreas: team?.focusAreas ?? []
+      // focusAreas: team?.focusAreas ?? []
     };
     imageUrl = team?.logoUrl ?? '';
 

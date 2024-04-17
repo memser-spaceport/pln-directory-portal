@@ -467,6 +467,7 @@ export function EditTeamModal({
           const res = await api.put(`/v1/teams/${id}`, data);
           if (res.status === 200 && res.statusText === 'OK')
             setSaveCompleted(true);
+          getFocusAreas();
           analytics.captureEvent(
             APP_ANALYTICS_EVENTS.SETTINGS_TEAM_PROFILE_EDIT_FORM,
             {

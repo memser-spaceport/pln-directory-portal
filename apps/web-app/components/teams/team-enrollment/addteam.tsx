@@ -240,7 +240,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     telegramHandler: '',
     blog: '',
     officeHours: '',
-    focusAreas: [],
+    // focusAreas: [],
   });
   const analytics = useAppAnalytics();
   const divRef = useRef<HTMLDivElement>(null);
@@ -298,7 +298,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       telegramHandler: '',
       blog: '',
       officeHours: '',
-      focusAreas: [],
+      // focusAreas: [],
     });
   }
 
