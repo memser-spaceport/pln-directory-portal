@@ -320,7 +320,7 @@ export class ParticipantsRequestService {
             mainTeam: false,
             teamLead: false,
             teamUid: t.teamUid,
-            roleTags: t.role?.split(',')
+            roleTags: t.role?.split(',')?.map(item => item.trim())
           };
         }),
       },
@@ -611,7 +611,8 @@ export class ParticipantsRequestService {
               if (foundDefaultRoleTag) {
                 dataToProcess.teamAndRoles[index].roleTags = foundValue.roleTags;
               } else {
-                dataToProcess.teamAndRoles[index].roleTags = dataToProcess.teamAndRoles[index].role?.split(',');
+                dataToProcess.teamAndRoles[index].roleTags = 
+                  dataToProcess.teamAndRoles[index].role?.split(',')?.map(item => item.trim());
               }
               return true;
             }
@@ -656,7 +657,7 @@ export class ParticipantsRequestService {
           teamLead: false,
           teamUid: t.teamUid,
           memberUid: dataFromDB.referenceUid,
-          roleTags: t.role.split(',')
+          roleTags: t.role?.split(',')?.map(item => item.trim())
         };
       }),
     });
