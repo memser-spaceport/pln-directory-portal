@@ -391,6 +391,15 @@ export const ANNOUNCEMENT_BANNER = {
 
 export const ChangeLogList = [
   {
+    title: 'Version 2.0.5 - Enhanced search on Member roles',
+    tag: 'Improvements',
+    date: '17, Apr 2024',
+    shortContent: `<div>
+      <ul style="list-style: disc; font-size: 16px">
+      This release is an further improvement on the filters based on member roles which was released as <a style="text-decoration:underline; color:#156ff7" href='#version-2.0.1'>Version 2.0.1</a> on 22, Mar 2024. This feature update enables users to type and search roles they are looking for into the Role filter's search bar.
+      </ul></div>`,
+  },
+  {
     title: 'Version 2.0.4 - IRL Gatherings',
     tag: 'New Feature',
     date: '12, Apr 2024',
@@ -430,7 +439,7 @@ export const ChangeLogList = [
     title: 'Version 2.0.1 - Filters based on Member roles',
     tag: 'New Feature',
     date: '22, Mar 2024 ',
-    shortContent: `<div>
+    shortContent: `<div id='version-2.0.1'>
       <ul style="list-style: disc; font-size: 16px; line-height:24px;">
       <li>Added a new filter in Member's page to search members based on their role.</li>
       <li>Roles that are currently supported in the filter are
