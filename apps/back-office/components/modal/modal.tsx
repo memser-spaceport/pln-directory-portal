@@ -1,6 +1,5 @@
 import { Dialog, Transition } from '@headlessui/react';
 import React, { ReactNode, Fragment, LegacyRef } from 'react';
-import { ReactComponent as CloseIcon } from '../../../../public/assets/images/icons/closeIcon.svg';
 
 type ModalProps = {
   isOpen: boolean;
@@ -30,9 +29,10 @@ function ModalHeader({
 }: ModalHeaderProps) {
   return (
     <>
-      <CloseIcon
-        className="stroke-3 absolute right-5 top-5 z-40 cursor-pointer"
+      <img
+        className="stroke-3 absolute right-5 top-5 z-40 cursor-pointer bg-red"
         onClick={() => onClose()}
+        src='/assets/images/minus_white.svg'
       />
       <div className={`${headerStyleClass} rounded-lg`}>
         {image && (

@@ -89,7 +89,7 @@
   padding-bottom: 32px;
   padding-left: 44px;
   padding-right: 44px;
-  z-index: 1057;
+  z-index: 5;
 }
 .cross-icon {
   width: 16px;
@@ -189,7 +189,7 @@
 }
 
 .github-project-popup{
-  max-height: calc(100vh - 380px);
+  max-height: calc(100vh - 350px);
 }
 
 nextjs-portal {

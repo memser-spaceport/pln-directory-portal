@@ -280,6 +280,10 @@ export const APP_ANALYTICS_EVENTS = {
   IRL_GUEST_LIST_TABLE_TELEGRAM_LINK_CLICKED:'irl-guest-list-table-telegram-link-clicked',
   IRL_RSVP_POPUP_SAVE_BTN_CLICKED:'irl-rsvp-popup-save-btn-clicked',
   IRL_RSVP_POPUP_UPDATE_BTN_CLICKED:'irl-rsvp-popup-update-btn-clicked',
+
+  SELECT_FOCUS_AREA_BTN_CLICKED:'select-focus-area-btn-clicked',
+  FOCUS_AREA_POPUP_SAVE_BTN_CLICKED:'focus-area-popup-save-btn-clicked',
+  FOCUS_AREA_EDIT_BTN_CLICKED:'focus-area-edit-btn-clicked',
 };
 
 export const TAB_CONSTANTS = {
@@ -473,3 +477,5 @@ export const FILTER_API_ROUTES = {
 };
 
 export const ROLE_FILTER_QUERY_NAME = "memberRoles";
+
+export const ABOUT_PLN_LINK = "https://protocol.ai/blog/transcription-pl-vision-driving-a-breakthroughs-in-computing-to-push-humanity-forward/"

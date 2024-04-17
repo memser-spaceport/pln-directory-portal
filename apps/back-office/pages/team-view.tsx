@@ -1,4 +1,4 @@
-import { useState, ChangeEvent, useCallback } from 'react';
+import { useState, ChangeEvent, useCallback, useEffect } from 'react';
 import TeamStepOne from '../components/teams/teamstepone';
 import TeamStepTwo from '../components/teams/teamsteptwo';
 import TeamStepThree from '../components/teams/teamstepthree';
@@ -13,6 +13,7 @@ import api from '../utils/api';
 import APP_CONSTANTS, {
   API_ROUTE,
   ENROLLMENT_TYPE,
+  FILTER_API_ROUTES,
   ROUTE_CONSTANTS,
 } from '../utils/constants';
 import { ApprovalLayout } from '../layout/approval-layout';
@@ -85,6 +86,7 @@ function validateForm(formValues, imageUrl) {
 }
 
 export default function TeamView(props) {
+  const focusAreas = props?.focusAreas;
   const name = props?.oldName;
   const [errors, setErrors] = useState([]);
   const [imageUrl, setImageUrl] = useState<string>(props?.imageUrl);
@@ -227,7 +229,7 @@ export default function TeamView(props) {
             logoUrl: image?.url ?? imageUrl,
           },
         };
-        await api
+        const res = await api
           .put(
             `${API_ROUTE.PARTICIPANTS_REQUEST}/${props.id}`,
             data,
@@ -240,7 +242,6 @@ export default function TeamView(props) {
           });
       } catch (err) {
         toast(err?.message);
-        console.log('error', err);
       } finally {
         setIsProcessing(false);
       }
@@ -281,6 +282,15 @@ export default function TeamView(props) {
       pathname: route,
     });
   }
+
+  const handleFocusSubmit = (focusAreas) => {
+    const isSame =
+      JSON.stringify(formValues.focusAreas) === JSON.stringify(focusAreas);
+    if (!isSame) {
+      setFormValues({ ...formValues, focusAreas: focusAreas });
+    }
+  };
+
 
   return (
     <>
@@ -325,6 +335,9 @@ export default function TeamView(props) {
                     handleInputChange={handleInputChange}
                     handleDropDownChange={handleDropDownChange}
                     isEditEnabled={isEditEnabled}
+                    focusAreas={focusAreas}
+                    handleFoucsAreaSave={handleFocusSubmit}
+                    from="Edit team"
                   />
                   <TeamStepThree
                     formValues={formValues}
@@ -388,6 +401,7 @@ export const getServerSideProps = async (context) => {
   let teamList = [];
   let oldName = '';
   let referenceUid, imageUrl, status;
+  let focusAreas = [];
 
   const [
     requestDetailResponse,
@@ -396,6 +410,7 @@ export const getServerSideProps = async (context) => {
     fundingStagesResponse,
     industryTagsResponse,
     technologiesResponse,
+    focusAreasResponse
   ] = await Promise.all([
     api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, config),
     api.get(API_ROUTE.PARTICIPANTS_REQUEST, config),
@@ -403,6 +418,7 @@ export const getServerSideProps = async (context) => {
     api.get(API_ROUTE.FUNDING_STAGE),
     api.get(API_ROUTE.INDUSTRIES),
     api.get(API_ROUTE.TECHNOLOGIES),
+    api.get(FILTER_API_ROUTES.FOCUS_AREA)
   ]);
 
   if (
@@ -411,20 +427,21 @@ export const getServerSideProps = async (context) => {
     membershipSourcesResponse.status === 200 &&
     fundingStagesResponse.status === 200 &&
     industryTagsResponse.status === 200 &&
-    technologiesResponse.status === 200
+    technologiesResponse.status === 200 &&
+    focusAreasResponse.status === 200
   ) {
     referenceUid = requestDetailResponse?.data?.referenceUid ?? '';
     const team = requestDetailResponse?.data?.newData;
     oldName = team?.oldName ?? team?.name;
     status = requestDetailResponse?.data?.status;
     formValues = {
-      name: team.name,
+      name: team?.name,
       logoUid: team?.logoUid ?? '',
       logoFile: null,
-      shortDescription: team.shortDescription ?? '',
-      longDescription: team.longDescription ?? '',
+      shortDescription: team?.shortDescription ?? '',
+      longDescription: team?.longDescription ?? '',
       requestorEmail: requestDetailResponse.data.requesterEmailId ?? '',
-      technologies: team.technologies?.map((item) => {
+      technologies: team?.technologies?.map((item) => {
         return { value: item.uid, label: item.title };
       }),
       fundingStage: {
@@ -445,6 +462,7 @@ export const getServerSideProps = async (context) => {
       telegramHandler: team.telegramHandler ?? '',
       blog: team.blog ?? '',
       officeHours: team.officeHours ?? '',
+      // focusAreas: team?.focusAreas ?? []
     };
     imageUrl = team?.logoUrl ?? '';
 
@@ -476,6 +494,10 @@ export const getServerSideProps = async (context) => {
     technologies = technologiesResponse?.data.map((item) => {
       return { value: item.uid, label: item.title };
     });
+
+    const filteredFocusArea = focusAreasResponse?.data?.filter((item) => !item?.parentUid)
+    focusAreas = filteredFocusArea ?? [];
+
   }
 
   // Redirects user to the 404 page if response from
@@ -502,6 +524,7 @@ export const getServerSideProps = async (context) => {
       memberList,
       plnadmin,
       oldName,
+      focusAreas
     },
   };
 };
