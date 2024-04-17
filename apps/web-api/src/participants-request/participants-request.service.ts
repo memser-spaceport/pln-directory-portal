@@ -643,7 +643,7 @@ export class ParticipantsRequestService {
             memberUid: dataFromDB.referenceUid,
           },
         },
-        data: { role: v.role, roleTags: v.role?.split(',') },
+        data: { role: v.role, roleTags: v.roleTags },
       })
     );
     await Promise.all(promisesToDelete);
@@ -656,7 +656,7 @@ export class ParticipantsRequestService {
           teamLead: false,
           teamUid: t.teamUid,
           memberUid: dataFromDB.referenceUid,
-          roleTags: [t.role]
+          roleTags: t.role.split(',')
         };
       }),
     });
