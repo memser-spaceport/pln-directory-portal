@@ -16,7 +16,7 @@ export function RequestPending({
         isOpen={isOpen}
         onClose={() => setIsModalOpen(false)}
       >
-        <div className="p-5">
+        <div className="p-5 w-[500px]">
           <div className="mb-3 text-center text-xl font-bold">
             You already have a request awaiting for approval. Please wait until
             it&apos;s processed.

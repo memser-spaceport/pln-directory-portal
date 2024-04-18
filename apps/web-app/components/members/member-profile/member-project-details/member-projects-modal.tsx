@@ -26,7 +26,7 @@ export function MemberProfileProjectsModal({
       isOpen={isOpen}
       onClose={() => setIsModalOpen(false)}
     >
-      <div className="pt-8 slim-scroll">
+      <div className="pt-8 slim-scroll w-[500px]">
         <div className="px-8 mb-4 font-bold text-slate-900">
           {'Repositories'} ({repositories?.length})
         </div>
