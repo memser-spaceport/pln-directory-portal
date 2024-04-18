@@ -12,7 +12,6 @@ import { RedisService } from '../utils/redis/redis.service';
 import { SlackService } from '../utils/slack/slack.service';
 import { TeamsController } from './teams.controller';
 import { TeamsService } from './teams.service';
-import { FocusAreasService } from './../focus-areas/focus-areas.service';
 
 @Module({
   controllers: [TeamsController],
@@ -28,8 +27,8 @@ import { FocusAreasService } from './../focus-areas/focus-areas.service';
     AwsService,
     RedisService,
     SlackService,
-    ForestAdminService,
-    FocusAreasService
+    ForestAdminService
   ],
+  exports:[TeamsService]
 })
 export class TeamsModule {}

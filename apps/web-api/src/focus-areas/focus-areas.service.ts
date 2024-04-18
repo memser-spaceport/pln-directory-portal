@@ -1,19 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
-
+import { TeamsService } from '../teams/teams.service'; 
 @Injectable()
 export class FocusAreasService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private teamsService: TeamsService) {}
 
-  async findAll(query: any) {
-    const teamFilter = query.where?.team || {};
+  async findAll(filter) {
     const result = await this.prisma.focusArea.findMany({
       include: {
-        children: this.buildQueryByLevel(5, teamFilter), // level denotes depth of children.
+        children: this.buildQueryByLevel(3, filter), // level denotes depth of children.
         teamAncestorFocusAreas: {
           where: {
             team: {
-              ...teamFilter
+              ...filter
             }
           }
         }
@@ -50,14 +49,8 @@ export class FocusAreasService {
       }
     };
   }
-
-  removeDuplicateFocusAreas(focusAreas): any {
-    const uniqueFocusAreas = {};
-    focusAreas.forEach(item => {
-        const uid = item.focusArea.uid;
-        const title = item.focusArea.title;
-        uniqueFocusAreas[uid] = { uid, title };
-    });
-    return Object.values(uniqueFocusAreas);
+  
+  buildTeamFilter(queryParams) {
+    return this.teamsService.buildTeamFilter(queryParams);
   }
 }
