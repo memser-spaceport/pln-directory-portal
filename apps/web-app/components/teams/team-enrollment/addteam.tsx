@@ -6,6 +6,7 @@ import {
   useEffect,
   useCallback,
   useRef,
+  ReactNode,
 } from 'react';
 import { trackGoal } from 'fathom-client';
 import AddTeamStepOne from './addteamstepone';
@@ -25,11 +26,15 @@ import {
   APP_ANALYTICS_EVENTS,
   ENROLLMENT_TYPE,
   FATHOM_EVENTS,
+  FILTER_API_ROUTES,
 } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/create_team.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
 import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
+import { ModalHeader } from '../../shared/modal-header/modal-header';
+import { getUserInfo } from 'apps/web-app/utils/shared.utils';
+
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddTeamModalProps {
@@ -235,10 +240,13 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     telegramHandler: '',
     blog: '',
     officeHours: '',
+    // focusAreas: [],
   });
   const analytics = useAppAnalytics();
   const divRef = useRef<HTMLDivElement>(null);
   // const { executeRecaptcha } = useGoogleReCaptcha();
+
+  const [rawData, setRawData] = useState([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -290,6 +298,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       telegramHandler: '',
       blog: '',
       officeHours: '',
+      // focusAreas: [],
     });
   }
 
@@ -483,6 +492,9 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
             dropDownValues={dropDownValues}
             handleInputChange={handleInputChange}
             handleDropDownChange={handleDropDownChange}
+            handleFoucsAreaSave={handleFoucsAreaSave}
+            focusAreas={rawData}
+            from="Team join network"
           />
         );
       case 3:
@@ -503,80 +515,105 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     }
   }
 
+  function handleFoucsAreaSave(values: any) {
+    analytics.captureEvent(
+      APP_ANALYTICS_EVENTS.FOCUS_AREA_POPUP_SAVE_BTN_CLICKED,
+      {
+        focusAreas: values,
+        userInfo: getUserInfo(),
+      }
+    );
+    setFormValues({ ...formValues, focusAreas: values });
+  }
+
+  const getFocusAreas = async () => {
+    try {
+      const focusAreasResponse = await api.get(
+        `${FILTER_API_ROUTES.FOCUS_AREA}`
+      );
+
+      const rawData = focusAreasResponse.data;
+      const filteredParents = rawData.filter((data) => !data.parentUid);
+      setRawData(filteredParents);
+    } catch (error) {
+      setRawData([]);
+    }
+  };
+
+  useEffect(() => {
+    getFocusAreas();
+  }, []);
+
   return (
     <>
-      {isProcessing && (
-        <div
-          className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
-        >
-          <LoadingIndicator />
-        </div>
-      )}
-      <Modal
-        isOpen={isOpen}
-        onClose={handleModalClose}
-        enableFooter={false}
-        image={<TextImage />}
-        modalClassName={isProcessing ? 'z-[49]' : ''}
-        modalRef={divRef}
-      >
-        {saveCompleted ? (
-          <div>
-            <div className="mb-3 text-center text-2xl font-bold">
-              Thank you for submitting
-            </div>
-            <div className="text-md mb-3 text-center">
-              Our team will review your request shortly & get back
-            </div>
-            <div className="text-center">
-              <button
-                className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
-                onClick={() => handleModalClose()}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div>
-            <FormStepsIndicator formStep={formStep} steps={teamFormSteps} />
-            {errors?.length > 0 && (
-              <div className="w-full rounded-lg bg-white p-5 ">
-                <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
-                  {errors.map((item, index) => (
-                    <li key={index}>{item}</li>
-                  ))}
-                </ul>
+      <Modal isOpen={isOpen} onClose={handleModalClose} modalRef={divRef}>
+        <div className="w-[500px] rounded-lg bg-white">
+          <ModalHeader onClose={handleModalClose} image={<TextImage />} />
+          <div className="mt-40">
+            {saveCompleted ? (
+              <div>
+                <div className="mb-3 text-center text-2xl font-bold">
+                  Thank you for submitting
+                </div>
+                <div className="text-md mb-3 text-center">
+                  Our team will review your request shortly & get back
+                </div>
+                <div className="text-center">
+                  <button
+                    className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
+                    onClick={() => handleModalClose()}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <FormStepsIndicator formStep={formStep} steps={teamFormSteps} />
+                {errors?.length > 0 && (
+                  <div className="w-full rounded-lg bg-white p-5 ">
+                    <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
+                      {errors.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className="px-11">{getFormStep()}</div>
+                <div className="footerdiv flow-root w-full">
+                  <div className="float-left">
+                    {getCancelOrBackButton(
+                      formStep,
+                      handleModalClose,
+                      setFormStep,
+                      setErrors
+                    )}
+                  </div>
+                  <div className="float-right">
+                    {getSubmitOrNextButton(
+                      formValues,
+                      formStep,
+                      setFormStep,
+                      handleSubmit,
+                      setErrors,
+                      isProcessing,
+                      nameExists,
+                      disableNext,
+                      divRef,
+                      analytics
+                    )}
+                  </div>
+                </div>
               </div>
             )}
-            <div className="px-11">{getFormStep()}</div>
-            <div className="footerdiv flow-root w-full">
-              <div className="float-left">
-                {getCancelOrBackButton(
-                  formStep,
-                  handleModalClose,
-                  setFormStep,
-                  setErrors
-                )}
-              </div>
-              <div className="float-right">
-                {getSubmitOrNextButton(
-                  formValues,
-                  formStep,
-                  setFormStep,
-                  handleSubmit,
-                  setErrors,
-                  isProcessing,
-                  nameExists,
-                  disableNext,
-                  divRef,
-                  analytics
-                )}
-              </div>
-            </div>
           </div>
-        )}
+        </div>
       </Modal>
+      {isProcessing && (
+        <Modal isOpen onClose={() => {}}>
+          <LoadingIndicator />
+        </Modal>
+      )}
     </>
   );
 }

@@ -20,7 +20,7 @@ import {
   fetchProtocol,
 } from '../../../utils/services/dropdown-service';
 import { fetchTeam } from '../../../utils/services/teams';
-import { IFormValues } from '../../../utils/teams.types';
+import { IFormValues, TFocusArea } from '../../../utils/teams.types';
 import api from '../../../utils/api';
 import {
   BTN_LABEL_CONSTANTS,
@@ -30,6 +30,7 @@ import {
   FATHOM_EVENTS,
   SETTINGS_CONSTANTS,
   APP_ANALYTICS_EVENTS,
+  FILTER_API_ROUTES,
 } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/edit-team.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
@@ -38,6 +39,10 @@ import { ValidationErrorMessages } from '../../shared/account-setttings/validati
 import { DiscardChangesPopup } from 'libs/ui/src/lib/modals/confirmation';
 import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+import { ReactComponent as CloseIcon } from '/public/assets/images/icons/closeIcon.svg';
+import { Dialog } from '@headlessui/react';
+import { ModalHeader } from '../../shared/modal-header/modal-header';
+import { getUserInfo } from 'apps/web-app/utils/shared.utils';
 
 interface EditTeamModalProps {
   isOpen: boolean;
@@ -197,11 +202,13 @@ export function EditTeamModal({
     twitterHandler: '',
     telegramHandler: '',
     blog: '',
+    focusAreas: [],
     officeHours: '',
   });
   const divRef = useRef<HTMLDivElement>(null);
   const [resetImg, setResetImg] = useState(false);
   const analytics = useAppAnalytics();
+  const [focusAreas, setFocusAreas] = useState([]);
   // const { executeRecaptcha } = useGoogleReCaptcha();
 
   useEffect(() => {
@@ -258,7 +265,9 @@ export function EditTeamModal({
           twitterHandler: team.twitterHandler,
           blog: team.blog,
           officeHours: team.officeHours,
+          focusAreas: team.teamFocusAreas,
         };
+
         // set requestor email
         const userInfoFromCookie = Cookies.get('userInfo');
         if (userInfoFromCookie) {
@@ -319,6 +328,7 @@ export function EditTeamModal({
       twitterHandler: '',
       telegramHandler: '',
       blog: '',
+      focusAreas: [],
       officeHours: '',
     });
   }
@@ -456,6 +466,7 @@ export function EditTeamModal({
           const res = await api.put(`/v1/teams/${id}`, data);
           if (res.status === 200 && res.statusText === 'OK')
             setSaveCompleted(true);
+          getFocusAreas();
           analytics.captureEvent(
             APP_ANALYTICS_EVENTS.SETTINGS_TEAM_PROFILE_EDIT_FORM,
             {
@@ -524,6 +535,30 @@ export function EditTeamModal({
     setModified(true);
     setModifiedFlag(true);
   }
+
+  const handleFocusSubmit = (focusAreas) => {
+    const filteredFocusAreas = focusAreas?.map((focusArea: TFocusArea) => ({
+      uid: focusArea.uid,
+      title:focusArea.title,
+    }));
+
+    analytics.captureEvent(
+      APP_ANALYTICS_EVENTS.FOCUS_AREA_POPUP_SAVE_BTN_CLICKED,
+      {
+        from: 'Settings-team',
+        focusAreas,
+        userInfo: getUserInfo(),
+        team: formValues,
+      }
+    );
+    const isSame =
+      JSON.stringify(formValues.focusAreas) === JSON.stringify(focusAreas);
+    if (!isSame) {
+      setFormValues({ ...formValues, focusAreas: filteredFocusAreas });
+      setModified(true);
+      setModifiedFlag(true);
+    }
+  };
 
   function saveCompletedTemplate() {
     return (
@@ -598,6 +633,7 @@ export function EditTeamModal({
   };
 
   useEffect(() => {
+    getFocusAreas();
     analytics.captureEvent(
       APP_ANALYTICS_EVENTS.SETTINGS_TEAM_PROFILE_EDIT_FORM,
       {
@@ -605,6 +641,19 @@ export function EditTeamModal({
       }
     );
   }, []);
+
+  const getFocusAreas = async () => {
+    try {
+      const focusAreasResponse = await api.get(
+        `${FILTER_API_ROUTES.FOCUS_AREA}`
+      );
+      const result = focusAreasResponse?.data ?? [];
+      const filteredData = result.filter((data) => !data.parentUid);
+      setFocusAreas(filteredData);
+    } catch (error) {
+      setFocusAreas([]);
+    }
+  };
 
   function beforeSaveTemplate() {
     return (
@@ -653,10 +702,14 @@ export function EditTeamModal({
           </div>
           <div className={openTab === 2 || !fromSettings ? 'block' : 'hidden'}>
             <AddTeamStepTwo
+              focusAreas={focusAreas}
+              handleFoucsAreaSave={handleFocusSubmit}
               formValues={formValues}
               dropDownValues={dropDownValues}
               handleInputChange={handleInputChange}
               handleDropDownChange={handleDropDownChange}
+              from="Settings-team"
+              isRequired
             />
           </div>
           <div className={openTab === 3 || !fromSettings ? 'block' : 'hidden'}>
@@ -726,9 +779,9 @@ export function EditTeamModal({
         {fromSettings ? (
           <>
             {
-              <div className="mt-3 flex h-10 w-full w-3/5  justify-start text-slate-400">
+              <div className="mt-3 flex h-10 justify-start  gap-[25px] text-slate-400">
                 <button
-                  className={`w-1/4 border-b-4 border-transparent text-base font-medium ${
+                  className={`border-b-4 border-transparent text-base font-medium ${
                     openTab == 1 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
                   } ${
                     basicErrors?.length > 0 && openTab == 1
@@ -743,7 +796,7 @@ export function EditTeamModal({
                   {TAB_CONSTANTS.BASIC}{' '}
                 </button>
                 <button
-                  className={`w-1/4 w-auto border-b-4 border-transparent text-base font-medium ${
+                  className={` border-b-4 border-transparent text-base font-medium ${
                     openTab == 2 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
                   } ${
                     projectErrors?.length > 0 && openTab == 2
@@ -758,7 +811,7 @@ export function EditTeamModal({
                   {TAB_CONSTANTS.PROJECT_DETAILS}
                 </button>
                 <button
-                  className={`w-1/4 border-b-4  border-transparent text-base font-medium ${
+                  className={` border-b-4  border-transparent text-base font-medium ${
                     openTab == 3 ? 'border-b-[#156FF7] text-[#156FF7]' : ''
                   } ${
                     socialErrors?.length > 0 && openTab == 3
@@ -782,14 +835,11 @@ export function EditTeamModal({
             />
           </>
         ) : (
-          <Modal
-            isOpen={isOpen}
-            onClose={handleModalClose}
-            enableFooter={false}
-            image={<TextImage />}
-            modalRef={divRef}
-          >
-            {saveCompleted ? saveCompletedTemplate() : beforeSaveTemplate()}
+          <Modal isOpen={isOpen} onClose={handleModalClose}>
+            <div>
+              <ModalHeader onClose={handleModalClose} image={<TextImage />} />
+              {saveCompleted ? saveCompletedTemplate() : beforeSaveTemplate()}
+            </div>
           </Modal>
         )}
       </div>

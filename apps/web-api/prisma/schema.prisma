@@ -42,8 +42,8 @@ model Team {
   moreDetails          String?
   maintainingProjects  Project[]          @relation("maintainingTeam")
   contributingProjects Project[]          @relation("contributingTeams")
-  focusAreas           FocusArea[]        @relation("teamFocusAreas")
   eventGuests          PLEventGuest[]
+  teamFocusAreas       TeamFocusArea[]
 }
 
 model Member {
@@ -308,19 +308,6 @@ model ProjectContributor {
   memberUid  String
 }
 
-model FocusArea {
-  id          Int         @id @default(autoincrement())
-  uid         String      @unique @default(cuid())
-  title       String      @unique
-  description String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  parentUid   String?
-  parent      FocusArea?  @relation("parentAreas", fields: [parentUid], references: [uid])
-  children    FocusArea[] @relation("parentAreas")
-  teams       Team[]      @relation("teamFocusAreas")
-}
-
 model PLEvent {
   id          Int            @id @default(autoincrement())
   uid         String         @unique @default(cuid())
@@ -352,6 +339,43 @@ model PLEventGuest {
   team       Team     @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
   eventUid   String
   event      PLEvent  @relation(fields: [eventUid], references: [uid], onDelete: Cascade)
+}
+
+model FocusArea {
+  id                     Int                  @id @default(autoincrement())
+  uid                    String               @unique @default(cuid())
+  title                  String               @unique
+  description            String?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  parentUid              String?
+  parent                 FocusArea?           @relation("parentAreas", fields: [parentUid], references: [uid])
+  children               FocusArea[]          @relation("parentAreas")
+  teamFocusAreas         TeamFocusArea[]      @relation("teamFocusAreas")
+  teamAncestorFocusAreas TeamFocusArea[]      @relation("teamAncestorFocusAreas")
+  focusAreas             FocusAreaHierarchy[] @relation("focusAreas")
+  subFocusAreas          FocusAreaHierarchy[] @relation("subfocusAreas")
+}
+
+model TeamFocusArea {
+  id              Int       @id @default(autoincrement())
+  teamUid         String
+  team            Team      @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  focusAreaUid    String
+  focusArea       FocusArea @relation("teamFocusAreas", fields: [focusAreaUid], references: [uid], onDelete: Cascade)
+  ancestorAreaUid String
+  ancestorArea    FocusArea @relation("teamAncestorFocusAreas", fields: [ancestorAreaUid], references: [uid], onDelete: Cascade)
+
+  @@unique([focusAreaUid, teamUid, ancestorAreaUid])
+}
+
+model FocusAreaHierarchy {
+  id              Int       @id @default(autoincrement())
+  isDirect        Boolean
+  focusAreaUid    String
+  focusArea       FocusArea @relation("focusAreas", fields: [focusAreaUid], references: [uid], onDelete: Cascade)
+  subFocusAreaUid String
+  subFocusArea    FocusArea @relation("subfocusAreas", fields: [subFocusAreaUid], references: [uid], onDelete: Cascade)
 }
 
 enum ImageSize {

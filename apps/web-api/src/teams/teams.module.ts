@@ -29,5 +29,6 @@ import { TeamsService } from './teams.service';
     SlackService,
     ForestAdminService
   ],
+  exports:[TeamsService]
 })
 export class TeamsModule {}

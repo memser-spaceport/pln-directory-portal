@@ -39,7 +39,7 @@ const TreeNode = ({
   );
 
   return (
-    node.teams?.length > 0 && (
+    node.teamAncestorFocusAreas?.length > 0 && (
       <div className="pl-5 w-full">
         <label
           key={node.title}
@@ -62,7 +62,7 @@ const TreeNode = ({
               <span className="pl-[6px] text-[12px] font-[500] leading-[14px] text-[#0F172A]">
                 {node.title}
                 <span className="ml-2 rounded-[2px] bg-[#F1F5F9] px-[5px] text-[10px] font-[500] leading-[14px] text-[#475569]">
-                  {node.teams?.length}
+                  {node.teamAncestorFocusAreas?.length}
                 </span>
               </span>
             </div>

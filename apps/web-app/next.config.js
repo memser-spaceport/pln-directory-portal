@@ -17,6 +17,8 @@ let nextConfig = {
     COOKIE_DOMAIN: process.env.COOKIE_DOMAIN,
     PROTOSPHERE_URL:process.env.PROTOSPHERE_URL,
     IRL_PGF_FORM_URL:process.env.IRL_PGF_FORM_URL,
+    AWS_S3_DOMAIN:process.env.AWS_S3_DOMAIN,
+    GET_SUPPORT_URL:process.env.GET_SUPPORT_URL
   },
   nx: {
     // Set this to true if you would like to to use SVGR

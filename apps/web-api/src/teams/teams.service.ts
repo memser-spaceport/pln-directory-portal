@@ -33,11 +33,11 @@ export class TeamsService {
     });
   }
 
-  findOne(
+  async findOne(
     uid: string,
     queryOptions: Omit<Prisma.TeamFindUniqueArgsBase, 'where'> = {}
   ) {
-    return this.prisma.team.findUniqueOrThrow({
+    const team = await this.prisma.team.findUniqueOrThrow({
       where: { uid },
       ...queryOptions,
       include: {
@@ -79,9 +79,21 @@ export class TeamsService {
             },
             contributingTeams: true
           }
+        },
+        teamFocusAreas: {
+          select: {
+            focusArea: {
+              select: { 
+                uid: true,
+                title: true 
+              }
+            }
+          }
         }
       },
     });
+    team.teamFocusAreas = this.removeDuplicateFocusAreas(team.teamFocusAreas);
+    return team;
   }
 
   async insertManyFromAirtable(
@@ -256,15 +268,118 @@ export class TeamsService {
   buildFocusAreaFilters(focusAreas) {
     if (focusAreas?.split(',')?.length > 0) {
       return {
-        focusAreas: {
+        teamFocusAreas: {
           some: {
-            title: {
-              in: focusAreas.split(',')
+            ancestorArea:{
+              title: {
+                in: focusAreas?.split(',')
+              }
             }
           }
         }
       }
     }
     return {};
+  }
+
+  buildTeamFilter(queryParams){
+    const { 
+      name,
+      plnFriend, 
+      industryTags, 
+      technologies,
+      membershipSources,
+      fundingStage  
+    } = queryParams;
+    const filter:any = [];
+    this.buildNameAndPLNFriendFilter(name, plnFriend, filter);
+    this.buildIndustryTagsFilter(industryTags, filter);
+    this.buildTechnologiesFilter(technologies, filter);
+    this.buildMembershipSourcesFilter(membershipSources, filter);
+    this.buildFundingStageFilter(fundingStage, filter);
+    return { 
+      AND: filter
+    };
+  };
+
+  buildNameAndPLNFriendFilter(name, plnFriend, filter) {
+    if (name) {
+      filter.push({ 
+        name: {
+          contains: name,
+          mode: 'insensitive'
+        }
+      });
+    }  
+    if (!(plnFriend === "true")) {
+      filter.push({  
+        plnFriend: false
+      }); 
+    }
+  }
+
+  buildIndustryTagsFilter(industryTags, filter) {
+    const tags = industryTags?.split(',').map(tag=> tag.trim());
+    if (tags?.length > 0) {
+      filter.push({
+        industryTags:{
+          some: {
+            title: { 
+              in: tags 
+            }
+          }
+        }
+      })
+    }
+  }
+
+  buildTechnologiesFilter(technologies, filter) {
+    const tags = technologies?.split(',').map(tech => tech.trim());
+    if (tags?.length > 0) {
+      filter.push({
+        technologies: {
+          some: {
+            title: { 
+              in: tags 
+            }
+          }
+        }
+      });
+    }
+  }
+
+  buildMembershipSourcesFilter(membershipSources, filter) {
+    const sources = membershipSources?.split(',').map(source => source.trim());
+    if (sources?.length > 0) {
+      filter.push({
+        membershipSources: {
+          some: {
+            title: { 
+              in: sources 
+            }
+          }
+        }
+      });
+    }
+  }
+
+  buildFundingStageFilter(fundingStage, filter) {
+    if (fundingStage?.length > 0) {
+      filter.push({
+        fundingStage: {
+          title: fundingStage.trim()
+        }
+      });
+    }
+  }
+
+  removeDuplicateFocusAreas(focusAreas): any {
+    const uniqueFocusAreas = {};
+    focusAreas.forEach(item => {
+        const uid = item.focusArea.uid;
+        const title = item.focusArea.title;
+        uniqueFocusAreas[uid] = { uid, title };
+    });
+    return Object.values(uniqueFocusAreas);
   }
 }

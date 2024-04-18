@@ -816,6 +816,11 @@ export class ParticipantsRequestService {
       };
     }
 
+    // focusAreas Mapping
+    dataToSave['teamFocusAreas'] = {
+      ...await this.createTeamWithFocusAreas(dataToProcess, this.prisma)
+    };
+   
     // Membership Sources Mapping
     dataToSave['membershipSources'] = {
       connect: dataToProcess.membershipSources.map((m) => {
@@ -945,6 +950,10 @@ export class ParticipantsRequestService {
       }),
     };
 
+    // focusAreas Mapping
+    dataToSave['teamFocusAreas'] = {
+      ...await this.updateTeamWithFocusAreas(dataFromDB.referenceUid, dataToProcess, transactionType)
+    };
     if (transactionType === this.prisma) {
       await this.prisma.$transaction(async (tx) => {
         // Update data
@@ -1000,6 +1009,55 @@ export class ParticipantsRequestService {
     return { code: 1, message: 'Success' };
   }
 
+  async createTeamWithFocusAreas(dataToProcess, transaction) {
+    if (dataToProcess.focusAreas && dataToProcess.focusAreas.length > 0) {
+      let teamFocusAreas:any = [];
+      const focusAreaHierarchies = await transaction.focusAreaHierarchy.findMany({
+        where: {
+          subFocusAreaUid: {
+            in: dataToProcess.focusAreas.map(area => area.uid)
+          }
+        }
+      });
+      focusAreaHierarchies.map(areaHierarchy => {
+        teamFocusAreas.push({
+          focusAreaUid: areaHierarchy.subFocusAreaUid,
+          ancestorAreaUid: areaHierarchy.focusAreaUid
+        });
+      });
+      dataToProcess.focusAreas.map(area => {
+        teamFocusAreas.push({
+          focusAreaUid: area.uid,
+          ancestorAreaUid: area.uid
+        });
+      });
+      return {
+        createMany: {
+          data: teamFocusAreas
+        }
+      }
+    }
+    return {};
+  }
+
+  async updateTeamWithFocusAreas(teamId, dataToProcess, transaction) {
+    if (dataToProcess.focusAreas && dataToProcess.focusAreas.length > 0) {
+      await transaction.teamFocusArea.deleteMany({
+        where: {
+          teamUid: teamId
+        }
+      });
+      return await this.createTeamWithFocusAreas(dataToProcess, transaction);
+    } else {
+      await transaction.teamFocusArea.deleteMany({
+        where: {
+          teamUid: teamId
+        }
+      });
+    }
+    return {};
+  }
+  
   generateMemberProfileURL(value) {
     return generateProfileURL(value);
   }

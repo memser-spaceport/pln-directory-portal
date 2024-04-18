@@ -25,10 +25,8 @@ export function MemberProfileProjectsModal({
     <Modal
       isOpen={isOpen}
       onClose={() => setIsModalOpen(false)}
-      enableFooter={false}
-      enableHeader={false}
     >
-      <div className="pt-8 slim-scroll">
+      <div className="pt-8 slim-scroll w-[500px]">
         <div className="px-8 mb-4 font-bold text-slate-900">
           {'Repositories'} ({repositories?.length})
         </div>
