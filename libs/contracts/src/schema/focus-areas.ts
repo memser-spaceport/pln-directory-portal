@@ -2,7 +2,7 @@ import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseTeamFocusAreaSchema } from './team-focus-areas';
-import { ResponseTeamSchema } from './team';
+import { ResponseTeamWithRelationsSchema } from './team';
 
 export const FocusAreaSchema = z.object({
   id: z.number().int(),
@@ -20,13 +20,21 @@ export const ResponseFocusAreaWithRelationsSchema = ResponseFocusAreaSchema.exte
   children: FocusAreaSchema.array().optional(),
   teamFocusAreas: ResponseTeamFocusAreaSchema.array().optional(),
   teamAncestorFocusAreas: ResponseTeamFocusAreaSchema.array().optional(),
-  team: ResponseTeamSchema.optional()
+  team: ResponseTeamWithRelationsSchema.optional()
 });
+
+export const FocusAreaRelationalFields = ResponseFocusAreaWithRelationsSchema.pick({
+  children: true,
+  teamFocusAreas: true,
+  teamAncestorFocusAreas: true,
+  team: true
+}).strip();
 
 export const FocusAreaQueryableFields = FocusAreaSchema.keyof();
 
 export const FocusAreaQueryParams = QueryParams({
   queryableFields: FocusAreaQueryableFields,
+  relationalFields: FocusAreaRelationalFields
 });
 
 export const FocusAreaDetailQueryParams = FocusAreaQueryParams.unwrap()
