@@ -6,7 +6,6 @@ import {
   useEffect,
   useCallback,
   useRef,
-  ReactNode,
 } from 'react';
 import { trackGoal } from 'fathom-client';
 import Cookies from 'js-cookie';
@@ -21,7 +20,7 @@ import {
   fetchProtocol,
 } from '../../../utils/services/dropdown-service';
 import { fetchTeam } from '../../../utils/services/teams';
-import { IFormValues } from '../../../utils/teams.types';
+import { IFormValues, TFocusArea } from '../../../utils/teams.types';
 import api from '../../../utils/api';
 import {
   BTN_LABEL_CONSTANTS,
@@ -538,10 +537,15 @@ export function EditTeamModal({
   }
 
   const handleFocusSubmit = (focusAreas) => {
+    const filteredFocusAreas = focusAreas?.map((focusArea: TFocusArea) => ({
+      uid: focusArea.uid,
+      title:focusArea.title,
+    }));
+
     analytics.captureEvent(
       APP_ANALYTICS_EVENTS.FOCUS_AREA_POPUP_SAVE_BTN_CLICKED,
       {
-        from:"Settings-team",
+        from: 'Settings-team',
         focusAreas,
         userInfo: getUserInfo(),
         team: formValues,
@@ -550,7 +554,7 @@ export function EditTeamModal({
     const isSame =
       JSON.stringify(formValues.focusAreas) === JSON.stringify(focusAreas);
     if (!isSame) {
-      setFormValues({ ...formValues, focusAreas: focusAreas });
+      setFormValues({ ...formValues, focusAreas: filteredFocusAreas });
       setModified(true);
       setModifiedFlag(true);
     }
