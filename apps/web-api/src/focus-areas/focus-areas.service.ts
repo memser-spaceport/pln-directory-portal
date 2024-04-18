@@ -8,13 +8,14 @@ export class FocusAreasService {
   async findAll(filter) {
     const result = await this.prisma.focusArea.findMany({
       include: {
-        children: this.buildQueryByLevel(3, filter), // level denotes depth of children.
+        children: this.buildQueryByLevel(4, filter), // level denotes depth of children.
         teamAncestorFocusAreas: {
           where: {
             team: {
               ...filter
             }
-          }
+          },
+          distinct: "teamUid"
         }
       }
     });
@@ -31,7 +32,8 @@ export class FocusAreasService {
               team: {
                 ...teamFilter
               }
-            }
+            },
+            distinct: "teamUid"
           }
         }
       };
@@ -44,7 +46,8 @@ export class FocusAreasService {
             team: {
               ...teamFilter
             }
-          }
+          },
+          distinct: "teamUid"
         }
       }
     };

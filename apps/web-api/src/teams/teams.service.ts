@@ -311,9 +311,9 @@ export class TeamsService {
         }
       });
     }  
-    if (plnFriend) {
+    if (!(plnFriend === "true")) {
       filter.push({  
-        plnFriend: plnFriend === "true" ? true: false
+        plnFriend: false
       }); 
     }
   }
