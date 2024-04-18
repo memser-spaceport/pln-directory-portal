@@ -272,7 +272,7 @@ export class TeamsService {
       return {
         teamFocusAreas: {
           some: {
-            focusArea:{
+            ancestorArea:{
               title: {
                 in: focusAreas?.split(',')
               }

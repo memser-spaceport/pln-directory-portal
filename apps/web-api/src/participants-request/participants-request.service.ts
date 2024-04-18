@@ -818,7 +818,7 @@ export class ParticipantsRequestService {
 
     // focusAreas Mapping
     dataToSave['teamFocusAreas'] = {
-      ...await this.createTeamWithFocusAreas(dataToProcess)
+      ...await this.createTeamWithFocusAreas(dataToProcess, this.prisma)
     };
    
     // Membership Sources Mapping
@@ -952,7 +952,7 @@ export class ParticipantsRequestService {
 
     // focusAreas Mapping
     dataToSave['teamFocusAreas'] = {
-      ...await this.updateTeamWithFocusAreas(dataFromDB.referenceUid, dataToProcess)
+      ...await this.updateTeamWithFocusAreas(dataFromDB.referenceUid, dataToProcess, transactionType)
     };
     if (transactionType === this.prisma) {
       await this.prisma.$transaction(async (tx) => {
@@ -1009,10 +1009,10 @@ export class ParticipantsRequestService {
     return { code: 1, message: 'Success' };
   }
 
-  async createTeamWithFocusAreas(dataToProcess) {
+  async createTeamWithFocusAreas(dataToProcess, transaction) {
     if (dataToProcess.focusAreas && dataToProcess.focusAreas.length > 0) {
       let teamFocusAreas:any = [];
-      const focusAreaHierarchies = await this.prisma.focusAreaHierarchy.findMany({
+      const focusAreaHierarchies = await transaction.focusAreaHierarchy.findMany({
         where: {
           subFocusAreaUid: {
             in: dataToProcess.focusAreas.map(area => area.uid)
@@ -1040,16 +1040,16 @@ export class ParticipantsRequestService {
     return {};
   }
 
-  async updateTeamWithFocusAreas(teamId, dataToProcess) {
+  async updateTeamWithFocusAreas(teamId, dataToProcess, transaction) {
     if (dataToProcess.focusAreas && dataToProcess.focusAreas.length > 0) {
-      await this.prisma.teamFocusArea.deleteMany({
+      await transaction.teamFocusArea.deleteMany({
         where: {
           teamUid: teamId
         }
       });
-      return await this.createTeamWithFocusAreas(dataToProcess)
+      return await this.createTeamWithFocusAreas(dataToProcess, transaction);
     } else {
-      await this.prisma.teamFocusArea.deleteMany({
+      await transaction.teamFocusArea.deleteMany({
         where: {
           teamUid: teamId
         }
