@@ -64,7 +64,7 @@ export function FooterButtons(props) {
 
   return (
     <div className="header">
-      <nav className="navbar fixed bottom-0 z-[5] grid h-[80px] w-full grid-flow-col items-center bg-[white] px-12 only-of-type:shadow-[0_1px_4px_0_#e2e8f0]">
+      <nav className="navbar fixed bottom-0 z-[1157] grid h-[80px] w-full grid-flow-col items-center bg-[white] px-12 only-of-type:shadow-[0_1px_4px_0_#e2e8f0]">
         <div className="col-span-4 justify-self-end">
           {!props.isEditEnabled ? (
             <button

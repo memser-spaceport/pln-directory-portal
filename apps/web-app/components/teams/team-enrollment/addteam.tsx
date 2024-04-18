@@ -520,7 +520,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       APP_ANALYTICS_EVENTS.FOCUS_AREA_POPUP_SAVE_BTN_CLICKED,
       {
         focusAreas: values,
-        userInfo:getUserInfo()
+        userInfo: getUserInfo(),
       }
     );
     setFormValues({ ...formValues, focusAreas: values });
@@ -546,13 +546,6 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
 
   return (
     <>
-      {isProcessing && (
-        <div
-          className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
-        >
-          <LoadingIndicator />
-        </div>
-      )}
       <Modal isOpen={isOpen} onClose={handleModalClose} modalRef={divRef}>
         <div className="w-[500px] rounded-lg bg-white">
           <ModalHeader onClose={handleModalClose} image={<TextImage />} />
@@ -616,6 +609,11 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
           </div>
         </div>
       </Modal>
+      {isProcessing && (
+        <Modal isOpen onClose={() => {}}>
+          <LoadingIndicator />
+        </Modal>
+      )}
     </>
   );
 }

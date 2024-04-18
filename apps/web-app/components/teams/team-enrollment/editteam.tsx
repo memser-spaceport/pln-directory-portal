@@ -541,6 +541,7 @@ export function EditTeamModal({
     analytics.captureEvent(
       APP_ANALYTICS_EVENTS.FOCUS_AREA_POPUP_SAVE_BTN_CLICKED,
       {
+        from:"Settings-team",
         focusAreas,
         userInfo: getUserInfo(),
         team: formValues,
@@ -703,7 +704,7 @@ export function EditTeamModal({
               dropDownValues={dropDownValues}
               handleInputChange={handleInputChange}
               handleDropDownChange={handleDropDownChange}
-              from="Edit team"
+              from="Settings-team"
               isRequired
             />
           </div>
