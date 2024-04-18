@@ -595,11 +595,9 @@ export function AddMemberModal({
   return (
     <>
       {isProcessing && (
-        <div
-          className={`fixed inset-0 z-[3000] flex h-screen w-screen items-center justify-center bg-gray-500 bg-opacity-75 outline-none transition-opacity`}
-        >
+        <Modal isOpen onClose={() => {}}>
           <LoadingIndicator />
-        </div>
+        </Modal>
       )}
       <Modal
         isOpen={isOpen}

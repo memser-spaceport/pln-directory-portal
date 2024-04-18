@@ -78,7 +78,7 @@ function Modal({
   return (
     <>
       <Transition show={isOpen} as={Fragment}>
-        <Dialog open={isOpen} onClose={onClose} ref={modalRef} className="relative z-50">
+        <Dialog open={isOpen} onClose={onClose} ref={modalRef} className="relative z-[1058]">
           {/* The backdrop, rendered as a fixed sibling to the panel container */}
           <Transition.Child
             as={Fragment}
