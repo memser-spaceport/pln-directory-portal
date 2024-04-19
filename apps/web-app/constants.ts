@@ -395,6 +395,14 @@ export const ANNOUNCEMENT_BANNER = {
 
 export const ChangeLogList = [
   {
+    title: 'Version 2.0.6 - Enhanced Edit feature for Teams',
+    tag: 'Improvements',
+    date: '19, Apr 2024',
+    shortContent: `<p style="font-size: 16px; line-height:24px;">
+    Team leads can use this update to make changes to the Focus and Sub focus areas within their teams. Additionally, a quick access feature to submit a support request from the directory has been enabled.
+    </p>`
+  },
+  {
     title: 'Version 2.0.5 - Enhanced search on Member roles',
     tag: 'Improvements',
     date: '17, Apr 2024',
