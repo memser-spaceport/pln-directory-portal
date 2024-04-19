@@ -135,7 +135,7 @@ const FocusAreasList = (props: IFocusAreasList) => {
     <div className="flex flex-col gap-3 pt-5">
       <div className="flex items-center justify-between">
         <div className="">
-          <span className="mr-2 text-sm font-bold">Focus Area</span>
+          <span className="mr-2 text-sm font-bold">Focus Area(s)</span>
           <span className="h-[18px] w-6 rounded-3xl bg-[#F1F5F9] px-2 py-[2px] text-xs font-[500] leading-[14px] text-[#475569] ">
             {selectedItems.length}
           </span>
@@ -155,7 +155,7 @@ const FocusAreasList = (props: IFocusAreasList) => {
           className="flex h-10 w-full items-center justify-center rounded-lg border border-[#156FF7] px-2 py-3 text-sm
           font-[500] leading-6 text-[#156FF7]"
         >
-          Select Focus Area
+          Select Focus Area(s)
         </button>
       )}
       {selectedItems?.length > 0 && (
@@ -169,7 +169,7 @@ const FocusAreasList = (props: IFocusAreasList) => {
                 {path?.title !== path?.path && (
                   <div className="flex items-center gap-[4px] rounded-[2px] border-[#CBD5E1]">
                     <div
-                      className={`word-break break-words text-[12px] font-[400] leading-[14px] text-[#0F172A]`}
+                      className={`word-break break-words text-[14px] font-[400] leading-[14px] text-[#0F172A]`}
                     >
                       {path?.path ? path.path : ''}
                     </div>
@@ -190,7 +190,7 @@ const FocusAreasList = (props: IFocusAreasList) => {
                   {path?.title?.split(',')?.map((path, index) => (
                     <div
                       key={`${path} + ${index}`}
-                      className="word-break rounded-full bg bg-[#F3F4F6] py-[4px] px-[8px] text-[12px] font-[500] leading-[14px] text-[#4B5563]"
+                      className="word-break rounded-full bg bg-[#F3F4F6] py-[6px] px-[8px] text-[14px] font-[500] leading-[14px] text-[#4B5563]"
                     >
                       {path}
                     </div>
