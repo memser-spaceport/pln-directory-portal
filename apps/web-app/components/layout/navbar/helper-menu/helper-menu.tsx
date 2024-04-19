@@ -16,12 +16,6 @@ export function HelperMenu(props: IHelperMenu) {
 
   const HELPER_MENU_OPTIONS = [
     {
-      icon: '/assets/images/icons/changelog.svg',
-      name: 'Changelog',
-      url: '/changelog',
-      type: 'in-app',
-    },
-    {
       icon: '/assets/images/icons/message.svg',
       name: 'ProtoSphere',
       type: '_blank',
@@ -32,6 +26,12 @@ export function HelperMenu(props: IHelperMenu) {
       name: 'Get Support',
       type: '_blank',
       url: process.env.GET_SUPPORT_URL,
+    },
+    {
+      icon: '/assets/images/icons/changelog.svg',
+      name: 'Changelog',
+      url: '/changelog',
+      type: 'in-app',
     },
   ];
 

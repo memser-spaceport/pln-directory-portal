@@ -118,20 +118,19 @@ export default function AddTeamStepTwo(props) {
               </div>
               <p className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] ">
                 <span className="opacity-40">
-                  Protocol Labs&apos;s vision for the future is built on three
+                  Protocol Labs&apos;s vision for the future is built on
                   core focus areas that aim to harness humanity&apos;s potential
                   for good, navigate potential pitfalls, and ensure a future
-                  where technology empowers humanity
-                </span>{' '}
-                -{' '}
-                <a
+                  where technology empowers humanity.
+                </span>
+                {/* <a
                   className="text-[#156FF7]"
                   href={ABOUT_PLN_LINK}
                   target="_blank"
                   rel="noreferrer"
                 >
                   Learn more.
-                </a>
+                </a> */}
               </p>
             </div>
           </>
