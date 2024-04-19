@@ -9,7 +9,7 @@ interface IFocusAreasList {
   onOpen: (mode: string) => void;
   rawData: TFocusArea[];
   from: string;
-  teamDetails: ITeam
+  teamDetails: ITeam;
 }
 
 interface ISelectedAreas {
@@ -30,7 +30,10 @@ const FocusAreasList = (props: IFocusAreasList) => {
   const selectedFocusAreas = getSelectedItems(
     formattedRawData,
     selectedItems
-  )?.sort((firstItem: ISelectedAreas, secondItem: ISelectedAreas) => firstItem.index - secondItem.index);
+  )?.sort(
+    (firstItem: ISelectedAreas, secondItem: ISelectedAreas) =>
+      firstItem.index - secondItem.index
+  );
   const user = getUserInfo();
 
   function findParents(data: TFocusArea[], childUid: string) {
@@ -123,9 +126,9 @@ const FocusAreasList = (props: IFocusAreasList) => {
     analytics.captureEvent(APP_ANALYTICS_EVENTS.FOCUS_AREA_EDIT_BTN_CLICKED, {
       from,
       user,
-      team: teamDetails
+      team: teamDetails,
     });
-    onOpen("Edit");
+    onOpen('Edit');
   }
 
   return (
@@ -148,7 +151,7 @@ const FocusAreasList = (props: IFocusAreasList) => {
       </div>
       {selectedItems?.length === 0 && (
         <button
-          onClick={() => onOpen("Select")}
+          onClick={() => onOpen('Select')}
           className="flex h-10 w-full items-center justify-center rounded-lg border border-[#156FF7] px-2 py-3 text-sm
           font-[500] leading-6 text-[#156FF7]"
         >
@@ -161,16 +164,29 @@ const FocusAreasList = (props: IFocusAreasList) => {
             return (
               <div
                 key={`${path} + ${index}`}
-                className="flex flex-col gap-2 rounded border border-[#CBD5E1] py-[14px] px-[13px]"
+                className="flex flex-col gap-[10px] rounded border border-[#CBD5E1] py-[14px] px-[13px]"
               >
-                <div className="text-sm font-semibold leading-[14px] text-[#0F172A] break-words">
-                  {path.title}
-                </div>
                 {path.title !== path.path && (
-                  <div className="text-sm  font-[500] leading-[14px] text-[#4D4D4D] opacity-60 break-words">
-                    {path.path}
+                  <div className="flex items-center gap-[4px] rounded-[2px] border-[#CBD5E1]">
+                    <div
+                      className={`break-words  text-[12px] font-[500] leading-[14px] text-[#4D4D4D] opacity-60`}
+                    >
+                      {path.path ? path?.path : ''}
+                    </div>
+                    <div className="flex h-[16px] w-[14px] items-center justify-center rounded-[2px]  border">
+                      <img
+                        alt="right_arrow"
+                        src="/assets/images/icons/right-arrow-gray.svg"
+                      />
+                    </div>
                   </div>
                 )}
+
+                <div
+                  className={`break-words text-[12px] font-[600] leading-[14px] `}
+                >
+                  {path.title ? path?.title : ''}
+                </div>
               </div>
             );
           })}
