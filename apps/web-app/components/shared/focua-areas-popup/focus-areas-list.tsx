@@ -164,28 +164,37 @@ const FocusAreasList = (props: IFocusAreasList) => {
             return (
               <div
                 key={`${path} + ${index}`}
-                className="flex flex-col gap-[10px] rounded border border-[#CBD5E1] py-[14px] px-[13px]"
+                className="flex flex-col gap-[8px] rounded border border-[#CBD5E1] py-[14px] px-[13px]"
               >
-                {path.title !== path.path && (
+                {path?.title !== path?.path && (
                   <div className="flex items-center gap-[4px] rounded-[2px] border-[#CBD5E1]">
                     <div
-                      className={`break-words  text-[12px] font-[500] leading-[14px] text-[#4D4D4D] opacity-60`}
+                      className={`word-break break-words text-[12px] font-[400] leading-[14px] text-[#0F172A]`}
                     >
-                      {path.path ? path?.path : ''}
+                      {path?.path ? path.path : ''}
                     </div>
-                    <div className="flex h-[16px] w-[14px] items-center justify-center rounded-[2px]  border">
+                    <div className="flex h-[16px] w-[14px] items-center justify-center ">
                       <img
                         alt="right_arrow"
-                        src="/assets/images/icons/right-arrow-gray.svg"
+                        src="/assets/images/icons/down-arrow-gray-focus.svg"
                       />
                     </div>
                   </div>
                 )}
 
                 <div
-                  className={`break-words text-[12px] font-[600] leading-[14px] `}
+                  className={`flex flex-wrap items-center gap-[4px] ${
+                    path.title !== path.path ? 'ml-[12px]' : ''
+                  }`}
                 >
-                  {path.title ? path?.title : ''}
+                  {path?.title?.split(',')?.map((path, index) => (
+                    <div
+                      key={`${path} + ${index}`}
+                      className="word-break rounded-full border border-[#CBD5E1] py-[4px] px-[8px] text-[12px] font-[400] leading-[14px] text-[#0F172A]"
+                    >
+                      {path}
+                    </div>
+                  ))}
                 </div>
               </div>
             );
