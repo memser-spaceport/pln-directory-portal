@@ -75,7 +75,7 @@ const FocusArea = (props: IFocusArea) => {
           </button>
 
           <div className='max-w-[85%] break-words'>
-          <p className="text-[14px] font-[500] leading-[24px]">{focusArea.title}</p>
+          <p className="text-[14px] font-[500] leading-[24px] word-break">{focusArea.title}</p>
           </div>
 
           {focusArea?.teamAncestorFocusAreas?.length > 0 && (
@@ -91,7 +91,7 @@ const FocusArea = (props: IFocusArea) => {
           <>
             {description && (
               <p className="px-[16px] text-[12px] font-[500] text-[#4D4D4D] break-words">
-                <span className="font-[600]">Selected:</span> {description}
+                <span className="font-[600]">Selected: </span>{description}
               </p>
             )}
           </>
