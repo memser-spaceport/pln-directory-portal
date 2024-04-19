@@ -44,4 +44,10 @@ export const API_ROUTE = {
 
 export const TOKEN = 'plnetwork@1';
 
+export const FILTER_API_ROUTES = {
+  FOCUS_AREA: '/v1/focus-areas',
+};
+
+export const ABOUT_PLN_LINK = "https://protocol.ai/blog/transcription-pl-vision-driving-a-breakthroughs-in-computing-to-push-humanity-forward/"
+
 export default APP_CONSTANTS;

@@ -97,9 +97,9 @@ export default function AllContributorsPopup({
           >
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75" />
           </Transition.Child>
-          <div className="fixed inset-0 overflow-y-auto">
+          <div className="fixed inset-0 flex items-center justify-center overflow-y-auto">
             {/* <div className="flex min-h-full items-center justify-center p-4"> */}
-            <div className="flex mt-20 items-center justify-center p-4">
+            <div className="flex items-center justify-center p-4">
               <Transition.Child
                 as={Fragment}
                 enter="ease-out duration-300"

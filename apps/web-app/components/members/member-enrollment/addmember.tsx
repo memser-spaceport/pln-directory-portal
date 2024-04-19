@@ -30,6 +30,7 @@ import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicat
 import { toast } from 'react-toastify';
 import useAppAnalytics from '../../../hooks/shared/use-app-analytics';
 import ProjectContribution from '../../projects/contribution/project-contribution';
+import { ModalHeader } from '../../shared/modal-header/modal-header';
 // import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface AddMemberModalProps {
@@ -76,24 +77,50 @@ function validateSkillForm(formValues) {
 }
 
 function validateContributionForm(fValues) {
-  const formErrors = []
+  const formErrors = [];
   const exps = fValues.projectContributions;
   exps.forEach((exp, expIndex) => {
-
-    if(exp.projectName.trim() === '') {
-      formErrors.push({id: expIndex, field: 'projectName', error: "Project name is mandatory"})
-    } if(exp.role.trim() === '') {
-      formErrors.push({id: expIndex, field: 'role', error: "Role is Mandatory"})
-    } if(exp.startDate && exp.startDate.getTime() >= new Date().getTime()) {
-      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "Your contribution cannot start from a future date"})
-    } if(exp.endDate && exp.endDate.getTime() >= new Date().getTime()) {
-      formErrors.push({id: expIndex, name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`, field: 'date', error: "Your contribution cannot end in a future date"})
-    } if(exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
-      formErrors.push({id: expIndex, field: 'date', error: "Your contribution end date cannot be less than or equal to start date"})
+    if (exp.projectName.trim() === '') {
+      formErrors.push({
+        id: expIndex,
+        field: 'projectName',
+        error: 'Project name is mandatory',
+      });
     }
-  })
+    if (exp.role.trim() === '') {
+      formErrors.push({
+        id: expIndex,
+        field: 'role',
+        error: 'Role is Mandatory',
+      });
+    }
+    if (exp.startDate && exp.startDate.getTime() >= new Date().getTime()) {
+      formErrors.push({
+        id: expIndex,
+        name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`,
+        field: 'date',
+        error: 'Your contribution cannot start from a future date',
+      });
+    }
+    if (exp.endDate && exp.endDate.getTime() >= new Date().getTime()) {
+      formErrors.push({
+        id: expIndex,
+        name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`,
+        field: 'date',
+        error: 'Your contribution cannot end in a future date',
+      });
+    }
+    if (exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
+      formErrors.push({
+        id: expIndex,
+        field: 'date',
+        error:
+          'Your contribution end date cannot be less than or equal to start date',
+      });
+    }
+  });
 
-  return formErrors
+  return formErrors;
 }
 
 function validateForm(formValues, formStep) {
@@ -108,7 +135,6 @@ function validateForm(formValues, formStep) {
     case 3:
       errors = validateContributionForm(formValues);
       return errors;
-
   }
 }
 
@@ -129,17 +155,18 @@ function handleNextClick(
     // element1.scrollTop = 0;
   }
   if (errors?.length > 0 || emailExists) {
-    if(formStep === 3) {
-      setContributionErrors(errors)
-      setErrors(["There are fields that require your attention. Please review the fields below."]);
+    if (formStep === 3) {
+      setContributionErrors(errors);
+      setErrors([
+        'There are fields that require your attention. Please review the fields below.',
+      ]);
       return false;
     } else {
       setErrors(errors);
       return false;
     }
-
   }
-  setContributionErrors([])
+  setContributionErrors([]);
   analytics.captureEvent(APP_ANALYTICS_EVENTS.MEMBER_JOIN_NETWORK_FORM_STEPS, {
     itemName: steps[formStep - 1].name,
   });
@@ -391,12 +418,14 @@ export function AddMemberModal({
         }
       );
       const values = formatData();
-      values.projectContributions = [...values.projectContributions].map(v => {
-        delete v.projectName;
-        delete v.projectLogo;
-        delete v.project;
-        return v
-      })
+      values.projectContributions = [...values.projectContributions].map(
+        (v) => {
+          delete v.projectName;
+          delete v.projectLogo;
+          delete v.project;
+          return v;
+        }
+      );
       try {
         // const captchaToken = await executeRecaptcha();
 
@@ -546,13 +575,13 @@ export function AddMemberModal({
             setContributionErrors={setContributionErrors}
           />
         );
-        case 4:
-          return (
-            <AddMemberSocialForm
-              formValues={formValues}
-              onChange={handleInputChange}
-            />
-          );
+      case 4:
+        return (
+          <AddMemberSocialForm
+            formValues={formValues}
+            onChange={handleInputChange}
+          />
+        );
       default:
         return (
           <AddMemberBasicForm
@@ -566,11 +595,9 @@ export function AddMemberModal({
   return (
     <>
       {isProcessing && (
-        <div
-          className={`fixed inset-0 z-[3000] flex h-screen w-screen items-center justify-center bg-gray-500 bg-opacity-75 outline-none transition-opacity`}
-        >
+        <Modal isOpen onClose={() => {}}>
           <LoadingIndicator />
-        </div>
+        </Modal>
       )}
       <Modal
         isOpen={isOpen}
@@ -580,63 +607,68 @@ export function AddMemberModal({
         modalClassName={isProcessing ? 'z-[49]' : ''}
         modalRef={divRef}
       >
-        {saveCompleted ? (
-          <div className="px-5">
-            <div className="mb-3 text-center text-2xl font-bold">
-              Thank you for submitting
-            </div>
-            <div className="text-md mb-3 text-center">
-              Our team will review your request shortly & get back
-            </div>
-            <div className="text-center">
-              <button
-                className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
-                onClick={() => handleModalClose()}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div>
-            <FormStepsIndicator formStep={formStep} steps={steps} />
-            {errors?.length > 0 && (
-              <div className="w-full rounded-lg bg-white p-5 ">
-                <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
-                  {errors.map((item, index) => (
-                    <li key={index}>{item}</li>
-                  ))}
-                </ul>
+        <div className="w-[500px] rounded-lg bg-white">
+          <ModalHeader onClose={handleModalClose} image={<TextImage />} />
+          <div className="mt-40">
+            {saveCompleted ? (
+              <div className="px-5">
+                <div className="mb-3 text-center text-2xl font-bold">
+                  Thank you for submitting
+                </div>
+                <div className="text-md mb-3 text-center">
+                  Our team will review your request shortly & get back
+                </div>
+                <div className="text-center">
+                  <button
+                    className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
+                    onClick={() => handleModalClose()}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <FormStepsIndicator formStep={formStep} steps={steps} />
+                {errors?.length > 0 && (
+                  <div className="w-full rounded-lg bg-white p-5 ">
+                    <ul className="list-inside list-disc space-y-1 text-xs text-red-500">
+                      {errors.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className="px-11">{getFormWithStep()}</div>
+                <div className={`footerdiv flow-root w-full`}>
+                  <div className="float-left">
+                    {getCancelOrBackButton(
+                      formStep,
+                      handleModalClose,
+                      setFormStep,
+                      setErrors
+                    )}
+                  </div>
+                  <div className="float-right">
+                    {getSubmitOrNextButton(
+                      formValues,
+                      formStep,
+                      setFormStep,
+                      handleSubmit,
+                      setErrors,
+                      setContributionErrors,
+                      isProcessing,
+                      emailExists,
+                      disableNext,
+                      divRef,
+                      analytics
+                    )}
+                  </div>
+                </div>
               </div>
             )}
-            <div className="px-11">{getFormWithStep()}</div>
-            <div className={`footerdiv flow-root w-full`}>
-              <div className="float-left">
-                {getCancelOrBackButton(
-                  formStep,
-                  handleModalClose,
-                  setFormStep,
-                  setErrors
-                )}
-              </div>
-              <div className="float-right">
-                {getSubmitOrNextButton(
-                  formValues,
-                  formStep,
-                  setFormStep,
-                  handleSubmit,
-                  setErrors,
-                  setContributionErrors,
-                  isProcessing,
-                  emailExists,
-                  disableNext,
-                  divRef,
-                  analytics
-                )}
-              </div>
-            </div>
           </div>
-        )}
+        </div>
       </Modal>
     </>
   );

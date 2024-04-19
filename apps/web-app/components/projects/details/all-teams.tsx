@@ -82,10 +82,8 @@ export function AllTeamsModal({
       <Modal
         isOpen={isOpen}
         onClose={() => setIsModalOpen(false)}
-        enableFooter={false}
-        enableHeader={false}
       >
-        <div className="slim-scroll pt-8 pb-4">
+        <div className="slim-scroll pt-8 pb-4 w-[500px]">
           <div className="mb-4 px-8 font-bold text-slate-900">
             {'Teams'} ({project.contributingTeams.length + 1})
             <div className="w-full pr-5">

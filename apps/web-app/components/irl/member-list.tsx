@@ -25,7 +25,7 @@ const MemberList = (props: any) => {
 
   const onMemberClick = (memberUid: string, memberName: string) => {
     analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_TELEGRAM_LINK_CLICKED,
+      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_MEMBER_CLICKED,
       {
         memberUid,
         memberName,
@@ -34,11 +34,13 @@ const MemberList = (props: any) => {
     );
   };
 
-  const onTelegramClick = (telegramUrl: string) => {
+  const onTelegramClick = (telegramUrl: string, memberUid: string, memberName: string) => {
     analytics.captureEvent(
       APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_TELEGRAM_LINK_CLICKED,
       {
         telegramUrl,
+        memberUid,
+        memberName,
         user,
       }
     );
@@ -152,7 +154,7 @@ const MemberList = (props: any) => {
                   title={item.telegramId}
                   className="text-clamp w-fit break-words pr-[2px]"
                   onClick={() =>
-                    onTelegramClick(`https://t.me/${item.telegramId}`)
+                    onTelegramClick(`https://t.me/${item.telegramId}`, item?.memberUid, item?.memberName)
                   }
                 >
                   {item.telegramId}

@@ -41,4 +41,17 @@ export interface IFormValues {
   telegramHandler: string;
   blog: string;
   officeHours: string;
+  focusAreas?: TFocusArea[];
+}
+
+export type TFocusArea = {
+  uid: string;
+  title: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  parentUid: string;
+  parents: any[];
+  children: TFocusArea[];
+  teamAncestorFocusAreas: ITeam[];
 }

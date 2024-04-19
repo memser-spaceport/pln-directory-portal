@@ -14,6 +14,7 @@ export * from './faq';
 export * from './project';
 export * from './project-contribution';
 export * from './join-requests';
-export * from './focus-areas';
 export * from './pl-event';
 export * from './pl-event-guest';
+export * from './focus-areas';
+export * from './team-focus-areas';
