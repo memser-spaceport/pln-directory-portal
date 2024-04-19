@@ -190,7 +190,7 @@ const FocusAreasList = (props: IFocusAreasList) => {
                   {path?.title?.split(',')?.map((path, index) => (
                     <div
                       key={`${path} + ${index}`}
-                      className="word-break rounded-full border border-[#CBD5E1] py-[4px] px-[8px] text-[12px] font-[400] leading-[14px] text-[#0F172A]"
+                      className="word-break rounded-full bg bg-[#F3F4F6] py-[4px] px-[8px] text-[12px] font-[500] leading-[14px] text-[#4B5563]"
                     >
                       {path}
                     </div>
