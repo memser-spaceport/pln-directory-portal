@@ -136,7 +136,7 @@ const FocusAreas = (props: IFocusAreas) => {
         <div className="flex h-full w-[100%] flex-col gap-[20px]">
           <div className="flex items-center justify-between">
             <h2 className="te text-[16px] font-[600] leading-[14px]">
-              Select Focus Areas
+              Select Focus Area(s)
             </h2>
             <button onClick={onClose}>
               <img
