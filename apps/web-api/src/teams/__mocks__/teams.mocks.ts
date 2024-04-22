@@ -43,6 +43,7 @@ export async function createTeam({ amount }: TestFactorySeederParams) {
       createdAt: new Date(),
       updatedAt: new Date(),
       fundingStageUid: fundingStage.uid,
+      lastModifiedBy: null
     };
 
     return team;
