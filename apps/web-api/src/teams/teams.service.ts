@@ -322,29 +322,33 @@ export class TeamsService {
   buildIndustryTagsFilter(industryTags, filter) {
     const tags = industryTags?.split(',').map(tag=> tag.trim());
     if (tags?.length > 0) {
-      filter.push({
-        industryTags:{
-          some: {
-            title: { 
-              in: tags 
+      tags.map((tag)=> {
+        filter.push({
+          industryTags:{
+            some: {
+              title: { 
+                in: tag 
+              }
             }
           }
-        }
-      })
+        });
+      });
     }
   }
 
   buildTechnologiesFilter(technologies, filter) {
     const tags = technologies?.split(',').map(tech => tech.trim());
     if (tags?.length > 0) {
-      filter.push({
-        technologies: {
-          some: {
-            title: { 
-              in: tags 
+      tags.map((tag)=> {
+        filter.push({
+          technologies: {
+            some: {
+              title: { 
+                in: tag 
+              }
             }
           }
-        }
+        });
       });
     }
   }
@@ -352,14 +356,16 @@ export class TeamsService {
   buildMembershipSourcesFilter(membershipSources, filter) {
     const sources = membershipSources?.split(',').map(source => source.trim());
     if (sources?.length > 0) {
-      filter.push({
-        membershipSources: {
-          some: {
-            title: { 
-              in: sources 
+      sources.map((source)=> {
+        filter.push({
+          membershipSources: {
+            some: {
+              title: { 
+                in: source 
+              }
             }
           }
-        }
+        });
       });
     }
   }

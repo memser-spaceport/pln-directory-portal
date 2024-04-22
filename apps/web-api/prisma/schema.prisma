@@ -268,7 +268,7 @@ model ProjectContribution {
   uid            String    @unique @default(cuid())
   role           String?
   description    String?
-  currentProject Boolean?   @default(false)
+  currentProject Boolean?  @default(false)
   startDate      DateTime?
   endDate        DateTime?
   memberUid      String
@@ -276,7 +276,7 @@ model ProjectContribution {
   projectUid     String
   project        Project?  @relation(fields: [projectUid], references: [uid])
 
-   @@unique([memberUid, projectUid])
+  @@unique([memberUid, projectUid])
 }
 
 model Project {
@@ -304,7 +304,6 @@ model Project {
   projectFocusAreas  ProjectFocusArea[]
   contributions      ProjectContribution[]
 }
-
 
 model PLEvent {
   id          Int            @id @default(autoincrement())
