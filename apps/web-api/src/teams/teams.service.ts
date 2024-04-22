@@ -225,6 +225,7 @@ export class TeamsService {
       throw new ForbiddenException();
     }
     participantsRequest.requesterEmailId = requestorDetails.email;
+    participantsRequest.newData.lastModifiedBy = requestorDetails.uid;
     if (
       participantsRequest.participantType === ParticipantType.TEAM.toString() &&
       !ParticipantRequestTeamSchema.safeParse(participantsRequest).success
