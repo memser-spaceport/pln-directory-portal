@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ReactComponent as ExpandIcon } from '../../../../../public/assets/images/icons/chevron-down-blue.svg';
 import { ReactComponent as CollapseIcon } from '../../../../../public/assets/images/icons/chevron-right-grey.svg';
 import { ReactComponent as InformationCircleIcon } from '../../../../../public/assets/images/icons/info_icon.svg';
-import { ReactComponent as HelpActive } from '../../../../../public/assets/images/icons/help-acive.svg';
+import { ReactComponent as HelpActive } from '../../../../../public/assets/images/icons/help-active.svg';
 import { ReactComponent as HelpInActive } from '../../../../../public/assets/images/icons/help-inactive.svg';
 import { useRouter } from 'next/router';
 import { APP_ANALYTICS_EVENTS, URL_QUERY_VALUE_SEPARATOR } from 'apps/web-app/constants';
