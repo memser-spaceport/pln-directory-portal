@@ -61,6 +61,7 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(
       createdAt: faker.date.past(),
       updatedAt: faker.date.recent(),
       fundingStageUid: null,
+      lastModifiedBy: null
     };
   }
 );

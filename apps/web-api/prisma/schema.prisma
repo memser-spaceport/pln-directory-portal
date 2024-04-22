@@ -15,68 +15,73 @@ datasource db {
 /// TODO: User permissions/grants
 
 model Team {
-  id                   Int                @id @default(autoincrement())
-  uid                  String             @unique @default(cuid())
-  name                 String             @unique
-  logo                 Image?             @relation(fields: [logoUid], references: [uid])
-  logoUid              String?
-  blog                 String?
-  officeHours          String?
-  website              String?
-  contactMethod        String?
-  twitterHandler       String?
-  linkedinHandler      String?
-  telegramHandler      String?
-  shortDescription     String?
-  longDescription      String?
-  plnFriend            Boolean            @default(false)
-  airtableRecId        String?            @unique
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-  teamMemberRoles      TeamMemberRole[]
-  industryTags         IndustryTag[]
-  membershipSources    MembershipSource[]
-  fundingStage         FundingStage?      @relation(fields: [fundingStageUid], references: [uid])
-  fundingStageUid      String?
-  technologies         Technology[]
-  moreDetails          String?
-  maintainingProjects  Project[]          @relation("maintainingTeam")
-  contributingProjects Project[]          @relation("contributingTeams")
-  eventGuests          PLEventGuest[]
-  teamFocusAreas       TeamFocusArea[]
+  id                           Int                           @id @default(autoincrement())
+  uid                          String                        @unique @default(cuid())
+  name                         String                        @unique
+  logo                         Image?                        @relation(fields: [logoUid], references: [uid])
+  logoUid                      String?
+  blog                         String?
+  officeHours                  String?
+  website                      String?
+  contactMethod                String?
+  twitterHandler               String?
+  linkedinHandler              String?
+  telegramHandler              String?
+  shortDescription             String?
+  longDescription              String?
+  plnFriend                    Boolean                       @default(false)
+  airtableRecId                String?                       @unique
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
+  lastModifiedBy               String?
+  lastModifier                 Member?                       @relation("LastModification", fields: [lastModifiedBy], references: [uid])
+  teamMemberRoles              TeamMemberRole[]
+  industryTags                 IndustryTag[]
+  membershipSources            MembershipSource[]
+  fundingStage                 FundingStage?                 @relation(fields: [fundingStageUid], references: [uid])
+  fundingStageUid              String?
+  technologies                 Technology[]
+  moreDetails                  String?
+  maintainingProjects          Project[]                     @relation("maintainingTeam")
+  contributingProjects         Project[]                     @relation("contributingTeams")
+  eventGuests                  PLEventGuest[]
+  teamFocusAreas               TeamFocusArea[]
+  teamFocusAreasVersionHistory TeamFocusAreaVersionHistory[]
 }
 
 model Member {
-  id                   Int                   @id @default(autoincrement())
-  uid                  String                @unique @default(cuid())
-  name                 String
-  email                String?               @unique
-  image                Image?                @relation(fields: [imageUid], references: [uid])
-  imageUid             String?
-  githubHandler        String?
-  discordHandler       String?
-  twitterHandler       String?
-  linkedinHandler      String?
-  telegramHandler      String?
-  officeHours          String?
-  moreDetails          String?
-  plnFriend            Boolean               @default(false)
-  plnStartDate         DateTime?
-  airtableRecId        String?               @unique
-  externalId           String?               @unique
-  openToWork           Boolean?              @default(false)
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  skills               Skill[]
-  location             Location?             @relation(fields: [locationUid], references: [uid])
-  locationUid          String?
-  teamMemberRoles      TeamMemberRole[]
-  memberRoles          MemberRole[]
-  preferences          Json?
-  projectContributions ProjectContribution[]
-  createdProjects      Project[]
-  contributedProjects  ProjectContributor[]
-  eventGuests          PLEventGuest[]
+  id                           Int                           @id @default(autoincrement())
+  uid                          String                        @unique @default(cuid())
+  name                         String
+  email                        String?                       @unique
+  image                        Image?                        @relation(fields: [imageUid], references: [uid])
+  imageUid                     String?
+  githubHandler                String?
+  discordHandler               String?
+  twitterHandler               String?
+  linkedinHandler              String?
+  telegramHandler              String?
+  officeHours                  String?
+  moreDetails                  String?
+  plnFriend                    Boolean                       @default(false)
+  plnStartDate                 DateTime?
+  airtableRecId                String?                       @unique
+  externalId                   String?                       @unique
+  openToWork                   Boolean?                      @default(false)
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
+  skills                       Skill[]
+  location                     Location?                     @relation(fields: [locationUid], references: [uid])
+  locationUid                  String?
+  teamMemberRoles              TeamMemberRole[]
+  memberRoles                  MemberRole[]
+  preferences                  Json?
+  projectContributions         ProjectContribution[]
+  createdProjects              Project[]
+  contributedProjects          ProjectContributor[]
+  eventGuests                  PLEventGuest[]
+  teamFocusAreasVersionHistory TeamFocusAreaVersionHistory[]
+  modifiedTeams                Team[]                        @relation("LastModification")
 }
 
 model MemberRole {
@@ -342,19 +347,20 @@ model PLEventGuest {
 }
 
 model FocusArea {
-  id                     Int                  @id @default(autoincrement())
-  uid                    String               @unique @default(cuid())
-  title                  String               @unique
-  description            String?
-  createdAt              DateTime             @default(now())
-  updatedAt              DateTime             @updatedAt
-  parentUid              String?
-  parent                 FocusArea?           @relation("parentAreas", fields: [parentUid], references: [uid])
-  children               FocusArea[]          @relation("parentAreas")
-  teamFocusAreas         TeamFocusArea[]      @relation("teamFocusAreas")
-  teamAncestorFocusAreas TeamFocusArea[]      @relation("teamAncestorFocusAreas")
-  focusAreas             FocusAreaHierarchy[] @relation("focusAreas")
-  subFocusAreas          FocusAreaHierarchy[] @relation("subfocusAreas")
+  id                           Int                           @id @default(autoincrement())
+  uid                          String                        @unique @default(cuid())
+  title                        String                        @unique
+  description                  String?
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
+  parentUid                    String?
+  parent                       FocusArea?                    @relation("parentAreas", fields: [parentUid], references: [uid])
+  children                     FocusArea[]                   @relation("parentAreas")
+  teamFocusAreas               TeamFocusArea[]               @relation("teamFocusAreas")
+  teamAncestorFocusAreas       TeamFocusArea[]               @relation("teamAncestorFocusAreas")
+  focusAreas                   FocusAreaHierarchy[]          @relation("focusAreas")
+  subFocusAreas                FocusAreaHierarchy[]          @relation("subfocusAreas")
+  teamFocusAreasVersionHistory TeamFocusAreaVersionHistory[]
 }
 
 model TeamFocusArea {
@@ -376,6 +382,25 @@ model FocusAreaHierarchy {
   focusArea       FocusArea @relation("focusAreas", fields: [focusAreaUid], references: [uid], onDelete: Cascade)
   subFocusAreaUid String
   subFocusArea    FocusArea @relation("subfocusAreas", fields: [subFocusAreaUid], references: [uid], onDelete: Cascade)
+}
+
+model TeamFocusAreaVersionHistory {
+  id             Int       @id @default(autoincrement())
+  uid            String    @unique @default(cuid())
+  teamUid        String
+  team           Team      @relation(fields: [teamUid], references: [uid])
+  teamName       String
+  focusAreaUid   String
+  focusArea      FocusArea @relation(fields: [focusAreaUid], references: [uid])
+  focusAreaTitle String?
+  modifiedBy     String
+  user           Member    @relation(fields: [modifiedBy], references: [uid])
+  username       String
+  version        Int
+  createdAt      DateTime  @default(now())
+  modifiedAt     DateTime  @updatedAt
+
+  @@unique([focusAreaUid, teamUid, version])
 }
 
 enum ImageSize {

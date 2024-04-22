@@ -914,6 +914,9 @@ export class ParticipantsRequestService {
     dataToSave['shortDescription'] = dataToProcess.shortDescription;
     dataToSave['longDescription'] = dataToProcess.longDescription;
     dataToSave['moreDetails'] = dataToProcess.moreDetails;
+    dataToSave['lastModifier'] = {
+      connect: { uid:  dataToProcess.lastModifiedBy }
+    };
 
     // Funding Stage Mapping
     dataToSave['fundingStage'] = {
