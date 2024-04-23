@@ -302,6 +302,7 @@ model Project {
   contributions      ProjectContribution[]
   contributors       ProjectContributor[]
   isDeleted          Boolean               @default(false)
+  projectFocusAreas  ProjectFocusArea[]
 }
 
 model ProjectContributor {
@@ -347,20 +348,22 @@ model PLEventGuest {
 }
 
 model FocusArea {
-  id                           Int                           @id @default(autoincrement())
-  uid                          String                        @unique @default(cuid())
-  title                        String                        @unique
-  description                  String?
-  createdAt                    DateTime                      @default(now())
-  updatedAt                    DateTime                      @updatedAt
-  parentUid                    String?
-  parent                       FocusArea?                    @relation("parentAreas", fields: [parentUid], references: [uid])
-  children                     FocusArea[]                   @relation("parentAreas")
-  teamFocusAreas               TeamFocusArea[]               @relation("teamFocusAreas")
-  teamAncestorFocusAreas       TeamFocusArea[]               @relation("teamAncestorFocusAreas")
-  focusAreas                   FocusAreaHierarchy[]          @relation("focusAreas")
-  subFocusAreas                FocusAreaHierarchy[]          @relation("subfocusAreas")
-  teamFocusAreasVersionHistory TeamFocusAreaVersionHistory[]
+  id                          Int                           @id @default(autoincrement())
+  uid                         String                        @unique @default(cuid())
+  title                       String                        @unique
+  description                 String?
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime                      @updatedAt
+  parentUid                   String?
+  parent                      FocusArea?                    @relation("parentAreas", fields: [parentUid], references: [uid])
+  children                    FocusArea[]                   @relation("parentAreas")
+  teamFocusAreas              TeamFocusArea[]               @relation("teamFocusAreas")
+  teamAncestorFocusAreas      TeamFocusArea[]               @relation("teamAncestorFocusAreas")
+  projectFocusAreas           ProjectFocusArea[]            @relation("projectFocusAreas")
+  projectAncestorFocusAreas   ProjectFocusArea[]            @relation("projectAncestorFocusAreas")
+  focusAreas                  FocusAreaHierarchy[]          @relation("focusAreas")
+  subFocusAreas               FocusAreaHierarchy[]          @relation("subfocusAreas")
+  TeamFocusAreaVersionHistory TeamFocusAreaVersionHistory[]
 }
 
 model TeamFocusArea {
@@ -375,6 +378,18 @@ model TeamFocusArea {
   @@unique([focusAreaUid, teamUid, ancestorAreaUid])
 }
 
+model ProjectFocusArea {
+  id              Int       @id @default(autoincrement())
+  projectUid      String
+  project         Project   @relation(fields: [projectUid], references: [uid], onDelete: Cascade)
+  focusAreaUid    String
+  focusArea       FocusArea @relation("projectFocusAreas", fields: [focusAreaUid], references: [uid], onDelete: Cascade)
+  ancestorAreaUid String
+  ancestorArea    FocusArea @relation("projectAncestorFocusAreas", fields: [ancestorAreaUid], references: [uid], onDelete: Cascade)
+
+  @@unique([focusAreaUid, projectUid, ancestorAreaUid])
+}
+
 model FocusAreaHierarchy {
   id              Int       @id @default(autoincrement())
   isDirect        Boolean
@@ -385,20 +400,20 @@ model FocusAreaHierarchy {
 }
 
 model TeamFocusAreaVersionHistory {
-  id             Int       @id @default(autoincrement())
-  uid            String    @unique @default(cuid())
+  id             Int        @id @default(autoincrement())
+  uid            String     @unique @default(cuid())
   teamUid        String
-  team           Team      @relation(fields: [teamUid], references: [uid])
+  team           Team       @relation(fields: [teamUid], references: [uid])
   teamName       String
   focusAreaUid   String?
   focusArea      FocusArea? @relation(fields: [focusAreaUid], references: [uid])
   focusAreaTitle String?
   modifiedBy     String
-  user           Member    @relation(fields: [modifiedBy], references: [uid])
+  user           Member     @relation(fields: [modifiedBy], references: [uid])
   username       String
   version        Int
-  createdAt      DateTime  @default(now())
-  modifiedAt     DateTime  @updatedAt
+  createdAt      DateTime   @default(now())
+  modifiedAt     DateTime   @updatedAt
 
   @@unique([focusAreaUid, teamUid, version])
 }

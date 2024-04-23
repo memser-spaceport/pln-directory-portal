@@ -18,3 +18,4 @@ export * from './pl-event';
 export * from './pl-event-guest';
 export * from './focus-areas';
 export * from './team-focus-areas';
+export * from './project-focus-areas';
