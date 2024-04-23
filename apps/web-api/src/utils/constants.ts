@@ -96,3 +96,6 @@ export const DEFAULT_MEMBER_ROLES = {
     default: true
   }
 };
+
+export const PROJECT = 'Project';
+export const TEAM = 'Team';
