@@ -11,6 +11,7 @@ const ContributorSchema = z.object({
 });
 
 const ProjectSchema = z.object({
+  id: z.number().int(),
   logoUid: z.string().optional().nullable(),
   name: z.string(),
   tagline: z.string(),
@@ -34,12 +35,17 @@ const ProjectSchema = z.object({
     name: z.string() 
   }).array().optional(),
   contributors: ContributorSchema.array().optional(),
-  readMe: z.string().optional()
+  readMe: z.string().optional(),
+  focusAreas: z.object({
+    uid: z.string(), 
+    title: z.string() 
+  }).array().optional()
 });
 
+export const ResponseProjectSchema = ProjectSchema.omit({ id: true }).strict();
 export const ResponseProjectWithRelationsSchema = ProjectSchema.extend({});
 export const ResponseProjectSuccessSchema = z.object({ success: z.boolean()});
-// omit score to avoid update from request
-export class UpdateProjectDto extends createZodDto(ProjectSchema.partial().omit({ score: true })) {}
-export class CreateProjectDto extends createZodDto(ProjectSchema.omit({ score: true })) {}
+// omit score and id to avoid update from request
+export class UpdateProjectDto extends createZodDto(ProjectSchema.partial().omit({ id:true, score: true })) {}
+export class CreateProjectDto extends createZodDto(ProjectSchema.omit({ id:true, score: true })) {}
 

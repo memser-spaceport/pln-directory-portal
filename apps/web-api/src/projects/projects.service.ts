@@ -1,4 +1,4 @@
-import { Inject, CACHE_MANAGER, BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, CACHE_MANAGER, BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, HttpException } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { Prisma } from '@prisma/client';
@@ -12,14 +12,15 @@ export class ProjectsService {
     private memberService: MembersService,
     private logger: LogService,
     @Inject(CACHE_MANAGER) private cacheService: Cache
-
   ) {}
 
   async createProject(project: Prisma.ProjectUncheckedCreateInput, userEmail: string) {
     try {
       const member:any = await this.getMemberInfo(userEmail);
-      const { contributingTeams, contributors } : any = project;
+      const { contributingTeams, contributors, focusAreas } : any = project;
       project.createdBy = member.uid;
+      project['projectFocusAreas'] = {...await this.createProjectWithFocusAreas(focusAreas, this.prisma)};
+      delete project['focusAreas'];
       const result = await this.prisma.project.create({
         data: {
           ...project,
@@ -47,10 +48,10 @@ export class ProjectsService {
   ) {
     try {
       const member:any = await this.getMemberInfo(userEmail);
-      const existingData = await this.getProjectByUid(uid);
+      const existingData:any = await this.getProjectByUid(uid);
       const contributingTeamsUid = existingData?.contributingTeams?.map(team => team.uid) || [];
       await this.isMemberAllowedToEdit(member, [existingData?.maintainingTeamUid, ...contributingTeamsUid], existingData);
-      const { contributingTeams, contributors } : any = project;
+      const { contributingTeams, contributors, focusAreas } : any = project;
       const contributorToCreate:any = [];
       const contributorUidsToDelete:any = [];
       contributors?.map((contributor) => {
@@ -61,24 +62,28 @@ export class ProjectsService {
           contributorUidsToDelete.push({ uid: contributor.uid });
         }
       });
-      const result = await this.prisma.project.update({
-        where: {
-          uid
-        },
-        data: {
-          ...project,
-          contributingTeams: {
-            disconnect: contributingTeamsUid?.map(uid => { return { uid }}),
-            connect: contributingTeams?.map(team => { return { uid: team.uid }}) || []
+      return await this.prisma.$transaction(async(tx) => {
+        project['projectFocusAreas'] = {...await this.updateProjectWithFocusAreas(uid, focusAreas, tx)};
+        delete project['focusAreas'];
+        const result = await tx.project.update({
+          where: {
+            uid
           },
-          contributors: {
-            create: contributorToCreate,
-            deleteMany: contributorUidsToDelete
+          data: {
+            ...project,
+            contributingTeams: {
+              disconnect: contributingTeamsUid?.map(uid => { return { uid }}),
+              connect: contributingTeams?.map(team => { return { uid: team.uid }}) || []
+            },
+            contributors: {
+              create: contributorToCreate,
+              deleteMany: contributorUidsToDelete
+            }
           }
-        }
+        });
+        await this.cacheService.reset();
+        return result;
       });
-      await this.cacheService.reset();
-      return result;
     } catch(err) {
       this.handleErrors(err, `${uid}`);
     }
@@ -105,7 +110,7 @@ export class ProjectsService {
     uid: string
   ) {
     try {
-      return await this.prisma.project.findUnique({
+      const project = await this.prisma.project.findUniqueOrThrow({
         where: { uid },
         include: {
           maintainingTeam: { select: { uid: true, name: true, logo: true }},
@@ -137,9 +142,21 @@ export class ProjectsService {
             }
           },
           creator: { select: { uid: true, name: true, image: true }},
-          logo: true
+          logo: true,
+          projectFocusAreas: {
+            select: {
+              focusArea: {
+                select: {
+                  uid: true,
+                  title: true 
+                }
+              }
+            }
+          }
         }
       });
+      project['projectFocusAreas'] = this.removeDuplicateFocusAreas(project?.projectFocusAreas);
+      return project;
     } catch(err) {
       this.handleErrors(err, `${uid}`);
     }
@@ -203,5 +220,144 @@ export class ProjectsService {
     } else {
       throw new ForbiddenException(`Member ${member.uid} isn't creator of the project ${project.uid} or leader of team ${project.maintainingTeamUid}`);
     }
+  }
+
+  async createProjectWithFocusAreas(focusAreas, transaction) {
+    if (focusAreas && focusAreas.length) {
+      const projectFocusAreas:any = [];
+      const focusAreaHierarchies = await transaction.focusAreaHierarchy.findMany({
+        where: {
+          subFocusAreaUid: {
+            in: focusAreas.map(area => area.uid)
+          }
+        }
+      });
+      focusAreaHierarchies.map(areaHierarchy => {
+        projectFocusAreas.push({
+          focusAreaUid: areaHierarchy.subFocusAreaUid,
+          ancestorAreaUid: areaHierarchy.focusAreaUid
+        });
+      });
+      focusAreas.map(area => {
+        projectFocusAreas.push({
+          focusAreaUid: area.uid,
+          ancestorAreaUid: area.uid
+        });
+      });
+      return {
+        createMany: {
+          data: projectFocusAreas
+        }
+      }
+     }
+  }
+
+  async isFocusAreaModified(projectId, focusAreas, transaction) {
+    const projectFocusAreas = await transaction.projectFocusArea.findMany({
+      where: {
+        projectUid: projectId
+      }
+    });
+    const newFocusAreaUIds = focusAreas.map(area => area.uid);
+    const focusAreasUIds = [...new Set(projectFocusAreas.map(area => area.focusAreaUid))];
+
+    if (newFocusAreaUIds.length !== focusAreasUIds.length) {
+      return true;
+    } 
+
+    if (projectFocusAreas.length === 0 && focusAreas.length === 0) {
+      return false 
+    }
+    return !focusAreasUIds.every(area => newFocusAreaUIds.includes(area));
+  }
+
+  async updateProjectWithFocusAreas(projectId, focusAreas, transaction) {
+    const isProjectFocusAreaModified = await this.isFocusAreaModified(projectId, focusAreas, transaction);
+    if (isProjectFocusAreaModified) {
+      if (focusAreas && focusAreas.length > 0) {
+        await transaction.projectFocusArea.deleteMany({
+          where: {
+            projectUid: projectId
+          }
+        });
+        return await this.createProjectWithFocusAreas(focusAreas, transaction)
+      } else {
+        await transaction.projectFocusArea.deleteMany({
+          where: {
+            projectUid: projectId
+          }
+        });
+      }
+      return {};
+    }
+  }
+
+  buildFocusAreaFilters(focusAreas) {
+    if (focusAreas?.split(',')?.length > 0) {
+      return {
+        projectFocusAreas: {
+          some: {
+            ancestorArea:{
+              title: {
+                in: focusAreas?.split(',')
+              }
+            }
+          }
+        }
+      }
+    }
+    return {};
+  }
+
+  removeDuplicateFocusAreas(focusAreas): any {
+    const uniqueFocusAreas = {};
+    focusAreas.forEach(item => {
+        const uid = item.focusArea.uid;
+        const title = item.focusArea.title;
+        uniqueFocusAreas[uid] = { uid, title };
+    });
+    return Object.values(uniqueFocusAreas);
+  }
+
+  buildProjectFilter(query){
+    const { 
+      name,
+      lookingForFunding,
+      team
+    } = query;
+    const filter:any = [];
+    this.buildNameFilter(name, filter);
+    this.buildFundingFilter(lookingForFunding, filter);
+    this.buildMaintainingTeamFilter(team, filter);
+    return { 
+      AND: filter
+    };
+  }
+
+  buildNameFilter(name, filter) {
+    if (name) {
+      filter.push({ 
+        name: {
+          contains: name,
+          mode: 'insensitive'
+        }
+      });
+    }  
+  }
+
+  buildFundingFilter(funding, filter) {
+    if (funding === "true") {
+      filter.push({ 
+        lookingForFunding: true
+      });
+    } 
+  }
+
+  buildMaintainingTeamFilter(team, filter) {
+    if (team) {
+      filter.push({ 
+        maintainingTeamUid: team
+      });
+    } 
   }
 }

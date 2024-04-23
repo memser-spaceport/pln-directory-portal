@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseTeamFocusAreaSchema } from './team-focus-areas';
 import { ResponseTeamWithRelationsSchema } from './team';
+import { ResponseProjectFocusAreaSchema } from './project-focus-areas';
 
 export const FocusAreaSchema = z.object({
   id: z.number().int(),
@@ -20,14 +21,18 @@ export const ResponseFocusAreaWithRelationsSchema = ResponseFocusAreaSchema.exte
   children: FocusAreaSchema.array().optional(),
   teamFocusAreas: ResponseTeamFocusAreaSchema.array().optional(),
   teamAncestorFocusAreas: ResponseTeamFocusAreaSchema.array().optional(),
-  team: ResponseTeamWithRelationsSchema.optional()
+  team: ResponseTeamWithRelationsSchema.optional(),
+  projectFocusAreas: ResponseProjectFocusAreaSchema.array().optional(),
+  projectAncestorFocusAreas: ResponseProjectFocusAreaSchema.array().optional()
 });
 
 export const FocusAreaRelationalFields = ResponseFocusAreaWithRelationsSchema.pick({
   children: true,
   teamFocusAreas: true,
   teamAncestorFocusAreas: true,
-  team: true
+  team: true,
+  projectFocusAreas: true,
+  projectAncestorFocusAreas: true
 }).strip();
 
 export const FocusAreaQueryableFields = FocusAreaSchema.keyof();
