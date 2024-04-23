@@ -49,6 +49,13 @@ export class ProjectsController {
     );
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(req.query);
+    const { focusAreas } : any = req.query;
+    builtQuery.where = {
+      AND: [
+        builtQuery.where ? builtQuery.where : {},
+        this.projectsService.buildFocusAreaFilters(focusAreas)
+      ]
+    }
     return this.projectsService.getProjects(builtQuery);
   }
 
