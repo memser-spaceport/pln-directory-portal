@@ -653,6 +653,18 @@ export class MembersService {
                 } 
               }      
             }
+          },
+          { 
+            projectContributions : {
+              some: {
+                project: {  
+                  name: {
+                    contains: name__icontains,
+                    mode: 'insensitive'
+                  } 
+                } 
+              }      
+            }
           }
         ]
       }
