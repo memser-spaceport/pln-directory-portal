@@ -3,9 +3,9 @@ import { z } from 'zod';
 const ProjectContribution = z.object({
   role: z.string(),
   currentProject: z.boolean(),
-  startDate: z.string(),
-  endDate: z.string().optional().nullable(),
-  description: z.string().optional(),
+  startDate: z.string().nullish(),
+  endDate: z.string().optional(),
+  description: z.string().optional().nullish(),
   projectUid: z.string(),
   uid: z.string().optional()
 });
