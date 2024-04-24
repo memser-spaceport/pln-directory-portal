@@ -325,7 +325,9 @@ export class ProjectsService {
       lookingForFunding,
       team
     } = query;
-    const filter:any = [];
+    const filter:any = [{
+      isDeleted: false
+    }];
     this.buildNameFilter(name, filter);
     this.buildFundingFilter(lookingForFunding, filter);
     this.buildMaintainingTeamFilter(team, filter);
