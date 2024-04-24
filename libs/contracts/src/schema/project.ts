@@ -3,7 +3,7 @@ import { z } from 'nestjs-zod/z';
 
 const TypeEnum = z.enum(['MAINTENER', 'COLLABORATOR']);
 
-const ContributorSchema = z.object({
+const ContributionSchema = z.object({
   uid: z.string().optional(), 
   projectUid: z.string().optional(), 
   memberUid: z.string(),
@@ -34,12 +34,12 @@ const ProjectSchema = z.object({
     uid: z.string(), 
     name: z.string() 
   }).array().optional(),
-  contributors: ContributorSchema.array().optional(),
   readMe: z.string().optional(),
   focusAreas: z.object({
     uid: z.string(), 
     title: z.string() 
-  }).array().optional()
+  }).array().optional(),
+  contributions: ContributionSchema.array().optional()
 });
 
 export const ResponseProjectSchema = ProjectSchema.omit({ id: true }).strict();
