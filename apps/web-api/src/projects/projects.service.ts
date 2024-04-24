@@ -17,7 +17,7 @@ export class ProjectsService {
   async createProject(project: Prisma.ProjectUncheckedCreateInput, userEmail: string) {
     try {
       const member:any = await this.getMemberInfo(userEmail);
-      const { contributingTeams, contributors, focusAreas } : any = project;
+      const { contributingTeams, contributions, focusAreas} : any = project;
       project.createdBy = member.uid;
       project['projectFocusAreas'] = {...await this.createProjectWithFocusAreas(focusAreas, this.prisma)};
       delete project['focusAreas'];
@@ -27,9 +27,9 @@ export class ProjectsService {
           contributingTeams: {
             connect: contributingTeams?.map(team => { return { uid: team.uid }})
           },
-          contributors: {
-            create: contributors?.map((contributor) => {
-              return contributor;
+          contributions: {
+            create: contributions?.map((contribution) => {
+              return contribution;
             })
           }
         }
@@ -51,15 +51,15 @@ export class ProjectsService {
       const existingData:any = await this.getProjectByUid(uid);
       const contributingTeamsUid = existingData?.contributingTeams?.map(team => team.uid) || [];
       await this.isMemberAllowedToEdit(member, [existingData?.maintainingTeamUid, ...contributingTeamsUid], existingData);
-      const { contributingTeams, contributors, focusAreas } : any = project;
-      const contributorToCreate:any = [];
-      const contributorUidsToDelete:any = [];
-      contributors?.map((contributor) => {
-        if (!contributor.uid) {
-          contributorToCreate.push(contributor);
+      const { contributingTeams, contributions, focusAreas } : any = project;
+      const contributionsToCreate:any = [];
+      const contributionUidsToDelete:any = [];
+      contributions?.map((contribution) => {
+        if (!contribution.uid) {
+          contributionsToCreate.push(contribution);
         }
-        if (contributor.isDeleted) {
-          contributorUidsToDelete.push({ uid: contributor.uid });
+        if (contribution.isDeleted) {
+          contributionUidsToDelete.push({ uid: contribution.uid });
         }
       });
       return await this.prisma.$transaction(async(tx) => {
@@ -75,9 +75,9 @@ export class ProjectsService {
               disconnect: contributingTeamsUid?.map(uid => { return { uid }}),
               connect: contributingTeams?.map(team => { return { uid: team.uid }}) || []
             },
-            contributors: {
-              create: contributorToCreate,
-              deleteMany: contributorUidsToDelete
+            contributions: {
+              create: contributionsToCreate,
+              deleteMany: contributionUidsToDelete
             }
           }
         });
@@ -115,7 +115,7 @@ export class ProjectsService {
         include: {
           maintainingTeam: { select: { uid: true, name: true, logo: true }},
           contributingTeams: { select: { uid: true, name: true, logo: true }},
-          contributors: { 
+          contributions: { 
             select: { 
               uid: true,
               member: { 
