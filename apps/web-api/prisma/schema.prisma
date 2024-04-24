@@ -78,7 +78,6 @@ model Member {
   preferences                  Json?
   projectContributions         ProjectContribution[]
   createdProjects              Project[]
-  contributedProjects          ProjectContributor[]
   eventGuests                  PLEventGuest[]
   teamFocusAreasVersionHistory TeamFocusAreaVersionHistory[]
   modifiedTeams                Team[]                        @relation("LastModification")
@@ -269,13 +268,15 @@ model ProjectContribution {
   uid            String    @unique @default(cuid())
   role           String?
   description    String?
-  currentProject Boolean   @default(false)
-  startDate      DateTime
+  currentProject Boolean?   @default(false)
+  startDate      DateTime?
   endDate        DateTime?
   memberUid      String
   member         Member?   @relation(fields: [memberUid], references: [uid])
   projectUid     String
   project        Project?  @relation(fields: [projectUid], references: [uid])
+
+   @@unique([memberUid, projectUid])
 }
 
 model Project {
@@ -299,20 +300,11 @@ model Project {
   contributingTeams  Team[]                @relation("contributingTeams")
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
-  contributions      ProjectContribution[]
-  contributors       ProjectContributor[]
   isDeleted          Boolean               @default(false)
   projectFocusAreas  ProjectFocusArea[]
+  contributions      ProjectContribution[]
 }
 
-model ProjectContributor {
-  id         Int      @id @default(autoincrement())
-  uid        String   @unique @default(cuid())
-  project    Project? @relation(fields: [projectUid], references: [uid])
-  projectUid String
-  member     Member?  @relation(fields: [memberUid], references: [uid])
-  memberUid  String
-}
 
 model PLEvent {
   id          Int            @id @default(autoincrement())
