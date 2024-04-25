@@ -390,8 +390,8 @@ model TeamFocusAreaVersionHistory {
   teamUid        String
   team           Team      @relation(fields: [teamUid], references: [uid])
   teamName       String
-  focusAreaUid   String
-  focusArea      FocusArea @relation(fields: [focusAreaUid], references: [uid])
+  focusAreaUid   String?
+  focusArea      FocusArea? @relation(fields: [focusAreaUid], references: [uid])
   focusAreaTitle String?
   modifiedBy     String
   user           Member    @relation(fields: [modifiedBy], references: [uid])
