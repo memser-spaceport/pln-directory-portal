@@ -30,7 +30,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
         const newFocusAreasUids = [...new Set(team.teamFocusAreas?.createMany?.data?.map(area => area.focusAreaUid)||[])];
         const newFocusAreas = await this.findFocusAreas(newFocusAreasUids);
         const existingFocusAreas = await this.findTeamFocusAreasRecentVersion(teamUid);
-        const existingFocusAreasUids:any = existingFocusAreas.map(area=> area.uid);
+        const existingFocusAreasUids:any = existingFocusAreas.map(area=> area.focusAreaUid);
         const member:any = await this.member.findFirstOrThrow({ where: { uid: team?.lastModifier?.connect?.uid }});
         if (existingFocusAreas.length > 0) {
           let isFocusAreaUpdated = false;
