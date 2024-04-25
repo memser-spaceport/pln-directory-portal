@@ -6,12 +6,16 @@ interface DirectoryListProps {
   children: ReactElement[];
   itemsCount: number;
   filterProperties: string[];
+  from: string;
+  callback: () => void;
 }
 
 export function DirectoryList({
   children,
   itemsCount,
   filterProperties,
+  from,
+  callback
 }: DirectoryListProps) {
   const [visibleItems] = useFakeInfiniteScroll({
     items: children,
@@ -27,6 +31,8 @@ export function DirectoryList({
       {!itemsCount ? (
         <div className="flex justify-center">
           <DirectoryEmpty
+          from={from}
+          callback={callback}
             filterProperties={[...filterProperties, 'searchBy']}
           />
         </div>
