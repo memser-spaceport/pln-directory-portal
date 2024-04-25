@@ -487,3 +487,8 @@ export const FILTER_API_ROUTES = {
 export const ROLE_FILTER_QUERY_NAME = "memberRoles";
 
 export const ABOUT_PLN_LINK = "https://protocol.ai/blog/transcription-pl-vision-driving-a-breakthroughs-in-computing-to-push-humanity-forward/"
+
+export const FOCUS_AREAS_FILTER_KEYS = {
+  projects: "projectAncestorFocusAreas",
+  teams: "teamAncestorFocusAreas"
+}
