@@ -1,10 +1,17 @@
+import { PAGE_ROUTES } from 'apps/web-app/constants';
 import { useRouter } from 'next/router';
 
 interface DirectoryEmptyProps {
   filterProperties: string[];
+  from: string;
+  callback: () => void;
 }
 
-export function DirectoryEmpty({ filterProperties }: DirectoryEmptyProps) {
+export function DirectoryEmpty({
+  filterProperties,
+  from,
+  callback,
+}: DirectoryEmptyProps) {
   const { push, pathname, query } = useRouter();
 
   function clearFilters() {
@@ -27,9 +34,19 @@ export function DirectoryEmpty({ filterProperties }: DirectoryEmptyProps) {
         className="text-blue-600 outline-none hover:text-blue-700 focus:text-blue-900 active:text-blue-900"
         onClick={() => clearFilters()}
       >
-        clear all the criteria
+        clear all the criteria.
       </button>
-      .
+      {from === PAGE_ROUTES.PROJECTS && (
+        <p>
+          If you&apos;re unable to find your project,&nbsp;
+          <button
+            className="text-blue-600 outline-none hover:text-blue-700 focus:text-blue-900 active:text-blue-900"
+            onClick={() => callback()}
+          >
+            click here
+          </button>&nbsp;to add a project.
+        </p>
+      )}
     </div>
   );
 }
