@@ -32,7 +32,37 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
         const existingFocusAreas = await this.findTeamFocusAreasRecentVersion(teamUid);
         const existingFocusAreasUids:any = existingFocusAreas.map(area=> area.focusAreaUid);
         const member:any = await this.member.findFirstOrThrow({ where: { uid: team?.lastModifier?.connect?.uid }});
-        if (existingFocusAreas.length > 0) {
+        if (
+          existingFocusAreas.length === 1 &&
+          existingFocusAreas[0].focusAreaUid === null && 
+          newFocusAreasUids.length === 0
+        ) {
+          return ;
+        } else if(existingFocusAreas.length === 0 && newFocusAreasUids.length === 0) {
+          focusAreaVersion.push(
+            {
+              teamUid,
+              teamName: team.name,
+              focusAreaUid: null,
+              focusAreaTitle: null,
+              version: 1,
+              modifiedBy: member.uid,
+              username: member.name
+            }
+          );  
+        } else if (existingFocusAreas.length > 0 && newFocusAreasUids.length === 0) {
+          focusAreaVersion.push(
+            {
+              teamUid, 
+              teamName: team.name, 
+              focusAreaUid: null,
+              focusAreaTitle: null,
+              version: existingFocusAreas[0].version + 1,
+              modifiedBy: member.uid,
+              username: member.name
+            }
+          );  
+        } else if (existingFocusAreas.length > 0) {
           let isFocusAreaUpdated = false;
           let recentVersion = existingFocusAreas[0]?.version;
           newFocusAreasUids.forEach((focusAreaUid) => {
@@ -54,7 +84,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
                 }
               );  
             });
-            await this.teamFocusAreaVersionHistory.createMany({ data: focusAreaVersion });
           }
         } else {
           newFocusAreasUids.forEach((areaUid, index:number)=>{
@@ -70,10 +99,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
               }
             );  
           });
-          await this.teamFocusAreaVersionHistory.createMany({ data: focusAreaVersion })
         }
+        await this.teamFocusAreaVersionHistory.createMany({ data: focusAreaVersion })
       } catch (error) {
-        console.error('Error logging focus area version history:', error);
+        console.error(`Error occured while logging focus area version history to the team ${params.args?.where?.uid}`, error);
       }
     });
   }
