@@ -133,14 +133,27 @@ export default function MemberList({
   };
 
   const onselect = (member) => {
+    const hasMemberAlreadyInOriginalList = checkIfPresentInOriginalList(member);
     if (checkForExistance(member) === 'no-data') {
-      // console.log(selectedMembers);
-      setDisableFlag(false);
+      if(hasMemberAlreadyInOriginalList) {
+        const alreadySelectedMembers = [...selectedMembers];
+        const updatedMembers = alreadySelectedMembers?.map((mem)=> {
+          if(mem.uid === member?.uid) {
+              return {...mem, isDeleted:false}
+          } 
+          return mem;
+        })
+
+        setSelectedMembers(updatedMembers);
+      } else {
       setSelectedMembers([...selectedMembers, member]);
+      }
       // if (selectedMembers.length + 1 === list.length) {
       //   setSelectAll(true);
       // }
+      setDisableFlag(false);
     }
+    
   };
 
   const onDeselect = (member) => {
