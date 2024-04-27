@@ -4,7 +4,7 @@ import { useState } from 'react';
 import AllContributorsPopup from './all-contributors-popup';
 import ContributorProfileCard from './contributor-profile-card';
 
-export default function Contributors({ project, contributingMembers }) {
+export default function Contributors({ project }) {
   const [allContributorsFlag, setAllContributors] = useState(false);
   const [contributorHoverFlag, setContributorHoverFlag] = useState(false);
   const [contributorHoveruid, setContributorHoveruid] = useState('');
@@ -14,11 +14,15 @@ export default function Contributors({ project, contributingMembers }) {
       ? project.contributors.slice(0, 17)
       : project.contributors;
 
-  const individualContributors = contributingMembers
-    ? contributors?.length < 17
-      ? contributingMembers.slice(0, 17 - contributors?.length)
-      : []
-    : [];
+
+  // const individualContributors = contributingMembers
+  //   ? contributors?.length < 17
+  //     ? contributingMembers.slice(0, 17 - contributors?.length)
+  //     : []
+  //   : [];
+
+  //   console.log("2",individualContributors);
+
 
   const getMemberDetailTemplate = (
     uid,
@@ -86,7 +90,7 @@ export default function Contributors({ project, contributingMembers }) {
           <div>Contributors</div>
           <div className="text-xs font-medium not-italic leading-[14px] text-[#156FF7]">
             <div className="relative top-[5px] rounded-[24px]  bg-[#DBEAFE] px-[8px] py-[2px] ">
-              {project?.contributors?.length + contributingMembers?.length}
+              {project?.contributors?.length}
             </div>
           </div>
         </div>
@@ -121,7 +125,7 @@ export default function Contributors({ project, contributingMembers }) {
                 contri?.teamLead
               );
             })}
-          {contributingMembers &&
+          {/* {contributingMembers &&
             individualContributors.map((contri) => {
               const mainTeam = contri.teamMemberRoles?.filter((teamRoles) => {
                 return teamRoles?.mainTeam === true;
@@ -140,8 +144,8 @@ export default function Contributors({ project, contributingMembers }) {
                 mainTeam?.length ? mainTeam[0]?.team?.name : '',
                 teamLeadArr?.length > 0
               );
-            })}
-          {project?.contributors?.length + contributingMembers?.length > 17 && (
+            })} */}
+          {project?.contributors?.length  > 17 && (
             <div
               className="text-black cursor-pointer relative inline-block h-[36px] w-[36px] bg-gray-200 rounded-full fill-white pt-[5px] text-center rounded-full hover:bg-[#156FF7] hover:text-[#DBEAFE]"
               onClick={() => {
@@ -150,7 +154,7 @@ export default function Contributors({ project, contributingMembers }) {
             >
               <span className='relative top-[1px]'>{' '}
               +
-              {project?.contributors?.length - 17 + contributingMembers?.length}</span>
+              {project?.contributors?.length - 17}</span>
             </div>
           )}
         </div>
@@ -162,7 +166,7 @@ export default function Contributors({ project, contributingMembers }) {
             setAllContributors(false);
           }}
           contributorsList={project?.contributors}
-          contributingMembers={contributingMembers}
+          // contributingMembers={contributingMembers}
         />
       )}
     </>

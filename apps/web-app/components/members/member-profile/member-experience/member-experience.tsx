@@ -102,11 +102,11 @@ function MemberExperience(props) {
                                 <p className="text-[14px] text-[#0F172A] font-[600] capitalize">{exp?.project?.name}</p>
                                 <p className="text-[#475569] text-[12px] font-[400] capitalize">{exp?.role}</p>
                                 <div className="text-[#475569] text-[12px] font-[400] flex gap-[5px]">
-                                    <p>{formatDate(exp.startDate)}</p>
+                                    {exp?.startDate && <p>{formatDate(exp.startDate)}</p>}
                                     {exp.currentProject && <p>{`- Present`}</p>}
                                     {(!exp.currentProject && exp.endDate) && <p>{` - ${formatDate(exp.endDate)}`}</p>}
                                     {exp.endDate && <p>{` (${dateDifference(new Date(exp.startDate), new Date(exp.endDate))})`}</p>}
-                                    {!exp.endDate && <p>{` (${dateDifference(new Date(exp.startDate), new Date())})`}</p>}
+                                    {!exp?.endDate && exp.startDate && <p>{` (${dateDifference(new Date(exp.startDate), new Date())})`}</p>}
                                 </div>
                             </div>
                         </a>}
@@ -126,7 +126,7 @@ function MemberExperience(props) {
                                 </div>
                             </div>
                         </div>}
-                        {exp?.description !== '' && <div className="p-[16px]">
+                        {exp?.description && <div className="p-[16px]">
                            <MemberExperienceDescription exp={exp} desc={exp.description}/>
                         </div>}
                     </div>)}
