@@ -128,7 +128,7 @@ function validateContributionForm(fValues) {
         error: 'Role is Mandatory',
       });
     }
-    if (exp.startDate && exp.startDate.getTime() >= new Date().getTime()) {
+    if (exp.startDate && exp?.startDate?.getTime() >= new Date().getTime()) {
       formErrors.push({
         id: expIndex,
         name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`,
@@ -136,7 +136,7 @@ function validateContributionForm(fValues) {
         error: 'Your contribution cannot start from a future date',
       });
     }
-    if (exp.endDate && exp.endDate.getTime() >= new Date().getTime()) {
+    if (exp.endDate && new Date(exp.endDate)?.getTime() >= new Date().getTime()) {
       formErrors.push({
         id: expIndex,
         name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`,
@@ -144,7 +144,7 @@ function validateContributionForm(fValues) {
         error: 'Your contribution cannot end in a future date',
       });
     }
-    if (exp.endDate && exp.startDate.getTime() >= exp.endDate.getTime()) {
+    if (exp.endDate && exp.startDate.getTime() >= new Date(exp.endDate)?.getTime()) {
       formErrors.push({
         id: expIndex,
         name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`,
@@ -453,7 +453,7 @@ export function EditMemberModal({
                     url: '/assets/images/icons/projects/default.svg',
                   };
                 }
-                exp.startDate = new Date(exp.startDate);
+                exp.startDate = exp?.startDate ? new Date(exp.startDate) : new Date(1990, 0);
                 exp.endDate = exp?.endDate ? new Date(exp?.endDate) : new Date();
                 exp.projectName = exp?.project?.name;
                 exp.projectLogo = exp?.project?.logo?.url;
@@ -705,6 +705,13 @@ export function EditMemberModal({
 
           delete values?.imageFile;
           delete values?.requestorEmail;
+
+          //removed the endDate if it is null
+          values?.projectContributions?.forEach(contibution => {
+            if (contibution.endDate === null) {
+                delete contibution.endDate;
+            }
+          });
 
           const data = {
             participantType: ENROLLMENT_TYPE.MEMBER,
