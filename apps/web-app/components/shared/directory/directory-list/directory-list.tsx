@@ -6,8 +6,8 @@ interface DirectoryListProps {
   children: ReactElement[];
   itemsCount: number;
   filterProperties: string[];
-  from: string;
-  callback: () => void;
+  from?: string;
+  callback?: () => void;
 }
 
 export function DirectoryList({
