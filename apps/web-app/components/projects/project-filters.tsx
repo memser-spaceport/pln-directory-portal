@@ -180,7 +180,7 @@ export default function ProjectsFilter({
         <div className="mt-[20px]">
           <FocusAreaFilter
             uniqueKey={FOCUS_AREAS_FILTER_KEYS.projects}
-            title={'Focus area'}
+            title={'Focus Area'}
             selectedItems={selectedFocusAreas}
             focusAreaRawData={focusAreaRawData}
           />

@@ -18,11 +18,12 @@ import { DIRECTORY_SEO } from '../../seo.config';
 import { ITeam } from '../../utils/teams.types';
 import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../utils/services/auth';
 import {
+  getTeamsFocusAreaOptionsFromQuery,
   getTeamsListOptions,
   getTeamsOptionsFromQuery,
   parseTeam,
 } from '../../utils/teams.utils';
-import { FILTER_API_ROUTES } from 'apps/web-app/constants';
+import { FILTER_API_ROUTES, URL_QUERY_VALUE_SEPARATOR } from 'apps/web-app/constants';
 import api from 'apps/web-app/utils/api';
 
 
@@ -105,10 +106,11 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) =>
   const includeFriends = query?.includeFriends ?? 'false';
   const optionsFromQuery = getTeamsOptionsFromQuery(query);
   const listOptions = getTeamsListOptions(optionsFromQuery);
+  const focusAreaFilterOptions = getTeamsFocusAreaOptionsFromQuery(query);
   const [teamsResponse, filtersValues, focusAreaResult] = await Promise.all([
     getTeams(listOptions),
     getTeamsFilters(optionsFromQuery, includeFriends.toString()),
-    api.get(`${FILTER_API_ROUTES.FOCUS_AREA}?plnFriend=${includeFriends}`),
+    api.get(`${FILTER_API_ROUTES.FOCUS_AREA}?type=Team&plnFriend=${includeFriends}&${focusAreaFilterOptions?.join("&")}`),
   ]);
 
   const teams: ITeam[] =
@@ -120,7 +122,15 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) =>
     query
   );
 
-  parsedFilters.focusAreas = focusAreaResult.data?.filter(item=>item.parentUid === null);
+  const focusAreaQuery = query?.focusAreas as string;
+  const focusAreaFilters = focusAreaQuery?.split(URL_QUERY_VALUE_SEPARATOR);
+  const focusAreas = {
+    rawData: focusAreaResult.data,
+    selectedFocusAreas: focusAreaFilters?.length>0 ? focusAreaResult.data?.filter(fa=> focusAreaFilters.includes(fa.title)) : []
+  }
+  parsedFilters.focusAreas = focusAreas;
+
+
 
   // Cache response data in the browser for 1 minute,
   // and in the CDN for 5 minutes, while keeping it stale for 7 days
