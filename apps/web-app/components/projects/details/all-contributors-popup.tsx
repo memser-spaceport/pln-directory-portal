@@ -10,13 +10,13 @@ export default function AllContributorsPopup({
   isOpen,
   onClose,
   contributorsList,
-  contributingMembers,
+  // contributingMembers,
 }) {
   const contriTitle = 'Contributors';
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredContriList, setFilteredContriList] = useState(contributorsList);
-  const [filteredContriMembers, setFilteredContriMembers] = useState(contributingMembers);
+  // const [filteredContriMembers, setFilteredContriMembers] = useState(contributingMembers);
 
   useEffect(() => {
     if (searchTerm) {
@@ -25,13 +25,13 @@ export default function AllContributorsPopup({
       });
       setFilteredContriList(tempContri);
 
-      const tempMembers = contributingMembers.filter((contri)=>{
-        return contri?.name.toLowerCase().includes(searchTerm.toLowerCase())
-      });
-      setFilteredContriMembers(tempMembers);
+      // const tempMembers = contributingMembers.filter((contri)=>{
+      //   return contri?.name.toLowerCase().includes(searchTerm.toLowerCase())
+      // });
+      // setFilteredContriMembers(tempMembers);
     } else {
       setFilteredContriList(contributorsList);
-      setFilteredContriMembers(contributingMembers);
+      // setFilteredContriMembers(contributingMembers);
     }
   }, [searchTerm]);
 
@@ -119,8 +119,8 @@ export default function AllContributorsPopup({
                         <p className="">
                           {' '}
                           {contriTitle} (
-                          {contributorsList.length +
-                            contributingMembers?.length}
+                          {contributorsList.length
+                           }
                           )
                         </p>
                         <div className="w-full pr-5">
@@ -157,7 +157,7 @@ export default function AllContributorsPopup({
                           contri?.teamLead
                         );
                       })}
-                    {filteredContriMembers &&
+                    {/* {filteredContriMembers &&
                       filteredContriMembers.map((contri) => {
                         const teamLeadArr = contri.teamMemberRoles?.filter(
                           (teamRoles) => {
@@ -170,9 +170,9 @@ export default function AllContributorsPopup({
                           contri.image?.url,
                           teamLeadArr?.length > 0
                         );
-                      })}
+                      })} */}
                       {
-                        filteredContriList.length === 0 && filteredContriMembers.length === 0 && <>
+                        filteredContriList.length === 0 && <>
                        No results found for the search criteria.</>
                       }
                   </div>
