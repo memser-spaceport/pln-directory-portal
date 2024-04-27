@@ -3,9 +3,10 @@ import { FriendOfPLNFilter } from '../../../shared/directory/directory-filters/f
 import { FundingStageFilter } from './funding-stage-filter/funding-stage-filter';
 import { MembershipSourcesFilter } from './membership-sources-filter/membership-sources-filter';
 import { TagsFilter } from './tags-filter/tags-filter';
-import { FocusAreaFilter } from './focus-area-filter/focus-area-filter';
 import { ITeamsFiltersValues } from './teams-directory-filters.types';
 import { TechnologyFilter } from './technology-filter/technology-filter';
+import FocusAreaFilter from 'apps/web-app/components/shared/focus-area-filter/focus-area-filter';
+import { FOCUS_AREAS_FILTER_KEYS } from 'apps/web-app/constants';
 
 export interface TeamsDirectoryFiltersProps {
   filtersValues: ITeamsFiltersValues;
@@ -20,7 +21,13 @@ export function TeamsDirectoryFilters({
     <DirectoryFilters filterProperties={filterProperties}>
       <FriendOfPLNFilter />
       <div className="my-5 h-px bg-slate-200" />
-      <FocusAreaFilter focusArea={filtersValues.focusAreas}/>
+      {/* <FocusAreaFilter focusArea={filtersValues.focusAreas}/> */}
+      <FocusAreaFilter
+        title="Focus Area"
+        uniqueKey={FOCUS_AREAS_FILTER_KEYS.teams}
+        focusAreaRawData={filtersValues?.focusAreas?.rawData}
+        selectedItems={filtersValues.focusAreas?.selectedFocusAreas}
+      />
       <div className="my-5 h-px bg-slate-200" />
       <TagsFilter tagsTags={filtersValues.tags} />
       <div className="my-5 h-px bg-slate-200" />

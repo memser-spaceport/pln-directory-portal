@@ -104,3 +104,38 @@ export const parseTeam = (team: TTeamResponse): ITeam => {
     linkedinHandle: linkedinHandler || null,
   };
 };
+
+/**
+ * Returns the options for requesting the teams on the teams directory,
+ * based on the provided query parameters.
+ */
+export function getTeamsFocusAreaOptionsFromQuery(queryParams: ParsedUrlQuery) {
+  const {
+    tags,
+    membershipSources,
+    fundingStage,
+    searchBy,
+    technology,
+    includeFriends,
+    focusAreas,
+  } = queryParams;
+
+  const filterOptions = [];
+  // filterOptions.push(`plnFriend=${includeFriends ?? "false"}`);
+  if(technology){
+    filterOptions.push(`technologies=${encodeURIComponent(stringifyQueryValues(technology))}`);
+  }
+  if(membershipSources){
+    filterOptions.push(`membershipSources=${encodeURIComponent(stringifyQueryValues(membershipSources))}`);
+  }
+  if(fundingStage){
+    filterOptions.push(`fundingStage=${encodeURIComponent(stringifyQueryValues(fundingStage))}`);
+  }
+  if(tags){
+    filterOptions.push(`industryTags=${encodeURIComponent(stringifyQueryValues(tags))}`);
+  }
+  if(searchBy){
+    filterOptions.push(`name=${encodeURIComponent(stringifyQueryValues(searchBy).trim())}`);
+  }
+  return filterOptions;
+}
