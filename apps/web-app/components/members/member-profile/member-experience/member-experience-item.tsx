@@ -8,7 +8,7 @@ function MemberExperienceDescription(props) {
     const exp = props?.exp
     const shortDesc = fullDesc;
     const [isShowMoreActive, showMoreStatus] = useState(false);
-    const isBigDesc = fullDesc.length >= 300;
+    const isBigDesc = fullDesc?.length >= 300;
     const analytics = useAppAnalytics()
 
     const onShowMore = () => {

@@ -109,8 +109,9 @@ function validateSkillForm(formValues) {
 
 function validateContributionForm(fValues) {
   const formErrors = [];
-  const exps = fValues.projectContributions;
-  exps.forEach((exp, expIndex) => {
+  const exps = fValues?.projectContributions;
+  exps?.forEach((exp, expIndex) => {
+
     if (exp.projectName.trim() === '') {
       formErrors.push({
         id: expIndex,
@@ -119,7 +120,7 @@ function validateContributionForm(fValues) {
         error: 'Project Name is Mandatory',
       });
     }
-    if (exp.role.trim() === '') {
+    if (exp?.role?.trim()==="" || !exp?.role) {
       formErrors.push({
         id: expIndex,
         name: `Project ${exp.projectName ? exp.projectName : expIndex + 1}`,
@@ -300,6 +301,8 @@ export function EditMemberModal({
     preferences: JSON.parse(JSON.stringify(PRIVACY_CONSTANTS.DEFAULT_SETTINGS)),
   });
 
+  const [initialValues, setInitialValues] = useState<any>();
+
   const [isPendingRequestModalOpen, setIsPendingRequestModalOpen] =
     useState(false);
   const [reset, setReset] = useState(false);
@@ -451,7 +454,7 @@ export function EditMemberModal({
                   };
                 }
                 exp.startDate = new Date(exp.startDate);
-                exp.endDate = exp.endDate ? new Date(exp.endDate) : null;
+                exp.endDate = exp?.endDate ? new Date(exp?.endDate) : new Date();
                 exp.projectName = exp?.project?.name;
                 exp.projectLogo = exp?.project?.logo?.url;
                 exp.projectUid = exp?.project?.uid;
@@ -470,7 +473,8 @@ export function EditMemberModal({
         }
 
         setImageUrl(member?.image?.url ?? '');
-        setFormValues(formValues);
+        setInitialValues(JSON.parse(JSON.stringify(formValues)));
+        setFormValues({...formValues});
         setDropDownValues({ skillValues: data[1], teamNames: data[2] });
         setDataLoaded(true);
       })
@@ -1058,6 +1062,7 @@ export function EditMemberModal({
                         showAddProject={true}
                         onChange={handleInputChange}
                         contributionErrors={contributionObjErrors}
+                        initialValues={initialValues}
                       />
                     </div>
                     <div className={openTab === 4 ? 'block' : 'hidden'}>
