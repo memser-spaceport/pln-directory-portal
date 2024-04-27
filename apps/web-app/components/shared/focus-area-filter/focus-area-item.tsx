@@ -81,7 +81,7 @@ const FocusAreaItem = (props: FocusArea) => {
           >
             {(isParent || isSelectedItem) && <img alt="mode" src={getIcon()} />}
           </button>
-          <button
+          {(isChildrensAvailable || isGrandParent) && <button
             disabled={!isChildrensAvailable}
             className={`min-h-[16px] min-w-[16px]`}
             onClick={onExpandClickHandler}
@@ -94,7 +94,7 @@ const FocusAreaItem = (props: FocusArea) => {
                   : '/assets/images/icons/chevron-right-grey.svg'
               }`}
             />
-          </button>
+          </button>}
 
           <div className="flex gap-[6px]">
             <p
