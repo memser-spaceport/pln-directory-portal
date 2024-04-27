@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 
 interface DirectoryEmptyProps {
   filterProperties: string[];
-  from: string;
+  from?: string;
   callback: () => void;
 }
 
