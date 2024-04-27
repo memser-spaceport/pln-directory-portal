@@ -24,7 +24,7 @@ export function ValidationErrorMessages({
       <Transition appear show={isOpen} as={Fragment}>
         <Dialog
           as="div"
-          className="fixed relative inset-0 left-0 top-0 z-[1000] w-full grow overflow-x-hidden outline-none"
+          className="fixed relative inset-0 left-0 top-0 z-[1058] w-full grow overflow-x-hidden outline-none"
           onClose={handleModalClose}
         >
           <Transition.Child
