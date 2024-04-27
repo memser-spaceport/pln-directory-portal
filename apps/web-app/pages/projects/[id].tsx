@@ -60,7 +60,7 @@ export default function ProjectDetails({ selectedProject, userHasEditRights, use
                         <TeamsInvolved project={selectedProject}/>
                         {
                             (selectedProject?.contributors?.length>0 || contributingMembers?.length > 0) && 
-                            <Contributors project={selectedProject} contributingMembers={contributingMembers}/>
+                            <Contributors project={selectedProject}/>
                         }
                         <ContactInfos project={selectedProject}/>
                     </div>

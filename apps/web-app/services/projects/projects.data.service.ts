@@ -177,7 +177,8 @@ const formatToSave = (inputs, imageUid) => {
     });
     
     objectToSave['contributingTeams'] = tempCTeam;
-    objectToSave['contributors'] = tempContributors;
+    objectToSave['contributions'] = tempContributors;
+    objectToSave['focusAreas'] = [];
     return objectToSave;
 }
 
@@ -205,7 +206,7 @@ const getFormattedProject = (project) => {
 
             
             const tempContributors = [];
-            project.contributors?.map((mem)=>{
+            project.contributions?.map((mem)=>{
                 const memberObj = {};
                 memberObj['logo'] = mem?.member?.image ? mem?.member?.image?.url : null;
                 const mainTeam = mem?.member?.teamMemberRoles?.filter(teamRoles=>{

@@ -11,7 +11,9 @@ function ProjectContribution(props) {
     const contributions = formValues.projectContributions;
     const currentProjectsCount = contributions.filter(v => v.currentProject === true).length;
     const onChange = props.onChange;
-    const analytics = useAppAnalytics()
+    const analytics = useAppAnalytics();
+    const initialValues= props?.initialValues?.projectContributions ?? [];
+    const intialProjectContributions = [...initialValues];
 
     const [expandedId, setExpandedId] = useState(-1);
     const [isLoading, setLoaderStatus] = useState(false)
@@ -24,7 +26,7 @@ function ProjectContribution(props) {
         description: "",
         role: "",
         startDate: new Date(1990, 0),
-        endDate: new Date(2022, 11)
+        endDate: new Date()
     }
 
     const onToggleExpansion = (index) => {
@@ -63,7 +65,7 @@ function ProjectContribution(props) {
        const newExp =  [...contributions];
        newExp[index][key] = value;
        if(key === 'currentProject' && value === false) {
-          newExp[index].endDate = new Date(2022, 11);
+          newExp[index].endDate = intialProjectContributions[index]?.endDate || new Date();
        } else if (key === 'currentProject' && value === true) {
           newExp[index].endDate = null;
        }
@@ -92,7 +94,7 @@ function ProjectContribution(props) {
                 <p className="text-[14px] text-[#94A3B8]">(Max 20 contributions)</p>
             </div>}
             <div className="">
-                {contributions.map((exp, expIndex) => <ProjectContributionForm showAddProject={showAddProject} currentProjectsCount={currentProjectsCount} errors={errors} setLoaderStatus={setLoaderStatus} onToggleExpansion={onToggleExpansion} expandedId={expandedId} key={`${expIndex}-exp`} onDeleteContribution={onDeleteContribution} exp={exp} expIndex={expIndex} onItemChange={onItemChange} />)}
+                {contributions.map((exp, expIndex) => <ProjectContributionForm showAddProject={showAddProject} currentProjectsCount={currentProjectsCount} errors={errors} setLoaderStatus={setLoaderStatus} onToggleExpansion={onToggleExpansion} expandedId={expandedId} key={`${expIndex}-exp`} onDeleteContribution={onDeleteContribution} exp={exp} expIndex={expIndex} onItemChange={onItemChange}  contributions={contributions}/>)}
             </div>
             {(contributions.length > 0 && expandedId !== -1 ) && <div className="flex justify-end pt-[10px]">
                  {contributions.length <= 19 && <button onClick={onAddContribution} className="flex items-center justify-center text-[14px]">

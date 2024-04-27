@@ -13,11 +13,11 @@ function ProjectSelection(props) {
     const [searchResult, setSearchResult] = useState([]);
     const [selectedItem, setSelectedItem] = useState(null);
     const onProjectSelected = props.onProjectSelected;
-    useClickOutside(inputRef, () => setPaneStatus(false))
+    useClickOutside(inputRef, () => setPaneStatus(false));
+    const contributions = props?.contributions ?? [];
 
     const onTextChange = (e) => {
         e.preventDefault();
-        console.log(e.target.value)
         if(e.target.value === "") {
             onProjectSelected(null)
         }
@@ -36,7 +36,10 @@ function ProjectSelection(props) {
         setLoadingStatus(true)
         findProjectByName(searchText)
             .then(d => {
-                setSearchResult(d.map(d => {
+                const filteredProjectContibutions = d?.filter((item)=>
+                    !contributions.some((contribution)=>contribution.projectUid === item?.uid));
+
+                setSearchResult(filteredProjectContibutions.map(d => {
                     if(!d.logo) {
                         d.logo = {url: '/assets/images/icons/projects/default.svg'}
                     }
@@ -53,7 +56,16 @@ function ProjectSelection(props) {
             setLoadingStatus(true)
             findProjectByName(searchQuery)
                 .then(d => {
-                    setSearchResult(d.map(d => {
+                    const filteredProjectContibutions = d.filter((item)=> 
+                       {
+                        if(item.uid === selectedProj?.uid) {
+                            return true
+                        }
+                        return !contributions.some((contribution)=>contribution.projectUid === item.uid)
+
+                       });
+
+                    setSearchResult(filteredProjectContibutions.map(d => {
                         if(!d.logo) {
                             d.logo = {url: '/assets/images/icons/projects/default.svg'}
                         }

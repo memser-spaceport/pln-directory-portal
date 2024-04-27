@@ -18,6 +18,7 @@ function ProjectContributionForm(props) {
     const analytics = useAppAnalytics();
     const uploadRef = useRef<HTMLInputElement>(null);
     const descriptionRef = useRef<HTMLTextAreaElement>(null);
+    const contributions = props.contributions ?? [];
 
     const getYears = () => {
         const currentYear = new Date().getFullYear();
@@ -111,7 +112,7 @@ function ProjectContributionForm(props) {
                             {showAddProject &&  <p className="text-[12px] flex gap-[6px] items-center">{`Can't find your project?`}<a className="text-blue-600 -ml-[3px]" onClick={onAddNewProject} target="_blank" href="/projects/add">Add here</a></p>}
                             </div>
                            {/*  <input maxLength={100} placeholder="Ex: Filecoin" className="text-[14px]  mt-[12px] border-solid border-[1px] border-[#CBD5E1] px-[12px] py-[8px] rounded-[8px] w-full" type="text" value={exp.companyName} onChange={(e) => onItemChange(expIndex, 'companyName', e.target.value)} /> */}
-                            <ProjectSelection selectedProj={exp?.project} onProjectSelected={onProjectSelected}/>
+                            <ProjectSelection contributions={contributions} selectedProj={exp?.project} onProjectSelected={onProjectSelected}/>
                         </div>
 
 
@@ -134,11 +135,11 @@ function ProjectContributionForm(props) {
                         <div className="w-[50%] pl-[8px]">
                             {exp?.endDate && <h2 className="text-[14px] font-[600] mb-[8px]">To*</h2>}
                             {!exp?.endDate && <h2 className="text-[14px] text-[#CBD5E1] font-[600] mb-[8px]">To</h2>}
-                            {exp?.endDate && <div className="flex flex-row gap-[8px]">
+                             {!exp.currentProject  && <div className="flex flex-row gap-[8px]">
                                 <div className="w-[115px]"><SingleSelect onChange={(option) => onMonthChange('endDate', option.value)} initialOption={getMonths()[endMonthIndex]} placeholder="Select Month" options={getMonths()} /></div>
                                 <div className="w-[75px]"><SingleSelect onChange={(option) => onYearChange('endDate', option.value)} initialOption={selectedEndyear} placeholder="Select Year" options={[...yearValues]} /></div>
                             </div>}
-                            {!exp?.endDate && <div className="flex flex-row gap-[8px]">
+                            {!exp?.endDate && exp.currentProject &&  <div className="flex flex-row gap-[8px]">
                                 <div className="w-[115px]"><input onClick={e => e.preventDefault()} className="w-full border-[1px] rounded-[8px] px-[8px] border-solid border-[#CBD5E1] h-[40px] text-[13px]" placeholder="Month" disabled /></div>
                                 <div className="w-[75px]"><input onClick={e => e.preventDefault()} className="w-full border-[1px] rounded-[8px] px-[8px] border-solid border-[#CBD5E1] h-[40px] text-[13px]" placeholder="Year" disabled /></div>
                             </div>}
