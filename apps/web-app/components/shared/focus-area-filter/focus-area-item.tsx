@@ -1,7 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 // eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
 import { IFocusArea } from 'apps/web-app/utils/shared.types';
-import { useState } from 'react';
+import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
 
 export interface FocusArea {
   item: IFocusArea;
@@ -21,18 +22,29 @@ const FocusAreaItem = (props: FocusArea) => {
   const isHelpActive = props?.isHelpActive;
   const uniqueKey = props?.uniqueKey;
 
+  const router = useRouter();
+
   const assignedItemsLength = currentItem?.[uniqueKey]?.length;
   const isChildrensAvailable = hasSelectedItems(currentItem);
-  const [isExpand, setIsExpand] = useState(false);
-  const isSelectedItem = selectedItems.some(
-    (item) => item.uid === currentItem.uid && assignedItemsLength > 0
+  const isSelectedItem = getIsSelectedItem(currentItem);
+  const [isExpand, setIsExpand] = useState(
+    (isSelectedItem && isChildrensAvailable) || false
   );
-  const isParent = parents.some(
-    (parent) => parent.uid === currentItem.uid && assignedItemsLength > 0
-  );
+
+  useEffect(() => {
+    if (isParent) {
+      setIsExpand(true);
+    } else {
+      setIsExpand(isSelectedItem && isChildrensAvailable);
+    }
+  }, [router?.asPath]);
+
+  const isParent = parents.some((parent) => parent.uid === currentItem.uid);
   const onCheckboxClickHandler = () => {
     if (isChildrensAvailable) {
       setIsExpand(true);
+    } else {
+      setIsExpand(isSelectedItem && isChildrensAvailable);
     }
     onItemClickHandler(currentItem);
   };
@@ -70,6 +82,22 @@ const FocusAreaItem = (props: FocusArea) => {
     return false;
   }
 
+  function getIsSelectedItem(cItem) {
+    return selectedItems.some(
+      (item) => item.parentUid === cItem.uid || item.uid === cItem.uid
+    );
+  }
+
+  const getExpandIcon = () => {
+    if (!isChildrensAvailable) {
+      return '/assets/images/icons/right_arrow_gray_shaded.svg';
+    }
+    if (isExpand) {
+      return '/assets/images/icons/chevron-down-blue.svg';
+    }
+    return '/assets/images/icons/chevron-right-grey.svg';
+  };
+
   return (
     <div>
       <div>
@@ -81,20 +109,15 @@ const FocusAreaItem = (props: FocusArea) => {
           >
             {(isParent || isSelectedItem) && <img alt="mode" src={getIcon()} />}
           </button>
-          {(isChildrensAvailable || isGrandParent) && <button
-            disabled={!isChildrensAvailable}
-            className={`min-h-[16px] min-w-[16px]`}
-            onClick={onExpandClickHandler}
-          >
-            <img
-              alt="expand"
-              src={`${
-                isExpand && assignedItemsLength >  0
-                  ? '/assets/images/icons/chevron-down-blue.svg'
-                  : '/assets/images/icons/chevron-right-grey.svg'
-              }`}
-            />
-          </button>}
+          {(isChildrensAvailable || isGrandParent) && (
+            <button
+              disabled={!isChildrensAvailable}
+              className={`min-h-[16px] min-w-[16px]`}
+              onClick={onExpandClickHandler}
+            >
+              <img alt="expand" src={getExpandIcon()} />
+            </button>
+          )}
 
           <div className="flex gap-[6px]">
             <p
@@ -119,29 +142,28 @@ const FocusAreaItem = (props: FocusArea) => {
       </div>
       {isExpand && (
         <>
-          {assignedItemsLength > 0 && (
-            <>
-              {currentItem?.children?.map(
-                (child, index) =>
-                  child?.[uniqueKey]?.length > 0 && (
-                    <div
-                      key={`${index}+ ${child}`}
-                      className="mt-[12px] flex flex-col gap-[12px] pl-[26px]"
-                    >
-                      <FocusAreaItem
-                        parents={parents}
-                        item={child}
-                        uniqueKey={uniqueKey}
-                        isGrandParent={false}
-                        isHelpActive={false}
-                        selectedItems={selectedItems}
-                        onItemClickHandler={onItemClickHandler}
-                      />
-                    </div>
-                  )
-              )}
-            </>
-          )}
+          <>
+            {currentItem?.children?.map(
+              (child, index) =>
+                (child?.[uniqueKey]?.length > 0 ||
+                  getIsSelectedItem(child)) && (
+                  <div
+                    key={`${index}+ ${child}`}
+                    className="mt-[12px] flex flex-col gap-[12px] pl-[26px]"
+                  >
+                    <FocusAreaItem
+                      parents={parents}
+                      item={child}
+                      uniqueKey={uniqueKey}
+                      isGrandParent={false}
+                      isHelpActive={false}
+                      selectedItems={selectedItems}
+                      onItemClickHandler={onItemClickHandler}
+                    />
+                  </div>
+                )
+            )}
+          </>
         </>
       )}
     </div>
