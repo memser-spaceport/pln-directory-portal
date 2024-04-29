@@ -31,6 +31,7 @@ export function ProjectList({
     from={PAGE_ROUTES.PROJECTS}
       filterProperties={filterProperties}
       callback={onAddProjectClicked}
+      isUserLoggedIn={isUserLoggedIn}
       itemsCount={projects ? projects.length : 0}
     >
       {
