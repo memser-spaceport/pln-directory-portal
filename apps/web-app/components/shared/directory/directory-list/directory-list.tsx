@@ -7,6 +7,7 @@ interface DirectoryListProps {
   itemsCount: number;
   filterProperties: string[];
   from?: string;
+  isUserLoggedIn?: boolean;
   callback?: () => void;
 }
 
@@ -15,7 +16,8 @@ export function DirectoryList({
   itemsCount,
   filterProperties,
   from,
-  callback
+  callback,
+  isUserLoggedIn
 }: DirectoryListProps) {
   const [visibleItems] = useFakeInfiniteScroll({
     items: children,
@@ -31,6 +33,7 @@ export function DirectoryList({
       {!itemsCount ? (
         <div className="flex justify-center">
           <DirectoryEmpty
+          isUserLoggedIn={isUserLoggedIn}
           from={from}
           callback={callback}
             filterProperties={[...filterProperties, 'searchBy']}
