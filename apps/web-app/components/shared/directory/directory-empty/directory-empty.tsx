@@ -5,12 +5,14 @@ interface DirectoryEmptyProps {
   filterProperties: string[];
   from?: string;
   callback: () => void;
+  isUserLoggedIn?: boolean;
 }
 
 export function DirectoryEmpty({
   filterProperties,
   from,
   callback,
+  isUserLoggedIn,
 }: DirectoryEmptyProps) {
   const { push, pathname, query } = useRouter();
 
@@ -37,15 +39,20 @@ export function DirectoryEmpty({
         clear all the criteria.
       </button>
       {from === PAGE_ROUTES.PROJECTS && (
-        <p>
+        <div>
           If you&apos;re unable to find your project,&nbsp;
-          <button
-            className="text-blue-600 outline-none hover:text-blue-700 focus:text-blue-900 active:text-blue-900"
-            onClick={() => callback()}
-          >
-            click here
-          </button>&nbsp;to add a project.
-        </p>
+          {isUserLoggedIn ? (
+            <button
+              className="text-blue-600 outline-none hover:text-blue-700 focus:text-blue-900 active:text-blue-900"
+              onClick={() => callback()}
+            >
+              click here
+            </button>
+          ) : (
+            <span>please login</span>
+          )}
+          &nbsp;to add a project.
+        </div>
       )}
     </div>
   );
