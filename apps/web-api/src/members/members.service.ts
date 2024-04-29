@@ -661,7 +661,8 @@ export class MembersService {
                   name: {
                     contains: name__icontains,
                     mode: 'insensitive'
-                  } 
+                  },
+                  isDeleted: false 
                 } 
               }      
             }
