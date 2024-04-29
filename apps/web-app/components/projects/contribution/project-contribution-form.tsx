@@ -48,13 +48,13 @@ function ProjectContributionForm(props) {
 
     const onMonthChange = (field, value) => {
         const monthIndex = monthNames.indexOf(value);
-        const year = exp[field].getFullYear();
+        const year = new Date(exp[field])?.getFullYear();
         const newDate = new Date(year, monthIndex);
         onItemChange(expIndex, field, newDate)
     }
 
     const onYearChange = (field, value) => {
-        const month = exp[field].getMonth();
+        const month = new Date(exp[field])?.getMonth();
         const newDate = new Date(parseInt(value, 10), month);
         onItemChange(expIndex, field, newDate);
     }
@@ -133,13 +133,13 @@ function ProjectContributionForm(props) {
 
                         </div>
                         <div className="w-[50%] pl-[8px]">
-                            {exp?.endDate && <h2 className="text-[14px] font-[600] mb-[8px]">To*</h2>}
-                            {!exp?.endDate && <h2 className="text-[14px] text-[#CBD5E1] font-[600] mb-[8px]">To</h2>}
+                            {!exp.currentProject  && <h2 className="text-[14px] font-[600] mb-[8px]">To*</h2>}
+                            {(!exp?.endDate || exp.currentProject) && <h2 className="text-[14px] text-[#CBD5E1] font-[600] mb-[8px]">To</h2>}
                              {!exp.currentProject  && <div className="flex flex-row gap-[8px]">
                                 <div className="w-[115px]"><SingleSelect onChange={(option) => onMonthChange('endDate', option.value)} initialOption={getMonths()[endMonthIndex]} placeholder="Select Month" options={getMonths()} /></div>
                                 <div className="w-[75px]"><SingleSelect onChange={(option) => onYearChange('endDate', option.value)} initialOption={selectedEndyear} placeholder="Select Year" options={[...yearValues]} /></div>
                             </div>}
-                            {!exp?.endDate && exp.currentProject &&  <div className="flex flex-row gap-[8px]">
+                            {(!exp?.endDate || exp.currentProject) &&  <div className="flex flex-row gap-[8px]">
                                 <div className="w-[115px]"><input onClick={e => e.preventDefault()} className="w-full border-[1px] rounded-[8px] px-[8px] border-solid border-[#CBD5E1] h-[40px] text-[13px]" placeholder="Month" disabled /></div>
                                 <div className="w-[75px]"><input onClick={e => e.preventDefault()} className="w-full border-[1px] rounded-[8px] px-[8px] border-solid border-[#CBD5E1] h-[40px] text-[13px]" placeholder="Year" disabled /></div>
                             </div>}
