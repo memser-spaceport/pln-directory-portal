@@ -36,7 +36,7 @@ export default function Projects(props) {
       <div>
         <ProjectContextProvider>
           <section className="pl-sidebar flex pt-20">
-            <div className="fixed left-0 z-40 h-full w-[300px] flex-shrink-0 border-r border-r-slate-200 bg-white">
+            <div className="fixed slim-scroll left-0 z-40 h-full w-[300px] flex-shrink-0 border-r border-r-slate-200 bg-white">
               <ProjectsFilter
                 parsedFilters={parsedFilters}
                 filterProperties={filterProperties}
