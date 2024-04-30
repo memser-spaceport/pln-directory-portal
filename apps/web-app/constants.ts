@@ -395,6 +395,25 @@ export const ANNOUNCEMENT_BANNER = {
 
 export const ChangeLogList = [
   {
+    title: "Version 2.0.7 - Enhancements to Project module & Member Search",
+    tag: 'Improvements',
+    date: '30, Apr 2024',
+    shortContent: `<div>
+      <ul style="list-style: disc; font-size: 16px">
+      <li>We have added a new filter in Project's page to search projects based on the focus areas that they contribute to.</li>
+      <ul style="padding-left: 16px">Projects are categorized into one of these categories-
+      <ul style="list-style: lower-alpha; padding:revert; font-size: 16px; line-height:24px">
+      <li>Digital Human Rights: Building a foundation of freedom and safety in the digital age.</li>
+      <li>Public Goods: Creating more efficient and equitable structures for global progress.</li>
+      <li>Advanced Technologies: Ensuring responsible advancement in AI, AR, VR, BCI, and other emerging fields.</li>
+      <li>Innovation Network: Projects that facilitate collaboration, offer technical and financial support to drive research and development.</li>
+      </ul>
+      </ul>
+      <li>We can add a member as a contributor in Project module and the contribution details would get reflected automatically in the related member details page.</li>
+      <li>In addition to the current capability of searching members by member name & team name, this enhancement will allow the members to be searched using a project name as well. Every member associated with the project as a contributor would be returned in the search result.</li>
+      </ul></div>`,
+  },
+  {
     title: 'Version 2.0.6 - Enhanced Edit feature for Teams',
     tag: 'Improvements',
     date: '19, Apr 2024',
