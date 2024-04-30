@@ -157,7 +157,7 @@ const FocusAreaFilter = (props: IFocusAreaFilter) => {
 
 
   return (
-    <div className="mb-[20px] flex flex-col gap-[16px]">
+    <div className=" flex flex-col gap-[16px]">
       <div className="flex items-center gap-[4px]">
         <h2 className="text-[14px] font-[600] leading-[20px]">{title}</h2>
         <button onClick={onHelpActiveClick}>
