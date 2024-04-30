@@ -33,7 +33,7 @@ const ChangeLogs = (props: any) => {
               </span>}
             </div>
             <div className="flex flex-col gap-5">
-              <h6 className="text-[24px] font-bold leading-5 text-[#0F172A]">
+              <h6 className="text-[24px] font-bold leading-[28px] text-[#0F172A]">
                 {changeLog.title}
               </h6>
               <div
