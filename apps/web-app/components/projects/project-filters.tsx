@@ -125,7 +125,7 @@ export default function ProjectsFilter({
 
   return (
     <>
-      <div className="relative flex items-center justify-between bg-white p-5  before:absolute before:bottom-[-0.2rem] before:left-0 before:h-1 before:w-full before:border-t after:absolute after:bottom-0 after:left-0 after:h-7 after:w-[calc(100%_-_1.23rem)] after:translate-y-full after:bg-gradient-to-b after:from-white">
+      <div className="relative pl-[37px]  flex items-center justify-between bg-white p-5  before:absolute before:bottom-[-0.2rem] before:left-0 before:h-1 before:w-full before:border-t after:absolute after:bottom-0 after:left-0 after:h-7 after:w-[calc(100%_-_1.23rem)] after:translate-y-full after:bg-gradient-to-b after:from-white">
         <span className="text-lg font-semibold leading-7">Filters</span>
         <button
           className="on-focus--link leading-3.5 text-xs text-blue-600 transition-colors hover:text-blue-700"
@@ -135,7 +135,16 @@ export default function ProjectsFilter({
         </button>
       </div>
 
-      <div className="h-[calc(100vh_-_148px)]  overflow-y-auto p-[20px]  focus-within:outline-none focus:outline-none focus-visible:outline-none">
+      <div className=" h-[calc(100vh_-_148px)] pl-[37px] overflow-y-auto px-[20px] focus-within:outline-none focus:outline-none focus-visible:outline-none">
+      
+        <div className="py-[20px]  border-b border-[#E2E8F0]">
+          <FocusAreaFilter
+            uniqueKey={FOCUS_AREAS_FILTER_KEYS.projects}
+            title={'Focus Area'}
+            selectedItems={selectedFocusAreas}
+            focusAreaRawData={focusAreaRawData}
+          />
+        </div>
         <div className="flex justify-between py-[20px] border-b border-[#E2E8F0]">
           <div className="flex items-center gap-2">
             <div className="relative top-1">
@@ -164,14 +173,6 @@ export default function ProjectsFilter({
                 }
               );
             }}
-          />
-        </div>
-        <div className="py-[20px]  border-b border-[#E2E8F0]">
-          <FocusAreaFilter
-            uniqueKey={FOCUS_AREAS_FILTER_KEYS.projects}
-            title={'Focus Area'}
-            selectedItems={selectedFocusAreas}
-            focusAreaRawData={focusAreaRawData}
           />
         </div>
         <div className='py-[20px]'>
