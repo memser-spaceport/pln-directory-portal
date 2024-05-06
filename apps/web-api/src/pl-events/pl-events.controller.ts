@@ -90,4 +90,16 @@ export class PLEventsController {
     }
     return await this.eventService.modifyPLEventGuestByUid(uid, body as any, slug, member);
   }
+
+  @Api(server.route.getPLEventsByLoggedInMember)
+  @ApiQueryFromZod(PLEventQueryParams)
+  @ApiOkResponseFromZod(ResponsePLEventSchemaWithRelationsSchema.array())
+  @UseGuards(UserTokenValidation)
+  async getPLEventsByLoggedInMember(
+    @Req() request
+  ) {
+    const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
+    return await this.eventService.getPLEventsByMember(member);
+  }
+
 }

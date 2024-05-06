@@ -8,6 +8,7 @@ export const PLEventSchema = z.object({
   id: z.number().int(),
   uid: z.string(),
   name: z.string(),
+  type: z.enum(['INVITE_ONLY']).optional(),
   telegramId: z.string().optional(),
   eventsCount: z.number().int(),
   logoUid: z.string().nullish(),
@@ -15,17 +16,30 @@ export const PLEventSchema = z.object({
   description: z.string().optional(),
   websiteURL: z.string().url().optional(),
   slugURL: z.string(),
+  resources: z.array(
+    z.object({ 
+      name: z.string(), 
+      link: z.string().url(),
+      description: z.string().optional()
+    })
+  ).optional(),
+  startDate: z.string(),
+  endDate: z.string(),
+  location: z.string(),
   createdAt: z.string(),
   updatedAt: z.string()
 });
 
 export const PLCreateEventSchema = PLEventSchema.pick({
   name: true,
+  type: true,
   description: true,
   telegramId: true,
   websiteURL: true,
-  logoUid: true,
-  bannerUid: true
+  resources: true,
+  startDate: true,
+  endDate: true,
+  location: true
 });
 
 export const ResponsePLEventSchema = PLEventSchema.omit({ id: true }).strict();

@@ -12,7 +12,18 @@ export class PLEventsService {
   ) {}
 
   async getPLEvents(queryOptions: Prisma.PLEventFindManyArgs) {
-    return await this.prisma.pLEvent.findMany(queryOptions);
+    return await this.prisma.pLEvent.findMany({
+      ...queryOptions,
+      include: {
+        logo: true,
+        banner: true,
+        eventGuests: {
+          select:{
+            eventUid: true
+          }
+        }
+      }
+    });
   };
 
   async getPLEventBySlug(
@@ -97,6 +108,22 @@ export class PLEventsService {
       this.handleErrors(err);
     }
   };
+
+  async getPLEventsByMember(member) {
+    try {
+      return this.prisma.pLEvent.findMany({
+        where: {
+          eventGuests:{
+            some: {
+              memberUid: member?.uid
+            }
+          }
+        },
+      }) 
+    } catch(err) {
+      this.handleErrors(err);
+    }
+  } 
 
   private handleErrors(error, message?) {
     this.logger.error(error);
