@@ -44,5 +44,14 @@ export const apiEvents = contract.router({
       200: contract.response<unknown>(),
     },
     summary: 'Modify a guest in pl event',
+  },
+  getPLEventsByLoggedInMember: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/irl/me/events`,
+    query: PLEventDetailQueryParams,
+    responses: {
+      200: ResponsePLEventSchemaWithRelationsSchema,
+    },
+    summary: 'Get events by logged in member',
   }
 });

@@ -104,6 +104,10 @@ enum ApprovalStatus {
   AUTOAPPROVED
 }
 
+enum PLEventType {
+  INVITE_ONLY
+}
+
 model ParticipantsRequest {
   id               Int             @id @default(autoincrement())
   uid              String          @unique @default(cuid())
@@ -308,6 +312,7 @@ model Project {
 model PLEvent {
   id          Int            @id @default(autoincrement())
   uid         String         @unique @default(cuid())
+  type        PLEventType?
   eventsCount Int?
   telegramId  String?
   logoUid     String?
@@ -317,7 +322,11 @@ model PLEvent {
   name        String
   description String?
   websiteURL  String?
+  location    String
   slugURL     String         @unique
+  resources   Json[]
+  startDate   DateTime
+  endDate     DateTime
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   eventGuests PLEventGuest[]
