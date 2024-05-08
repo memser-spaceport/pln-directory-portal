@@ -59,7 +59,6 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
   const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
   const events = await getAllEvents();
-  console.log("events", events);
   if (events.errorCode) {
     error = true;
   } else {
