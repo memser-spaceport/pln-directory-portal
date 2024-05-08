@@ -6,7 +6,7 @@ import Link from "next/link";
 const TeamList = (props: any) => {
   const items = props?.items ?? [];
   const onLogin = props.onLogin;
-
+  const eventDetails = props?.eventDetails;
   const analytics = useAppAnalytics();
   const user = getUserInfo();
 
@@ -17,6 +17,8 @@ const TeamList = (props: any) => {
 
   const onTeamClick = (teamUid:string, teamName:string)=> {
     analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_TEAM_CLICKED, {
+      eventId: eventDetails?.id,
+      eventName: eventDetails?.name,
       teamUid, 
       teamName,
       user

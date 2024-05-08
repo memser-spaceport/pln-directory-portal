@@ -2,15 +2,16 @@ import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
 
 function HeaderStrip(props) {
-  const onJoin = props.onJoin;
   const analytics = useAppAnalytics();
-
+  const eventDetails = props?.eventDetails;
   const requestFormLink = process.env.IRL_PGF_FORM_URL;
 
   const onNavigate = () => {
     analytics.captureEvent(
       APP_ANALYTICS_EVENTS.IRL_HEADER_JOIN_BTN_CLICKED,
       {
+        eventId: eventDetails?.id,
+        eventName: eventDetails?.name,
         url: requestFormLink,
       }
     );

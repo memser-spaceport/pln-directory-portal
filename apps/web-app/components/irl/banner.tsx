@@ -1,50 +1,109 @@
-import { useEffect, useState } from "react";
+import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
+import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
+import { formatIrlEventDate } from 'apps/web-app/utils/irl.utils';
+import { getUserInfo } from 'apps/web-app/utils/shared.utils';
 
 const Banner = (props: any) => {
-
   const eventDetails = props?.eventDetails;
-
-  const eventCount = eventDetails?.eventCount;
-  const peopleCount = eventDetails?.guests.length;
   const description = eventDetails?.description;
   const name = eventDetails?.name;
   const bannerUrl = eventDetails?.bannerUrl;
 
-  const [memberCount, setMemberCount] = useState(peopleCount);
-  useEffect(() => {
-    const handler = (e: any) => {
-      const eventDetails = e.detail.eventDetails;
-      setMemberCount(eventDetails?.guests?.length ?? 0);
-    };
-    document.addEventListener('updateGuests', handler);
-    return () => {
-      document.removeEventListener('updateGuests', handler);
-    };
-  }, []);
+  const analytics = useAppAnalytics();
+  const user = getUserInfo();
+  const eventDateRange = formatIrlEventDate(eventDetails.startDate, eventDetails.endDate);
+
+  const onScheduleClick = () => {
+    analytics.captureEvent(
+      APP_ANALYTICS_EVENTS.IRL_BANNER_VIEW_SCHEDULE_BTN_CLICKED,
+      {
+        eventId: eventDetails?.id,
+        eventName: eventDetails?.name,
+        schedulePageUrl: eventDetails?.websiteUrl,
+        user,
+      }
+    );
+  };
+
+  const onTelegramLinkClick = () => {
+    analytics.captureEvent(
+      APP_ANALYTICS_EVENTS.IRL_BANNER_TELEGRAM_BTN_CLICKED,
+      {
+        eventId: eventDetails?.id,
+        eventName: eventDetails?.name,
+        telegramUrl: eventDetails?.telegram,
+        user,
+      }
+    );
+  };
+
+  const onAddScheduleClick = () => {
+    analytics.captureEvent(
+      APP_ANALYTICS_EVENTS.IRL_BANNER_ADD_SCHEDULE_BTN_CLICKED,
+      {
+        eventId: eventDetails?.id,
+        eventName: eventDetails?.name,
+        user,
+      }
+    );
+  };
 
   return (
     <div className="p-[20px]">
-      <div className="h-[153px] w-[100%] rounded-[8px] bg-gray-400">
-        <img src={bannerUrl} className="h-[153px] w-[100%] rounded-[8px] object-cover object-bottom" />
-      </div>
-      <div className="mt-[24px] flex flex-col lg:flex-row justify-between items-start lg:items-center">
-        <p className="text-[24px] font-[700]">
-          {name}
-        </p>
-        <div className="flex gap-[8px]">
-          <div className="py-[6px] px-[12px] bg-[#F1F5F9] text-[12px] font-[500] flex gap-[6px] rounded-[24px] items-center">
-            <img src="/assets/images/icons/thumbs-up.svg"/>
-            <p>{memberCount} Going</p>
-          </div>
-          <div className="py-[6px] px-[12px] bg-[#F1F5F9] text-[12px] font-[500] flex gap-[6px] rounded-[24px] items-center">
-            <img src="/assets/images/icons/flat_calendar.svg"/>
-            <p>{eventCount} Events</p>
+      <div className="pb-3 lg:pb-[14px]">
+        <div className="h-[153px] w-[100%] rounded-[8px] bg-gray-400">
+          <img
+            src={bannerUrl}
+            className="h-[153px] w-[100%] rounded-[8px] object-cover object-bottom"
+          />
+        </div>
+        <div className="mt-[12px] flex flex-col items-start justify-between gap-1 lg:mt-[24px] lg:flex-row lg:items-center">
+          <p className="text-[24px] font-[700]">{name}</p>
+          <div className="flex gap-[8px]">
+            <a
+              href={eventDetails?.telegram}
+              target="_blank"
+              onClick={onTelegramLinkClick}
+              className="flex items-center gap-1 rounded-[24px] bg-[#F1F5F9] py-[6px] px-[12px] text-[12px] font-[500] text-[#475569] lg:order-2"
+            >
+              <img
+                src="/assets/images/icons/telegram-contact-logo.svg"
+                alt="telegram"
+              />
+              {/* {eventDetails.type !== "INVITE_ONLY" && <p>Telegram</p>} */}
+              <p>Telegram</p>
+            </a>
+            <div className="flex items-center gap-1 rounded-[24px] bg-[#F1F5F9] py-[6px] px-[12px] text-[12px] font-[500] text-[#475569] lg:order-1">
+              <img src="/assets/images/icons/flat_calendar.svg" />
+              <p>{eventDateRange}</p>
+            </div>
+            {/* {eventDetails.type === "INVITE_ONLY" && <div className='flex items-center gap-1 rounded-[24px] bg-[#F1F5F9] py-[6px] px-[12px] text-[12px] font-[500] text-[#0F172A]'>
+            <img src="/assets/images/icons/invite-only.svg" />
+              <p>Invite Only</p>
+            </div>} */}
           </div>
         </div>
+        <p className="mt-[10px] text-[15px] font-[400] leading-6 text-[#0F172A]">
+          {description}
+        </p>
       </div>
-      <p className="mt-[10px] text-[15px] font-[400]">
-        {description}
-      </p>
+      <div className="pt-5 border-t border-[#E2E8F0]">
+        <div className="flex items-center gap-3">
+          {eventDetails?.websiteUrl && <a
+            target="_blank"
+            rel="noreferrer"
+            href={eventDetails?.websiteUrl}
+            className="flex h-[40px] w-[154px] items-center justify-center gap-[8px] rounded-[8px] border border-[#CBD5E1] bg-white px-[18px] py-[10px] text-[14px] font-[500] leading-5 text-[#0F172A] lg:w-[unset] lg:px-6"
+            onClick={onScheduleClick}
+          >
+            View Schedule
+          </a>}
+          <button onClick={onAddScheduleClick} className=" flex h-10 w-[154px] items-center justify-center gap-2 rounded-lg border border-[#CBD5E1] bg-white py-[10px] text-[14px] font-[500] leading-5 text-[#0F172A] lg:w-[unset] lg:px-6">
+            <img src="/assets/images/icons/plus-black.svg" alt="add" />
+            Add Event
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

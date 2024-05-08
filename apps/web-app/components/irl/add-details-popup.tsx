@@ -72,6 +72,8 @@ const AddDetailsPopup = (props: any) => {
       APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED,
       {
         type: 'clicked',
+        eventId: eventDetails?.id,
+        eventName: eventDetails?.name,
         user,
       }
     );
@@ -91,6 +93,8 @@ const AddDetailsPopup = (props: any) => {
       APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED,
       {
         type: 'api_initiated',
+        eventId: eventDetails?.id,
+        eventName: eventDetails?.name,
         user,
         ...payload,
         teamName,
@@ -108,6 +112,8 @@ const AddDetailsPopup = (props: any) => {
         APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED,
         {
           type: 'api_sucess',
+          eventId: eventDetails?.id,
+          eventName: eventDetails?.name,
           user,
           ...payload,
           teamName,
@@ -134,6 +140,8 @@ const AddDetailsPopup = (props: any) => {
       APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_SAVE_BTN_CLICKED,
       {
         type: 'clicked',
+        eventId: eventDetails?.id,
+        eventName: eventDetails?.name,
         user,
       }
     );
@@ -154,6 +162,8 @@ const AddDetailsPopup = (props: any) => {
         APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_SAVE_BTN_CLICKED,
         {
           type: 'api_initiated',
+          eventId: eventDetails?.id,
+          eventName: eventDetails?.name,
           user,
           ...payload,
           teamName,
@@ -166,6 +176,8 @@ const AddDetailsPopup = (props: any) => {
           APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_SAVE_BTN_CLICKED,
           {
             type: 'api_success',
+            eventId: eventDetails?.id,
+            eventName: eventDetails?.name,
             user,
             ...payload,
             teamName,
@@ -193,6 +205,7 @@ const AddDetailsPopup = (props: any) => {
     } catch {
       onClose();
       toast.error('Something went wrong');
+      
     }
   };
 
