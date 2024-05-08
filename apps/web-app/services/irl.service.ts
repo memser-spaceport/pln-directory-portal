@@ -8,7 +8,7 @@ export const getEventDetailBySlug = async (slug, token) => {
       { headers: { Authorization: `Bearer ${token}` } }
     );  
   } catch (e) {
-    if(e.response.status) {
+    if(e.response?.status) {
       return {
         errorCode: 404
       }
@@ -24,20 +24,23 @@ export const getEventDetailBySlug = async (slug, token) => {
   
 
   return {
-    id: output.uid,
-    name: output.name,
-    slugUrl: output.slugURL,
-    bannerUrl: output.banner.url,
-    eventCount: output.eventsCount,
-    description: output.description,
-    websiteUrl: output.websiteURL,
-    telegram:output.telegramId,
-    guests: output.eventGuests?.map((guest: any) => {
+    id: output?.uid,
+    name: output?.name,
+    slugUrl: output?.slugURL,
+    bannerUrl: output?.banner?.url,
+    eventCount: output?.eventsCount,
+    description: output?.description,
+    websiteUrl: output?.websiteURL,
+    telegram:output?.telegramId,
+    type:output?.type,
+    startDate:output?.startDate,
+    endDate:output?.endDate,
+    guests: output?.eventGuests?.map((guest: any) => {
       return {
-        uid: guest.uid,
+        uid: guest?.uid,
         teamUid: guest?.teamUid,
-        teamName: guest?.team.name,
-        teamLogo: guest?.team.logo?.url,
+        teamName: guest?.team?.name,
+        teamLogo: guest?.team?.logo?.url,
         memberUid: guest?.memberUid,
         memberName: guest?.member?.name,
         memberLogo: guest?.member?.image?.url,
