@@ -79,7 +79,7 @@ export function MobileMenu() {
                     />
                   </div>
                   <span className="mb-text text-[10px]">{item.name}</span>
-                  {item.name === 'IRL Gatherings' && (
+                  {item.version === 'BETA' && (
                     <img
                       src="/assets/images/icons/beta-logo.svg"
                       alt="beta logo"
