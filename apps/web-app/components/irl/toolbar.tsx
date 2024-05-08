@@ -127,7 +127,7 @@ const Toolbar = (props: any) => {
         </div>
         {isUserLoggedIn && (
           <div className="w-full lg:order-2 lg:ml-4 lg:w-[256px]">
-            <Search onChange={getValue} />
+            <Search onChange={getValue}  placeholder="Search by Attendee"/>
           </div>
         )}
       </div>
