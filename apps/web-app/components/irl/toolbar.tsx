@@ -9,6 +9,7 @@ const Toolbar = (props: any) => {
   const onLogin = props.onLogin;
   const isUserLoggedIn = props?.isUserLoggedIn;
   const isUserGoing = props?.isUserGoing;
+  const isPastEvent = eventDetails?.isPastEvent;
   const [searchTerm, setSearchTerm] = useState('');
   const analytics = useAppAnalytics();
   const user = getUserInfo();
@@ -100,10 +101,10 @@ const Toolbar = (props: any) => {
           Attendees
         </span>
         <div className="flex w-auto justify-end gap-[8px] lg:order-3 lg:flex-1">
-          {!isUserGoing && isUserLoggedIn && (
+          {!isUserGoing && isUserLoggedIn && !isPastEvent && (
             <button
               onClick={onIAmGoingClick}
-              className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] hover:bg-[#1D4ED8] px-[24px]  py-[10px] text-[14px] font-[500] text-[#fff]"
+              className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] px-[24px] py-[10px]  text-[14px] font-[500] text-[#fff] hover:bg-[#1D4ED8]"
             >
               I am Going
             </button>
@@ -111,15 +112,15 @@ const Toolbar = (props: any) => {
           {!isUserLoggedIn && (
             <button
               onClick={onLoginClick}
-              className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] hover:bg-[#1D4ED8] px-[24px] py-[10px] text-[14px]  font-[500] text-[#fff] lg:w-fit "
+              className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] px-[24px] py-[10px] text-[14px] font-[500]  text-[#fff] hover:bg-[#1D4ED8] lg:w-fit "
             >
               Login to Respond
             </button>
           )}
-          {isUserGoing && isUserLoggedIn && (
+          {isUserGoing && isUserLoggedIn && !isPastEvent && (
             <button
               onClick={onEditResponse}
-              className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] hover:bg-[#1D4ED8] px-[24px]  py-[10px] text-[14px] font-[500] text-[#fff]"
+              className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] px-[24px] py-[10px]  text-[14px] font-[500] text-[#fff] hover:bg-[#1D4ED8]"
             >
               Edit Response
             </button>
@@ -127,7 +128,7 @@ const Toolbar = (props: any) => {
         </div>
         {isUserLoggedIn && (
           <div className="w-full lg:order-2 lg:ml-4 lg:w-[256px]">
-            <Search onChange={getValue}  placeholder="Search by Attendee"/>
+            <Search onChange={getValue} placeholder="Search by Attendee" />
           </div>
         )}
       </div>

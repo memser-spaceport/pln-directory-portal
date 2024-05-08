@@ -23,3 +23,8 @@ export const formatIrlEventDate = (startDate, endDate) => {
   }
   return formattedDateRange;
 };
+
+export const isPastDate = (date) => {
+  const currentDate = new Date();
+  return new Date(date)?.getTime() < currentDate.getTime();
+};
