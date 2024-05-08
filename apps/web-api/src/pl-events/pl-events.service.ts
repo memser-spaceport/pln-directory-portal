@@ -1,14 +1,16 @@
-import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, NotFoundException, Inject, CACHE_MANAGER } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { Prisma } from '@prisma/client';
+import { Cache } from 'cache-manager';
 
 
 @Injectable()
 export class PLEventsService {
   constructor(
     private prisma: PrismaService,
-    private logger: LogService
+    private logger: LogService,
+    @Inject(CACHE_MANAGER) private cacheService: Cache
   ) {}
 
   async getPLEvents(queryOptions: Prisma.PLEventFindManyArgs) {
@@ -76,13 +78,17 @@ export class PLEventsService {
   ) {
     try {  
       const event: any = await this.getPLEventBySlug(slug, true);
-      return await this.prisma.pLEventGuest.create({
+      await this.prisma.pLEventGuest.create({
         data:{
           ...guest,
           memberUid: member?.uid,
           eventUid: event?.uid
         }
-      });  
+      });
+      await this.cacheService.reset();
+      return {
+        msg: "success"
+      };  
     } catch(err) {
       this.handleErrors(err);
     }
