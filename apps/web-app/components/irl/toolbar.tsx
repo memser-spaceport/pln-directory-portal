@@ -103,7 +103,7 @@ const Toolbar = (props: any) => {
           {!isUserGoing && isUserLoggedIn && (
             <button
               onClick={onIAmGoingClick}
-              className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] px-[24px]  py-[10px] text-[14px] font-[500] text-[#fff]"
+              className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] hover:bg-[#1D4ED8] px-[24px]  py-[10px] text-[14px] font-[500] text-[#fff]"
             >
               I am Going
             </button>
@@ -111,7 +111,7 @@ const Toolbar = (props: any) => {
           {!isUserLoggedIn && (
             <button
               onClick={onLoginClick}
-              className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] px-[24px] py-[10px] text-[14px]  font-[500] text-[#fff] lg:w-fit "
+              className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] hover:bg-[#1D4ED8] px-[24px] py-[10px] text-[14px]  font-[500] text-[#fff] lg:w-fit "
             >
               Login to Respond
             </button>
@@ -119,7 +119,7 @@ const Toolbar = (props: any) => {
           {isUserGoing && isUserLoggedIn && (
             <button
               onClick={onEditResponse}
-              className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] px-[24px]  py-[10px] text-[14px] font-[500] text-[#fff]"
+              className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] hover:bg-[#1D4ED8] px-[24px]  py-[10px] text-[14px] font-[500] text-[#fff]"
             >
               Edit Response
             </button>
