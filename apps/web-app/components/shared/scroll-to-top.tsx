@@ -3,7 +3,8 @@ import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { getUserInfo } from 'apps/web-app/utils/shared.utils';
 import { useEffect, useState } from 'react';
 
-const ScrollToTop = () => {
+const ScrollToTop = (props:any) => {
+  const pageName = props?.pageName;
   const analytics = useAppAnalytics();
   const user = getUserInfo();
   const [showTopBtn, setShowTopBtn] = useState(false);
@@ -24,7 +25,8 @@ const ScrollToTop = () => {
   }, []);
 
   const scrollToTop = () => {
-    analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_GO_TO_TOP_BTN_CLICKED, {
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.GO_TO_TOP_BTN_CLICKED, {
+      pageName,
       user,
     });
 

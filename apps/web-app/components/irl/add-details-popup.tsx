@@ -111,7 +111,7 @@ const AddDetailsPopup = (props: any) => {
       analytics.captureEvent(
         APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED,
         {
-          type: 'api_sucess',
+          type: 'api_success',
           eventId: eventDetails?.id,
           eventName: eventDetails?.name,
           user,

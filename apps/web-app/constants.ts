@@ -268,7 +268,7 @@ export const APP_ANALYTICS_EVENTS = {
 
   DIRECTORY_LIST_SORTBY_CHANGED: 'directory-list-sortby-changed',
 
-  IRL_NAVBAR_BACK_BTN_CLICKED:"irl-navbar-back-button-clicked",
+  IRL_NAVBAR_BACK_BTN_CLICKED:"irl-navbar-back-btn-clicked",
   IRL_BANNER_TELEGRAM_BTN_CLICKED:'irl-banner-telegram-btn-clicked',
   IRL_BANNER_VIEW_SCHEDULE_BTN_CLICKED:"irl-banner-view-schedule-btn-clicked",
   IRL_BANNER_ADD_SCHEDULE_BTN_CLICKED:"irl-banner-add-schedule-btn-clicked",
@@ -286,8 +286,8 @@ export const APP_ANALYTICS_EVENTS = {
   IRL_GUEST_LIST_TABLE_TELEGRAM_LINK_CLICKED:'irl-guest-list-table-telegram-link-clicked',
   IRL_RSVP_POPUP_SAVE_BTN_CLICKED:'irl-rsvp-popup-save-btn-clicked',
   IRL_RSVP_POPUP_UPDATE_BTN_CLICKED:'irl-rsvp-popup-update-btn-clicked',
-  IRL_GO_TO_TOP_BTN_CLICKED:"irl-go-to-top-btn-clicked",
 
+  GO_TO_TOP_BTN_CLICKED:"go-to-top-btn-clicked",
   SELECT_FOCUS_AREA_BTN_CLICKED:'select-focus-area-btn-clicked',
   FOCUS_AREA_POPUP_SAVE_BTN_CLICKED:'focus-area-popup-save-btn-clicked',
   FOCUS_AREA_EDIT_BTN_CLICKED:'focus-area-edit-btn-clicked',

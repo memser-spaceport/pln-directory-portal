@@ -8,10 +8,15 @@ const Banner = (props: any) => {
   const description = eventDetails?.description;
   const name = eventDetails?.name;
   const bannerUrl = eventDetails?.bannerUrl;
+  const startDate = eventDetails?.startDate;
+  const endDate = eventDetails?.endDate;
 
   const analytics = useAppAnalytics();
   const user = getUserInfo();
-  const eventDateRange = formatIrlEventDate(eventDetails.startDate, eventDetails.endDate);
+  const eventDateRange = formatIrlEventDate(startDate, endDate);
+
+  const currentDate = new Date();
+  const isPastEvent = new Date(endDate) < currentDate;
 
   const onScheduleClick = () => {
     analytics.captureEvent(
@@ -60,19 +65,21 @@ const Banner = (props: any) => {
         <div className="mt-[12px] flex flex-col items-start justify-between gap-1 lg:mt-[24px] lg:flex-row lg:items-center">
           <p className="text-[24px] font-[700]">{name}</p>
           <div className="flex gap-[8px]">
-            <a
-              href={eventDetails?.telegram}
-              target="_blank"
-              onClick={onTelegramLinkClick}
-              className="flex items-center gap-1 rounded-[24px] bg-[#F1F5F9] py-[6px] px-[12px] text-[12px] font-[500] text-[#475569] lg:order-2"
-            >
-              <img
-                src="/assets/images/icons/telegram-contact-logo.svg"
-                alt="telegram"
-              />
-              {/* {eventDetails.type !== "INVITE_ONLY" && <p>Telegram</p>} */}
-              <p>Telegram</p>
-            </a>
+            {eventDetails?.telegram && (
+              <a
+                href={eventDetails?.telegram}
+                target="_blank"
+                onClick={onTelegramLinkClick}
+                className="flex items-center gap-1 rounded-[24px] bg-[#F1F5F9] py-[6px] px-[12px] text-[12px] font-[500] text-[#475569] lg:order-2"
+              >
+                <img
+                  src="/assets/images/icons/telegram-contact-logo.svg"
+                  alt="telegram"
+                />
+                {/* {eventDetails.type !== "INVITE_ONLY" && <p>Telegram</p>} */}
+                <p>Telegram</p>
+              </a>
+            )}
             <div className="flex items-center gap-1 rounded-[24px] bg-[#F1F5F9] py-[6px] px-[12px] text-[12px] font-[500] text-[#475569] lg:order-1">
               <img src="/assets/images/icons/flat_calendar.svg" />
               <p>{eventDateRange}</p>
@@ -87,21 +94,28 @@ const Banner = (props: any) => {
           {description}
         </p>
       </div>
-      <div className="pt-5 border-t border-[#E2E8F0]">
+      <div className="border-t border-[#E2E8F0] pt-5">
         <div className="flex items-center gap-3">
-          {eventDetails?.websiteUrl && <a
-            target="_blank"
-            rel="noreferrer"
-            href={eventDetails?.websiteUrl}
-            className="flex h-[40px] w-[154px] items-center justify-center gap-[8px] rounded-[8px] border border-[#CBD5E1] bg-white px-[18px] py-[10px] text-[14px] font-[500] leading-5 text-[#0F172A] lg:w-[unset] lg:px-6"
-            onClick={onScheduleClick}
-          >
-            View Schedule
-          </a>}
-          <button onClick={onAddScheduleClick} className=" flex h-10 w-[154px] items-center justify-center gap-2 rounded-lg border border-[#CBD5E1] bg-white py-[10px] text-[14px] font-[500] leading-5 text-[#0F172A] lg:w-[unset] lg:px-6">
-            <img src="/assets/images/icons/plus-black.svg" alt="add" />
-            Add Event
-          </button>
+          {eventDetails?.websiteUrl && (
+            <a
+              target="_blank"
+              rel="noreferrer"
+              href={eventDetails?.websiteUrl}
+              className="flex h-[40px] w-[154px] items-center justify-center gap-[8px] rounded-[8px] border border-[#CBD5E1] bg-white px-[18px] py-[10px] text-[14px] font-[500] leading-5 text-[#0F172A] lg:w-[unset] lg:px-6"
+              onClick={onScheduleClick}
+            >
+              View Schedule
+            </a>
+          )}
+          {!isPastEvent && (
+            <button
+              onClick={onAddScheduleClick}
+              className=" flex h-10 w-[154px] items-center justify-center gap-2 rounded-lg border border-[#CBD5E1] bg-white py-[10px] text-[14px] font-[500] leading-5 text-[#0F172A] lg:w-[unset] lg:px-6"
+            >
+              <img src="/assets/images/icons/plus-black.svg" alt="add" />
+              Add Event
+            </button>
+          )}
         </div>
       </div>
     </div>
