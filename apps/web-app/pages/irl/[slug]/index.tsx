@@ -43,7 +43,7 @@ export default function IrlDetails({
             <Navbar eventDetails={eventDetails} />
           </div>
           <div className="w-[calc(100%_-_2px)] bg-white lg:rounded-[8px] shadow-md">
-            <Banner eventDetails={eventDetails} />
+            <Banner eventDetails={eventDetails} isUserLoggedIn={isUserLoggedIn} />
           </div>
           {!isUserLoggedIn && ( 
             <div className="sticky top-[40px] mt-[0px] w-full lg:top-[83px] lg:mt-[16px]">

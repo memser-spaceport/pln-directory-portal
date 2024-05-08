@@ -10,6 +10,7 @@ const Banner = (props: any) => {
   const bannerUrl = eventDetails?.bannerUrl;
   const startDate = eventDetails?.startDate;
   const endDate = eventDetails?.endDate;
+  const isUserLoggedIn = props?.isUserLoggedIn;
 
   const analytics = useAppAnalytics();
   const user = getUserInfo();
@@ -17,6 +18,7 @@ const Banner = (props: any) => {
 
   const currentDate = new Date();
   const isPastEvent = new Date(endDate) < currentDate;
+  const requestFormLink = process.env.IRL_PGF_FORM_URL;
 
   const onScheduleClick = () => {
     analytics.captureEvent(
@@ -51,6 +53,7 @@ const Banner = (props: any) => {
         user,
       }
     );
+    window.open(requestFormLink, '_blank');
   };
 
   return (
@@ -59,7 +62,7 @@ const Banner = (props: any) => {
         <div className="h-[153px] w-[100%] rounded-[8px] bg-gray-400">
           <img
             src={bannerUrl}
-            className="h-[153px] w-[100%] rounded-[8px] object-cover object-bottom"
+            className="h-[153px] w-[100%] rounded-[8px] object-fill object-bottom"
           />
         </div>
         <div className="mt-[12px] flex flex-col items-start justify-between gap-1 lg:mt-[24px] lg:flex-row lg:items-center">
@@ -107,7 +110,7 @@ const Banner = (props: any) => {
               View Schedule
             </a>
           )}
-          {!isPastEvent && (
+          {!isPastEvent && isUserLoggedIn && (
             <button
               onClick={onAddScheduleClick}
               className=" flex h-10 w-[154px] items-center justify-center gap-2 rounded-lg border border-[#CBD5E1] bg-white py-[10px] text-[14px] font-[500] leading-5 text-[#0F172A] lg:w-[unset] lg:px-6"
