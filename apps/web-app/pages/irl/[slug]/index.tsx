@@ -3,7 +3,7 @@ import Banner from 'apps/web-app/components/irl/banner';
 import HeaderStrip from 'apps/web-app/components/irl/header-strip';
 import IrlMain from 'apps/web-app/components/irl/irl-main';
 import Navbar from 'apps/web-app/components/irl/navbar';
-import ScrollToTop from 'apps/web-app/components/irl/scroll-to-top';
+import ScrollToTop from 'apps/web-app/components/shared/scroll-to-top';
 import { DirectoryLayout } from 'apps/web-app/layouts/directory-layout';
 import { getEventDetailBySlug } from 'apps/web-app/services/irl.service';
 import {
@@ -46,7 +46,7 @@ export default function IrlDetails({
          <IrlMain eventDetails={eventDetails} onLogin={onLogin} userInfo={userInfo} isUserGoing={isUserGoing} isUserLoggedIn={isUserLoggedIn} teams={teams}/>
         </div>
         <div>
-          <ScrollToTop/>
+          <ScrollToTop pageName='Irl Detail'/>
         </div>
       </div>
     </>

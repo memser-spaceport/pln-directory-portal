@@ -115,6 +115,10 @@ const JoinEventStrip = (props: any) => {
           border: 1px solid #cbd5e1;
         }
 
+        .joinEventStrip__btnWrpr__btn:hover {
+          background-color: #1D4ED8;
+        }
+
         .joinEventStrip__btnWrpr__loginBtn {
           width: 100%;
           background-color: #156ff7;
@@ -126,6 +130,10 @@ const JoinEventStrip = (props: any) => {
           color: #ffffff;
           line-height: 20px;
           border-radius: 8px;
+        }
+
+        .joinEventStrip__btnWrpr__loginBtn:hover {
+          background-color: #1D4ED8;
         }
 
         @media (min-width: 1024px) {
