@@ -1,5 +1,42 @@
 import api from '../utils/api';
 
+export const getAllEvents = async () => {
+  try {
+    const response = await api.get(
+      `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/irl/events?orderBy=-startDate`
+    ); 
+
+    if (response.status === 200) {
+      const events = response?.data?.map((event:any)=>{
+        return {
+          id: event?.uid,
+          name: event?.name,
+          slugUrl: event?.slugURL,
+          bannerUrl: event?.banner?.url,
+          description: event?.description,
+          location: event?.location,
+          startDate: event?.startDate,
+          endDate: event?.endDate,
+          createdAt: event?.createdAt,
+          type: event?.type,
+          attendees: event?.eventGuests?.length
+        }
+      });
+      
+      return events;
+    } else {
+      throw new Error(`Unexpected status code: ${response.status}`);
+    }
+  } catch (error) {
+    if (error.response) {
+      const { status, data } = error.response;
+      return { errorCode: status, errorMessage: data.message || 'Something went wrong!' };
+    } else {
+      return { errorCode: 500, errorMessage: 'Something went wrong' };
+    }
+  }
+};
+
 export const getEventDetailBySlug = async (slug, token) => {
   let result;
   try {

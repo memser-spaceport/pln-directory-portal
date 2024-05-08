@@ -93,3 +93,21 @@ export const DIRECTORY_SEO = {
     { name: 'viewport', content: 'width=1272, user-scalable=no' },
   ],
 };
+
+export const IRL_SEO = {
+  titleTemplate: '%s | Protocol Labs Directory',
+  defaultTitle: 'Protocol Labs Directory',
+  description:
+    'The Protocol Labs Directory helps network members orient themselves within the network by making it easy to learn about other teams and members, including their roles, capabilities, and experiences.',
+  openGraph: {
+    images: [
+      {
+        url: `${siteUrl}/assets/images/protocol-labs-open-graph.jpg?v1`,
+        width: 1280,
+        height: 640,
+        alt: 'Protocol Labs Directory',
+        type: 'image/jpeg',
+      },
+    ],
+  }
+};

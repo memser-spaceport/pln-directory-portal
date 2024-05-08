@@ -112,11 +112,6 @@ let nextConfig = {
         destination: 'https://events.plnetwork.io/',
         permanent: false,
       },
-      {
-        source: '/irl',
-        destination: '/irl/lw24-pg',
-        permanent: false,
-      },
     ];
   },
 };
