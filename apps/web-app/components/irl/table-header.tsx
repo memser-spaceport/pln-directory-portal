@@ -19,6 +19,7 @@ const TableHeader = (props: any) => {
         eventId: eventDetails?.id,
         eventName: eventDetails?.name,
         column: key,
+        order: sortConfig.order === 'asc' ? 'desc' : 'asc',
         user,
       }
     );
@@ -50,7 +51,7 @@ const TableHeader = (props: any) => {
           <div className="flex w-[200px] items-center justify-start  pl-[20px]">
             <div
               onClick={() => onSort('memberName')}
-              className="flex items-center gap-1 cursor-pointer"
+              className="flex cursor-pointer items-center gap-1"
             >
               <img
                 src={
@@ -79,7 +80,9 @@ const TableHeader = (props: any) => {
           <div className="flex w-[200px] items-center justify-start pl-[20px]">
             Team
           </div>
-          <div className="flex w-[200px] items-center justify-start">Name</div>
+          <div className="flex w-[200px] items-center justify-start">
+            Attendee Name
+          </div>
           <div className="flex w-[150px] items-center justify-start">
             Telegram
           </div>
