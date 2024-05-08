@@ -268,6 +268,8 @@ export const APP_ANALYTICS_EVENTS = {
 
   DIRECTORY_LIST_SORTBY_CHANGED: 'directory-list-sortby-changed',
 
+  IRL_GATHERING_CARD_CLICKED: 'irl_gathering_card_clicked',
+
   IRL_NAVBAR_BACK_BTN_CLICKED:"irl-navbar-back-btn-clicked",
   IRL_BANNER_TELEGRAM_BTN_CLICKED:'irl-banner-telegram-btn-clicked',
   IRL_BANNER_VIEW_SCHEDULE_BTN_CLICKED:"irl-banner-view-schedule-btn-clicked",

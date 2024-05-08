@@ -5,6 +5,7 @@ import IrlMain from 'apps/web-app/components/irl/irl-main';
 import Navbar from 'apps/web-app/components/irl/navbar';
 import ScrollToTop from 'apps/web-app/components/shared/scroll-to-top';
 import { DirectoryLayout } from 'apps/web-app/layouts/directory-layout';
+import { IRL_SEO } from 'apps/web-app/seo.config';
 import { getEventDetailBySlug } from 'apps/web-app/services/irl.service';
 import {
   authenticate,
@@ -13,6 +14,7 @@ import {
 } from 'apps/web-app/utils/services/auth';
 import { parseCookie } from 'apps/web-app/utils/shared.utils';
 import { GetServerSideProps } from 'next';
+import { NextSeo } from 'next-seo';
 import { useRouter } from 'next/router';
 import { ReactElement } from 'react';
 
@@ -30,6 +32,11 @@ export default function IrlDetails({
 
   return (
     <>
+          <NextSeo
+        {...IRL_SEO}
+        title={eventDetails.name}
+        description={eventDetails.description}
+      />
       <div className="flex justify-center pt-[76px] lg:pt-[122px]">
         <div className="flex w-[calc(100%_-_1px)] flex-col items-center lg:w-[900px] lg:px-0">
           <div className="h-9 w-full lg:h-[unset] lg:pb-2">

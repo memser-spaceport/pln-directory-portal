@@ -1,10 +1,12 @@
 
 const Search = (props: any) => {
     const onChange = props?.onChange;
+    const placeholder = props?.placeholder;
+
   return (
     <>
       <div className="search">
-        <input onChange={onChange} className="search__input" placeholder="Search" />
+        <input onChange={onChange} className="search__input" placeholder={placeholder} />
         <button className="search__btn">
           <img src="/assets/images/icons/search-blue.svg" alt="search" />
         </button>

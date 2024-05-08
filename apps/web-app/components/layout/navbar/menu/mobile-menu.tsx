@@ -37,8 +37,8 @@ export function MobileMenu() {
     {
       icon: IRLGatheringIcon,
       name: 'IRL Gatherings',
-      path: '/irl/lw24-pg',
-      version: 'BETA',
+      path: '/irl',
+      version: 'PUBLISHED',
     },
   ];
 
