@@ -15,9 +15,7 @@ const Banner = (props: any) => {
   const analytics = useAppAnalytics();
   const user = getUserInfo();
   const eventDateRange = formatIrlEventDate(startDate, endDate);
-
-  const currentDate = new Date();
-  const isPastEvent = new Date(endDate) < currentDate;
+  const isPastEvent = eventDetails?.isPastEvent;
   const requestFormLink = process.env.IRL_PGF_FORM_URL;
 
   const onScheduleClick = () => {

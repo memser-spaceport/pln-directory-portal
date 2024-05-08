@@ -1,4 +1,5 @@
 import api from '../utils/api';
+import { isPastDate } from '../utils/irl.utils';
 
 export const getAllEvents = async () => {
   try {
@@ -58,6 +59,7 @@ export const getEventDetailBySlug = async (slug, token) => {
   }
 
   const output = result.data;
+  const isPastEvent = isPastDate(output?.endDate);
   
 
   return {
@@ -72,6 +74,7 @@ export const getEventDetailBySlug = async (slug, token) => {
     type:output?.type,
     startDate:output?.startDate,
     endDate:output?.endDate,
+    isPastEvent,
     guests: output?.eventGuests?.map((guest: any) => {
       return {
         uid: guest?.uid,
