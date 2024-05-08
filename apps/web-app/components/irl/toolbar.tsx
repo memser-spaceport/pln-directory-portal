@@ -1,39 +1,36 @@
 import { useEffect, useState } from 'react';
-import AddDetailsPopup from './add-details-popup';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
 import { getUserInfo } from 'apps/web-app/utils/shared.utils';
+import Search from './search';
 
 const Toolbar = (props: any) => {
-  const teams = props?.teams;
   const eventDetails = props?.eventDetails;
-  const userInfo = props?.userInfo;
   const onLogin = props.onLogin;
   const isUserLoggedIn = props?.isUserLoggedIn;
-  const registeredGuest = eventDetails.guests.find(
-    (guest) => guest.memberUid === userInfo.uid
-  );
-
-  const [isUserGoing, setIsGoing] = useState(props.isUserGoing);
-  const [updatedUser, setUpdatedUser] = useState(registeredGuest);
-  const [allGuest, setAllGuest] = useState(eventDetails.guests);
-  const [isOpen, setIsOpen] = useState(false);
+  const isUserGoing = props?.isUserGoing;
+  const [searchTerm, setSearchTerm] = useState('');
   const analytics = useAppAnalytics();
   const user = getUserInfo();
-
-  const onClose = () => {
-    setIsOpen(false);
-  };
 
   const onIAmGoingClick = () => {
     analytics.captureEvent(
       APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_HEADER_IAM_GOING_BTN_CLICKED,
       {
         type: 'i am going',
+        eventId: eventDetails?.id,
+        eventName: eventDetails?.name,
         user,
       }
     );
-    setIsOpen(true);
+
+    document.dispatchEvent(
+      new CustomEvent('openRsvpModal', {
+        detail: {
+          isOpen: true,
+        },
+      })
+    );
   };
 
   const onEditResponse = () => {
@@ -41,87 +38,68 @@ const Toolbar = (props: any) => {
       APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_HEADER_EDIT_RESPONSE_BTN_CLICKED,
       {
         type: 'edit response',
+        eventId: eventDetails?.id,
+        eventName: eventDetails?.name,
         user,
       }
     );
-    setIsOpen(true);
-  };
-
-  const onTelegramLinkClick = () => {
-    analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_HEADER_TELEGRAM_BTN_CLICKED,
-      {
-        telegramUrl: eventDetails?.telegram,
-        user,
-      }
+    document.dispatchEvent(
+      new CustomEvent('openRsvpModal', {
+        detail: {
+          isOpen: true,
+        },
+      })
     );
   };
 
-  const onScheduleClick = () => {
-    analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_HEADER_VIEW_SCHEDULE_BTN_CLICKED,
-      {
-        schedulePageUrl: eventDetails?.websiteUrl,
-        user,
-      }
+  const getValue = (event: any) => {
+    const searchValue = event?.target?.value;
+    setSearchTerm(searchValue);
+    document.dispatchEvent(
+      new CustomEvent('irl-details-searchlist', {
+        detail: {
+          searchValue: searchValue,
+        },
+      })
     );
   };
 
   const onLoginClick = () => {
     analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_HEADER_LOGIN_BTN_CLICKED
+      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_HEADER_LOGIN_BTN_CLICKED,
+      {
+        eventId: eventDetails?.id,
+        eventName: eventDetails?.name,
+      }
     );
     onLogin();
   };
 
   useEffect(() => {
-    const handler = (e: any) => {
-      const eventDetails = e.detail.eventDetails;
-
-      const registeredGuest = eventDetails.guests.find(
-        (guest) => guest.memberUid === userInfo.uid
+    const handler = setTimeout(() => {
+      analytics.captureEvent(
+        APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_HEADER_SEARCH,
+        {
+          eventId: eventDetails?.id,
+          eventName: eventDetails?.name,
+          searchTerm,
+          user,
+        }
       );
-      setAllGuest(eventDetails.guests);
-      if (registeredGuest) {
-        setIsGoing(true);
-      }
-      setUpdatedUser(registeredGuest);
-    };
-    document.addEventListener('updateGuests', handler);
+    }, 500);
+
     return () => {
-      document.removeEventListener('updateGuests', handler);
+      clearTimeout(handler);
     };
-  }, []);
+  }, [searchTerm]);
 
   return (
     <>
-      <div className="flex w-[100%] flex-col justify-between lg:flex-row lg:items-center">
-        <p className="pb-[4px] text-[18px] font-[700] lg:pb-0 lg:text-[20px]">{`Guest List (${allGuest.length})`}</p>
-        <div className="flex flex-wrap gap-[8px]">
-          <a
-            href={eventDetails?.telegram}
-            target="_blank"
-            rel="noreferrer"
-            className="mb-btn flex h-[40px]  cursor-pointer items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-white p-[10px]  text-[14px] font-[500] text-[#156FF7] lg:px-[24px] lg:py-[10px]"
-            onClick={onTelegramLinkClick}
-          >
-            <img
-              className="h-[21px] w-[21px]"
-              src="/assets/images/icons/telegram-contact-logo.svg"
-            />
-            <span className="hidden text-sm font-[500] text-[#0F172A] lg:block">
-              Telegram
-            </span>
-          </a>
-          <a
-            target="_blank"
-            rel="noreferrer"
-            href={eventDetails?.websiteUrl}
-            className="mb-btn flex flex-1 h-[40px] cursor-pointer items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-white px-[16px] py-[10px] text-[14px]  text-sm font-[500] text-[#0F172A] lg:flex-auto lg:px-[24px] lg:py-[10px]"
-            onClick={onScheduleClick}
-          >
-            View Schedule
-          </a>
+      <div className="lg:flex-wrap-[unset] lg:justify-between-[unset] flex flex-wrap items-center justify-between gap-y-2 lg:items-center">
+        <span className="w-auto text-[18px] font-[700] lg:text-[20px]">
+          Attendees
+        </span>
+        <div className="flex w-auto justify-end gap-[8px] lg:order-3 lg:flex-1">
           {!isUserGoing && isUserLoggedIn && (
             <button
               onClick={onIAmGoingClick}
@@ -133,7 +111,7 @@ const Toolbar = (props: any) => {
           {!isUserLoggedIn && (
             <button
               onClick={onLoginClick}
-              className="mb-btn flex h-[40px] w-full items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] px-[24px] py-[10px] text-[14px]  font-[500] text-[#fff] lg:w-fit lg:flex-auto"
+              className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] px-[24px] py-[10px] text-[14px]  font-[500] text-[#fff] lg:w-fit "
             >
               Login to Respond
             </button>
@@ -147,18 +125,13 @@ const Toolbar = (props: any) => {
             </button>
           )}
         </div>
+        {isUserLoggedIn && (
+          <div className="w-full lg:order-2 lg:ml-4 lg:w-[256px]">
+            <Search onChange={getValue} />
+          </div>
+        )}
       </div>
-      {isOpen && (
-        <AddDetailsPopup
-          eventDetails={eventDetails}
-          teams={teams}
-          isOpen={isOpen}
-          onClose={onClose}
-          userInfo={userInfo}
-          isUserGoing={isUserGoing}
-          registeredGuest={updatedUser}
-        />
-      )}
+
       <style jsx>
         {`
           @media (max-width: 375px) {
