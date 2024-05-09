@@ -62,7 +62,7 @@ const Banner = (props: any) => {
         <div className="h-[153px] w-[100%] rounded-[8px] bg-gray-400">
           <img
             src={bannerUrl}
-            className="h-[153px] w-[100%] rounded-[8px] object-fill object-bottom"
+            className="h-[153px] w-[100%] rounded-[8px] object-cover object-center"
           />
         </div>
         <div className="mt-[12px] flex flex-col items-start justify-between gap-1 lg:mt-[24px] lg:flex-row lg:items-center">
