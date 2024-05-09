@@ -114,7 +114,7 @@ export default function IrlCard(props: IIrlCard) {
         .irlCard__hdr img {
           height: 100%;
           width: 100%;
-          object-fit: fill;
+          object-fit: cover;
           object-position: center;
           border-top-left-radius: 12px;
           border-top-right-radius: 12px;
