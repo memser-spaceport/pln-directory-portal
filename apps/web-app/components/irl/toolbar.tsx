@@ -16,7 +16,7 @@ const Toolbar = (props: any) => {
 
   const onIAmGoingClick = () => {
     analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_HEADER_IAM_GOING_BTN_CLICKED,
+      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_IAM_GOING_BTN_CLICKED,
       {
         type: 'i am going',
         eventId: eventDetails?.id,
@@ -36,7 +36,7 @@ const Toolbar = (props: any) => {
 
   const onEditResponse = () => {
     analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_HEADER_EDIT_RESPONSE_BTN_CLICKED,
+      APP_ANALYTICS_EVENTS.IRL_EDIT_RESPONSE_BTN_CLICKED,
       {
         type: 'edit response',
         eventId: eventDetails?.id,
@@ -67,7 +67,7 @@ const Toolbar = (props: any) => {
 
   const onLoginClick = () => {
     analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_HEADER_LOGIN_BTN_CLICKED,
+      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_LOGIN_BTN_CLICKED,
       {
         eventId: eventDetails?.id,
         eventName: eventDetails?.name,
@@ -77,21 +77,23 @@ const Toolbar = (props: any) => {
   };
 
   useEffect(() => {
-    const handler = setTimeout(() => {
-      analytics.captureEvent(
-        APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_HEADER_SEARCH,
-        {
-          eventId: eventDetails?.id,
-          eventName: eventDetails?.name,
-          searchTerm,
-          user,
-        }
-      );
-    }, 500);
+    if (searchTerm) {
+      const handler = setTimeout(() => {
+        analytics.captureEvent(
+          APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_SEARCH,
+          {
+            eventId: eventDetails?.id,
+            eventName: eventDetails?.name,
+            searchTerm,
+            user,
+          }
+        );
+      }, 500);
 
-    return () => {
-      clearTimeout(handler);
-    };
+      return () => {
+        clearTimeout(handler);
+      };
+    }
   }, [searchTerm]);
 
   return (
@@ -114,7 +116,7 @@ const Toolbar = (props: any) => {
               onClick={onLoginClick}
               className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] px-[24px] py-[10px] text-[14px] font-[500]  text-[#fff] hover:bg-[#1D4ED8] lg:w-fit "
             >
-              Login to Respond
+              Login to Access
             </button>
           )}
           {isUserGoing && isUserLoggedIn && !isPastEvent && (
@@ -128,7 +130,7 @@ const Toolbar = (props: any) => {
         </div>
         {isUserLoggedIn && (
           <div className="w-full lg:order-2 lg:ml-4 lg:w-[256px]">
-            <Search onChange={getValue} placeholder="Search by Attendee" />
+            <Search onChange={getValue} placeholder="Search by Attendee Name" />
           </div>
         )}
       </div>

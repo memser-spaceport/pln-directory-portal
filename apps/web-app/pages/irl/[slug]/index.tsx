@@ -42,7 +42,7 @@ export default function IrlDetails({
           <div className="h-9 w-full lg:h-[unset] lg:pb-2">
             <Navbar eventDetails={eventDetails} />
           </div>
-          <div className="w-[calc(100%_-_2px)] bg-white lg:rounded-[8px] shadow-md">
+          <div className="w-[calc(100%_-_2px)] bg-white lg:rounded-[8px] mb-[2px] shadow-md">
             <Banner eventDetails={eventDetails} isUserLoggedIn={isUserLoggedIn} />
           </div>
           {!isUserLoggedIn && !eventDetails?.isPastEvent && ( 
