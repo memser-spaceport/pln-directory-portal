@@ -5,6 +5,7 @@ import TableHeader from './table-header';
 import TeamList from './team-list';
 import MemberList from './member-list';
 import AddDetailsPopup from './add-details-popup';
+import { useIrlDetails } from 'apps/web-app/hooks/irl/use-irl-details';
 
 const IrlMain = (props: any) => {
   const eventDetails = props?.eventDetails;
@@ -20,7 +21,7 @@ const IrlMain = (props: any) => {
   const [isOpen, setIsOpen] = useState(false);
   const [updatedUser, setUpdatedUser] = useState(registeredGuest);
   const [isUserGoing, setIsGoing] = useState(props?.isUserGoing);
-
+  const { filteredList } = useIrlDetails(updatedEventDetails.guests, userInfo);
 
   const onClose = () => {
     setIsOpen(false);
@@ -35,6 +36,42 @@ const IrlMain = (props: any) => {
       if (registeredGuest) {
         setIsGoing(true);
       }
+
+      const notAvailableTeams = eventDetails?.guests.filter(
+        (item) => item.teamUid === 'cleeky1re000202tx3kex3knn'
+      );
+      const otherTeams = eventDetails?.guests.filter(
+        (item) => item.teamUid !== 'cleeky1re000202tx3kex3knn'
+      );
+
+      const sortedGuests = otherTeams.sort((a, b) =>
+        a.memberName?.localeCompare(b.memberName)
+      );
+      const sortedNotAvailableTeamGuests = notAvailableTeams.sort((a, b) =>
+        a.memberName?.localeCompare(b.memberName)
+      );
+
+      const combinedTeams = [...sortedGuests, ...sortedNotAvailableTeamGuests];
+      eventDetails.guests = combinedTeams;
+
+      const isUserGoing = eventDetails.guests.some(
+        (guest) => guest.memberUid === userInfo.uid && guest.memberUid
+      );
+
+      if (isUserGoing) {
+        const currentUser = [...combinedTeams].find(
+          (v) => v.memberUid === userInfo.uid
+        );
+        if (currentUser) {
+          // currentUser.memberName = `(You) ${currentUser.memberName}`;
+          const filteredList = [...combinedTeams].filter(
+            (v) => v.memberUid !== userInfo.uid
+          );
+          const formattedGuests = [currentUser, ...filteredList];
+          eventDetails.guests = formattedGuests;
+        }
+      }
+
       setUpdatedUser(registeredGuest);
       setUpdatedEventDetails(eventDetails);
     };
@@ -58,7 +95,7 @@ const IrlMain = (props: any) => {
   return (
     <>
       {updatedEventDetails?.guests.length === 0 && (
-        <div className="pt-2">
+        <div className="py-2">
           <JoinEventStrip
             onLogin={onLogin}
             isUserGoing={isUserGoing}
@@ -71,10 +108,6 @@ const IrlMain = (props: any) => {
       {updatedEventDetails?.guests.length > 0 && (
         <>
           <div
-            //  ${
-            //   isUserLoggedIn ? 'h-[110px]' : 'h-[152px]'
-            // }
-            // lg:h-[76px]
             className={`g:px-0 w-[100%] bg-slate-100 px-[20px] pt-[16px] pb-[20px] lg:px-[unset] lg:py-[18px] lg:pt-[18px]`}
           >
             <Toolbar
@@ -86,11 +119,12 @@ const IrlMain = (props: any) => {
               onLogin={onLogin}
             />
           </div>
-          <div className="slim-scroll lg-rounded-tl-[8px] lg-rounded-tr-[8px] mb-[8px] h-[calc(100svh_-_246px)] w-[calc(100%_-_2px)] overflow-y-auto overflow-x-scroll lg:h-[calc(100vh_-_220px)] lg:overflow-x-hidden">
+          <div className={`slim-scroll lg-rounded-tl-[8px] lg-rounded-tr-[8px] mb-[8px] ${isUserLoggedIn ? "h-[calc(100svh_-_205px)] lg:h-[calc(100vh_-_161px)]": 'h-[calc(100svh_-_236px)] lg:h-[calc(100vh_-_210px)]' } w-[calc(100%_-_2px)] overflow-y-auto overflow-x-scroll lg:overflow-x-hidden`}>
             <TableHeader
               userInfo={userInfo}
               isUserLoggedIn={isUserLoggedIn}
               eventDetails={updatedEventDetails}
+              filteredList={filteredList}
             />
             <div
               className={`relative -mt-[4px] ${
@@ -98,7 +132,7 @@ const IrlMain = (props: any) => {
               } lg-rounded-[8px] bg-white shadow-sm lg:w-[calc(100%_-_2px)]`}
             >
               {isUserLoggedIn && (
-                <MemberList userInfo={userInfo} items={updatedEventDetails.guests} eventDetails={updatedEventDetails} />
+                <MemberList userInfo={userInfo} items={filteredList} eventDetails={updatedEventDetails} />
               )}
               {!isUserLoggedIn && (
                 <TeamList onLogin={onLogin} items={updatedEventDetails.guests} eventDetails={updatedEventDetails}  />

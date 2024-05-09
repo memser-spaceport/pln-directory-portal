@@ -3,17 +3,14 @@ import { useIrlDetails } from 'apps/web-app/hooks/irl/use-irl-details';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { getUserInfo } from 'apps/web-app/utils/shared.utils';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 
 const MemberList = (props: any) => {
-  const items = props?.items ?? [];
   const userInfo = props?.userInfo;
   const eventDetails = props?.eventDetails;
   const analytics = useAppAnalytics();
   const user = getUserInfo();
 
-  const [guests, setGuests] = useState(items);
-  const { filteredList } = useIrlDetails(guests, userInfo);
+  const filteredList = props?.items;
 
   const onTeamClick = (teamUid: string, teamName: string) => {
     analytics.captureEvent(
@@ -59,56 +56,10 @@ const MemberList = (props: any) => {
     );
   };
 
-  useEffect(() => {
-    const handler = (e: any) => {
-      const eventDetails = e.detail.eventDetails;
-
-      const notAvailableTeams = eventDetails?.guests.filter(
-        (item) => item.teamUid === 'cleeky1re000202tx3kex3knn'
-      );
-      const otherTeams = eventDetails?.guests.filter(
-        (item) => item.teamUid !== 'cleeky1re000202tx3kex3knn'
-      );
-
-      const sortedGuests = otherTeams.sort((a, b) =>
-        a.memberName?.localeCompare(b.memberName)
-      );
-      const sortedNotAvailableTeamGuests = notAvailableTeams.sort((a, b) =>
-        a.memberName?.localeCompare(b.memberName)
-      );
-
-      const combinedTeams = [...sortedGuests, ...sortedNotAvailableTeamGuests];
-      eventDetails.guests = combinedTeams;
-
-      const isUserGoing = eventDetails.guests.some(
-        (guest) => guest.memberUid === userInfo.uid && guest.memberUid
-      );
-
-      if (isUserGoing) {
-        const currentUser = [...combinedTeams].find(
-          (v) => v.memberUid === userInfo.uid
-        );
-        if (currentUser) {
-          // currentUser.memberName = `(You) ${currentUser.memberName}`;
-          const filteredList = [...combinedTeams].filter(
-            (v) => v.memberUid !== userInfo.uid
-          );
-          const formattedGuests = [currentUser, ...filteredList];
-          eventDetails.guests = formattedGuests;
-        }
-      }
-
-      setGuests([...eventDetails.guests]);
-    };
-    document.addEventListener('updateGuests', handler);
-    return () => {
-      document.removeEventListener('updateGuests', handler);
-    };
-  }, []);
 
   return (
     <>
-      <div className="flex flex-col pt-[8px] lg:w-full">
+      <div className="flex flex-col lg:w-full">
         {filteredList.length > 0 &&
           filteredList.map((item, itemIndex) => {
             const isUserGoing = item.memberUid === userInfo.uid;
@@ -117,7 +68,7 @@ const MemberList = (props: any) => {
                 key={`${itemIndex}-event-list`}
                 className={`${
                   isUserGoing ? 'bg-[#FFFAE6]' : ''
-                } flex w-fit border-b-[1px] border-b-[#CBD5E1] py-[12px] text-[13px] font-[400] lg:w-[100%]`}
+                } flex w-fit ${itemIndex !== filteredList?.length - 1 ? "border-b-[1px] border-b-[#CBD5E1]" : ""} py-[12px] text-[13px] font-[400] lg:w-[100%]`}
               >
                 <div className="flex w-[200px] items-center justify-start gap-[4px] pl-[20px]">
                   <Link href={`/members/${item.memberUid}`}>
