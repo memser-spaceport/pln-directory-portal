@@ -8,7 +8,7 @@ function HeaderStrip(props) {
 
   const onNavigate = () => {
     analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_HEADER_JOIN_BTN_CLICKED,
+      APP_ANALYTICS_EVENTS.IRL_INFO_STRIP_JOIN_BTN_CLICKED,
       {
         eventId: eventDetails?.id,
         eventName: eventDetails?.name,

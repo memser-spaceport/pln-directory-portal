@@ -323,13 +323,13 @@ const AddDetailsPopup = (props: any) => {
                   <div className="flex items-center justify-end gap-2">
                     <button
                       onClick={onClose}
-                      className="flex h-10 items-center justify-center rounded-[60px] border border-[#CBD5E1] px-[24px] text-sm font-[500] text-[#0F172A] shadow-sm"
+                      className="flex h-10 items-center justify-center rounded-lg border border-[#CBD5E1] px-[24px] text-sm font-[500] text-[#0F172A] shadow-sm"
                     >
                       Close
                     </button>
                     <button
                       type="submit"
-                      className="flex h-10 items-center justify-center rounded-[60px] bg-gradient-to-r from-blue-500 to-teal-400 px-[24px] text-sm font-[500] text-[#fff] shadow-sm"
+                      className="flex h-10 items-center justify-center rounded-lg px-[24px] text-sm font-[500] text-[#fff] shadow-sm border border-[#CBD5E1] bg-[#156FF7] hover:bg-[#1D4ED8]"
                     >
                       {isUserGoing ? 'Update' : 'Save'}
                     </button>

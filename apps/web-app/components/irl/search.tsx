@@ -1,12 +1,15 @@
-
 const Search = (props: any) => {
-    const onChange = props?.onChange;
-    const placeholder = props?.placeholder;
+  const onChange = props?.onChange;
+  const placeholder = props?.placeholder;
 
   return (
     <>
       <div className="search">
-        <input onChange={onChange} className="search__input" placeholder={placeholder} />
+        <input
+          onChange={onChange}
+          className="search__input"
+          placeholder={placeholder}
+        />
         <button className="search__btn">
           <img src="/assets/images/icons/search-blue.svg" alt="search" />
         </button>
@@ -46,6 +49,7 @@ const Search = (props: any) => {
           display: flex;
           align-items: center;
           justify-content: center;
+          cursor: unset;
         }
       `}</style>
     </>
