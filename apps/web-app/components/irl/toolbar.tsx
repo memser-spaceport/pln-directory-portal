@@ -35,15 +35,12 @@ const Toolbar = (props: any) => {
   };
 
   const onEditResponse = () => {
-    analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_EDIT_RESPONSE_BTN_CLICKED,
-      {
-        type: 'edit response',
-        eventId: eventDetails?.id,
-        eventName: eventDetails?.name,
-        user,
-      }
-    );
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_EDIT_RESPONSE_BTN_CLICKED, {
+      type: 'edit response',
+      eventId: eventDetails?.id,
+      eventName: eventDetails?.name,
+      user,
+    });
     document.dispatchEvent(
       new CustomEvent('openRsvpModal', {
         detail: {
@@ -79,15 +76,12 @@ const Toolbar = (props: any) => {
   useEffect(() => {
     if (searchTerm) {
       const handler = setTimeout(() => {
-        analytics.captureEvent(
-          APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_SEARCH,
-          {
-            eventId: eventDetails?.id,
-            eventName: eventDetails?.name,
-            searchTerm,
-            user,
-          }
-        );
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_SEARCH, {
+          eventId: eventDetails?.id,
+          eventName: eventDetails?.name,
+          searchTerm,
+          user,
+        });
       }, 500);
 
       return () => {
@@ -116,7 +110,7 @@ const Toolbar = (props: any) => {
               onClick={onLoginClick}
               className="mb-btn flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border-[1px] border-[#CBD5E1] bg-[#156FF7] px-[24px] py-[10px] text-[14px] font-[500]  text-[#fff] hover:bg-[#1D4ED8] lg:w-fit "
             >
-              Login to Access
+              {isPastEvent ? 'Login to Access' : 'Login to Respond'}
             </button>
           )}
           {isUserGoing && isUserLoggedIn && !isPastEvent && (

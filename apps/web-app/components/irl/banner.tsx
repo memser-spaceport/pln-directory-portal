@@ -114,10 +114,10 @@ const Banner = (props: any) => {
             <Tooltip
               content="Coming Soon"
               align='center'
+              asChild
               trigger={
                 <button
-                  disabled
-                  className="flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border border-[#CBD5E1] bg-white px-[18px] py-[10px] text-[14px] font-[500] leading-5 text-[#0F172A] lg:w-[unset] lg:px-6"
+                  className="flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border border-[#CBD5E1] bg-white px-[18px] py-[10px] text-[14px] font-[500] leading-5 text-[#0F172A] lg:w-[unset] lg:px-6 cursor-default"
                 >
                   Network Side Events
                 </button>
