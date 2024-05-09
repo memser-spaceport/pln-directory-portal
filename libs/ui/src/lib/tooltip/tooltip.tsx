@@ -5,7 +5,7 @@ export interface TooltipProps {
   triggerClassName?: string;
   content: string | React.ReactElement;
   asChild?: boolean;
-  align: "start" | "center" | "end" | undefined,
+  align?: "start" | "center" | "end" | undefined,
 }
 
 export function Tooltip({
