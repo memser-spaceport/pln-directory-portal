@@ -1,7 +1,7 @@
 'use client';
 
 import { IIrlCard } from 'apps/web-app/utils/irl.types';
-import { formatIrlEventDate } from 'apps/web-app/utils/irl.utils';
+import { formatIrlEventDate, isPastDate } from 'apps/web-app/utils/irl.utils';
 import Link from 'next/link';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
@@ -22,10 +22,10 @@ export default function IrlCard(props: IIrlCard) {
 
   //variables
   const formattedDate = formatIrlEventDate(startDate, endDate);
-  const currentDate = new Date();
-  const isPastEvent = new Date(endDate) < currentDate;
+  const isPastEvent = isPastDate(endDate);
   const analytics = useAppAnalytics();
   const user = getUserInfo();
+  const isLongName = name?.length > 25;
 
   //methods
   const onCardClick = () => {
@@ -47,8 +47,8 @@ export default function IrlCard(props: IIrlCard) {
               <img src={bannerImage} alt="IRL header" />
             </div>
             <div className="irlCard__body">
-              <div className="irlCard__body__name">{name}</div>
-              <div className="irlCard__body__desc">{description}</div>
+              <div className={`irlCard__body__name ${isLongName ? "irlCard__body__name--long" : ""}`}>{name}</div>
+              <div className={`irlCard__body__desc ${isLongName ? "irlCard__body__desc--short" : ""}`}>{description}</div>
               <div className="irlCard__body__location">
                 <img src="/assets/images/icons/location.svg" alt="location" />
                 <span>{location}</span>
@@ -72,7 +72,7 @@ export default function IrlCard(props: IIrlCard) {
                       alt="Thumbs Up"
                     />
                     <span>{`${attendees} ${
-                      isPastEvent ? 'Attended' : 'Going'
+                      isPastEvent ? 'Joined' : 'Going'
                     }`}</span>
                   </div>
                 )}
@@ -135,10 +135,13 @@ export default function IrlCard(props: IIrlCard) {
           font-size: 18px;
           line-height: 28px;
           color: #0f172a;
+        }
+
+        .irlCard__body__name--long{
           overflow: hidden;
           text-overflow: ellipsis;
           display: -webkit-box;
-          -webkit-line-clamp: 1; /* Number of lines to show */
+          -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
         }
 
@@ -150,8 +153,12 @@ export default function IrlCard(props: IIrlCard) {
           overflow: hidden;
           text-overflow: ellipsis;
           display: -webkit-box;
-          -webkit-line-clamp: 3; /* Number of lines to show */
+          -webkit-line-clamp: 3;
           -webkit-box-orient: vertical;
+        }
+
+        .irlCard__body__desc--short {
+          -webkit-line-clamp: 2;
         }
 
         .irlCard__body__location {
