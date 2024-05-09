@@ -1,3 +1,4 @@
+import { Tooltip } from '@protocol-labs-network/ui';
 import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { formatIrlEventDate } from 'apps/web-app/utils/irl.utils';
@@ -16,11 +17,11 @@ const Banner = (props: any) => {
   const user = getUserInfo();
   const eventDateRange = formatIrlEventDate(startDate, endDate);
   const isPastEvent = eventDetails?.isPastEvent;
-  const requestFormLink = process.env.IRL_PGF_FORM_URL;
+  const addEventLink = process.env.IRL_ADD_EVENT_URL;
 
   const onScheduleClick = () => {
     analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_BANNER_VIEW_SCHEDULE_BTN_CLICKED,
+      APP_ANALYTICS_EVENTS.IRL_BANNER_NETWORK_SIDE_EVENTS_BTN_CLICKED,
       {
         eventId: eventDetails?.id,
         eventName: eventDetails?.name,
@@ -44,14 +45,15 @@ const Banner = (props: any) => {
 
   const onAddScheduleClick = () => {
     analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_BANNER_ADD_SCHEDULE_BTN_CLICKED,
+      APP_ANALYTICS_EVENTS.IRL_BANNER_ADD_EVENT_BTN_CLICKED,
       {
         eventId: eventDetails?.id,
         eventName: eventDetails?.name,
+        addEventUrl: addEventLink,
         user,
       }
     );
-    window.open(requestFormLink, '_blank');
+    window.open(addEventLink, '_blank');
   };
 
   return (
@@ -102,11 +104,25 @@ const Banner = (props: any) => {
               target="_blank"
               rel="noreferrer"
               href={eventDetails?.websiteUrl}
-              className="flex h-[40px] w-[154px] items-center justify-center gap-[8px] rounded-[8px] border border-[#CBD5E1] bg-white px-[18px] py-[10px] text-[14px] font-[500] leading-5 text-[#0F172A] lg:w-[unset] lg:px-6"
+              className="flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border border-[#CBD5E1] bg-white px-[18px] py-[10px] text-[14px] font-[500] leading-5 text-[#0F172A] lg:w-[unset] lg:px-6"
               onClick={onScheduleClick}
             >
-              View Schedule
+              Network Side Events
             </a>
+          )}
+          {!eventDetails?.websiteUrl && (
+            <Tooltip
+              content="Coming Soon"
+              align='center'
+              trigger={
+                <button
+                  disabled
+                  className="flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border border-[#CBD5E1] bg-white px-[18px] py-[10px] text-[14px] font-[500] leading-5 text-[#0F172A] lg:w-[unset] lg:px-6"
+                >
+                  Network Side Events
+                </button>
+              }
+            ></Tooltip>
           )}
           {!isPastEvent && isUserLoggedIn && (
             <button

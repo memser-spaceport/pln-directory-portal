@@ -43,33 +43,33 @@ export const useIrlDetails = (rawGuestList, userInfo) => {
     }
 
     if (sortConfig.key !== null) {
-      const isUserGoing = filteredItems.some(
-        (guest) => guest.memberUid === userInfo.uid
-      );
+      // const isUserGoing = filteredItems.some(
+      //   (guest) => guest.memberUid === userInfo.uid
+      // );
 
-      if (isUserGoing) {
-        const currentUser = [...filteredItems].find(
-          (v) => v.memberUid === userInfo.uid
-        );
+      // if (isUserGoing) {
+      //   const currentUser = [...filteredItems].find(
+      //     (v) => v.memberUid === userInfo.uid
+      //   );
 
-        if (currentUser) {
-          const filteredList = [...filteredItems].filter(
-            (v) => v.memberUid !== userInfo.uid
-          );
-          //sort the remaining guests
-          const formattedGuests = filteredList.sort((a, b) => {
-            const valueA = a[sortConfig.key];
-            const valueB = b[sortConfig.key];
-            return sortConfig.order === 'asc'
-              ? valueA.localeCompare(valueB)
-              : valueB.localeCompare(valueA);
-          });
+      //   if (currentUser) {
+      //     const filteredList = [...filteredItems].filter(
+      //       (v) => v.memberUid !== userInfo.uid
+      //     );
+      //     //sort the remaining guests
+      //     const formattedGuests = filteredList.sort((a, b) => {
+      //       const valueA = a[sortConfig.key];
+      //       const valueB = b[sortConfig.key];
+      //       return sortConfig.order === 'asc'
+      //         ? valueA.localeCompare(valueB)
+      //         : valueB.localeCompare(valueA);
+      //     });
 
-          const sortedGuests = [currentUser, ...formattedGuests];
+      //     const sortedGuests = [currentUser, ...formattedGuests];
 
-          setFilteredList([...sortedGuests]);
-        }
-      } else {
+      //     setFilteredList([...sortedGuests]);
+      //   }
+      // } else {
         const sortedData = [...filteredItems].sort((a, b) => {
           const valueA = a[sortConfig.key];
           const valueB = b[sortConfig.key];
@@ -79,7 +79,7 @@ export const useIrlDetails = (rawGuestList, userInfo) => {
             : valueB?.localeCompare(valueA);
         });
         setFilteredList([...sortedData]);
-      }
+      // }
     } else {
       setFilteredList([...filteredItems]);
     }
