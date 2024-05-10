@@ -93,7 +93,7 @@ export function MobileMenu() {
       </ul>
       <style jsx>
         {`
-          @media (max-width: 375px) {
+          @media (max-width: 390px) {
             .mb-text {
               font-size: 8px;
             }
