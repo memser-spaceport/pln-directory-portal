@@ -10,6 +10,7 @@ const Toolbar = (props: any) => {
   const isUserLoggedIn = props?.isUserLoggedIn;
   const isUserGoing = props?.isUserGoing;
   const isPastEvent = eventDetails?.isPastEvent;
+  const filteredList = props?.filteredList;
   const [searchTerm, setSearchTerm] = useState('');
   const analytics = useAppAnalytics();
   const user = getUserInfo();
@@ -68,9 +69,23 @@ const Toolbar = (props: any) => {
       {
         eventId: eventDetails?.id,
         eventName: eventDetails?.name,
+        isPastEvent,
       }
     );
     onLogin();
+  };
+
+  const onTelegramLinkClick = () => {
+    analytics.captureEvent(
+      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TELEGRAM_BTN_CLICKED,
+      {
+        eventId: eventDetails?.id,
+        eventName: eventDetails?.name,
+        telegramUrl: eventDetails?.telegram,
+        isPastEvent,
+        user,
+      }
+    );
   };
 
   useEffect(() => {
@@ -95,8 +110,26 @@ const Toolbar = (props: any) => {
       <div className="lg:flex-wrap-[unset] lg:justify-between-[unset] flex flex-wrap items-center justify-between gap-y-2 lg:items-center">
         <span className="w-auto text-[18px] font-[700] lg:text-[20px]">
           Attendees
+          <span className="text-[14px] font-[400]"> ({filteredList.length})</span>
         </span>
         <div className="flex w-auto justify-end gap-[8px] lg:order-3 lg:flex-1">
+          {eventDetails?.telegram && (
+            <a
+              href={eventDetails?.telegram}
+              target="_blank"
+              onClick={onTelegramLinkClick}
+              className="flex items-center h-10 gap-1 rounded-lg border border-[#CBD5E1] bg-white py-[6px] px-[12px] text-[14px] font-[500] lg:px-[24px]"
+            >
+              <img
+                width={21}
+                height={21}
+                src="/assets/images/icons/telegram-contact-logo.svg"
+                alt="telegram"
+              />
+              {/* {eventDetails.type !== "INVITE_ONLY" && <p>Telegram</p>} */}
+              <p className="hidden lg:block">Telegram</p>
+            </a>
+          )}
           {!isUserGoing && isUserLoggedIn && !isPastEvent && (
             <button
               onClick={onIAmGoingClick}

@@ -21,23 +21,12 @@ const Banner = (props: any) => {
 
   const onScheduleClick = () => {
     analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_BANNER_NETWORK_SIDE_EVENTS_BTN_CLICKED,
+      APP_ANALYTICS_EVENTS.IRL_BANNER_VIEW_SCHEDULE_BTN_CLICKED,
       {
         eventId: eventDetails?.id,
         eventName: eventDetails?.name,
+        isPastEvent,
         schedulePageUrl: eventDetails?.websiteUrl,
-        user,
-      }
-    );
-  };
-
-  const onTelegramLinkClick = () => {
-    analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_BANNER_TELEGRAM_BTN_CLICKED,
-      {
-        eventId: eventDetails?.id,
-        eventName: eventDetails?.name,
-        telegramUrl: eventDetails?.telegram,
         user,
       }
     );
@@ -50,6 +39,7 @@ const Banner = (props: any) => {
         eventId: eventDetails?.id,
         eventName: eventDetails?.name,
         addEventUrl: addEventLink,
+        isPastEvent,
         user,
       }
     );
@@ -68,21 +58,6 @@ const Banner = (props: any) => {
         <div className="mt-[12px] flex flex-col items-start justify-between gap-1 lg:mt-[24px] lg:flex-row lg:items-center">
           <p className="text-[24px] font-[700]">{name}</p>
           <div className="flex gap-[8px]">
-            {eventDetails?.telegram && (
-              <a
-                href={eventDetails?.telegram}
-                target="_blank"
-                onClick={onTelegramLinkClick}
-                className="flex items-center gap-1 rounded-[24px] bg-[#F1F5F9] py-[6px] px-[12px] text-[12px] font-[500] text-[#475569] lg:order-2"
-              >
-                <img
-                  src="/assets/images/icons/telegram-contact-logo.svg"
-                  alt="telegram"
-                />
-                {/* {eventDetails.type !== "INVITE_ONLY" && <p>Telegram</p>} */}
-                <p>Telegram</p>
-              </a>
-            )}
             <div className="flex items-center gap-1 rounded-[24px] bg-[#F1F5F9] py-[6px] px-[12px] text-[12px] font-[500] text-[#475569] lg:order-1">
               <img src="/assets/images/icons/flat_calendar.svg" />
               <p>{eventDateRange}</p>
@@ -93,13 +68,11 @@ const Banner = (props: any) => {
             </div>} */}
           </div>
         </div>
-        <p className="mt-[10px] text-[15px] font-[400] leading-6 text-[#0F172A]">
-          {description}
-        </p>
+        <div className="mt-[10px] text-[15px] font-[400] leading-6 text-[#0F172A]" dangerouslySetInnerHTML={{__html:description}}></div>
       </div>
-      <div className="border-t border-[#E2E8F0] pt-5">
-        <div className="flex items-center gap-3">
-          {eventDetails?.websiteUrl && (
+      {eventDetails?.websiteUrl && (
+        <div className="border-t border-[#E2E8F0] pt-5">
+          <div className="flex items-center gap-3">
             <a
               target="_blank"
               rel="noreferrer"
@@ -107,10 +80,10 @@ const Banner = (props: any) => {
               className="flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border border-[#CBD5E1] bg-white px-[18px] py-[10px] text-[14px] font-[500] leading-5 text-[#0F172A] lg:w-[unset] lg:px-6"
               onClick={onScheduleClick}
             >
-              Network Side Events
+              View Schedule
             </a>
-          )}
-          {!eventDetails?.websiteUrl && (
+
+            {/* {!eventDetails?.websiteUrl && (
             <Tooltip
               content="Coming Soon"
               align='center'
@@ -123,8 +96,8 @@ const Banner = (props: any) => {
                 </button>
               }
             ></Tooltip>
-          )}
-          {!isPastEvent && isUserLoggedIn && (
+          )} */}
+            {/* {!isPastEvent && isUserLoggedIn && (
             <button
               onClick={onAddScheduleClick}
               className=" flex h-10 w-[154px] items-center justify-center gap-2 rounded-lg border border-[#CBD5E1] bg-white py-[10px] text-[14px] font-[500] leading-5 text-[#0F172A] lg:w-[unset] lg:px-6"
@@ -132,9 +105,10 @@ const Banner = (props: any) => {
               <img src="/assets/images/icons/plus-black.svg" alt="add" />
               Add Event
             </button>
-          )}
+          )} */}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

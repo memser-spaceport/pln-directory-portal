@@ -34,7 +34,8 @@ export default function IrlCard(props: IIrlCard) {
       name: name,
       slugUrl: slugUrl,
       isInviteOnly: isInviteOnly,
-      user: user
+      user: user,
+      isPastEvent
     });
   };
 
@@ -48,7 +49,7 @@ export default function IrlCard(props: IIrlCard) {
             </div>
             <div className="irlCard__body">
               <div className={`irlCard__body__name ${isLongName ? "irlCard__body__name--long" : ""}`}>{name}</div>
-              <div className={`irlCard__body__desc ${isLongName ? "irlCard__body__desc--short" : ""}`}>{description}</div>
+              <div className={`irlCard__body__desc ${isLongName ? "irlCard__body__desc--short" : ""}`} dangerouslySetInnerHTML={{__html:description}}></div>
               <div className="irlCard__body__location">
                 <img src="/assets/images/icons/location.svg" alt="location" />
                 <span>{location}</span>

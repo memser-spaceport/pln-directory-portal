@@ -40,6 +40,7 @@ export const useIrlDetails = (rawGuestList, userInfo) => {
       filteredItems = [...rawGuest].filter((v) =>
         v.memberName.toLowerCase().includes(searchItem.toLowerCase())
       );
+      filteredItems = filteredItems.sort((a, b) => a?.memberName.localeCompare(b?.memberName))
     }
 
     if (sortConfig.key !== null) {

@@ -271,8 +271,8 @@ export const APP_ANALYTICS_EVENTS = {
   IRL_GATHERING_CARD_CLICKED: 'irl_gathering_card_clicked',
 
   IRL_NAVBAR_BACK_BTN_CLICKED:"irl-navbar-back-btn-clicked",
-  IRL_BANNER_TELEGRAM_BTN_CLICKED:'irl-banner-telegram-btn-clicked',
-  IRL_BANNER_NETWORK_SIDE_EVENTS_BTN_CLICKED:"irl-banner-network-side-events-btn-clicked",
+  IRL_GUEST_LIST_TELEGRAM_BTN_CLICKED:'irl-guest-list-telegram-btn-clicked',
+  IRL_BANNER_VIEW_SCHEDULE_BTN_CLICKED:"irl-banner-view-schedule-btn-clicked",
   IRL_BANNER_ADD_EVENT_BTN_CLICKED:"irl-banner-add-event-btn-clicked",
   IRL_JOIN_EVENT_STRIP_LOGIN_BTN_CLICKED:"irl-join-event-strip-login-btn-clicked",
   IRL_JOIN_EVENT_STRIP_IAM_GOING_BTN_CLICKED:"irl-join-event-strip-iam-going-btn-clicked",

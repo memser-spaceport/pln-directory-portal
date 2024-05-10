@@ -298,7 +298,7 @@ const AddDetailsPopup = (props: any) => {
                     </div>
                     <div className="flex flex-col gap-3">
                       <h6 className="text-sm font-semibold text-[#0F172A]">
-                        What are you hoping to get out of this event?
+                      Topics you are interested in & why?
                       </h6>
                       <textarea
                         maxLength={100}
