@@ -4,13 +4,17 @@ export const formatIrlEventDate = (startDate, endDate) => {
 
   const startMonth = startDateTime.toLocaleString('default', {
     month: 'short',
+    timeZone: 'UTC',
   });
-  const startDay = startDateTime.getDate();
-  const startYear = startDateTime.getFullYear();
+  const startDay = startDateTime.getUTCDate();
+  const startYear = startDateTime.getUTCFullYear();
 
-  const endMonth = endDateTime.toLocaleString('default', { month: 'short' });
-  const endDay = endDateTime.getDate();
-  const endYear = endDateTime.getFullYear();
+  const endMonth = endDateTime.toLocaleString('default', {
+    month: 'short',
+    timeZone: 'UTC',
+  });
+  const endDay = endDateTime.getUTCDate();
+  const endYear = endDateTime.getUTCFullYear();
 
   let formattedDateRange = '';
 
