@@ -15,6 +15,7 @@ export class LogException extends BaseExceptionFilter {
   async catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse();
+    console.log("global exception filter",exception)
 
     if (exception instanceof PrismaClientKnownRequestError) {
       // Handle Prisma errors
