@@ -404,6 +404,14 @@ export const ANNOUNCEMENT_BANNER = {
 
 export const ChangeLogList = [
   {
+    title: 'Version 2.0.8 - Introducing Landing Page for IRL Gatherings',
+    tag: 'Improvements',
+    date: '10, May 2024',
+    shortContent: `<p style="font-size: 16px; line-height:24px;">
+    We're excited to unveil our new landing page dedicated to IRL Gatherings! Our new landing page serves as a one-stop destination for all upcoming IRL gatherings hosted within our network. Network members can easily navigate through a curated list of events, each accompanied by detailed information and RSVP options.
+    </p>`,
+  },
+  {
     title: "Version 2.0.7 - Enhancements to Project module & Member Search",
     tag: 'Improvements',
     date: '30, Apr 2024',
