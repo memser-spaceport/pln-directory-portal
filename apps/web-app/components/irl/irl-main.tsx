@@ -117,6 +117,7 @@ const IrlMain = (props: any) => {
               isUserGoing={isUserGoing}
               isUserLoggedIn={isUserLoggedIn}
               onLogin={onLogin}
+              filteredList={filteredList}
             />
           </div>
           <div className={`slim-scroll lg-rounded-tl-[8px] lg-rounded-tr-[8px] mb-[8px] ${isUserLoggedIn ? "h-[calc(100svh_-_205px)] lg:h-[calc(100vh_-_161px)]": 'h-[calc(100svh_-_236px)] lg:h-[calc(100vh_-_210px)]' } w-[calc(100%_-_2px)] overflow-y-auto overflow-x-scroll lg:overflow-x-hidden`}>

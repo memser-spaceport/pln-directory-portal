@@ -7,7 +7,6 @@ const TableHeader = (props: any) => {
   const isUserLoggedIn = props.isUserLoggedIn ?? false;
   const eventDetails = props?.eventDetails;
   // const guests = eventDetails?.guests;
-  const filteredList = props?.filteredList;
   const analytics = useAppAnalytics();
   const user = getUserInfo();
 
@@ -63,15 +62,15 @@ const TableHeader = (props: any) => {
                 }
                 alt="sort"
               />
-              {` Attendee Name (${filteredList.length})`}
+              Attendee Name
             </div>
           </div>
           <div className="flex w-[200px] items-center justify-start">Team</div>
           <div className="flex w-[150px] items-center justify-start">
             Telegram
           </div>
-          <div className="flex w-[340px] items-center justify-start pr-[20px]">
-            Topics are you interested in connecting on? Why?
+          <div className="flex w-[330px] items-center justify-start pr-[20px]">
+            Topics you are interested in & why?
           </div>
         </div>
       )}
@@ -81,20 +80,20 @@ const TableHeader = (props: any) => {
             Team
           </div>
           <div className="flex w-[200px] items-center justify-start">
-            {` Attendee Name (${filteredList.length})`}
+            Attendee Name
           </div>
           <div className="flex w-[150px] items-center justify-start">
             Telegram
           </div>
-          <div className="flex w-[340px] items-center justify-start pr-[20px]">
-            Topics are you interested in connecting on? Why?
+          <div className="flex w-[330px] items-center justify-start pr-[20px]">
+            Topics you are interested in & why?
           </div>
         </div>
       )}
       {!isUserLoggedIn && (
         <div className="hideInDesktop sticky top-0  z-[2] flex h-[42px] w-[calc(100%_-_2px)] items-center justify-between rounded-tl-[8px] rounded-tr-[8px] border-b-[1px] border-b-[#64748B] bg-white px-5 text-[13px] font-[600] shadow-sm">
           <div className="flex w-[200px] items-center justify-start">Team</div>
-          <div className="text-[13px] font-[400] leading-6 text-[#0F172A]">{`${filteredList.length} Attendees`}</div>
+          {/* <div className="text-[13px] font-[400] leading-6 text-[#0F172A]">{`${filteredList.length} Attendees`}</div> */}
         </div>
       )}
       <style jsx>
