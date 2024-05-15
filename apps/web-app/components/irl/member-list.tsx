@@ -56,7 +56,6 @@ const MemberList = (props: any) => {
     );
   };
 
-
   return (
     <>
       <div className="flex flex-col lg:w-full">
@@ -66,9 +65,11 @@ const MemberList = (props: any) => {
             return (
               <div
                 key={`${itemIndex}-event-list`}
-                className={`${
-                  isUserGoing ? 'bg-[#FFFAE6]' : ''
-                } flex w-fit ${itemIndex !== filteredList?.length - 1 ? "border-b-[1px] border-b-[#CBD5E1]" : ""} py-[12px] text-[13px] font-[400] lg:w-[100%]`}
+                className={`${isUserGoing ? 'bg-[#FFFAE6]' : ''} flex w-fit ${
+                  itemIndex !== filteredList?.length - 1
+                    ? 'border-b-[1px] border-b-[#CBD5E1]'
+                    : ''
+                } py-[12px] text-[13px] font-[400] lg:w-[100%]`}
               >
                 <div className="flex w-[200px] items-center justify-start gap-[4px] pl-[20px]">
                   <Link href={`/members/${item.memberUid}`}>
@@ -146,7 +147,12 @@ const MemberList = (props: any) => {
                   </Link>
                 </div>
                 <div className="flex w-[330px] items-center justify-start pr-[20px]">
-                  <p className="break-words">{item.reason}</p>
+                  <p
+                    style={{ wordBreak: 'break-word' }}
+                    className="break-words"
+                  >
+                    {item.reason}
+                  </p>
                 </div>
               </div>
             );

@@ -32,7 +32,7 @@ export default function IrlDetails({
 
   return (
     <>
-          <NextSeo
+      <NextSeo
         {...IRL_SEO}
         title={eventDetails.name}
         description={eventDetails.description}
@@ -42,18 +42,28 @@ export default function IrlDetails({
           <div className="h-9 w-full lg:h-[unset] lg:pb-2">
             <Navbar eventDetails={eventDetails} />
           </div>
-          <div className="w-[calc(100%_-_2px)] bg-white lg:rounded-[8px] mb-[2px] shadow-md">
-            <Banner eventDetails={eventDetails} isUserLoggedIn={isUserLoggedIn} />
+          <div className="mb-[2px] w-[calc(100%_-_2px)] bg-white shadow-md lg:rounded-[8px]">
+            <Banner
+              eventDetails={eventDetails}
+              isUserLoggedIn={isUserLoggedIn}
+            />
           </div>
-          {!isUserLoggedIn && !eventDetails?.isPastEvent && ( 
+          {!isUserLoggedIn && !eventDetails?.isPastEvent && (
             <div className="sticky top-[40px] mt-[0px] w-full lg:top-[83px] lg:mt-[16px]">
-              <HeaderStrip eventDetails={eventDetails}/>
+              <HeaderStrip eventDetails={eventDetails} />
             </div>
           )}
-         <IrlMain eventDetails={eventDetails} onLogin={onLogin} userInfo={userInfo} isUserGoing={isUserGoing} isUserLoggedIn={isUserLoggedIn} teams={teams}/>
+          <IrlMain
+            eventDetails={eventDetails}
+            onLogin={onLogin}
+            userInfo={userInfo}
+            isUserGoing={isUserGoing}
+            isUserLoggedIn={isUserLoggedIn}
+            teams={teams}
+          />
         </div>
         <div>
-          <ScrollToTop pageName='Irl Detail'/>
+          <ScrollToTop pageName="Irl Detail" />
         </div>
       </div>
     </>
@@ -78,6 +88,46 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
   const isUserLoggedIn = cookies?.authToken && cookies?.userInfo;
   const authToken = parseCookie(cookies?.authToken);
+  const eventDetails = await getEventDetailBySlug(slug, authToken);
+  const type = eventDetails?.type;
+
+  //sorted by guests createdAt
+  const sortedGuests = eventDetails?.guests?.sort(
+    (a, b) => new Date(b?.createdAt)?.getTime() - new Date(a?.createdAt)?.getTime()
+  );
+
+  //has current user is going for an event
+  const isUserGoing = sortedGuests?.some(
+    (guest) => guest.memberUid === userInfo?.uid && guest?.memberUid
+  );
+
+  if (isUserGoing) {
+    const currentUser = [...sortedGuests]?.find(
+      (v) => v.memberUid === userInfo?.uid
+    );
+    if (currentUser) {
+      const filteredList = [...sortedGuests].filter(
+        (v) => v.memberUid !== userInfo?.uid
+      );
+      const formattedGuests = [currentUser, ...filteredList];
+      eventDetails.guests = formattedGuests;
+    }
+  }
+
+  if (type === 'INVITE_ONLY' && (!isUserLoggedIn || !isUserGoing)) {
+    return {
+      redirect: {
+        permanent: true,
+        destination: '/irl',
+      },
+    };
+  }
+
+  if (eventDetails.errorCode === 404) {
+    return {
+      notFound: true,
+    };
+  }
 
   if (isUserLoggedIn) {
     const { uid } = userInfo;
@@ -96,49 +146,6 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
           logo: team?.logo?.url,
         };
       });
-    }
-  }
-
-  const eventDetails = await getEventDetailBySlug(slug, authToken);
-
-  if (eventDetails.errorCode === 404) {
-    return {
-      notFound: true,
-    };
-  }
-
-  const notAvailableTeams = eventDetails?.guests?.filter(
-    (item) => item.teamUid === 'cleeky1re000202tx3kex3knn'
-  );
-  const otherTeams = eventDetails?.guests?.filter(
-    (item) => item.teamUid !== 'cleeky1re000202tx3kex3knn'
-  );
-
-  const sortedGuests = otherTeams?.sort((a, b) =>
-    a.memberName?.localeCompare(b.memberName)
-  );
-  const sortedNotAvailableTeamGuests = notAvailableTeams?.sort((a, b) =>
-    a.memberName?.localeCompare(b?.memberName)
-  );
-
-  const combinedTeams = [...sortedGuests, ...sortedNotAvailableTeamGuests];
-  eventDetails.guests = combinedTeams;
-
-  const isUserGoing = combinedTeams?.some(
-    (guest) => guest.memberUid === userInfo?.uid && guest?.memberUid
-  );
-
-  if (isUserGoing) {
-    const currentUser = [...combinedTeams]?.find(
-      (v) => v.memberUid === userInfo?.uid
-    );
-    if (currentUser) {
-      // currentUser.memberName = `(You) ${currentUser.memberName}`;
-      const filteredList = [...combinedTeams].filter(
-        (v) => v.memberUid !== userInfo?.uid
-      );
-      const formattedGuests = [currentUser, ...filteredList];
-      eventDetails.guests = formattedGuests;
     }
   }
 

@@ -76,6 +76,7 @@ export const getEventDetailBySlug = async (slug, token) => {
     startDate: output?.startDate,
     endDate: output?.endDate,
     isPastEvent,
+    resources:output?.resources,
     guests: output?.eventGuests?.map((guest: any) => {
       return {
         uid: guest?.uid,
@@ -87,6 +88,7 @@ export const getEventDetailBySlug = async (slug, token) => {
         memberLogo: guest?.member?.image?.url,
         reason: guest?.reason,
         telegramId: guest?.telegramId,
+        createdAt:guest?.createdAt
       };
     }),
   };
