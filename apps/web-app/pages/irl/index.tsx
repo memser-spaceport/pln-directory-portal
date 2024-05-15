@@ -9,16 +9,16 @@ import { destroyCookie } from 'nookies';
 import { ReactElement } from 'react';
 import styles from './index.module.css';
 import IrlHeader from 'apps/web-app/components/irl/irl-list/irl-header';
-import { getAllEvents } from 'apps/web-app/services/irl.service';
+import { getAllEvents, getUserEvents } from 'apps/web-app/services/irl.service';
 import IrlList from 'apps/web-app/components/irl/irl-list/irl-list';
 import { NextSeo } from 'next-seo';
 import { IRL_SEO } from 'apps/web-app/seo.config';
+import { parseCookie } from 'apps/web-app/utils/shared.utils';
 
 export default function Irl({
-  isUserLoggedIn,
-  userInfo,
   conference,
   error,
+  userEvents
 }) {
   if (error) {
     return;
@@ -34,7 +34,7 @@ export default function Irl({
         <IrlHeader />
       </div>
       <div className={styles.irl__conferences}>
-        <IrlList conference={conference}/>
+        <IrlList conference={conference} userEvents={userEvents}/>
       </div>
     </section>
     </>
@@ -49,6 +49,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
   const { req } = ctx;
   let cookies = req?.cookies;
   let conference = [];
+  let userEvents = null;
   let error = false;
   if (!cookies?.authToken) {
     await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
@@ -58,11 +59,18 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
   destroyCookie(null, 'state');
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
   const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
+  const authToken = parseCookie(cookies?.authToken);
   const events = await getAllEvents();
   if (events.errorCode) {
     error = true;
   } else {
     conference = events;
+  }
+  if(isUserLoggedIn){
+    userEvents = await getUserEvents(authToken);
+    if(!userEvents?.errorCode){
+      userEvents.map(event=>event.uid);
+    }
   }
 
   return {
@@ -71,6 +79,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
       userInfo: userInfo,
       conference: conference,
       error: error,
+      userEvents: userEvents
     },
   };
 };
