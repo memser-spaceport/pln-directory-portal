@@ -122,7 +122,7 @@ export const getUserEvents = async (token) => {
     );
     return response?.data;
   } catch (err) {
-    if (e.response?.status) {
+    if (err.response?.status) {
       return {
         errorCode: 404,
       };
