@@ -6,11 +6,9 @@ import { useState } from 'react';
 const TableHeader = (props: any) => {
   const isUserLoggedIn = props.isUserLoggedIn ?? false;
   const eventDetails = props?.eventDetails;
-  // const guests = eventDetails?.guests;
   const analytics = useAppAnalytics();
   const user = getUserInfo();
-
-  const [sortConfig, setSortConfig] = useState({ key: null, order: null });
+  const sortConfig = props?.sortConfig;
 
   const onSort = (key) => {
     analytics.captureEvent(
@@ -22,17 +20,6 @@ const TableHeader = (props: any) => {
         user,
       }
     );
-
-    setSortConfig((old) => {
-      if (old.key === key) {
-        if (old.order === 'asc') {
-          return { key: old.key, order: 'desc' };
-        }
-        return { key: old.key, order: 'asc' };
-      } else {
-        return { key, order: 'desc' };
-      }
-    });
 
     document.dispatchEvent(
       new CustomEvent('irl-details-sortlist', {
@@ -70,7 +57,7 @@ const TableHeader = (props: any) => {
             Telegram
           </div>
           <div className="flex w-[330px] items-center justify-start pr-[20px]">
-            Topics you are interested in & why?
+            Topics you are interested in?
           </div>
         </div>
       )}
@@ -86,7 +73,7 @@ const TableHeader = (props: any) => {
             Telegram
           </div>
           <div className="flex w-[330px] items-center justify-start pr-[20px]">
-            Topics you are interested in & why?
+            Topics you are interested in?
           </div>
         </div>
       )}
