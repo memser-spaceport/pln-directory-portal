@@ -55,7 +55,8 @@ export class PLEventsService {
                 name: true,
                 logo: true
               }
-            } 
+            } ,
+            createdAt: true
           }:
           {
             teamUid: true,
@@ -64,7 +65,8 @@ export class PLEventsService {
                 name: true,
                 logo: true
               }
-            }
+            },
+            createdAt: true
           }
         }
       }
