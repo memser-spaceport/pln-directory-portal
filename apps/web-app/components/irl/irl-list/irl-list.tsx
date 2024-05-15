@@ -40,7 +40,7 @@ export default function IrlList(props: IIrlList) {
       restrictedReason=INVITE_ONLY_RESTRICTION_ERRORS.NOT_LOGGED_IN;
       setRestrictionReason(INVITE_ONLY_RESTRICTION_ERRORS.NOT_LOGGED_IN);
       setIsPopupOpen(true);
-    } else if (isInviteOnly && userEvents.includes(item.id)) {
+    } else if (isInviteOnly && !userEvents.includes(item.id)) {
       event.preventDefault();
       restrictedReason=INVITE_ONLY_RESTRICTION_ERRORS.NOT_LOGGED_IN;
       setRestrictionReason(INVITE_ONLY_RESTRICTION_ERRORS.UNAUTHORIZED);
