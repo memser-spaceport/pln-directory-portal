@@ -5,10 +5,10 @@ export const getAllEvents = async () => {
   try {
     const response = await api.get(
       `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/irl/events?orderBy=-startDate`
-    ); 
+    );
 
     if (response.status === 200) {
-      const events = response?.data?.map((event:any)=>{
+      const events = response?.data?.map((event: any) => {
         return {
           id: event?.uid,
           name: event?.name,
@@ -20,10 +20,10 @@ export const getAllEvents = async () => {
           endDate: event?.endDate,
           createdAt: event?.createdAt,
           type: event?.type,
-          attendees: event?.eventGuests?.length
-        }
+          attendees: event?.eventGuests?.length,
+        };
       });
-      
+
       return events;
     } else {
       throw new Error(`Unexpected status code: ${response.status}`);
@@ -31,7 +31,10 @@ export const getAllEvents = async () => {
   } catch (error) {
     if (error.response) {
       const { status, data } = error.response;
-      return { errorCode: status, errorMessage: data.message || 'Something went wrong!' };
+      return {
+        errorCode: status,
+        errorMessage: data.message || 'Something went wrong!',
+      };
     } else {
       return { errorCode: 500, errorMessage: 'Something went wrong' };
     }
@@ -44,23 +47,21 @@ export const getEventDetailBySlug = async (slug, token) => {
     result = await api.get(
       `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/irl/events/${slug}`,
       { headers: { Authorization: `Bearer ${token}` } }
-    );  
+    );
   } catch (e) {
-    if(e.response?.status) {
+    if (e.response?.status) {
       return {
-        errorCode: 404
-      }
+        errorCode: 404,
+      };
     } else {
       return {
-        errorCode: 500
-      }
+        errorCode: 500,
+      };
     }
-   
   }
 
   const output = result.data;
   const isPastEvent = isPastDate(output?.endDate);
-  
 
   return {
     id: output?.uid,
@@ -70,10 +71,10 @@ export const getEventDetailBySlug = async (slug, token) => {
     eventCount: output?.eventsCount,
     description: output?.description,
     websiteUrl: output?.websiteURL,
-    telegram:output?.telegramId,
-    type:output?.type,
-    startDate:output?.startDate,
-    endDate:output?.endDate,
+    telegram: output?.telegramId,
+    type: output?.type,
+    startDate: output?.startDate,
+    endDate: output?.endDate,
     isPastEvent,
     guests: output?.eventGuests?.map((guest: any) => {
       return {
@@ -107,4 +108,28 @@ export const editEventGuest = async (slug, uid, payload) => {
   );
 
   return result;
+};
+
+export const getUserEvents = async (token) => {
+  try {
+    const response = await api.get(
+      `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/irl/me/events`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return response?.data;
+  } catch (err) {
+    if (e.response?.status) {
+      return {
+        errorCode: 404,
+      };
+    } else {
+      return {
+        errorCode: 500,
+      };
+    }
+  }
 };

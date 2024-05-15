@@ -528,3 +528,8 @@ export const FOCUS_AREAS_FILTER_KEYS = {
   projects: "projectAncestorFocusAreas",
   teams: "teamAncestorFocusAreas"
 }
+
+export const INVITE_ONLY_RESTRICTION_ERRORS = {
+  NOT_LOGGED_IN: "not_logged_in",
+  UNAUTHORIZED: "unauthorized",
+}
