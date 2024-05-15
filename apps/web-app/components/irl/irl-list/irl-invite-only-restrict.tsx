@@ -61,13 +61,13 @@ export function IrlInviteOnlyRestrict(props: IIrlInviteOnlyRestrict) {
                     onClick={handleModalClose}
                   />
                   <Dialog.Title as="h2" className="text-2xl font-bold">
-                    <p className="">
+                    {isOpen && <p className="">
                       {isUnauthorized ? 'Access Restricted' : 'Login to view'}
-                    </p>
+                    </p>}
                   </Dialog.Title>
                   {
                     <>
-                      {isUnauthorized ? (
+                      {isOpen && <div> {isUnauthorized ? (
                         <div className="mt-5 py-2 px-3 flex items-center gap-[10px] rounded-[4px] bg-[#DD2C5A] bg-opacity-10 text-[#0F172A]">
                           <img
                             src="/assets/images/icons/info-red.svg"
@@ -81,7 +81,7 @@ export function IrlInviteOnlyRestrict(props: IIrlInviteOnlyRestrict) {
                         <p className="mt-[20px]">
                           Please login to access this event.
                         </p>
-                      )}
+                      )}</div>}
 
                       <div className="mt-4 w-full md:float-right md:w-auto ">
                         <button

@@ -69,7 +69,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
   if(isUserLoggedIn){
     userEvents = await getUserEvents(authToken);
     if(!userEvents?.errorCode){
-      userEvents.map(event=>event.uid);
+      userEvents = userEvents.map(event=>event.uid);
     }
   }
 

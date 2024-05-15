@@ -25,6 +25,7 @@ export default function IrlList(props: IIrlList) {
 
   //variable
   const [restrictionReason, setRestrictionReason] = useState<string>('');
+  const [isPopupOpen, setIsPopupOpen] = useState<boolean>(false);
   const analytics = useAppAnalytics();
   const user = getUserInfo();
 
@@ -38,10 +39,12 @@ export default function IrlList(props: IIrlList) {
       event.preventDefault();
       restrictedReason=INVITE_ONLY_RESTRICTION_ERRORS.NOT_LOGGED_IN;
       setRestrictionReason(INVITE_ONLY_RESTRICTION_ERRORS.NOT_LOGGED_IN);
-    } else if (isInviteOnly && !userEvents.includes(item.id)) {
+      setIsPopupOpen(true);
+    } else if (isInviteOnly && userEvents.includes(item.id)) {
       event.preventDefault();
       restrictedReason=INVITE_ONLY_RESTRICTION_ERRORS.NOT_LOGGED_IN;
       setRestrictionReason(INVITE_ONLY_RESTRICTION_ERRORS.UNAUTHORIZED);
+      setIsPopupOpen(true);
     }
     
     analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_GATHERING_CARD_CLICKED, {
@@ -54,6 +57,11 @@ export default function IrlList(props: IIrlList) {
       restrictedReason
     });
   };
+
+  const onPopupClose = () => {
+    setIsPopupOpen(false);
+    setRestrictionReason('');
+  }
 
   return (
     <>
@@ -73,9 +81,9 @@ export default function IrlList(props: IIrlList) {
 
       <div className="">
         <IrlInviteOnlyRestrict
-          isOpen={restrictionReason !== ''}
+          isOpen={isPopupOpen}
           restrictionReason={restrictionReason}
-          onClose={() => setRestrictionReason('')}
+          onClose={onPopupClose}
         />
       </div>
 
