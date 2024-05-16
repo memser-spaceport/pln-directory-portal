@@ -225,7 +225,7 @@ const AddDetailsPopup = (props: any) => {
       const data = {
         teamUid: registeredGuest.teamUid,
         telegramId: registeredGuest.telegramId,
-        reason: registeredGuest.reason?.trim(),
+        reason: registeredGuest.reason ? registeredGuest.reason.trim() : '' ,
       };
       setFormValues(data);
     }

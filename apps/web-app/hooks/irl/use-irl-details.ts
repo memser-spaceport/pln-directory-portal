@@ -1,3 +1,4 @@
+import { sortByDefault } from 'apps/web-app/utils/irl.utils';
 import { useEffect, useState } from 'react';
 
 export const useIrlDetails = (rawGuestList, userInfo) => {
@@ -60,12 +61,13 @@ export const useIrlDetails = (rawGuestList, userInfo) => {
         });
         setFilteredList([...sortedData]);
       } else {
+
+        const sortedGuests = sortByDefault(filteredItems);
+        filteredItems = sortedGuests;
+
         const isUserGoing = filteredItems.some(
           (guest) => guest.memberUid === userInfo.uid
         );
-
-        //sorted by guests createdAt
-        const sortedGuests = filteredItems.sort((a, b) => new Date(b?.createdAt)?.getTime() - new Date(a?.createdAt)?.getTime());
 
         if (isUserGoing) {
           const currentUser = [...sortedGuests]?.find(

@@ -4,9 +4,11 @@ import HeaderStrip from 'apps/web-app/components/irl/header-strip';
 import IrlMain from 'apps/web-app/components/irl/irl-main';
 import Navbar from 'apps/web-app/components/irl/navbar';
 import ScrollToTop from 'apps/web-app/components/shared/scroll-to-top';
+import { ADMIN_ROLE } from 'apps/web-app/constants';
 import { DirectoryLayout } from 'apps/web-app/layouts/directory-layout';
 import { IRL_SEO } from 'apps/web-app/seo.config';
 import { getEventDetailBySlug } from 'apps/web-app/services/irl.service';
+import { sortByDefault } from 'apps/web-app/utils/irl.utils';
 import {
   authenticate,
   convertCookiesToJson,
@@ -86,27 +88,26 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
       cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
   }
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
-  const isUserLoggedIn = cookies?.authToken && cookies?.userInfo;
+  const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
   const authToken = parseCookie(cookies?.authToken);
   const eventDetails = await getEventDetailBySlug(slug, authToken);
   const type = eventDetails?.type;
-
-  //sorted by guests createdAt
-  const sortedGuests = eventDetails?.guests?.sort(
-    (a, b) => new Date(b?.createdAt)?.getTime() - new Date(a?.createdAt)?.getTime()
-  );
+  
+  const sortedList = sortByDefault(eventDetails?.guests);
+  eventDetails.guests = sortedList;
 
   //has current user is going for an event
-  const isUserGoing = sortedGuests?.some(
+  const isUserGoing = sortedList?.some(
     (guest) => guest.memberUid === userInfo?.uid && guest?.memberUid
+    
   );
 
   if (isUserGoing) {
-    const currentUser = [...sortedGuests]?.find(
+    const currentUser = [...sortedList]?.find(
       (v) => v.memberUid === userInfo?.uid
     );
     if (currentUser) {
-      const filteredList = [...sortedGuests].filter(
+      const filteredList = [...sortedList].filter(
         (v) => v.memberUid !== userInfo?.uid
       );
       const formattedGuests = [currentUser, ...filteredList];
@@ -114,7 +115,22 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
     }
   }
 
-  if (type === 'INVITE_ONLY' && (!isUserLoggedIn || !isUserGoing)) {
+
+  if (type === 'INVITE_ONLY' && !isUserLoggedIn) {
+    return {
+      redirect: {
+        permanent: true,
+        destination: '/irl',
+      },
+    };
+  }
+
+  if (
+    type === 'INVITE_ONLY' &&
+    isUserLoggedIn &&
+    !userInfo?.roles?.includes(ADMIN_ROLE) &&
+    !isUserGoing
+  ) {
     return {
       redirect: {
         permanent: true,
