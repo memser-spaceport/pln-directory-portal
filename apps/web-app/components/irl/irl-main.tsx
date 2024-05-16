@@ -6,6 +6,7 @@ import TeamList from './team-list';
 import MemberList from './member-list';
 import AddDetailsPopup from './add-details-popup';
 import { useIrlDetails } from 'apps/web-app/hooks/irl/use-irl-details';
+import { sortByDefault } from 'apps/web-app/utils/irl.utils';
 
 const IrlMain = (props: any) => {
   const eventDetails = props?.eventDetails;
@@ -36,10 +37,7 @@ const IrlMain = (props: any) => {
       const registeredGuest = eventDetails?.guests.find(
         (guest) => guest.memberUid === userInfo.uid
       );
-      const sortedGuests = eventDetails?.guests?.sort(
-        (a, b) =>
-          new Date(b?.createdAt)?.getTime() - new Date(a?.createdAt)?.getTime()
-      );
+      const sortedGuests = sortByDefault(eventDetails?.guests)
 
       if (registeredGuest) {
         setIsGoing(true);
