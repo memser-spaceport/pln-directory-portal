@@ -4,8 +4,8 @@ import { isPastDate } from '../utils/irl.utils';
 export const getAllEvents = async () => {
   try {
     const response = await api.get(
-      `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/irl/events?orderBy=-startDate`
-    );
+      `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/irl/events?orderBy=-createdAt`
+    ); 
 
     if (response.status === 200) {
       const events = response?.data?.map((event: any) => {
