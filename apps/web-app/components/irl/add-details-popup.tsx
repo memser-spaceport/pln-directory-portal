@@ -205,7 +205,6 @@ const AddDetailsPopup = (props: any) => {
     } catch {
       onClose();
       toast.error('Something went wrong');
-      
     }
   };
 
@@ -226,7 +225,7 @@ const AddDetailsPopup = (props: any) => {
       const data = {
         teamUid: registeredGuest.teamUid,
         telegramId: registeredGuest.telegramId,
-        reason: registeredGuest.reason?.trim(),
+        reason: registeredGuest.reason ? registeredGuest.reason.trim() : '' ,
       };
       setFormValues(data);
     }
@@ -244,7 +243,7 @@ const AddDetailsPopup = (props: any) => {
                   {/* Header */}
                   <div className="flex items-center justify-between">
                     <h1 className="text-[18px] font-semibold leading-[14px] text-[#0F172A]">
-                      RSVP Details
+                      Attendee Details
                     </h1>
                     <CloseIcon
                       className="stroke-3 cursor-pointer"
@@ -298,7 +297,7 @@ const AddDetailsPopup = (props: any) => {
                     </div>
                     <div className="flex flex-col gap-3">
                       <h6 className="text-sm font-semibold text-[#0F172A]">
-                      Topics you are interested in & why?
+                        Topics you are interested in?
                       </h6>
                       <textarea
                         maxLength={100}
@@ -329,7 +328,7 @@ const AddDetailsPopup = (props: any) => {
                     </button>
                     <button
                       type="submit"
-                      className="flex h-10 items-center justify-center rounded-lg px-[24px] text-sm font-[500] text-[#fff] shadow-sm border border-[#CBD5E1] bg-[#156FF7] hover:bg-[#1D4ED8]"
+                      className="flex h-10 items-center justify-center rounded-lg border border-[#CBD5E1] bg-[#156FF7] px-[24px] text-sm font-[500] text-[#fff] shadow-sm hover:bg-[#1D4ED8]"
                     >
                       {isUserGoing ? 'Update' : 'Save'}
                     </button>

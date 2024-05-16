@@ -2,10 +2,6 @@
 
 import { IIrlCard } from 'apps/web-app/utils/irl.types';
 import { formatIrlEventDate, isPastDate } from 'apps/web-app/utils/irl.utils';
-import Link from 'next/link';
-import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
-import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
-import { getUserInfo } from 'apps/web-app/utils/shared.utils';
 
 export default function IrlCard(props: IIrlCard) {
   //props
@@ -23,26 +19,12 @@ export default function IrlCard(props: IIrlCard) {
   //variables
   const formattedDate = formatIrlEventDate(startDate, endDate);
   const isPastEvent = isPastDate(endDate);
-  const analytics = useAppAnalytics();
-  const user = getUserInfo();
   const isLongName = name?.length > 25;
 
-  //methods
-  const onCardClick = () => {
-    analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_GATHERING_CARD_CLICKED, {
-      uid: id,
-      name: name,
-      slugUrl: slugUrl,
-      isInviteOnly: isInviteOnly,
-      user: user,
-      isPastEvent
-    });
-  };
 
   return (
     <>
-      <Link href={`/irl/${slugUrl}`} passHref>
-        <a onClick={onCardClick}>
+
           <div className={`irlCard ${isPastEvent ? 'irlCard--grayscale' : ''}`}>
             <div className="irlCard__hdr">
               <img src={bannerImage} alt="IRL header" />
@@ -87,8 +69,7 @@ export default function IrlCard(props: IIrlCard) {
               </div>
             </div>
           </div>
-        </a>
-      </Link>
+
       <style jsx>{`
         .irlCard {
           height: 311px;

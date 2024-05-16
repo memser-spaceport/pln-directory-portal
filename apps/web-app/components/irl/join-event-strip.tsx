@@ -7,6 +7,7 @@ const JoinEventStrip = (props: any) => {
   const isUserLoggedIn = props?.isUserLoggedIn;
   const isUserGoing = props?.isUserGoing;
   const eventDetails = props?.eventDetails;
+  const type = eventDetails?.type;
   const user = getUserInfo();
   const analytics = useAppAnalytics();
 
@@ -50,7 +51,7 @@ const JoinEventStrip = (props: any) => {
           </p>
         </div>
         <div className="joinEventStrip__btnWrpr">
-          {isUserLoggedIn && !isUserGoing && (
+          {isUserLoggedIn && !isUserGoing && type !== 'INVITE_ONLY' && (
             <button
               onClick={onJoinClick}
               className="joinEventStrip__btnWrpr__btn"
@@ -116,7 +117,7 @@ const JoinEventStrip = (props: any) => {
         }
 
         .joinEventStrip__btnWrpr__btn:hover {
-          background-color: #1D4ED8;
+          background-color: #1d4ed8;
         }
 
         .joinEventStrip__btnWrpr__loginBtn {
@@ -133,7 +134,7 @@ const JoinEventStrip = (props: any) => {
         }
 
         .joinEventStrip__btnWrpr__loginBtn:hover {
-          background-color: #1D4ED8;
+          background-color: #1d4ed8;
         }
 
         @media (min-width: 1024px) {

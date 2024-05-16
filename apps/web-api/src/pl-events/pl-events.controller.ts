@@ -95,6 +95,7 @@ export class PLEventsController {
   @ApiQueryFromZod(PLEventQueryParams)
   @ApiOkResponseFromZod(ResponsePLEventSchemaWithRelationsSchema.array())
   @UseGuards(UserTokenValidation)
+  @NoCache()
   async getPLEventsByLoggedInMember(
     @Req() request
   ) {
