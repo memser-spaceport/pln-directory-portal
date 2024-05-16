@@ -270,10 +270,15 @@ export const APP_ANALYTICS_EVENTS = {
 
   IRL_GATHERING_CARD_CLICKED: 'irl_gathering_card_clicked',
 
+  IRL_INVITE_ONLY_RESTRICTION_POPUP_LOGIN_CLICKED: 'irl_invite_only_restriction_popup_login_clicked',
+
   IRL_NAVBAR_BACK_BTN_CLICKED:"irl-navbar-back-btn-clicked",
   IRL_GUEST_LIST_TELEGRAM_BTN_CLICKED:'irl-guest-list-telegram-btn-clicked',
   IRL_BANNER_VIEW_SCHEDULE_BTN_CLICKED:"irl-banner-view-schedule-btn-clicked",
   IRL_BANNER_ADD_EVENT_BTN_CLICKED:"irl-banner-add-event-btn-clicked",
+  IRL_BANNER_RESOURCE_CLICKED:'irl-banner-resource-clicked',
+  IRL_RESOURCE_POPUP_RESOURCE_LINK_CLICKED:"irl-banner-resource-popup-resource-link-clicked",
+  IRL_RESOURCES_SEE_MORE_CLICKED:"irl-resources-see-more-clicked",
   IRL_JOIN_EVENT_STRIP_LOGIN_BTN_CLICKED:"irl-join-event-strip-login-btn-clicked",
   IRL_JOIN_EVENT_STRIP_IAM_GOING_BTN_CLICKED:"irl-join-event-strip-iam-going-btn-clicked",
   IRL_INFO_STRIP_JOIN_BTN_CLICKED:'irl-info-strip-join-btn-clicked',
@@ -527,4 +532,9 @@ export const ABOUT_PLN_LINK = "https://protocol.ai/blog/transcription-pl-vision-
 export const FOCUS_AREAS_FILTER_KEYS = {
   projects: "projectAncestorFocusAreas",
   teams: "teamAncestorFocusAreas"
+}
+
+export const INVITE_ONLY_RESTRICTION_ERRORS = {
+  NOT_LOGGED_IN: "not_logged_in",
+  UNAUTHORIZED: "unauthorized",
 }

@@ -4,9 +4,11 @@ import HeaderStrip from 'apps/web-app/components/irl/header-strip';
 import IrlMain from 'apps/web-app/components/irl/irl-main';
 import Navbar from 'apps/web-app/components/irl/navbar';
 import ScrollToTop from 'apps/web-app/components/shared/scroll-to-top';
+import { ADMIN_ROLE } from 'apps/web-app/constants';
 import { DirectoryLayout } from 'apps/web-app/layouts/directory-layout';
 import { IRL_SEO } from 'apps/web-app/seo.config';
 import { getEventDetailBySlug } from 'apps/web-app/services/irl.service';
+import { sortByDefault } from 'apps/web-app/utils/irl.utils';
 import {
   authenticate,
   convertCookiesToJson,
@@ -32,7 +34,7 @@ export default function IrlDetails({
 
   return (
     <>
-          <NextSeo
+      <NextSeo
         {...IRL_SEO}
         title={eventDetails.name}
         description={eventDetails.description}
@@ -42,18 +44,28 @@ export default function IrlDetails({
           <div className="h-9 w-full lg:h-[unset] lg:pb-2">
             <Navbar eventDetails={eventDetails} />
           </div>
-          <div className="w-[calc(100%_-_2px)] bg-white lg:rounded-[8px] mb-[2px] shadow-md">
-            <Banner eventDetails={eventDetails} isUserLoggedIn={isUserLoggedIn} />
+          <div className="mb-[2px] w-[calc(100%_-_2px)] bg-white shadow-md lg:rounded-[8px]">
+            <Banner
+              eventDetails={eventDetails}
+              isUserLoggedIn={isUserLoggedIn}
+            />
           </div>
-          {!isUserLoggedIn && !eventDetails?.isPastEvent && ( 
+          {!isUserLoggedIn && !eventDetails?.isPastEvent && (
             <div className="sticky top-[40px] mt-[0px] w-full lg:top-[83px] lg:mt-[16px]">
-              <HeaderStrip eventDetails={eventDetails}/>
+              <HeaderStrip eventDetails={eventDetails} />
             </div>
           )}
-         <IrlMain eventDetails={eventDetails} onLogin={onLogin} userInfo={userInfo} isUserGoing={isUserGoing} isUserLoggedIn={isUserLoggedIn} teams={teams}/>
+          <IrlMain
+            eventDetails={eventDetails}
+            onLogin={onLogin}
+            userInfo={userInfo}
+            isUserGoing={isUserGoing}
+            isUserLoggedIn={isUserLoggedIn}
+            teams={teams}
+          />
         </div>
         <div>
-          <ScrollToTop pageName='Irl Detail'/>
+          <ScrollToTop pageName="Irl Detail" />
         </div>
       </div>
     </>
@@ -76,8 +88,62 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
       cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
   }
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
-  const isUserLoggedIn = cookies?.authToken && cookies?.userInfo;
+  const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
   const authToken = parseCookie(cookies?.authToken);
+  const eventDetails = await getEventDetailBySlug(slug, authToken);
+  const type = eventDetails?.type;
+  
+  const sortedList = sortByDefault(eventDetails?.guests);
+  eventDetails.guests = sortedList;
+
+  //has current user is going for an event
+  const isUserGoing = sortedList?.some(
+    (guest) => guest.memberUid === userInfo?.uid && guest?.memberUid
+    
+  );
+
+  if (isUserGoing) {
+    const currentUser = [...sortedList]?.find(
+      (v) => v.memberUid === userInfo?.uid
+    );
+    if (currentUser) {
+      const filteredList = [...sortedList].filter(
+        (v) => v.memberUid !== userInfo?.uid
+      );
+      const formattedGuests = [currentUser, ...filteredList];
+      eventDetails.guests = formattedGuests;
+    }
+  }
+
+
+  if (type === 'INVITE_ONLY' && !isUserLoggedIn) {
+    return {
+      redirect: {
+        permanent: true,
+        destination: '/irl',
+      },
+    };
+  }
+
+  if (
+    type === 'INVITE_ONLY' &&
+    isUserLoggedIn &&
+    !userInfo?.roles?.includes(ADMIN_ROLE) &&
+    !isUserGoing
+  ) {
+    return {
+      redirect: {
+        permanent: true,
+        destination: '/irl',
+      },
+    };
+  }
+
+  if (eventDetails.errorCode === 404) {
+    return {
+      notFound: true,
+    };
+  }
 
   if (isUserLoggedIn) {
     const { uid } = userInfo;
@@ -96,49 +162,6 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
           logo: team?.logo?.url,
         };
       });
-    }
-  }
-
-  const eventDetails = await getEventDetailBySlug(slug, authToken);
-
-  if (eventDetails.errorCode === 404) {
-    return {
-      notFound: true,
-    };
-  }
-
-  const notAvailableTeams = eventDetails?.guests?.filter(
-    (item) => item.teamUid === 'cleeky1re000202tx3kex3knn'
-  );
-  const otherTeams = eventDetails?.guests?.filter(
-    (item) => item.teamUid !== 'cleeky1re000202tx3kex3knn'
-  );
-
-  const sortedGuests = otherTeams?.sort((a, b) =>
-    a.memberName?.localeCompare(b.memberName)
-  );
-  const sortedNotAvailableTeamGuests = notAvailableTeams?.sort((a, b) =>
-    a.memberName?.localeCompare(b?.memberName)
-  );
-
-  const combinedTeams = [...sortedGuests, ...sortedNotAvailableTeamGuests];
-  eventDetails.guests = combinedTeams;
-
-  const isUserGoing = combinedTeams?.some(
-    (guest) => guest.memberUid === userInfo?.uid && guest?.memberUid
-  );
-
-  if (isUserGoing) {
-    const currentUser = [...combinedTeams]?.find(
-      (v) => v.memberUid === userInfo?.uid
-    );
-    if (currentUser) {
-      // currentUser.memberName = `(You) ${currentUser.memberName}`;
-      const filteredList = [...combinedTeams].filter(
-        (v) => v.memberUid !== userInfo?.uid
-      );
-      const formattedGuests = [currentUser, ...filteredList];
-      eventDetails.guests = formattedGuests;
     }
   }
 
