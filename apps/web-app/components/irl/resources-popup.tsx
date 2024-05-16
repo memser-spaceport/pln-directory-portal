@@ -12,7 +12,7 @@ const ResourcesPopup = (props: any) => {
       <Modal isOpen={isOpen} onClose={onToggleModal}>
         <div className="relative flex max-h-[50vh] w-[320px] flex-col gap-[18px] py-6 pl-6 pr-4 lg:max-h-[60vh] lg:min-h-[250px] lg:w-[656px]">
           <div>
-            <h6 className="text-2xl font-[700] leading-8">Resources</h6>
+            <h6 className="text-2xl font-[700] leading-8">{`Resources (${resources?.length})`}</h6>
             <button onClick={onToggleModal} className="absolute right-6 top-6">
               <img src="/assets/images/icons/close-grey.svg" alt="close" />
             </button>

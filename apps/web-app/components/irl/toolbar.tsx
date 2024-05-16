@@ -11,7 +11,7 @@ const Toolbar = (props: any) => {
   const isUserGoing = props?.isUserGoing;
   const isPastEvent = eventDetails?.isPastEvent;
   const filteredList = props?.filteredList;
-  const type = props?.type;
+  const type = eventDetails?.type;
   const [searchTerm, setSearchTerm] = useState('');
   const analytics = useAppAnalytics();
   const user = getUserInfo();

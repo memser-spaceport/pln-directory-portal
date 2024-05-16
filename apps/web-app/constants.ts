@@ -270,6 +270,8 @@ export const APP_ANALYTICS_EVENTS = {
 
   IRL_GATHERING_CARD_CLICKED: 'irl_gathering_card_clicked',
 
+  IRL_INVITE_ONLY_RESTRICTION_POPUP_LOGIN_CLICKED: 'irl_invite_only_restriction_popup_login_clicked',
+
   IRL_NAVBAR_BACK_BTN_CLICKED:"irl-navbar-back-btn-clicked",
   IRL_GUEST_LIST_TELEGRAM_BTN_CLICKED:'irl-guest-list-telegram-btn-clicked',
   IRL_BANNER_VIEW_SCHEDULE_BTN_CLICKED:"irl-banner-view-schedule-btn-clicked",

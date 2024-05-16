@@ -10,7 +10,8 @@ import {
   INVITE_ONLY_RESTRICTION_ERRORS,
 } from 'apps/web-app/constants';
 import { getUserInfo } from 'apps/web-app/utils/shared.utils';
-import { IrlInviteOnlyRestrict } from './irl-invite-only-restrict';
+import { IrlInviteOnlyUnauthorized } from './irl-invite-only-unauthorized';
+import { IrlInviteOnlyLoggedOut } from './irl-invite-only-logged-out';
 import { useState } from 'react';
 import { isPastDate } from 'apps/web-app/utils/irl.utils';
 
@@ -33,18 +34,22 @@ export default function IrlList(props: IIrlList) {
   const onCardClick = (event, item) => {
     const isPastEvent = isPastDate(item.endDate);
     const isInviteOnly = item.type === 'INVITE_ONLY';
-    let restrictedReason = "";
+    let restrictedReason = '';
 
     if (isInviteOnly && !user.email) {
       event.preventDefault();
-      restrictedReason=INVITE_ONLY_RESTRICTION_ERRORS.NOT_LOGGED_IN;
+      restrictedReason = INVITE_ONLY_RESTRICTION_ERRORS.NOT_LOGGED_IN;
       setRestrictionReason(INVITE_ONLY_RESTRICTION_ERRORS.NOT_LOGGED_IN);
-    } else if (isInviteOnly && !userEvents.includes(item.id) && !user.roles.includes(ADMIN_ROLE)) {
+    } else if (
+      isInviteOnly &&
+      !userEvents.includes(item.id) &&
+      !user.roles.includes(ADMIN_ROLE)
+    ) {
       event.preventDefault();
-      restrictedReason=INVITE_ONLY_RESTRICTION_ERRORS.NOT_LOGGED_IN;
+      restrictedReason = INVITE_ONLY_RESTRICTION_ERRORS.NOT_LOGGED_IN;
       setRestrictionReason(INVITE_ONLY_RESTRICTION_ERRORS.UNAUTHORIZED);
     }
-    
+
     analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_GATHERING_CARD_CLICKED, {
       uid: item.id,
       name: item.name,
@@ -52,13 +57,13 @@ export default function IrlList(props: IIrlList) {
       isInviteOnly,
       user: user,
       isPastEvent,
-      restrictedReason
+      restrictedReason,
     });
   };
 
   const onPopupClose = () => {
     setRestrictionReason('');
-  }
+  };
 
   return (
     <>
@@ -77,9 +82,12 @@ export default function IrlList(props: IIrlList) {
       </div>
 
       <div className="">
-        <IrlInviteOnlyRestrict
-          isOpen={restrictionReason!==""}
-          restrictionReason={restrictionReason}
+        <IrlInviteOnlyUnauthorized
+          isOpen={restrictionReason === INVITE_ONLY_RESTRICTION_ERRORS.UNAUTHORIZED}
+          onClose={onPopupClose}
+        />
+        <IrlInviteOnlyLoggedOut
+          isOpen={restrictionReason === INVITE_ONLY_RESTRICTION_ERRORS.NOT_LOGGED_IN }
           onClose={onPopupClose}
         />
       </div>
