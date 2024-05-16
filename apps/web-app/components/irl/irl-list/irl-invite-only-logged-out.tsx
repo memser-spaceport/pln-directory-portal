@@ -68,7 +68,7 @@ export function IrlInviteOnlyLoggedOut(props: IIrlInviteOnlyLoggedOut) {
                     onClick={handleModalClose}
                   />
                   <Dialog.Title as="h2" className="text-2xl font-bold">
-                    <p className="text-[#0F172A]">Login to view</p>
+                    <p className="text-[#0F172A]">Login to Access</p>
                   </Dialog.Title>
                   {
                     <>
@@ -98,7 +98,7 @@ export function IrlInviteOnlyLoggedOut(props: IIrlInviteOnlyLoggedOut) {
                               handleLoginClick();
                             }}
                           >
-                            Proceed to login
+                            Login
                           </button>
                         </div>
                       </div>
