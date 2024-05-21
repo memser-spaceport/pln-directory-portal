@@ -75,6 +75,7 @@ export const getEventDetailBySlug = async (slug, token) => {
     type: output?.type,
     startDate: output?.startDate,
     endDate: output?.endDate,
+    eventLocation: output?.location,
     isPastEvent,
     resources:output?.resources,
     guests: output?.eventGuests?.map((guest: any) => {

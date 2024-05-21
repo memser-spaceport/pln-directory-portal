@@ -8,7 +8,7 @@ import { getUserInfo } from 'apps/web-app/utils/shared.utils';
 const Resources = (props: any) => {
   const eventDetails = props?.eventDetails;
   const resources = eventDetails?.resources ?? [];
-  const resourcesNeedToShow = 3;
+  const resourcesNeedToShow = 5;
   const [isOpen, setIsOpen] = useState(false);
   const analytics = useAppAnalytics();
   const user = getUserInfo();
