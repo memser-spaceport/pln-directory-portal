@@ -13,13 +13,17 @@ export const PLEventGuestSchema = z.object({
   telegramId: z.string().optional(),
   reason: z.string().optional(),
   createdAt: z.string(),
-  updatedAt: z.string()
+  updatedAt: z.string(),
+  additionalInfo: z.any(),
+  topics: z.array(z.string()).optional()
 });
 
 export const CreatePLEventGuestSchema = PLEventGuestSchema.pick({
   teamUid: true,
   telegramId: true,
-  reason: true
+  reason: true,
+  additionalInfo: true,
+  topics: true
 });
 
 export const ResponsePLEventGuestSchema = PLEventGuestSchema.omit({ id: true }).strict();
