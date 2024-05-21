@@ -115,7 +115,7 @@ export default function IrlCard(props: IIrlCard) {
         .irlCard__body__name {
           font-weight: 600;
           font-size: 18px;
-          line-height: 28px;
+          line-height: 25px;
           color: #0f172a;
         }
 
@@ -124,6 +124,7 @@ export default function IrlCard(props: IIrlCard) {
           text-overflow: ellipsis;
           display: -webkit-box;
           -webkit-line-clamp: 2;
+          height: 54px;
           -webkit-box-orient: vertical;
         }
 
@@ -140,6 +141,7 @@ export default function IrlCard(props: IIrlCard) {
         }
 
         .irlCard__body__desc--short {
+          height: 45px;
           -webkit-line-clamp: 2;
         }
 

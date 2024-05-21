@@ -13,6 +13,7 @@ const Banner = (props: any) => {
   const endDate = eventDetails?.endDate;
   const isUserLoggedIn = props?.isUserLoggedIn;
   const resources = eventDetails?.resources ?? [];
+  const eventLocation = eventDetails?.eventLocation;
 
   const analytics = useAppAnalytics();
   const user = getUserInfo();
@@ -58,17 +59,35 @@ const Banner = (props: any) => {
         </div>
         <div className="mt-[12px] flex flex-col items-start justify-between gap-1 lg:mt-[24px] lg:flex-row lg:items-center">
           <p className="text-[24px] font-[700]">{name}</p>
-          <div className="flex gap-[8px]">
-            <div className="flex items-center gap-1 rounded-[24px] bg-[#F1F5F9] py-[6px] px-[12px] text-[12px] font-[500] text-[#475569] lg:order-1">
-              <img src="/assets/images/icons/flat_calendar.svg" />
-              <p>{eventDateRange}</p>
-            </div>
+          <div className="flex flex-wrap gap-[8px]">
             {eventDetails.type === 'INVITE_ONLY' && (
-              <div className="flex items-center gap-1 rounded-[24px] bg-[#F1F5F9] py-[6px] px-[12px] text-[12px] font-[500] text-[#0F172A]">
-                <img src="/assets/images/icons/invite-only.svg" />
+              <div className="lg:order-0 flex items-center gap-1 rounded-[24px] bg-[#F1F5F9] py-[6px] px-[12px] text-[12px] font-[500] text-[#0F172A]">
+                <img
+                  src="/assets/images/icons/invite-only.svg"
+                  alt="invite-only"
+                  width={16}
+                />
                 <p>Invite Only</p>
               </div>
             )}
+            <div className="flex items-center gap-1 rounded-[24px] bg-[#F1F5F9] py-[6px] px-[12px] text-[12px] font-[500] text-[#475569] lg:order-1">
+              <img
+                src="/assets/images/icons/flat_calendar.svg"
+                alt="calender"
+                width={16}
+                height={16}
+              />
+              <p>{eventDateRange}</p>
+            </div>
+            <div className="flex items-center gap-1 rounded-[24px] bg-[#F1F5F9] py-[6px] px-[12px] text-[12px] font-[500] text-[#475569] lg:order-2">
+              <img
+                src="/assets/images/icons/location-grey.svg"
+                alt="calender"
+                width={16}
+                height={16}
+              />
+              <p>{eventLocation}</p>
+            </div>
           </div>
         </div>
         <div
