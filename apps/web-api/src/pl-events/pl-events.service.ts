@@ -32,7 +32,7 @@ export class PLEventsService {
     slug: string,
     isUserLoggedIn: Boolean
   ) {
-    return await this.prisma.pLEvent.findUnique({
+    const plEvent = await this.prisma.pLEvent.findUnique({
       where: { slugURL: slug },
       include: {
         logo: true,
@@ -43,20 +43,38 @@ export class PLEventsService {
             reason: true,
             telegramId: true,
             memberUid: true,
+            topics: true,
+            additionalInfo: true,
             member: {
               select:{
                 name: true,
-                image: true
+                image: true,
+                teamMemberRoles: true,
+                projectContributions: {
+                  select:{
+                    project:{
+                      select:{
+                        name: true
+                      }
+                    }
+                  }
+                },
+                createdProjects:{
+                  select: {
+                    name: true
+                  }
+                }
               }
             },
             teamUid: true,
             team: {
               select:{
+                uid: true,
                 name: true,
                 logo: true
               }
-            } ,
-            createdAt: true
+            },
+            createdAt: true,
           }:
           {
             teamUid: true,
@@ -71,6 +89,12 @@ export class PLEventsService {
         }
       }
     });
+    if (plEvent?.resources && plEvent?.resources.length && !isUserLoggedIn) {
+      plEvent.resources = plEvent?.resources.filter((resource:any) => { 
+        return !resource.isPrivate
+      });
+    }
+    return plEvent;
   };
 
   async createPLEventGuest(
