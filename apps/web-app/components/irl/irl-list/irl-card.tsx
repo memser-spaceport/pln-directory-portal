@@ -25,7 +25,7 @@ export default function IrlCard(props: IIrlCard) {
   return (
     <>
 
-          <div className={`irlCard ${isPastEvent ? 'irlCard--grayscale' : ''}`}>
+          <div className="irlCard">
             <div className="irlCard__hdr">
               <img src={bannerImage} alt="IRL header" />
             </div>

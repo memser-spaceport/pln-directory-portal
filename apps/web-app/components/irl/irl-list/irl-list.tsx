@@ -27,6 +27,8 @@ export default function IrlList(props: IIrlList) {
 
   //variable
   const [restrictionReason, setRestrictionReason] = useState<string>('');
+  const pastEvents = props.conference?.filter((item) => item.isPastEvent);
+  const upcomingEvents = props.conference?.filter((item) => !item.isPastEvent);
   const analytics = useAppAnalytics();
   const user = getUserInfo();
 
@@ -68,26 +70,50 @@ export default function IrlList(props: IIrlList) {
   return (
     <>
       <div className="irlList">
-        {conference.length > 0 ? (
-          conference?.map((item, index: number) => (
-            <Link key={index} href={`/irl/${item.slugUrl}`} passHref>
-              <a onClick={(e) => onCardClick(e, item)}>
-                <IrlCard {...item} />
-              </a>
-            </Link>
-          ))
-        ) : (
-          <p>No events available</p>
+        <div className="irlList__upcoming">
+          {/* <h2 className="irlList__upcoming__title">Upcoming Conferences</h2> */}
+          <div className="irlList__upcoming__events">
+            {upcomingEvents.length > 0 ? (
+              upcomingEvents?.map((item, index: number) => (
+                <Link key={index} href={`/irl/${item.slugUrl}`} passHref>
+                  <a onClick={(e) => onCardClick(e, item)}>
+                    <IrlCard {...item} />
+                  </a>
+                </Link>
+              ))
+            ) : (
+              <p>No events available</p>
+            )}
+          </div>
+        </div>
+
+        {pastEvents.length > 0 && (
+          <div className="irlList__past">
+            <h2 className="irlList__past__title">Past Gatherings</h2>
+            <div className="irlList__past__events">
+              {pastEvents?.map((item, index: number) => (
+                <Link key={index} href={`/irl/${item.slugUrl}`} passHref>
+                  <a onClick={(e) => onCardClick(e, item)}>
+                    <IrlCard {...item} />
+                  </a>
+                </Link>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 
       <div className="">
         <IrlInviteOnlyUnauthorized
-          isOpen={restrictionReason === INVITE_ONLY_RESTRICTION_ERRORS.UNAUTHORIZED}
+          isOpen={
+            restrictionReason === INVITE_ONLY_RESTRICTION_ERRORS.UNAUTHORIZED
+          }
           onClose={onPopupClose}
         />
         <IrlInviteOnlyLoggedOut
-          isOpen={restrictionReason === INVITE_ONLY_RESTRICTION_ERRORS.NOT_LOGGED_IN }
+          isOpen={
+            restrictionReason === INVITE_ONLY_RESTRICTION_ERRORS.NOT_LOGGED_IN
+          }
           onClose={onPopupClose}
         />
       </div>
@@ -99,11 +125,59 @@ export default function IrlList(props: IIrlList) {
             height: 100%;
             padding: 20px 0;
             display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 34px;
+            margin: auto;
+          }
+
+          .irlList__upcoming {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            gap: 16px;
+          }
+
+          .irlList__upcoming__events {
+            display: flex;
             align-items: center;
             flex-wrap: wrap;
             justify-content: center;
             gap: 16px;
-            margin: auto;
+          }
+
+          .irlList__past{
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            // justify-content: flex-start;
+            gap: 16px;
+            width: 100%;
+          }
+
+          .irlList__past__title{
+            width: 100%;
+            font-weight:700;
+            font-size:18px;
+            line-height:20px;
+            color:#0F172A;
+            padding-left: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #CBD5E1;
+          }
+
+          .irlList__past__events {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 16px;
+            width: 100%;
           }
 
           .irlList__modal {
@@ -114,6 +188,25 @@ export default function IrlList(props: IIrlList) {
           @media (min-width: 1024px) {
             .irlList {
               padding: 24px 0;
+              gap: 24px;
+            }
+
+            .irlList__upcoming__title{
+              font-size:28px;
+              line-height:40px;
+            }
+            
+            .irlList__upcoming__events {
+              justify-content: flex-start;
+            }
+
+            .irlList__past__title{
+              font-size:28px;
+              line-height:40px;
+              padding-left: 0;
+            }
+
+            .irlList__past__events {
               justify-content: flex-start;
             }
           }
