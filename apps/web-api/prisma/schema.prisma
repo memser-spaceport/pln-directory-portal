@@ -310,41 +310,46 @@ model Project {
 }
 
 model PLEvent {
-  id          Int            @id @default(autoincrement())
-  uid         String         @unique @default(cuid())
-  type        PLEventType?
-  eventsCount Int?
-  telegramId  String?
-  logoUid     String?
-  logo        Image?         @relation("logo", fields: [logoUid], references: [uid])
-  bannerUid   String?
-  banner      Image?         @relation("banner", fields: [bannerUid], references: [uid])
-  name        String
-  description String?
-  websiteURL  String?
-  location    String
-  slugURL     String         @unique
-  resources   Json[]
-  startDate   DateTime
-  endDate     DateTime
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  eventGuests PLEventGuest[]
+  id               Int            @id @default(autoincrement())
+  uid              String         @unique @default(cuid())
+  type             PLEventType?
+  eventsCount      Int?
+  telegramId       String?
+  logoUid          String?
+  logo             Image?         @relation("logo", fields: [logoUid], references: [uid])
+  bannerUid        String?
+  banner           Image?         @relation("banner", fields: [bannerUid], references: [uid])
+  name             String
+  description      String?
+  shortDescription String?
+  websiteURL       String?
+  location         String
+  slugURL          String         @unique
+  resources        Json[]
+  priority         Int?
+  additionalInfo   Json?
+  startDate        DateTime
+  endDate          DateTime
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  eventGuests      PLEventGuest[]
 }
 
 model PLEventGuest {
-  id         Int      @id @default(autoincrement())
-  uid        String   @unique @default(cuid())
-  telegramId String?
-  reason     String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  memberUid  String
-  member     Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
-  teamUid    String
-  team       Team     @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
-  eventUid   String
-  event      PLEvent  @relation(fields: [eventUid], references: [uid], onDelete: Cascade)
+  id             Int      @id @default(autoincrement())
+  uid            String   @unique @default(cuid())
+  telegramId     String?
+  reason         String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  memberUid      String
+  member         Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  teamUid        String
+  team           Team     @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  eventUid       String
+  event          PLEvent  @relation(fields: [eventUid], references: [uid], onDelete: Cascade)
+  additionalInfo Json?
+  topics         String[]
 }
 
 model FocusArea {

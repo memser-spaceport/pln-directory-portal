@@ -14,6 +14,7 @@ export const PLEventSchema = z.object({
   logoUid: z.string().nullish(),
   bannerUid: z.string().nullish(),
   description: z.string().optional(),
+  shortDescription: z.string().optional(),
   websiteURL: z.string().url().optional(),
   slugURL: z.string(),
   resources: z.array(
@@ -23,6 +24,7 @@ export const PLEventSchema = z.object({
       description: z.string().optional()
     })
   ).optional(),
+  additionalInfo: z.any(),
   startDate: z.string(),
   endDate: z.string(),
   location: z.string(),
