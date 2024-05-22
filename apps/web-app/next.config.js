@@ -113,6 +113,16 @@ let nextConfig = {
         destination: 'https://events.plnetwork.io/',
         permanent: false,
       },
+      {
+        source: '/irl/lw24-fb',
+        destination: '/irl/ee-lwfb',
+        permanent: true,
+      },
+      {
+        source: '/irl/edge-esm',
+        destination: '/irl/ee-lwfb',
+        permanent: true,
+      },
     ];
   },
 };
