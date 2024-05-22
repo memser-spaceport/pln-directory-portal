@@ -138,6 +138,7 @@ export default function IrlCard(props: IIrlCard) {
           display: -webkit-box;
           -webkit-line-clamp: 3;
           -webkit-box-orient: vertical;
+          max-width:245px;
         }
 
         .irlCard__body__desc--short {

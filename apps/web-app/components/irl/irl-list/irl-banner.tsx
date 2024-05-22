@@ -18,7 +18,7 @@ export default function IrlBanner() {
         <div className="irlBnr__text">
           <div className="irlBnr__text__cn">
             <h1 className="irlBnr__text__cn__title">
-              Enhance Your Event Exprience
+              Enhance Your Event Experience
             </h1>
             <p className="irlBnr__text__cn__desc">
               Explore key network events, find out who will be attending, and
