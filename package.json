@@ -16,7 +16,9 @@
     "heroku-postbuild": "npx prisma generate --schema=./apps/web-api/prisma/schema.prisma && nx build $PROJECT_NAME --prod && npx prisma migrate deploy --schema=./apps/web-api/prisma/schema.prisma && npx prisma db execute --file ./apps/web-api/prisma/migrations/fix_m2m_forest_admin.sql && nx run web-api:build-cli",
     "build:storybook": "nx build-storybook storybook-host",
     "deploy:staging": "gh workflow run staging.yml",
-    "deploy:production": "gh workflow run production.yml"
+    "deploy:production": "gh workflow run production.yml",
+    "start:prod": "node dist/main",
+    "start:migrate:prod": "npx prisma migrate deploy --schema=./schema.prisma --preview-feature && npm run start:prod"
   },
   "private": true,
   "prisma": {

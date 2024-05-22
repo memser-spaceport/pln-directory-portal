@@ -112,6 +112,7 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) =>
     getTeamsFilters(optionsFromQuery, includeFriends.toString()),
     api.get(`${FILTER_API_ROUTES.FOCUS_AREA}?type=Team&plnFriend=${includeFriends}&${focusAreaFilterOptions?.join("&")}`),
   ]);
+ 
 
   const teams: ITeam[] =
     teamsResponse.status === 200
