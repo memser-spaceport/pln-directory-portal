@@ -95,10 +95,9 @@ const Banner = (props: any) => {
           dangerouslySetInnerHTML={{ __html: description }}
         ></div>
       </div>
-      {(eventDetails?.websiteUrl ||
-        (resources?.length > 0 && isUserLoggedIn)) && (
+      {(eventDetails?.websiteUrl || resources?.length > 0) && (
         <div className="flex flex-col items-center justify-between gap-5 border-t border-[#E2E8F0] pt-5 lg:flex-row">
-          {isUserLoggedIn && resources?.length > 0 && (
+          {resources?.length > 0 && (
             <div className="w-full lg:w-[unset]">
               <Resources eventDetails={eventDetails} />
             </div>
