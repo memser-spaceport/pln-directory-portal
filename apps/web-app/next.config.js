@@ -20,6 +20,7 @@ let nextConfig = {
     AWS_S3_DOMAIN:process.env.AWS_S3_DOMAIN,
     GET_SUPPORT_URL:process.env.GET_SUPPORT_URL,
     IRL_ADD_EVENT_URL:process.env.IRL_ADD_EVENT_URL,
+    IRL_TELEGRAM_EXCLUSIONS:process.env.IRL_TELEGRAM_EXCLUSIONS
   },
   nx: {
     // Set this to true if you would like to to use SVGR

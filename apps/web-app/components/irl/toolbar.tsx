@@ -16,6 +16,9 @@ const Toolbar = (props: any) => {
   const analytics = useAppAnalytics();
   const user = getUserInfo();
 
+  const telegramExclusions = process.env.IRL_TELEGRAM_EXCLUSIONS;
+  const telegramExclusionIds = telegramExclusions?.split(',');
+
   const onIAmGoingClick = () => {
     analytics.captureEvent(
       APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_IAM_GOING_BTN_CLICKED,
@@ -117,7 +120,9 @@ const Toolbar = (props: any) => {
           </span>
         </span>
         <div className="flex w-auto justify-end gap-[8px] lg:order-3 lg:flex-1">
-          {eventDetails?.telegram && (
+          {(telegramExclusionIds?.includes(eventDetails?.id)
+            ? isUserLoggedIn && eventDetails?.telegram
+            : eventDetails?.telegram) && (
             <a
               href={eventDetails?.telegram}
               target="_blank"
