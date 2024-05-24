@@ -21,7 +21,11 @@ let nextConfig = {
     GET_SUPPORT_URL:process.env.GET_SUPPORT_URL,
     IRL_ADD_EVENT_URL:process.env.IRL_ADD_EVENT_URL,
     IRL_TELEGRAM_EXCLUSIONS:process.env.IRL_TELEGRAM_EXCLUSIONS,
-    IRL_DEFAULT_TOPICS:process.env.IRL_DEFAULT_TOPICS
+    IRL_DEFAULT_TOPICS:process.env.IRL_DEFAULT_TOPICS,
+    AUTH_APP_CLIENT_SECRET:process.env.AUTH_APP_CLIENT_SECRET,
+    AUTH_APP_CLIENT_ID:process.env.AUTH_APP_CLIENT_ID,
+    WEB_API_BASE_URL: process.env.WEB_API_BASE_URL,
+    PRIVY_AUTH_ID: process.env.PRIVY_AUTH_ID
   },
   nx: {
     // Set this to true if you would like to to use SVGR
@@ -31,7 +35,7 @@ let nextConfig = {
   images: {
     // List remote domains that have access to Next.js Image Optimization API,
     // to protect the app from malicious users
-    domains: ['loremflickr.com', 'files.plnetwork.io','i.ytimg.com', AWS_S3_DOMAIN, 'pl-directory-images-prod.s3.us-west-1.amazonaws.com'],
+    domains: ['loremflickr.com', 'files.plnetwork.io','i.ytimg.com', AWS_S3_DOMAIN, 'pl-directory-images-prod.s3.us-west-1.amazonaws.com', 'pl-directory-images-dev.s3.us-west-1.amazonaws.com'],
     // Enable `dangerouslyAllowSVG` and `contentSecurityPolicy` to serve
     // SVG images using the default Image Optimization API
     dangerouslyAllowSVG: true,

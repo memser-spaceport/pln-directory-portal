@@ -37,8 +37,7 @@ export function MemberProfileOfficeHours({
       Cookies.set('page_params', 'schedule_meeting', { expires: 60, path: '/' });
       router.reload();
     } else {
-      authenticate(router.asPath);
-      trackGoal(loginAsUserCode, 0);
+      router.push(`${window.location.pathname}${window.location.search}#login`)
     }
   };
 
