@@ -19,7 +19,7 @@ export default function AddProject({isUserLoggedIn}) {
 
     useEffect(() => {
         if(!isUserLoggedIn){
-            authenticate(router.asPath);
+            router.push(`${window.location.pathname}${window.location.search}#login`)
         }
     }, [])
 

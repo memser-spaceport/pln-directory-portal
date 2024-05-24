@@ -30,7 +30,7 @@ export default function IrlDetails({
 }) {
   const router = useRouter();
   const onLogin = () => {
-    authenticate(router.asPath);
+    router.push(`${window.location.pathname}${window.location.search}#login`)
   };
 
   return (

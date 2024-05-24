@@ -29,9 +29,6 @@ export class AuthService implements OnModuleInit {
       this.membersService = this.moduleRef.get(MembersService, {strict : false});
     }
 
-
-
-
   async getTokenAndUserInfo(tokenRequest) {
     const { id_token, access_token, refresh_token } = await this.getAuthTokens(tokenRequest);
     const { email, externalId } = await this.decodeAuthIdToken(id_token)
@@ -57,7 +54,7 @@ export class AuthService implements OnModuleInit {
     }
 
     // if no user found for the email too, then throw forbidden exception
-    throw new ForbiddenException();
+    throw new ForbiddenException("Invalid User");
   }
 
   async verifyAndSendEmailOtp(email) {
@@ -187,7 +184,7 @@ export class AuthService implements OnModuleInit {
     return linkResult.data;
   }
 
-  private async getAuthTokens({grantType, refreshToken, code}) {
+  private async getAuthTokens({grantType, refreshToken, code, exchangeRequestId, exchangeRequestToken}) {
     const payload = { client_id: process.env.AUTH_APP_CLIENT_ID, client_secret: process.env.AUTH_APP_CLIENT_SECRET, grant_type: grantType}
     let result;
 
@@ -196,6 +193,9 @@ export class AuthService implements OnModuleInit {
       payload['code'] = code;
     } else if (grantType === 'refresh_token') {
       payload['refresh_token'] = refreshToken
+    } else if (grantType === 'token_exchange') {
+      payload['token'] = exchangeRequestToken
+      payload['auth_request_id'] = exchangeRequestId
     }
 
     try {

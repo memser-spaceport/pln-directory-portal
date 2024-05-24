@@ -57,7 +57,7 @@ export function ForgotEmailModal({
   };
 
   const handleSignIn = () => {
-    authenticate(router.asPath);
+    router.push(`${window.location.pathname}${window.location.search}#login`)
     handleOnClick();
   };
 

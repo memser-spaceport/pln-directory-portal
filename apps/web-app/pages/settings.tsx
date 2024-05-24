@@ -85,6 +85,10 @@ export default function Settings({
         });
     }
 
+    const onLinkAccount = (account) => {
+        document.dispatchEvent(new CustomEvent('auth-link-account', {detail : account}))
+    }
+
     const updateMemberAutocomplete = () => {
         fetchMember(selectedMember.value).then(data => {
             setSelectedMember({ label: '', value: '' })
@@ -442,6 +446,7 @@ export default function Settings({
 
             <NextSeo {...DIRECTORY_SEO} title={userInfo.name} />
             <Breadcrumb items={breadcrumbItems} classname="max-w-[150px] truncate" />
+            
             <SettingsContext.Provider value={{state, dispatch}}>
             <div className="w-full h-full">
                 <div className="grid grid-cols-4 pt-40 gap-x-8">
@@ -470,12 +475,17 @@ export default function Settings({
                                         </div>
 
                                     </div>
+                                   
                                     {getAdminMenuTemplate()}
+                                   
                                 </div>
                             ))
                         }
                     </div>
                     <div className="col-span-2">
+                    <button onClick={() => onLinkAccount('github')}>Link github</button>
+                    <button onClick={() => onLinkAccount('google')}>Link Google</button>
+                   
                         {
                             getSettingComponent(userInfo)
                         }
