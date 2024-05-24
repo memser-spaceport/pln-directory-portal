@@ -18,9 +18,7 @@ export function Login() {
       Cookies.set('page_params', 'user_logged_in', { expires: 60, path: '/' });
       router.push("/members");
     } else {
-      setLoaderFlag(true);
-      authenticate(router.asPath);
-      trackGoal(loginAsUserCode, 0);
+      router.push(`${window.location.pathname}${window.location.search}#login`)
     }
   };
   return (

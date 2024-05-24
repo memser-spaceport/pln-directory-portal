@@ -11,7 +11,7 @@ import { PAGE_ROUTES , FORBIDDEN_ERR_MSG, BAD_REQUEST_ERR_MSG, NETWORK_ERR_MSG, 
 const authIgnoreURLS = ["/v1/auth/token", "/v1/participants-request/unique-identifier"];
 
 const isUrlToIgnoreToaster = (baseUrl, fullUrl) => {
-  const urlPath = fullUrl.replace(new RegExp(`^${baseUrl}`), "");
+  const urlPath = fullUrl?.replace(new RegExp(`^${baseUrl}`), "");
   const staticUrlsToIgnoreForToaster = [`/v1/auth/otp`, `/v1/auth/otp/verify`];
   const dynamicUrlRegexToIgnoreForToaster = /^\/v1\/members\/([a-zA-Z0-9]+)\/email(?:\/otp)?$/;
   console.log(urlPath, fullUrl, baseUrl, staticUrlsToIgnoreForToaster.includes(urlPath), dynamicUrlRegexToIgnoreForToaster.test(urlPath))
@@ -122,7 +122,7 @@ api.interceptors.response.use(
       msg = SOMETHING_WENT_WRONG;
     }
     if (response?.status != 401) {
-      if(!isUrlToIgnoreToaster(response.config.baseURL, response.config.url)) {
+      if(!isUrlToIgnoreToaster(response?.config?.baseURL, response?.config?.url)) {
         toast.error(msg, {
           hideProgressBar: true
         });

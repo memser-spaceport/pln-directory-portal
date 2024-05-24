@@ -62,7 +62,7 @@ export function VerifyEmailModal({
                     <span className="font-bold"> spaceport@protocol.ai </span>{' '}
                     for assistance or try to{' '}
                     <span
-                      onClick={()=>{ authenticate(router.asPath)}}
+                      onClick={()=>{ router.push(`${window.location.pathname}${window.location.search}#login`)}}
                       className="cursor-pointer font-bold italic underline"
                     >
                       {' '}
