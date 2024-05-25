@@ -64,12 +64,12 @@ const TeamList = (props: any) => {
                 </a>
               </Link>
             </div>
-            <div className="hidden w-[180px] items-center justify-start gap-[4px] lg:flex">
+            <div className="hidden w-[160px] items-center justify-start gap-[4px] lg:flex">
               <div className="h-[32px] w-[32px] rounded-[58px] bg-gray-200"></div>
               <p className="">aaaaaa aaa</p>
             </div>
 
-            <div className="hidden w-[150px] items-center justify-start lg:flex">
+            <div className="hidden w-[160px] items-center justify-start lg:flex">
               @aaaaaaa
             </div>
             <div className="hidden w-[330px] items-center justify-start pr-[20px] lg:flex">

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import Modal from '../layout/navbar/modal/modal';
 import ResourcesPopup from './resources-popup';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
@@ -7,14 +6,40 @@ import { getUserInfo } from 'apps/web-app/utils/shared.utils';
 
 const Resources = (props: any) => {
   const eventDetails = props?.eventDetails;
+  const isUserLoggedIn = props?.isUserLoggedIn;
   const resources = eventDetails?.resources ?? [];
-  const resourcesNeedToShow = 5;
+  const onLogin = props?.onLogin;
   const [isOpen, setIsOpen] = useState(false);
   const analytics = useAppAnalytics();
   const user = getUserInfo();
 
+  const splitResources = (resources) => {
+    const publicResources = [];
+    const privateResources = [];
+
+    resources?.map((resource) => {
+      if (resource.isPublic) {
+        publicResources.push(resource);
+      } else {
+        privateResources.push(resource);
+      }
+    });
+
+    return { publicResources, privateResources };
+  };
+
+  const publicResources = splitResources(resources)?.publicResources;
+
+  const totalResources = isUserLoggedIn ? [...resources] : [...publicResources];
+
+  const resourcesNeedToShow = isUserLoggedIn
+    ? 5
+    : totalResources?.length < 5
+    ? totalResources?.length
+    : 5;
+
   const onResourceClick = (resource: any) => {
-    analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_BANNER_RESOURCE_CLICKED, {
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_RESOURCE_CLICKED, {
       eventId: eventDetails?.id,
       eventName: eventDetails?.name,
       type: eventDetails?.type,
@@ -36,6 +61,17 @@ const Resources = (props: any) => {
         user,
       }
     );
+  };
+
+  const onLoginClick = (analyticsName) => {
+    analytics.captureEvent(analyticsName, {
+      eventId: eventDetails?.id,
+      eventName: eventDetails?.name,
+      type: eventDetails?.type,
+      isPastEvent: eventDetails?.isPastEvent,
+      user,
+    });
+    onLogin();
   };
 
   const onToggleModal = () => {
@@ -64,13 +100,19 @@ const Resources = (props: any) => {
           onClick={() => onClick(resource)}
         >
           <img
-            width={20}
-            height={20}
-            src="/assets/images/icons/projects/link.svg"
+            src={resource?.icon || '/assets/images/icons/link-blue.svg'}
             alt="link"
+            loading="lazy"
+            width={14}
+            height={14}
           />
           <span className="resourceLink__text">{resource?.name}</span>
-          <img src="/assets/images/icons/projects/arrow.svg" alt="arrow" />
+          <img
+            src="/assets/images/icons/projects/arrow.svg"
+            alt="arrow"
+            width={9}
+            height={9}
+          />
         </a>
         <style jsx>{`
           .resourceLink {
@@ -92,70 +134,65 @@ const Resources = (props: any) => {
 
   return (
     <>
-      <div className="resources">
-        <h6 className="resources__title">Resources</h6>
-        <div className="resources__list">
-          {resources?.slice(0, resourcesNeedToShow)?.map((item, index) => (
-            <div
-              className="resources__list__resource"
-              key={`resource-${index}`}
-            >
-              <ResourceLink resource={item} onClick={onResourceClick} />
-            </div>
-          ))}
-          {resources?.length > resourcesNeedToShow && (
-            <button className="reosources__remaining" onClick={onToggleModal}>
-              {`+${resources?.length - resourcesNeedToShow} more`}
-            </button>
-          )}
-        </div>
+      <div
+        className={`flex flex-col gap-1 ${
+          totalResources?.length === 0 ? 'justify-between lg:flex-row' : ''
+        }`}
+      >
+        <h6 className="text-sm font-semibold text-[#475569]">Resources</h6>
+        {totalResources?.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-[14px]">
+            {totalResources
+              ?.slice(0, resourcesNeedToShow)
+              ?.map((item, index) => (
+                <div className="flex h-5" key={`resource-${index}`}>
+                  <ResourceLink resource={item} onClick={onResourceClick} />
+                </div>
+              ))}
+            {resources?.length > resourcesNeedToShow && (
+              <button
+                className="flex h-6 items-center rounded-[29px] border border-[#cbd5e1] px-[6px] text-[13px] font-medium leading-5 text-[#156ff7]"
+                onClick={onToggleModal}
+              >
+                {`+${resources?.length - resourcesNeedToShow} more`}
+              </button>
+            )}
+          </div>
+        )}
+        {totalResources?.length === 0 && (
+          <div className="flex items-start gap-1 lg:items-center">
+            <img
+              className="pt-[2px] lg:p-[unset]"
+              src="/assets/images/icons/lock-grey.svg"
+              alt="lock"
+            />
+            <span className=" text-[13px] leading-5 text-[#64748B]">
+              Resources are set to private. Please{' '}
+              <span
+                onClick={() =>
+                  onLoginClick(
+                    APP_ANALYTICS_EVENTS.IRL_RESOURCES_LOGIN_BTN_CLICKED
+                  )
+                }
+                className="cursor-pointer text-[13px] font-medium leading-5 text-[#156FF7]"
+              >
+                login
+              </span>
+              {` `}
+              to access
+            </span>
+          </div>
+        )}
       </div>
       <ResourcesPopup
         isOpen={isOpen}
         onClose={onToggleModal}
         resourceLink={ResourceLink}
-        resources={resources}
+        allResources={resources}
+        resourcesToShow={totalResources}
         onResourceClick={onPopupResourceClick}
+        onLogin={onLoginClick}
       />
-      <style jsx>{`
-        .resources {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .resources__title {
-          font-size: 14px;
-          font-weight: 600;
-          line-height: 20px;
-          color: #475569;
-        }
-
-        .resources__list {
-          display: flex;
-          flex-wrap: wrap;
-          column-gap: 12px;
-          row-gap: 14px;
-          align-items: center;
-        }
-
-        .resources__list__resource {
-          height: 20px;
-        }
-
-        .reosources__remaining {
-          border: 1px solid #cbd5e1;
-          border-radius: 29px;
-          font-size: 13px;
-          font-weight: 500;
-          line-height: 20px;
-          color: #156ff7;
-          height: 24px;
-          display: flex;
-          align-items: center;
-          padding-inline: 8px;
-        }
-      `}</style>
     </>
   );
 };

@@ -1,8 +1,9 @@
-import { getTeams } from '@protocol-labs-network/teams/data-access';
+import { getMember } from '@protocol-labs-network/members/data-access';
 import Banner from 'apps/web-app/components/irl/banner';
 import HeaderStrip from 'apps/web-app/components/irl/header-strip';
 import IrlMain from 'apps/web-app/components/irl/irl-main';
 import Navbar from 'apps/web-app/components/irl/navbar';
+import Resources from 'apps/web-app/components/irl/resources';
 import ScrollToTop from 'apps/web-app/components/shared/scroll-to-top';
 import { ADMIN_ROLE } from 'apps/web-app/constants';
 import { DirectoryLayout } from 'apps/web-app/layouts/directory-layout';
@@ -44,12 +45,21 @@ export default function IrlDetails({
           <div className="h-9 w-full lg:h-[unset] lg:pb-2">
             <Navbar eventDetails={eventDetails} />
           </div>
-          <div className="mb-[2px] w-[calc(100%_-_2px)] bg-white shadow-md lg:rounded-[8px]">
+          <div className="mb-[2px] w-[calc(100%_-_2px)] bg-white shadow-sm lg:rounded-[8px]">
             <Banner
               eventDetails={eventDetails}
               isUserLoggedIn={isUserLoggedIn}
             />
           </div>
+          {eventDetails?.resources?.length > 0 && (
+            <div className="mt-2 w-full rounded-lg shadow-sm  bg-white p-5 ">
+              <Resources
+                eventDetails={eventDetails}
+                isUserLoggedIn={isUserLoggedIn}
+                onLogin={onLogin}
+              />
+            </div>
+          )}
           {!isUserLoggedIn && !eventDetails?.isPastEvent && (
             <div className="sticky top-[40px] mt-[0px] w-full lg:top-[83px] lg:mt-[16px]">
               <HeaderStrip eventDetails={eventDetails} />
@@ -92,14 +102,13 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
   const authToken = parseCookie(cookies?.authToken);
   const eventDetails = await getEventDetailBySlug(slug, authToken);
   const type = eventDetails?.type;
-  
+
   const sortedList = sortByDefault(eventDetails?.guests);
   eventDetails.guests = sortedList;
 
   //has current user is going for an event
   const isUserGoing = sortedList?.some(
     (guest) => guest.memberUid === userInfo?.uid && guest?.memberUid
-    
   );
 
   if (isUserGoing) {
@@ -114,7 +123,6 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
       eventDetails.guests = formattedGuests;
     }
   }
-
 
   if (type === 'INVITE_ONLY' && !isUserLoggedIn) {
     return {
@@ -147,19 +155,17 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
 
   if (isUserLoggedIn) {
     const { uid } = userInfo;
-    const memberTeamsResponse = await getTeams({
-      'teamMemberRoles.member.uid': uid,
-      select:
-        'uid,name,logo.url,industryTags.title,teamMemberRoles.role,teamMemberRoles.mainTeam',
-      pagination: false,
+
+    const memberResponse = await getMember(uid, {
+      with: 'teamMemberRoles.team',
     });
 
-    if (memberTeamsResponse.status === 200) {
-      teams = memberTeamsResponse.body.map((team) => {
+    if (memberResponse.status === 200) {
+      teams = memberResponse.body?.teamMemberRoles?.map((teamResponse) => {
         return {
-          id: team?.uid,
-          name: team?.name,
-          logo: team?.logo?.url,
+          id: teamResponse?.team?.uid,
+          name: teamResponse?.team?.name,
+          mainTeam: teamResponse?.mainTeam,
         };
       });
     }

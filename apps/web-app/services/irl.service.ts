@@ -5,7 +5,7 @@ export const getAllEvents = async () => {
   try {
     const response = await api.get(
       `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/irl/events?orderBy=-createdAt`
-    ); 
+    );
 
     if (response.status === 200) {
       const events = response?.data?.map((event: any) => {
@@ -62,6 +62,36 @@ export const getEventDetailBySlug = async (slug, token) => {
 
   const output = result.data;
   const isPastEvent = isPastDate(output?.endDate);
+  const eventExclusions = process.env.IRL_TELEGRAM_EXCLUSIONS;
+  const eventExclusionIds = eventExclusions?.split(',');
+  const isExclusionEvent = eventExclusionIds?.includes(output?.uid);
+
+  const guests = output?.eventGuests?.map((guest: any) => {
+    const memberRole = guest?.member?.teamMemberRoles?.find(
+      (teamRole) => guest?.teamUid === teamRole?.teamUid
+    )?.role;
+
+    const projectContributions = guest?.member?.projectContributions.map(
+      (item) => item?.project?.name
+    );
+
+    return {
+      uid: guest?.uid,
+      teamUid: guest?.teamUid,
+      teamName: guest?.team?.name,
+      teamLogo: guest?.team?.logo?.url,
+      memberUid: guest?.memberUid,
+      memberName: guest?.member?.name,
+      memberLogo: guest?.member?.image?.url,
+      memberRole,
+      reason: guest?.reason,
+      telegramId: guest?.telegramId,
+      createdAt: guest?.createdAt,
+      projectContributions,
+      topics: guest?.topics,
+      additionalInfo: guest?.additionalInfo,
+    };
+  });
 
   return {
     id: output?.uid,
@@ -77,21 +107,10 @@ export const getEventDetailBySlug = async (slug, token) => {
     endDate: output?.endDate,
     eventLocation: output?.location,
     isPastEvent,
-    resources:output?.resources,
-    guests: output?.eventGuests?.map((guest: any) => {
-      return {
-        uid: guest?.uid,
-        teamUid: guest?.teamUid,
-        teamName: guest?.team?.name,
-        teamLogo: guest?.team?.logo?.url,
-        memberUid: guest?.memberUid,
-        memberName: guest?.member?.name,
-        memberLogo: guest?.member?.image?.url,
-        reason: guest?.reason,
-        telegramId: guest?.telegramId,
-        createdAt:guest?.createdAt
-      };
-    }),
+    resources: output?.resources,
+    guests,
+    isExclusionEvent,
+    additionalInfo: output?.additionalInfo,
   };
 };
 
