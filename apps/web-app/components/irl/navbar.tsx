@@ -27,6 +27,8 @@ const Navbar = (props) => {
             <img
               src="/assets/images/icons/left-arrow-blue.svg"
               alt="left arrow"
+              width={16}
+              height={16}
             />
             Back
           </a>
