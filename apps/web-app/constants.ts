@@ -276,8 +276,10 @@ export const APP_ANALYTICS_EVENTS = {
   IRL_GUEST_LIST_TELEGRAM_BTN_CLICKED:'irl-guest-list-telegram-btn-clicked',
   IRL_BANNER_VIEW_SCHEDULE_BTN_CLICKED:"irl-banner-view-schedule-btn-clicked",
   IRL_BANNER_ADD_EVENT_BTN_CLICKED:"irl-banner-add-event-btn-clicked",
-  IRL_BANNER_RESOURCE_CLICKED:'irl-banner-resource-clicked',
+  IRL_RESOURCE_CLICKED:'irl-resource-clicked',
+  IRL_RESOURCES_LOGIN_BTN_CLICKED:"irl-resources-login-btn-clicked",
   IRL_RESOURCE_POPUP_RESOURCE_LINK_CLICKED:"irl-banner-resource-popup-resource-link-clicked",
+  IRL_RESOURCE_POPUP_LOGIN_CLICKED:"irl-resource-popup-login-clicked",
   IRL_RESOURCES_SEE_MORE_CLICKED:"irl-resources-see-more-clicked",
   IRL_JOIN_EVENT_STRIP_LOGIN_BTN_CLICKED:"irl-join-event-strip-login-btn-clicked",
   IRL_JOIN_EVENT_STRIP_IAM_GOING_BTN_CLICKED:"irl-join-event-strip-iam-going-btn-clicked",
@@ -287,6 +289,7 @@ export const APP_ANALYTICS_EVENTS = {
   IRL_EDIT_RESPONSE_BTN_CLICKED:"irl-edit-response-btn-clicked",
   IRL_GUEST_LIST_SEARCH:'irl-guest-list-search',
   IRL_GUEST_LIST_TABLE_SORT_CLICKED:"irl-guest-list-table-sort-clicked",
+  IRL_GUEST_LIST_TABLE_FILTER_CLICKED:"irl-guest-list-table-filter-clicked",
   IRL_GUEST_LIST_TABLE_LOGIN_BTN_CLICKED:"irl-guest-list-table-login-btn-clicked",
   IRL_GUEST_LIST_TABLE_TEAM_CLICKED:"irl-guest-list-table-team-clicked",
   IRL_GUEST_LIST_TABLE_MEMBER_CLICKED:"irl-guest-list-table-member-clicked",
@@ -537,4 +540,13 @@ export const FOCUS_AREAS_FILTER_KEYS = {
 export const INVITE_ONLY_RESTRICTION_ERRORS = {
   NOT_LOGGED_IN: "not_logged_in",
   UNAUTHORIZED: "unauthorized",
+}
+
+export const IRL_LW_EE_DATES = {
+  startDate:"2024-05-28",
+  endDate:"2024-07-04"
+}
+
+export const EVENT_TYPE = {
+  INVITE_ONLY:"INVITE_ONLY"
 }

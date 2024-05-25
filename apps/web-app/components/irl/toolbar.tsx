@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
-import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
+import { APP_ANALYTICS_EVENTS, EVENT_TYPE } from 'apps/web-app/constants';
 import { getUserInfo } from 'apps/web-app/utils/shared.utils';
 import Search from './search';
 
@@ -12,12 +12,12 @@ const Toolbar = (props: any) => {
   const isPastEvent = eventDetails?.isPastEvent;
   const filteredList = props?.filteredList;
   const type = eventDetails?.type;
+  const schedule = eventDetails?.additionalInfo?.schedule ?? 'View Schedule';
+  const websiteUrl = eventDetails?.websiteUrl;
+
   const [searchTerm, setSearchTerm] = useState('');
   const analytics = useAppAnalytics();
   const user = getUserInfo();
-
-  const telegramExclusions = process.env.IRL_TELEGRAM_EXCLUSIONS;
-  const telegramExclusionIds = telegramExclusions?.split(',');
 
   const onIAmGoingClick = () => {
     analytics.captureEvent(
@@ -79,14 +79,27 @@ const Toolbar = (props: any) => {
     onLogin();
   };
 
-  const onTelegramLinkClick = () => {
+  // const onTelegramLinkClick = () => {
+  //   analytics.captureEvent(
+  //     APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TELEGRAM_BTN_CLICKED,
+  //     {
+  //       eventId: eventDetails?.id,
+  //       eventName: eventDetails?.name,
+  //       telegramUrl: eventDetails?.telegram,
+  //       isPastEvent,
+  //       user,
+  //     }
+  //   );
+  // };
+
+  const onScheduleClick = () => {
     analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TELEGRAM_BTN_CLICKED,
+      APP_ANALYTICS_EVENTS.IRL_BANNER_VIEW_SCHEDULE_BTN_CLICKED,
       {
         eventId: eventDetails?.id,
         eventName: eventDetails?.name,
-        telegramUrl: eventDetails?.telegram,
         isPastEvent,
+        schedulePageUrl: eventDetails?.websiteUrl,
         user,
       }
     );
@@ -113,33 +126,24 @@ const Toolbar = (props: any) => {
     <>
       <div className="lg:flex-wrap-[unset] lg:justify-between-[unset] flex flex-wrap items-center justify-between gap-y-2 lg:items-center">
         <span className="w-auto text-[18px] font-[700] lg:text-[20px]">
-          Attendees
+          Attendees{` `}
           <span className="text-[14px] font-[400]">
-            {' '}
             ({filteredList.length})
           </span>
         </span>
         <div className="flex w-auto justify-end gap-[8px] lg:order-3 lg:flex-1">
-          {(telegramExclusionIds?.includes(eventDetails?.id)
-            ? isUserLoggedIn && eventDetails?.telegram
-            : eventDetails?.telegram) && (
+          {websiteUrl && (
             <a
-              href={eventDetails?.telegram}
               target="_blank"
-              onClick={onTelegramLinkClick}
-              className="flex h-10 items-center gap-1 rounded-lg border border-[#CBD5E1] bg-white py-[6px] px-[12px] text-[14px] font-[500] lg:px-[24px]"
+              rel="noreferrer"
+              href={websiteUrl}
+              className="flex h-[40px] items-center justify-center gap-[8px] rounded-[8px] border border-[#CBD5E1] bg-white px-[18px] py-[10px] text-[14px] font-[500] leading-5 text-[#0F172A] lg:w-[unset] lg:px-6"
+              onClick={onScheduleClick}
             >
-              <img
-                width={21}
-                height={21}
-                src="/assets/images/icons/telegram-contact-logo.svg"
-                alt="telegram"
-              />
-              {/* {eventDetails.type !== "INVITE_ONLY" && <p>Telegram</p>} */}
-              <p className="hidden lg:block">Telegram</p>
+              {schedule}
             </a>
           )}
-          {type !== 'INVITE_ONLY' &&
+          {type !== EVENT_TYPE.INVITE_ONLY &&
             !isUserGoing &&
             isUserLoggedIn &&
             !isPastEvent && (
@@ -168,8 +172,11 @@ const Toolbar = (props: any) => {
           )}
         </div>
         {isUserLoggedIn && (
-          <div className="w-full lg:order-2 lg:ml-4 lg:w-[256px]">
-            <Search onChange={getValue} placeholder="Search by Attendee Name" />
+          <div className="w-full lg:order-2 lg:ml-4 lg:w-[300px]">
+            <Search
+              onChange={getValue}
+              placeholder="Search by Attendee, Team or Project"
+            />
           </div>
         )}
       </div>

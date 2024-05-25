@@ -1,4 +1,4 @@
-import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
+import { APP_ANALYTICS_EVENTS, EVENT_TYPE } from 'apps/web-app/constants';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { getUserInfo } from 'apps/web-app/utils/shared.utils';
 
@@ -51,7 +51,7 @@ const JoinEventStrip = (props: any) => {
           </p>
         </div>
         <div className="joinEventStrip__btnWrpr">
-          {isUserLoggedIn && !isUserGoing && type !== 'INVITE_ONLY' && (
+          {isUserLoggedIn && !isUserGoing && type !== EVENT_TYPE.INVITE_ONLY && (
             <button
               onClick={onJoinClick}
               className="joinEventStrip__btnWrpr__btn"

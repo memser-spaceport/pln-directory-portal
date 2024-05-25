@@ -1,15 +1,16 @@
 import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
-import { useIrlDetails } from 'apps/web-app/hooks/irl/use-irl-details';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { getUserInfo } from 'apps/web-app/utils/shared.utils';
 import Link from 'next/link';
+import GuestDescription from './guest-description';
+import { formatDateRange } from 'apps/web-app/utils/irl.utils';
+import { Tooltip } from './tooltip';
 
 const MemberList = (props: any) => {
   const userInfo = props?.userInfo;
   const eventDetails = props?.eventDetails;
   const analytics = useAppAnalytics();
   const user = getUserInfo();
-
   const filteredList = props?.items;
 
   const onTeamClick = (teamUid: string, teamName: string) => {
@@ -62,6 +63,11 @@ const MemberList = (props: any) => {
         {filteredList.length > 0 &&
           filteredList.map((item, itemIndex) => {
             const isUserGoing = item.memberUid === userInfo.uid;
+            const topicsNeedToShow = 2;
+            const topics = item?.topics;
+            const remainingTopics = topics
+              .slice(topicsNeedToShow, topics?.length)
+              .map((topic) => topic);
             return (
               <div
                 key={`${itemIndex}-event-list`}
@@ -69,90 +75,140 @@ const MemberList = (props: any) => {
                   itemIndex !== filteredList?.length - 1
                     ? 'border-b-[1px] border-b-[#CBD5E1]'
                     : ''
-                } py-[12px] text-[13px] font-[400] lg:w-[100%]`}
+                } py-[12px] px-5 text-[13px] font-[400] lg:w-[100%]`}
               >
-                <div className="flex w-[200px] items-center justify-start gap-[4px] pl-[20px]">
-                  <Link href={`/members/${item.memberUid}`}>
-                    <a
-                      target="_blank"
-                      title={item.memberName}
-                      className="w-fit break-words pr-[3px]"
-                      onClick={() =>
-                        onMemberClick(item?.memberUid, item?.memberName)
-                      }
-                    >
-                      <span className="flex w-fit items-center gap-1">
-                        <div className="h-[32px] w-[32px] rounded-[58px] ">
-                          <img
-                            alt="member image"
-                            src={
-                              item?.memberLogo ||
-                              '/assets/images/icons/memberdefault.svg'
-                            }
-                            className="h-[32px] w-[32px] rounded-[58px] bg-gray-200 object-cover"
-                          />
-                        </div>
-                        <span className="w-fit">{item.memberName}</span>
-                      </span>
-                    </a>
-                  </Link>
-                </div>
-                <div className="flex w-[200px] items-center justify-start gap-[4px]">
+                <div className="flex w-[160px] items-center justify-start gap-[4px]">
                   <span>
                     <Link href={`/teams/${item.teamUid}`}>
                       <a
                         target="_blank"
                         title={item.teamName}
-                        className="text-clamp flex-1 break-words pr-[2px]"
+                        className="flex w-fit items-center gap-1"
                         onClick={() =>
                           onTeamClick(item?.teamUid, item?.teamName)
                         }
                       >
-                        <span className="flex items-center gap-1">
-                          <div className="h-[32px] w-[32px]">
-                            <img
-                              alt="team logo"
-                              src={
-                                item?.teamLogo ||
-                                '/assets/images/icons/teamdefault.svg'
-                              }
-                              className="h-[32px] w-[32px] "
-                            />
-                          </div>
-                          <span>{item.teamName}</span>
-                        </span>
+                        <div className="h-[32px] w-[32px]">
+                          <img
+                            alt="team logo"
+                            src={
+                              item?.teamLogo ||
+                              '/assets/images/icons/teamdefault.svg'
+                            }
+                            className="h-[32px] w-[32px] "
+                            loading="lazy"
+                          />
+                        </div>
+                        <div style={{ wordBreak: 'break-word' }}>
+                          {item.teamName}
+                        </div>
                       </a>
                     </Link>
                   </span>
                 </div>
-                <div className="flex w-[150px] items-center justify-start">
-                  {/* <p className="text-clamp break-words pr-[2px]">
-                {item.telegramId}
-              </p> */}
-                  <Link href={`https://t.me/${item.telegramId}`}>
+                <div className="flex w-[160px] items-center justify-start gap-[4px] pr-4">
+                  <Link href={`/members/${item.memberUid}`}>
                     <a
+                      title={item.memberName}
                       target="_blank"
-                      title={item.telegramId}
-                      className="text-clamp w-fit break-words pr-[2px]"
+                      className="flex w-fit items-start gap-2"
                       onClick={() =>
-                        onTelegramClick(
-                          `https://t.me/${item.telegramId}`,
-                          item?.memberUid,
-                          item?.memberName
-                        )
+                        onMemberClick(item?.memberUid, item?.memberName)
                       }
                     >
-                      {item.telegramId}
+                      <div className="h-[32px] w-[32px] rounded-[58px]">
+                        <img
+                          alt="member image"
+                          src={
+                            item?.memberLogo ||
+                            '/assets/images/icons/memberdefault.svg'
+                          }
+                          loading="lazy"
+                          className="h-[32px] w-[32px] rounded-[58px] bg-gray-200 object-cover"
+                        />
+                      </div>
+                      <div
+                        style={{ wordBreak: 'break-word' }}
+                        className="flex flex-1 flex-col"
+                      >
+                        <div className="text-clamp text-[13px] leading-5 text-[#000000]">
+                          {item.memberName}
+                        </div>
+                        {item?.telegramId ? (
+                          <span className="flex items-center gap-1">
+                            <img
+                              src="/assets/images/icons/telegram-solid.svg"
+                              alt="telegram"
+                            />
+                            <a
+                              target="_blank"
+                              title={item.telegramId}
+                              href={`https://t.me/${item.telegramId}`}
+                              className="text-clamp text-[12px] leading-5 text-[#156FF7]"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onTelegramClick(
+                                  item.telegramId,
+                                  item?.memberUid,
+                                  item?.memberName
+                                );
+                              }}
+                            >
+                              @{item?.telegramId}
+                            </a>
+                          </span>
+                        ) : (
+                          <span className="text-[#156FF7]">-</span>
+                        )}
+                      </div>
                     </a>
                   </Link>
                 </div>
-                <div className="flex w-[330px] items-center justify-start pr-[20px]">
-                  <p
-                    style={{ wordBreak: 'break-word' }}
-                    className="break-words"
-                  >
-                    {item.reason}
-                  </p>
+                {!eventDetails?.isExclusionEvent && (
+                  <div className="w-[160px]">
+                    <span className="flex h-full items-center text-[13px] leading-6 text-[#0F172A]">
+                      {item?.memberRole}
+                    </span>
+                  </div>
+                )}
+                {eventDetails?.isExclusionEvent && (
+                  <div className="w-[160px]">
+                    <span className="flex h-full items-center text-[13px] leading-6 text-[#0F172A]">
+                      {formatDateRange(
+                        item?.additionalInfo?.checkInDate,
+                        item?.additionalInfo?.checkOutDate
+                      )}
+                    </span>
+                  </div>
+                )}
+                <div className="flex w-[380px] flex-col justify-start gap-1">
+                  <GuestDescription description={item?.reason} />
+                  <div className="flex flex-wrap items-center gap-1">
+                    {topics?.slice(0, topicsNeedToShow).map((topic, index) => (
+                      <span
+                        key={`topic-${index}`}
+                        className="flex h-[20px] items-center rounded-[24px] border border-[#CBD5E1] bg-[#F1F5F9] px-2 text-xs font-[500] leading-[14px] text-[#475569]"
+                      >
+                        {topic}
+                      </span>
+                    ))}
+                    {topics?.length > topicsNeedToShow && (
+                      <Tooltip
+                        asChild
+                        content={
+                          <span className="rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white">
+                            {remainingTopics?.join(', ')}
+                          </span>
+                        }
+                        align="start"
+                        trigger={
+                          <span className="flex h-[20px] items-center rounded-[24px] border border-[#CBD5E1] bg-[#F1F5F9] px-2 text-xs font-[500] leading-[14px] text-[#475569]">
+                            {`+${topics?.length - topicsNeedToShow}`}
+                          </span>
+                        }
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             );

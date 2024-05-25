@@ -14,15 +14,17 @@ const IrlMain = (props: any) => {
   const userInfo = props?.userInfo;
   const teams = props?.teams;
   const isUserLoggedIn = props?.isUserLoggedIn;
+  // const telegram = eventDetails?.telegram;
+  // const resources = eventDetails?.resources ?? [];
   const registeredGuest = eventDetails.guests.find(
-    (guest) => guest.memberUid === userInfo.uid
+    (guest) => guest?.memberUid === userInfo?.uid
   );
 
   const [updatedEventDetails, setUpdatedEventDetails] = useState(eventDetails);
   const [isOpen, setIsOpen] = useState(false);
   const [updatedUser, setUpdatedUser] = useState(registeredGuest);
   const [isUserGoing, setIsGoing] = useState(props?.isUserGoing);
-  const { filteredList, sortConfig } = useIrlDetails(
+  const { filteredList, sortConfig, filterConfig } = useIrlDetails(
     updatedEventDetails.guests,
     userInfo
   );
@@ -31,13 +33,14 @@ const IrlMain = (props: any) => {
     setIsOpen(false);
   };
 
+  //update event details when form submit
   useEffect(() => {
     const handler = (e: any) => {
       const eventDetails = e.detail.eventDetails;
       const registeredGuest = eventDetails?.guests.find(
         (guest) => guest.memberUid === userInfo.uid
       );
-      const sortedGuests = sortByDefault(eventDetails?.guests)
+      const sortedGuests = sortByDefault(eventDetails?.guests);
 
       if (registeredGuest) {
         setIsGoing(true);
@@ -62,6 +65,7 @@ const IrlMain = (props: any) => {
     };
   }, []);
 
+  //toggle attendees details modal
   useEffect(() => {
     const handler = (e: any) => {
       const isOpen = e.detail.isOpen;
@@ -114,6 +118,7 @@ const IrlMain = (props: any) => {
               eventDetails={updatedEventDetails}
               filteredList={filteredList}
               sortConfig={sortConfig}
+              // filterConfig={filterConfig}
             />
             <div
               className={`relative -mt-[4px] ${

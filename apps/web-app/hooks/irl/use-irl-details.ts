@@ -6,6 +6,7 @@ export const useIrlDetails = (rawGuestList, userInfo) => {
   const [sortConfig, setSortConfig] = useState({ key: null, order: 'default' });
   const [filteredList, setFilteredList] = useState([...rawGuestList]);
   const [searchItem, setSearchItem] = useState('');
+  const [filterConfig, setFilterConfig] = useState({});
 
   useEffect(() => {
     const searchHandler = (e: any) => {
@@ -29,26 +30,46 @@ export const useIrlDetails = (rawGuestList, userInfo) => {
       });
     };
 
+    const filterHandler = (e: any) => {
+      const key = e.detail?.key;
+      const selectedItems = e.detail?.selectedItems;
+      setFilterConfig((prev) => ({ ...prev, [key]: selectedItems }));
+    };
+
     document.addEventListener('irl-details-searchlist', searchHandler);
     document.addEventListener('irl-details-sortlist', sortHandler);
+    document.addEventListener('irl-details-filterList', filterHandler);
 
     return () => {
       document.removeEventListener('irl-details-searchlist', searchHandler);
       document.removeEventListener('irl-details-sortlist', sortHandler);
+      document.removeEventListener('irl-details-filter', filterHandler);
     };
   }, []);
 
   useEffect(() => {
     let filteredItems = [...rawGuest];
+
+    //search by memberName, teamName, projectName
     if (searchItem?.trim() !== '') {
-      filteredItems = [...rawGuest].filter((v) =>
-        v.memberName.toLowerCase().includes(searchItem.toLowerCase())
+      filteredItems = [...rawGuest].filter(
+        (v) =>
+          v?.memberName
+            ?.toLowerCase()
+            ?.includes(searchItem?.toLowerCase()?.trim()) ||
+          v?.teamName
+            ?.toLowerCase()
+            ?.includes(searchItem?.toLowerCase()?.trim()) ||
+          v?.projectContributions?.some((project: string) =>
+            project?.toLowerCase()?.includes(searchItem?.toLowerCase()?.trim())
+          )
       );
       filteredItems = filteredItems.sort((a, b) =>
         a?.memberName.localeCompare(b?.memberName)
       );
     }
 
+    //sort by team & member
     if (sortConfig.key !== null) {
       if (sortConfig.order === 'asc' || sortConfig.order === 'desc') {
         const sortedData = [...filteredItems].sort((a, b) => {
@@ -59,9 +80,8 @@ export const useIrlDetails = (rawGuestList, userInfo) => {
             ? valueA?.localeCompare(valueB)
             : valueB?.localeCompare(valueA);
         });
-        setFilteredList([...sortedData]);
+        filteredItems = [...sortedData];
       } else {
-
         const sortedGuests = sortByDefault(filteredItems);
         filteredItems = sortedGuests;
 
@@ -84,10 +104,27 @@ export const useIrlDetails = (rawGuestList, userInfo) => {
 
         setFilteredList([...filteredItems]);
       }
-    } else {
-      setFilteredList([...filteredItems]);
     }
-  }, [searchItem, sortConfig, rawGuestList]);
 
-  return { filteredList, sortConfig };
+    // Roles filter
+    if (filterConfig['roles']?.length > 0) {
+      const selectedRoles = new Set(filterConfig['roles']);
+      filteredItems = [...filteredItems]?.filter((item) =>
+        selectedRoles.has(item?.memberRole)
+      );
+    }
+
+    // Topics filter
+    if (filterConfig['topics']?.length > 0) {
+      const selectedTopics = new Set(filterConfig['topics']);
+      filteredItems = [...filteredItems]?.filter((item) =>
+        item.topics.some((topic) => selectedTopics?.has(topic))
+      );
+    }
+
+    // Update the filtered list
+    setFilteredList(filteredItems);
+  }, [searchItem, sortConfig, filterConfig, rawGuestList]);
+
+  return { filteredList, sortConfig, filterConfig };
 };
