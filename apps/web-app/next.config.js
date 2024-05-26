@@ -20,6 +20,8 @@ let nextConfig = {
     AWS_S3_DOMAIN:process.env.AWS_S3_DOMAIN,
     GET_SUPPORT_URL:process.env.GET_SUPPORT_URL,
     IRL_ADD_EVENT_URL:process.env.IRL_ADD_EVENT_URL,
+    IRL_TELEGRAM_EXCLUSIONS:process.env.IRL_TELEGRAM_EXCLUSIONS,
+    IRL_DEFAULT_TOPICS:process.env.IRL_DEFAULT_TOPICS
   },
   nx: {
     // Set this to true if you would like to to use SVGR
@@ -112,6 +114,16 @@ let nextConfig = {
         source: '/events',
         destination: 'https://events.plnetwork.io/',
         permanent: false,
+      },
+      {
+        source: '/irl/lw24-fb',
+        destination: '/irl/ee-lwfb',
+        permanent: true,
+      },
+      {
+        source: '/irl/edge-esm',
+        destination: '/irl/ee-lwfb',
+        permanent: true,
       },
     ];
   },

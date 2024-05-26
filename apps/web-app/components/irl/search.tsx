@@ -11,7 +11,7 @@ const Search = (props: any) => {
           placeholder={placeholder}
         />
         <button className="search__btn">
-          <img src="/assets/images/icons/search-blue.svg" alt="search" />
+          <img src="/assets/images/icons/search-blue.svg" alt="search" width={16} height={16} />
         </button>
       </div>
       <style jsx>{`
