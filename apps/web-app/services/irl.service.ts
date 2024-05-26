@@ -21,6 +21,7 @@ export const getAllEvents = async () => {
           createdAt: event?.createdAt,
           type: event?.type,
           attendees: event?.eventGuests?.length,
+          isPastEvent: isPastDate(event?.endDate),
         };
       });
 
