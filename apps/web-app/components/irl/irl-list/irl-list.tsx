@@ -27,8 +27,8 @@ export default function IrlList(props: IIrlList) {
 
   //variable
   const [restrictionReason, setRestrictionReason] = useState<string>('');
-  const pastEvents = props.conference?.filter((item) => item.isPastEvent);
-  const upcomingEvents = props.conference?.filter((item) => !item.isPastEvent);
+  const pastEvents = conference?.filter((item) => item.isPastEvent);
+  const upcomingEvents = conference?.filter((item) => !item.isPastEvent);
   const analytics = useAppAnalytics();
   const user = getUserInfo();
 
@@ -140,6 +140,7 @@ export default function IrlList(props: IIrlList) {
             flex-wrap: wrap;
             justify-content: flex-start;
             gap: 16px;
+            width: 100%;
           }
 
           .irlList__upcoming__events {
@@ -148,9 +149,10 @@ export default function IrlList(props: IIrlList) {
             flex-wrap: wrap;
             justify-content: center;
             gap: 16px;
+            width: 100%;
           }
 
-          .irlList__past{
+          .irlList__past {
             display: flex;
             flex-direction: column;
             align-items: flex-start;
@@ -160,15 +162,15 @@ export default function IrlList(props: IIrlList) {
             width: 100%;
           }
 
-          .irlList__past__title{
+          .irlList__past__title {
             width: 100%;
-            font-weight:700;
-            font-size:18px;
-            line-height:20px;
-            color:#0F172A;
+            font-weight: 700;
+            font-size: 18px;
+            line-height: 20px;
+            color: #0f172a;
             padding-left: 20px;
             padding-bottom: 16px;
-            border-bottom: 1px solid #CBD5E1;
+            border-bottom: 1px solid #cbd5e1;
           }
 
           .irlList__past__events {
@@ -191,18 +193,19 @@ export default function IrlList(props: IIrlList) {
               gap: 24px;
             }
 
-            .irlList__upcoming__title{
-              font-size:28px;
-              line-height:40px;
-            }
-            
-            .irlList__upcoming__events {
-              justify-content: flex-start;
+            .irlList__upcoming__title {
+              font-size: 28px;
+              line-height: 40px;
             }
 
-            .irlList__past__title{
-              font-size:28px;
-              line-height:40px;
+            .irlList__upcoming__events {
+              justify-content: flex-start;
+              align-items: flex-start;
+            }
+
+            .irlList__past__title {
+              font-size: 28px;
+              line-height: 40px;
               padding-left: 0;
             }
 

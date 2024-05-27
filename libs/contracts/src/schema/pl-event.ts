@@ -24,6 +24,7 @@ export const PLEventSchema = z.object({
       description: z.string().optional()
     })
   ).optional(),
+  priority: z.number(),
   additionalInfo: z.any(),
   startDate: z.string(),
   endDate: z.string(),
