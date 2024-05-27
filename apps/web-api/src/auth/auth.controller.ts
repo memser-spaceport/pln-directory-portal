@@ -19,7 +19,7 @@ import { UserAccessTokenValidateGuard } from '../guards/user-access-token-valida
 import { LogService } from '../shared/log.service';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { UserAuthTokenValidation } from '../guards/user-authtoken-validation.guard';
-import { ResendOtpRequestDto, SendOtpRequestDto, TokenRequestDto, VerifyOtpRequestDto } from 'libs/contracts/src/schema/auth';
+import { AuthRequestDto, ResendOtpRequestDto, SendOtpRequestDto, TokenRequestDto, VerifyOtpRequestDto } from 'libs/contracts/src/schema/auth';
 
 
 @Controller('v1/auth')
@@ -49,6 +49,13 @@ export class AuthController {
   @UsePipes(ZodValidationPipe)
   async verifyOtp(@Body() verifyOtpRequest: VerifyOtpRequestDto) {
     return await this.authService.verifyEmailOtpAndLinkAccount(verifyOtpRequest.otp, verifyOtpRequest.otpToken, verifyOtpRequest.idToken)
+  }
+
+  @Post()
+  @NoCache()
+  @UsePipes(ZodValidationPipe)
+  async createAuthRequest(@Body() authRequest: AuthRequestDto) {
+    return await this.authService.createAuthRequest(authRequest);
   }
 
   @Post('token')

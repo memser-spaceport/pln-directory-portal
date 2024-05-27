@@ -10,7 +10,6 @@ function AuthInvalidUser() {
         function handleInvalidEmail(e) {
             if(e?.detail) {
                 if(e.detail === "linked_to_another_user") {
-                    console.log(e)
                     setTitle('Invalid Email')
                     setDescription('Email provided is already linked to another user. Please try again with another email.')
                 }

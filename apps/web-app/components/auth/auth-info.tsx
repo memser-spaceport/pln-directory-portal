@@ -14,18 +14,16 @@ function AuthInfo(props) {
       if (!key.includes('privy_')) {
         queryParams = `${queryParams}${queryParams === '?' ? '' : '&'}${key}=${value}`;
       }
-      console.log(`Key: ${key}, Value: ${value}`);
     });
     router.push(`${window.location.pathname}${queryParams === '?' ? '' : queryParams}`);
   };
 
   // Initiate Privy Login and get the auth code for state
   const onLogin = async () => {
-    const result = await axios.post(`${process.env.AUTH_API_URL}/auth`, {
+    const result = await axios.post(`${process.env.WEB_API_BASE_URL}/v1/auth`, {
       state: generateOAuth2State(),
-      client_id: process.env.AUTH_APP_CLIENT_ID,
     });
-    localStorage.setItem('stateUid', result.data.uid);
+    localStorage.setItem('stateUid', result.data);
     document.dispatchEvent(new CustomEvent('privy-init-login'));
     router.push(`${window.location.pathname}${window.location.search}`);
   };

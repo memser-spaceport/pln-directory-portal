@@ -32,7 +32,6 @@ function PrivyModals() {
       if (!key.includes('privy_')) {
         queryParams = `${queryParams}${queryParams === '?' ? '' : '&'}${key}=${value}`;
       }
-      console.log(`Key: ${key}, Value: ${value}`);
     });
     router.push(`${window.location.pathname}${queryParams === '?' ? '' : queryParams}`);
   };
@@ -76,7 +75,6 @@ function PrivyModals() {
   }
 
   const saveTokensAndUserInfo = (output, user) => {
-    console.log(user, 'user');
     const authLinkedAccounts = getLinkedAccounts(user);
     const accessTokenExpiry = decodeToken(output.accessToken);
     const refreshTokenExpiry = decodeToken(output.refreshToken);
@@ -120,7 +118,6 @@ function PrivyModals() {
         loginInUser(result.data)
       })
       .catch((e) => {
-        console.error(e);
         if (user?.email?.address && e.response.status === 403) {
           if(user?.email?.address && user?.linkedAccounts.length > 1) {
             unlinkEmail(user?.email?.address);
@@ -135,7 +132,6 @@ function PrivyModals() {
   useEffect(() => {
     function handlePrivyLoginSuccess(e) {
       const info = e.detail;
-      console.log(info, 'login success');
       // If email is not linked, link email mandatorily
       if (!info?.user?.email?.address) {
         setLinkAccountKey('email');
@@ -148,7 +144,6 @@ function PrivyModals() {
     function handlePrivyLinkSuccess(e) {
       const { linkMethod, linkedAccount } = e.detail;
       const authLinkedAccounts = getLinkedAccounts(e.detail.user)
-      console.log( e.detail, 'linked account---');
       if (linkMethod === 'email') {
         // Initiate Directory Login to validate email and login user
         initDirectoryLogin();

@@ -29,6 +29,15 @@ export class AuthService implements OnModuleInit {
       this.membersService = this.moduleRef.get(MembersService, {strict : false});
     }
 
+  async createAuthRequest(authRequest) {
+    const output = await axios.post(`${process.env.AUTH_API_URL}/auth`, {
+      state: authRequest.state,
+      client_id: process.env.AUTH_APP_CLIENT_ID,
+    })
+
+    return output.data.uid;
+  }
+
   async getTokenAndUserInfo(tokenRequest) {
     const { id_token, access_token, refresh_token } = await this.getAuthTokens(tokenRequest);
     const { email, externalId } = await this.decodeAuthIdToken(id_token)
