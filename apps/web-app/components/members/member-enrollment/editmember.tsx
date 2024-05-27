@@ -64,6 +64,7 @@ interface EditMemberModalProps {
   isUserProfile?: boolean;
   userInfo?: any;
   tabSelection: string;
+  authLinkedAccounts?: string;
   setModified?: (boolean) => void;
   setRefreshMemberAutocomplete?: (boolean) => void;
 }
@@ -248,6 +249,7 @@ export function EditMemberModal({
   isUserProfile = false,
   setModified,
   tabSelection,
+  authLinkedAccounts,
   setRefreshMemberAutocomplete,
 }: EditMemberModalProps) {
   const tabs = ['BASIC', 'SKILLS', 'CONTRIBUTIONS', 'SOCIAL'];
@@ -327,6 +329,11 @@ export function EditMemberModal({
     setFormValues((v) => (v['email'] = newEmailValue));
   };
 
+  const onUpdateEmail = (newEmailValue) => {
+    setFormValues((v) => (v['email'] = newEmailValue));
+    handleSubmit({});
+  }
+
   const onChangeEmailClose = (step) => {
     setEmailEditStatus(false);
     if (step && step === 3) {
@@ -368,13 +375,13 @@ export function EditMemberModal({
         logoutAndRedirect(PAGE_ROUTES.MEMBERS);
       }
 
-      setEmailEditStatus(true);
+      document.dispatchEvent(new CustomEvent('auth-link-account', {detail: 'updateEmail'}))
     } else {
-      analytics.captureEvent(
+     /*  analytics.captureEvent(
         APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_CHANGE_EMAIL_CLICKED,
         {}
       );
-      setEmailEditStatus(true);
+      setEmailEditStatus(true); */
     }
   };
 
@@ -643,7 +650,9 @@ export function EditMemberModal({
 
   const handleSubmit = useCallback(
     async (e) => {
-      e.preventDefault();
+      if(e.preventDefault) {
+        e.preventDefault();
+      }
       setResetImg(true);
       if (isModified) {
         setImageChanged(false);
@@ -679,7 +688,7 @@ export function EditMemberModal({
           setIsErrorPopupOpen(true);
           return false;
         }
-        trackGoal(FATHOM_EVENTS.teams.profile.editSave, 0);
+        // trackGoal(FATHOM_EVENTS.teams.profile.editSave, 0);
         const values = formatData();
         try {
           // const captchaToken = await executeRecaptcha();
@@ -1049,6 +1058,8 @@ export function EditMemberModal({
                         resetImg={resetImg}
                         onResetImg={handleResetImg}
                         dataLoaded={dataLoaded}
+                        authLinkedAccounts={authLinkedAccounts}
+                        onUpdateEmail={onUpdateEmail}
                       />
                     </div>
                     <div className={openTab === 2 ? 'block' : 'hidden'}>

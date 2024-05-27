@@ -31,7 +31,7 @@ import { VerifyEmailModal } from '../components/layout/navbar/login-menu/verify-
 import { ReactComponent as SuccessIcon } from '../public/assets/images/icons/success.svg';
 import { logoutAllTabs } from '../utils/services/auth';
 import { decodeToken } from '../utils/services/auth';
-import { PrivyProvider } from '@privy-io/react-auth';
+
 import AuthBox from '../components/auth/auth-box';
 // Check that PostHog is client-side (used to handle Next.js SSR)
 if (typeof window !== 'undefined') {
@@ -58,7 +58,6 @@ export default function CustomApp({
   pageProps,
 }: AppPropsWithLayout) {
   // Load Fathom web analytics tracker
-  const [isOpen, setIsModalOpen] = useState(false);
   useFathom();
   const router = useRouter();
 
@@ -66,15 +65,7 @@ export default function CustomApp({
     // Track page views
     const handleRouteChange = () => posthog?.capture('$pageview');
     router.events.on('routeChangeComplete', handleRouteChange);
-    const isVerified = Cookies.get('verified');
     const params = Cookies.get('page_params');
-    if (isVerified === 'true') {
-      toast.success(LOGIN_MSG, {
-        icon: <SuccessIcon />,
-      });
-    } else if (isVerified === 'false') {
-      setIsModalOpen(true);
-    }
     logoutAllTabs();
     switch (params) {
       case 'auth_error':
@@ -154,29 +145,7 @@ export default function CustomApp({
         progressClassName="!bg-[#30C593]"
       />
       <EmailOtpVerificationModal />
-      <PrivyProvider
-        appId={process.env.PRIVY_AUTH_ID}
-        config={{
-          // Customize Privy's appearance in your app
-          appearance: {
-            theme: 'light',
-            accentColor: '#676FFF',
-            landingHeader: 'PL Member Login',
-          },
-
-          // Create embedded wallets for users who don't have a wallet
-          loginMethods: ['email', 'google', 'github', 'wallet'],
-        }}
-      >
-        <AuthBox />
-      </PrivyProvider>
-      <VerifyEmailModal
-        isOpen={isOpen}
-        setIsModalOpen={(isOpen) => {
-          setIsModalOpen(isOpen);
-          router.push(PAGE_ROUTES.TEAMS);
-        }}
-      />
+      <AuthBox />
     </>
   );
 }
