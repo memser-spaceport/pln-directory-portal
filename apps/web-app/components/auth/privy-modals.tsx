@@ -1,0 +1,261 @@
+import { useEffect, useState } from 'react';
+import usePrivyWrapper from '../../hooks/auth/usePrivyWrapper';
+import { toast } from 'react-toastify';
+import axios from 'axios';
+import { calculateExpiry, decodeToken } from 'apps/web-app/utils/services/auth';
+import Cookies from 'js-cookie';
+import { useRouter } from 'next/router';
+function PrivyModals() {
+  const {
+    authenticated,
+    getAccessToken,
+    linkEmail,
+    linkGithub,
+    linkGoogle,
+    linkWallet,
+    login,
+    logout,
+    ready,
+    unlinkEmail,
+    updateEmail,
+    user,
+    PRIVY_CUSTOM_EVENTS,
+  } = usePrivyWrapper();
+  const [linkAccountKey, setLinkAccountKey] = useState('');
+  const router = useRouter();
+
+  const clearPrivyParams = () => {
+    const queryString = window.location.search.substring(1);
+    const params = new URLSearchParams(queryString);
+    let queryParams = `?`;
+    params.forEach((value, key) => {
+      if (!key.includes('privy_')) {
+        queryParams = `${queryParams}${queryParams === '?' ? '' : '&'}${key}=${value}`;
+      }
+      console.log(`Key: ${key}, Value: ${value}`);
+    });
+    router.push(`${window.location.pathname}${queryParams === '?' ? '' : queryParams}`);
+  };
+
+  const getLinkedAccounts = (user) => {
+    const userLinkedAccounts = user?.linkedAccounts ?? [];
+    const linkedAccounts = userLinkedAccounts.map((account) => {
+      const linkedType = account.type;
+      if (linkedType === 'wallet') {
+        return 'siwe';
+      } else if (linkedType === 'google_oauth') {
+        return 'google';
+      } else if (linkedType === 'github_oauth') {
+        return 'github';
+      } else {
+        return ""
+      }
+    });
+
+    return linkedAccounts.filter(v => v !== '').join(',');
+  };
+
+  const loginInUser = (output) => {
+    if (output.userInfo?.isFirstTimeLogin) {
+        router.push('/settings');
+      }
+      clearPrivyParams();
+      setLinkAccountKey('');
+      toast.success('Successfully Logged In', { hideProgressBar: true });
+  }
+
+  const resetLinkedAccounts = (user) => {
+    const authLinkedAccounts = getLinkedAccounts(user);
+    const refreshToken = Cookies.get('refreshToken')
+    const refreshTokenExpiry = decodeToken(refreshToken);
+    Cookies.set('authLinkedAccounts', JSON.stringify(authLinkedAccounts), {
+        expires: calculateExpiry(new Date(refreshTokenExpiry.exp)),
+        path: '/',
+        domain: process.env.COOKIE_DOMAIN || '',
+      });
+  }
+
+  const saveTokensAndUserInfo = (output, user) => {
+    console.log(user, 'user');
+    const authLinkedAccounts = getLinkedAccounts(user);
+    const accessTokenExpiry = decodeToken(output.accessToken);
+    const refreshTokenExpiry = decodeToken(output.refreshToken);
+    localStorage.removeItem('stateUid');
+    Cookies.set('authToken', JSON.stringify(output.accessToken), {
+      expires: calculateExpiry(new Date(accessTokenExpiry.exp)),
+      domain: process.env.COOKIE_DOMAIN || '',
+    });
+
+    Cookies.set('refreshToken', JSON.stringify(output.refreshToken), {
+      expires: calculateExpiry(new Date(refreshTokenExpiry.exp)),
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN || '',
+    });
+    Cookies.set('userInfo', JSON.stringify(output.userInfo), {
+      expires: calculateExpiry(new Date(accessTokenExpiry.exp)),
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN || '',
+    });
+
+    Cookies.set('authLinkedAccounts', JSON.stringify(authLinkedAccounts), {
+      expires: calculateExpiry(new Date(refreshTokenExpiry.exp)),
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN || '',
+    });
+
+   
+  };
+
+  const initDirectoryLogin = async () => {
+    getAccessToken()
+      .then((privyToken) => {
+        return axios.post(`${process.env.WEB_API_BASE_URL}/v1/auth/token`, {
+          exchangeRequestToken: privyToken,
+          exchangeRequestId: localStorage.getItem('stateUid'),
+          grantType: 'token_exchange',
+        });
+      })
+      .then((result) => {
+        saveTokensAndUserInfo(result.data, user);
+        loginInUser(result.data)
+      })
+      .catch((e) => {
+        console.error(e);
+        if (user?.email?.address && e.response.status === 403) {
+          if(user?.email?.address && user?.linkedAccounts.length > 1) {
+            unlinkEmail(user?.email?.address);
+          }
+          setLinkAccountKey('');
+          logout();
+          document.dispatchEvent(new CustomEvent('auth-invalid-email'));
+        }
+      });
+  };
+
+  useEffect(() => {
+    function handlePrivyLoginSuccess(e) {
+      const info = e.detail;
+      console.log(info, 'login success');
+      // If email is not linked, link email mandatorily
+      if (!info?.user?.email?.address) {
+        setLinkAccountKey('email');
+        return;
+      }
+      // If linked login user
+      initDirectoryLogin();
+    }
+
+    function handlePrivyLinkSuccess(e) {
+      const { linkMethod, linkedAccount } = e.detail;
+      const authLinkedAccounts = getLinkedAccounts(e.detail.user)
+      console.log( e.detail, 'linked account---');
+      if (linkMethod === 'email') {
+        // Initiate Directory Login to validate email and login user
+        initDirectoryLogin();
+      } else if (linkMethod === 'github') {
+        document.dispatchEvent(new CustomEvent('new-auth-accounts', {detail: authLinkedAccounts}))
+        toast.success('Github linked successfully', { hideProgressBar: true });
+      } else if (linkMethod === 'google') {
+        document.dispatchEvent(new CustomEvent('new-auth-accounts', {detail: authLinkedAccounts}))
+        toast.success('Google linked successfully', { hideProgressBar: true });
+      } else if (linkMethod === 'siwe') {
+        document.dispatchEvent(new CustomEvent('new-auth-accounts', {detail: authLinkedAccounts}))
+        toast.success('Wallet linked successfully', { hideProgressBar: true });
+      }
+      setLinkAccountKey('')
+    }
+
+    function handlePrivyLoginError(e) {
+      console.log(e, 'login error')
+    }
+
+    function handlePrivyLinkError(e) {
+        console.log(e, e?.detail?.error);
+        const userInfo = Cookies.get('userInfo');
+          const accessToken = Cookies.get('accessToken');
+          const refreshToken = Cookies.get('refreshToken');
+          if (!userInfo && !accessToken && !refreshToken) {
+            logout();
+            document.dispatchEvent(new CustomEvent('auth-invalid-email', {detail: e?.detail?.error}));
+            setLinkAccountKey('');
+             //setLinkAccountKey('');
+          }
+    }
+    function initPrivyLogin() {
+      login();
+    }
+    function addAccountToPrivy(e) {
+      setLinkAccountKey(e.detail);
+    }
+    function handlePrivyLogout() {
+      Cookies.remove('authLinkedAccounts')
+      logout();
+    }
+    document.addEventListener('privy-init-login', initPrivyLogin);
+    document.addEventListener('auth-link-account', addAccountToPrivy);
+    document.addEventListener('init-privy-logout', handlePrivyLogout);
+    document.addEventListener(PRIVY_CUSTOM_EVENTS.AUTH_LOGIN_SUCCESS, handlePrivyLoginSuccess);
+    document.addEventListener(PRIVY_CUSTOM_EVENTS.AUTH_LINK_ACCOUNT_SUCCESS, handlePrivyLinkSuccess);
+    document.addEventListener(PRIVY_CUSTOM_EVENTS.AUTH_LOGIN_ERROR, handlePrivyLoginError);
+    document.addEventListener(PRIVY_CUSTOM_EVENTS.AUTH_LINK_ERROR, handlePrivyLinkError);
+    return function () {
+      document.removeEventListener('privy-init-login', initPrivyLogin);
+      document.removeEventListener('auth-link-account', addAccountToPrivy);
+      document.removeEventListener('init-privy-logout', handlePrivyLogout);
+      document.removeEventListener(PRIVY_CUSTOM_EVENTS.AUTH_LOGIN_SUCCESS, handlePrivyLoginSuccess);
+      document.removeEventListener(PRIVY_CUSTOM_EVENTS.AUTH_LINK_ACCOUNT_SUCCESS, handlePrivyLinkSuccess);
+      document.removeEventListener(PRIVY_CUSTOM_EVENTS.AUTH_LOGIN_ERROR, handlePrivyLoginError);
+      document.removeEventListener(PRIVY_CUSTOM_EVENTS.AUTH_LINK_ERROR, handlePrivyLinkError);
+    };
+  }, [user, login, logout]);
+
+  /**** FIX NEEDED: Currently privy link methods throws errors when called directly. Requires useEffect based setup like below *****/
+  useEffect(() => {
+    if (linkAccountKey === 'github') {
+      linkGithub();
+      setLinkAccountKey('')
+    } else if (linkAccountKey === 'google') {
+      linkGoogle();
+      setLinkAccountKey('')
+    } else if (linkAccountKey === 'siwe') {
+      linkWallet();
+      setLinkAccountKey('')
+    } else if (linkAccountKey === 'email') {
+      linkEmail();
+      setLinkAccountKey('')
+    } else if (linkAccountKey === 'updateEmail') {
+        updateEmail();
+        setLinkAccountKey('')
+    }
+  }, [linkAccountKey]);
+
+  return (
+    <>
+      <style jsx global>
+        {`
+          #privy-modal-content {
+            overflow-y: auto !important;
+            scrollbar-width: thin;
+          }
+          #privy-modal-content img[alt='PL Network logo'] {
+            max-width: none !important;
+            width: 100% !important;
+            object-fit: cover;
+            object-position: top;
+            margin: 0;
+            padding: 0;
+            max-height: fit-content !important;
+          }
+          div:has(> img[alt='PL Network logo']) {
+            padding: 0;
+          }
+          .hide-on-mobile {
+            display: none !important;
+          }
+        `}
+      </style>
+    </>
+  );
+}
+
+export default PrivyModals;
