@@ -4,6 +4,7 @@ import { Autocomplete, Breadcrumb, Dropdown } from "@protocol-labs-network/ui";
 import { trackGoal } from 'fathom-client';
 import { NextSeo } from "next-seo";
 import { setCookie } from "nookies";
+import Cookies from 'js-cookie';
 import React, { ReactElement, useEffect, useReducer, useState } from "react";
 import { EditMemberModal } from "apps/web-app/components/members/member-enrollment/editmember";
 import { EditTeamModal } from "apps/web-app/components/teams/team-enrollment/editteam";
@@ -24,7 +25,7 @@ export const SettingsContext = React.createContext({state:null, dispatch:null});
 
 export default function Settings({
     backLink,
-    userInfo, teamsDropdown, membersDropdown, tabSelection, teamSelected, memberSelected, settingCategory, preferences }) {
+    userInfo, teamsDropdown, membersDropdown, tabSelection, teamSelected, memberSelected, settingCategory, preferences, authLinkedAccounts }) {
 
     const [activeSetting, setActiveSetting] = useState(settingCategory ?? SETTINGS_CONSTANTS.PROFILE_SETTINGS);
     const [selectedTeam, setSelectedTeam] = useState(teamSelected ? teamSelected : (teamsDropdown && teamsDropdown.length) ? teamsDropdown[0] : null);
@@ -36,6 +37,7 @@ export default function Settings({
     const [isModifiedMember, setModifiedMember] = useState<boolean>(false);
     const [isPflModified, setModifiedProfile] = useState<boolean>(false);
     const [openValidationPopup, setOpenValidationPopup] = useState<boolean>(false);
+    const [authAccounts, setAuthAccounts] = useState(authLinkedAccounts ?? '');
     // const [isPrivacyModified, setPrivacymodifiedFlag] = useState<boolean>(false);
 
     function settingsReducer(state, action) {
@@ -72,6 +74,16 @@ export default function Settings({
         }
 
     }, [refreshMemberAutocomplete]);
+
+    useEffect(() => {
+        function authAccountsHandler(e) {
+            setAuthAccounts(e.detail)
+        }
+        document.addEventListener('new-auth-accounts', authAccountsHandler);
+        return function() {
+            document.removeEventListener('new-auth-accounts', authAccountsHandler);
+        }
+    }, [])
 
 
     const updateTeamAutocomplete = () => {
@@ -325,6 +337,7 @@ export default function Settings({
                     isProfileSettings={true}
                     isUserProfile={true}
                     tabSelection={tabSelection}
+                    authLinkedAccounts={authAccounts}
                     setModified={setModifiedProfile}
                 />
             );
@@ -442,6 +455,7 @@ export default function Settings({
 
             <NextSeo {...DIRECTORY_SEO} title={userInfo.name} />
             <Breadcrumb items={breadcrumbItems} classname="max-w-[150px] truncate" />
+            
             <SettingsContext.Provider value={{state, dispatch}}>
             <div className="w-full h-full">
                 <div className="grid grid-cols-4 pt-40 gap-x-8">
@@ -470,12 +484,15 @@ export default function Settings({
                                         </div>
 
                                     </div>
+                                   
                                     {getAdminMenuTemplate()}
+                                   
                                 </div>
                             ))
                         }
                     </div>
                     <div className="col-span-2">
+                   
                         {
                             getSettingComponent(userInfo)
                         }
@@ -607,6 +624,7 @@ export const getServerSideProps = async (ctx) => {
     }
 
     let preferences = null;
+    const authLinkedAccounts = JSON.parse(cookies.authLinkedAccounts ?? '%22%22');
     if(cookies?.authToken){
 
         try{
@@ -633,6 +651,6 @@ export const getServerSideProps = async (ctx) => {
         'no-cache, no-store, max-age=0, must-revalidate'
     );
     return {
-        props: { isUserLoggedIn, userInfo, teamsDropdown, membersDropdown, teamSelected, memberSelected, settingCategory, preferences, tabSelection: query?.tab ?? '' },
+        props: { isUserLoggedIn, userInfo, teamsDropdown, membersDropdown, teamSelected, memberSelected, settingCategory, preferences, authLinkedAccounts, tabSelection: query?.tab ?? '' },
     };
 };

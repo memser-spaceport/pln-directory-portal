@@ -15,11 +15,16 @@ const VerifyOtpRequestSchema = z.object({
     idToken: z.string()
 })
 
-const GRANT_TYPES = ["refresh_token", "authorization_code"] as const;
+const GRANT_TYPES = ["refresh_token", "authorization_code", "token_exchange"] as const;
+const AuthRequestSchema = z.object({
+    state: z.string()
+})
 const TokenRequestSchema = z.object({
     grantType: z.enum(GRANT_TYPES),
     code: z.string().optional(),
-    refreshToken: z.string().optional()
+    refreshToken: z.string().optional(),
+    exchangeRequestToken: z.string().optional(),
+    exchangeRequestId: z.string().optional()
 }).superRefine((data, ctx) => {
     if (data.grantType === 'refresh_token' && !data.refreshToken) {
         ctx.addIssue({
@@ -37,8 +42,17 @@ const TokenRequestSchema = z.object({
         });
         return z.never;
     }
+    if (data.grantType === 'token_exchange' && (!data.exchangeRequestToken || !data.exchangeRequestId)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Request token and id required for this grant type',
+            fatal: true,
+        });
+        return z.never;
+    }
 });
 
+export class AuthRequestDto extends createZodDto(AuthRequestSchema) {}
 export class SendOtpRequestDto extends createZodDto(SendOtpRequestSchema) { }
 export class ResendOtpRequestDto extends createZodDto(ResendOtpRequestSchema) { }
 export class VerifyOtpRequestDto extends createZodDto(VerifyOtpRequestSchema) { }

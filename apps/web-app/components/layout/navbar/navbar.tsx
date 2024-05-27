@@ -28,6 +28,7 @@ type INavbarProbs = {
 type ISettingMenu = {
   icon: HeroIcon;
   label: string;
+  isLink: boolean,
   url: string;
   eventCode: string;
   onClick?: () => void;
@@ -40,6 +41,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
     {
       icon: CogIcon,
       label: 'Settings',
+      isLink: true,
       url: `/settings`,
       eventCode:  FATHOM_EVENTS.directory.settings,
       onClick: () => {
@@ -54,8 +56,9 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
     },
     {
       icon: ArrowNarrowRightIcon,
+      isLink: false,
       label: 'Logout',
-      url: '#',
+      url: '',
       eventCode: FATHOM_EVENTS.directory.logout,
       onClick: () => {
         analytics.captureEvent(APP_ANALYTICS_EVENTS.NAVBAR_ACCOUNTMENU_ITEM_CLICKED, {
@@ -65,6 +68,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
         Cookies.remove('refreshToken', { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
         Cookies.remove('userInfo', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
         Cookies.set('page_params', 'logout', { expires: 60, path: '/' });
+        document.dispatchEvent(new CustomEvent('init-privy-logout'))
         toast.info(LOGOUT_MSG, {
           hideProgressBar: true
         });
@@ -147,7 +151,8 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
                       {settingMenu.map((option) => {
                         const OptionIcon = option.icon;
                         return (
-                          <Menu.Item key={option.label}>
+                          <>
+                           {option.isLink && <Menu.Item key={option.label}>
                             {(active) => (
                               <OptionLink
                                 href={option.url}
@@ -160,7 +165,23 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
                                 {option.label}
                               </OptionLink>
                             )}
-                          </Menu.Item>
+                          </Menu.Item>}
+                          {!option.isLink && <Menu.Item key={option.label}>
+                            {(active) => (
+                              <div
+                              className="on-focus cursor-pointer flex items-center rounded-md px-3 py-2 text-sm transition duration-150 ease-in-out hover:bg-slate-100 focus:bg-white"
+                                onClick={
+                                  option.onClick ? option.onClick : () => {}
+                                }
+                                
+                              >
+                                <OptionIcon className="stroke-1.5 mr-2 h-4 w-4" />
+                                {option.label}
+                              </div>
+                            )}
+                          </Menu.Item>}
+                          
+                          </>
                         );
                       })}
                     </Menu.Items>

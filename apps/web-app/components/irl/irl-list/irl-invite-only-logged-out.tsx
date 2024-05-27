@@ -26,7 +26,7 @@ export function IrlInviteOnlyLoggedOut(props: IIrlInviteOnlyLoggedOut) {
 
   const handleLoginClick = () => {
     onClose();
-    authenticate(router.asPath);
+    router.push(`${window.location.pathname}${window.location.search}#login`)
     analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_INVITE_ONLY_RESTRICTION_POPUP_LOGIN_CLICKED);
   };
 

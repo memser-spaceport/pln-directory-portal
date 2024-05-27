@@ -21,7 +21,7 @@ export function LoginModal({
   };
 
   const handleSignIn = () => {
-    authenticate(router.asPath);
+    router.push(`${window.location.pathname}${window.location.search}#login`)
     handleModalClose(true);
   };
 

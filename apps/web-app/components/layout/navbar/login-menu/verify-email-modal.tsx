@@ -2,22 +2,24 @@ import { XCircleIcon } from '@heroicons/react/solid';
 import { Dispatch, Fragment, SetStateAction } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { ReactComponent as FailedIcon } from '../../../../public/assets/images/icons/danger.svg';
-import { authenticate } from 'apps/web-app/utils/services/auth';
 import { useRouter } from 'next/router';
 interface IVerifyEmailModalProps {
   isOpen: boolean;
   setIsModalOpen: Dispatch<SetStateAction<boolean>>;
+  title?: string;
+  description?: string;
 }
 
 export function VerifyEmailModal({
   isOpen,
   setIsModalOpen,
+  title = 'Verify Membership',
+  description
 }: IVerifyEmailModalProps) {
   const handleModalClose = () => {
     setIsModalOpen(false);
   };
   const router = useRouter();
-
   return (
     <>
       <Transition appear show={isOpen} as={Fragment}>
@@ -54,22 +56,23 @@ export function VerifyEmailModal({
                     className="text-2xl flex font-bold leading-6"
                   >
                     <FailedIcon />
-                    <p className="my-auto ml-2">Verify Membership</p>
+                    <p className="my-auto ml-2">{title}</p>
                   </Dialog.Title>
-                  <div className="text-sm/5 mt-3">
+                  {!description && <div className="text-sm/5 mt-3">
                     Email doesn't match a membership email in the directory.
                     Please contact our support at{' '}
                     <span className="font-bold"> spaceport@protocol.ai </span>{' '}
                     for assistance or try to{' '}
                     <span
-                      onClick={()=>{ authenticate(router.asPath)}}
+                      onClick={()=>{ router.push(`${window.location.pathname}${window.location.search}#login`)}}
                       className="cursor-pointer font-bold italic underline"
                     >
                       {' '}
                       log in
                     </span>
                     {' '} again.
-                  </div>
+                  </div> }
+                  {description && <div className='text-sm/5 met-3'>{description}</div>}
                   <div className="w-100 mt-6 flex justify-end">
                     <button
                       type="button"
