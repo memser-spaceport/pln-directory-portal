@@ -33,6 +33,7 @@ import { logoutAllTabs } from '../utils/services/auth';
 import { decodeToken } from '../utils/services/auth';
 
 import AuthBox from '../components/auth/auth-box';
+import { AppLoader } from '../components/shared/app-loader';
 // Check that PostHog is client-side (used to handle Next.js SSR)
 if (typeof window !== 'undefined') {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
@@ -146,6 +147,7 @@ export default function CustomApp({
       />
       <EmailOtpVerificationModal />
       <AuthBox />
+      <AppLoader/>
     </>
   );
 }
