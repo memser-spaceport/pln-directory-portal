@@ -4,7 +4,7 @@ import { isPastDate } from '../utils/irl.utils';
 export const getAllEvents = async () => {
   try {
     const response = await api.get(
-      `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/irl/events?orderBy=-createdAt`
+      `${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/irl/events?orderBy=priority`
     );
 
     if (response.status === 200) {
@@ -22,6 +22,7 @@ export const getAllEvents = async () => {
           type: event?.type,
           attendees: event?.eventGuests?.length,
           isPastEvent: isPastDate(event?.endDate),
+          priority: event?.priority,
         };
       });
 
