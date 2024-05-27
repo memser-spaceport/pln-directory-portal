@@ -36,7 +36,7 @@ function AuthInfo(props) {
               <div className="infocn">
                 <img onClick={clearPrivyParams} src="/assets/images/icons/close-grey.svg" className="infocn__close" />
                 <div className="infocn__imgcn">
-                  <img className="infocn__imgcn__img" src="/assets/images/auth/auth_info2.svg" />
+                  <img className="infocn__imgcn__img" src="/assets/images/auth/authinfo4.png" />
                 </div>
                 <div className="infocn__content">
                   <h2 className="infocn__content__title">New Authentication Method</h2>
@@ -58,11 +58,11 @@ function AuthInfo(props) {
         {`
                 .content { background: white; width:fit-content;  border-radius: 8px;}
 
-                .infocn {max-width: 796px; width: 65vw; position: relative; max-height: 598px; border-radius: 8px; height: 70svh; display: flex; background: white;}
+                .infocn { position: relative; max-height: 598px; border-radius: 8px; height: 70svh; display: flex; background: white;}
                 .infocn__close {position: absolute; top: 16px; right: 12px; width: 12px; height: 12px; cursor: pointer;}
                 .infocn__imgcn__img {height: 100%; border-radius: 8px;}
                 .infocn__imgcn {background: white; width: fit-content; height: 100%; padding: 8px; border-radius: 8px 0 0 8px;}
-                .infocn__content {display: flex; padding: 16px; flex-direction: column; align-items: center; justify-content: center; flex: 1; height: 100%;}
+                .infocn__content {display: flex; padding: 16px; flex-direction: column; align-items: center; justify-content: center; max-width: 300px; flex: 1; height: 100%;}
                 .infocn__content__title {font-weight: 700; text-align:center; font-size: 20px;}
                 .infocn__content__info {font-weight: 400; font-size: 14px; text-align: center; margin: 16px 0;}
                 .infocn__content__login {background: #156FF7; padding: 10px 24px; border-radius: 8px; color: white;}
