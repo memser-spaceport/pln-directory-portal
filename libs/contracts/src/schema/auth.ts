@@ -16,6 +16,9 @@ const VerifyOtpRequestSchema = z.object({
 })
 
 const GRANT_TYPES = ["refresh_token", "authorization_code", "token_exchange"] as const;
+const AuthRequestSchema = z.object({
+    state: z.string()
+})
 const TokenRequestSchema = z.object({
     grantType: z.enum(GRANT_TYPES),
     code: z.string().optional(),
@@ -49,6 +52,7 @@ const TokenRequestSchema = z.object({
     }
 });
 
+export class AuthRequestDto extends createZodDto(AuthRequestSchema) {}
 export class SendOtpRequestDto extends createZodDto(SendOtpRequestSchema) { }
 export class ResendOtpRequestDto extends createZodDto(ResendOtpRequestSchema) { }
 export class VerifyOtpRequestDto extends createZodDto(VerifyOtpRequestSchema) { }
