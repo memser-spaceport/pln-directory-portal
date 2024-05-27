@@ -1,13 +1,19 @@
-import { useLinkAccount, useLogin, usePrivy } from '@privy-io/react-auth';
+import { useLinkAccount, useLogin, usePrivy, useLogout } from '@privy-io/react-auth';
 
 function usePrivyWrapper() {
-  const { authenticated, logout, unlinkEmail, updateEmail, ready, linkGoogle, linkWallet, user, getAccessToken } = usePrivy();
+  const { authenticated, unlinkEmail, updateEmail, ready, linkGoogle, linkWallet, user, getAccessToken } = usePrivy();
   const PRIVY_CUSTOM_EVENTS = {
     AUTH_LOGIN_SUCCESS: 'AUTH_LOGIN_SUCCESS',
     AUTH_LINK_ACCOUNT_SUCCESS: 'AUTH_LINK_ACCOUNT_SUCCESS',
     AUTH_LOGIN_ERROR: 'AUTH_LOGIN_ERROR',
     AUTH_LINK_ERROR: 'AUTH_LINK_ERROR',
   };
+
+  const {logout} = useLogout({
+    onSuccess: () => {
+      document.dispatchEvent(new CustomEvent('privy-logout-success'))
+    }
+  })
   /*****  SETUP FOR PRIVY LOGIN POPUP *******/
   const { login } = useLogin({
     onComplete: (user) => {
@@ -40,6 +46,7 @@ function usePrivyWrapper() {
     logout,
     updateEmail,
     getAccessToken,
+    useLogout,
     user,
     authenticated,
     ready,

@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import usePrivyWrapper from '../../hooks/auth/usePrivyWrapper';
 import { toast } from 'react-toastify';
 import axios from 'axios';
-import { calculateExpiry, decodeToken } from 'apps/web-app/utils/services/auth';
+import { calculateExpiry, createLogoutChannel, decodeToken } from '../../utils/services/auth';
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
+import { LOGOUT_MSG } from 'apps/web-app/constants';
 function PrivyModals() {
   const {
     authenticated,
@@ -47,32 +48,32 @@ function PrivyModals() {
       } else if (linkedType === 'github_oauth') {
         return 'github';
       } else {
-        return ""
+        return '';
       }
     });
 
-    return linkedAccounts.filter(v => v !== '').join(',');
+    return linkedAccounts.filter((v) => v !== '').join(',');
   };
 
   const loginInUser = (output) => {
     if (output.userInfo?.isFirstTimeLogin) {
-        router.push('/settings');
-      }
-      clearPrivyParams();
-      setLinkAccountKey('');
-      toast.success('Successfully Logged In', { hideProgressBar: true });
-  }
+      router.push('/settings');
+    }
+    clearPrivyParams();
+    setLinkAccountKey('');
+    toast.success('Successfully Logged In', { hideProgressBar: true });
+  };
 
   const resetLinkedAccounts = (user) => {
     const authLinkedAccounts = getLinkedAccounts(user);
-    const refreshToken = Cookies.get('refreshToken')
+    const refreshToken = Cookies.get('refreshToken');
     const refreshTokenExpiry = decodeToken(refreshToken);
     Cookies.set('authLinkedAccounts', JSON.stringify(authLinkedAccounts), {
-        expires: calculateExpiry(new Date(refreshTokenExpiry.exp)),
-        path: '/',
-        domain: process.env.COOKIE_DOMAIN || '',
-      });
-  }
+      expires: calculateExpiry(new Date(refreshTokenExpiry.exp)),
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN || '',
+    });
+  };
 
   const saveTokensAndUserInfo = (output, user) => {
     const authLinkedAccounts = getLinkedAccounts(user);
@@ -100,8 +101,6 @@ function PrivyModals() {
       path: '/',
       domain: process.env.COOKIE_DOMAIN || '',
     });
-
-   
   };
 
   const initDirectoryLogin = async () => {
@@ -115,11 +114,11 @@ function PrivyModals() {
       })
       .then((result) => {
         saveTokensAndUserInfo(result.data, user);
-        loginInUser(result.data)
+        loginInUser(result.data);
       })
       .catch((e) => {
         if (user?.email?.address && e.response.status === 403) {
-          if(user?.email?.address && user?.linkedAccounts.length > 1) {
+          if (user?.email?.address && user?.linkedAccounts.length > 1) {
             unlinkEmail(user?.email?.address);
           }
           setLinkAccountKey('');
@@ -143,38 +142,38 @@ function PrivyModals() {
 
     function handlePrivyLinkSuccess(e) {
       const { linkMethod, linkedAccount } = e.detail;
-      const authLinkedAccounts = getLinkedAccounts(e.detail.user)
+      const authLinkedAccounts = getLinkedAccounts(e.detail.user);
       if (linkMethod === 'email') {
         // Initiate Directory Login to validate email and login user
         initDirectoryLogin();
       } else if (linkMethod === 'github') {
-        document.dispatchEvent(new CustomEvent('new-auth-accounts', {detail: authLinkedAccounts}))
+        document.dispatchEvent(new CustomEvent('new-auth-accounts', { detail: authLinkedAccounts }));
         toast.success('Github linked successfully', { hideProgressBar: true });
       } else if (linkMethod === 'google') {
-        document.dispatchEvent(new CustomEvent('new-auth-accounts', {detail: authLinkedAccounts}))
+        document.dispatchEvent(new CustomEvent('new-auth-accounts', { detail: authLinkedAccounts }));
         toast.success('Google linked successfully', { hideProgressBar: true });
       } else if (linkMethod === 'siwe') {
-        document.dispatchEvent(new CustomEvent('new-auth-accounts', {detail: authLinkedAccounts}))
+        document.dispatchEvent(new CustomEvent('new-auth-accounts', { detail: authLinkedAccounts }));
         toast.success('Wallet linked successfully', { hideProgressBar: true });
       }
-      setLinkAccountKey('')
+      setLinkAccountKey('');
     }
 
     function handlePrivyLoginError(e) {
-      console.log(e, 'login error')
+      console.log(e, 'login error');
     }
 
     function handlePrivyLinkError(e) {
-        console.log(e, e?.detail?.error);
-        const userInfo = Cookies.get('userInfo');
-          const accessToken = Cookies.get('accessToken');
-          const refreshToken = Cookies.get('refreshToken');
-          if (!userInfo && !accessToken && !refreshToken) {
-            logout();
-            document.dispatchEvent(new CustomEvent('auth-invalid-email', {detail: e?.detail?.error}));
-            setLinkAccountKey('');
-             //setLinkAccountKey('');
-          }
+      console.log(e, e?.detail?.error);
+      const userInfo = Cookies.get('userInfo');
+      const accessToken = Cookies.get('accessToken');
+      const refreshToken = Cookies.get('refreshToken');
+      if (!userInfo && !accessToken && !refreshToken) {
+        logout();
+        document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: e?.detail?.error }));
+        setLinkAccountKey('');
+        //setLinkAccountKey('');
+      }
     }
     function initPrivyLogin() {
       login();
@@ -183,8 +182,15 @@ function PrivyModals() {
       setLinkAccountKey(e.detail);
     }
     function handlePrivyLogout() {
-      Cookies.remove('authLinkedAccounts')
+      Cookies.remove('authLinkedAccounts');
       logout();
+    }
+
+    function handlePrivyLogoutSuccess() {
+      toast.info(LOGOUT_MSG, {
+        hideProgressBar: true
+      });
+      createLogoutChannel().postMessage('logout');
     }
     document.addEventListener('privy-init-login', initPrivyLogin);
     document.addEventListener('auth-link-account', addAccountToPrivy);
@@ -193,6 +199,7 @@ function PrivyModals() {
     document.addEventListener(PRIVY_CUSTOM_EVENTS.AUTH_LINK_ACCOUNT_SUCCESS, handlePrivyLinkSuccess);
     document.addEventListener(PRIVY_CUSTOM_EVENTS.AUTH_LOGIN_ERROR, handlePrivyLoginError);
     document.addEventListener(PRIVY_CUSTOM_EVENTS.AUTH_LINK_ERROR, handlePrivyLinkError);
+    document.addEventListener('privy-logout-success', handlePrivyLogoutSuccess);
     return function () {
       document.removeEventListener('privy-init-login', initPrivyLogin);
       document.removeEventListener('auth-link-account', addAccountToPrivy);
@@ -201,26 +208,27 @@ function PrivyModals() {
       document.removeEventListener(PRIVY_CUSTOM_EVENTS.AUTH_LINK_ACCOUNT_SUCCESS, handlePrivyLinkSuccess);
       document.removeEventListener(PRIVY_CUSTOM_EVENTS.AUTH_LOGIN_ERROR, handlePrivyLoginError);
       document.removeEventListener(PRIVY_CUSTOM_EVENTS.AUTH_LINK_ERROR, handlePrivyLinkError);
+      document.removeEventListener('privy-logout-success', handlePrivyLogoutSuccess);
     };
-  }, [user, login, logout]);
+  }, [user, login, logout, ready]);
 
   /**** FIX NEEDED: Currently privy link methods throws errors when called directly. Requires useEffect based setup like below *****/
   useEffect(() => {
     if (linkAccountKey === 'github') {
       linkGithub();
-      setLinkAccountKey('')
+      setLinkAccountKey('');
     } else if (linkAccountKey === 'google') {
       linkGoogle();
-      setLinkAccountKey('')
+      setLinkAccountKey('');
     } else if (linkAccountKey === 'siwe') {
       linkWallet();
-      setLinkAccountKey('')
+      setLinkAccountKey('');
     } else if (linkAccountKey === 'email') {
       linkEmail();
-      setLinkAccountKey('')
+      setLinkAccountKey('');
     } else if (linkAccountKey === 'updateEmail') {
-        updateEmail();
-        setLinkAccountKey('')
+      updateEmail();
+      setLinkAccountKey('');
     }
   }, [linkAccountKey]);
 
