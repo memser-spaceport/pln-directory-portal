@@ -15,6 +15,7 @@ export const createLogoutChannel = () => {
 
 export const logoutAllTabs = () => {
   createLogoutChannel().onmessage = async (msg) => {
+    localStorage.clear();
     window.location.reload();
     await createLogoutChannel().close();
   };
