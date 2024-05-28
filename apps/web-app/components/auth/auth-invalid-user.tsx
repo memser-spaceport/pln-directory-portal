@@ -10,8 +10,8 @@ function AuthInvalidUser() {
         function handleInvalidEmail(e) {
             if(e?.detail) {
                 if(e.detail === "linked_to_another_user") {
-                    setTitle('Invalid Email')
-                    setDescription('Email provided is already linked to another user. Please try again with another email.')
+                    //setTitle('Invalid Email')
+                    //setDescription('Email provided is already linked to another user. Please try again with another email.')
                 }
             } 
            
@@ -23,7 +23,7 @@ function AuthInvalidUser() {
         }
     }, [])
     return <>
-    <VerifyEmailModal title={title} description={description} isOpen={isOpen} setIsModalOpen={setIsModalOpen}/>
+    <VerifyEmailModal title={"Email Verification failed"} description={"Your email is either invalid or not available in our directory. Please try again"} isOpen={isOpen} setIsModalOpen={setIsModalOpen}/>
     <style jsx>
         {
             `
