@@ -47,7 +47,7 @@ function AuthInfo(props) {
               <p className="authinfo__cn__box__info__text">
                 We are updating our authentication service. You may need to do a one time verification of your Directory
                 Membership email at the time of login. Reach out to us at{' '}
-                <a href="mailto:spaceport-admin@protocol.ai">spaceport-admin@protocol.ai</a> in case you don&apos;t
+                <a className='link' href="mailto:spaceport-admin@protocol.ai">spaceport-admin@protocol.ai</a> in case you don&apos;t
                 remember the linked email
               </p>
               <button onClick={onLogin} className="authinfo__cn__box__info__btn">
@@ -76,7 +76,7 @@ function AuthInfo(props) {
             right: 0;
             left: 0;
             width: 100svw;
-            height: 100svh;
+            height: 100%;
             background: rgb(0, 0, 0, 0.6);
           }
           .authinfo__cn {
@@ -196,6 +196,9 @@ function AuthInfo(props) {
               cursor: pointer;
               height: 12px;
               width: 12px;
+            }
+            .link {
+              text-decoration: underline;
             }
           }
         `}
