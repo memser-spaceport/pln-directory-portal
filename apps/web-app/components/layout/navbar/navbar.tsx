@@ -68,9 +68,11 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
         Cookies.remove('authToken', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
         Cookies.remove('refreshToken', { path: '/', domain: process.env.COOKIE_DOMAIN || ''});
         Cookies.remove('userInfo', { path: '/', domain: process.env.COOKIE_DOMAIN || '' });
-        Cookies.remove('privy_token');
-        Cookies.remove('privy_session');
+        Cookies.remove('privy-token');
+        Cookies.remove('privy-session');
+        Cookies.remove('authLinkedAccounts');
         Cookies.remove('privy-refresh-token');
+        localStorage.clear()
         Cookies.set('page_params', 'logout', { expires: 60, path: '/' });
         document.dispatchEvent(new CustomEvent('init-privy-logout'))
        
