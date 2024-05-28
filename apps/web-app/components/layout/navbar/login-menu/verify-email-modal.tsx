@@ -13,7 +13,7 @@ interface IVerifyEmailModalProps {
 export function VerifyEmailModal({
   isOpen,
   setIsModalOpen,
-  title = 'Email Verification failed',
+  title = 'Email Verification Failed',
   description
 }: IVerifyEmailModalProps) {
   const handleModalClose = () => {
