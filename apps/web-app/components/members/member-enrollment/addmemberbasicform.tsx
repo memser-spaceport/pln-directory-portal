@@ -12,7 +12,7 @@ export default function AddMemberBasicForm(props) {
   const userLinkedAccounts = rawLinkedAccounts.split(',');
   const linkAccounts = [
     { img: '/assets/images/icons/auth/google.svg', name: 'google', title: 'Google', isLinked: false },
-    { img: '/assets/images/icons/auth/mdi_github.svg', name: 'github', title: 'Github', isLinked: false },
+    { img: '/assets/images/icons/auth/mdi_github.svg', name: 'github', title: 'GitHub', isLinked: false },
     { img: '/assets/images/icons/auth/wallet-cards.svg', name: 'siwe', title: 'Wallet', isLinked: false },
   ];
 

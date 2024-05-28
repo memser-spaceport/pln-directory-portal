@@ -187,10 +187,14 @@ function PrivyModals() {
     }
 
     function handlePrivyLogoutSuccess() {
-      toast.info(LOGOUT_MSG, {
-        hideProgressBar: true
-      });
-      createLogoutChannel().postMessage('logout');
+      const isDirectory = localStorage.getItem('directory-logout');
+      if(isDirectory) {
+        localStorage.clear();
+        toast.info(LOGOUT_MSG, {
+          hideProgressBar: true
+        });
+        createLogoutChannel().postMessage('logout');
+      }
     }
     document.addEventListener('privy-init-login', initPrivyLogin);
     document.addEventListener('auth-link-account', addAccountToPrivy);
