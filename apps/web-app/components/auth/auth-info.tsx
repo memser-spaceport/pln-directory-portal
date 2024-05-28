@@ -1,6 +1,8 @@
-import { generateOAuth2State } from 'apps/web-app/utils/services/auth';
+import { generateOAuth2State } from '../../utils/services/auth';
 import axios from 'axios';
 import { useRouter } from 'next/router';
+import { useEffect } from 'react';
+import Cookies from 'js-cookie';
 
 function AuthInfo(props) {
   const router = useRouter();
@@ -27,51 +29,176 @@ function AuthInfo(props) {
     document.dispatchEvent(new CustomEvent('privy-init-login'));
     router.push(`${window.location.pathname}${window.location.search}`);
   };
+
+  useEffect(() => {
+    if (Cookies.get('refreshToken')) {
+      router.push(`${window.location.pathname}${window.location.search}`);
+    }
+  }, []);
+
   return (
     <>
-      <div className="ev">
-        <div className="ev__cn">
-          <div className="ev__en__box">
-            <div className="content">
-              <div className="infocn">
-                <img onClick={clearPrivyParams} src="/assets/images/icons/close-grey.svg" className="infocn__close" />
-                <div className="infocn__imgcn">
-                  <img className="infocn__imgcn__img" src="/assets/images/auth/authinfo4.png" />
-                </div>
-                <div className="infocn__content">
-                  <h2 className="infocn__content__title">New Authentication Method</h2>
-                  <p className="infocn__content__info">
-                    We are updating our authentication service. You may need to do a one time verification of your
-                    Directory Membership email at the time of login. Reach out to us at in case you dont remember the
-                    linked email
-                  </p>
-                  <button className="infocn__content__login" onClick={onLogin}>
-                    Proceed To Login
-                  </button>
-                </div>
-              </div>
+      <div className="authinfo">
+        <div className="authinfo__cn">
+          <div className="authinfo__cn__box">
+            <div className="authinfo__cn__box__info">
+              <img src="/assets/images/auth/auth-whatsnew.svg" />
+              <h2 className="authinfo__cn__box__info__title">New Authentication Method</h2>
+              <p className="authinfo__cn__box__info__text">
+                We are updating our authentication service. You may need to do a one time verification of your Directory
+                Membership email at the time of login. Reach out to us at{' '}
+                <a href="mailto:spaceport-admin@protocol.ai">spaceport-admin@protocol.ai</a> in case you don&apos;t
+                remember the linked email
+              </p>
+              <button onClick={onLogin} className="authinfo__cn__box__info__btn">
+                Proceed to Login
+              </button>
             </div>
+            <img onClick={clearPrivyParams} src='/assets/images/icons/close-grey.svg' className='authinfo__cn__box__close'/>
+            <img className="authinfo__cn__box__img" src="/assets/images/auth/authinfo4.png" />
+          </div>
+          <div className="authinfo__cn__actions">
+            <button onClick={clearPrivyParams} className="authinfo__cn__actions__cancel">
+              Cancel
+            </button>
+            <button onClick={onLogin} className="authinfo__cn__actions__login">
+              Proceed to Login
+            </button>
           </div>
         </div>
       </div>
       <style jsx>
         {`
-                .content { background: white; width:fit-content;  border-radius: 8px;}
+          .authinfo {
+            position: fixed;
+            top: 0;
+            z-index: 2000;
+            right: 0;
+            left: 0;
+            width: 100svw;
+            height: 100svh;
+            background: rgb(0, 0, 0, 0.6);
+          }
+          .authinfo__cn {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            align-items: center;
+            justify-content: center;
+          }
+          .authinfo__cn__box {
+            width: 90svw;
+            max-height: calc(90svh - 72px);
+            overflow-y: scroll;
+            background: white;
+            border-radius: 8px 8px 0 0;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+          }
+          .authinfo__cn__box__close {
+            display: none;
+          }
+          .authinfo__cn__box__info {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+          }
+          .authinfo__cn__box__info__title {
+            font-size: 20px;
+            font-weight: 700;
+            line-height: 32px;
+            margin-top: 12px;
+            text-align: center;
+          }
+          .authinfo__cn__box__img {
+            width: 100%;
+          }
+          .authinfo__cn__box__info__text {
+            font-size: 12px;
+            font-weight: 400;
+            text-align: center;
+            line-height: 20x;
+            padding: 16px 0;
+          }
+          .authinfo__cn__actions {
+            background: white;
+            width: 90svw;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            height: 72px;
+            border-radius: 0 0 8px 8px;
+          }
+          .authinfo__cn__actions__cancel {
+            padding: 10px 24px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            font-size: 14px;
+            font-weight: 500;
+          }
+          .authinfo__cn__actions__login {
+            padding: 10px 24px;
+            border-radius: 8px;
+            background: #156ff7;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+          }
+          .authinfo__cn__box__info__btn {
+            display: none;
+          }
 
-                .infocn { position: relative; max-height: 598px; border-radius: 8px; height: 70svh; display: flex; background: white;}
-                .infocn__close {position: absolute; top: 16px; right: 12px; width: 12px; height: 12px; cursor: pointer;}
-                .infocn__imgcn__img {height: 100%; border-radius: 8px;}
-                .infocn__imgcn {background: white; width: fit-content; height: 100%; padding: 8px; border-radius: 8px 0 0 8px;}
-                .infocn__content {display: flex; padding: 16px; flex-direction: column; align-items: center; justify-content: center; max-width: 300px; flex: 1; height: 100%;}
-                .infocn__content__title {font-weight: 700; text-align:center; font-size: 20px;}
-                .infocn__content__info {font-weight: 400; font-size: 14px; text-align: center; margin: 16px 0;}
-                .infocn__content__login {background: #156FF7; padding: 10px 24px; border-radius: 8px; color: white;}
-                .ev {position: fixed; top:0; z-index: 2000; right:0; left:0; width: 100svw; height: 100svh; background: rgb(0,0,0,0.6); }
-                .ev__cn {width: 100%; height: 100%; display: flex; position: relative; align-items: center; justify-content: center;}
-                .ev__loader {position: absolute; background: rgb(255,255,255, 0.7); display: flex; align-items: center; justify-content: center; z-index:52; width: 100%; height: 100%; top:0; right:0; left:0;}
-                .ev__en__box {width:fit-content; height:fit-content; position: relative; overf}
-                .ev__en__box__error {background: white; z-index: 51; position: relative; width: 650px; border-radius: 8px; padding: 24px 32px; min-height: 150px; }
-                `}
+          @media (min-width: 1024px) {
+            .authinfo__cn__actions {
+              display: none;
+            }
+            .authinfo__cn__box {
+              flex-direction: row;
+              height: 70svh;
+              max-height:598px;
+              width: fit-content;
+              overflow: hidden;
+            }
+            .authinfo__cn__box__img {
+              order: 1;
+              width: fit-content;
+              height: 100%;
+              
+             
+              
+            }
+            .authinfo__cn__box__info {
+              order: 2;
+              max-width: 300px;
+              flex: 1;
+              height: 100%;
+            }
+            .authinfo__cn__box__info__btn {
+              display: flex;
+              padding: 10px 24px;
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 500;
+              background: #156ff7;
+              color: white;
+            }
+            .authinfo__cn__box__close {
+              position: absolute;
+              top: 16px;
+              right: 16px;
+              display: block;
+              cursor: pointer;
+              height: 12px;
+              width: 12px;
+            }
+          }
+        `}
       </style>
     </>
   );

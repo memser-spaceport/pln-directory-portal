@@ -60,14 +60,14 @@ const MemberList = (props: any) => {
   return (
     <>
       <div className="flex flex-col lg:w-full">
-        {filteredList.length > 0 &&
-          filteredList.map((item, itemIndex) => {
+        {filteredList?.length > 0 &&
+          filteredList?.map((item, itemIndex) => {
             const isUserGoing = item.memberUid === userInfo.uid;
             const topicsNeedToShow = 2;
             const topics = item?.topics;
             const remainingTopics = topics
-              .slice(topicsNeedToShow, topics?.length)
-              .map((topic) => topic);
+              ?.slice(topicsNeedToShow, topics?.length)
+              ?.map((topic) => topic);
             return (
               <div
                 key={`${itemIndex}-event-list`}
