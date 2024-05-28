@@ -74,6 +74,7 @@ export function Navbar({ isUserLoggedIn = false, userInfo }: INavbarProbs) {
         Cookies.remove('privy-refresh-token');
         localStorage.clear()
         Cookies.set('page_params', 'logout', { expires: 60, path: '/' });
+        localStorage.setItem('directory-logout', 'true');
         document.dispatchEvent(new CustomEvent('init-privy-logout'))
        
 

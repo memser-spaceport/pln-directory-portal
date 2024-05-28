@@ -13,7 +13,7 @@ interface IVerifyEmailModalProps {
 export function VerifyEmailModal({
   isOpen,
   setIsModalOpen,
-  title = 'Verify Membership',
+  title = 'Email Verification failed',
   description
 }: IVerifyEmailModalProps) {
   const handleModalClose = () => {
@@ -59,18 +59,7 @@ export function VerifyEmailModal({
                     <p className="my-auto ml-2">{title}</p>
                   </Dialog.Title>
                   {!description && <div className="text-sm/5 mt-3">
-                    Email doesn't match a membership email in the directory.
-                    Please contact our support at{' '}
-                    <span className="font-bold"> spaceport@protocol.ai </span>{' '}
-                    for assistance or try to{' '}
-                    <span
-                      onClick={()=>{ router.push(`${window.location.pathname}${window.location.search}#login`)}}
-                      className="cursor-pointer font-bold italic underline"
-                    >
-                      {' '}
-                      log in
-                    </span>
-                    {' '} again.
+                  Your email is either invalid or not available in our directory. Please try again with valid email.
                   </div> }
                   {description && <div className='text-sm/5 met-3'>{description}</div>}
                   <div className="w-100 mt-6 flex justify-end">
