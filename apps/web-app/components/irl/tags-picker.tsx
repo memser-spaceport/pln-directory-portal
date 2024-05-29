@@ -41,7 +41,7 @@ const TagsPicker = (props: any) => {
             key={index}
             className="flex h-[18px] items-center gap-1 rounded-[24px] bg-[#DBEAFE] px-2 text-xs font-[500] leading-[14px] text-[#475569]"
           >
-            <span title={item} className="max-w-[250px] text-ellipsis overflow-hidden">{item}</span>
+            <div title={item} className="max-w-[250px] text-ellipsis whitespace-nowrap overflow-hidden">{item}</div>
             <button
               type="button"
               onClick={() => onItemsSelected(item)}
