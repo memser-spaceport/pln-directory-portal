@@ -64,9 +64,12 @@ export const getEventDetailBySlug = async (slug, token) => {
 
   const output = result.data;
   const isPastEvent = isPastDate(output?.endDate);
-  const eventExclusions = process.env.IRL_TELEGRAM_EXCLUSIONS;
-  const eventExclusionIds = eventExclusions?.split(',');
-  const isExclusionEvent = eventExclusionIds?.includes(output?.uid);
+  // const eventExclusions = process.env.IRL_TELEGRAM_EXCLUSIONS;
+  
+  // const eventExclusionIds = eventExclusions?.split(',');
+  // const isExclusionEvent = eventExclusionIds?.includes(output?.uid);
+
+  const isExclusionEvent = output.additionalInfo.isExclusiveEvent;
 
   const guests = output?.eventGuests?.map((guest: any) => {
     const memberRole = guest?.member?.teamMemberRoles?.find(
