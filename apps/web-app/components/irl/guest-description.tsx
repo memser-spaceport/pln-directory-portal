@@ -20,7 +20,7 @@ const GuestDescription = (props: IDescription) => {
     <div>
       {isReadMore ? `${description?.slice(0, 100)}...` : description}
       <span onClick={toggleReadMore} className="cursor-pointer text-[13px] leading-[22px] font-[500] text-[#156FF7]">
-        {isReadMore ? ' read More' : ' read Less'}
+        {isReadMore ? ' read more' : ' read less'}
       </span>
     </div>
   );

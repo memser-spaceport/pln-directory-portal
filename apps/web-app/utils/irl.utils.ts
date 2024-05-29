@@ -71,11 +71,14 @@ export const sortByDefault = (guests) => {
 };
 
 export const getUniqueRoles = (guests: any) => {
+  try {
   const allRoles = guests?.map((guest: any) => guest?.memberRole);
-
-  const uniqueRoles = Array.from(new Set([...allRoles]));
-
+  const filteredRoles = allRoles.filter((role) => role.trim() !== "")
+  const uniqueRoles = Array.from(new Set([...filteredRoles]));
   return uniqueRoles;
+  } catch (error) {
+    return [];
+  }
 };
 
 export const getTopics = (guests: any) => {
@@ -127,6 +130,6 @@ export function formatDateRange(date1, date2) {
   } else if (startMonth === endMonth) {
     return `${startDayWithSuffix}-${endDayWithSuffix} ${startMonth}`;
   } else {
-    return `${startDayWithSuffix} ${startMonth} - ${endDayWithSuffix} ${endMonth}`;
+    return `${startDayWithSuffix} ${startMonth}-${endDayWithSuffix} ${endMonth}`;
   }
 }

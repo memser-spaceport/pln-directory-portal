@@ -97,7 +97,7 @@ const Resources = (props: any) => {
           href={resource?.link}
           target="_blank"
           className="resourceLink"
-          onClick={() => onClick(resource)}
+          onClick={() => onClick(resource)} rel="noreferrer"
         >
           <img
             src={resource?.icon || '/assets/images/icons/link-blue.svg'}

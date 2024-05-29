@@ -150,20 +150,6 @@ const TableHeader = (props: any) => {
         <div className="sticky top-0 z-[2]  flex h-[42px] w-fit rounded-tl-[8px] rounded-tr-[8px] border-b-[1px] border-b-[#64748B] bg-white px-5 text-[13px] font-[600] shadow-sm lg:w-[calc(100%_-_2px)]">
           <div className="flex w-[160px] items-center justify-start">
             <div
-              className="flex cursor-pointer items-center gap-1"
-              onClick={() => onSort('teamName')}
-            >
-              <img
-                src={getSortIcon('teamName')}
-                alt="sort"
-                width={16}
-                height={16}
-              />
-              Team
-            </div>
-          </div>
-          <div className="flex w-[160px] items-center justify-start">
-            <div
               onClick={() => onSort('memberName')}
               className="flex cursor-pointer items-center gap-1"
             >
@@ -176,6 +162,21 @@ const TableHeader = (props: any) => {
               Attendee Name
             </div>
           </div>
+          <div className="flex w-[160px] items-center justify-start">
+            <div
+              className="flex cursor-pointer items-center gap-1"
+              onClick={() => onSort('teamName')}
+            >
+              <img
+                src={getSortIcon('teamName')}
+                alt="sort"
+                width={16}
+                height={16}
+              />
+              Team
+            </div>
+          </div>
+      
           {!eventDetails?.isExclusionEvent && (
             <div className="relative flex w-[160px] items-center justify-start gap-[10px]">
               Member Role
