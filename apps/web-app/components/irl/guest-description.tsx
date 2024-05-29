@@ -17,9 +17,9 @@ const GuestDescription = (props: IDescription) => {
   }
 
   return (
-    <div>
+    <div className='word-break'>
       {isReadMore ? `${description?.slice(0, 100)}...` : description}
-      <span onClick={toggleReadMore} className="cursor-pointer text-[13px] leading-[22px] font-[500] text-[#156FF7]">
+      <span onClick={toggleReadMore} className="word-break cursor-pointer text-[13px] leading-[22px] font-[500] text-[#156FF7]">
         {isReadMore ? ' read more' : ' read less'}
       </span>
     </div>
