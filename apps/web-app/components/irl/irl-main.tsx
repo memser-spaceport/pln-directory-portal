@@ -33,9 +33,9 @@ const IrlMain = (props: any) => {
     setIsOpen(false);
   };
 
-  useEffect(() => {
-    setUpdatedEventDetails(eventDetails);
-  }, [eventDetails])
+  // useEffect(() => {
+  //   setUpdatedEventDetails(eventDetails);
+  // }, [eventDetails])
 
   //update event details when form submit
   useEffect(() => {
@@ -67,7 +67,7 @@ const IrlMain = (props: any) => {
     return () => {
       document.removeEventListener('updateGuests', handler);
     };
-  }, [eventDetails]);
+  }, []);
 
   //toggle attendees details modal
   useEffect(() => {
