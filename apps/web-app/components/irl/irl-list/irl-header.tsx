@@ -5,7 +5,7 @@ export default function IrlHeader() {
     <>
       <div className="irlHdr">
         <div className="irlHdr__title">
-          IRL Gatherings
+        Current & Upcoming Gatherings
         </div>
         {/* <div className="irlHdr__button">
           <div className="irlHdr__button__manage">

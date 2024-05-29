@@ -13,9 +13,8 @@ const authIgnoreURLS = ["/v1/auth/token", "/v1/participants-request/unique-ident
 const isUrlToIgnoreToaster = (baseUrl, fullUrl) => {
   const urlPath = fullUrl?.replace(new RegExp(`^${baseUrl}`), "");
   const staticUrlsToIgnoreForToaster = [`/v1/auth/otp`, `/v1/auth/otp/verify`];
-  const dynamicUrlRegexToIgnoreForToaster = /^\/v1\/members\/([a-zA-Z0-9]+)\/email(?:\/otp)?$/;
-  console.log(urlPath, fullUrl, baseUrl, staticUrlsToIgnoreForToaster.includes(urlPath), dynamicUrlRegexToIgnoreForToaster.test(urlPath))
-  return staticUrlsToIgnoreForToaster.includes(urlPath) || dynamicUrlRegexToIgnoreForToaster.test(urlPath)
+  const dynamicUrlRegexToIgnoreForToaster = [/^\/v1\/members\/([a-zA-Z0-9]+)\/email(?:\/otp)?$/,   /^\/v1\/irl\/events\/[^/]+\/guest\/[^/]+$/];
+  return staticUrlsToIgnoreForToaster.includes(urlPath) ||dynamicUrlRegexToIgnoreForToaster.some(regex => regex.test(urlPath))
 }
 
 // Create an Axios instance with default configuration
