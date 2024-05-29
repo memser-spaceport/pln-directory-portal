@@ -1,25 +1,20 @@
 import { XCircleIcon } from '@heroicons/react/solid';
-import { Dispatch, Fragment, SetStateAction } from 'react';
+import { Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { ReactComponent as FailedIcon } from '../../../../public/assets/images/icons/danger.svg';
-import { useRouter } from 'next/router';
 interface IVerifyEmailModalProps {
   isOpen: boolean;
-  setIsModalOpen: Dispatch<SetStateAction<boolean>>;
+  handleModalClose: () => void;
   title?: string;
   description?: string;
 }
 
 export function VerifyEmailModal({
   isOpen,
-  setIsModalOpen,
   title = 'Email Verification Failed',
-  description
+  description,
+  handleModalClose
 }: IVerifyEmailModalProps) {
-  const handleModalClose = () => {
-    setIsModalOpen(false);
-  };
-  const router = useRouter();
   return (
     <>
       <Transition appear show={isOpen} as={Fragment}>
@@ -51,17 +46,16 @@ export function VerifyEmailModal({
                 leaveTo="opacity-0 scale-95"
               >
                 <Dialog.Panel className="relative w-full max-w-2xl transform rounded-md bg-white p-8 text-left align-middle shadow-xl transition-all">
-                  <Dialog.Title
-                    as="h2"
-                    className="text-2xl flex font-bold leading-6"
-                  >
+                  <Dialog.Title as="h2" className="flex text-2xl font-bold leading-6">
                     <FailedIcon />
                     <p className="my-auto ml-2">{title}</p>
                   </Dialog.Title>
-                  {!description && <div className="text-sm/5 mt-3">
-                  Your email is either invalid or not available in our directory. Please try again with valid email.
-                  </div> }
-                  {description && <div className='text-sm/5 met-3'>{description}</div>}
+                  {!description && (
+                    <div className="text-sm/5 mt-3">
+                      Your email is either invalid or not available in our directory. Please try again with valid email.
+                    </div>
+                  )}
+                  {description && <div className="text-sm/5 met-3">{description}</div>}
                   <div className="w-100 mt-6 flex justify-end">
                     <button
                       type="button"
@@ -75,9 +69,7 @@ export function VerifyEmailModal({
                   <XCircleIcon
                     onClick={handleModalClose}
                     data-testid={'close-icon'}
-                    className={
-                      'absolute -top-4 -right-4 h-8 w-8 text-slate-600'
-                    }
+                    className={'absolute -top-4 -right-4 h-8 w-8 cursor-pointer text-slate-600'}
                   />
                 </Dialog.Panel>
               </Transition.Child>
