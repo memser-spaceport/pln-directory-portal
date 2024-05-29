@@ -19,14 +19,19 @@ import { ZodValidationPipe } from 'nestjs-zod';
 import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { NoCache } from '../decorators/no-cache.decorator';
-import {MembersService} from '../members/members.service';
+import { MembersService } from '../members/members.service';
+import { TeamsService } from '../teams/teams.service';
 
 const server = initNestServer(apiEvents);
 type RouteShape = typeof server.routeShapes;
 
 @Controller()
 export class PLEventsController {
-  constructor(private readonly eventService: PLEventsService, private memberService: MembersService) {}
+  constructor(
+    private readonly eventService: PLEventsService, 
+    private memberService: MembersService,
+    private teamService: TeamsService
+    ) {}
 
   @Api(server.route.getPLEvents)
   @ApiQueryFromZod(PLEventQueryParams)
@@ -68,7 +73,8 @@ export class PLEventsController {
     const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
     const result = await this.memberService.isMemberPartOfTeams(member, [body.teamUid]);
     if (!result) {
-      throw new ForbiddenException(`Member with email ${userEmail} is not part of team with uid ${body.teamUid}`);
+      const team = await this.teamService.findOne(body.teamUid);
+      throw new ForbiddenException(`Member with email ${userEmail} is not part of team with name ${team.name}`);
     }
     return await this.eventService.createPLEventGuest(body as any, slug, member);
   }
@@ -86,7 +92,8 @@ export class PLEventsController {
     const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
     const result = await this.memberService.isMemberPartOfTeams(member, [body.teamUid]);
     if (!result) {
-      throw new ForbiddenException(`Member with email ${userEmail} is not part of team with uid ${body.teamUid}`);
+      const team = await this.teamService.findOne(body.teamUid);
+      throw new ForbiddenException(`Member with email ${userEmail} is not part of team with name ${team.name}`);
     }
     return await this.eventService.modifyPLEventGuestByUid(uid, body as any, slug, member);
   }
