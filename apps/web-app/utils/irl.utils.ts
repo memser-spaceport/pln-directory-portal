@@ -73,7 +73,7 @@ export const sortByDefault = (guests) => {
 export const getUniqueRoles = (guests: any) => {
   try {
   const allRoles = guests?.map((guest: any) => guest?.memberRole);
-  const filteredRoles = allRoles.filter((role) => role.trim() !== "")
+  const filteredRoles = allRoles.filter((role) => role && role.trim() !== "")
   const uniqueRoles = Array.from(new Set([...filteredRoles]));
   return uniqueRoles;
   } catch (error) {

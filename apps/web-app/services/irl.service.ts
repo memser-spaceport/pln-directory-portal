@@ -69,7 +69,7 @@ export const getEventDetailBySlug = async (slug, token) => {
   // const eventExclusionIds = eventExclusions?.split(',');
   // const isExclusionEvent = eventExclusionIds?.includes(output?.uid);
 
-  const isExclusionEvent = output.additionalInfo.isExclusiveEvent;
+  const isExclusionEvent = output?.additionalInfo?.isExclusiveEvent;
 
   const guests = output?.eventGuests?.map((guest: any) => {
     const memberRole = guest?.member?.teamMemberRoles?.find(
