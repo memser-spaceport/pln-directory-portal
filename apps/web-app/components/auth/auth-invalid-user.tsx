@@ -3,8 +3,16 @@ import { VerifyEmailModal } from "../layout/navbar/login-menu/verify-email-modal
 
 function AuthInvalidUser() {
     const [isOpen, setIsModalOpen] = useState(false);
-    const [title, setTitle] = useState('Email Verification failed');
+    const [title, setTitle] = useState('Email Verification Failed');
     const [description, setDescription] = useState('');
+
+    const handleModalClose = () => {
+        setIsModalOpen(false);
+        setTimeout(()=>{
+            setTitle("Email Verification Failed");
+            setDescription('');
+        },500)
+      };
 
     useEffect(() => {
         function handleInvalidEmail(e) {
@@ -22,8 +30,10 @@ function AuthInvalidUser() {
             document.removeEventListener('auth-invalid-email',handleInvalidEmail )
         }
     }, [])
+
+
     return <>
-    <VerifyEmailModal title={title} description={description} isOpen={isOpen} setIsModalOpen={setIsModalOpen}/>
+    <VerifyEmailModal title={title} description={description} isOpen={isOpen} handleModalClose={handleModalClose}/>
     <style jsx>
         {
             `
