@@ -229,7 +229,7 @@ const AddDetailsPopup = (props: any) => {
       }
     } catch {
       onClose();
-      toast.error('Something went wrong');
+        toast.error('Something went wrong');
     }
   };
 
@@ -342,7 +342,7 @@ const AddDetailsPopup = (props: any) => {
                     </div>
                     <div className="flex flex-col gap-3">
                       <h6 className="text-sm font-semibold text-[#0F172A]">
-                        Select topics of your interest
+                      Choose the topics that interest you
                       </h6>
                       <TagsPicker
                         inputValue={topicsProps?.inputValue}
@@ -365,7 +365,7 @@ const AddDetailsPopup = (props: any) => {
                     </div>
                     <div className="flex flex-col gap-3">
                       <h6 className="text-sm font-semibold text-[#0F172A]">
-                        Briefly describe about the topics you are interested in
+                        Briefly describe the topics you are interested in
                       </h6>
                       <textarea
                         maxLength={250}
@@ -385,7 +385,7 @@ const AddDetailsPopup = (props: any) => {
                           <div className="flex flex-col gap-1 lg:flex-1">
                             <div className="flex flex-col gap-3 ">
                               <h6 className="text-sm font-bold text-[#0F172A]">
-                                Check In*
+                              Arrival Date*
                               </h6>
                               <input
                                 type="date"
@@ -405,7 +405,7 @@ const AddDetailsPopup = (props: any) => {
                           <div className="flex flex-col gap-1 lg:flex-1">
                             <div className="flex flex-col gap-3 ">
                               <h6 className="text-sm font-bold text-[#0F172A]">
-                                Check Out*
+                              Departure Date*
                               </h6>
                               <input
                                 type="date"
@@ -434,10 +434,7 @@ const AddDetailsPopup = (props: any) => {
                             height={16}
                           />
                           <p className="text-[13px] font-[500] leading-[18px] text-[#0F172A] opacity-40">
-                            Note that the dates of your check-in and check-out
-                            cannot be any earlier or later than five days prior
-                            to or after the official event dates (June 2nd -
-                            June 30th).
+                          Please note that your arrival and departure dates must fall within five days before or after the official event dates (June 2nd - June 30th).
                           </p>
                         </div>
                       </div>

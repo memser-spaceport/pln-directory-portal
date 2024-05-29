@@ -77,41 +77,12 @@ const MemberList = (props: any) => {
                     : ''
                 } py-[12px] px-5 text-[13px] font-[400] lg:w-[100%]`}
               >
-                <div className="flex w-[160px] items-center justify-start gap-[4px]">
-                  <span>
-                    <Link href={`/teams/${item.teamUid}`}>
-                      <a
-                        target="_blank"
-                        title={item.teamName}
-                        className="flex w-fit items-center gap-1"
-                        onClick={() =>
-                          onTeamClick(item?.teamUid, item?.teamName)
-                        }
-                      >
-                        <div className="h-[32px] w-[32px]">
-                          <img
-                            alt="team logo"
-                            src={
-                              item?.teamLogo ||
-                              '/assets/images/icons/teamdefault.svg'
-                            }
-                            className="h-[32px] w-[32px] "
-                            loading="lazy"
-                          />
-                        </div>
-                        <div style={{ wordBreak: 'break-word' }}>
-                          {item.teamName}
-                        </div>
-                      </a>
-                    </Link>
-                  </span>
-                </div>
-                <div className="flex w-[160px] items-center justify-start gap-[4px] pr-4">
+                    <div className="flex w-[160px] items-center justify-start gap-[4px] pr-4">
                   <Link href={`/members/${item.memberUid}`}>
                     <a
                       title={item.memberName}
                       target="_blank"
-                      className="flex w-fit items-start gap-2"
+                      className="flex w-fit items-start gap-2 items-center"
                       onClick={() =>
                         onMemberClick(item?.memberUid, item?.memberName)
                       }
@@ -152,18 +123,49 @@ const MemberList = (props: any) => {
                                   item?.memberUid,
                                   item?.memberName
                                 );
-                              }}
+                              }} 
+                              rel="noreferrer"
                             >
                               @{item?.telegramId}
                             </a>
                           </span>
                         ) : (
-                          <span className="text-[#156FF7]">-</span>
+                          <span onClick={(e) => e.preventDefault()} className="text-[#156FF7] cursor-default">-</span>
                         )}
                       </div>
                     </a>
                   </Link>
                 </div>
+                <div className="flex w-[160px] items-center justify-start gap-[4px]">
+                  <span>
+                    <Link href={`/teams/${item.teamUid}`}>
+                      <a
+                        target="_blank"
+                        title={item.teamName}
+                        className="flex w-fit items-center gap-1"
+                        onClick={() =>
+                          onTeamClick(item?.teamUid, item?.teamName)
+                        }
+                      >
+                        <div className="h-[32px] w-[32px]">
+                          <img
+                            alt="team logo"
+                            src={
+                              item?.teamLogo ||
+                              '/assets/images/icons/teamdefault.svg'
+                            }
+                            className="h-[32px] w-[32px] "
+                            loading="lazy"
+                          />
+                        </div>
+                        <div style={{ wordBreak: 'break-word' }}>
+                          {item.teamName}
+                        </div>
+                      </a>
+                    </Link>
+                  </span>
+                </div>
+            
                 {!eventDetails?.isExclusionEvent && (
                   <div className="w-[160px]">
                     <span className="flex h-full items-center text-[13px] leading-6 text-[#0F172A]">
@@ -185,24 +187,45 @@ const MemberList = (props: any) => {
                   <GuestDescription description={item?.reason} />
                   <div className="flex flex-wrap items-center gap-1">
                     {topics?.slice(0, topicsNeedToShow).map((topic, index) => (
-                      <span
+                      <Tooltip
+                      key={`${topic}-${index}`}
+                      asChild
+                      align='start'
+                      content={
+                      <div className="word-break rounded max-w-[200px] bg-slate-900 px-2 py-1 text-xs font-medium text-white">
+                        {topic}
+                          </div>
+                      }
+                      trigger={
+                      <div
                         key={`topic-${index}`}
-                        className="flex h-[20px] items-center rounded-[24px] border border-[#CBD5E1] bg-[#F1F5F9] px-2 text-xs font-[500] leading-[14px] text-[#475569]"
+                        className="word-break text-ellipsis max-w-[250px]  whitespace-nowrap overflow-hidden py-[2px] px-[8px] items-center rounded-[24px] border border-[#CBD5E1] bg-[#F1F5F9] text-xs font-[500] leading-[14px] text-[#475569]"
                       >
                         {topic}
-                      </span>
+                      </div>
+                      }
+                      />
                     ))}
                     {topics?.length > topicsNeedToShow && (
                       <Tooltip
                         asChild
                         content={
-                          <span className="rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white">
-                            {remainingTopics?.join(', ')}
-                          </span>
+                          <>
+                          <div className="rounded max-w-[200px] max-h-[250px] overflow-auto bg-slate-900 px-2 py-1 text-xs font-medium text-white">
+                          {remainingTopics.map((topic: string, index: any) => (
+                            <span className='word-break' key={`${topic} + ${index}`}> {topic}
+                            {index !== remainingTopics.length -1 ? "," : ""}
+                            <br/></span>
+                            
+                          ))}
+                          </div>
+
+                         
+                          </>
                         }
                         align="start"
                         trigger={
-                          <span className="flex h-[20px] items-center rounded-[24px] border border-[#CBD5E1] bg-[#F1F5F9] px-2 text-xs font-[500] leading-[14px] text-[#475569]">
+                          <span className="cursor-default flex h-[20px] items-center rounded-[24px] border border-[#CBD5E1] bg-[#F1F5F9] px-2 text-xs font-[500] leading-[14px] text-[#475569]">
                             {`+${topics?.length - topicsNeedToShow}`}
                           </span>
                         }
@@ -226,6 +249,10 @@ const MemberList = (props: any) => {
             -webkit-box-orient: vertical;
             overflow: hidden;
             -webkit-line-clamp: 2;
+          }
+
+          .word-break {
+            word-break: break-word;
           }
         `}
       </style>
