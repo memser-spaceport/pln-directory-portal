@@ -37,7 +37,7 @@ const useTagsPicker = (props: any) => {
 
   useEffect(() => {
     setSelectedItems(alreadySelected);
-  }, [alreadySelected.length]);
+  }, [alreadySelected]);
 
   return {
     onItemsSelected,

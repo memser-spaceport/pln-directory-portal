@@ -16,58 +16,42 @@ const IrlMain = (props: any) => {
   const isUserLoggedIn = props?.isUserLoggedIn;
   // const telegram = eventDetails?.telegram;
   // const resources = eventDetails?.resources ?? [];
-  const registeredGuest = eventDetails.guests.find(
-    (guest) => guest?.memberUid === userInfo?.uid
-  );
+  const registeredGuest = eventDetails.guests.find((guest) => guest?.memberUid === userInfo?.uid);
 
   const [updatedEventDetails, setUpdatedEventDetails] = useState(eventDetails);
   const [isOpen, setIsOpen] = useState(false);
   const [updatedUser, setUpdatedUser] = useState(registeredGuest);
   const [isUserGoing, setIsGoing] = useState(props?.isUserGoing);
-  const { filteredList, sortConfig, filterConfig } = useIrlDetails(
-    updatedEventDetails.guests,
-    userInfo
-  );
+  const { filteredList, sortConfig } = useIrlDetails(updatedEventDetails.guests, userInfo);
 
   const onClose = () => {
     setIsOpen(false);
   };
 
-  // useEffect(() => {
-  //   setUpdatedEventDetails(eventDetails);
-  // }, [eventDetails])
-
   //update event details when form submit
   useEffect(() => {
     const handler = (e: any) => {
-      const eventDetails = e.detail.eventDetails;
-      const registeredGuest = eventDetails?.guests.find(
-        (guest) => guest.memberUid === userInfo.uid
-      );
-      const sortedGuests = sortByDefault(eventDetails?.guests);
-
-      if (registeredGuest) {
+      const eventInfo = e.detail?.eventDetails;
+      const goingGuest = eventInfo?.guests.find((guest) => guest.memberUid === userInfo.uid);
+      const sortedGuests = sortByDefault(eventInfo?.guests);
+      if (goingGuest) {
         setIsGoing(true);
-        const currentUser = [...sortedGuests]?.find(
-          (v) => v.memberUid === userInfo?.uid
-        );
+        const currentUser = [...sortedGuests]?.find((v) => v.memberUid === userInfo?.uid);
         if (currentUser) {
-          const filteredList = [...sortedGuests]?.filter(
-            (v) => v.memberUid !== userInfo?.uid
-          );
+          const filteredList = [...sortedGuests]?.filter((v) => v.memberUid !== userInfo?.uid);
           const formattedGuests = [currentUser, ...filteredList];
-          eventDetails.guests = formattedGuests;
+          eventInfo.guests = formattedGuests;
         }
       }
 
-      setUpdatedUser(registeredGuest);
-      setUpdatedEventDetails(eventDetails);
+      setUpdatedUser(goingGuest);
+      setUpdatedEventDetails(eventInfo);
     };
     document.addEventListener('updateGuests', handler);
     return () => {
       document.removeEventListener('updateGuests', handler);
     };
-  }, []);
+  }, [eventDetails]);
 
   //toggle attendees details modal
   useEffect(() => {
@@ -80,6 +64,12 @@ const IrlMain = (props: any) => {
       document.removeEventListener('openRsvpModal', handler);
     };
   }, []);
+
+  useEffect(() => {
+    setUpdatedEventDetails(eventDetails);
+    setIsGoing(props?.isUserGoing);
+    setUpdatedUser(registeredGuest);
+  }, [eventDetails]);
 
   return (
     <>
@@ -130,18 +120,10 @@ const IrlMain = (props: any) => {
               } lg-rounded-[8px] bg-white shadow-sm lg:w-[calc(100%_-_2px)]`}
             >
               {isUserLoggedIn && (
-                <MemberList
-                  userInfo={userInfo}
-                  items={filteredList}
-                  eventDetails={updatedEventDetails}
-                />
+                <MemberList userInfo={userInfo} items={filteredList} eventDetails={updatedEventDetails} />
               )}
               {!isUserLoggedIn && (
-                <TeamList
-                  onLogin={onLogin}
-                  items={updatedEventDetails.guests}
-                  eventDetails={updatedEventDetails}
-                />
+                <TeamList onLogin={onLogin} items={updatedEventDetails.guests} eventDetails={updatedEventDetails} />
               )}
             </div>
           </div>
@@ -149,7 +131,7 @@ const IrlMain = (props: any) => {
       )}
       {isOpen && (
         <AddDetailsPopup
-          eventDetails={eventDetails}
+          eventDetails={updatedEventDetails}
           teams={teams}
           isOpen={isOpen}
           onClose={onClose}
