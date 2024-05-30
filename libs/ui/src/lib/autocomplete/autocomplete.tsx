@@ -9,6 +9,7 @@ interface IDropdownOption {
   label: string;
   value?: string;
   logo?: string | any;
+  externalId?: string;
 }
 
 interface AutocompleteProps {

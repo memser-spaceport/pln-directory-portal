@@ -49,10 +49,7 @@ function AuthInfo(props) {
               <img src="/assets/images/auth/auth-whatsnew.svg" />
               <h2 className="authinfo__cn__box__info__title">New Authentication Method</h2>
               <p className="authinfo__cn__box__info__text">
-                We are updating our authentication service. You may need to do a one time verification of your Directory
-                Membership email at the time of login. Reach out to us at{' '}
-                <a className='link' href="mailto:spaceport-admin@protocol.ai">spaceport-admin@protocol.ai</a> in case you don&apos;t
-                remember the linked email
+              We have updated our Authentication Service. Please verify and link your directory membership email to a login method of your choice. If you can&apos;t remember your membership email, <a className='link' target='_blank' rel="noreferrer" href='https://www.plnetwork.io/contact?showModal=getSupport'>contact us here</a> for assistance
               </p>
               <button onClick={onLogin} className="authinfo__cn__box__info__btn">
                 Proceed to Login
