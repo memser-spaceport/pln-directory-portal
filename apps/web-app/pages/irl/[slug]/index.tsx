@@ -34,11 +34,11 @@ export default function IrlDetails({ eventDetails, teams, userInfo, isUserGoing,
       <NextSeo {...IRL_SEO} title={eventDetails.name} description={eventDetails.description} />
       <div className="flex justify-center pt-[76px] lg:pt-[122px]">
         <div className="flex w-[calc(100%_-_1px)] flex-col items-center lg:w-[900px] lg:px-0">
-          <div className='relative z-[2] bg-[white] '>
-          <div className="h-9 w-full lg:h-[unset] lg:pb-2">
+        <div className="h-9 w-full lg:h-[unset] lg:pb-2">
             <Navbar eventDetails={eventDetails} />
           </div>
-          <div className="mb-[2px] w-[calc(100%_-_2px)] bg-white shadow-sm lg:rounded-[8px]">
+          <div className='relative z-[2] bg-[white] shadow-sm lg:rounded-[8px]'>
+          <div className="mb-[2px] w-[calc(100%_-_2px)] bg-white shadow-sm lg:rounded-[8px] ">
             <Banner eventDetails={eventDetails} isUserLoggedIn={isUserLoggedIn} />
           </div>
           {eventDetails?.resources?.length > 0 && (
