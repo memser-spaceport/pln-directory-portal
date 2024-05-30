@@ -153,7 +153,7 @@ export function formatDateRangeForDescription(date1, date2) {
   if (startDate.getTime() === endDate.getTime()) {
     return `${startDayWithSuffix} ${startMonth}`;
   } else {
-    return `${startMonth} ${startDayWithSuffix}  - ${endMonth} ${endDayWithSuffix} `;
+    return `${startMonth} ${startDayWithSuffix} - ${endMonth} ${endDayWithSuffix}`;
   }
 }
 
