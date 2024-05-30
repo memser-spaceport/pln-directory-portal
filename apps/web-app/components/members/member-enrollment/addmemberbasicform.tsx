@@ -27,8 +27,6 @@ export default function AddMemberBasicForm(props) {
     document.dispatchEvent(new CustomEvent('auth-link-account', {detail : account}))
 }
 
-  console.log(activeLinkedAccounts, rawLinkedAccounts, 'linked accounts')
-
   const editEmail = () => {
     return (
       <div className="absolute right-0 top-[20px] flex cursor-pointer items-center gap-1" onClick={props.onEmailChange}>
@@ -89,7 +87,7 @@ export default function AddMemberBasicForm(props) {
             placeholder="Enter your email address"
             className="custom-grey custom-outline-none border"
           />
-          {/* {!props.isEmailEditActive && props.isProfileSettings && editEmail()} */}
+           {!props.isEmailEditActive && props.isProfileSettings && editEmail()} 
         </div>
       )}
 
@@ -97,7 +95,7 @@ export default function AddMemberBasicForm(props) {
         <div className="inputfield relative pt-5">
           <p className="text-sm font-bold">Email</p>
           <p className="mt-[12px] text-sm text-slate-900">{values?.email}</p>
-          {!props.isEmailEditActive && props.isProfileSettings && editEmail()}
+         {/*  {!props.isEmailEditActive && props.isProfileSettings && editEmail()} */}
         </div>
       )}
       {props.isEmailEditActive && props.isProfileSettings && !props.isUserProfile && (
