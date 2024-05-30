@@ -149,8 +149,12 @@ function PrivyModals() {
         setLinkAccountKey('email');
         return;
       }
-      // If linked login user
-      initDirectoryLogin();
+      const stateUid = localStorage.getItem('stateUid');
+      if(stateUid) {
+        // If linked login user
+        initDirectoryLogin();
+      }
+    
     }
 
     function handlePrivyLinkSuccess(e) {
@@ -193,7 +197,11 @@ function PrivyModals() {
       }
     }
     function initPrivyLogin() {
-      login();
+      const stateUid = localStorage.getItem('stateUid')
+      if(stateUid) {
+        login();
+      }
+   
     }
     function addAccountToPrivy(e) {
       setLinkAccountKey(e.detail);

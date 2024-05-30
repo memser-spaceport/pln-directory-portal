@@ -375,13 +375,13 @@ export function EditMemberModal({
         logoutAndRedirect(PAGE_ROUTES.MEMBERS);
       }
 
-      document.dispatchEvent(new CustomEvent('auth-link-account', {detail: 'updateEmail'}))
+      // setEmailEditStatus(true);
     } else {
-     /*  analytics.captureEvent(
+      analytics.captureEvent(
         APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_CHANGE_EMAIL_CLICKED,
         {}
       );
-      setEmailEditStatus(true); */
+      setEmailEditStatus(true);
     }
   };
 
