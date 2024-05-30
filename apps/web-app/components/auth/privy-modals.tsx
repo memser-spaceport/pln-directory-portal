@@ -134,7 +134,7 @@ function PrivyModals() {
             }
             setLinkAccountKey('');
             logout();
-            // document.dispatchEvent(new CustomEvent('auth-invalid-email'));
+            document.dispatchEvent(new CustomEvent('auth-invalid-email'));
           } else {
             document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: 'unexpected_error' }))
             setLinkAccountKey('');
