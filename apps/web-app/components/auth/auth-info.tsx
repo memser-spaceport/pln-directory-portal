@@ -3,9 +3,11 @@ import axios from 'axios';
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
 import Cookies from 'js-cookie';
+import usePrivyWrapper from '../../hooks/auth/usePrivyWrapper';
 
 function AuthInfo(props) {
   const router = useRouter();
+  const {logout} = usePrivyWrapper()
 
   // Reset Url
   const clearPrivyParams = () => {
@@ -22,6 +24,8 @@ function AuthInfo(props) {
 
   // Initiate Privy Login and get the auth code for state
   const onLogin = async () => {
+    localStorage.clear();
+    await logout()
     const result = await axios.post(`${process.env.WEB_API_BASE_URL}/v1/auth`, {
       state: generateOAuth2State(),
     });
