@@ -5,10 +5,7 @@ export function AppLoader() {
   const [isActive, setActiveStatus] = useState(false);
   useEffect(() => {
     function handleLoader(e) {
-      console.log(e);
-      if (e.detail) {
-        setActiveStatus(e.detail);
-      }
+      setActiveStatus(e.detail ?? false);
     }
     document.addEventListener('app-loader-status', handleLoader);
     return function () {
