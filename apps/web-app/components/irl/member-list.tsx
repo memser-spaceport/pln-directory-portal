@@ -108,6 +108,7 @@ const MemberList = (props: any) => {
                         {item?.telegramId ? (
                           <span className="flex items-center gap-1">
                             <img
+                            onClick={(e) => e.preventDefault()}
                             className='cursor-default'
                               src="/assets/images/icons/telegram-solid.svg"
                               alt="telegram"
