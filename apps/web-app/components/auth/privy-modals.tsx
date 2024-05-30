@@ -100,6 +100,7 @@ function PrivyModals() {
         })
         .then((d) => {
           console.log('User deleted');
+          document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: errorCode }))
         })
         .catch((e) => console.error(e));
     });
@@ -128,12 +129,13 @@ function PrivyModals() {
             logout();
             document.dispatchEvent(new CustomEvent('auth-invalid-email'));
           } else {
+            document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: 'unexpected_error' }))
             setLinkAccountKey('');
             logout();
           }
         });
     } catch (error) {
-      console.log('new error', error);
+      document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: 'unexpected_error' }))
       setLinkAccountKey('');
       logout();
     }
