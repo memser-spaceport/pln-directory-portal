@@ -61,6 +61,7 @@ function PrivyModals() {
     }
     clearPrivyParams();
     setLinkAccountKey('');
+    document.dispatchEvent(new CustomEvent('app-loader-status', {detail: false}))
     toast.success('Successfully Logged In', { hideProgressBar: true });
   };
 
@@ -108,6 +109,7 @@ function PrivyModals() {
 
   const initDirectoryLogin = async () => {
     try {
+      document.dispatchEvent(new CustomEvent('app-loader-status', {detail: true}))
       getAccessToken()
         .then((privyToken) => {
           return axios.post(`${process.env.WEB_API_BASE_URL}/v1/auth/token`, {
@@ -138,8 +140,11 @@ function PrivyModals() {
             setLinkAccountKey('');
             logout();
           }
-        });
+        }).finally(() => {
+          document.dispatchEvent(new CustomEvent('app-loader-status', {detail: false}))
+        })
     } catch (error) {
+      document.dispatchEvent(new CustomEvent('app-loader-status', {detail: false}))
       document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: 'unexpected_error' }))
       setLinkAccountKey('');
       logout();
