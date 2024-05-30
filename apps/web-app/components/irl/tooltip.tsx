@@ -53,7 +53,7 @@ export function Tooltip({
                 side={side}
                 align={align}
                 sideOffset={sideOffset}
-                className="tp"
+                className="tp z-50 max-w-[260px] flex-shrink-0 break-words rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white"
                 avoidCollisions
               >
                 {content}
