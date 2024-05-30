@@ -45,7 +45,8 @@ const AddDetailsPopup = (props: any) => {
   const analytics = useAppAnalytics();
   const user = getUserInfo();
   const dateRange = getArrivalDepartureDateRange(eventDetails?.startDate, eventDetails?.endDate, 5);
-  const departureMinDate = eventDetails.startDate.split("T")[0];
+  const departureMinDate = eventDetails?.startDate?.split("T")[0];
+  const arrivalMaxDate = eventDetails?.endDate?.split("T")[0];
   const startAndEndDateInfo = formatDateRangeForDescription(eventDetails?.startDate, eventDetails?.endDate);
 
   const defaultItems = process.env.IRL_DEFAULT_TOPICS?.split(',') ?? [];
@@ -398,7 +399,7 @@ const AddDetailsPopup = (props: any) => {
                                 autoComplete="off"
                                 className="h-10 w-full rounded-lg border border-[#CBD5E1] px-3 py-[8px] text-sm leading-6 text-[#475569] focus:outline-none"
                                 min={dateRange.dateFrom}
-                                max={dateRange.dateTo}
+                                max={arrivalMaxDate}
                                 onChange={onAdditionalInfoChange}
                                 value={formValues?.additionalInfo?.checkInDate}
                               />
