@@ -134,6 +134,7 @@ export default function Settings({
         label: data.name,
         value: data.uid,
         logo: data?.image?.url,
+        externalId: data?.externalId
       });
     });
   };
@@ -269,13 +270,13 @@ export default function Settings({
   const fetchMembersWithLogoSearchTerm = async (searchTerm) => {
     try {
       const response = await api.get(
-        `/v1/members?name__istartswith=${searchTerm}&select=uid,name,image&orderBy=name,asc`
+        `/v1/members?name__istartswith=${searchTerm}&select=uid,name,image,externalId&orderBy=name,asc`
       );
       if (response.data) {
         return response.data
           .filter((item) => item?.uid !== userInfo?.uid)
           .map((item) => {
-            return { value: item.uid, label: item.name, logo: item?.image?.url ? item.image.url : null };
+            return { value: item.uid, externalId: item.externalId, label: item.name, logo: item?.image?.url ? item.image.url : null };
           });
       }
     } catch (error) {
@@ -357,6 +358,7 @@ export default function Settings({
           isOpen={true}
           setIsModalOpen={() => null}
           id={selectedMember?.value}
+          externalId={selectedMember?.externalId}
           isProfileSettings={true}
           isUserProfile={false}
           setModified={setModifiedMember}
