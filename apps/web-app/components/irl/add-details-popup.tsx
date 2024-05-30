@@ -141,7 +141,8 @@ const AddDetailsPopup = (props: any) => {
   //validate form
   const validateForm = (formValues: any) => {
     const errors = {} as any;
-    if (!formValues?.teamUid?.trim()) {
+    const initialTeamValue = teams?.find((team) => team?.id === formValues?.teamUid);
+    if (!formValues?.teamUid?.trim() || !initialTeamValue) {
       errors.teamUid = 'Team is required';
     }
 

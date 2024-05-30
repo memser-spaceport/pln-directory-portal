@@ -411,6 +411,28 @@ export const ANNOUNCEMENT_BANNER = {
 };
 
 export const ChangeLogList = [
+    {
+      title: 'Version 2.0.9 - Enhancements to IRL Gatherings module & Updating the Authentication Service',
+      tag: 'Improvements',
+      date: '31, May 2024 ',
+      shortContent: `<p style="font-size: 16px; line-height:24px;">
+      <span style="font-size: 18px; font-weight: 500">IRL Gatherings -</span><br/>
+      <ul style="padding-left:32px ; list-style: disc;">
+      <li>Events detailed page has been enhanced with the following features
+      <ul style="list-style: lower-alpha; padding:revert; font-size: 16px; line-height:24px" >
+      <li>List important links of the event in a dedicated Resources section.</li>
+      <li>Attendee details enhanced with additional information and you can search the attendee list by their name or related team name or project name.</li>
+      </ul></li>
+      <li>You can add tags to the Topics that you are interested in when you register your attendance to the event.</li>
+      <li>The landing page is now categorized into Current & Upcoming Gatherings and Past Gatherings.
+      </li>
+      </ul>
+      <br/>
+      <span style="font-size: 18px; font-weight: 500">Authentication Service -</span>
+      <br/>
+      <p style="padding-left: 16px">We are updating our authentication service. You may need to do a one-time verification of your Directory Membership email at the time of login. Reach out to us at <a style="text-decoration:underline; color:#156ff7" href="mailto:spaceport-admin@protocol.ai">spaceport-admin@protocol.ai</a> in case you don't remember the linked email</p>
+      </p>`,
+    },
   {
     title: 'Version 2.0.8 - Introducing Landing Page for IRL Gatherings',
     tag: 'Improvements',
