@@ -53,7 +53,7 @@ export function Tooltip({
                 side={side}
                 align={align}
                 sideOffset={sideOffset}
-                className="tp z-50 max-w-[260px] flex-shrink-0 break-words rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white"
+                className="tp max-w-[260px] flex-shrink-0 break-words rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white"
                 avoidCollisions
               >
                 {content}
@@ -80,7 +80,7 @@ export function Tooltip({
                 side={side}
                 align={align}
                 sideOffset={sideOffset}
-                className="tp z-50 max-w-[260px] flex-shrink-0 break-words rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white"
+                className="tp  max-w-[260px] flex-shrink-0 break-words rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white"
                 avoidCollisions
               >
                 {content}
@@ -92,7 +92,7 @@ export function Tooltip({
       <style jsx>
         {`
           .tp {
-            z-index: 50;
+            z-index: 1;
             position: absolute;
             max-width: 260px;
             flex-shrink: 0;
