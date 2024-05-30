@@ -30,6 +30,7 @@ export const MemberSchema = z.object({
   uid: z.string(),
   name: z.string(),
   email: z.string(),
+  externalId: z.string(),
   imageUid: z.string().nullish(),
   githubHandler: z.string().nullish(),
   discordHandler: z.string().nullish(),
