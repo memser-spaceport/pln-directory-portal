@@ -123,11 +123,16 @@ function PrivyModals() {
         .catch((e) => {
           if (user?.email?.address && e?.response?.status === 403) {
             if (user?.email?.address && user?.linkedAccounts.length > 1) {
-              unlinkEmail(user?.email?.address);
+              unlinkEmail(user?.email?.address)
+              .then(d => {
+                deleteUser('')
+              })
+              .catch(e => "");
+             
             }
             setLinkAccountKey('');
             logout();
-            document.dispatchEvent(new CustomEvent('auth-invalid-email'));
+            // document.dispatchEvent(new CustomEvent('auth-invalid-email'));
           } else {
             document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: 'unexpected_error' }))
             setLinkAccountKey('');
@@ -187,7 +192,7 @@ function PrivyModals() {
       if (!userInfo && !accessToken && !refreshToken) {
         logout();
         setLinkAccountKey('');
-        if (e?.detail?.error === 'linked_to_another_user' || e?.detail?.error === "exited_link_flow") {
+        if (e?.detail?.error === 'linked_to_another_user' || e?.detail?.error === "exited_link_flow" || e?.detail?.error === 'invalid_credentials') {
           deleteUser(e?.detail?.error);
           //document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: e?.detail?.error }))
         }
