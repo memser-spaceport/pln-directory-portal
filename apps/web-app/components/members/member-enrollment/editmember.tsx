@@ -63,6 +63,7 @@ interface EditMemberModalProps {
   isProfileSettings?: boolean;
   isUserProfile?: boolean;
   userInfo?: any;
+  externalId?: string;
   tabSelection: string;
   authLinkedAccounts?: string;
   setModified?: (boolean) => void;
@@ -250,6 +251,7 @@ export function EditMemberModal({
   setModified,
   tabSelection,
   authLinkedAccounts,
+  externalId = null,
   setRefreshMemberAutocomplete,
 }: EditMemberModalProps) {
   const tabs = ['BASIC', 'SKILLS', 'CONTRIBUTIONS', 'SOCIAL'];
@@ -1045,6 +1047,7 @@ export function EditMemberModal({
                         handleImageChange={handleImageChange}
                         imageUrl={imageUrl}
                         isEditMode={true}
+                        externalId={externalId}
                         disableEmail={true}
                         setDisableNext={setDisableSubmit}
                         resetFile={reset}
