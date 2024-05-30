@@ -95,6 +95,20 @@ export const getTopics = (guests: any) => {
   return uniqueTopics;
 };
 
+function getDayWithSuffix(day) {
+  if (day > 3 && day < 21) return day + 'th';
+  switch (day % 10) {
+    case 1:
+      return day + 'st';
+    case 2:
+      return day + 'nd';
+    case 3:
+      return day + 'rd';
+    default:
+      return day + 'th';
+  }
+}
+
 export function formatDateRange(date1, date2) {
   if (!date1 && !date2) {
     return '';
@@ -108,20 +122,6 @@ export function formatDateRange(date1, date2) {
   const startMonth = startDate.toLocaleString('en-US', { month: 'long' });
   const endMonth = endDate.toLocaleString('en-US', { month: 'long' });
 
-  function getDayWithSuffix(day) {
-    if (day > 3 && day < 21) return day + 'th';
-    switch (day % 10) {
-      case 1:
-        return day + 'st';
-      case 2:
-        return day + 'nd';
-      case 3:
-        return day + 'rd';
-      default:
-        return day + 'th';
-    }
-  }
-
   const startDayWithSuffix = getDayWithSuffix(startDay);
   const endDayWithSuffix = getDayWithSuffix(endDay);
 
@@ -132,4 +132,38 @@ export function formatDateRange(date1, date2) {
   } else {
     return `${startDayWithSuffix} ${startMonth}-${endDayWithSuffix} ${endMonth}`;
   }
+}
+
+
+export function formatDateRangeForDescription(date1, date2) {
+  if (!date1 && !date2) {
+    return '';
+  }
+  const startDate = new Date(date1);
+  const endDate = new Date(date2);
+
+  const startDay = startDate.getDate();
+  const endDay = endDate.getDate();
+  const startMonth = startDate.toLocaleString('en-US', { month: 'long' });
+  const endMonth = endDate.toLocaleString('en-US', { month: 'long' });
+
+  const startDayWithSuffix = getDayWithSuffix(startDay);
+  const endDayWithSuffix = getDayWithSuffix(endDay);
+
+  if (startDate.getTime() === endDate.getTime()) {
+    return `${startDayWithSuffix} ${startMonth}`;
+  } else {
+    return `${startMonth} ${startDayWithSuffix}  - ${endMonth} ${endDayWithSuffix} `;
+  }
+}
+
+export function getArrivalDepartureDateRange(startDate, endDate, interval) {
+  const newStartDate = new Date(startDate);
+  const newEndDate = new Date(endDate);
+  const dateFrom = new Date(newStartDate.getTime() - interval * 24 * 60 * 60 * 1000)?.toISOString();
+  const dateTo = new Date(newEndDate.getTime() + interval * 24 * 60 * 60 * 1000)?.toISOString();
+  return {
+    dateFrom:dateFrom.split('T')[0],
+    dateTo: dateTo.split('T')[0],
+  };
 }

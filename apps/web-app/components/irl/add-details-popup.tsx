@@ -16,6 +16,7 @@ import { getUserInfo, parseCookie } from 'apps/web-app/utils/shared.utils';
 import { APP_ANALYTICS_EVENTS, IRL_LW_EE_DATES } from 'apps/web-app/constants';
 import TagsPicker from './tags-picker';
 import useTagsPicker from 'apps/web-app/hooks/shared/use-tags-picker';
+import { formatDateRangeForDescription, getArrivalDepartureDateRange } from 'apps/web-app/utils/irl.utils';
 
 const AddDetailsPopup = (props: any) => {
   const isOpen = props.isOpen;
@@ -43,6 +44,9 @@ const AddDetailsPopup = (props: any) => {
   });
   const analytics = useAppAnalytics();
   const user = getUserInfo();
+  const dateRange = getArrivalDepartureDateRange(eventDetails?.startDate, eventDetails?.endDate, 5);
+  const departureMinDate = eventDetails.startDate.split("T")[0];
+  const startAndEndDateInfo = formatDateRangeForDescription(eventDetails?.startDate, eventDetails?.endDate);
 
   const defaultItems = process.env.IRL_DEFAULT_TOPICS?.split(',') ?? [];
   const topicsProps = useTagsPicker({
@@ -393,9 +397,9 @@ const AddDetailsPopup = (props: any) => {
                                 name="checkInDate"
                                 autoComplete="off"
                                 className="h-10 w-full rounded-lg border border-[#CBD5E1] px-3 py-[8px] text-sm leading-6 text-[#475569] focus:outline-none"
-                                min={IRL_LW_EE_DATES.startDate}
+                                min={dateRange.dateFrom}
+                                max={dateRange.dateTo}
                                 onChange={onAdditionalInfoChange}
-                                max={IRL_LW_EE_DATES.endDate}
                                 value={formValues?.additionalInfo?.checkInDate}
                               />
                             </div>
@@ -413,8 +417,8 @@ const AddDetailsPopup = (props: any) => {
                                 name="checkOutDate"
                                 autoComplete="off"
                                 className="h-10 w-full rounded-lg border border-[#CBD5E1] px-3 py-[8px] text-sm leading-6 text-[#475569] focus:outline-none"
-                                min={formValues?.additionalInfo?.checkInDate}
-                                max={IRL_LW_EE_DATES.endDate}
+                                min={departureMinDate}
+                                max={dateRange.dateTo}
                                 value={formValues?.additionalInfo?.checkOutDate}
                                 onChange={onAdditionalInfoChange}
                                 disabled={
@@ -435,7 +439,8 @@ const AddDetailsPopup = (props: any) => {
                             height={16}
                           />
                           <p className="text-[13px] font-[500] leading-[18px] text-[#0F172A] opacity-40">
-                          Please note that your arrival and departure dates must fall within five days before or after the official event dates (June 2nd - June 30th).
+                            
+                          Please note that your arrival and departure dates must fall within five days before or after the official event dates ({startAndEndDateInfo}).
                           </p>
                         </div>
                       </div>
