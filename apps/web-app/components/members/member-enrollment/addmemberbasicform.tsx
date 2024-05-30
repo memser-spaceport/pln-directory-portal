@@ -7,6 +7,7 @@ export default function AddMemberBasicForm(props) {
   const rawLinkedAccounts = props?.authLinkedAccounts ?? ''
   const values = props.formValues;
   const onChange = props.onChange;
+  const externalId = props.externalId;
   const requiredFlag = props?.isEditMode ? (props?.dataLoaded ? true : false) : true;
   const currentEmail = props.currentEmail;
   const userLinkedAccounts = rawLinkedAccounts.split(',');
@@ -87,7 +88,7 @@ export default function AddMemberBasicForm(props) {
             placeholder="Enter your email address"
             className="custom-grey custom-outline-none border"
           />
-           {!props.isEmailEditActive && props.isProfileSettings && editEmail()} 
+           {!props.isEmailEditActive && !externalId && props.isProfileSettings && editEmail()} 
         </div>
       )}
 
