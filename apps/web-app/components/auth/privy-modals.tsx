@@ -100,7 +100,8 @@ function PrivyModals() {
           token: token,
         })
         .then((d) => {
-          console.log('User deleted');
+          setLinkAccountKey('');
+          logout();
           document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: errorCode }))
         })
         .catch((e) => console.error(e));
@@ -134,7 +135,6 @@ function PrivyModals() {
             }
             setLinkAccountKey('');
             logout();
-            document.dispatchEvent(new CustomEvent('auth-invalid-email'));
           } else {
             document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: 'unexpected_error' }))
             setLinkAccountKey('');
@@ -195,11 +195,12 @@ function PrivyModals() {
       const accessToken = Cookies.get('accessToken');
       const refreshToken = Cookies.get('refreshToken');
       if (!userInfo && !accessToken && !refreshToken) {
-        logout();
-        setLinkAccountKey('');
         if (e?.detail?.error === 'linked_to_another_user' || e?.detail?.error === "exited_link_flow" || e?.detail?.error === 'invalid_credentials') {
           deleteUser(e?.detail?.error);
           //document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: e?.detail?.error }))
+        } else {
+          logout();
+          setLinkAccountKey('');
         }
         //document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: e?.detail?.error }));
 
