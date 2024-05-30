@@ -131,10 +131,12 @@ function PrivyModals() {
                 deleteUser('')
               })
               .catch(e => "");
-             
+            } else {
+              setLinkAccountKey('');
+              logout();
+              document.dispatchEvent(new CustomEvent('auth-invalid-email'))
             }
-            setLinkAccountKey('');
-            logout();
+           
           } else {
             document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: 'unexpected_error' }))
             setLinkAccountKey('');
@@ -201,6 +203,7 @@ function PrivyModals() {
         } else {
           logout();
           setLinkAccountKey('');
+          document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: 'unexpected_error' }))
         }
         //document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: e?.detail?.error }));
 
