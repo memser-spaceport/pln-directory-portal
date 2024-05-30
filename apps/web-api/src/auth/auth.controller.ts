@@ -11,7 +11,8 @@ import {
   Res,
   Redirect,
   UsePipes,
-  Put
+  Put,
+  Param
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { NoCache } from '../decorators/no-cache.decorator';
@@ -19,7 +20,7 @@ import { UserAccessTokenValidateGuard } from '../guards/user-access-token-valida
 import { LogService } from '../shared/log.service';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { UserAuthTokenValidation } from '../guards/user-authtoken-validation.guard';
-import { AuthRequestDto, ResendOtpRequestDto, SendOtpRequestDto, TokenRequestDto, VerifyOtpRequestDto } from 'libs/contracts/src/schema/auth';
+import { AuthRequestDto, DeleteUserAccountDto, ResendOtpRequestDto, SendOtpRequestDto, TokenRequestDto, VerifyOtpRequestDto } from 'libs/contracts/src/schema/auth';
 
 
 @Controller('v1/auth')
@@ -63,5 +64,12 @@ export class AuthController {
   @UsePipes(ZodValidationPipe)
   async getToken(@Body() tokenRequest: TokenRequestDto) {
     return await this.authService.getTokenAndUserInfo(tokenRequest);
+  }
+
+  @Post('accounts/external/:id')
+  @NoCache()
+  @UsePipes(ZodValidationPipe)
+  async deleteUserAccount(@Body() deleteRequest: DeleteUserAccountDto, @Param() params) {
+    return await this.authService.deleteUserAccount(deleteRequest.token, params.id);
   }
 }
