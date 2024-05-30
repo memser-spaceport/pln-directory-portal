@@ -20,6 +20,9 @@ function AuthInvalidUser() {
                 if(e.detail === "linked_to_another_user") {
                     setTitle('Email Verification')
                     setDescription('The email you provided is already linked to another account. If this is your email id, then login directly with the email id and then connect your social account in settings.')
+                } else if(e.detail === 'unexpected_error') {
+                    setTitle('Something went wrong')
+                    setDescription('We are unable to authenticate you at the moment due to technical issues. Please try again later')
                 }
             } 
            

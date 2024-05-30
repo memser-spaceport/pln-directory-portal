@@ -16,11 +16,17 @@ import { GetServerSideProps } from 'next';
 import { NextSeo } from 'next-seo';
 import { useRouter } from 'next/router';
 import { ReactElement } from 'react';
+import Cookies from 'js-cookie'
 
 export default function IrlDetails({ eventDetails, teams, userInfo, isUserGoing, isUserLoggedIn }) {
   const router = useRouter();
   const onLogin = () => {
-    router.push(`${window.location.pathname}${window.location.search}#login`);
+    if(Cookies.get("refreshToken")) {
+      Cookies.set('page_params', 'user_logged_in', { expires: 60, path: '/' });
+      router.reload();
+    } else {
+    router.push(`${window.location.pathname}${window.location.search}#login`)
+    }
   };
 
   return (
