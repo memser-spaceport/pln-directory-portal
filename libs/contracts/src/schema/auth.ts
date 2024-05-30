@@ -52,8 +52,13 @@ const TokenRequestSchema = z.object({
     }
 });
 
+const DeleteUserAccountSchema = z.object({
+  token: z.string(),
+})
+
 export class AuthRequestDto extends createZodDto(AuthRequestSchema) {}
 export class SendOtpRequestDto extends createZodDto(SendOtpRequestSchema) { }
 export class ResendOtpRequestDto extends createZodDto(ResendOtpRequestSchema) { }
 export class VerifyOtpRequestDto extends createZodDto(VerifyOtpRequestSchema) { }
 export class TokenRequestDto extends createZodDto(TokenRequestSchema) { }
+export class DeleteUserAccountDto extends createZodDto(DeleteUserAccountSchema) {}
