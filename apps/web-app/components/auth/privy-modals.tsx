@@ -64,17 +64,6 @@ function PrivyModals() {
     toast.success('Successfully Logged In', { hideProgressBar: true });
   };
 
-  const resetLinkedAccounts = (user) => {
-    const authLinkedAccounts = getLinkedAccounts(user);
-    const refreshToken = Cookies.get('refreshToken');
-    const refreshTokenExpiry = decodeToken(refreshToken);
-    Cookies.set('authLinkedAccounts', JSON.stringify(authLinkedAccounts), {
-      expires: calculateExpiry(new Date(refreshTokenExpiry.exp)),
-      path: '/',
-      domain: process.env.COOKIE_DOMAIN || '',
-    });
-  };
-
   const saveTokensAndUserInfo = (output, user) => {
     const authLinkedAccounts = getLinkedAccounts(user);
     const accessTokenExpiry = decodeToken(output.accessToken);
@@ -103,29 +92,51 @@ function PrivyModals() {
     });
   };
 
+  const deleteUser = (errorCode) => {
+    getAccessToken().then((token) => {
+      return axios
+        .post(`${process.env.WEB_API_BASE_URL}/v1/auth/accounts/external/${user.id}`, {
+          token: token,
+        })
+        .then((d) => {
+          console.log('User deleted');
+        })
+        .catch((e) => console.error(e));
+    });
+  };
+
   const initDirectoryLogin = async () => {
-    getAccessToken()
-      .then((privyToken) => {
-        return axios.post(`${process.env.WEB_API_BASE_URL}/v1/auth/token`, {
-          exchangeRequestToken: privyToken,
-          exchangeRequestId: localStorage.getItem('stateUid'),
-          grantType: 'token_exchange',
-        });
-      })
-      .then((result) => {
-        saveTokensAndUserInfo(result.data, user);
-        loginInUser(result.data);
-      })
-      .catch((e) => {
-        if (user?.email?.address && e.response.status === 403) {
-          if (user?.email?.address && user?.linkedAccounts.length > 1) {
-            unlinkEmail(user?.email?.address);
+    try {
+      getAccessToken()
+        .then((privyToken) => {
+          return axios.post(`${process.env.WEB_API_BASE_URL}/v1/auth/token`, {
+            exchangeRequestToken: privyToken,
+            exchangeRequestId: localStorage.getItem('stateUid'),
+            grantType: 'token_exchange',
+          });
+        })
+        .then((result) => {
+          saveTokensAndUserInfo(result.data, user);
+          loginInUser(result.data);
+        })
+        .catch((e) => {
+          if (user?.email?.address && e?.response?.status === 403) {
+            if (user?.email?.address && user?.linkedAccounts.length > 1) {
+              unlinkEmail(user?.email?.address);
+            }
+            setLinkAccountKey('');
+            logout();
+            document.dispatchEvent(new CustomEvent('auth-invalid-email'));
+          } else {
+            setLinkAccountKey('');
+            logout();
           }
-          setLinkAccountKey('');
-          logout();
-          document.dispatchEvent(new CustomEvent('auth-invalid-email'));
-        }
-      });
+        });
+    } catch (error) {
+      console.log('new error', error);
+      setLinkAccountKey('');
+      logout();
+    }
   };
 
   useEffect(() => {
@@ -160,18 +171,22 @@ function PrivyModals() {
     }
 
     function handlePrivyLoginError(e) {
-      console.log(e, 'login error');
+      console.log(e, 'Privy login error');
     }
 
     function handlePrivyLinkError(e) {
-      console.log(e, e?.detail?.error);
       const userInfo = Cookies.get('userInfo');
       const accessToken = Cookies.get('accessToken');
       const refreshToken = Cookies.get('refreshToken');
       if (!userInfo && !accessToken && !refreshToken) {
         logout();
-        document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: e?.detail?.error }));
         setLinkAccountKey('');
+        if (e?.detail?.error === 'linked_to_another_user' || e?.detail?.error === "exited_link_flow") {
+          deleteUser(e?.detail?.error);
+          //document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: e?.detail?.error }))
+        }
+        //document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: e?.detail?.error }));
+
         //setLinkAccountKey('');
       }
     }
@@ -187,15 +202,17 @@ function PrivyModals() {
     }
 
     function handlePrivyLogoutSuccess() {
+      console.log('privy Logout success');
       const isDirectory = localStorage.getItem('directory-logout');
-      if(isDirectory) {
+      if (isDirectory) {
         localStorage.clear();
         toast.info(LOGOUT_MSG, {
-          hideProgressBar: true
+          hideProgressBar: true,
         });
         createLogoutChannel().postMessage('logout');
       }
     }
+
     document.addEventListener('privy-init-login', initPrivyLogin);
     document.addEventListener('auth-link-account', addAccountToPrivy);
     document.addEventListener('init-privy-logout', handlePrivyLogout);
