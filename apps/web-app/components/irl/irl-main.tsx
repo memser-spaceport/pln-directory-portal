@@ -87,7 +87,7 @@ const IrlMain = (props: any) => {
       {updatedEventDetails?.guests.length > 0 && (
         <>
           <div
-            className={`g:px-0 w-[100%] bg-slate-100 px-[20px] pt-[16px] pb-[20px] lg:px-[unset] lg:py-[18px] lg:pt-[18px]`}
+            className={`z-[2] g:px-0 w-[100%] bg-slate-100 px-[20px] pt-[16px] pb-[20px] lg:px-[unset] lg:py-[18px] lg:pt-[18px]`}
           >
             <Toolbar
               eventDetails={updatedEventDetails}
@@ -100,7 +100,7 @@ const IrlMain = (props: any) => {
             />
           </div>
           <div
-            className={`slim-scroll lg-rounded-tl-[8px] lg-rounded-tr-[8px] mb-[8px] ${
+            className={`slim-scroll lg-rounded-tl-[8px] lg-rounded-tr-[8px] mb-[8px] relative ${
               isUserLoggedIn
                 ? 'h-[calc(100svh_-_205px)] lg:h-[calc(100vh_-_161px)]'
                 : 'h-[calc(100svh_-_236px)] lg:h-[calc(100vh_-_210px)]'

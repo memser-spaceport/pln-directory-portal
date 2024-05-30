@@ -149,14 +149,14 @@ const MemberList = (props: any) => {
                           onTeamClick(item?.teamUid, item?.teamName)
                         }
                       >
-                        <div className="h-[32px] w-[32px]">
+                        <div className="h-[32px] min-w-[32px] w-[32px]">
                           <img
                             alt="team logo"
                             src={
                               item?.teamLogo ||
                               '/assets/images/icons/teamdefault.svg'
                             }
-                            className="h-[32px] w-[32px] "
+                            className="h-[32px] min-w-[32px] w-[32px]"
                             loading="lazy"
                           />
                         </div>
@@ -226,6 +226,7 @@ const MemberList = (props: any) => {
                           </>
                         }
                         align="start"
+                        side='bottom'
                         trigger={
                           <span className="cursor-default flex h-[20px] items-center rounded-[24px] border border-[#CBD5E1] bg-[#F1F5F9] px-2 text-xs font-[500] leading-[14px] text-[#475569]">
                             {`+${topics?.length - topicsNeedToShow}`}
