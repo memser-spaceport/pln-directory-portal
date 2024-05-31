@@ -146,10 +146,10 @@ export function formatDateRangeForDescription(date1, date2) {
   const startDate = new Date(date1);
   const endDate = new Date(date2);
 
-  const startDay = startDate.getDate();
-  const endDay = endDate.getDate();
-  const startMonth = startDate.toLocaleString('en-US', { month: 'long' });
-  const endMonth = endDate.toLocaleString('en-US', { month: 'long' });
+  const startDay = startDate.getUTCDate();
+  const endDay = endDate.getUTCDate();
+  const startMonth = startDate.toLocaleString('en-US', { month: 'long', timeZone: 'UTC' });
+  const endMonth = endDate.toLocaleString('en-US', { month: 'long', timeZone: 'UTC' });
 
   const startDayWithSuffix = getDayWithSuffix(startDay);
   const endDayWithSuffix = getDayWithSuffix(endDay);
