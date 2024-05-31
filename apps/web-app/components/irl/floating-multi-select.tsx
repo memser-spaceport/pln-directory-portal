@@ -78,7 +78,7 @@ const FloatingMultiSelect = (props: any) => {
           <button
             onClick={(e) => {
               onClearSelection(e);
-              onFilter([])}}
+              onFilter([], "reset")}}
             className="flex-1 text-sm font-[500] text-[#64748B]"
           >
             Reset
