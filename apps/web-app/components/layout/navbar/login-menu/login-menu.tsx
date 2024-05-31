@@ -7,10 +7,12 @@ import { FATHOM_EVENTS } from '../../../../constants';
 // import { ForgotEmailModal } from './forgot-email-modal';
 import { authenticate } from '../../../../utils/services/auth';
 import { LoadingIndicator } from 'apps/web-app/components/shared/loading-indicator/loading-indicator';
+import useAuthAnalytics from 'apps/web-app/analytics/auth.analytics';
 export function Login() {
   const [loaderFlag, setLoaderFlag] = useState(false);
   const loginAsUserCode = FATHOM_EVENTS.directory.loginAsUser;
   const router = useRouter();
+  const analytics = useAuthAnalytics()
   // const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   // const [isForgotEmailModalOpen, setIsForgotEmailModalOpen] = useState(false);
   const handleOpenModal = () => {
@@ -18,6 +20,7 @@ export function Login() {
       Cookies.set('page_params', 'user_logged_in', { expires: 60, path: '/' });
       router.push("/members");
     } else {
+      analytics.onLoginBtnClicked();
       router.push(`${window.location.pathname}${window.location.search}#login`)
     }
   };
