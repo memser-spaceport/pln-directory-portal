@@ -74,7 +74,7 @@ function AuthInfo(props) {
               src="/assets/images/icons/close-grey.svg"
               className="authinfo__cn__box__close"
             />
-            <img className="authinfo__cn__box__img" src="/assets/images/auth/authinfo.png" />
+            <img className="authinfo__cn__box__img" src="/assets/images/auth/auth_info_banner.png" />
           </div>
           <div className="authinfo__cn__actions">
             <button onClick={onClose} className="authinfo__cn__actions__cancel">
