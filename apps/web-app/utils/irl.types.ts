@@ -9,6 +9,5 @@ export interface IIrlCard{
     endDate: Date;
     type: string;
     attendees: number;
-    isPastEvent: boolean;
     priority: number;
 }

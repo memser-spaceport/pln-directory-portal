@@ -27,8 +27,8 @@ export default function IrlList(props: IIrlList) {
 
   //variable
   const [restrictionReason, setRestrictionReason] = useState<string>('');
-  const pastEvents = conference?.filter((item) => item.isPastEvent);
-  const upcomingEvents = conference?.filter((item) => !item.isPastEvent);
+  const pastEvents = conference?.filter((item) => isPastDate(item.endDate));
+  const upcomingEvents = conference?.filter((item) => !isPastDate(item.endDate));
   const analytics = useAppAnalytics();
   const user = getUserInfo();
 
