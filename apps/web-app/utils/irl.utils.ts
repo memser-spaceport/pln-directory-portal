@@ -1,25 +1,25 @@
 export function formatIrlEventDate(startDateStr, endDateStr, timeZone = 'America/Los_Angeles') {
-  const options = { month: 'short', day: 'numeric', timeZone: timeZone };
-  
+  const options: unknown = { month: 'short', day: 'numeric', timeZone: timeZone };
+
   const startDate = new Date(startDateStr);
   const endDate = new Date(endDateStr);
-  
+
   const startFormatter = new Intl.DateTimeFormat('en-US', options);
   const startFormatted = startFormatter.format(startDate);
-  
+
   const endMonth = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: timeZone }).format(endDate);
   const endDay = new Intl.DateTimeFormat('en-US', { day: 'numeric', timeZone: timeZone }).format(endDate);
   const endYear = new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: timeZone }).format(endDate);
-  
+
   const startMonth = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: timeZone }).format(startDate);
-  
+
   let endFormatted;
   if (startMonth === endMonth) {
     endFormatted = endDay;
   } else {
     endFormatted = `${endMonth} ${endDay}`;
   }
-  
+
   return `${startFormatted}-${endFormatted}, ${endYear}`;
 }
 
@@ -47,31 +47,22 @@ export const sortByDefault = (guests) => {
     }
   });
 
-  guestsWithReasonAndTelegram?.sort((a, b) =>
-    a.memberName?.localeCompare(b?.memberName)
-  );
+  guestsWithReasonAndTelegram?.sort((a, b) => a.memberName?.localeCompare(b?.memberName));
   guestsWithReason?.sort((a, b) => a.memberName?.localeCompare(b?.memberName));
-  guestsWithTelegram?.sort((a, b) =>
-    a.memberName?.localeCompare(b?.memberName)
-  );
+  guestsWithTelegram?.sort((a, b) => a.memberName?.localeCompare(b?.memberName));
   remaining?.sort((a, b) => a.memberName?.localeCompare(b?.memberName));
 
-  const combinedList = [
-    ...guestsWithReasonAndTelegram,
-    ...guestsWithReason,
-    ...guestsWithTelegram,
-    ...remaining,
-  ];
+  const combinedList = [...guestsWithReasonAndTelegram, ...guestsWithReason, ...guestsWithTelegram, ...remaining];
 
   return combinedList;
 };
 
 export const getUniqueRoles = (guests: any) => {
   try {
-  const allRoles = guests?.map((guest: any) => guest?.memberRole);
-  const filteredRoles = allRoles.filter((role) => role && role.trim() !== "")
-  const uniqueRoles = Array.from(new Set([...filteredRoles]));
-  return uniqueRoles;
+    const allRoles = guests?.map((guest: any) => guest?.memberRole);
+    const filteredRoles = allRoles.filter((role) => role && role.trim() !== '');
+    const uniqueRoles = Array.from(new Set([...filteredRoles]));
+    return uniqueRoles;
   } catch (error) {
     return [];
   }
@@ -130,22 +121,21 @@ export function formatDateRange(date1, date2) {
   }
 }
 
-
 export function formatDateRangeForDescription(startDateStr, endDateStr, timeZone = 'America/Los_Angeles') {
-  const options: any = { month: 'short', day: 'numeric', timeZone: timeZone };
-  
+  const options: unknown = { month: 'short', day: 'numeric', timeZone: timeZone };
+
   const startDate = new Date(startDateStr);
   const endDate = new Date(endDateStr);
-  
+
   const startFormatter = new Intl.DateTimeFormat('en-US', options);
   const endFormatter = new Intl.DateTimeFormat('en-US', options);
-  
+
   const startFormatted = startFormatter.format(startDate);
   const endFormatted = endFormatter.format(endDate);
-  
+
   const startMonth = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: timeZone }).format(startDate);
   const endMonth = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: timeZone }).format(endDate);
-  
+
   const endYear = new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: timeZone }).format(endDate);
 
   // Function to get the appropriate suffix for a date
@@ -153,20 +143,24 @@ export function formatDateRangeForDescription(startDateStr, endDateStr, timeZone
     const day = date.getDate();
     if (day > 3 && day < 21) return day + 'th'; // handle 11th to 20th
     switch (day % 10) {
-      case 1: return day + 'st';
-      case 2: return day + 'nd';
-      case 3: return day + 'rd';
-      default: return day + 'th';
+      case 1:
+        return day + 'st';
+      case 2:
+        return day + 'nd';
+      case 3:
+        return day + 'rd';
+      default:
+        return day + 'th';
     }
   }
 
   const startDayWithSuffix = getDateWithSuffix(startDate);
   const endDayWithSuffix = getDateWithSuffix(endDate);
-  
+
   // Format the final string with month and day suffixes
   const startFormattedWithSuffix = `${startMonth} ${startDayWithSuffix}`;
   const endFormattedWithSuffix = `${endMonth} ${endDayWithSuffix}`;
-  
+
   return `${startFormattedWithSuffix} - ${endFormattedWithSuffix}, ${endYear}`;
 }
 
@@ -176,7 +170,7 @@ export function getArrivalDepartureDateRange(startDate, endDate, interval) {
   const dateFrom = new Date(newStartDate.getTime() - interval * 24 * 60 * 60 * 1000)?.toISOString();
   const dateTo = new Date(newEndDate.getTime() + interval * 24 * 60 * 60 * 1000)?.toISOString();
   return {
-    dateFrom:dateFrom.split('T')[0],
+    dateFrom: dateFrom.split('T')[0],
     dateTo: dateTo.split('T')[0],
   };
 }
