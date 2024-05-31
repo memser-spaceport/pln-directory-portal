@@ -123,7 +123,6 @@ export function formatDateRange(date1, date2) {
 
 export function formatDateRangeForDescription(startDateStr, endDateStr, timeZone = 'America/Los_Angeles') {
   const options: unknown = { month: 'short', day: 'numeric', timeZone: timeZone };
-
   const startDate = new Date(startDateStr);
   const endDate = new Date(endDateStr);
 
@@ -136,26 +135,13 @@ export function formatDateRangeForDescription(startDateStr, endDateStr, timeZone
   const startMonth = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: timeZone }).format(startDate);
   const endMonth = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: timeZone }).format(endDate);
 
+  const startDay = new Intl.DateTimeFormat('en-US', { day: 'numeric', timeZone: timeZone }).format(startDate);
+  const endDay = new Intl.DateTimeFormat('en-US', { day: 'numeric', timeZone: timeZone }).format(endDate);
+
   const endYear = new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: timeZone }).format(endDate);
 
-  // Function to get the appropriate suffix for a date
-  function getDateWithSuffix(date: Date) {
-    const day = date.getDate();
-    if (day > 3 && day < 21) return day + 'th'; // handle 11th to 20th
-    switch (day % 10) {
-      case 1:
-        return day + 'st';
-      case 2:
-        return day + 'nd';
-      case 3:
-        return day + 'rd';
-      default:
-        return day + 'th';
-    }
-  }
-
-  const startDayWithSuffix = getDateWithSuffix(startDate);
-  const endDayWithSuffix = getDateWithSuffix(endDate);
+  const startDayWithSuffix = getDayWithSuffix(startDay);
+  const endDayWithSuffix = getDayWithSuffix(endDay);
 
   // Format the final string with month and day suffixes
   const startFormattedWithSuffix = `${startMonth} ${startDayWithSuffix}`;
@@ -173,4 +159,18 @@ export function getArrivalDepartureDateRange(startDate, endDate, interval) {
     dateFrom: dateFrom.split('T')[0],
     dateTo: dateTo.split('T')[0],
   };
+}
+
+export function formatDateToISO(dateStr, timeZone = 'America/Los_Angeles') {
+  const date = new Date(dateStr);
+
+  const options = { timeZone: timeZone };
+  const yearFormatter = new Intl.DateTimeFormat('en-US', { year: 'numeric', ...options });
+  const monthFormatter = new Intl.DateTimeFormat('en-US', { month: '2-digit', ...options });
+  const dayFormatter = new Intl.DateTimeFormat('en-US', { day: '2-digit', ...options });
+
+  const year = yearFormatter.format(date);
+  const month = monthFormatter.format(date);
+  const day = dayFormatter.format(date);
+  return `${year}-${month}-${day}`;
 }
