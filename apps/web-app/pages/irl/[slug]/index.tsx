@@ -37,7 +37,7 @@ export default function IrlDetails({ eventDetails, teams, userInfo, isUserGoing,
         <div className="h-9 w-full lg:h-[unset] lg:pb-2">
             <Navbar eventDetails={eventDetails} />
           </div>
-          <div className='relative z-[2] bg-[white] shadow-sm lg:rounded-[8px]'>
+          <div className='relative z-[2] bg-[#F1F5F9] lg:rounded-[8px]'>
           <div className="mb-[2px] w-[calc(100%_-_2px)] bg-white shadow-sm lg:rounded-[8px] ">
             <Banner eventDetails={eventDetails} isUserLoggedIn={isUserLoggedIn} />
           </div>
