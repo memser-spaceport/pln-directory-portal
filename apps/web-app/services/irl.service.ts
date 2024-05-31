@@ -21,7 +21,6 @@ export const getAllEvents = async () => {
           createdAt: event?.createdAt,
           type: event?.type,
           attendees: event?.eventGuests?.length,
-          isPastEvent: isPastDate(event?.endDate),
           priority: event?.priority,
         };
       });
@@ -63,7 +62,7 @@ export const getEventDetailBySlug = async (slug, token) => {
   }
 
   const output = result.data;
-  const isPastEvent = isPastDate(output?.endDate);
+  // const isPastEvent = isPastDate(output?.endDate);
   // const eventExclusions = process.env.IRL_TELEGRAM_EXCLUSIONS;
   
   // const eventExclusionIds = eventExclusions?.split(',');
@@ -111,7 +110,7 @@ export const getEventDetailBySlug = async (slug, token) => {
     startDate: output?.startDate,
     endDate: output?.endDate,
     eventLocation: output?.location,
-    isPastEvent,
+    // isPastEvent,
     resources: output?.resources,
     guests,
     isExclusionEvent,

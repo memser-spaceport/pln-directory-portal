@@ -3,6 +3,7 @@ import ResourcesPopup from './resources-popup';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
 import { getUserInfo } from 'apps/web-app/utils/shared.utils';
+import { isPastDate } from 'apps/web-app/utils/irl.utils';
 
 const Resources = (props: any) => {
   const eventDetails = props?.eventDetails;
@@ -12,6 +13,7 @@ const Resources = (props: any) => {
   const [isOpen, setIsOpen] = useState(false);
   const analytics = useAppAnalytics();
   const user = getUserInfo();
+  const isPastEvent = isPastDate(eventDetails?.endDate);
 
   const splitResources = (resources) => {
     const publicResources = [];
@@ -43,7 +45,7 @@ const Resources = (props: any) => {
       eventId: eventDetails?.id,
       eventName: eventDetails?.name,
       type: eventDetails?.type,
-      isPastEvent: eventDetails?.isPastEvent,
+      isPastEvent: isPastEvent,
       ...resource,
       user,
     });
@@ -56,7 +58,7 @@ const Resources = (props: any) => {
         eventId: eventDetails?.id,
         eventName: eventDetails?.name,
         type: eventDetails?.type,
-        isPastEvent: eventDetails?.isPastEvent,
+        isPastEvent: isPastEvent,
         ...resource,
         user,
       }
@@ -68,7 +70,7 @@ const Resources = (props: any) => {
       eventId: eventDetails?.id,
       eventName: eventDetails?.name,
       type: eventDetails?.type,
-      isPastEvent: eventDetails?.isPastEvent,
+      isPastEvent: isPastEvent,
       user,
     });
     onLogin();
@@ -81,7 +83,7 @@ const Resources = (props: any) => {
         eventId: eventDetails?.id,
         eventName: eventDetails?.name,
         type: eventDetails?.type,
-        isPastEvent: eventDetails?.isPastEvent,
+        isPastEvent:isPastEvent,
         user,
       }
     );

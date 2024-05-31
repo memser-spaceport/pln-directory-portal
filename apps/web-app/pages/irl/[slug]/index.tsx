@@ -9,7 +9,7 @@ import { ADMIN_ROLE } from 'apps/web-app/constants';
 import { DirectoryLayout } from 'apps/web-app/layouts/directory-layout';
 import { IRL_SEO } from 'apps/web-app/seo.config';
 import { getEventDetailBySlug } from 'apps/web-app/services/irl.service';
-import { sortByDefault } from 'apps/web-app/utils/irl.utils';
+import { isPastDate, sortByDefault } from 'apps/web-app/utils/irl.utils';
 import { authenticate, convertCookiesToJson, renewAndStoreNewAccessToken } from 'apps/web-app/utils/services/auth';
 import { parseCookie } from 'apps/web-app/utils/shared.utils';
 import { GetServerSideProps } from 'next';
@@ -48,7 +48,7 @@ export default function IrlDetails({ eventDetails, teams, userInfo, isUserGoing,
             
           )}
          
-          {!isUserLoggedIn && !eventDetails?.isPastEvent && (
+          {!isUserLoggedIn && !isPastDate(eventDetails?.endDate) && (
             <div className="sticky top-[40px] mt-[0px] w-full lg:top-[83px] lg:mt-[16px]">
               <HeaderStrip eventDetails={eventDetails} />
             </div>
