@@ -5,7 +5,9 @@ import axios from 'axios';
 import { calculateExpiry, createLogoutChannel, decodeToken } from '../../utils/services/auth';
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
-import { LOGOUT_MSG } from 'apps/web-app/constants';
+import { LOGOUT_MSG } from '../../constants';
+import useAuthAnalytics from '../../analytics/auth.analytics';
+
 function PrivyModals() {
   const {
     authenticated,
@@ -22,6 +24,7 @@ function PrivyModals() {
     user,
     PRIVY_CUSTOM_EVENTS,
   } = usePrivyWrapper();
+  const analytics = useAuthAnalytics();
   const [linkAccountKey, setLinkAccountKey] = useState('');
   const router = useRouter();
 
@@ -61,7 +64,7 @@ function PrivyModals() {
     }
     clearPrivyParams();
     setLinkAccountKey('');
-    document.dispatchEvent(new CustomEvent('app-loader-status', {detail: false}))
+    document.dispatchEvent(new CustomEvent('app-loader-status', { detail: false }));
     toast.success('Successfully Logged In', { hideProgressBar: true });
   };
 
@@ -93,88 +96,87 @@ function PrivyModals() {
     });
   };
 
-  const deleteUser = (errorCode) => {
-    getAccessToken().then((token) => {
-      return axios
-        .post(`${process.env.WEB_API_BASE_URL}/v1/auth/accounts/external/${user.id}`, {
-          token: token,
-        })
-        .then((d) => {
-          setLinkAccountKey('');
-          logout();
-          document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: errorCode }))
-        })
-        .catch((e) => console.error(e));
-    });
+  const deleteUser = async (errorCode) => {
+    analytics.onPrivyUserDelete({...user, type: 'init'})
+    const token = await getAccessToken();
+    await axios.post(`${process.env.WEB_API_BASE_URL}/v1/auth/accounts/external/${user.id}`, { token: token });
+    analytics.onPrivyUserDelete({type: 'success'})
+    setLinkAccountKey('');
+    await logout();
+    document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: errorCode }));
+  };
+
+  const handleInvalidDirectoryEmail = async () => {
+    try {
+      analytics.onDirectoryLoginFailure({...user, type: 'INVALID_DIRECTORY_EMAIL'})
+      if (user?.email?.address && user?.linkedAccounts.length > 1) {
+        analytics.onPrivyUnlinkEmail({...user, type: 'init'})
+        await unlinkEmail(user?.email?.address);
+        analytics.onPrivyUnlinkEmail({type: 'success'})
+        await deleteUser('');
+      } else if (user?.email?.address && user?.linkedAccounts.length === 1) {
+        setLinkAccountKey('');
+        await deleteUser('');
+      } else {
+        await logout();
+        document.dispatchEvent(new CustomEvent('auth-invalid-email'));
+      }
+    } catch (error) {
+      document.dispatchEvent(new CustomEvent('auth-invalid-email'));
+    }
   };
 
   const initDirectoryLogin = async () => {
     try {
-      document.dispatchEvent(new CustomEvent('app-loader-status', {detail: true}))
-      getAccessToken()
-        .then((privyToken) => {
-          return axios.post(`${process.env.WEB_API_BASE_URL}/v1/auth/token`, {
-            exchangeRequestToken: privyToken,
-            exchangeRequestId: localStorage.getItem('stateUid'),
-            grantType: 'token_exchange',
-          });
-        })
-        .then((result) => {
-          saveTokensAndUserInfo(result.data, user);
-          loginInUser(result.data);
-        })
-        .catch((e) => {
-          if (user?.email?.address && e?.response?.status === 403) {
-            if (user?.email?.address && user?.linkedAccounts.length > 1) {
-              unlinkEmail(user?.email?.address)
-              .then(d => {
-                deleteUser('')
-              })
-              .catch(e => "");
-            } else {
-              setLinkAccountKey('');
-              logout();
-              document.dispatchEvent(new CustomEvent('auth-invalid-email'))
-            }
-           
-          } else {
-            document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: 'unexpected_error' }))
-            setLinkAccountKey('');
-            logout();
-          }
-        }).finally(() => {
-          document.dispatchEvent(new CustomEvent('app-loader-status', {detail: false}))
-        })
+      document.dispatchEvent(new CustomEvent('app-loader-status', { detail: true }));
+      const privyToken = await getAccessToken();
+      const result = await axios.post(`${process.env.WEB_API_BASE_URL}/v1/auth/token`, {
+        exchangeRequestToken: privyToken,
+        exchangeRequestId: localStorage.getItem('stateUid'),
+        grantType: 'token_exchange',
+      });
+      saveTokensAndUserInfo(result.data, user);
+      loginInUser(result.data);
+      analytics.onDirectoryLoginSuccess()
     } catch (error) {
-      document.dispatchEvent(new CustomEvent('app-loader-status', {detail: false}))
-      document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: 'unexpected_error' }))
-      setLinkAccountKey('');
-      logout();
+      
+      document.dispatchEvent(new CustomEvent('app-loader-status', { detail: false }));
+      if (user?.email?.address && error?.response?.status === 403) {
+        await handleInvalidDirectoryEmail();
+      } else {
+        document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: 'unexpected_error' }));
+        setLinkAccountKey('');
+        await logout();
+      }
     }
   };
 
   useEffect(() => {
-    function handlePrivyLoginSuccess(e) {
+    async function handlePrivyLoginSuccess(e) {
       const info = e.detail;
+      analytics.onPrivyLoginSuccess(info?.user)
       // If email is not linked, link email mandatorily
       if (!info?.user?.email?.address) {
         setLinkAccountKey('email');
         return;
       }
       const stateUid = localStorage.getItem('stateUid');
-      if(stateUid) {
+      if (stateUid) {
         // If linked login user
-        initDirectoryLogin();
+        analytics.onDirectoryLoginInit({...info?.user, stateUid})
+        await initDirectoryLogin();
       }
-    
     }
 
-    function handlePrivyLinkSuccess(e) {
+    async function handlePrivyLinkSuccess(e) {
       const { linkMethod, linkedAccount } = e.detail;
       const authLinkedAccounts = getLinkedAccounts(e.detail.user);
+      analytics.onPrivyLinkSuccess({linkMethod, linkedAccount, authLinkedAccounts})
       if (linkMethod === 'email') {
         // Initiate Directory Login to validate email and login user
-        initDirectoryLogin();
+        const stateUid = localStorage.getItem('stateUid');
+        analytics.onDirectoryLoginInit({...e?.detail?.user, stateUid, linkedAccount})
+        await initDirectoryLogin();
       } else if (linkMethod === 'github') {
         document.dispatchEvent(new CustomEvent('new-auth-accounts', { detail: authLinkedAccounts }));
         toast.success('Github linked successfully', { hideProgressBar: true });
@@ -189,44 +191,51 @@ function PrivyModals() {
     }
 
     function handlePrivyLoginError(e) {
-      console.log(e, 'Privy login error');
+      console.log('Privy login error');
     }
 
-    function handlePrivyLinkError(e) {
+    async function handlePrivyLinkError(e) {
       const userInfo = Cookies.get('userInfo');
       const accessToken = Cookies.get('accessToken');
       const refreshToken = Cookies.get('refreshToken');
+      
       if (!userInfo && !accessToken && !refreshToken) {
-        if (e?.detail?.error === 'linked_to_another_user' || e?.detail?.error === "exited_link_flow" || e?.detail?.error === 'invalid_credentials') {
-          deleteUser(e?.detail?.error);
-          //document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: e?.detail?.error }))
+        analytics.onAccountLinkError({type: 'loggedout', error: e?.detail?.error})
+        if (
+          e?.detail?.error === 'linked_to_another_user' ||
+          e?.detail?.error === 'exited_link_flow' ||
+          e?.detail?.error === 'invalid_credentials'
+        ) {
+          try {
+            await deleteUser(e?.detail?.error);
+          } catch (err) {
+            document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: e?.detail?.error }));
+          }
         } else {
-          logout();
+          await logout();
           setLinkAccountKey('');
-          document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: 'unexpected_error' }))
+          document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: 'unexpected_error' }));
         }
-        //document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: e?.detail?.error }));
-
-        //setLinkAccountKey('');
+      } else {
+        analytics.onAccountLinkError({type: 'loggedin', error: e?.detail?.error})
       }
     }
-    function initPrivyLogin() {
-      const stateUid = localStorage.getItem('stateUid')
-      if(stateUid) {
+    async function initPrivyLogin() {
+      const stateUid = localStorage.getItem('stateUid');
+      if (stateUid) {
         login();
       }
-   
     }
     function addAccountToPrivy(e) {
+      analytics.onPrivyAccountLink({account: e?.detail})
       setLinkAccountKey(e.detail);
     }
-    function handlePrivyLogout() {
+    async function handlePrivyLogout() {
       Cookies.remove('authLinkedAccounts');
-      logout();
+      await logout();
     }
 
-    function handlePrivyLogoutSuccess() {
-      console.log('privy Logout success');
+    async function handlePrivyLogoutSuccess() {
       const isDirectory = localStorage.getItem('directory-logout');
       if (isDirectory) {
         localStorage.clear();

@@ -4,13 +4,16 @@ import { useRouter } from 'next/router';
 import { useEffect } from 'react';
 import Cookies from 'js-cookie';
 import usePrivyWrapper from '../../hooks/auth/usePrivyWrapper';
+import useAuthAnalytics from 'apps/web-app/analytics/auth.analytics';
 
 function AuthInfo(props) {
   const router = useRouter();
-  const {logout} = usePrivyWrapper()
+  const { logout } = usePrivyWrapper();
+  const analytics = useAuthAnalytics();
 
   // Reset Url
-  const clearPrivyParams = () => {
+  const onClose = () => {
+    analytics.onAuthInfoClosed()
     const queryString = window.location.search.substring(1);
     const params = new URLSearchParams(queryString);
     let queryParams = `?`;
@@ -24,9 +27,10 @@ function AuthInfo(props) {
 
   // Initiate Privy Login and get the auth code for state
   const onLogin = async () => {
+    analytics.onProceedToLogin()
     localStorage.clear();
-    await logout()
-    const result = await axios.post(`${process.env.WEB_API_BASE_URL}/v1/auth`, {
+    await logout();  
+      const result = await axios.post(`${process.env.WEB_API_BASE_URL}/v1/auth`, {
       state: generateOAuth2State(),
     });
     localStorage.setItem('stateUid', result.data);
@@ -49,17 +53,31 @@ function AuthInfo(props) {
               <img src="/assets/images/auth/auth-whatsnew.svg" />
               <h2 className="authinfo__cn__box__info__title">New Authentication Method</h2>
               <p className="authinfo__cn__box__info__text">
-              We have updated our Authentication Service. Please verify and link your directory membership email to a login method of your choice. If you can&apos;t remember your membership email, <a className='link' target='_blank' rel="noreferrer" href='https://www.plnetwork.io/contact?showModal=getSupport'>contact us here</a> for assistance
+                We have updated our Authentication Service. Please verify and link your directory membership email to a
+                login method of your choice. If you can&apos;t remember your membership email,{' '}
+                <a
+                  className="link"
+                  target="_blank"
+                  rel="noreferrer"
+                  href="https://www.plnetwork.io/contact?showModal=getSupport"
+                >
+                  contact us here
+                </a>{' '}
+                for assistance
               </p>
               <button onClick={onLogin} className="authinfo__cn__box__info__btn">
                 Proceed to Login
               </button>
             </div>
-            <img onClick={clearPrivyParams} src='/assets/images/icons/close-grey.svg' className='authinfo__cn__box__close'/>
+            <img
+              onClick={onClose}
+              src="/assets/images/icons/close-grey.svg"
+              className="authinfo__cn__box__close"
+            />
             <img className="authinfo__cn__box__img" src="/assets/images/auth/authinfo4.png" />
           </div>
           <div className="authinfo__cn__actions">
-            <button onClick={clearPrivyParams} className="authinfo__cn__actions__cancel">
+            <button onClick={onClose} className="authinfo__cn__actions__cancel">
               Cancel
             </button>
             <button onClick={onLogin} className="authinfo__cn__actions__login">
@@ -162,7 +180,7 @@ function AuthInfo(props) {
             .authinfo__cn__box {
               flex-direction: row;
               height: 70svh;
-              max-height:598px;
+              max-height: 598px;
               width: fit-content;
               overflow: hidden;
             }
@@ -170,9 +188,6 @@ function AuthInfo(props) {
               order: 1;
               width: fit-content;
               height: 100%;
-              
-             
-              
             }
             .authinfo__cn__box__info {
               order: 2;
