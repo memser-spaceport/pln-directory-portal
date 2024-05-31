@@ -50,7 +50,7 @@ function AuthInfo(props) {
         <div className="authinfo__cn">
           <div className="authinfo__cn__box">
             <div className="authinfo__cn__box__info">
-              <img src="/assets/images/auth/auth-whatsnew.svg" />
+              <img className='authinfo__cn__box__info__whatsnew' src="/assets/images/auth/auth-whatsnew.svg" />
               <h2 className="authinfo__cn__box__info__title">New Authentication Method</h2>
               <p className="authinfo__cn__box__info__text">
                 We have updated our Authentication Service. Please verify and link your directory membership email to a
@@ -74,7 +74,7 @@ function AuthInfo(props) {
               src="/assets/images/icons/close-grey.svg"
               className="authinfo__cn__box__close"
             />
-            <img className="authinfo__cn__box__img" src="/assets/images/auth/authinfo4.png" />
+            <img className="authinfo__cn__box__img" src="/assets/images/auth/authinfo.png" />
           </div>
           <div className="authinfo__cn__actions">
             <button onClick={onClose} className="authinfo__cn__actions__cancel">
@@ -88,6 +88,11 @@ function AuthInfo(props) {
       </div>
       <style jsx>
         {`
+         .link {
+          color: #156FF7;
+          font-weight: 600;
+        }
+        
           .authinfo {
             position: fixed;
             top: 0;
@@ -112,8 +117,9 @@ function AuthInfo(props) {
             max-height: calc(90svh - 72px);
             overflow-y: scroll;
             background: white;
-            border-radius: 8px 8px 0 0;
+            border-radius: 8px;
             position: relative;
+            padding: 8px;
             display: flex;
             flex-direction: column;
           }
@@ -136,6 +142,7 @@ function AuthInfo(props) {
           }
           .authinfo__cn__box__img {
             width: 100%;
+            border-radius: 6px;
           }
           .authinfo__cn__box__info__text {
             font-size: 12px;
@@ -153,6 +160,9 @@ function AuthInfo(props) {
             gap: 10px;
             height: 72px;
             border-radius: 0 0 8px 8px;
+          }
+          .authinfo__cn__box__info__whatsnew {
+            width: 136px;
           }
           .authinfo__cn__actions__cancel {
             padding: 10px 24px;
@@ -213,9 +223,7 @@ function AuthInfo(props) {
               height: 12px;
               width: 12px;
             }
-            .link {
-              text-decoration: underline;
-            }
+           
           }
         `}
       </style>
