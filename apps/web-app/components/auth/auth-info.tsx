@@ -117,7 +117,7 @@ function AuthInfo(props) {
             max-height: calc(90svh - 72px);
             overflow-y: scroll;
             background: white;
-            border-radius: 8px;
+            border-radius: unset;
             position: relative;
             padding: 8px;
             display: flex;
@@ -193,6 +193,7 @@ function AuthInfo(props) {
               max-height: 598px;
               width: fit-content;
               overflow: hidden;
+              border-radius: 8px;
             }
             .authinfo__cn__box__img {
               order: 1;
