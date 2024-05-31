@@ -16,7 +16,7 @@ import { getUserInfo, parseCookie } from 'apps/web-app/utils/shared.utils';
 import { APP_ANALYTICS_EVENTS, IRL_LW_EE_DATES } from 'apps/web-app/constants';
 import TagsPicker from './tags-picker';
 import useTagsPicker from 'apps/web-app/hooks/shared/use-tags-picker';
-import { formatDateRangeForDescription, getArrivalDepartureDateRange } from 'apps/web-app/utils/irl.utils';
+import { formatDateRangeForDescription, formatDateToISO, getArrivalDepartureDateRange } from 'apps/web-app/utils/irl.utils';
 
 const AddDetailsPopup = (props: any) => {
   const isOpen = props.isOpen;
@@ -45,8 +45,9 @@ const AddDetailsPopup = (props: any) => {
   const analytics = useAppAnalytics();
   const user = getUserInfo();
   const dateRange = getArrivalDepartureDateRange(eventDetails?.startDate, eventDetails?.endDate, 5);
-  const departureMinDate = eventDetails?.startDate?.split("T")[0];
-  const arrivalMaxDate = eventDetails?.endDate?.split("T")[0];
+  const endRange = getArrivalDepartureDateRange(eventDetails?.startDate, eventDetails?.endDate, 4);
+  const departureMinDate = formatDateToISO(eventDetails?.startDate);
+  const arrivalMaxDate = formatDateToISO(eventDetails?.endDate);
   const startAndEndDateInfo = formatDateRangeForDescription(eventDetails?.startDate, eventDetails?.endDate);
 
   const defaultItems = process.env.IRL_DEFAULT_TOPICS?.split(',') ?? [];
@@ -419,7 +420,7 @@ const AddDetailsPopup = (props: any) => {
                                 autoComplete="off"
                                 className="h-10 w-full rounded-lg border border-[#CBD5E1] px-3 py-[8px] text-sm leading-6 text-[#475569] focus:outline-none"
                                 min={departureMinDate}
-                                max={dateRange.dateTo}
+                                max={endRange.dateTo}
                                 value={formValues?.additionalInfo?.checkOutDate}
                                 onChange={onAdditionalInfoChange}
                                 disabled={
