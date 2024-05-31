@@ -3,13 +3,14 @@ import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { APP_ANALYTICS_EVENTS, EVENT_TYPE } from 'apps/web-app/constants';
 import { getUserInfo } from 'apps/web-app/utils/shared.utils';
 import Search from './search';
+import { isPastDate } from 'apps/web-app/utils/irl.utils';
 
 const Toolbar = (props: any) => {
   const eventDetails = props?.eventDetails;
   const onLogin = props.onLogin;
   const isUserLoggedIn = props?.isUserLoggedIn;
   const isUserGoing = props?.isUserGoing;
-  const isPastEvent = eventDetails?.isPastEvent;
+  const isPastEvent = isPastDate(eventDetails?.endDate);
   const filteredList = props?.filteredList;
   const type = eventDetails?.type;
   const schedule = eventDetails?.additionalInfo?.schedule ?? 'View Schedule';
