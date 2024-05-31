@@ -66,17 +66,20 @@ const TableHeader = (props: any) => {
   };
 
   //filter column by roles
-  const onFilterByRoles = (items: any) => {
-    analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_FILTER_CLICKED,
-      {
-        eventId: eventDetails?.id,
-        eventName: eventDetails?.name,
-        column: 'member role',
-        filterValues: items,
-        user,
+  const onFilterByRoles = (items: any, from: string) => {
+
+    if(from !== "reset") {
+      analytics.captureEvent(
+        APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_FILTER_APPLY_BTN_CLICKED,
+        {
+          eventId: eventDetails?.id,
+          eventName: eventDetails?.name,
+          column: 'member roles',
+          filterValues: items,
+          user,
       }
     );
+  }
     document.dispatchEvent(
       new CustomEvent('irl-details-filterList', {
         detail: {
@@ -91,10 +94,12 @@ const TableHeader = (props: any) => {
   };
 
   //filter column by topics
-  const onFilterByTopics = (items: any) => {
-    analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_FILTER_CLICKED,
-      {
+  const onFilterByTopics = (items: any, from: string) => {
+
+    if(from !== "reset") {
+      analytics.captureEvent(
+        APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_FILTER_APPLY_BTN_CLICKED,
+        {
         eventId: eventDetails?.id,
         eventName: eventDetails?.name,
         column: 'topics',
@@ -102,6 +107,7 @@ const TableHeader = (props: any) => {
         user,
       }
     );
+  }
 
     document.dispatchEvent(
       new CustomEvent('irl-details-filterList', {
@@ -144,6 +150,35 @@ const TableHeader = (props: any) => {
     topicFilterProps?.onClearSelection(e);
   };
 
+  const onTopicsFilterclicked = () => {
+    analytics.captureEvent(
+      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_FILTER_BTN_CLICKED,
+      {
+        eventId: eventDetails?.id,
+        eventName: eventDetails?.name,
+        column: 'topics',
+        user,
+      }
+    );
+    topicFilterProps?.onOpenPane();
+    roleFilterProps?.onClosePane();
+  }
+
+  const onMemberRoleFilterClicked = () => {
+    analytics.captureEvent(
+      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_FILTER_BTN_CLICKED,
+      {
+        eventId: eventDetails?.id,
+        eventName: eventDetails?.name,
+        column: 'member roles',
+        user,
+      }
+    );
+
+    roleFilterProps?.onOpenPane();
+    topicFilterProps.onClosePane();
+  }
+
   return (
     <>
       {isUserLoggedIn && (
@@ -184,10 +219,7 @@ const TableHeader = (props: any) => {
                 <>
                   <div className="flex items-center gap-[2px]">
                     <button
-                      onClick={() => {
-                        roleFilterProps?.onOpenPane();
-                        topicFilterProps.onClosePane();
-                      }}
+                      onClick={onMemberRoleFilterClicked}
                     >
                       <img
                         width={16}
@@ -234,10 +266,7 @@ const TableHeader = (props: any) => {
               <>
                 <div className="flex items-center gap-[2px]">
                   <button
-                    onClick={() => {
-                      topicFilterProps?.onOpenPane();
-                      roleFilterProps?.onClosePane();
-                    }}
+                    onClick={onTopicsFilterclicked}
                   >
                     <img
                       width={16}

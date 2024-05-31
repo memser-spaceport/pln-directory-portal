@@ -153,10 +153,10 @@ const AddDetailsPopup = (props: any) => {
 
     if (eventDetails?.isExclusionEvent) {
       if (!formValues.additionalInfo.checkInDate) {
-        errors.checkInDate = 'Check in date is required';
+        errors.checkInDate = 'Arrival date is required';
       }
       if (!formValues.additionalInfo.checkOutDate) {
-        errors.checkOutDate = 'Check out date is required';
+        errors.checkOutDate = 'Departure date is required';
       }
     }
     setFormErrors(errors);
