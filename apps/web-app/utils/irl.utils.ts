@@ -30,7 +30,11 @@ export const formatIrlEventDate = (startDate, endDate) => {
 
 export const isPastDate = (date) => {
   const currentDate = new Date();
-  return new Date(date)?.getTime() < currentDate.getTime();
+  const inputDate = new Date(date);
+  currentDate.setHours(0, 0, 0, 0);
+  inputDate.setHours(0, 0, 0, 0);
+
+  return inputDate.getTime() < currentDate.getTime();
 };
 
 export const sortByDefault = (guests) => {
