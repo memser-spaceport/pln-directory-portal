@@ -8,7 +8,6 @@ function useLoginPopupStatus() {
   const router = useRouter();
 
   useEffect(() => {
-    console.log('useeffect in hook', authenticated)
     setLoginStatus(window.location.hash === '#login');
   }, [router]);
   return {
