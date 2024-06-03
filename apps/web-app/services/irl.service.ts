@@ -68,7 +68,8 @@ export const getEventDetailBySlug = async (slug, token) => {
   // const eventExclusionIds = eventExclusions?.split(',');
   // const isExclusionEvent = eventExclusionIds?.includes(output?.uid);
 
-  const isExclusionEvent = output?.additionalInfo?.isExclusiveEvent;
+  const isExclusionEvent = output?.additionalInfo?.isExclusiveEvent ?? false;
+  const topics = output?.additionalInfo?.topics ?? [];
 
   const guests = output?.eventGuests?.map((guest: any) => {
     const memberRole = guest?.member?.teamMemberRoles?.find(
@@ -113,6 +114,7 @@ export const getEventDetailBySlug = async (slug, token) => {
     // isPastEvent,
     resources: output?.resources,
     guests,
+    topics,
     isExclusionEvent,
     additionalInfo: output?.additionalInfo,
   };
