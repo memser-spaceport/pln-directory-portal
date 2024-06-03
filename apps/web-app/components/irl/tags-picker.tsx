@@ -11,7 +11,7 @@ const TagsPicker = (props: any) => {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-[6px] lg:gap-3">
-        {defaultItems.map((item, index) => (
+        {defaultItems?.map((item, index) => (
           <div
             onClick={() => onItemsSelected(item)}
             key={index}
