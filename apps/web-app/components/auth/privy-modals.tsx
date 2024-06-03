@@ -74,23 +74,23 @@ function PrivyModals() {
     const refreshTokenExpiry = decodeToken(output.refreshToken);
     localStorage.removeItem('stateUid');
     Cookies.set('authToken', JSON.stringify(output.accessToken), {
-      expires: calculateExpiry(new Date(accessTokenExpiry.exp)),
+      expires: new Date((accessTokenExpiry.exp) * 1000),
       domain: process.env.COOKIE_DOMAIN || '',
     });
 
     Cookies.set('refreshToken', JSON.stringify(output.refreshToken), {
-      expires: calculateExpiry(new Date(refreshTokenExpiry.exp)),
+      expires: new Date((refreshTokenExpiry.exp) * 1000),
       path: '/',
       domain: process.env.COOKIE_DOMAIN || '',
     });
     Cookies.set('userInfo', JSON.stringify(output.userInfo), {
-      expires: calculateExpiry(new Date(accessTokenExpiry.exp)),
+      expires: new Date((accessTokenExpiry.exp) * 1000),
       path: '/',
       domain: process.env.COOKIE_DOMAIN || '',
     });
 
     Cookies.set('authLinkedAccounts', JSON.stringify(authLinkedAccounts), {
-      expires: calculateExpiry(new Date(refreshTokenExpiry.exp)),
+      expires: new Date((refreshTokenExpiry.exp) * 1000),
       path: '/',
       domain: process.env.COOKIE_DOMAIN || '',
     });
