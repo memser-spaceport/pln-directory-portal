@@ -51,7 +51,7 @@ const Banner = (props: any) => {
                 width={16}
                 height={16}
               />
-              <p title={eventLocation} className='h-full max-w-[100px] overflow-hidden text-ellipsis'>{eventLocation}</p>
+              <p title={eventLocation} className='whitespace-nowrap	 h-full max-w-[100px] overflow-hidden text-ellipsis'>{eventLocation}</p>
             </div>
           </div>
         </div>

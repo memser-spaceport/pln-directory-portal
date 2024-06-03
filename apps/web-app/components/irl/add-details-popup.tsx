@@ -50,7 +50,7 @@ const AddDetailsPopup = (props: any) => {
   const arrivalMaxDate = formatDateToISO(eventDetails?.endDate);
   const startAndEndDateInfo = formatDateRangeForDescription(eventDetails?.startDate, eventDetails?.endDate);
 
-  const defaultItems = process.env.IRL_DEFAULT_TOPICS?.split(',') ?? [];
+  const defaultItems = eventDetails?.topics ?? [];
   const topicsProps = useTagsPicker({
     defaultItems,
     selectedItems: formValues?.topics,
