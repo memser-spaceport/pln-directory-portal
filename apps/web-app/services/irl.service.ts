@@ -115,7 +115,7 @@ export const getEventDetailBySlug = async (slug, token) => {
     // isPastEvent,
     resources: output?.resources,
     guests,
-    topics: topics ?? [],
+    topics: Array.isArray(topics) ? topics : [],
     isExclusionEvent,
     additionalInfo: output?.additionalInfo,
   };
