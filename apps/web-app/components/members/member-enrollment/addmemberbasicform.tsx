@@ -96,7 +96,7 @@ export default function AddMemberBasicForm(props) {
         <div className="inputfield relative pt-5">
           <p className="text-sm font-bold">Email</p>
           <p className="mt-[12px] text-sm text-slate-900">{values?.email}</p>
-         {/*  {!props.isEmailEditActive && props.isProfileSettings && editEmail()} */}
+          {!props.isEmailEditActive && props.isProfileSettings && editEmail()}
         </div>
       )}
       {props.isEmailEditActive && props.isProfileSettings && !props.isUserProfile && (

@@ -1,11 +1,4 @@
-import {
-  Body,
-  Controller,
-  Param,
-  Req,
-  UnauthorizedException,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Param, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
@@ -36,18 +29,13 @@ type RouteShape = typeof server.routeShapes;
 @Controller()
 @NoCache()
 export class MemberController {
-  constructor(
-    private readonly membersService: MembersService,
-    private logger: LogService
-  ) {}
+  constructor(private readonly membersService: MembersService, private logger: LogService) {}
 
   @Api(server.route.getMembers)
   @ApiQueryFromZod(MemberQueryParams)
   @ApiOkResponseFromZod(ResponseMemberWithRelationsSchema.array())
   async findAll(@Req() request: Request) {
-    const queryableFields = prismaQueryableFieldsFromZod(
-      ResponseMemberWithRelationsSchema
-    );
+    const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(queryParams);
@@ -60,16 +48,14 @@ export class MemberController {
         builtQuery.where,
         this.membersService.buildNameFilters(queryParams),
         this.membersService.buildRoleFilters(queryParams),
-      ]
+      ],
     };
     return await this.membersService.findAll(builtQuery);
   }
 
   @Api(server.route.getMemberRoles)
   async getMemberFilters(@Req() request: Request) {
-    const queryableFields = prismaQueryableFieldsFromZod(
-      ResponseMemberWithRelationsSchema
-    );
+    const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(queryParams);
@@ -78,10 +64,7 @@ export class MemberController {
       delete builtQuery.where?.name;
     }
     builtQuery.where = {
-      AND: [
-        builtQuery.where,
-        this.membersService.buildNameFilters(queryParams),
-      ],
+      AND: [builtQuery.where, this.membersService.buildNameFilters(queryParams)],
     };
     return await this.membersService.getRolesWithCount(builtQuery, queryParams);
   }
@@ -91,17 +74,9 @@ export class MemberController {
   @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
   @ApiOkResponseFromZod(ResponseMemberWithRelationsSchema)
   @ApiQueryFromZod(MemberDetailQueryParams)
-  async findOne(
-    @Req() request: Request,
-    @ApiDecorator() { params: { uid } }: RouteShape['getMember']
-  ) {
-    const queryableFields = prismaQueryableFieldsFromZod(
-      ResponseMemberWithRelationsSchema
-    );
-    const builder = new PrismaQueryBuilder(
-      queryableFields,
-      ENABLED_RETRIEVAL_PROFILE
-    );
+  async findOne(@Req() request: Request, @ApiDecorator() { params: { uid } }: RouteShape['getMember']) {
+    const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
+    const builder = new PrismaQueryBuilder(queryableFields, ENABLED_RETRIEVAL_PROFILE);
     const builtQuery = builder.build(request.query);
     const member = await this.membersService.findOne(uid, builtQuery);
     return member;
@@ -110,12 +85,9 @@ export class MemberController {
   @Api(server.route.modifyMember)
   @UseGuards(UserTokenValidation)
   async updateOne(@Param('id') id, @Body() body, @Req() req) {
-    this.logger.info(`Member update request - Initated by -> ${req.userEmail}`)
+    this.logger.info(`Member update request - Initated by -> ${req.userEmail}`);
     const participantsRequest = body;
-    return await this.membersService.editMemberParticipantsRequest(
-      participantsRequest,
-      req.userEmail
-    );
+    return await this.membersService.editMemberParticipantsRequest(participantsRequest, req.userEmail);
   }
 
   @Api(server.route.modifyMemberPreference)
@@ -134,32 +106,18 @@ export class MemberController {
 
   @Api(server.route.sendOtpForEmailChange)
   @UseGuards(UserAccessTokenValidateGuard)
-  async sendOtpForEmailChange(
-    @Body() sendOtpRequest: SendEmailOtpRequestDto,
-    @Req() req
-  ) {
-    return await this.membersService.sendOtpForEmailChange(
-      sendOtpRequest.newEmail,
-      req.userEmail
-    );
+  async sendOtpForEmailChange(@Body() sendOtpRequest: SendEmailOtpRequestDto, @Req() req) {
+    return await this.membersService.sendOtpForEmailChange(sendOtpRequest.newEmail, req.userEmail);
   }
 
   @Api(server.route.updateMemberEmail)
   @UseGuards(UserAccessTokenValidateGuard)
-  async updateMemberEmail(
-    @Body() changeEmailRequest: ChangeEmailRequestDto,
-    @Req() req
-  ) {
-    return await this.membersService.verifyOtpAndUpdateEmail(
-      changeEmailRequest.otp,
-      changeEmailRequest.otpToken,
-      req.userEmail
-    );
+  async updateMemberEmail(@Body() changeEmailRequest: ChangeEmailRequestDto, @Req() req) {
+    return await this.membersService.updateMemberEmail(changeEmailRequest.newEmail, req.userEmail);
   }
 
   @Api(server.route.getMemberGitHubProjects)
   async getGitProjects(@Param('uid') uid) {
     return await this.membersService.getGitProjects(uid);
   }
-
 }

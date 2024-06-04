@@ -173,10 +173,19 @@ function PrivyModals() {
       const authLinkedAccounts = getLinkedAccounts(e.detail.user);
       analytics.onPrivyLinkSuccess({linkMethod, linkedAccount, authLinkedAccounts})
       if (linkMethod === 'email') {
-        // Initiate Directory Login to validate email and login user
-        const stateUid = localStorage.getItem('stateUid');
-        analytics.onDirectoryLoginInit({...e?.detail?.user, stateUid, linkedAccount})
-        await initDirectoryLogin();
+        const userInfo = Cookies.get('userInfo');
+        const accessToken = Cookies.get('accessToken');
+        const refreshToken = Cookies.get('refreshToken');
+        if (!userInfo && !accessToken && !refreshToken) {
+          // Initiate Directory Login to validate email and login user
+          const stateUid = localStorage.getItem('stateUid');
+          analytics.onDirectoryLoginInit({...e?.detail?.user, stateUid, linkedAccount})
+          await initDirectoryLogin();
+        } else {
+          document.dispatchEvent(new CustomEvent('app-loader-status', {detail: true}))
+          document.dispatchEvent(new CustomEvent('directory-update-email', {detail: {newEmail: linkedAccount.address}}),)
+        }
+       
       } else if (linkMethod === 'github') {
         document.dispatchEvent(new CustomEvent('new-auth-accounts', { detail: authLinkedAccounts }));
         toast.success('Github linked successfully', { hideProgressBar: true });
