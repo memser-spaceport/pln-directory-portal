@@ -88,7 +88,7 @@ export default function AddMemberBasicForm(props) {
             placeholder="Enter your email address"
             className="custom-grey custom-outline-none border"
           />
-           {!props.isEmailEditActive && !externalId && props.isProfileSettings && editEmail()} 
+           {!props.isEmailEditActive && props.isProfileSettings && editEmail()} 
         </div>
       )}
 

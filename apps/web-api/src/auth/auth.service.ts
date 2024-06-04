@@ -66,12 +66,18 @@ export class AuthService implements OnModuleInit {
     // Find User by externalId
     let foundUser = await this.membersService.findMemberByExternalId(externalId);
     if (foundUser) {
-      return {
-        userInfo: this.memberToUserInfo(foundUser),
-        refreshToken: refresh_token,
-        idToken: id_token,
-        accessToken: access_token,
-      };
+      if(foundUser.email === email) {
+        return {
+          userInfo: this.memberToUserInfo(foundUser),
+          refreshToken: refresh_token,
+          idToken: id_token,
+          accessToken: access_token,
+        };
+      } else {
+        return {
+          isEmailChanged: true
+        }
+      }
     }
 
     // If there is no user found for externalId, then find user by  and update externalId
