@@ -30,6 +30,8 @@ import {
 } from '../utils/services/auth';
 import { DiscardChangesPopup } from 'libs/ui/src/lib/modals/confirmation';
 import Privacy from 'apps/web-app/components/preference/privacy';
+import { updateUserDirectoryEmail } from '../services/member.service';
+import { toast } from 'react-toastify';
 
 export const SettingsContext = React.createContext({ state: null, dispatch: null });
 
@@ -104,15 +106,49 @@ export default function Settings({
       const refreshToken = Cookies.get('refreshToken');
       const refreshTokenExpiry = decodeToken(JSON.parse(refreshToken));
       Cookies.set('authLinkedAccounts', JSON.stringify(e.detail), {
-        expires: calculateExpiry(new Date(refreshTokenExpiry.exp)),
+        expires: new Date(refreshTokenExpiry.exp),
         path: '/',
         domain: process.env.COOKIE_DOMAIN || '',
       });
       setAuthAccounts(e.detail);
     }
+
+    async function updateUserEmail(e) {
+      try {
+        const newEmail = e.detail.newEmail
+      const oldAccessToken = Cookies.get('authToken');
+      const header = {headers: {Authorization: `Bearer ${JSON.parse(oldAccessToken)}`}}
+      const result = await updateUserDirectoryEmail({newEmail}, userInfo.uid, header)
+      const { refreshToken, accessToken, userInfo: newUserInfo} = result;
+        if (refreshToken && accessToken) {
+            const accessTokenExpiry = decodeToken(accessToken);
+            const refreshTokenExpiry = decodeToken(refreshToken);
+            Cookies.set('authToken', JSON.stringify(accessToken), { 
+                expires: new Date(accessTokenExpiry.exp * 1000),
+               
+            });
+            Cookies.set('refreshToken', JSON.stringify(refreshToken), {
+                expires: new Date(refreshTokenExpiry.exp * 1000),
+              
+            });
+            Cookies.set('userInfo', JSON.stringify(newUserInfo), { 
+                expires: new Date(refreshTokenExpiry.exp * 1000),
+            });
+            document.dispatchEvent(new CustomEvent('app-loader-status'))
+            toast.success('Email Updated Successfully')
+            window.location.reload();
+        }
+      } catch (e) {
+        document.dispatchEvent(new CustomEvent('app-loader-status'))
+        toast.error('Email Update Failed')
+      }
+    }
+
     document.addEventListener('new-auth-accounts', authAccountsHandler);
+    document.addEventListener('directory-update-email', updateUserEmail)
     return function () {
       document.removeEventListener('new-auth-accounts', authAccountsHandler);
+      document.removeEventListener('directory-update-email', updateUserEmail)
     };
   }, []);
 

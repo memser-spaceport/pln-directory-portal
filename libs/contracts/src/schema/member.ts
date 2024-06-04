@@ -104,8 +104,7 @@ export class ResponseMemberSchemaDto extends createZodDto(
 export type TMemberResponse = z.infer<typeof ResponseMemberWithRelationsSchema>;
 
 const ChangeEmailRequestSchema = z.object({
-  otpToken: z.string(),
-  otp: z.string()
+  newEmail: z.string(),
 })
 
 const SendEmailOtpRequestSchema = z.object({
