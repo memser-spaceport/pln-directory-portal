@@ -377,7 +377,7 @@ export function EditMemberModal({
         logoutAndRedirect(PAGE_ROUTES.MEMBERS);
       }
 
-      // setEmailEditStatus(true);
+      document.dispatchEvent(new CustomEvent('auth-link-account', {detail: 'updateEmail'}))
     } else {
       analytics.captureEvent(
         APP_ANALYTICS_EVENTS.SETTINGS_MEMBER_CHANGE_EMAIL_CLICKED,

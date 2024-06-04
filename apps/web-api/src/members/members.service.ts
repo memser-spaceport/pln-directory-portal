@@ -222,15 +222,10 @@ export class MembersService {
      return await this.emailOtpService.sendEmailOtp(newEmailId);
   }
 
-  async verifyOtpAndUpdateEmail(otp, otpToken, oldEmail) {
+  async updateMemberEmail(newEmail, oldEmail) {
     const memberInfo = await this.findMemberByEmail(oldEmail);
     if(!memberInfo || !memberInfo.externalId) {
       throw new ForbiddenException("Please login again and try")
-    }
-
-    const { recipient, valid } =  await this.emailOtpService.verifyEmailOtp(otp, otpToken);
-    if (!valid) {
-      return { valid }
     }
 
     let newTokens;
@@ -243,23 +238,23 @@ export class MembersService {
         referenceUid: memberInfo.uid,
         uniqueIdentifier: oldEmail,
         participantType: 'MEMBER',
-        newData: { oldEmail: oldEmail, newEmail: recipient }
+        newData: { oldEmail: oldEmail, newEmail: newEmail }
       })
 
       newMemberInfo = await tx.member.update({
           where: {email: oldEmail.toLowerCase().trim()},
-          data: {email: recipient},
+          data: {email: newEmail.toLowerCase().trim()},
           include: {
             memberRoles: true,
             image: true,
             teamMemberRoles: true,
           }
         })
-      newTokens = await this.authService.updateEmailInAuth(recipient, oldEmail, memberInfo.externalId)
+      newTokens = await this.authService.updateEmailInAuth(newEmail, oldEmail, memberInfo.externalId)
     })
 
     // Log Info
-    this.logger.info(`Email has been successfully updated from ${oldEmail} to ${recipient}`)
+    this.logger.info(`Email has been successfully updated from ${oldEmail} to ${newEmail}`)
     await this.cacheService.reset();
     return {
       refreshToken: newTokens.refresh_token,
