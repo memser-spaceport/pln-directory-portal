@@ -54,8 +54,7 @@ function AuthInfo(props) {
               <img className='authinfo__cn__box__info__whatsnew' src="/assets/images/auth/auth-whatsnew.svg" />
               <h2 className="authinfo__cn__box__info__title">New Authentication Method</h2>
               <p className="authinfo__cn__box__info__text">
-                We have updated our Authentication Service. Please verify and link your directory membership email to a
-                login method of your choice. If you can&apos;t remember your membership email,{' '}
+                We&apos;ve updated our authentication experience. You will need to login with your Directory profile email or link it to a login method of your choice. If you don&apos;t remember which email is tied to your Directory profile, please{' '}
                 <a
                   className="link"
                   target="_blank"
@@ -64,7 +63,7 @@ function AuthInfo(props) {
                 >
                   contact us here
                 </a>{' '}
-                for assistance
+                for assistance.
               </p>
               <button onClick={onLogin} className="authinfo__cn__box__info__btn">
                 Proceed to Login
