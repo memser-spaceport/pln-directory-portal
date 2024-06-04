@@ -212,7 +212,7 @@ const TableHeader = (props: any) => {
             </div>
           </div>
       
-          {!eventDetails?.isExclusionEvent && (
+          {/* {!eventDetails?.isExclusionEvent && ( */}
             <div className="relative flex w-[160px] items-center justify-start gap-[10px]">
               Member Role
               {roles?.length > 0 && (
@@ -254,7 +254,7 @@ const TableHeader = (props: any) => {
                 </>
               )}
             </div>
-          )}
+          {/* )} */}
           {eventDetails?.isExclusionEvent && (
             <div className="flex w-[160px] items-center justify-start gap-[10px]">
               {`Date(s) Attending`}
@@ -311,18 +311,18 @@ const TableHeader = (props: any) => {
           <div className="flex w-[160px] items-center justify-start">
             Attendee Name
           </div>
-          {!eventDetails?.isExclusionEvent && (
+          {/* {!eventDetails?.isExclusionEvent && ( */}
             <div className="flex w-[160px] items-center justify-start">
               Member Role
             </div>
-          )}
+          {/* )} */}
           {eventDetails?.isExclusionEvent && (
             <div className="flex w-[160px] items-center justify-start">
               {`Date(s) Attending`}
             </div>
           )}
 
-          <div className="flex w-[380px] items-center justify-start pr-[20px]">
+          <div className="flex  items-center justify-start pr-[20px]">
             Topics you are interested in
           </div>
         </div>
