@@ -10,6 +10,7 @@ function AuthInfo(props) {
   const router = useRouter();
   const { logout } = usePrivyWrapper();
   const analytics = useAuthAnalytics();
+  const loginBanner = process.env.LOGIN_BANNER_URL;
 
   // Reset Url
   const onClose = () => {
@@ -74,7 +75,7 @@ function AuthInfo(props) {
               src="/assets/images/icons/close-grey.svg"
               className="authinfo__cn__box__close"
             />
-            <img className="authinfo__cn__box__img" src="/assets/images/auth/auth_info_banner.png" />
+            <img className="authinfo__cn__box__img" src={loginBanner} alt='login banner' />
           </div>
           <div className="authinfo__cn__actions">
             <button onClick={onClose} className="authinfo__cn__actions__cancel">
