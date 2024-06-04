@@ -65,6 +65,10 @@ const MemberList = (props: any) => {
             const isUserGoing = item.memberUid === userInfo.uid;
             const topicsNeedToShow = 2;
             const topics = item?.topics;
+            const formattedDate = formatDateRange(
+              item?.additionalInfo?.checkInDate,
+              item?.additionalInfo?.checkOutDate
+            )
             const remainingTopics = topics
               ?.slice(topicsNeedToShow, topics?.length)
               ?.map((topic) => topic);
@@ -178,10 +182,7 @@ const MemberList = (props: any) => {
                 {eventDetails?.isExclusionEvent && (
                   <div className="w-[160px]">
                     <span className="flex h-full items-center text-[13px] leading-6 text-[#0F172A]">
-                      {formatDateRange(
-                        item?.additionalInfo?.checkInDate,
-                        item?.additionalInfo?.checkOutDate
-                      )}
+                      {formattedDate}
                     </span>
                   </div>
                 )}

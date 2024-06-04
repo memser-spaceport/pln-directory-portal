@@ -52,7 +52,7 @@ export const sortByDefault = (guests) => {
   guestsWithTopics?.sort((a, b) => a.memberName?.localeCompare(b?.memberName));
   remaining?.sort((a, b) => a.memberName?.localeCompare(b?.memberName));
 
-  const combinedList = [...guestsWithReasonAndTopics, ...guestsWithReason, ...guestsWithTopics, ...remaining];
+  const combinedList = [...guestsWithReasonAndTopics, ...guestsWithTopics, ...guestsWithReason, ...remaining];
 
   return combinedList;
 };
@@ -95,31 +95,49 @@ function getDayWithSuffix(day) {
       return day + 'th';
   }
 }
+  const getOrdinalSuffix = (day) => {
+    if (day > 3 && day < 21) return 'th';
+    switch (day % 10) {
+      case 1: return 'st';
+      case 2: return 'nd';
+      case 3: return 'rd';
+      default: return 'th';
+    }
+  };
 
-export function formatDateRange(date1, date2) {
-  if (!date1 && !date2) {
-    return '';
-  }
+    const getMonthName = (monthNumber) => {
+      const monthNames = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      return monthNames[monthNumber - 1];
+    };
 
-  const startDate = new Date(date1);
-  const endDate = new Date(date2);
+  const formatDate = (dateString) => {
+    const [year, month, day] = dateString.split('-').map(Number);
+    const dayWithSuffix = day + getOrdinalSuffix(day);
+    const monthName = getMonthName(month);
+    return `${dayWithSuffix} ${monthName}`;
+  };
 
-  const startDay = startDate.getDate();
-  const endDay = endDate.getDate();
-  const startMonth = startDate.toLocaleString('en-US', { month: 'long' });
-  const endMonth = endDate.toLocaleString('en-US', { month: 'long' });
+  export const formatDateRange = (startDate, endDate) => {
+    if (!startDate && !endDate) {
+          return '';
+        }
+    const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+    const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
 
-  const startDayWithSuffix = getDayWithSuffix(startDay);
-  const endDayWithSuffix = getDayWithSuffix(endDay);
-
-  if (startDate.getTime() === endDate.getTime()) {
-    return `${startDayWithSuffix} ${startMonth}`;
-  } else if (startMonth === endMonth) {
-    return `${startDayWithSuffix}-${endDayWithSuffix} ${startMonth}`;
-  } else {
-    return `${startDayWithSuffix} ${startMonth}-${endDayWithSuffix} ${endMonth}`;
-  }
-}
+    if (startDate === endDate) {
+      return formatDate(startDate);
+    } else if (startMonth === endMonth && startYear === endYear) {
+      const startDayWithSuffix = startDay + getOrdinalSuffix(startDay);
+      const endDayWithSuffix = endDay + getOrdinalSuffix(endDay);
+      const monthName = getMonthName(startMonth);
+      return `${startDayWithSuffix} - ${endDayWithSuffix} ${monthName}`;
+    } else {
+      return `${formatDate(startDate)} - ${formatDate(endDate)}`;
+    }
+  };
 
 export function formatDateRangeForDescription(startDateStr, endDateStr, timeZone = 'America/Los_Angeles') {
   const options: unknown = { month: 'short', day: 'numeric', timeZone: timeZone };
