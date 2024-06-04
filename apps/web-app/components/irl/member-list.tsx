@@ -168,13 +168,13 @@ const MemberList = (props: any) => {
                   </span>
                 </div>
             
-                {!eventDetails?.isExclusionEvent && (
+                {/* {!eventDetails?.isExclusionEvent && ( */}
                   <div className="w-[160px]">
                     <span className="flex h-full items-center text-[13px] leading-6 text-[#0F172A]">
                       {item?.memberRole}
                     </span>
                   </div>
-                )}
+                {/* )} */}
                 {eventDetails?.isExclusionEvent && (
                   <div className="w-[160px]">
                     <span className="flex h-full items-center text-[13px] leading-6 text-[#0F172A]">
