@@ -2,11 +2,7 @@ import { Dialog } from '@headlessui/react';
 import { ReactComponent as CloseIcon } from '/public/assets/images/icons/close-grey.svg';
 import { useEffect, useState } from 'react';
 import TeamsDropDown from './teams-dropdown';
-import {
-  createEventGuest,
-  editEventGuest,
-  getEventDetailBySlug,
-} from 'apps/web-app/services/irl.service';
+import { createEventGuest, editEventGuest, getEventDetailBySlug } from 'apps/web-app/services/irl.service';
 import { toast } from 'react-toastify';
 import { LoadingIndicator } from '../shared/loading-indicator/loading-indicator';
 import Cookies from 'js-cookie';
@@ -16,7 +12,12 @@ import { getUserInfo, parseCookie } from 'apps/web-app/utils/shared.utils';
 import { APP_ANALYTICS_EVENTS, IRL_LW_EE_DATES } from 'apps/web-app/constants';
 import TagsPicker from './tags-picker';
 import useTagsPicker from 'apps/web-app/hooks/shared/use-tags-picker';
-import { formatDateRangeForDescription, formatDateToISO, getArrivalDepartureDateRange } from 'apps/web-app/utils/irl.utils';
+import {
+  formatDateRangeForDescription,
+  formatDateToISO,
+  getArrivalDepartureDateRange,
+
+} from 'apps/web-app/utils/irl.utils';
 
 const AddDetailsPopup = (props: any) => {
   const isOpen = props.isOpen;
@@ -46,8 +47,11 @@ const AddDetailsPopup = (props: any) => {
   const user = getUserInfo();
   const dateRange = getArrivalDepartureDateRange(eventDetails?.startDate, eventDetails?.endDate, 5);
   const endRange = getArrivalDepartureDateRange(eventDetails?.startDate, eventDetails?.endDate, 4);
-  const departureMinDate = formatDateToISO(eventDetails?.startDate);
-  const arrivalMaxDate = formatDateToISO(eventDetails?.endDate);
+
+  const [departureMinDate, setDepartureMinDate] = useState(getDepartureMinDate());
+  // const departureMinDate = formatDateToISO(eventDetails?.startDate);
+  const [arrivalMaxDate, setArrivalMaxDate] = useState(getArrivalMaxDate());
+  // const arrivalMaxDate = formatDateToISO(eventDetails?.endDate);
   const startAndEndDateInfo = formatDateRangeForDescription(eventDetails?.startDate, eventDetails?.endDate);
 
   const defaultItems = eventDetails?.topics ?? [];
@@ -55,6 +59,15 @@ const AddDetailsPopup = (props: any) => {
     defaultItems,
     selectedItems: formValues?.topics,
   });
+
+
+  function getDepartureMinDate() {
+    return  formatDateToISO(eventDetails?.startDate)
+  }
+
+  function getArrivalMaxDate() {
+    return formatDateToISO(eventDetails?.endDate);
+  }
 
   const intialTeamValue = teams?.find((team) => team?.id === formValues?.teamUid);
   const handleChange = (event: any) => {
@@ -80,15 +93,12 @@ const AddDetailsPopup = (props: any) => {
 
   //edit guest details
   const onEditGuestDetails = async () => {
-    analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED,
-      {
-        type: 'clicked',
-        eventId: eventDetails?.id,
-        eventName: eventDetails?.name,
-        user,
-      }
-    );
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED, {
+      type: 'clicked',
+      eventId: eventDetails?.id,
+      eventName: eventDetails?.name,
+      user,
+    });
 
     const payload = {
       ...formValues,
@@ -104,36 +114,26 @@ const AddDetailsPopup = (props: any) => {
     const isValid = validateForm(payload);
 
     if (isValid) {
-      analytics.captureEvent(
-        APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED,
-        {
-          type: 'api_initiated',
+      analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED, {
+        type: 'api_initiated',
+        eventId: eventDetails?.id,
+        eventName: eventDetails?.name,
+        user,
+        ...payload,
+        teamName,
+      });
+
+      const response = await editEventGuest(eventDetails?.slugUrl, registeredGuest.uid, payload);
+
+      if (response.status === 200 || response.status === 201) {
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED, {
+          type: 'api_success',
           eventId: eventDetails?.id,
           eventName: eventDetails?.name,
           user,
           ...payload,
           teamName,
-        }
-      );
-
-      const response = await editEventGuest(
-        eventDetails?.slugUrl,
-        registeredGuest.uid,
-        payload
-      );
-
-      if (response.status === 200 || response.status === 201) {
-        analytics.captureEvent(
-          APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_UPDATE_BTN_CLICKED,
-          {
-            type: 'api_success',
-            eventId: eventDetails?.id,
-            eventName: eventDetails?.name,
-            user,
-            ...payload,
-            teamName,
-          }
-        );
+        });
         await getEventDetails();
         onClose();
         setIsLoader(false);
@@ -152,29 +152,33 @@ const AddDetailsPopup = (props: any) => {
       errors.teamUid = 'Team is required';
     }
 
-    if (eventDetails?.isExclusionEvent) {
-      if (!formValues.additionalInfo.checkInDate) {
-        errors.checkInDate = 'Arrival date is required';
-      }
-      if (!formValues.additionalInfo.checkOutDate) {
-        errors.checkOutDate = 'Departure date is required';
-      }
+    if(formValues.additionalInfo.checkInDate && !formValues.additionalInfo.checkOutDate) {
+      errors.checkOutDate = 'Departure date is required';
     }
+
+    if(!formValues.additionalInfo.checkInDate && formValues.additionalInfo.checkOutDate) {
+      errors.checkInDate = 'Arrival date is required';
+    }
+
+    const checkInDate = new Date(formValues.additionalInfo.checkInDate).getTime();
+    const checkOutDate = new Date(formValues.additionalInfo.checkOutDate).getTime();
+
+    if(checkOutDate < checkInDate) {
+      errors.maxDate = 'Departure date should be greater than or equal to the Arrival date';
+    }
+    
     setFormErrors(errors);
     return Object.keys(errors)?.length === 0;
   };
 
   //add event details
   const onAddGuestDetails = async () => {
-    analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_SAVE_BTN_CLICKED,
-      {
-        type: 'clicked',
-        eventId: eventDetails?.id,
-        eventName: eventDetails?.name,
-        user,
-      }
-    );
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_SAVE_BTN_CLICKED, {
+      type: 'clicked',
+      eventId: eventDetails?.id,
+      eventName: eventDetails?.name,
+      user,
+    });
 
     const payload = {
       ...formValues,
@@ -189,31 +193,25 @@ const AddDetailsPopup = (props: any) => {
     const isValid = validateForm(payload);
 
     if (isValid) {
-      analytics.captureEvent(
-        APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_SAVE_BTN_CLICKED,
-        {
-          type: 'api_initiated',
+      analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_SAVE_BTN_CLICKED, {
+        type: 'api_initiated',
+        eventId: eventDetails?.id,
+        eventName: eventDetails?.name,
+        user,
+        ...payload,
+        teamName,
+      });
+
+      const response = await createEventGuest(eventDetails?.slugUrl, payload);
+      if (response.status === 201) {
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_SAVE_BTN_CLICKED, {
+          type: 'api_success',
           eventId: eventDetails?.id,
           eventName: eventDetails?.name,
           user,
           ...payload,
           teamName,
-        }
-      );
-
-      const response = await createEventGuest(eventDetails?.slugUrl, payload);
-      if (response.status === 201) {
-        analytics.captureEvent(
-          APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_SAVE_BTN_CLICKED,
-          {
-            type: 'api_success',
-            eventId: eventDetails?.id,
-            eventName: eventDetails?.name,
-            user,
-            ...payload,
-            teamName,
-          }
-        );
+        });
         await getEventDetails();
         onClose();
         setIsLoader(false);
@@ -236,7 +234,7 @@ const AddDetailsPopup = (props: any) => {
       }
     } catch {
       onClose();
-        toast.error('Something went wrong');
+      toast.error('Something went wrong');
     }
   };
 
@@ -266,8 +264,8 @@ const AddDetailsPopup = (props: any) => {
   useEffect(() => {
     if (isUserGoing) {
       const data = {
-        teamUid: registeredGuest.teamUid,
-        telegramId: registeredGuest.telegramId,
+        teamUid: registeredGuest?.teamUid,
+        telegramId: registeredGuest?.telegramId,
         reason: registeredGuest.reason ? registeredGuest?.reason?.trim() : '',
         topics: registeredGuest?.topics,
         additionalInfo: {
@@ -283,6 +281,17 @@ const AddDetailsPopup = (props: any) => {
     }
   }, []);
 
+  const onClearDate = (key) => {
+
+    setFormValues((prev) => ({
+     ...prev,
+      additionalInfo: {
+       ...prev?.additionalInfo,
+       [key]: ""
+      },
+    }));
+  }
+
   return (
     <>
       <div className="relative">
@@ -294,21 +303,14 @@ const AddDetailsPopup = (props: any) => {
                 <div className="flex max-h-[80vh] flex-col gap-5 py-[24px] pl-[20px] pr-[10px]">
                   {/* Header */}
                   <div className="flex items-center justify-between pr-[10px]">
-                    <h1 className="text-[18px] font-semibold leading-[14px] text-[#0F172A]">
-                      Attendee Details
-                    </h1>
-                    <CloseIcon
-                      className="stroke-3 cursor-pointer"
-                      onClick={onClose}
-                    />
+                    <h1 className="text-[18px] font-semibold leading-[14px] text-[#0F172A]">Attendee Details</h1>
+                    <CloseIcon className="stroke-3 cursor-pointer" onClick={onClose} />
                   </div>
                   {/* BODY */}
                   <div className="flex w-full flex-1 flex-col gap-5 overflow-auto pr-[10px]">
                     <div className="flex flex-col gap-[10px] lg:flex-row lg:gap-[30px]">
                       <div className="flex flex-1 flex-col gap-3">
-                        <h6 className="text-sm font-semibold text-[#0F172A]">
-                          Team
-                        </h6>
+                        <h6 className="text-sm font-semibold text-[#0F172A]">Team</h6>
                         <div className="w-full lg:w-[285px]">
                           <input
                             name="teamUid"
@@ -323,15 +325,11 @@ const AddDetailsPopup = (props: any) => {
                             getValue={onTeamsChange}
                             initialOption={intialTeamValue}
                           />
-                          <span className="text-[13px] leading-[18px] text-red-500">
-                            {formErrors?.teamUid}
-                          </span>
+                          <span className="text-[13px] leading-[18px] text-red-500">{formErrors?.teamUid}</span>
                         </div>
                       </div>
                       <div className="flex flex-1  flex-col gap-3">
-                        <h6 className="text-sm font-semibold text-[#0F172A]">
-                          Telegram Handle
-                        </h6>
+                        <h6 className="text-sm font-semibold text-[#0F172A]">Telegram Handle</h6>
                         <div className="relative">
                           <input
                             value={formValues?.telegramId}
@@ -348,9 +346,7 @@ const AddDetailsPopup = (props: any) => {
                       </div>
                     </div>
                     <div className="flex flex-col gap-3">
-                      <h6 className="text-sm font-semibold text-[#0F172A]">
-                      Choose the topics that interest you
-                      </h6>
+                      <h6 className="text-sm font-semibold text-[#0F172A]">Choose the topics that interest you</h6>
                       <TagsPicker
                         inputValue={topicsProps?.inputValue}
                         defaultItems={topicsProps?.defaultItems}
@@ -367,8 +363,7 @@ const AddDetailsPopup = (props: any) => {
                         value={formValues.topics}
                         onChange={handleChange}
                         className="hidden"
-                      >
-                      </select>
+                      ></select>
                     </div>
                     <div className="flex flex-col gap-3">
                       <h6 className="text-sm font-semibold text-[#0F172A]">
@@ -391,9 +386,8 @@ const AddDetailsPopup = (props: any) => {
                         <div className="flex flex-col gap-3 lg:flex-row">
                           <div className="flex flex-col gap-1 lg:flex-1">
                             <div className="flex flex-col gap-3 ">
-                              <h6 className="text-sm font-bold text-[#0F172A]">
-                              Arrival Date*
-                              </h6>
+                              <h6 className="text-sm font-bold text-[#0F172A]">Arrival Date</h6>
+                              <div className='relative'>
                               <input
                                 type="date"
                                 name="checkInDate"
@@ -404,16 +398,20 @@ const AddDetailsPopup = (props: any) => {
                                 onChange={onAdditionalInfoChange}
                                 value={formValues?.additionalInfo?.checkInDate}
                               />
+                              {formValues?.additionalInfo?.checkInDate && (
+                                  <button className='absolute right-[40px] top-0 bottom-0 m-auto' onClick={() => onClearDate("checkInDate")}>
+                                  <img src='/assets/images/icons/close-gray.svg'/>
+                                </button>
+                              )}
+                            
+                              </div>
                             </div>
-                            <span className="text-[13px] leading-[18px] text-red-500">
-                              {formErrors?.checkInDate}
-                            </span>
+                            <span className="text-[13px] leading-[18px] text-red-500">{formErrors?.checkInDate}</span>
                           </div>
                           <div className="flex flex-col gap-1 lg:flex-1">
                             <div className="flex flex-col gap-3 ">
-                              <h6 className="text-sm font-bold text-[#0F172A]">
-                              Departure Date*
-                              </h6>
+                              <h6 className="text-sm font-bold text-[#0F172A]">Departure Date</h6>
+                              <div className='relative'>
                               <input
                                 type="date"
                                 name="checkOutDate"
@@ -423,26 +421,25 @@ const AddDetailsPopup = (props: any) => {
                                 max={endRange.dateTo}
                                 value={formValues?.additionalInfo?.checkOutDate}
                                 onChange={onAdditionalInfoChange}
-                                disabled={
-                                  !formValues?.additionalInfo?.checkInDate
-                                }
+                                // disabled={!formValues?.additionalInfo?.checkInDate}
                               />
+                                {formValues?.additionalInfo?.checkOutDate && (
+                                   <button className='absolute right-[40px] top-0 bottom-0 m-auto' onClick={() => onClearDate("checkOutDate")}>
+                                   <img src='/assets/images/icons/close-gray.svg'/>
+                                 </button>
+                              )}
+                              </div>
                             </div>
-                            <span className="text-[13px] leading-[18px] text-red-500">
-                              {formErrors?.checkOutDate}
-                            </span>
-                          </div>
+                            <span className="text-[13px] leading-[18px] text-red-500">{formErrors?.checkOutDate}</span>
+                          </div>                    
+                          
                         </div>
+                        <span className="text-[13px] leading-[18px] text-red-500">{formErrors?.maxDate}</span>  
                         <div className="flex gap-[6px]">
-                          <img
-                            src="/assets/images/icons/info_icon.svg"
-                            alt="info"
-                            width={16}
-                            height={16}
-                          />
+                          <img src="/assets/images/icons/info_icon.svg" alt="info" width={16} height={16} />
                           <p className="text-[13px] font-[500] leading-[18px] text-[#0F172A] opacity-40">
-                            
-                          Please note that your arrival and departure dates must fall within five days before or after the official event dates ({startAndEndDateInfo}).
+                            Please note that your arrival and departure dates must fall within five days before or after
+                            the official event dates ({startAndEndDateInfo}).
                           </p>
                         </div>
                       </div>
