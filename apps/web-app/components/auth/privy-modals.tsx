@@ -135,9 +135,15 @@ function PrivyModals() {
         exchangeRequestId: localStorage.getItem('stateUid'),
         grantType: 'token_exchange',
       });
-      saveTokensAndUserInfo(result.data, user);
-      loginInUser(result.data);
-      analytics.onDirectoryLoginSuccess()
+      
+      if(result?.data?.isEmailChanged) {
+        document.dispatchEvent(new CustomEvent('auth-link-account', {detail: 'updateEmail'}))
+      } else {
+        saveTokensAndUserInfo(result.data, user);
+        loginInUser(result.data);
+        analytics.onDirectoryLoginSuccess()
+      }
+
     } catch (error) {
       
       document.dispatchEvent(new CustomEvent('app-loader-status', { detail: false }));
