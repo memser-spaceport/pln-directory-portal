@@ -30,29 +30,29 @@ export const isPastDate = (date) => {
 };
 
 export const sortByDefault = (guests) => {
-  const guestsWithReasonAndTelegram = [];
+  const guestsWithReasonAndTopics = [];
   const guestsWithReason = [];
-  const guestsWithTelegram = [];
+  const guestsWithTopics = [];
   const remaining = [];
 
   guests?.forEach((guest) => {
-    if (guest?.reason?.trim() && guest?.telegramId) {
-      guestsWithReasonAndTelegram.push(guest);
-    } else if (guest?.reason?.trim() && !guest?.telegramId) {
+    if (guest?.reason?.trim() && guest?.topics?.length > 0) {
+      guestsWithReasonAndTopics.push(guest);
+    } else if (guest?.reason?.trim() && guest?.topics?.length === 0) {
       guestsWithReason.push(guest);
-    } else if (!guest?.reason?.trim() && guest?.telegramId) {
-      guestsWithTelegram.push(guest);
+    } else if (!guest?.reason?.trim() && guest?.topics?.length > 0) {
+      guestsWithTopics.push(guest);
     } else {
       remaining.push(guest);
     }
   });
 
-  guestsWithReasonAndTelegram?.sort((a, b) => a.memberName?.localeCompare(b?.memberName));
+  guestsWithReasonAndTopics?.sort((a, b) => a.memberName?.localeCompare(b?.memberName));
   guestsWithReason?.sort((a, b) => a.memberName?.localeCompare(b?.memberName));
-  guestsWithTelegram?.sort((a, b) => a.memberName?.localeCompare(b?.memberName));
+  guestsWithTopics?.sort((a, b) => a.memberName?.localeCompare(b?.memberName));
   remaining?.sort((a, b) => a.memberName?.localeCompare(b?.memberName));
 
-  const combinedList = [...guestsWithReasonAndTelegram, ...guestsWithReason, ...guestsWithTelegram, ...remaining];
+  const combinedList = [...guestsWithReasonAndTopics, ...guestsWithReason, ...guestsWithTopics, ...remaining];
 
   return combinedList;
 };
