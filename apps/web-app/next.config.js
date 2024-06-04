@@ -25,7 +25,8 @@ let nextConfig = {
     AUTH_APP_CLIENT_SECRET:process.env.AUTH_APP_CLIENT_SECRET,
     AUTH_APP_CLIENT_ID:process.env.AUTH_APP_CLIENT_ID,
     WEB_API_BASE_URL: process.env.WEB_API_BASE_URL,
-    PRIVY_AUTH_ID: process.env.PRIVY_AUTH_ID
+    PRIVY_AUTH_ID: process.env.PRIVY_AUTH_ID,
+    LOGIN_BANNER_URL:process.env.LOGIN_BANNER_URL
   },
   nx: {
     // Set this to true if you would like to to use SVGR
