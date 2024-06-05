@@ -213,7 +213,7 @@ const TableHeader = (props: any) => {
           </div>
       
           {/* {!eventDetails?.isExclusionEvent && ( */}
-            <div className="relative flex w-[160px] items-center justify-start gap-[10px]">
+            <div className="relative flex w-[200px] items-center justify-start gap-[10px]">
               Member Role
               {roles?.length > 0 && (
                 <>
@@ -260,7 +260,7 @@ const TableHeader = (props: any) => {
               {`Date(s) Attending`}
             </div>
           )}
-          <div className="relative flex w-[380px] items-center justify-start gap-[10px]">
+          <div className="relative flex w-[340px] items-center justify-start gap-[10px]">
             Topics you are interested in
             {topics?.length > 0 && (
               <>
