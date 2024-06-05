@@ -294,6 +294,7 @@ function PrivyModals() {
             overflow-y: auto !important;
             scrollbar-width: thin;
           }
+          
           #privy-modal-content img[alt='PL Network logo'] {
             max-width: none !important;
             width: 100% !important;
@@ -303,9 +304,25 @@ function PrivyModals() {
             padding: 0;
             max-height: fit-content !important;
           }
+
           div:has(> img[alt='PL Network logo']) {
             padding: 0;
           }
+
+          #privy-modal-content img[alt='Protocol Labs logo'] {
+            max-width: none !important;
+            width: 100% !important;
+            object-fit: cover;
+            object-position: top;
+            margin: 0;
+            padding: 0;
+            max-height: fit-content !important;
+          }
+
+          div:has(> img[alt='Protocol Labs logo']) {
+            padding: 0;
+          }
+
           .hide-on-mobile {
             display: none !important;
           }
