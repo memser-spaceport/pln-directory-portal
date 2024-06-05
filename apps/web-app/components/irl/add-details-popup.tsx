@@ -30,7 +30,6 @@ const AddDetailsPopup = (props: any) => {
   const router = useRouter();
   const slug = router.query.slug;
 
-  const userCookie = parseCookie(Cookies.get('authToken'));
   const [isLoader, setIsLoader] = useState(false);
   const [formErrors, setFormErrors] = useState<any>({});
   const [formValues, setFormValues] = useState({
@@ -81,6 +80,7 @@ const AddDetailsPopup = (props: any) => {
 
   //get event details
   const getEventDetails = async () => {
+  const userCookie = parseCookie(Cookies.get('authToken'));
     const eventDetails = await getEventDetailBySlug(slug, userCookie);
     document.dispatchEvent(
       new CustomEvent('updateGuests', {
