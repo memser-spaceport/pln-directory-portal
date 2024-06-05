@@ -173,7 +173,7 @@ const MemberList = (props: any) => {
                 </div>
             
                 {/* {!eventDetails?.isExclusionEvent && ( */}
-                  <div className="w-[160px]">
+                  <div className="w-[200px]">
                     <span className="flex h-full items-center text-[13px] leading-6 text-[#0F172A]">
                       {item?.memberRole}
                     </span>
@@ -186,7 +186,7 @@ const MemberList = (props: any) => {
                     </span>
                   </div>
                 )}
-                <div className="flex w-[380px] flex-col justify-start gap-1">
+                <div className="flex w-[340px] flex-col justify-start gap-1">
                   <GuestDescription description={item?.reason} />
                   <div className="flex flex-wrap items-center gap-1">
                     {topics?.slice(0, topicsNeedToShow).map((topic, index) => (
