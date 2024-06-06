@@ -22,15 +22,8 @@ export const verifyAndProcessEmailChange = async (payload, uid, header) => {
 }
 
 export const updateUserDirectoryEmail = async (payload, uid, header) => {
-    // eslint-disable-next-line no-useless-catch
-    try {
-        const result = await api.patch(`${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/members/${uid}/email`, payload, header)
-        return result.data;
-    } catch (e) {
-        return {
-            isError: true
-        }
-    }
+    const result = await api.patch(`${process.env.NEXT_PUBLIC_WEB_API_BASE_URL}/v1/members/${uid}/email`, payload, header)
+    return result.data;
 }
 
 export const findRoleByName = async (params) => {
