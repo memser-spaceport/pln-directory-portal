@@ -6,6 +6,7 @@ import PrivyModals from './privy-modals';
 import AuthInfo from './auth-info';
 import AuthInvalidUser from './auth-invalid-user';
 import { PrivyProvider } from '@privy-io/react-auth';
+import { AuthErrorModal } from './auth-info-modal';
 
 function AuthBox(props) {
   const { isLoginActive } = useLoginPopupStatus();
@@ -24,6 +25,7 @@ function AuthBox(props) {
         }}
       >
         <PrivyModals />
+        <AuthErrorModal/>
         <AuthInvalidUser />
         {isLoginActive === true && <AuthInfo />}
       </PrivyProvider>

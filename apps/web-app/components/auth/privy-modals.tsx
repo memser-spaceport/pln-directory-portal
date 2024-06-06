@@ -74,33 +74,33 @@ function PrivyModals() {
     const refreshTokenExpiry = decodeToken(output.refreshToken);
     localStorage.removeItem('stateUid');
     Cookies.set('authToken', JSON.stringify(output.accessToken), {
-      expires: new Date((accessTokenExpiry.exp) * 1000),
+      expires: new Date(accessTokenExpiry.exp * 1000),
       domain: process.env.COOKIE_DOMAIN || '',
     });
 
     Cookies.set('refreshToken', JSON.stringify(output.refreshToken), {
-      expires: new Date((refreshTokenExpiry.exp) * 1000),
+      expires: new Date(refreshTokenExpiry.exp * 1000),
       path: '/',
       domain: process.env.COOKIE_DOMAIN || '',
     });
     Cookies.set('userInfo', JSON.stringify(output.userInfo), {
-      expires: new Date((accessTokenExpiry.exp) * 1000),
+      expires: new Date(accessTokenExpiry.exp * 1000),
       path: '/',
       domain: process.env.COOKIE_DOMAIN || '',
     });
 
     Cookies.set('authLinkedAccounts', JSON.stringify(authLinkedAccounts), {
-      expires: new Date((refreshTokenExpiry.exp) * 1000),
+      expires: new Date(refreshTokenExpiry.exp * 1000),
       path: '/',
       domain: process.env.COOKIE_DOMAIN || '',
     });
   };
 
   const deleteUser = async (errorCode) => {
-    analytics.onPrivyUserDelete({...user, type: 'init'})
+    analytics.onPrivyUserDelete({ ...user, type: 'init' });
     const token = await getAccessToken();
     await axios.post(`${process.env.WEB_API_BASE_URL}/v1/auth/accounts/external/${user.id}`, { token: token });
-    analytics.onPrivyUserDelete({type: 'success'})
+    analytics.onPrivyUserDelete({ type: 'success' });
     setLinkAccountKey('');
     await logout();
     document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: errorCode }));
@@ -108,11 +108,11 @@ function PrivyModals() {
 
   const handleInvalidDirectoryEmail = async () => {
     try {
-      analytics.onDirectoryLoginFailure({...user, type: 'INVALID_DIRECTORY_EMAIL'})
+      analytics.onDirectoryLoginFailure({ ...user, type: 'INVALID_DIRECTORY_EMAIL' });
       if (user?.email?.address && user?.linkedAccounts.length > 1) {
-        analytics.onPrivyUnlinkEmail({...user, type: 'init'})
+        analytics.onPrivyUnlinkEmail({ ...user, type: 'init' });
         await unlinkEmail(user?.email?.address);
-        analytics.onPrivyUnlinkEmail({type: 'success'})
+        analytics.onPrivyUnlinkEmail({ type: 'success' });
         await deleteUser('');
       } else if (user?.email?.address && user?.linkedAccounts.length === 1) {
         setLinkAccountKey('');
@@ -135,17 +135,16 @@ function PrivyModals() {
         exchangeRequestId: localStorage.getItem('stateUid'),
         grantType: 'token_exchange',
       });
-      
-      if(result?.data?.isEmailChanged) {
-        document.dispatchEvent(new CustomEvent('auth-link-account', {detail: 'updateEmail'}))
+
+      if (result?.data?.isEmailChanged) {
+        document.dispatchEvent(new CustomEvent('auth-info-modal', { detail: 'email_changed' }));
       } else {
         saveTokensAndUserInfo(result.data, user);
         loginInUser(result.data);
-        analytics.onDirectoryLoginSuccess()
+        analytics.onDirectoryLoginSuccess();
       }
-
     } catch (error) {
-      
+
       document.dispatchEvent(new CustomEvent('app-loader-status', { detail: false }));
       if (user?.email?.address && error?.response?.status === 403) {
         await handleInvalidDirectoryEmail();
@@ -160,7 +159,7 @@ function PrivyModals() {
   useEffect(() => {
     async function handlePrivyLoginSuccess(e) {
       const info = e.detail;
-      analytics.onPrivyLoginSuccess(info?.user)
+      analytics.onPrivyLoginSuccess(info?.user);
       // If email is not linked, link email mandatorily
       if (!info?.user?.email?.address) {
         setLinkAccountKey('email');
@@ -169,7 +168,7 @@ function PrivyModals() {
       const stateUid = localStorage.getItem('stateUid');
       if (stateUid) {
         // If linked login user
-        analytics.onDirectoryLoginInit({...info?.user, stateUid})
+        analytics.onDirectoryLoginInit({ ...info?.user, stateUid });
         await initDirectoryLogin();
       }
     }
@@ -177,7 +176,7 @@ function PrivyModals() {
     async function handlePrivyLinkSuccess(e) {
       const { linkMethod, linkedAccount } = e.detail;
       const authLinkedAccounts = getLinkedAccounts(e.detail.user);
-      analytics.onPrivyLinkSuccess({linkMethod, linkedAccount, authLinkedAccounts})
+      analytics.onPrivyLinkSuccess({ linkMethod, linkedAccount, authLinkedAccounts });
       if (linkMethod === 'email') {
         const userInfo = Cookies.get('userInfo');
         const accessToken = Cookies.get('accessToken');
@@ -185,13 +184,14 @@ function PrivyModals() {
         if (!userInfo && !accessToken && !refreshToken) {
           // Initiate Directory Login to validate email and login user
           const stateUid = localStorage.getItem('stateUid');
-          analytics.onDirectoryLoginInit({...e?.detail?.user, stateUid, linkedAccount})
+          analytics.onDirectoryLoginInit({ ...e?.detail?.user, stateUid, linkedAccount });
           await initDirectoryLogin();
         } else {
-          document.dispatchEvent(new CustomEvent('app-loader-status', {detail: true}))
-          document.dispatchEvent(new CustomEvent('directory-update-email', {detail: {newEmail: linkedAccount.address}}),)
+          document.dispatchEvent(new CustomEvent('app-loader-status', { detail: true }));
+          document.dispatchEvent(
+            new CustomEvent('directory-update-email', { detail: { newEmail: linkedAccount.address } })
+          );
         }
-       
       } else if (linkMethod === 'github') {
         document.dispatchEvent(new CustomEvent('new-auth-accounts', { detail: authLinkedAccounts }));
         toast.success('Github linked successfully', { hideProgressBar: true });
@@ -213,9 +213,9 @@ function PrivyModals() {
       const userInfo = Cookies.get('userInfo');
       const accessToken = Cookies.get('accessToken');
       const refreshToken = Cookies.get('refreshToken');
-      
+
       if (!userInfo && !accessToken && !refreshToken) {
-        analytics.onAccountLinkError({type: 'loggedout', error: e?.detail?.error})
+        analytics.onAccountLinkError({ type: 'loggedout', error: e?.detail?.error });
         if (
           e?.detail?.error === 'linked_to_another_user' ||
           e?.detail?.error === 'exited_link_flow' ||
@@ -232,7 +232,7 @@ function PrivyModals() {
           document.dispatchEvent(new CustomEvent('auth-invalid-email', { detail: 'unexpected_error' }));
         }
       } else {
-        analytics.onAccountLinkError({type: 'loggedin', error: e?.detail?.error})
+        analytics.onAccountLinkError({ type: 'loggedin', error: e?.detail?.error });
       }
     }
     async function initPrivyLogin() {
@@ -242,7 +242,7 @@ function PrivyModals() {
       }
     }
     function addAccountToPrivy(e) {
-      analytics.onPrivyAccountLink({account: e?.detail})
+      analytics.onPrivyAccountLink({ account: e?.detail });
       setLinkAccountKey(e.detail);
     }
     async function handlePrivyLogout() {
@@ -297,7 +297,7 @@ function PrivyModals() {
       setLinkAccountKey('');
     } else if (linkAccountKey === 'updateEmail') {
       updateEmail();
-      setLinkAccountKey('');
+        setLinkAccountKey('');
     }
   }, [linkAccountKey]);
 
