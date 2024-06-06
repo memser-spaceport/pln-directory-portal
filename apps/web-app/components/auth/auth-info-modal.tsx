@@ -7,6 +7,7 @@ export function AuthErrorModal() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const onModalClose = () => {
+    document.dispatchEvent(new CustomEvent('app-loader-status'))
     setIsModalOpen(false);
   };
 

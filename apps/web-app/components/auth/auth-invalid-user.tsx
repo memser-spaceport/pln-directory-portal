@@ -7,6 +7,7 @@ function AuthInvalidUser() {
     const [description, setDescription] = useState('');
 
     const handleModalClose = () => {
+        document.dispatchEvent(new CustomEvent('app-loader-status'))
         setIsModalOpen(false);
         setTimeout(()=>{
             setTitle("Email Verification Failed");
@@ -23,6 +24,9 @@ function AuthInvalidUser() {
                 } else if(e.detail === 'unexpected_error') {
                     setTitle('Something went wrong')
                     setDescription('We are unable to authenticate you at the moment due to technical issues. Please try again later')
+                } else if (e.detail === 'email-changed') {
+                    setTitle('Email Changed recently')
+                    setDescription('Your email in our directory has been changed recently. Please login with your updated email id.')
                 }
             } 
            
