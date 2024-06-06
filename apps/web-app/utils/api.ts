@@ -112,6 +112,8 @@ api.interceptors.response.use(
         window.location.href = PAGE_ROUTES.TEAMS;
       } else if (response.status === 403) {
         msg = response?.data?.message ? response?.data?.message : FORBIDDEN_ERR_MSG;
+      } else if (response.status === 400 && response?.data?.message === 'EMAIL_ALREADY_EXIST') {
+        msg = 'Email Already Exist';
       } else if (response.status === 400) {
         msg = response?.data?.message ? response?.data?.message : BAD_REQUEST_ERR_MSG;
       } else if (response.status === 404) {

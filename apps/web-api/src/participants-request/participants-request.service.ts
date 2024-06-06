@@ -711,7 +711,7 @@ export class ParticipantsRequestService {
       data: { ...dataToSave },
     });
     this.logger.info(`Member update request - attibutes updated, requestId -> ${uidToEdit}`)
-    if (isEmailChange && isExternalIdAvailable) {
+   /*  if (isEmailChange && isExternalIdAvailable) {
       // try {
       this.logger.info(`Member update request - Initiating email change - newEmail - ${dataToSave.email}, oldEmail - ${existingData.email}, externalId - ${existingData.externalId}, requestId -> ${uidToEdit}`)
       const response = await axios.post(
@@ -750,7 +750,7 @@ export class ParticipantsRequestService {
       //   }
       // }
       this.logger.info(`Member update request - Email changed,  requestId -> ${uidToEdit}`)
-    }
+    } */
     // Updating status
     await tx.participantsRequest.update({
       where: { uid: uidToEdit },
