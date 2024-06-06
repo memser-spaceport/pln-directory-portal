@@ -115,14 +115,15 @@ export default function Settings({
 
     async function updateUserEmail(e) {
       try {
-        const newEmail = e.detail.newEmail
+      const newEmail = e.detail.newEmail
       const oldAccessToken = Cookies.get('authToken');
       const header = {headers: {Authorization: `Bearer ${JSON.parse(oldAccessToken)}`}}
-      const result = await updateUserDirectoryEmail({newEmail}, userInfo.uid, header)
-      if(result.isError) {
-        document.dispatchEvent(new CustomEvent('app-loader-status'))
+      if(newEmail === userInfo.email) {
+        document.dispatchEvent(new CustomEvent('app-loader-status'));
+        toast.error('New and current email cannot be same');
         return;
       }
+      const result = await updateUserDirectoryEmail({newEmail}, userInfo.uid, header)
       const { refreshToken, accessToken, userInfo: newUserInfo} = result;
         if (refreshToken && accessToken) {
             const accessTokenExpiry = decodeToken(accessToken);
