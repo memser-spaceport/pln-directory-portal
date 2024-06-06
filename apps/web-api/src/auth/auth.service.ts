@@ -306,18 +306,6 @@ export class AuthService implements OnModuleInit {
   private handleAuthErrors(error) {
     if (error?.response?.status === 401) {
       throw new UnauthorizedException('Unauthorized');
-    } else if (error?.response?.status === 400 && error?.response?.data?.errors?.issues) {
-      const errorList = error?.response?.data?.errors?.issues;
-      let isEmailError = false;
-      errorList.map(item => {
-        if(item.message === 'Email cannot be same as existing email') {
-          isEmailError = true;
-        }
-      })
-
-      if(isEmailError) {
-        throw new BadRequestException('EMAIL_ALREADY_EXIST');
-      }
     } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP005') {
       throw new UnauthorizedException('Unauthorized');
     } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP003') {
