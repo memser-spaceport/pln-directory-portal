@@ -138,6 +138,14 @@ function PrivyModals() {
 
       if (result?.data?.isEmailChanged) {
         document.dispatchEvent(new CustomEvent('auth-info-modal', { detail: 'email_changed' }));
+      } else if(result?.data?.isDeleteAccount) {
+        if (user?.linkedAccounts.length > 1) {
+          await unlinkEmail(user?.email?.address);
+          await deleteUser('email-changed');
+        } else if (user?.email?.address && user?.linkedAccounts.length === 1) {
+          setLinkAccountKey('');
+          await deleteUser('email-changed');
+        }
       } else {
         saveTokensAndUserInfo(result.data, user);
         loginInUser(result.data);
