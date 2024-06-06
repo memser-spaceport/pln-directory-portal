@@ -80,12 +80,24 @@ export class AuthService implements OnModuleInit {
       }
     }
 
-    // If there is no user found for externalId, then find user by email.
-    // If email exist then delete the users account in privy
+    // If there is no user found for externalId, then find user by  and update externalId
+    // if user found by email has externalid, delete user in privy
+    // if user found by email doesn't has email id then its a new user. update external id for user
     foundUser = await this.membersService.findMemberByEmail(email);
     if (foundUser) {
-      return {
-        isDeleteAccount: true
+      if(foundUser.externalId) {
+        return {
+          isDeleteAccount: true
+        }
+      } else {
+        await this.membersService.updateExternalIdByEmail(email, externalId);
+        this.logger.info(`Updated externalId - ${externalId} for emailId - ${email}`);
+        return {
+          userInfo: this.memberToUserInfo(foundUser),
+          refreshToken: refresh_token,
+          idToken: id_token,
+          accessToken: access_token,
+        };
       }
     }
 
