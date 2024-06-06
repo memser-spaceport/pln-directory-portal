@@ -130,14 +130,17 @@ export default function Settings({
             const refreshTokenExpiry = decodeToken(refreshToken);
             Cookies.set('authToken', JSON.stringify(accessToken), { 
                 expires: new Date(accessTokenExpiry.exp * 1000),
+                domain: process.env.COOKIE_DOMAIN || '',
                
             });
             Cookies.set('refreshToken', JSON.stringify(refreshToken), {
                 expires: new Date(refreshTokenExpiry.exp * 1000),
+                domain: process.env.COOKIE_DOMAIN || '',
               
             });
             Cookies.set('userInfo', JSON.stringify(newUserInfo), { 
                 expires: new Date(refreshTokenExpiry.exp * 1000),
+                domain: process.env.COOKIE_DOMAIN || '',
             });
             document.dispatchEvent(new CustomEvent('app-loader-status'))
             toast.success('Email Updated Successfully')
