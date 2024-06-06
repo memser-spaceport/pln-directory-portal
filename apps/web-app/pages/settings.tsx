@@ -106,7 +106,7 @@ export default function Settings({
       const refreshToken = Cookies.get('refreshToken');
       const refreshTokenExpiry = decodeToken(JSON.parse(refreshToken));
       Cookies.set('authLinkedAccounts', JSON.stringify(e.detail), {
-        expires: new Date(refreshTokenExpiry.exp),
+        expires: new Date(refreshTokenExpiry.exp * 1000),
         path: '/',
         domain: process.env.COOKIE_DOMAIN || '',
       });
@@ -687,7 +687,7 @@ export const getServerSideProps = async (ctx) => {
   }
 
   let preferences = null;
-  const authLinkedAccounts = JSON.parse(cookies.authLinkedAccounts ?? '%22%22');
+  const authLinkedAccounts = cookies.authLinkedAccounts ? JSON.parse(cookies.authLinkedAccounts) : '';
   if (cookies?.authToken) {
     try {
       let memberPreferences = await getMemberPreferences(userInfo.uid, cookies.authToken);
