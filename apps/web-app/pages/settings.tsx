@@ -119,6 +119,10 @@ export default function Settings({
       const oldAccessToken = Cookies.get('authToken');
       const header = {headers: {Authorization: `Bearer ${JSON.parse(oldAccessToken)}`}}
       const result = await updateUserDirectoryEmail({newEmail}, userInfo.uid, header)
+      if(result.isError) {
+        document.dispatchEvent(new CustomEvent('app-loader-status'))
+        return;
+      }
       const { refreshToken, accessToken, userInfo: newUserInfo} = result;
         if (refreshToken && accessToken) {
             const accessTokenExpiry = decodeToken(accessToken);
