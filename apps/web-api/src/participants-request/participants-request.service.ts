@@ -706,12 +706,17 @@ export class ParticipantsRequestService {
     });
 
     // Other member Changes
+    
     await tx.member.update({
       where: { uid: dataFromDB.referenceUid },
-      data: { ...dataToSave },
+      data: {
+        ...dataToSave,
+        ...(isEmailChange && isExternalIdAvailable && { externalId: null }),
+      },
     });
+
     this.logger.info(`Member update request - attibutes updated, requestId -> ${uidToEdit}`)
-   /*  if (isEmailChange && isExternalIdAvailable) {
+     if (isEmailChange && isExternalIdAvailable) {
       // try {
       this.logger.info(`Member update request - Initiating email change - newEmail - ${dataToSave.email}, oldEmail - ${existingData.email}, externalId - ${existingData.externalId}, requestId -> ${uidToEdit}`)
       const response = await axios.post(
@@ -732,15 +737,9 @@ export class ParticipantsRequestService {
       const headers = {
         Authorization: `Bearer ${clientToken}`,
       };
-      const authPayload = {
-        email: dataToSave.email,
-        existingEmail: existingData.email.toLowerCase().trim(),
-        userId: existingData.externalId,
-        deleteAndReplace: true,
-      };
-      await axios.patch(
-        `${process.env.AUTH_API_URL}/admin/accounts/email`,
-        authPayload,
+      
+      await axios.delete(
+        `${process.env.AUTH_API_URL}/admin/accounts/external/${existingData.externalId}`,
         { headers: headers }
       );
       // } catch (e) {
@@ -750,7 +749,7 @@ export class ParticipantsRequestService {
       //   }
       // }
       this.logger.info(`Member update request - Email changed,  requestId -> ${uidToEdit}`)
-    } */
+    } 
     // Updating status
     await tx.participantsRequest.update({
       where: { uid: uidToEdit },

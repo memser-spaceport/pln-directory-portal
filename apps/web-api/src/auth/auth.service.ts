@@ -42,7 +42,7 @@ export class AuthService implements OnModuleInit {
   async deleteUserAccount(externalAuthToken: string, externalAuthId: string) {
     const clientToken = await this.getAuthClientToken();
     await axios.delete(
-      `${process.env.AUTH_API_URL}/admin/accounts/external/${externalAuthId}`,
+      `${process.env.AUTH_API_URL}/accounts/external/${externalAuthId}`,
       {
         headers: {
           Authorization: `Bearer ${clientToken}`,
