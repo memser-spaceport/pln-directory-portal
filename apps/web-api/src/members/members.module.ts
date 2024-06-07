@@ -15,6 +15,7 @@ import { AuthService } from '../auth/auth.service';
 import { ParticipantsRequestModule } from '../participants-request/participants-request.module';
 import { OtpModule } from '../otp/otp.module';
 import { AuthModule } from '../auth/auth.module';
+import { ForumService } from '../forum/forum.service';
 
 
 @Module({
@@ -31,7 +32,8 @@ import { AuthModule } from '../auth/auth.module';
     RedisService,
     SlackService,
     ForestAdminService,
-    AuthService
+    AuthService,
+    ForumService
   ],
   controllers: [MemberController],
   exports: [MembersService]
