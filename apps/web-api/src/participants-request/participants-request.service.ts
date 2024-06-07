@@ -26,6 +26,7 @@ import axios from 'axios';
 import { LogService } from '../shared/log.service';
 import { Cache } from 'cache-manager';
 import { DEFAULT_MEMBER_ROLES } from '../utils/constants';
+import { ForumService } from '../forum/forum.service';
 
 @Injectable()
 export class ParticipantsRequestService {
@@ -38,6 +39,7 @@ export class ParticipantsRequestService {
     private forestAdminService: ForestAdminService,
     private logger: LogService,
     @Inject(CACHE_MANAGER) private cacheService: Cache,
+    private forumService: ForumService
   ) {}
 
   async getAll(userQuery) {
@@ -413,7 +415,8 @@ export class ParticipantsRequestService {
     disableNotification = false,
     isAutoApproval = false,
     isDirectoryAdmin = false,
-    transactionType: Prisma.TransactionClient | PrismaClient = this.prisma
+    transactionType: Prisma.TransactionClient | PrismaClient = this.prisma,
+    authToken = null
   ) {
     // Get
     const dataFromDB: any =
@@ -553,6 +556,9 @@ export class ParticipantsRequestService {
       await this.slackService.notifyToChannel(slackConfig);
     }
     await this.cacheService.reset();
+    if (authToken) {
+      await this.forumService.updateUser(dataToSave, authToken);
+    }
     // Send ack email to old & new email of member reg his/her email change.
     if (isEmailChange && isDirectoryAdmin) {
       const oldEmail = existingData.email;

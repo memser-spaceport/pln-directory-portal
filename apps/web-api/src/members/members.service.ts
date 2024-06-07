@@ -26,6 +26,7 @@ import { EmailOtpService } from '../otp/email-otp.service';
 import { AuthService } from '../auth/auth.service';
 import { LogService } from '../shared/log.service';
 import { DIRECTORYADMIN, DEFAULT_MEMBER_ROLES } from '../utils/constants';
+import { ForumService } from '../forum/forum.service';
 @Injectable()
 export class MembersService {
   constructor(
@@ -35,6 +36,7 @@ export class MembersService {
     private fileMigrationService: FileMigrationService,
     private emailOtpService: EmailOtpService,
     private authService: AuthService,
+    private forumService: ForumService,
     private logger: LogService,
     @Inject(CACHE_MANAGER) private cacheService: Cache
 
@@ -240,7 +242,6 @@ export class MembersService {
         participantType: 'MEMBER',
         newData: { oldEmail: oldEmail, newEmail: newEmail }
       })
-
       newMemberInfo = await tx.member.update({
           where: {email: oldEmail.toLowerCase().trim()},
           data: {email: newEmail.toLowerCase().trim()},
@@ -252,7 +253,7 @@ export class MembersService {
         })
       newTokens = await this.authService.updateEmailInAuth(newEmail, oldEmail, memberInfo.externalId)
     })
-
+    await this.forumService.updateUser(newMemberInfo, newTokens.access_token);
     // Log Info
     this.logger.info(`Email has been successfully updated from ${oldEmail} to ${newEmail}`)
     await this.cacheService.reset();
@@ -453,7 +454,7 @@ export class MembersService {
     return [];
   }
 
-  async editMemberParticipantsRequest(participantsRequest, userEmail) {
+  async editMemberParticipantsRequest(participantsRequest, userEmail, authToken) {
     this.logger.info(`Member update request  - Processing with values - ${JSON.stringify(participantsRequest)}`)
     const { referenceUid } = participantsRequest;
     const requestorDetails =
@@ -507,7 +508,8 @@ export class MembersService {
             true, // disable the notification
             true, // enable the auto approval
             requestorDetails.isDirectoryAdmin,
-            tx
+            tx,
+            authToken
           );
           this.logger.info(`Member update request - completed, requestId -> ${result.uid}, requestor -> ${userEmail}`)
         } else {

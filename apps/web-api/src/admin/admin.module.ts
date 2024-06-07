@@ -10,6 +10,7 @@ import { AdminService } from './admin.service';
 import { JwtService } from '../utils/jwt/jwt.service';
 import { AdminController } from './admin.controller';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
+import { ForumService } from '../forum/forum.service';
 
 @Module({
   imports: [CacheModule.register()],
@@ -23,6 +24,7 @@ import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
     AdminService,
     JwtService,
     ForestAdminService,
+    ForumService
   ],
 })
 export class AdminModule {}

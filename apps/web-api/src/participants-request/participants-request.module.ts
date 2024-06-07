@@ -8,6 +8,7 @@ import { UniqueIdentifier } from './unique-identifier/unique-identifier.controll
 import { RedisService } from '../utils/redis/redis.service';
 import { SlackService } from '../utils/slack/slack.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
+import { ForumService } from '../forum/forum.service';
 @Module({
   imports: [],
   controllers: [ParticipantsRequestController, UniqueIdentifier],
@@ -18,6 +19,7 @@ import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
     RedisService,
     SlackService,
     ForestAdminService,
+    ForumService
   ],
   exports: [ParticipantsRequestService]
 })

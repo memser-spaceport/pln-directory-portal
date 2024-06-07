@@ -87,7 +87,7 @@ export class MemberController {
   async updateOne(@Param('id') id, @Body() body, @Req() req) {
     this.logger.info(`Member update request - Initated by -> ${req.userEmail}`);
     const participantsRequest = body;
-    return await this.membersService.editMemberParticipantsRequest(participantsRequest, req.userEmail);
+    return await this.membersService.editMemberParticipantsRequest(participantsRequest, req.userEmail, req.authToken);
   }
 
   @Api(server.route.modifyMemberPreference)

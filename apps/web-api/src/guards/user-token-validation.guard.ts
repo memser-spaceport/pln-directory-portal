@@ -27,6 +27,7 @@ export class UserTokenValidation implements CanActivate {
         validationResult?.data?.email
       ) {
         request['userEmail'] = validationResult.data.email;
+        request['authToken'] = token;
       } else {
         throw new UnauthorizedException();
       }
