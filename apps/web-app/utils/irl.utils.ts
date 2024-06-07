@@ -1,3 +1,5 @@
+import { destroyCookie } from "nookies";
+
 export function formatIrlEventDate(startDateStr, endDateStr, timeZone = 'America/Los_Angeles') {
   const options: unknown = { month: 'short', day: 'numeric', timeZone: timeZone };
 
@@ -57,6 +59,27 @@ export const sortByDefault = (guests) => {
   return combinedList;
 };
 
+export const removeCookieInserverSide = (ctx) => {
+  destroyCookie(ctx, 'authToken', {
+    path: '/',
+    domain: process.env.COOKIE_DOMAIN || ''
+  });
+
+  destroyCookie(ctx, 'refreshToken', {
+    path: '/',
+    domain: process.env.COOKIE_DOMAIN || ''
+  });
+
+  destroyCookie(ctx, 'userInfo', {
+    path: '/',
+    domain: process.env.COOKIE_DOMAIN || ''
+  });
+
+  destroyCookie(ctx, 'idToken', {
+    path: '/',
+    domain: process.env.COOKIE_DOMAIN || ''
+  });
+}
 export const getUniqueRoles = (guests: any) => {
   try {
     const allRoles = guests?.map((guest: any) => guest?.memberRole);

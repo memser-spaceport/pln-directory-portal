@@ -9,14 +9,15 @@ import { ADMIN_ROLE } from 'apps/web-app/constants';
 import { DirectoryLayout } from 'apps/web-app/layouts/directory-layout';
 import { IRL_SEO } from 'apps/web-app/seo.config';
 import { getEventDetailBySlug } from 'apps/web-app/services/irl.service';
-import { isPastDate, sortByDefault } from 'apps/web-app/utils/irl.utils';
-import { authenticate, convertCookiesToJson, renewAndStoreNewAccessToken } from 'apps/web-app/utils/services/auth';
+import { isPastDate, removeCookieInserverSide, sortByDefault } from 'apps/web-app/utils/irl.utils';
+import { authenticate, convertCookiesToJson, decodeToken, renewAndStoreNewAccessToken } from 'apps/web-app/utils/services/auth';
 import { parseCookie } from 'apps/web-app/utils/shared.utils';
 import { GetServerSideProps } from 'next';
 import { NextSeo } from 'next-seo';
 import { useRouter } from 'next/router';
 import { ReactElement } from 'react';
 import Cookies from 'js-cookie'
+import { destroyCookie } from 'nookies';
 
 export default function IrlDetails({ eventDetails, teams, userInfo, isUserGoing, isUserLoggedIn }) {
   const router = useRouter();
@@ -89,6 +90,21 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
     const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
     const isUserLoggedIn = cookies?.authToken && cookies?.userInfo ? true : false;
     const authToken = parseCookie(cookies?.authToken);
+    const decodedToken = decodeToken(authToken);
+    if(decodedToken?.exp) {
+      const expiryDate = new Date(decodedToken?.exp * 1000);
+      const currentDate = new Date();
+      if(currentDate > expiryDate)  {
+        removeCookieInserverSide(ctx);
+        return {
+          redirect: {
+            permanent: true,
+            destination: `/irl`,
+          },
+        };
+      }
+    }
+
     const eventDetails = await getEventDetailBySlug(slug, authToken);
     const type = eventDetails?.type;
 
