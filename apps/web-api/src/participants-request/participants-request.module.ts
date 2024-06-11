@@ -8,8 +8,19 @@ import { UniqueIdentifier } from './unique-identifier/unique-identifier.controll
 import { RedisService } from '../utils/redis/redis.service';
 import { SlackService } from '../utils/slack/slack.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
+import { SqsModule } from '@ssut/nestjs-sqs';
 @Module({
-  imports: [],
+  imports: [
+    SqsModule.register({
+      producers: [
+        {
+          name: process.env.QUEUE || '', // name of the queue
+          queueUrl: process.env.QUEUE_URL || '', // the url of the queue
+          region: process.env.AWS_REGION,
+        }
+      ]
+    })
+  ],
   controllers: [ParticipantsRequestController, UniqueIdentifier],
   providers: [
     ParticipantsRequestService,

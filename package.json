@@ -51,6 +51,7 @@
     "@radix-ui/react-tooltip": "^1.0.0",
     "@sentry/minimal": "^6.19.7",
     "@sentry/nextjs": "^7.8.1",
+    "@ssut/nestjs-sqs": "2.1.0",
     "@swc/helpers": "^0.4.11",
     "@ts-rest/core": "^3.19.3",
     "@ts-rest/nest": "^3.19.3",
