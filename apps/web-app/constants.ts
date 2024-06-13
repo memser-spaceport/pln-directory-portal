@@ -213,6 +213,9 @@ export const APP_ANALYTICS_EVENTS = {
   TEAM_EDIT_BY_ADMIN: 'team-edit-by-admin',
   TEAM_FOCUS_AREA_HELP_CLICKED: 'team-filter-focus-area-help-clicked',
   TEAM_OFFICE_HOURS_FILTER_SELECTED: 'team-office-hours-filter-selected',
+  TEAM_OFFICEHOURS_CLICKED: 'team-officehours-clicked',
+  TEAM_OFFICEHOURS_LOGIN_BTN_CLICKED: 'team-officehours-login-btn-clicked',
+  TEAM_OFFICEHOURS_LEARN_MORE_CLICKED: 'team-officehours-learn-more-clicked',
 
   PR_CONRTIBUTIONS_LIST_ITEM_ADD: 'pr-contributions-list-item-add',
   PR_CONRTIBUTIONS_LIST_ITEM_DELETE: 'pr-contributions-list-item-delete',
