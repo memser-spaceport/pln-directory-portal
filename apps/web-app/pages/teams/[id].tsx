@@ -29,6 +29,7 @@ import { renewAndStoreNewAccessToken, convertCookiesToJson} from '../../utils/se
 import TeamProfileProjects from 'apps/web-app/components/teams/team-profile/team-profile-projects/team-profile-projects';
 import ProjectsService from 'apps/web-app/services/projects';
 import { getAllFormattedProjects } from 'apps/web-app/services/projects/projects.data.service';
+import { TeamProfileOfficeHours } from 'apps/web-app/components/teams/team-profile/team-profile-office-hours/team-profile-office-hours';
 
 interface TeamProps {
   team: ITeam;
@@ -38,9 +39,10 @@ interface TeamProps {
   userInfo: any;
   teamsProjectList:any;
   hasProjectsEditAccess: boolean;
+  officeHoursFlag: boolean;
 }
 
-export default function Team({ team, members, backLink, userInfo, teamsProjectList, hasProjectsEditAccess, isUserLoggedIn }: TeamProps) {
+export default function Team({ team, members, backLink, userInfo, teamsProjectList, hasProjectsEditAccess, isUserLoggedIn, officeHoursFlag }: TeamProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
     directoryName: 'Teams',
@@ -60,6 +62,12 @@ export default function Team({ team, members, backLink, userInfo, teamsProjectLi
         <div className="card p-7.5 w-full">
           <TeamProfileHeader team={team} loggedInMember={userInfo} />
           <TeamProfileDetails {...team} />
+          <TeamProfileOfficeHours
+              url={team.officeHours}
+              userInfo={userInfo}
+              team={team}
+              officeHoursFlag={officeHoursFlag}
+            />
           {team.fundingStage || team.membershipSources.length ? (
             <TeamProfileFunding {...team} />
           ) : null}
@@ -130,7 +138,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
      getTeams({
       'teamMemberRoles.member.uid': userInfo.uid,
       select:
-          'uid,name,logo.url,industryTags.title,teamMemberRoles.role,teamMemberRoles.mainTeam',
+          'uid,name,logo.url,industryTags.title,teamMemberRoles.role,teamMemberRoles.mainTeam,officeHours',
       pagination: false,
   })
   ]);
@@ -178,6 +186,13 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
     console.log(err);
   }
 
+  let officeHoursFlag = false;
+  console.log("officeHours",team['officeHours'])
+  officeHoursFlag = team['officeHours'] !== null ? true : false;
+  if (!isUserLoggedIn && team['officeHours']) {
+    delete team['officeHours'];
+  }
+
   // Redirects user to the 404 page when we're unable to fetch
   // a valid team with the provided ID
   if (!team) {
@@ -194,7 +209,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
   );
 
   return {
-    props: { team, members, backLink, isUserLoggedIn, userInfo, teamsProjectList, hasProjectsEditAccess },
+    props: { team, members, backLink, isUserLoggedIn, userInfo, teamsProjectList, hasProjectsEditAccess, officeHoursFlag },
   };
 };
 

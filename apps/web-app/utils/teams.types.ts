@@ -18,6 +18,7 @@ export interface ITeam {
   linkedinHandle: string | null;
   maintainingProjects?: IProject[];
   contributingProjects?: IProject[];
+  officeHours?: string|null;
 }
 
 interface DropDownProps {
