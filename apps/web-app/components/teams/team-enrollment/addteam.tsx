@@ -1,13 +1,4 @@
-import {
-  Dispatch,
-  SetStateAction,
-  useState,
-  ChangeEvent,
-  useEffect,
-  useCallback,
-  useRef,
-  ReactNode,
-} from 'react';
+import { Dispatch, SetStateAction, useState, ChangeEvent, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { trackGoal } from 'fathom-client';
 import AddTeamStepOne from './addteamstepone';
 import AddTeamStepTwo from './addteamsteptwo';
@@ -22,12 +13,7 @@ import {
 } from '../../../utils/services/dropdown-service';
 import { IFormValues } from '../../../utils/teams.types';
 import api from '../../../utils/api';
-import {
-  APP_ANALYTICS_EVENTS,
-  ENROLLMENT_TYPE,
-  FATHOM_EVENTS,
-  FILTER_API_ROUTES,
-} from '../../../constants';
+import { APP_ANALYTICS_EVENTS, ENROLLMENT_TYPE, FATHOM_EVENTS, FILTER_API_ROUTES } from '../../../constants';
 import { ReactComponent as TextImage } from '/public/assets/images/create_team.svg';
 import { LoadingIndicator } from '../../shared/loading-indicator/loading-indicator';
 import { toast } from 'react-toastify';
@@ -52,10 +38,7 @@ function validateBasicForm(formValues) {
   const errors = [];
   const emailRE =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-  if (
-    !formValues.requestorEmail?.trim() ||
-    !formValues.requestorEmail?.trim().match(emailRE)
-  ) {
+  if (!formValues.requestorEmail?.trim() || !formValues.requestorEmail?.trim().match(emailRE)) {
     errors.push('Please add a valid Requestor email');
   }
   if (!formValues.name.trim()) {
@@ -108,15 +91,7 @@ function validateForm(formValues, formStep) {
   }
 }
 
-function handleNextClick(
-  formValues,
-  formStep,
-  setFormStep,
-  setErrors,
-  nameExists,
-  divRef,
-  analytics
-) {
+function handleNextClick(formValues, formStep, setFormStep, setErrors, nameExists, divRef, analytics) {
   const errors = validateForm(formValues, formStep);
   const element1 = divRef.current;
   if (element1) {
@@ -152,11 +127,7 @@ function getSubmitOrNextButton(
     'shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8] disabled:bg-slate-400';
   const submitOrNextButton =
     formStep === 3 ? (
-      <button
-        className={buttonClassName}
-        disabled={isProcessing}
-        onClick={handleSubmit}
-      >
+      <button className={buttonClassName} disabled={isProcessing} onClick={handleSubmit}>
         Request to Join
       </button>
     ) : (
@@ -167,17 +138,7 @@ function getSubmitOrNextButton(
             : buttonClassName
         }
         disabled={disableNext}
-        onClick={() =>
-          handleNextClick(
-            formValues,
-            formStep,
-            setFormStep,
-            setErrors,
-            nameExists,
-            divRef,
-            analytics
-          )
-        }
+        onClick={() => handleNextClick(formValues, formStep, setFormStep, setErrors, nameExists, divRef, analytics)}
       >
         Next
       </button>
@@ -185,12 +146,7 @@ function getSubmitOrNextButton(
   return submitOrNextButton;
 }
 
-function getCancelOrBackButton(
-  formStep,
-  handleModalClose,
-  setFormStep,
-  setErrors
-) {
+function getCancelOrBackButton(formStep, handleModalClose, setFormStep, setErrors) {
   const cancelorBackButton =
     formStep === 1 ? (
       <button
@@ -250,12 +206,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
 
   useEffect(() => {
     if (isOpen) {
-      Promise.all([
-        fetchMembershipSources(),
-        fetchFundingStages(),
-        fetchIndustryTags(),
-        fetchProtocol(),
-      ])
+      Promise.all([fetchMembershipSources(), fetchFundingStages(), fetchIndustryTags(), fetchProtocol()])
         .then((data) =>
           setDropDownValues({
             membershipSources: data[0],
@@ -321,11 +272,9 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     const formattedTags = formValues.industryTags.map((item) => {
       return { uid: item?.value, title: item?.label };
     });
-    const formattedMembershipSource = formValues.membershipSources.map(
-      (item) => {
-        return { uid: item?.value, title: item?.label };
-      }
-    );
+    const formattedMembershipSource = formValues.membershipSources.map((item) => {
+      return { uid: item?.value, title: item?.label };
+    });
     const formattedtechnologies = formValues.technologies.map((item) => {
       return { uid: item?.value, title: item?.label };
     });
@@ -345,7 +294,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       linkedinHandler: formValues.linkedinHandler?.trim(),
       telegramHandler: formValues.telegramHandler?.trim(),
       blog: formValues.blog?.trim(),
-      officeHours: formValues.officeHours?.trim(),
+      officeHours: formValues.officeHours?.trim() === '' ? null : formValues.officeHours?.trim(),
       fundingStage: formattedFundingStage,
       fundingStageUid: formattedFundingStage.uid,
       industryTags: formattedTags,
@@ -361,16 +310,12 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
       uniqueIdentifier: event.target.value?.trim(),
       participantType: ENROLLMENT_TYPE.TEAM,
     };
-    api
-      .post(`/v1/participants-request/unique-identifier`, data)
-      .then((response) => {
-        setDisableNext(false);
-        response?.data &&
-        (response.data?.isUniqueIdentifierExist ||
-          response.data?.isRequestPending)
-          ? setNameExists(true)
-          : setNameExists(false);
-      });
+    api.post(`/v1/participants-request/unique-identifier`, data).then((response) => {
+      setDisableNext(false);
+      response?.data && (response.data?.isUniqueIdentifierExist || response.data?.isRequestPending)
+        ? setNameExists(true)
+        : setNameExists(false);
+    });
   }
 
   const handleSubmit = useCallback(
@@ -391,12 +336,9 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
         setErrors(errors);
         return false;
       }
-      analytics.captureEvent(
-        APP_ANALYTICS_EVENTS.TEAM_JOIN_NETWORK_FORM_STEPS,
-        {
-          itemName: 'SOCIAL',
-        }
-      );
+      analytics.captureEvent(APP_ANALYTICS_EVENTS.TEAM_JOIN_NETWORK_FORM_STEPS, {
+        itemName: 'SOCIAL',
+      });
       const requestorEmail = formValues.requestorEmail?.trim();
       const value = formatData();
       try {
@@ -426,12 +368,9 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
         };
         const response = await api.post(`/v1/participants-request`, data);
         trackGoal(FATHOM_EVENTS.directory.joinNetworkAsTeamSave, 0);
-        analytics.captureEvent(
-          APP_ANALYTICS_EVENTS.TEAM_JOIN_NETWORK_FORM_STEPS,
-          {
-            itemName: 'COMPLETED',
-          }
-        );
+        analytics.captureEvent(APP_ANALYTICS_EVENTS.TEAM_JOIN_NETWORK_FORM_STEPS, {
+          itemName: 'COMPLETED',
+        });
         setSaveCompleted(true);
       } catch (err) {
         if (err?.response?.status === 400) {
@@ -447,9 +386,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
     [formValues]
   );
 
-  function handleInputChange(
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) {
+  function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = event.target;
     setFormValues({ ...formValues, [name]: value });
   }
@@ -498,12 +435,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
           />
         );
       case 3:
-        return (
-          <AddTeamStepThree
-            formValues={formValues}
-            handleInputChange={handleInputChange}
-          />
-        );
+        return <AddTeamStepThree formValues={formValues} handleInputChange={handleInputChange} />;
       default:
         return (
           <AddTeamStepOne
@@ -516,21 +448,16 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
   }
 
   function handleFoucsAreaSave(values: any) {
-    analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.FOCUS_AREA_POPUP_SAVE_BTN_CLICKED,
-      {
-        focusAreas: values,
-        userInfo: getUserInfo(),
-      }
-    );
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.FOCUS_AREA_POPUP_SAVE_BTN_CLICKED, {
+      focusAreas: values,
+      userInfo: getUserInfo(),
+    });
     setFormValues({ ...formValues, focusAreas: values });
   }
 
   const getFocusAreas = async () => {
     try {
-      const focusAreasResponse = await api.get(
-        `${FILTER_API_ROUTES.FOCUS_AREA}`
-      );
+      const focusAreasResponse = await api.get(`${FILTER_API_ROUTES.FOCUS_AREA}`);
 
       const rawData = focusAreasResponse.data;
       const filteredParents = rawData.filter((data) => !data.parentUid);
@@ -552,12 +479,8 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
           <div className="mt-40">
             {saveCompleted ? (
               <div>
-                <div className="mb-3 text-center text-2xl font-bold">
-                  Thank you for submitting
-                </div>
-                <div className="text-md mb-3 text-center">
-                  Our team will review your request shortly & get back
-                </div>
+                <div className="mb-3 text-center text-2xl font-bold">Thank you for submitting</div>
+                <div className="text-md mb-3 text-center">Our team will review your request shortly & get back</div>
                 <div className="text-center">
                   <button
                     className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
@@ -582,12 +505,7 @@ export function AddTeamModal({ isOpen, setIsModalOpen }: AddTeamModalProps) {
                 <div className="px-11">{getFormStep()}</div>
                 <div className="footerdiv flow-root w-full">
                   <div className="float-left">
-                    {getCancelOrBackButton(
-                      formStep,
-                      handleModalClose,
-                      setFormStep,
-                      setErrors
-                    )}
+                    {getCancelOrBackButton(formStep, handleModalClose, setFormStep, setErrors)}
                   </div>
                   <div className="float-right">
                     {getSubmitOrNextButton(

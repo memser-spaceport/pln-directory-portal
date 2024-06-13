@@ -17,12 +17,14 @@ export function getTeamsOptionsFromQuery(queryParams: ParsedUrlQuery) {
     technology,
     includeFriends,
     focusAreas,
+    officeHoursOnly,
   } = queryParams;
 
   const sortFromQuery = getSortFromQuery(sort?.toString());
   const sortField = sortFromQuery.field.toLowerCase();
 
   return {
+    ...(officeHoursOnly ? { officeHours__not: 'null' } : {}),
     ...(technology
       ? { 'technologies.title__with': stringifyQueryValues(technology) }
       : {}),

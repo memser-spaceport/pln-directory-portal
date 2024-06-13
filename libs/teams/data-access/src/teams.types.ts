@@ -1,6 +1,7 @@
 import { TListOptions } from '@protocol-labs-network/shared/data-access';
 
 export type TTeamListOptions = TListOptions & {
+  officeHours__not?: 'null';
   'technologies.title__with'?: string;
   'membershipSources.title__with'?: string;
   'industryTags.title__with'?: string;

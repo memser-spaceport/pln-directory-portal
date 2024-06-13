@@ -1,12 +1,4 @@
-import {
-  Dispatch,
-  SetStateAction,
-  useState,
-  ChangeEvent,
-  useEffect,
-  useCallback,
-  useRef,
-} from 'react';
+import { Dispatch, SetStateAction, useState, ChangeEvent, useEffect, useCallback, useRef } from 'react';
 import { trackGoal } from 'fathom-client';
 import Cookies from 'js-cookie';
 import AddTeamStepOne from './addteamstepone';
@@ -57,10 +49,7 @@ function validateBasicForm(formValues, imageUrl) {
   const errors = [];
   const emailRE =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-  if (
-    !formValues.requestorEmail?.trim() ||
-    !formValues.requestorEmail?.trim().match(emailRE)
-  ) {
+  if (!formValues.requestorEmail?.trim() || !formValues.requestorEmail?.trim().match(emailRE)) {
     //errors.push('Please add a valid Requestor email');
   }
   if (!formValues.name?.trim()) {
@@ -119,16 +108,9 @@ function validateForm(formValues, imageUrl) {
   };
 }
 
-function getSubmitOrNextButton(
-  handleSubmit,
-  isProcessing,
-  fromSettings,
-  disableSubmit
-) {
+function getSubmitOrNextButton(handleSubmit, isProcessing, fromSettings, disableSubmit) {
   const buttonClassName = `${
-    fromSettings
-      ? 'bg-[#156FF7]'
-      : 'bg-gradient-to-r from-[#427DFF] to-[#44D5BB]'
+    fromSettings ? 'bg-[#156FF7]' : 'bg-gradient-to-r from-[#427DFF] to-[#44D5BB]'
   } shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus inline-flex w-full justify-center rounded-full px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]`;
   const submitOrNextButton = (
     <button
@@ -181,8 +163,7 @@ export function EditTeamModal({
   const [isErrorPopupOpen, setIsErrorPopupOpen] = useState(false);
   const [disableSubmit, setDisableSubmit] = useState<boolean>(false);
   const [isModified, setModifiedFlag] = useState<boolean>(false);
-  const [openValidationPopup, setOpenValidationPopup] =
-    useState<boolean>(false);
+  const [openValidationPopup, setOpenValidationPopup] = useState<boolean>(false);
   const [nameExists, setNameExists] = useState<boolean>(false);
   const [dataLoaded, setDataLoaded] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>({
@@ -230,13 +211,7 @@ export function EditTeamModal({
   const setTeamDetails = () => {
     setIsProcessing(true);
     setDataLoaded(false);
-    Promise.all([
-      fetchTeam(id),
-      fetchMembershipSources(),
-      fetchFundingStages(),
-      fetchIndustryTags(),
-      fetchProtocol(),
-    ])
+    Promise.all([fetchTeam(id), fetchMembershipSources(), fetchFundingStages(), fetchIndustryTags(), fetchProtocol()])
       .then((data) => {
         const team = data[0];
         const formValues = {
@@ -342,11 +317,9 @@ export function EditTeamModal({
     const formattedTags = formValues.industryTags.map((item) => {
       return { uid: item?.value, title: item?.label };
     });
-    const formattedMembershipSource = formValues.membershipSources.map(
-      (item) => {
-        return { uid: item?.value, title: item?.label };
-      }
-    );
+    const formattedMembershipSource = formValues.membershipSources.map((item) => {
+      return { uid: item?.value, title: item?.label };
+    });
     const formattedtechnologies = formValues.technologies.map((item) => {
       return { uid: item?.value, title: item?.label };
     });
@@ -366,7 +339,7 @@ export function EditTeamModal({
       linkedinHandler: formValues.linkedinHandler?.trim(),
       telegramHandler: formValues.telegramHandler?.trim(),
       blog: formValues.blog?.trim(),
-      officeHours: formValues.officeHours?.trim(),
+      officeHours: formValues.officeHours?.trim() === '' ? null : formValues.officeHours?.trim(),
       fundingStage: formattedFundingStage,
       fundingStageUid: formattedFundingStage.uid,
       industryTags: formattedTags,
@@ -384,16 +357,12 @@ export function EditTeamModal({
       participantType: ENROLLMENT_TYPE.TEAM,
       uid: id,
     };
-    api
-      .post(`/v1/participants-request/unique-identifier`, data)
-      .then((response) => {
-        setDisableSubmit(false);
-        response?.data &&
-        (response.data?.isUniqueIdentifierExist ||
-          response.data?.isRequestPending)
-          ? setNameExists(true)
-          : setNameExists(false);
-      });
+    api.post(`/v1/participants-request/unique-identifier`, data).then((response) => {
+      setDisableSubmit(false);
+      response?.data && (response.data?.isUniqueIdentifierExist || response.data?.isRequestPending)
+        ? setNameExists(true)
+        : setNameExists(false);
+    });
   }
 
   const handleSubmit = useCallback(
@@ -411,12 +380,10 @@ export function EditTeamModal({
         setBasicErrors([]);
         seProjecttErrors([]);
         setSocialErrors([]);
-        const {
-          errors,
-          basicFormErrors,
-          projectDetailFormErrors,
-          socialFormErrors,
-        } = validateForm(formValues, imageUrl);
+        const { errors, basicFormErrors, projectDetailFormErrors, socialFormErrors } = validateForm(
+          formValues,
+          imageUrl
+        );
         if (errors?.length > 0 || nameExists) {
           if (nameExists) {
             basicFormErrors.push('Name already exists');
@@ -444,11 +411,7 @@ export function EditTeamModal({
                 'content-type': 'multipart/form-data',
               },
             };
-            const imageResponse = await api.post(
-              `/v1/images`,
-              formData,
-              config
-            );
+            const imageResponse = await api.post(`/v1/images`, formData, config);
             image = imageResponse?.data?.image;
           }
           delete values?.logoFile;
@@ -464,15 +427,11 @@ export function EditTeamModal({
             // captchaToken,
           };
           const res = await api.put(`/v1/teams/${id}`, data);
-          if (res.status === 200 && res.statusText === 'OK')
-            setSaveCompleted(true);
+          if (res.status === 200 && res.statusText === 'OK') setSaveCompleted(true);
           getFocusAreas();
-          analytics.captureEvent(
-            APP_ANALYTICS_EVENTS.SETTINGS_TEAM_PROFILE_EDIT_FORM,
-            {
-              itemName: 'COMPLETED',
-            }
-          );
+          analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_TEAM_PROFILE_EDIT_FORM, {
+            itemName: 'COMPLETED',
+          });
           if (fromSettings) {
             setModified(false);
             setModifiedFlag(false);
@@ -499,9 +458,7 @@ export function EditTeamModal({
     [formValues, imageUrl, isProcessing, imageChanged, id, nameExists]
   );
 
-  function handleInputChange(
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) {
+  function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = event.target;
     if (name === 'name') {
       setNameChanged(true);
@@ -539,20 +496,16 @@ export function EditTeamModal({
   const handleFocusSubmit = (focusAreas) => {
     const filteredFocusAreas = focusAreas?.map((focusArea: TFocusArea) => ({
       uid: focusArea.uid,
-      title:focusArea.title,
+      title: focusArea.title,
     }));
 
-    analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.FOCUS_AREA_POPUP_SAVE_BTN_CLICKED,
-      {
-        from: 'Settings-team',
-        focusAreas,
-        userInfo: getUserInfo(),
-        team: formValues,
-      }
-    );
-    const isSame =
-      JSON.stringify(formValues.focusAreas) === JSON.stringify(focusAreas);
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.FOCUS_AREA_POPUP_SAVE_BTN_CLICKED, {
+      from: 'Settings-team',
+      focusAreas,
+      userInfo: getUserInfo(),
+      team: formValues,
+    });
+    const isSame = JSON.stringify(formValues.focusAreas) === JSON.stringify(focusAreas);
     if (!isSame) {
       setFormValues({ ...formValues, focusAreas: filteredFocusAreas });
       setModified(true);
@@ -563,12 +516,8 @@ export function EditTeamModal({
   function saveCompletedTemplate() {
     return (
       <div>
-        <div className="mb-3 text-center text-2xl font-bold">
-          Thank you for submitting
-        </div>
-        <div className="text-md mb-3 text-center">
-          Our team will review your request shortly & get back
-        </div>
+        <div className="mb-3 text-center text-2xl font-bold">Thank you for submitting</div>
+        <div className="text-md mb-3 text-center">Our team will review your request shortly & get back</div>
         <div className="text-center">
           <button
             className="shadow-special-button-default hover:shadow-on-hover focus:shadow-special-button-focus mb-5 inline-flex rounded-full bg-gradient-to-r from-[#427DFF] to-[#44D5BB] px-6 py-2 text-base font-semibold leading-6 text-white outline-none hover:from-[#1A61FF] hover:to-[#2CC3A8]"
@@ -596,12 +545,9 @@ export function EditTeamModal({
   const onTabSelected = (tab) => {
     const allTabs = ['BASIC', 'PROJECT DETAILS', 'SOCIAL'];
     setOpenTab(tab);
-    analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.SETTINGS_TEAM_PROFILE_EDIT_FORM,
-      {
-        itemName: allTabs[tab - 1],
-      }
-    );
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_TEAM_PROFILE_EDIT_FORM, {
+      itemName: allTabs[tab - 1],
+    });
   };
 
   const handleReset = () => {
@@ -634,19 +580,14 @@ export function EditTeamModal({
 
   useEffect(() => {
     getFocusAreas();
-    analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.SETTINGS_TEAM_PROFILE_EDIT_FORM,
-      {
-        itemName: 'BASIC',
-      }
-    );
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.SETTINGS_TEAM_PROFILE_EDIT_FORM, {
+      itemName: 'BASIC',
+    });
   }, []);
 
   const getFocusAreas = async () => {
     try {
-      const focusAreasResponse = await api.get(
-        `${FILTER_API_ROUTES.FOCUS_AREA}`
-      );
+      const focusAreasResponse = await api.get(`${FILTER_API_ROUTES.FOCUS_AREA}`);
       const result = focusAreasResponse?.data ?? [];
       const filteredData = result.filter((data) => !data.parentUid);
       setFocusAreas(filteredData);
@@ -658,14 +599,8 @@ export function EditTeamModal({
   function beforeSaveTemplate() {
     return (
       <div>
-        <div
-          className={`px-11 ${
-            fromSettings ? 'mt-[24px]  rounded-t-[8px] bg-white pt-[24px]' : ''
-          } `}
-        >
-          <span className="font-size-14 text-sm">
-            {SETTINGS_CONSTANTS.TEAM_HELP_TXT}
-          </span>
+        <div className={`px-11 ${fromSettings ? 'mt-[24px]  rounded-t-[8px] bg-white pt-[24px]' : ''} `}>
+          <span className="font-size-14 text-sm">{SETTINGS_CONSTANTS.TEAM_HELP_TXT}</span>
         </div>
 
         {errors?.length > 0 && !fromSettings && (
@@ -677,11 +612,7 @@ export function EditTeamModal({
             </ul>
           </div>
         )}
-        <div
-          className={`overflow-y-auto px-11 ${
-            fromSettings ? 'mb-[90px] rounded-[8px] bg-white pb-[24px]' : ''
-          }`}
-        >
+        <div className={`overflow-y-auto px-11 ${fromSettings ? 'mb-[90px] rounded-[8px] bg-white pb-[24px]' : ''}`}>
           <div className={openTab === 1 || !fromSettings ? 'block' : 'hidden'}>
             <AddTeamStepOne
               formValues={formValues}
@@ -722,29 +653,16 @@ export function EditTeamModal({
         </div>
         {
           <div
-            className={`footerdiv flow-root w-full ${
-              fromSettings ? 'fixed inset-x-0 bottom-0 h-[80px] bg-white' : ''
-            }`}
+            className={`footerdiv flow-root w-full ${fromSettings ? 'fixed inset-x-0 bottom-0 h-[80px] bg-white' : ''}`}
           >
-            {!fromSettings && (
-              <div className="float-left">
-                {getCancelOrBackButton(handleModalClose)}
-              </div>
-            )}
+            {!fromSettings && <div className="float-left">{getCancelOrBackButton(handleModalClose)}</div>}
             <div className="flex justify-center">
               <div className="mx-5">
                 {getResetButton(() => {
                   handleReset();
                 })}
               </div>
-              <div>
-                {getSubmitOrNextButton(
-                  handleSubmit,
-                  isProcessing,
-                  fromSettings,
-                  disableSubmit
-                )}
-              </div>
+              <div>{getSubmitOrNextButton(handleSubmit, isProcessing, fromSettings, disableSubmit)}</div>
             </div>
           </div>
         }
@@ -769,9 +687,7 @@ export function EditTeamModal({
   return (
     <>
       {isProcessing && (
-        <div
-          className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}
-        >
+        <div className={`fixed inset-0 z-[3000] flex items-center justify-center bg-gray-500 bg-opacity-50`}>
           <LoadingIndicator />
         </div>
       )}
