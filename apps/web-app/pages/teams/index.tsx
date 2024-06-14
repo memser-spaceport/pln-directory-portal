@@ -43,7 +43,8 @@ export default function Teams({ teams, filtersValues }: TeamsProps) {
     'fundingStage',
     'technology',
     'includeFriends',
-    'focusAreas'
+    'focusAreas',
+    'officeHoursOnly'
   ];
 
   useDirectoryFiltersFathomLogger('teams', filterProperties);
