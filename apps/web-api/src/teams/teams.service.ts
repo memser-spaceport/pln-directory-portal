@@ -290,7 +290,8 @@ export class TeamsService {
       industryTags, 
       technologies,
       membershipSources,
-      fundingStage  
+      fundingStage,
+      officeHours  
     } = queryParams;
     const filter:any = [];
     this.buildNameAndPLNFriendFilter(name, plnFriend, filter);
@@ -298,6 +299,7 @@ export class TeamsService {
     this.buildTechnologiesFilter(technologies, filter);
     this.buildMembershipSourcesFilter(membershipSources, filter);
     this.buildFundingStageFilter(fundingStage, filter);
+    this.buildOfficeHoursFilter(officeHours, filter);
     return { 
       AND: filter
     };
@@ -388,5 +390,15 @@ export class TeamsService {
         uniqueFocusAreas[uid] = { uid, title };
     });
     return Object.values(uniqueFocusAreas);
+  }
+
+  buildOfficeHoursFilter(officeHours, filter) {
+    console.log("officeHours", officeHours);
+    console.log("oh condition", officeHours === true);
+    if ((officeHours === "true")) {
+      filter.push({  
+        officeHours: { not: null }
+      });
+    }
   }
 }
