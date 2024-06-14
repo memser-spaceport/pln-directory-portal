@@ -142,6 +142,8 @@ export const BAD_REQUEST_ERR_MSG = 'Bad Request';
 export const NETWORK_ERR_MSG = 'Network error. please try again';
 export const OFFICE_HOURS_MSG =
   'Schedule a one on one office hours discussion with';
+export const TEAM_OFFICE_HOURS_MSG =
+  'Join office hours discussion with';
 
 export const PAGE_ROUTES = {
   MEMBERS: '/members',
@@ -416,8 +418,16 @@ export const ANNOUNCEMENT_BANNER = {
 };
 
 export const ChangeLogList = [
+  {
+    title: 'Version 2.1.1 - Enhancements',
+    tag: 'Improvements',
+    date: '14, Jun 2024 ',
+    shortContent: `<p style="font-size: 16px; line-height:24px;">
+    We are excited to introduce office hours for teams. With this option, you can now schedule office hours with other teams to drop in, ask questions, discuss projects, or seek guidance.
+    </p>`,
+  },
     {
-      title: 'Version 2.0.9 - Enhancements',
+      title: 'Version 2.1.0 - Enhancements',
       tag: 'Improvements',
       date: '31, May 2024 ',
       shortContent: `<p style="font-size: 16px; line-height:24px;">
