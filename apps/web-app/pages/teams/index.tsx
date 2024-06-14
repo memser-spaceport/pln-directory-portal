@@ -105,13 +105,14 @@ export const getServerSideProps: GetServerSideProps<TeamsProps> = async (ctx) =>
   const userInfo = cookies?.userInfo ? JSON.parse(cookies?.userInfo) : {};
   const isUserLoggedIn = cookies?.authToken &&  cookies?.userInfo ? true : false;
   const includeFriends = query?.includeFriends ?? 'false';
+  const officeHoursFilter = query?.officeHoursOnly ?? false;
   const optionsFromQuery = getTeamsOptionsFromQuery(query);
   const listOptions = getTeamsListOptions(optionsFromQuery);
   const focusAreaFilterOptions = getTeamsFocusAreaOptionsFromQuery(query);
   const [teamsResponse, filtersValues, focusAreaResult] = await Promise.all([
     getTeams(listOptions),
     getTeamsFilters(optionsFromQuery, includeFriends.toString()),
-    api.get(`${FILTER_API_ROUTES.FOCUS_AREA}?type=Team&plnFriend=${includeFriends}&${focusAreaFilterOptions?.join("&")}`),
+    api.get(`${FILTER_API_ROUTES.FOCUS_AREA}?type=Team&plnFriend=${includeFriends}&officeHours=${officeHoursFilter}&${focusAreaFilterOptions?.join("&")}`),
   ]);
 
   const teams: ITeam[] =
