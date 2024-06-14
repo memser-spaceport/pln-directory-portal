@@ -1,15 +1,19 @@
 import ChangeLogs from 'apps/web-app/components/changeLog/change-logs';
 import { DirectoryLayout } from 'apps/web-app/layouts/directory-layout';
+import { DIRECTORY_SEO } from 'apps/web-app/seo.config';
 import {
   convertCookiesToJson,
   renewAndStoreNewAccessToken,
 } from 'apps/web-app/utils/services/auth';
 import { GetServerSideProps } from 'next';
+import { NextSeo } from 'next-seo';
 import { destroyCookie } from 'nookies';
 import { ReactElement } from 'react';
 
 export default function ChangeLog() {
   return (
+    <>
+    <NextSeo {...DIRECTORY_SEO} title="Changelog" />
     <section className="flex justify-center pt-20">
       <div className="my-8 flex w-[800px] flex-col gap-5 ">
         <h1 className="color-[#0F172A] text-[24px] font-bold leading-5">
@@ -18,6 +22,7 @@ export default function ChangeLog() {
         <ChangeLogs />
       </div>
     </section>
+    </>
   );
 }
 
