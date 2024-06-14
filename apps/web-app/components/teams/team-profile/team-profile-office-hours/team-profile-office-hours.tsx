@@ -4,7 +4,7 @@ import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
 import {
   APP_ANALYTICS_EVENTS,
-  OFFICE_HOURS_MSG,
+  TEAM_OFFICE_HOURS_MSG,
 } from '../../../../constants';
 import { ITeam } from '../../../../utils/teams.types';
 import useAppAnalytics from '../../../../hooks/shared/use-app-analytics';
@@ -68,12 +68,12 @@ export function TeamProfileOfficeHours({
             </span>
             {!userInfo.uid ? (
               <p className="flex select-none items-center gap-1 text-sm font-normal">
-                {OFFICE_HOURS_MSG}{' '}
+                {TEAM_OFFICE_HOURS_MSG}{' '}
                 <span>
                   <Tooltip
                     asChild
                     trigger={
-                      <p className="w-[80px] truncate">{team?.name}</p>
+                      <p className="w-[240px] truncate">{team?.name}</p>
                     }
                     content={team?.name}
                   />
@@ -84,7 +84,7 @@ export function TeamProfileOfficeHours({
             )}
           </div>
           <div className="flex space-x-4">
-            <AnchorLink
+            {/* <AnchorLink
               href={LEARN_MORE_URL}
               linkClassName="flex items-center text-sm font-semibold group outline-none"
               handleOnClick={handleLearnMoreClick}
@@ -93,7 +93,7 @@ export function TeamProfileOfficeHours({
                 Learn more
               </span>
               <ArrowSmRightIcon className="stroke-1.5 ml-1 h-4 w-4 -rotate-45" />
-            </AnchorLink>
+            </AnchorLink> */}
             {userInfo.uid ? (
               <>
                 {url ? (
