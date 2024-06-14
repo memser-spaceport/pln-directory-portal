@@ -393,8 +393,6 @@ export class TeamsService {
   }
 
   buildOfficeHoursFilter(officeHours, filter) {
-    console.log("officeHours", officeHours);
-    console.log("oh condition", officeHours === true);
     if ((officeHours === "true")) {
       filter.push({  
         officeHours: { not: null }
