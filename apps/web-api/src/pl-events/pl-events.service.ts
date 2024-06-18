@@ -50,6 +50,7 @@ export class PLEventsService {
                 name: true,
                 image: true,
                 teamMemberRoles: true,
+                preferences: true,
                 projectContributions: {
                   select:{
                     project:{
@@ -92,6 +93,17 @@ export class PLEventsService {
     if (plEvent?.resources && plEvent?.resources.length && !isUserLoggedIn) {
       plEvent.resources = plEvent?.resources.filter((resource:any) => { 
         return !resource.isPrivate
+      });
+    }
+    if (isUserLoggedIn && plEvent?.eventGuests) {
+      plEvent.eventGuests = plEvent.eventGuests.map((guest:any) => {
+        if (!guest.member.preferences) {
+          return guest;
+        }
+        if (!guest.member.preferences.showTelegram) {
+          delete guest.telegramId;
+        }
+        return guest;
       });
     }
     return plEvent;
