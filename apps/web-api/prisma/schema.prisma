@@ -70,6 +70,7 @@ model Member {
   openToWork                   Boolean?                      @default(false)
   createdAt                    DateTime                      @default(now())
   updatedAt                    DateTime                      @updatedAt
+  approvedAt                   DateTime                      @default(now())
   skills                       Skill[]
   location                     Location?                     @relation(fields: [locationUid], references: [uid])
   locationUid                  String?
