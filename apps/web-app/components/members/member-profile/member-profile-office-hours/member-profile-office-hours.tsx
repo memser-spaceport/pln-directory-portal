@@ -21,7 +21,7 @@ type MemberProfileOfficeHoursProps = {
 };
 
 const LEARN_MORE_URL =
-  'https://protocol.almanac.io/handbook/protocol-labs-spaceport-JzKymu/0ljck9mPhMLfQN6P7ihodQSQPWmWcIfb';
+  'https://protosphere.plnetwork.io/posts/Office-Hours-Guidelines-and-Tips-clsdgrbkk000ypocoqsceyfaq';
 
 export function MemberProfileOfficeHours({
   url,
