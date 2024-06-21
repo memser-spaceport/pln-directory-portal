@@ -30,7 +30,7 @@ export function LoginModal({
       <Transition appear show={isOpen} as={Fragment}>
         <Dialog
           as="div"
-          className="fixed relative inset-0 left-0 top-0 z-[1000] w-full grow overflow-x-hidden outline-none"
+          className="fixed relative inset-0 left-0 top-0 z-[99999] w-full grow overflow-x-hidden outline-none"
           onClose={() => {
             handleModalClose(true);
           }}
