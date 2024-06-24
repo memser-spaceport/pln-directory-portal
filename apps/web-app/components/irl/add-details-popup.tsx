@@ -346,7 +346,7 @@ const AddDetailsPopup = (props: any) => {
                       </div>
                     </div>
                     <div className="flex flex-col gap-3">
-                      <h6 className="text-sm font-semibold text-[#0F172A]">Choose the topics that interest you</h6>
+                      <h6 className="text-sm font-semibold text-[#0F172A]">Select topics of interest</h6>
                       <TagsPicker
                         inputValue={topicsProps?.inputValue}
                         defaultItems={topicsProps?.defaultItems}
