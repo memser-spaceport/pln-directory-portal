@@ -149,7 +149,7 @@ export default function AddMemberBasicForm(props) {
           onKeyDown={(e) => e.preventDefault()}
           value={values?.plnStartDate}
           hasClear={true}
-          label="PLN Join Date"
+          label="Join Date"
           onClear={() => onChange({ target: { name: 'plnStartDate', value: '' } })}
           className="custom-grey custom-outline-none border"
         />

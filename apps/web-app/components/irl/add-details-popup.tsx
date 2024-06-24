@@ -355,7 +355,9 @@ const AddDetailsPopup = (props: any) => {
                         onInputChange={topicsProps?.onInputChange}
                         onInputKeyDown={topicsProps?.onInputKeyDown}
                         error={topicsProps?.error}
-                        placeholder="Something else? Add here"
+                        filteredOptions={topicsProps?.filteredOptions}
+                        addCurrentInputValue={topicsProps?.addCurrentInputValue}
+                        placeholder="Search to add topics"
                       />
                       <select
                         multiple
