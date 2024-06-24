@@ -420,6 +420,9 @@ export function AddMemberModal({
       const values = formatData();
       values.projectContributions = [...values.projectContributions].map(
         (v) => {
+          if(v.currentProject){
+            delete v.endDate;
+          }
           delete v.projectName;
           delete v.projectLogo;
           delete v.project;
