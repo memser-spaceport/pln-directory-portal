@@ -155,8 +155,7 @@ export default function MemberView(props) {
       .then((response) => {
         setDisableSave(false);
         response?.data &&
-        (response.data?.isUniqueIdentifierExist ||
-          response.data?.isRequestPending)
+        (response.data?.isUniqueIdentifierExist)
           ? setEmailExists(true)
           : setEmailExists(false);
       });
@@ -434,6 +433,8 @@ export const getServerSideProps = async (context) => {
     api.get(API_ROUTE.TEAMS),
     api.get(API_ROUTE.SKILLS),
   ]);
+
+  console.log("requestDetailREsponse", requestDetailResponse);
 
   if (
     requestDetailResponse.status === 200 &&
