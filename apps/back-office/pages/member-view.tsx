@@ -434,8 +434,6 @@ export const getServerSideProps = async (context) => {
     api.get(API_ROUTE.SKILLS),
   ]);
 
-  console.log("requestDetailREsponse", requestDetailResponse);
-
   if (
     requestDetailResponse.status === 200 &&
     allRequestResponse.status === 200 &&
