@@ -34,7 +34,7 @@ const AddDetailsPopup = (props: any) => {
   const [formErrors, setFormErrors] = useState<any>({});
   const [formValues, setFormValues] = useState({
     teamUid: '',
-    telegramId: '',
+    telegramId: props.telegram ? removeAt(getTelegramUsername(props.telegram)) : '',
     reason: '',
     topics: [],
     additionalInfo: {
@@ -252,6 +252,12 @@ const AddDetailsPopup = (props: any) => {
     return modifiedText;
   }
 
+  function getTelegramUsername(input) {
+    const regex = /(?:https?:\/\/)?(?:www\.)?t(?:elegram)?\.me\/([a-zA-Z0-9_]+)/;
+    const match = input.match(regex);
+    return match ? match[1] : input;
+  }
+  
   //get additionalinfo from form
   const onAdditionalInfoChange = (event: any) => {
     const { name, value } = event.target;
@@ -311,7 +317,7 @@ const AddDetailsPopup = (props: any) => {
                     <div className="flex flex-col gap-[10px] lg:flex-row lg:gap-[30px]">
                       <div className="flex flex-1 flex-col gap-3">
                         <h6 className="text-sm font-semibold text-[#0F172A]">Team</h6>
-                        <div className="w-full lg:w-[285px]">
+                        <div className="w-full">
                           <input
                             name="teamUid"
                             value={formValues?.teamUid}
@@ -328,22 +334,29 @@ const AddDetailsPopup = (props: any) => {
                           <span className="text-[13px] leading-[18px] text-red-500">{formErrors?.teamUid}</span>
                         </div>
                       </div>
-                      <div className="flex flex-1  flex-col gap-3">
-                        <h6 className="text-sm font-semibold text-[#0F172A]">Telegram Handle</h6>
-                        <div className="relative">
-                          <input
-                            value={formValues?.telegramId}
-                            onChange={handleChange}
-                            name="telegramId"
-                            placeholder="Enter link here"
-                            className="h-10 w-full rounded-lg border border-[#CBD5E1] py-[8px] pl-6 pr-[12px] text-[#475569] placeholder:text-sm placeholder:leading-6 placeholder:text-[#475569] placeholder:opacity-40 focus:outline-none"
-                            onKeyDown={handleKeyDown}
-                          />
-                          <span className="absolute left-2  top-[19px] -translate-y-1/2 transform text-[#475569] ">
-                            @
-                          </span>
-                        </div>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      <h6 className="text-sm font-semibold text-[#0F172A]">Telegram Handle</h6>
+                      <div className="relative">
+                        <input
+                          value={formValues?.telegramId}
+                          onChange={handleChange}
+                          name="telegramId"
+                          placeholder="Enter link here"
+                          className="h-10 w-full rounded-lg border border-[#CBD5E1] py-[8px] pl-6 pr-[12px] text-[#475569] placeholder:text-sm placeholder:leading-6 placeholder:text-[#475569] placeholder:opacity-40 focus:outline-none"
+                          onKeyDown={handleKeyDown}
+                        />
+                        <span className="absolute left-2  top-[19px] -translate-y-1/2 transform text-[#475569] ">
+                          @
+                        </span>
                       </div>
+                    </div>
+                    <div className="flex gap-[6px]">
+                      <img src="/assets/images/icons/info_icon.svg" alt="info" width={16} height={16} />
+                      <p className="text-[13px] font-[500] leading-[18px] text-[#0F172A] opacity-40">
+                        Share your Telegram handle so that attendees and members can easily reach out to you. Note 
+                        that your handle will be hidden if you have turned off this option in your privacy settings.
+                      </p>
                     </div>
                     <div className="flex flex-col gap-3">
                       <h6 className="text-sm font-semibold text-[#0F172A]">Select topics of interest</h6>

@@ -14,6 +14,7 @@ const IrlMain = (props: any) => {
   const userInfo = props?.userInfo;
   const teams = props?.teams;
   const isUserLoggedIn = props?.isUserLoggedIn;
+  const telegram = props?.telegram;
   // const telegram = eventDetails?.telegram;
   // const resources = eventDetails?.resources ?? [];
   const registeredGuest = eventDetails.guests.find((guest) => guest?.memberUid === userInfo?.uid);
@@ -138,6 +139,7 @@ const IrlMain = (props: any) => {
           userInfo={userInfo}
           isUserGoing={isUserGoing}
           registeredGuest={updatedUser}
+          telegram={telegram}
         />
       )}
       <style jsx>
