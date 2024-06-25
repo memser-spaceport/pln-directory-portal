@@ -13,7 +13,10 @@ function useAuthAnalytics() {
         AUTH_PRIVY_UNLINK_EMAIL: 'AUTH_PRIVY_UNLINK_EMAIL',
         AUTH_PRIVY_DELETE_USER: 'AUTH_PRIVY_DELETE_USER',
         AUTH_PRIVY_LINK_ERROR: 'AUTH_PRIVY_LINK_ERROR',
-        AUTH_SETTINGS_PRIVY_ACCOUNT_LINK: 'AUTH_SETTINGS_PRIVY_ACCOUNT_LINK'
+        AUTH_SETTINGS_PRIVY_ACCOUNT_LINK: 'AUTH_SETTINGS_PRIVY_ACCOUNT_LINK',
+        AUTH_SETTINGS_EMAIL_UPDATE_SUCCESS:'AUTH_SETTINGS_EMAIL_UPDATE_SUCCESS',
+        AUTH_SETTINGS_EMAIL_UPDATE_FAILED:'AUTH_SETTINGS_EMAIL_UPDATE_FAILED',
+        AUTH_SETTINGS_EMAIL_UPDATE_SAME_AS_OLD:"AUTH_SETTINGS_EMAIL_UPDATE_SAME_AS_OLD"
 
     }
     const postHogProps = usePostHog();
@@ -97,7 +100,19 @@ function useAuthAnalytics() {
         captureEvent(events.AUTH_SETTINGS_PRIVY_ACCOUNT_LINK, {...privyUser})
     }
 
-    return { onLoginBtnClicked, onProceedToLogin, onAuthInfoClosed, onPrivyLinkSuccess, onPrivyUnlinkEmail, onPrivyUserDelete, onPrivyLoginSuccess, onDirectoryLoginInit, onDirectoryLoginSuccess, onDirectoryLoginFailure, onAccountLinkError, onPrivyAccountLink }
+    const onUpdateEmailSuccess = (privyUser)=> {
+        captureEvent(events.AUTH_SETTINGS_EMAIL_UPDATE_SUCCESS, {...privyUser})
+    }
+
+    const onUpdateEmailFailure = (privyUser)=> {
+        captureEvent(events.AUTH_SETTINGS_EMAIL_UPDATE_FAILED, {...privyUser})
+    }
+
+    const onUpdateSameEmailProvided = (privyUser)=> {
+        captureEvent(events.AUTH_SETTINGS_EMAIL_UPDATE_SAME_AS_OLD, {...privyUser})
+    }
+
+    return { onLoginBtnClicked, onProceedToLogin, onAuthInfoClosed, onPrivyLinkSuccess, onPrivyUnlinkEmail, onPrivyUserDelete, onPrivyLoginSuccess, onDirectoryLoginInit, onDirectoryLoginSuccess, onDirectoryLoginFailure, onAccountLinkError, onPrivyAccountLink, onUpdateEmailSuccess, onUpdateEmailFailure, onUpdateSameEmailProvided }
 }
 
 export default useAuthAnalytics;
