@@ -155,7 +155,8 @@ export default function MemberView(props) {
       .then((response) => {
         setDisableSave(false);
         response?.data &&
-        (response.data?.isUniqueIdentifierExist)
+        (response.data?.isUniqueIdentifierExist ||
+          response.data?.isRequestPending)
           ? setEmailExists(true)
           : setEmailExists(false);
       });
@@ -448,7 +449,7 @@ export const getServerSideProps = async (context) => {
     );
 
     let counter = 1;
-    referenceUid = requestDetailResponse?.data?.referenceUid ?? null;
+    referenceUid = requestDetailResponse?.data?.referenceUid ?? '';
     const requestData = requestDetailResponse?.data?.newData;
     oldName = requestData?.oldName ?? requestData?.name;
     status = requestDetailResponse?.data?.status;
