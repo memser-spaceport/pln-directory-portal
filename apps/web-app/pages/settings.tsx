@@ -32,6 +32,7 @@ import { DiscardChangesPopup } from 'libs/ui/src/lib/modals/confirmation';
 import Privacy from 'apps/web-app/components/preference/privacy';
 import { updateUserDirectoryEmail } from '../services/member.service';
 import { toast } from 'react-toastify';
+import useAuthAnalytics from '../analytics/auth.analytics';
 
 export const SettingsContext = React.createContext({ state: null, dispatch: null });
 
@@ -63,6 +64,8 @@ export default function Settings({
   const [openValidationPopup, setOpenValidationPopup] = useState<boolean>(false);
   const [authAccounts, setAuthAccounts] = useState(authLinkedAccounts ?? '');
   // const [isPrivacyModified, setPrivacymodifiedFlag] = useState<boolean>(false);
+
+  const analytics = useAuthAnalytics();
 
   function settingsReducer(state, action) {
     let newState = { ...state };
@@ -119,6 +122,7 @@ export default function Settings({
       const oldAccessToken = Cookies.get('authToken');
       const header = {headers: {Authorization: `Bearer ${JSON.parse(oldAccessToken)}`}}
       if(newEmail === userInfo.email) {
+        analytics.onUpdateSameEmailProvided({newEmail, oldEmail:userInfo.email})
         document.dispatchEvent(new CustomEvent('app-loader-status'));
         toast.error('New and current email cannot be same');
         return;
@@ -143,10 +147,13 @@ export default function Settings({
                 domain: process.env.COOKIE_DOMAIN || '',
             });
             document.dispatchEvent(new CustomEvent('app-loader-status'))
+            analytics.onUpdateEmailSuccess({newEmail, oldEmail:userInfo.email})
             toast.success('Email Updated Successfully')
             window.location.reload();
         }
-      } catch (e) {
+      } catch (err) {
+        const newEmail = e.detail.newEmail;
+        analytics.onUpdateEmailFailure({newEmail, oldEmail:userInfo.email})
         document.dispatchEvent(new CustomEvent('app-loader-status'))
         toast.error('Email Update Failed')
       }
