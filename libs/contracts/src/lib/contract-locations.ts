@@ -14,4 +14,13 @@ export const apiLocations = contract.router({
     },
     summary: 'Get all locations',
   },
+  validateLocation: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/locations/validate`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Validate location',
+  },
 });
