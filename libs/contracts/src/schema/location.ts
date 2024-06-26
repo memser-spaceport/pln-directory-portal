@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { createZodDto } from '@abitia/zod-dto';
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 
 export const LocationSchema = z.object({
@@ -6,7 +7,7 @@ export const LocationSchema = z.object({
   uid: z.string(),
   placeId: z.string(),
   city: z.string().nullish(),
-  country: z.string(),
+  country: z.string().nullish(),
   continent: z.string(),
   region: z.string().nullish(),
   regionAbbreviation: z.string().nullish(),
@@ -32,3 +33,4 @@ export const LocationDetailQueryParams = LocationQueryParams.unwrap()
   .optional();
 
 export type TLocationResponse = z.infer<typeof LocationResponseSchema>;
+export class ValidateLocationDto extends createZodDto(LocationSchema.pick({ city: true, region: true, country: true })) {}
