@@ -21408,13 +21408,14 @@ postgres-interval@^1.1.0:
   dependencies:
     xtend "^4.0.0"
 
-posthog-js@^1.56.0:
-  version "1.140.1"
-  resolved "https://registry.yarnpkg.com/posthog-js/-/posthog-js-1.140.1.tgz#34efc0d326fa5fcf7950106f350fb4f0e73b2da6"
-  integrity sha512-UeKuAtQSvbzmTCzNVaauku8F194EYwAP33WrRrWZlDlMNbMy7GKcZOgKbr7jZqnha7FlVlHrWk+Rpyr1zCFhPQ==
+posthog-js@^1.141.4:
+  version "1.141.4"
+  resolved "https://registry.yarnpkg.com/posthog-js/-/posthog-js-1.141.4.tgz#c3fcc8bf312c8baaed2b9032cd5fb527a712283b"
+  integrity sha512-e8rUFEnAR1MB+YqrjWLEmvm0d1X90cebCPNyby6oNX1cp36s/PpxeTx+Up7bArJmRv2N+rT1Kd5sJ7jpXWAonA==
   dependencies:
     fflate "^0.4.8"
     preact "^10.19.3"
+    web-vitals "^4.0.1"
 
 posthog-node@^3.1.1:
   version "3.1.1"
@@ -25725,6 +25726,11 @@ web-streams-polyfill@^3.1.1:
   version "3.2.1"
   resolved "https://registry.npmjs.org/web-streams-polyfill/-/web-streams-polyfill-3.2.1.tgz"
   integrity sha512-e0MO3wdXWKrLbL0DgGnUV7WHVuw9OUvL4hjgnPkIeEvESk74gAITi5G606JtZPp39cd8HA9VQzCIvA49LpPN5Q==
+
+web-vitals@^4.0.1:
+  version "4.2.0"
+  resolved "https://registry.yarnpkg.com/web-vitals/-/web-vitals-4.2.0.tgz#008949ab79717a68ccaaa3c4371cbc7bbbd78a92"
+  integrity sha512-ohj72kbtVWCpKYMxcbJ+xaOBV3En76hW47j52dG+tEGG36LZQgfFw5yHl9xyjmosy3XUMn8d/GBUAy4YPM839w==
 
 web3-core-helpers@1.10.4:
   version "1.10.4"
