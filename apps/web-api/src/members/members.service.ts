@@ -667,4 +667,28 @@ export class MembersService {
     }
     return { };
   }
+
+  async updateTelegramIfChanged(member, telegram) {
+    if (telegram != '' && member.telegramHandler != telegram) {
+      member = await this.prisma.member.update({
+        where: { uid: member.uid },
+        data: {
+          telegramHandler: telegram
+        }
+      });
+    }
+    return member;
+  }
+
+  async updateOfficeHoursIfChanged(member, officeHours) {
+    if (officeHours != '' && member.officeHours != officeHours) {
+      member = await this.prisma.member.update({
+        where: { uid: member.uid },
+        data: {
+          officeHours
+        }
+      });
+    }
+    return member;
+  }
 }
