@@ -3,6 +3,7 @@ import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { Prisma } from '@prisma/client';
 import { Cache } from 'cache-manager';
+import { MembersService } from '../members/members.service';
 
 
 @Injectable()
@@ -10,6 +11,7 @@ export class PLEventsService {
   constructor(
     private prisma: PrismaService,
     private logger: LogService,
+    private memberService: MembersService,
     @Inject(CACHE_MANAGER) private cacheService: Cache
   ) {}
 
@@ -44,13 +46,16 @@ export class PLEventsService {
             telegramId: true,
             memberUid: true,
             topics: true,
+            officeHours: true,
             additionalInfo: true,
             member: {
               select:{
                 name: true,
                 image: true,
+                telegramHandler: true,
                 teamMemberRoles: true,
                 preferences: true,
+                officeHours: true,
                 projectContributions: {
                   select:{
                     project:{
@@ -90,24 +95,52 @@ export class PLEventsService {
         }
       }
     });
+    this.filterPrivateResources(plEvent, isUserLoggedIn);
+    this.restrictTelegramBasedOnMemberPreference(plEvent, isUserLoggedIn);
+    this.restrictOfficeHours(plEvent, isUserLoggedIn);
+    return plEvent;
+  };
+
+  filterPrivateResources(plEvent, isUserLoggedIn) {
     if (plEvent?.resources && plEvent?.resources.length && !isUserLoggedIn) {
       plEvent.resources = plEvent?.resources.filter((resource:any) => { 
         return !resource.isPrivate
       });
     }
+    return plEvent;
+  }
+
+  restrictTelegramBasedOnMemberPreference(plEvent, isUserLoggedIn) {
     if (isUserLoggedIn && plEvent?.eventGuests) {
       plEvent.eventGuests = plEvent.eventGuests.map((guest:any) => {
+        if (!guest.telegramId) {
+          delete guest.member.telegramHandler;
+          return guest; 
+        }
         if (!guest.member.preferences) {
           return guest;
         }
         if (!guest.member.preferences.showTelegram) {
+          delete guest.member.telegramHandler;
           delete guest.telegramId;
         }
         return guest;
       });
     }
     return plEvent;
-  };
+  }
+
+  restrictOfficeHours(plEvent, isUserLoggedIn) {
+    if (plEvent?.eventGuests && isUserLoggedIn) {
+      plEvent.eventGuests = plEvent.eventGuests.map((guest:any) => {
+        if (!guest.officeHours) {
+          delete guest.member.officeHours;
+        }
+        return guest;
+      });
+    }
+    return plEvent;
+  }
 
   async createPLEventGuest(
     guest: Prisma.PLEventGuestUncheckedCreateInput,
@@ -116,6 +149,8 @@ export class PLEventsService {
   ) {
     try {  
       const event: any = await this.getPLEventBySlug(slug, true);
+      await this.memberService.updateTelegramIfChanged(member, guest.telegramId);
+      await this.memberService.updateOfficeHoursIfChanged(member, guest.officeHours);
       await this.prisma.pLEventGuest.create({
         data:{
           ...guest,
@@ -140,6 +175,8 @@ export class PLEventsService {
   ) {
     try {  
       const event: any = await this.getPLEventBySlug(slug, true);
+      await this.memberService.updateTelegramIfChanged(member, guest.telegramId);
+      await this.memberService.updateOfficeHoursIfChanged(member, guest.officeHours);
       return await this.prisma.pLEventGuest.update({
         where:{ uid },
         data:{

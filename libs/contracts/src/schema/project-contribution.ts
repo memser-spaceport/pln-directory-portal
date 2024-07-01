@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { compareDateWithoutTime, compareMonthYear } from '../../src/utils/date-utils';
 
 const ProjectContribution = z.object({
   role: z.string(),
@@ -11,7 +12,7 @@ const ProjectContribution = z.object({
 });
 
 export const ProjectContributionSchema = ProjectContribution.superRefine((data, ctx) => {
-  if(!data.currentProject && !data.endDate) {
+  if (!data.currentProject && !data.endDate) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'End date should not be null for past contribution',
@@ -19,7 +20,7 @@ export const ProjectContributionSchema = ProjectContribution.superRefine((data, 
     });
   }
 
-  if(data.startDate && data.endDate && new Date(data.startDate).getTime() >= new Date(data.endDate).getTime() ){
+  if (data.startDate && data.endDate && compareDateWithoutTime(data.startDate, data.endDate) >= 0) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'End date should be greater than start date',
@@ -27,7 +28,7 @@ export const ProjectContributionSchema = ProjectContribution.superRefine((data, 
     });
   }
 
-  if(data.startDate  && new Date(data.startDate).getTime() >= Date.now() ){
+  if (data.startDate && compareDateWithoutTime(data.startDate, new Date().toISOString()) > 0) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'Start date should be less than or equal to current date',
@@ -35,7 +36,7 @@ export const ProjectContributionSchema = ProjectContribution.superRefine((data, 
     });
   }
 
-  if(data.endDate  && new Date(data.endDate).getTime() > Date.now() ){
+  if (data.endDate && compareMonthYear(data.endDate, new Date().toISOString()) > 0) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'End date should be less than or equal to current date',
@@ -43,7 +44,7 @@ export const ProjectContributionSchema = ProjectContribution.superRefine((data, 
     });
   }
 
-  return z.never;
+  return z.never();
 });
 
 export const ResponseProjectContributionSchema = ProjectContribution.strict();
