@@ -11,27 +11,21 @@ const TeamList = (props: any) => {
   const user = getUserInfo();
 
   const onLoginClick = () => {
-    analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_LOGIN_BTN_CLICKED,
-      {
-        eventId: eventDetails?.id,
-        eventName: eventDetails?.name,
-      }
-    );
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_LOGIN_BTN_CLICKED, {
+      eventId: eventDetails?.id,
+      eventName: eventDetails?.name,
+    });
     onLogin();
   };
 
   const onTeamClick = (teamUid: string, teamName: string) => {
-    analytics.captureEvent(
-      APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_TEAM_CLICKED,
-      {
-        eventId: eventDetails?.id,
-        eventName: eventDetails?.name,
-        teamUid,
-        teamName,
-        user,
-      }
-    );
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_GUEST_LIST_TABLE_TEAM_CLICKED, {
+      eventId: eventDetails?.id,
+      eventName: eventDetails?.name,
+      teamUid,
+      teamName,
+      user,
+    });
   };
 
   return (
@@ -52,10 +46,7 @@ const TeamList = (props: any) => {
                   <span className="inline-flex items-center gap-1">
                     <div className=" h-[32px] w-[32px]">
                       <img
-                        src={
-                          item.teamLogo ||
-                          '/assets/images/icons/teamdefault.svg'
-                        }
+                        src={item.teamLogo || '/assets/images/icons/teamdefault.svg'}
                         className=" h-[32px] w-[32px]"
                       />
                     </div>
@@ -69,17 +60,13 @@ const TeamList = (props: any) => {
               <p className="">aaaaaa aaa</p>
             </div>
 
-            <div className="hidden w-[160px] items-center justify-start gap-[4px] lg:flex">
+            {/* <div className="hidden w-[160px] items-center justify-start gap-[4px] lg:flex">
               <div className="h-[32px] w-[32px] rounded-[58px] bg-gray-200"></div>
               <p className="">aaaaaa aaa</p>
-            </div>
+            </div> */}
 
-            <div className="hidden w-[160px] items-center justify-start lg:flex">
-              @aaaaaaa
-            </div>
-            <div className="hidden  items-center justify-start pr-[20px] lg:flex">
-              aaaa aaaaaaa
-            </div>
+            <div className="hidden w-[350px] items-center justify-start lg:flex">aaaa aaaaaaa</div>
+            <div className="hidden  items-center justify-start pr-[20px] lg:flex">@aaaaaaa</div>
           </div>
         ))}
 

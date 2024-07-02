@@ -1,6 +1,6 @@
 import { Dialog } from '@headlessui/react';
 import { ReactComponent as CloseIcon } from '/public/assets/images/icons/close-grey.svg';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import TeamsDropDown from './teams-dropdown';
 import { createEventGuest, editEventGuest, getEventDetailBySlug } from 'apps/web-app/services/irl.service';
 import { toast } from 'react-toastify';
@@ -9,15 +9,15 @@ import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
 import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { getUserInfo, parseCookie } from 'apps/web-app/utils/shared.utils';
-import { APP_ANALYTICS_EVENTS, IRL_LW_EE_DATES } from 'apps/web-app/constants';
+import { APP_ANALYTICS_EVENTS, OH_GUIDELINE_URL } from 'apps/web-app/constants';
 import TagsPicker from './tags-picker';
 import useTagsPicker from 'apps/web-app/hooks/shared/use-tags-picker';
 import {
   formatDateRangeForDescription,
   formatDateToISO,
   getArrivalDepartureDateRange,
-
 } from 'apps/web-app/utils/irl.utils';
+import Link from 'next/link';
 
 const AddDetailsPopup = (props: any) => {
   const isOpen = props.isOpen;
@@ -27,6 +27,9 @@ const AddDetailsPopup = (props: any) => {
   const eventDetails = props?.eventDetails;
   const isUserGoing = props?.isUserGoing;
   const registeredGuest = props?.registeredGuest;
+  const officeHours = props?.officeHours;
+  const showTelegram = props?.showTelegram;
+  const focusOHField = props?.focusOHField;
   const router = useRouter();
   const slug = router.query.slug;
 
@@ -37,6 +40,7 @@ const AddDetailsPopup = (props: any) => {
     telegramId: props.telegram ? removeAt(getTelegramUsername(props.telegram)) : '',
     reason: '',
     topics: [],
+    officeHours: officeHours ? officeHours : '',
     additionalInfo: {
       checkInDate: '',
       checkOutDate: '',
@@ -46,6 +50,12 @@ const AddDetailsPopup = (props: any) => {
   const user = getUserInfo();
   const dateRange = getArrivalDepartureDateRange(eventDetails?.startDate, eventDetails?.endDate, 5);
   const endRange = getArrivalDepartureDateRange(eventDetails?.startDate, eventDetails?.endDate, 4);
+  const officeHoursRef = useRef(null);
+
+  if (focusOHField && officeHoursRef.current) {
+    officeHoursRef.current.focus();
+    officeHoursRef.current.scrollIntoView({ behavior: 'smooth' });
+  }
 
   const [departureMinDate, setDepartureMinDate] = useState(getDepartureMinDate());
   // const departureMinDate = formatDateToISO(eventDetails?.startDate);
@@ -59,9 +69,8 @@ const AddDetailsPopup = (props: any) => {
     selectedItems: formValues?.topics,
   });
 
-
   function getDepartureMinDate() {
-    return  formatDateToISO(eventDetails?.startDate)
+    return formatDateToISO(eventDetails?.startDate);
   }
 
   function getArrivalMaxDate() {
@@ -80,7 +89,7 @@ const AddDetailsPopup = (props: any) => {
 
   //get event details
   const getEventDetails = async () => {
-  const userCookie = parseCookie(Cookies.get('authToken'));
+    const userCookie = parseCookie(Cookies.get('authToken'));
     const eventDetails = await getEventDetailBySlug(slug, userCookie);
     document.dispatchEvent(
       new CustomEvent('updateGuests', {
@@ -148,25 +157,30 @@ const AddDetailsPopup = (props: any) => {
   const validateForm = (formValues: any) => {
     const errors = {} as any;
     const initialTeamValue = teams?.find((team) => team?.id === formValues?.teamUid);
+    const urlRE = /(^|\s)((https?:\/\/)?[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?)(?![.\S])/gi;
     if (!formValues?.teamUid?.trim() || !initialTeamValue) {
       errors.teamUid = 'Team is required';
     }
 
-    if(formValues.additionalInfo.checkInDate && !formValues.additionalInfo.checkOutDate) {
+    if (formValues.additionalInfo.checkInDate && !formValues.additionalInfo.checkOutDate) {
       errors.checkOutDate = 'Departure date is required';
     }
 
-    if(!formValues.additionalInfo.checkInDate && formValues.additionalInfo.checkOutDate) {
+    if (!formValues.additionalInfo.checkInDate && formValues.additionalInfo.checkOutDate) {
       errors.checkInDate = 'Arrival date is required';
+    }
+
+    if (formValues.officeHours !== '' && !formValues.officeHours.match(urlRE)) {
+      errors.officeHours = 'Enter valid link';
     }
 
     const checkInDate = new Date(formValues.additionalInfo.checkInDate).getTime();
     const checkOutDate = new Date(formValues.additionalInfo.checkOutDate).getTime();
 
-    if(checkOutDate < checkInDate) {
+    if (checkOutDate < checkInDate) {
       errors.maxDate = 'Departure date should be greater than or equal to the Arrival date';
     }
-    
+
     setFormErrors(errors);
     return Object.keys(errors)?.length === 0;
   };
@@ -238,6 +252,22 @@ const AddDetailsPopup = (props: any) => {
     }
   };
 
+  const handleDisplayWarning = (elementId: string) => {
+    const messageElement = document.getElementById(elementId);
+    if (messageElement) {
+      messageElement.classList.remove('hidden-message');
+      messageElement.classList.add('visible-message');
+    }
+  };
+
+  const handleHideWarning = (elementId: string) => {
+    const messageElement = document.getElementById(elementId);
+    if (messageElement) {
+      messageElement.classList.remove('visible-message');
+      messageElement.classList.add('hidden-message');
+    }
+  };
+
   //prevent form submit from when user pressing enter in the empty input field
   const handleKeyDown = (event) => {
     if (event.key === 'Enter') {
@@ -257,7 +287,7 @@ const AddDetailsPopup = (props: any) => {
     const match = input.match(regex);
     return match ? match[1] : input;
   }
-  
+
   //get additionalinfo from form
   const onAdditionalInfoChange = (event: any) => {
     const { name, value } = event.target;
@@ -267,13 +297,30 @@ const AddDetailsPopup = (props: any) => {
     }));
   };
 
+  const handleOHGuidlineClick = () => {
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_OH_GUIDELINE_URL_CLICKED, {
+      eventId: eventDetails?.id,
+      eventName: eventDetails?.name,
+      user
+    });
+  }
+
+  const handlePrivacySettingClick = () => {
+    analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_PRIVACY_SETTING_LINK_CLICKED, {
+      eventId: eventDetails?.id,
+      eventName: eventDetails?.name,
+      user
+    });
+  }
+
   useEffect(() => {
     if (isUserGoing) {
       const data = {
         teamUid: registeredGuest?.teamUid,
-        telegramId: registeredGuest?.telegramId,
+        telegramId: !showTelegram ? removeAt(getTelegramUsername(props.telegram)) : registeredGuest?.telegramId,
         reason: registeredGuest.reason ? registeredGuest?.reason?.trim() : '',
         topics: registeredGuest?.topics,
+        officeHours: registeredGuest?.officeHours ? registeredGuest.officeHours : '',
         additionalInfo: {
           ...formValues.additionalInfo,
           checkInDate: registeredGuest?.additionalInfo?.checkInDate,
@@ -288,15 +335,14 @@ const AddDetailsPopup = (props: any) => {
   }, []);
 
   const onClearDate = (key) => {
-
     setFormValues((prev) => ({
-     ...prev,
+      ...prev,
       additionalInfo: {
-       ...prev?.additionalInfo,
-       [key]: ""
+        ...prev?.additionalInfo,
+        [key]: '',
       },
     }));
-  }
+  };
 
   return (
     <>
@@ -323,7 +369,7 @@ const AddDetailsPopup = (props: any) => {
                             value={formValues?.teamUid}
                             onChange={handleChange}
                             placeholder="Team"
-                            className="hidden w-full rounded-lg border border-[#CBD5E1] py-[8px] px-[12px] text-[#475569] focus:outline-none "
+                            className="focus:border-1 hidden w-full rounded-lg border border-[#CBD5E1] py-[8px] px-[12px] text-[#475569] focus:border-[#156FF7] focus:outline-none"
                           />
                           <TeamsDropDown
                             options={teams}
@@ -343,20 +389,41 @@ const AddDetailsPopup = (props: any) => {
                           onChange={handleChange}
                           name="telegramId"
                           placeholder="Enter link here"
-                          className="h-10 w-full rounded-lg border border-[#CBD5E1] py-[8px] pl-6 pr-[12px] text-[#475569] placeholder:text-sm placeholder:leading-6 placeholder:text-[#475569] placeholder:opacity-40 focus:outline-none"
+                          className="focus:border-1 h-10 w-full rounded-lg border border-[#CBD5E1] py-[8px] pl-6 pr-[12px] text-[#475569] placeholder:text-sm placeholder:leading-6 placeholder:text-[#475569] placeholder:opacity-40 focus:border-[#156FF7] focus:outline-none"
                           onKeyDown={handleKeyDown}
+                          onFocus={()=>handleDisplayWarning('telegram-message')}
+                          onBlur={()=>handleHideWarning('telegram-message')}
                         />
                         <span className="absolute left-2  top-[19px] -translate-y-1/2 transform text-[#475569] ">
                           @
                         </span>
                       </div>
-                    </div>
-                    <div className="flex gap-[6px]">
-                      <img src="/assets/images/icons/info_icon.svg" alt="info" width={16} height={16} />
-                      <p className="text-[13px] font-[500] leading-[18px] text-[#0F172A] opacity-40">
-                        Share your Telegram handle so that attendees and members can easily reach out to you. Note 
-                        that your handle will be hidden if you have turned off this option in your privacy settings.
-                      </p>
+                      {!showTelegram && (
+                        <div className="flex items-start gap-[6px]">
+                          <img src="/assets/images/icons/info_icon.svg" alt="info" width={16} height={16} />
+                          <p className="text-[13px] font-[500] leading-[18px] text-[#0F172A] opacity-40">
+                            Your Telegram handle is hidden. Unhide it in your profile&apos;s{' '}
+                            <Link href="/settings">
+                              <a target="_blank" className="italic underline underline-offset-2" onClick={handlePrivacySettingClick}>
+                                privacy settings
+                              </a>
+                            </Link>{' '}
+                            to show it here and refresh this page once you have updated your privacy settings.
+                          </p>
+                        </div>
+                      )}
+                      {
+                        <div
+                          className="hidden-message flex items-start gap-[6px] rounded-[8px] bg-[#FF820E] bg-opacity-10 px-3 py-4"
+                          id="telegram-message"
+                        >
+                          <img src="/assets/images/icons/info-yellow.svg" alt="info" width={16} height={16} />
+                          <p className="text-[14px] font-[400] leading-[20px] text-[#0F172A]">
+                            Any changes made here will also update your directory profile&apos;s Telegram handle, except for
+                            deletions.
+                          </p>
+                        </div>
+                      }
                     </div>
                     <div className="flex flex-col gap-3">
                       <h6 className="text-sm font-semibold text-[#0F172A]">Select topics of interest</h6>
@@ -390,11 +457,51 @@ const AddDetailsPopup = (props: any) => {
                         onChange={handleChange}
                         name="reason"
                         placeholder="Enter details here"
-                        className="placeholder:text-[500] h-[80px] w-full resize-none rounded-lg border border-[#CBD5E1] px-2 py-3 text-sm font-[500] leading-6 text-[#475569] placeholder:text-sm placeholder:leading-6 placeholder:text-[#475569] placeholder:opacity-40 focus:outline-none"
+                        className="placeholder:text-[500] focus:border-1 h-[80px] w-full resize-none rounded-lg border border-[#CBD5E1] px-[12px] py-[8px] text-sm font-[500] leading-6 text-[#475569] placeholder:text-sm placeholder:leading-6 placeholder:text-[#475569] placeholder:opacity-40 focus:border-[#156FF7] focus:outline-none"
                       />
                       <span className="text-[13px] leading-[18px] text-[#0F172A]">
                         {250 - formValues?.reason?.length} characters remaining
                       </span>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      <h6 className="text-sm font-semibold text-[#0F172A]">Office Hours Link</h6>
+                      <div className="flex flex-col gap-1">
+                        <input
+                          value={formValues?.officeHours}
+                          onChange={handleChange}
+                          name="officeHours"
+                          placeholder="Enter link here"
+                          className="focus:border-1 h-10 w-full rounded-lg border border-[#CBD5E1] py-[8px] px-[12px] text-[#475569] placeholder:text-sm placeholder:leading-6 placeholder:text-[#475569] placeholder:opacity-40 focus:border-[#156FF7] focus:outline-none"
+                          onKeyDown={handleKeyDown}
+                          ref={officeHoursRef}
+                          onFocus={()=>handleDisplayWarning('oh-message')}
+                          onBlur={()=>handleHideWarning('oh-message')}
+                        />
+                        {formErrors?.officeHours && (
+                          <span className="text-[13px] leading-[18px] text-red-500">{formErrors?.officeHours}</span>
+                        )}
+                      </div>
+                      <div className="flex items-start gap-[6px]">
+                        <img src="/assets/images/icons/info_icon.svg" alt="info" width={16} height={16} />
+                        <p className="text-[13px] font-[500] leading-[18px] text-[#94A3B8]">
+                          Drop your calendar link here so others can get in touch with you at a time that is convenient.
+                          We recommend 15-min meetings scheduled via Calendly or Google Calendar appointments.{' '}
+                          <Link href={OH_GUIDELINE_URL}>
+                            <a target="_blank" className="text-[#156FF7]" onClick={handleOHGuidlineClick}>Click Here</a>
+                          </Link>{' '}
+                          to view our office hours guidelines.
+                        </p>
+                      </div>
+                      <div
+                          className="hidden-message flex items-start gap-[6px] rounded-[8px] bg-[#FF820E] bg-opacity-10 px-3 py-4"
+                          id="oh-message"
+                        >
+                          <img src="/assets/images/icons/info-yellow.svg" alt="info" width={16} height={16} />
+                          <p className="text-[14px] font-[400] leading-[20px] text-[#0F172A]">
+                            Any changes made here will also update your directory profile&apos;s Office Hours link, except for
+                            deletions.
+                          </p>
+                        </div>
                     </div>
                     {eventDetails?.isExclusionEvent && (
                       <div className="flex flex-col gap-3">
@@ -402,55 +509,67 @@ const AddDetailsPopup = (props: any) => {
                           <div className="flex flex-col gap-1 lg:flex-1">
                             <div className="flex flex-col gap-3 ">
                               <h6 className="text-sm font-bold text-[#0F172A]">Arrival Date</h6>
-                              <div className='relative'>
-                              <input
-                                type="date"
-                                name="checkInDate"
-                                autoComplete="off"
-                                className="h-10 w-full rounded-lg border border-[#CBD5E1] px-3 py-[8px] text-sm leading-6 text-[#475569] focus:outline-none"
-                                min={dateRange.dateFrom}
-                                max={arrivalMaxDate}
-                                onChange={onAdditionalInfoChange}
-                                value={formValues?.additionalInfo?.checkInDate}
-                              />
-                              {formValues?.additionalInfo?.checkInDate && (
-                                  <button className='absolute right-[40px] top-0 bottom-0 m-auto' onClick={() => onClearDate("checkInDate")}>
-                                  <img src='/assets/images/icons/close-gray.svg'/>
-                                </button>
-                              )}
-                            
+                              <div className="relative">
+                                <input
+                                  type="date"
+                                  name="checkInDate"
+                                  autoComplete="off"
+                                  className="focus:border-1 h-10 w-full rounded-lg border border-[#CBD5E1] px-3 py-[8px] text-sm leading-6 text-[#475569] focus:border-[#156FF7] focus:outline-none"
+                                  min={dateRange.dateFrom}
+                                  max={arrivalMaxDate}
+                                  onChange={onAdditionalInfoChange}
+                                  value={formValues?.additionalInfo?.checkInDate}
+                                />
+                                {formValues?.additionalInfo?.checkInDate && (
+                                  <button
+                                    className="absolute right-[40px] top-0 bottom-0 m-auto"
+                                    onClick={() => onClearDate('checkInDate')}
+                                  >
+                                    <img src="/assets/images/icons/close-gray.svg" />
+                                  </button>
+                                )}
                               </div>
                             </div>
-                            <span className="text-[13px] leading-[18px] text-red-500">{formErrors?.checkInDate}</span>
+                            {formErrors?.checkInDate && (
+                              <span className="text-[13px] leading-[18px] text-red-500">{formErrors?.checkInDate}</span>
+                            )}
                           </div>
                           <div className="flex flex-col gap-1 lg:flex-1">
                             <div className="flex flex-col gap-3 ">
                               <h6 className="text-sm font-bold text-[#0F172A]">Departure Date</h6>
-                              <div className='relative'>
-                              <input
-                                type="date"
-                                name="checkOutDate"
-                                autoComplete="off"
-                                className="h-10 w-full rounded-lg border border-[#CBD5E1] px-3 py-[8px] text-sm leading-6 text-[#475569] focus:outline-none"
-                                min={departureMinDate}
-                                max={endRange.dateTo}
-                                value={formValues?.additionalInfo?.checkOutDate}
-                                onChange={onAdditionalInfoChange}
-                                // disabled={!formValues?.additionalInfo?.checkInDate}
-                              />
+                              <div className="relative">
+                                <input
+                                  type="date"
+                                  name="checkOutDate"
+                                  autoComplete="off"
+                                  className="focus:border-1 h-10 w-full rounded-lg border border-[#CBD5E1] px-3 py-[8px] text-sm leading-6 text-[#475569] focus:border-[#156FF7] focus:outline-none"
+                                  min={departureMinDate}
+                                  max={endRange.dateTo}
+                                  value={formValues?.additionalInfo?.checkOutDate}
+                                  onChange={onAdditionalInfoChange}
+                                  // disabled={!formValues?.additionalInfo?.checkInDate}
+                                />
                                 {formValues?.additionalInfo?.checkOutDate && (
-                                   <button className='absolute right-[40px] top-0 bottom-0 m-auto' onClick={() => onClearDate("checkOutDate")}>
-                                   <img src='/assets/images/icons/close-gray.svg'/>
-                                 </button>
-                              )}
+                                  <button
+                                    className="absolute right-[40px] top-0 bottom-0 m-auto"
+                                    onClick={() => onClearDate('checkOutDate')}
+                                  >
+                                    <img src="/assets/images/icons/close-gray.svg" />
+                                  </button>
+                                )}
                               </div>
                             </div>
-                            <span className="text-[13px] leading-[18px] text-red-500">{formErrors?.checkOutDate}</span>
-                          </div>                    
-                          
+                            {formErrors?.checkOutDate && (
+                              <span className="text-[13px] leading-[18px] text-red-500">
+                                {formErrors?.checkOutDate}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <span className="text-[13px] leading-[18px] text-red-500">{formErrors?.maxDate}</span>  
-                        <div className="flex gap-[6px]">
+                        {formErrors?.maxDate && (
+                          <span className="text-[13px] leading-[18px] text-red-500">{formErrors?.maxDate}</span>
+                        )}
+                        <div className="flex items-start gap-[6px]">
                           <img src="/assets/images/icons/info_icon.svg" alt="info" width={16} height={16} />
                           <p className="text-[13px] font-[500] leading-[18px] text-[#0F172A] opacity-40">
                             Please note that your arrival and departure dates must fall within five days before or after
@@ -498,6 +617,22 @@ const AddDetailsPopup = (props: any) => {
           ::-webkit-scrollbar-thumb {
             background-color: #cbd5e1;
             border-radius: 10px;
+          }
+          .telegram {
+            position: relative;
+          }
+          .telegram__info {
+            display: none;
+          }
+          .telegram__input:focus ~ .telegram__info {
+            display: block;
+          }
+          .hidden-message {
+            display: none;
+          }
+
+          .visible-message {
+            display: flex;
           }
         `}
       </style>

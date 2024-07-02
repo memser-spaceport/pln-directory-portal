@@ -301,8 +301,12 @@ export const APP_ANALYTICS_EVENTS = {
   IRL_GUEST_LIST_TABLE_TEAM_CLICKED:"irl-guest-list-table-team-clicked",
   IRL_GUEST_LIST_TABLE_MEMBER_CLICKED:"irl-guest-list-table-member-clicked",
   IRL_GUEST_LIST_TABLE_TELEGRAM_LINK_CLICKED:'irl-guest-list-table-telegram-link-clicked',
+  IRL_GUEST_LIST_TABLE_OFFICE_HOURS_LINK_CLICKED:'irl-guest-list-table-office-hours-link-clicked',
+  IRL_GUEST_LIST_TABLE_ADD_OFFICE_HOURS_CLICKED:'irl-guest-list-table-add-office-hours-clicked',
   IRL_RSVP_POPUP_SAVE_BTN_CLICKED:'irl-rsvp-popup-save-btn-clicked',
   IRL_RSVP_POPUP_UPDATE_BTN_CLICKED:'irl-rsvp-popup-update-btn-clicked',
+  IRL_RSVP_POPUP_OH_GUIDELINE_URL_CLICKED: 'irl-rsvp-popup-oh-guideline-url-clicked',
+  IRL_RSVP_POPUP_PRIVACY_SETTING_LINK_CLICKED: 'irl-rsvp-popup-privacy-setting-link-clicked',
 
   GO_TO_TOP_BTN_CLICKED:"go-to-top-btn-clicked",
   SELECT_FOCUS_AREA_BTN_CLICKED:'select-focus-area-btn-clicked',
@@ -582,3 +586,5 @@ export const IRL_LW_EE_DATES = {
 export const EVENT_TYPE = {
   INVITE_ONLY:"INVITE_ONLY"
 }
+
+export const OH_GUIDELINE_URL = "https://protosphere.plnetwork.io/posts/Office-Hours-Guidelines-and-Tips-clsdgrbkk000ypocoqsceyfaq"
