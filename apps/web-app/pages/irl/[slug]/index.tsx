@@ -1,4 +1,4 @@
-import { getMember } from '@protocol-labs-network/members/data-access';
+import { getMember, getMemberPreferences } from '@protocol-labs-network/members/data-access';
 import Banner from 'apps/web-app/components/irl/banner';
 import HeaderStrip from 'apps/web-app/components/irl/header-strip';
 import IrlMain from 'apps/web-app/components/irl/irl-main';
@@ -19,7 +19,7 @@ import { ReactElement } from 'react';
 import Cookies from 'js-cookie'
 import { destroyCookie } from 'nookies';
 
-export default function IrlDetails({ eventDetails, teams, userInfo, isUserGoing, isUserLoggedIn, telegram }) {
+export default function IrlDetails({ eventDetails, teams, userInfo, isUserGoing, isUserLoggedIn,officeHours, telegram, showTelegram }) {
   const router = useRouter();
   const onLogin = () => {
     if(Cookies.get("refreshToken")) {
@@ -62,7 +62,9 @@ export default function IrlDetails({ eventDetails, teams, userInfo, isUserGoing,
             isUserGoing={isUserGoing}
             isUserLoggedIn={isUserLoggedIn}
             teams={teams}
+            officeHours={officeHours}
             telegram={telegram}
+            showTelegram={showTelegram}
           />
         </div>
         <div>
@@ -85,6 +87,8 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
     let cookies = req?.cookies;
     let teams = [];
     let telegram = null;
+    let officeHours = null;
+    let showTelegram = true;
     if (!cookies?.authToken) {
       await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
       if (ctx.res.getHeader('Set-Cookie')) cookies = convertCookiesToJson(ctx.res.getHeader('Set-Cookie'));
@@ -152,11 +156,14 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
     if (isUserLoggedIn) {
       const { uid } = userInfo;
 
-      const memberResponse = await getMember(uid, {
-        with: 'teamMemberRoles.team',
-      });
+      const [memberResponse, memberPreferences] = await Promise.all([
+        getMember(uid, {
+          with: 'teamMemberRoles.team',
+        }),
+        getMemberPreferences(uid, cookies.authToken),
+      ]);    
 
-      if (memberResponse.status === 200) {
+      if (memberResponse.status === 200 && memberPreferences.status === 200) {
         teams = memberResponse.body?.teamMemberRoles?.map((teamResponse) => {
           return {
             id: teamResponse?.team?.uid,
@@ -165,6 +172,8 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
           };
         });
         telegram = memberResponse.body?.telegramHandler;
+        officeHours = memberResponse.body?.officeHours;
+        showTelegram = memberPreferences.body?.showTelegram;
       }
     }
 
@@ -176,7 +185,9 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
         isIrlPage: true,
         eventDetails,
         isUserGoing,
-        telegram
+        officeHours,
+        telegram,
+        showTelegram
       })
     );
     return {

@@ -177,7 +177,7 @@ const TableHeader = (props: any) => {
 
     roleFilterProps?.onOpenPane();
     topicFilterProps.onClosePane();
-  }
+  } 
 
   return (
     <>
@@ -213,7 +213,7 @@ const TableHeader = (props: any) => {
           </div>
       
           {/* {!eventDetails?.isExclusionEvent && ( */}
-            <div className="relative flex w-[200px] items-center justify-start gap-[10px]">
+            {/* <div className="relative flex w-[200px] items-center justify-start gap-[10px]">
               Member Role
               {roles?.length > 0 && (
                 <>
@@ -253,13 +253,8 @@ const TableHeader = (props: any) => {
                   )}
                 </>
               )}
-            </div>
+            </div> */}
           {/* )} */}
-          {eventDetails?.isExclusionEvent && (
-            <div className="flex w-[160px] items-center justify-start gap-[10px]">
-              {`Date(s) Attending`}
-            </div>
-          )}
           <div className="relative flex w-[340px] items-center justify-start gap-[10px]">
             Topics you are interested in
             {topics?.length > 0 && (
@@ -301,6 +296,14 @@ const TableHeader = (props: any) => {
               </>
             )}
           </div>
+          {eventDetails?.isExclusionEvent && (
+            <div className="flex w-[160px] items-center justify-start gap-[10px]">
+              {`Date(s) Attending`}
+            </div>
+          )}
+            <div className="flex w-[160px] items-center justify-start gap-[10px]">
+              Connect
+            </div>
         </div>
       )}
       {!isUserLoggedIn && (
@@ -312,18 +315,20 @@ const TableHeader = (props: any) => {
             Attendee Name
           </div>
           {/* {!eventDetails?.isExclusionEvent && ( */}
-            <div className="flex w-[160px] items-center justify-start">
+            {/* <div className="flex w-[160px] items-center justify-start">
               Member Role
-            </div>
+            </div> */}
           {/* )} */}
           {eventDetails?.isExclusionEvent && (
             <div className="flex w-[160px] items-center justify-start">
               {`Date(s) Attending`}
             </div>
           )}
-
           <div className="flex  items-center justify-start pr-[20px]">
             Topics you are interested in
+          </div>
+          <div className="flex  items-center justify-start pr-[20px]">
+            Connect 
           </div>
         </div>
       )}
