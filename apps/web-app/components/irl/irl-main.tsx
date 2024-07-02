@@ -14,7 +14,9 @@ const IrlMain = (props: any) => {
   const userInfo = props?.userInfo;
   const teams = props?.teams;
   const isUserLoggedIn = props?.isUserLoggedIn;
+  const officeHours = props?.officeHours;
   const telegram = props?.telegram;
+  const showTelegram = props?.showTelegram;
   // const telegram = eventDetails?.telegram;
   // const resources = eventDetails?.resources ?? [];
   const registeredGuest = eventDetails.guests.find((guest) => guest?.memberUid === userInfo?.uid);
@@ -23,6 +25,7 @@ const IrlMain = (props: any) => {
   const [isOpen, setIsOpen] = useState(false);
   const [updatedUser, setUpdatedUser] = useState(registeredGuest);
   const [isUserGoing, setIsGoing] = useState(props?.isUserGoing);
+  const [focusOHField, setFocusOHField] = useState(false);
   const { filteredList, sortConfig } = useIrlDetails(updatedEventDetails.guests, userInfo);
 
   const onClose = () => {
@@ -58,7 +61,9 @@ const IrlMain = (props: any) => {
   useEffect(() => {
     const handler = (e: any) => {
       const isOpen = e.detail.isOpen;
+      const isOHFocused = e.detail?.isOHFocused ?? false;
       setIsOpen(isOpen);
+      setFocusOHField(isOHFocused);
     };
     document.addEventListener('openRsvpModal', handler);
     return () => {
@@ -121,7 +126,7 @@ const IrlMain = (props: any) => {
               } lg-rounded-[8px] bg-white shadow-sm lg:w-[calc(100%_-_2px)]`}
             >
               {isUserLoggedIn && (
-                <MemberList userInfo={userInfo} items={filteredList} eventDetails={updatedEventDetails} />
+                <MemberList userInfo={userInfo} items={filteredList} eventDetails={updatedEventDetails} showTelegram={showTelegram}/>
               )}
               {!isUserLoggedIn && (
                 <TeamList onLogin={onLogin} items={updatedEventDetails.guests} eventDetails={updatedEventDetails} />
@@ -139,7 +144,10 @@ const IrlMain = (props: any) => {
           userInfo={userInfo}
           isUserGoing={isUserGoing}
           registeredGuest={updatedUser}
+          officeHours={officeHours}
           telegram={telegram}
+          showTelegram={showTelegram}
+          focusOHField={focusOHField}
         />
       )}
       <style jsx>
