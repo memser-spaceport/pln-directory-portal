@@ -14,8 +14,6 @@ const IrlMain = (props: any) => {
   const userInfo = props?.userInfo;
   const teams = props?.teams;
   const isUserLoggedIn = props?.isUserLoggedIn;
-  const officeHours = props?.officeHours;
-  const telegram = props?.telegram;
   const showTelegram = props?.showTelegram;
   // const telegram = eventDetails?.telegram;
   // const resources = eventDetails?.resources ?? [];
@@ -144,8 +142,6 @@ const IrlMain = (props: any) => {
           userInfo={userInfo}
           isUserGoing={isUserGoing}
           registeredGuest={updatedUser}
-          officeHours={officeHours}
-          telegram={telegram}
           showTelegram={showTelegram}
           focusOHField={focusOHField}
         />
