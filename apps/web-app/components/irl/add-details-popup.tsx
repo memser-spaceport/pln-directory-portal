@@ -29,6 +29,7 @@ const AddDetailsPopup = (props: any) => {
   const registeredGuest = props?.registeredGuest;
   const officeHours = props?.officeHours;
   const showTelegram = props?.showTelegram;
+  const telegram = props?.telegram;
   const focusOHField = props?.focusOHField;
   const router = useRouter();
   const slug = router.query.slug;
@@ -37,7 +38,7 @@ const AddDetailsPopup = (props: any) => {
   const [formErrors, setFormErrors] = useState<any>({});
   const [formValues, setFormValues] = useState({
     teamUid: '',
-    telegramId: props.telegram ? removeAt(getTelegramUsername(props.telegram)) : '',
+    telegramId: telegram ? removeAt(getTelegramUsername(telegram)) : '',
     reason: '',
     topics: [],
     officeHours: officeHours ? officeHours : '',
@@ -268,6 +269,22 @@ const AddDetailsPopup = (props: any) => {
     }
   };
 
+  const handleTelegramBlur = () => {
+    //Reset the telegram value with the profile telegram handle if user removes the telegram handle
+    if (telegram !== '' && formValues.telegramId === '') {
+      setFormValues((prevFormData) => ({ ...prevFormData, telegramId: telegram }));
+    }
+    handleHideWarning('telegram-message');
+  };
+
+  const handleOHBlur = () => {
+    //Reset the Office hours value with the profile office hours link if user removes the office hours
+    if (officeHours !== '' && formValues.officeHours === '') {
+      setFormValues((prevFormData) => ({ ...prevFormData, officeHours: officeHours }));
+    }
+    handleHideWarning('oh-message');
+  };
+
   //prevent form submit from when user pressing enter in the empty input field
   const handleKeyDown = (event) => {
     if (event.key === 'Enter') {
@@ -301,23 +318,23 @@ const AddDetailsPopup = (props: any) => {
     analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_OH_GUIDELINE_URL_CLICKED, {
       eventId: eventDetails?.id,
       eventName: eventDetails?.name,
-      user
+      user,
     });
-  }
+  };
 
   const handlePrivacySettingClick = () => {
     analytics.captureEvent(APP_ANALYTICS_EVENTS.IRL_RSVP_POPUP_PRIVACY_SETTING_LINK_CLICKED, {
       eventId: eventDetails?.id,
       eventName: eventDetails?.name,
-      user
+      user,
     });
-  }
+  };
 
   useEffect(() => {
     if (isUserGoing) {
       const data = {
         teamUid: registeredGuest?.teamUid,
-        telegramId: !showTelegram ? removeAt(getTelegramUsername(props.telegram)) : registeredGuest?.telegramId,
+        telegramId: removeAt(getTelegramUsername(props.telegram)),
         reason: registeredGuest.reason ? registeredGuest?.reason?.trim() : '',
         topics: registeredGuest?.topics,
         officeHours: registeredGuest?.officeHours ? registeredGuest.officeHours : '',
@@ -391,8 +408,8 @@ const AddDetailsPopup = (props: any) => {
                           placeholder="Enter link here"
                           className="focus:border-1 h-10 w-full rounded-lg border border-[#CBD5E1] py-[8px] pl-6 pr-[12px] text-[#475569] placeholder:text-sm placeholder:leading-6 placeholder:text-[#475569] placeholder:opacity-40 focus:border-[#156FF7] focus:outline-none"
                           onKeyDown={handleKeyDown}
-                          onFocus={()=>handleDisplayWarning('telegram-message')}
-                          onBlur={()=>handleHideWarning('telegram-message')}
+                          onFocus={() => handleDisplayWarning('telegram-message')}
+                          onBlur={handleTelegramBlur}
                         />
                         <span className="absolute left-2  top-[19px] -translate-y-1/2 transform text-[#475569] ">
                           @
@@ -404,7 +421,11 @@ const AddDetailsPopup = (props: any) => {
                           <p className="text-[13px] font-[500] leading-[18px] text-[#0F172A] opacity-40">
                             Your Telegram handle is hidden. Unhide it in your profile&apos;s{' '}
                             <Link href="/settings">
-                              <a target="_blank" className="italic underline underline-offset-2" onClick={handlePrivacySettingClick}>
+                              <a
+                                target="_blank"
+                                className="italic underline underline-offset-2"
+                                onClick={handlePrivacySettingClick}
+                              >
                                 privacy settings
                               </a>
                             </Link>{' '}
@@ -419,8 +440,8 @@ const AddDetailsPopup = (props: any) => {
                         >
                           <img src="/assets/images/icons/info-yellow.svg" alt="info" width={16} height={16} />
                           <p className="text-[14px] font-[400] leading-[20px] text-[#0F172A]">
-                            Any changes made here will also update your directory profile&apos;s Telegram handle, except for
-                            deletions.
+                            Any changes made here will also update your directory profile&apos;s Telegram handle, except
+                            for deletions.
                           </p>
                         </div>
                       }
@@ -474,8 +495,8 @@ const AddDetailsPopup = (props: any) => {
                           className="focus:border-1 h-10 w-full rounded-lg border border-[#CBD5E1] py-[8px] px-[12px] text-[#475569] placeholder:text-sm placeholder:leading-6 placeholder:text-[#475569] placeholder:opacity-40 focus:border-[#156FF7] focus:outline-none"
                           onKeyDown={handleKeyDown}
                           ref={officeHoursRef}
-                          onFocus={()=>handleDisplayWarning('oh-message')}
-                          onBlur={()=>handleHideWarning('oh-message')}
+                          onFocus={() => handleDisplayWarning('oh-message')}
+                          onBlur={handleOHBlur}
                         />
                         {formErrors?.officeHours && (
                           <span className="text-[13px] leading-[18px] text-red-500">{formErrors?.officeHours}</span>
@@ -484,24 +505,27 @@ const AddDetailsPopup = (props: any) => {
                       <div className="flex items-start gap-[6px]">
                         <img src="/assets/images/icons/info_icon.svg" alt="info" width={16} height={16} />
                         <p className="text-[13px] font-[500] leading-[18px] text-[#94A3B8]">
-                          Drop your calendar link here so others can get in touch with you at a time that is convenient.
-                          We recommend 15-min meetings scheduled via Calendly or Google Calendar appointments.{' '}
+                          Please share your calendar link to facilitate scheduling for in-person meetings during the
+                          conference. Updating your availability for the conference week allows others to book time with
+                          you for face-to-face connections.{' '}
                           <Link href={OH_GUIDELINE_URL}>
-                            <a target="_blank" className="text-[#156FF7]" onClick={handleOHGuidlineClick}>Click Here</a>
+                            <a target="_blank" className="text-[#156FF7]" onClick={handleOHGuidlineClick}>
+                              Click Here
+                            </a>
                           </Link>{' '}
                           to view our office hours guidelines.
                         </p>
                       </div>
                       <div
-                          className="hidden-message flex items-start gap-[6px] rounded-[8px] bg-[#FF820E] bg-opacity-10 px-3 py-4"
-                          id="oh-message"
-                        >
-                          <img src="/assets/images/icons/info-yellow.svg" alt="info" width={16} height={16} />
-                          <p className="text-[14px] font-[400] leading-[20px] text-[#0F172A]">
-                            Any changes made here will also update your directory profile&apos;s Office Hours link, except for
-                            deletions.
-                          </p>
-                        </div>
+                        className="hidden-message flex items-start gap-[6px] rounded-[8px] bg-[#FF820E] bg-opacity-10 px-3 py-4"
+                        id="oh-message"
+                      >
+                        <img src="/assets/images/icons/info-yellow.svg" alt="info" width={16} height={16} />
+                        <p className="text-[14px] font-[400] leading-[20px] text-[#0F172A]">
+                          Any changes made here will also update your directory profile&apos;s Office Hours link, except
+                          for deletions.
+                        </p>
+                      </div>
                     </div>
                     {eventDetails?.isExclusionEvent && (
                       <div className="flex flex-col gap-3">

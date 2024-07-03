@@ -204,7 +204,16 @@ const MemberList = (props: any) => {
                 )}
                 <div className="flex w-[160px] flex-col gap-1">
                   {!showTelegram && userInfo.uid === item.memberUid ? (
-                    <div className="flex items-center" title="Change your privacy settings to display">
+                    <Tooltip
+                    asChild
+                    align="start"
+                    content={
+                      <div className="word-break max-w-[200px] rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white">
+                        Change your privacy settings to display
+                      </div>
+                    }
+                    trigger={
+                      <div className="flex items-center">
                       {' '}
                       <img
                         onClick={(e) => e.preventDefault()}
@@ -213,8 +222,10 @@ const MemberList = (props: any) => {
                         alt="telegram-hidden"
                         loading='lazy'
                       />
-                      <span className='font-normal text-[12px] leading-[20px] text-[#94A3B8]'>Hidden from public</span>
+                      <span className='font-normal text-[12px] leading-[20px] text-[#94A3B8]'>Hidden from others</span>
                     </div>
+                    }
+                  />
                   ) : item?.telegramId ? (
                     <span className="flex items-center gap-1">
                       <img
@@ -253,6 +264,24 @@ const MemberList = (props: any) => {
                         alt="plus"
                       />
                       <span className="text-[12px] font-medium leading-[14px] text-[#475569]">Add Office Hours</span>
+                      <Tooltip
+                        asChild
+                        align="start"
+                        content={
+                          <div className="word-break max-w-[200px] rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white">
+                            Please share your calendar link to facilitate scheduling for in-person meetings during the conference. Updating your availability for the conference week allows others to book time with you for face-to-face connections.
+                          </div>
+                        }
+                        trigger={
+                          <img
+                          loading="lazy"
+                          src="/assets/images/icons/info_icon.svg"
+                          height={16}
+                          width={16}
+                          alt="plus"
+                        />
+                        }
+                      />
                     </button>
                   ) : userInfo.uid !== item.memberUid ? (
                     <Link href={item.officeHours}>
