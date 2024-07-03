@@ -19,7 +19,7 @@ import { ReactElement } from 'react';
 import Cookies from 'js-cookie'
 import { destroyCookie } from 'nookies';
 
-export default function IrlDetails({ eventDetails, teams, userInfo, isUserGoing, isUserLoggedIn,officeHours, telegram, showTelegram }) {
+export default function IrlDetails({ eventDetails, teams, userInfo, isUserGoing, isUserLoggedIn, showTelegram }) {
   const router = useRouter();
   const onLogin = () => {
     if(Cookies.get("refreshToken")) {
@@ -62,8 +62,6 @@ export default function IrlDetails({ eventDetails, teams, userInfo, isUserGoing,
             isUserGoing={isUserGoing}
             isUserLoggedIn={isUserLoggedIn}
             teams={teams}
-            officeHours={officeHours}
-            telegram={telegram}
             showTelegram={showTelegram}
           />
         </div>
@@ -86,8 +84,6 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
     const slug = query.slug;
     let cookies = req?.cookies;
     let teams = [];
-    let telegram = null;
-    let officeHours = null;
     let showTelegram = true;
     if (!cookies?.authToken) {
       await renewAndStoreNewAccessToken(cookies?.refreshToken, ctx);
@@ -171,9 +167,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
             mainTeam: teamResponse?.mainTeam,
           };
         });
-        telegram = memberResponse.body?.telegramHandler;
-        officeHours = memberResponse.body?.officeHours;
-        showTelegram = memberPreferences.body?.showTelegram;
+        showTelegram = memberPreferences.body?.showTelegram ?? true;
       }
     }
 
@@ -185,8 +179,6 @@ export const getServerSideProps: GetServerSideProps = async (ctx: any) => {
         isIrlPage: true,
         eventDetails,
         isUserGoing,
-        officeHours,
-        telegram,
         showTelegram
       })
     );

@@ -3,7 +3,7 @@ import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
 import { getUserInfo } from 'apps/web-app/utils/shared.utils';
 import Link from 'next/link';
 import GuestDescription from './guest-description';
-import { formatDateRange } from 'apps/web-app/utils/irl.utils';
+import { formatDateRange, getTelegramUsername, removeAt } from 'apps/web-app/utils/irl.utils';
 import { Tooltip } from './tooltip';
 
 const MemberList = (props: any) => {
@@ -237,15 +237,15 @@ const MemberList = (props: any) => {
                       <a
                         target="_blank"
                         title={item.telegramId}
-                        href={`https://t.me/${item.telegramId}`}
-                        className="text-clamp text-[12px] leading-5 text-[#156FF7]"
+                        href={`https://t.me/${removeAt(getTelegramUsername(item?.telegramId))}`}
+                        className="word-break  text-clamp text-[12px] leading-5 text-[#156FF7]"
                         onClick={(e) => {
                           e.stopPropagation();
                           onTelegramClick(item.telegramId, item?.memberUid, item?.memberName);
                         }}
                         rel="noreferrer"
                       >
-                        @{item?.telegramId}
+                        @{removeAt(getTelegramUsername(item?.telegramId))}
                       </a>
                     </span>
                   ) : (
@@ -283,7 +283,7 @@ const MemberList = (props: any) => {
                         }
                       />
                     </button>
-                  ) : userInfo.uid !== item.memberUid ? (
+                  ) : userInfo.uid !== item.memberUid && item.officeHours ? (
                     <Link href={item.officeHours}>
                       <a
                         className="flex w-fit items-center gap-1 rounded-[24px] border-[0.5px] border-[#CBD5E1] bg-[#F1F5F9] py-1 px-2"

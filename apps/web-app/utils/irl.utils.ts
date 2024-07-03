@@ -1,4 +1,4 @@
-import { destroyCookie } from "nookies";
+import { destroyCookie } from 'nookies';
 
 export function formatIrlEventDate(startDateStr, endDateStr, timeZone = 'America/Los_Angeles') {
   const options: unknown = { month: 'short', day: 'numeric', timeZone: timeZone };
@@ -62,24 +62,24 @@ export const sortByDefault = (guests) => {
 export const removeCookieInserverSide = (ctx) => {
   destroyCookie(ctx, 'authToken', {
     path: '/',
-    domain: process.env.COOKIE_DOMAIN || ''
+    domain: process.env.COOKIE_DOMAIN || '',
   });
 
   destroyCookie(ctx, 'refreshToken', {
     path: '/',
-    domain: process.env.COOKIE_DOMAIN || ''
+    domain: process.env.COOKIE_DOMAIN || '',
   });
 
   destroyCookie(ctx, 'userInfo', {
     path: '/',
-    domain: process.env.COOKIE_DOMAIN || ''
+    domain: process.env.COOKIE_DOMAIN || '',
   });
 
   destroyCookie(ctx, 'idToken', {
     path: '/',
-    domain: process.env.COOKIE_DOMAIN || ''
+    domain: process.env.COOKIE_DOMAIN || '',
   });
-}
+};
 export const getUniqueRoles = (guests: any) => {
   try {
     const allRoles = guests?.map((guest: any) => guest?.memberRole);
@@ -118,49 +118,50 @@ function getDayWithSuffix(day) {
       return day + 'th';
   }
 }
-  const getOrdinalSuffix = (day) => {
-    if (day > 3 && day < 21) return 'th';
-    switch (day % 10) {
-      case 1: return 'st';
-      case 2: return 'nd';
-      case 3: return 'rd';
-      default: return 'th';
-    }
-  };
+const getOrdinalSuffix = (day) => {
+  if (day > 3 && day < 21) return 'th';
+  switch (day % 10) {
+    case 1:
+      return 'st';
+    case 2:
+      return 'nd';
+    case 3:
+      return 'rd';
+    default:
+      return 'th';
+  }
+};
 
-    const getMonthName = (monthNumber) => {
-      const monthNames = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-      ];
-      return monthNames[monthNumber - 1];
-    };
+const getMonthName = (monthNumber) => {
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return monthNames[monthNumber - 1];
+};
 
-  const formatDate = (dateString) => {
-    const [year, month, day] = dateString.split('-').map(Number);
-    const dayWithSuffix = day + getOrdinalSuffix(day);
-    const monthName = getMonthName(month);
-    return `${dayWithSuffix} ${monthName}`;
-  };
+const formatDate = (dateString) => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  const dayWithSuffix = day + getOrdinalSuffix(day);
+  const monthName = getMonthName(month);
+  return `${dayWithSuffix} ${monthName}`;
+};
 
-  export const formatDateRange = (startDate, endDate) => {
-    if (!startDate && !endDate) {
-          return '';
-        }
-    const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
-    const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+export const formatDateRange = (startDate, endDate) => {
+  if (!startDate && !endDate) {
+    return '';
+  }
+  const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+  const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
 
-    if (startDate === endDate) {
-      return formatDate(startDate);
-    } else if (startMonth === endMonth && startYear === endYear) {
-      const startDayWithSuffix = startDay + getOrdinalSuffix(startDay);
-      const endDayWithSuffix = endDay + getOrdinalSuffix(endDay);
-      const monthName = getMonthName(startMonth);
-      return `${startDayWithSuffix} - ${endDayWithSuffix} ${monthName}`;
-    } else {
-      return `${formatDate(startDate)} - ${formatDate(endDate)}`;
-    }
-  };
+  if (startDate === endDate) {
+    return formatDate(startDate);
+  } else if (startMonth === endMonth && startYear === endYear) {
+    const startDayWithSuffix = startDay + getOrdinalSuffix(startDay);
+    const endDayWithSuffix = endDay + getOrdinalSuffix(endDay);
+    const monthName = getMonthName(startMonth);
+    return `${startDayWithSuffix} - ${endDayWithSuffix} ${monthName}`;
+  } else {
+    return `${formatDate(startDate)} - ${formatDate(endDate)}`;
+  }
+};
 
 export function formatDateRangeForDescription(startDateStr, endDateStr, timeZone = 'America/Los_Angeles') {
   const options: unknown = { month: 'short', day: 'numeric', timeZone: timeZone };
@@ -214,4 +215,17 @@ export function formatDateToISO(dateStr, timeZone = 'America/Los_Angeles') {
   const month = monthFormatter.format(date);
   const day = dayFormatter.format(date);
   return `${year}-${month}-${day}`;
+}
+
+export function getTelegramUsername(input: string) {
+  const regex = /(?:https?:\/\/)?(?:www\.)?t(?:elegram)?\.me\/([a-zA-Z0-9_]+)/;
+  const match = input.match(regex);
+  return match ? match[1] : input;
+}
+
+//remove the @ symbol from telegram
+export function removeAt(text: string) {
+  const textToBeModified = text?.trim();
+  const modifiedText = textToBeModified?.replace(/\B@/g, '');
+  return modifiedText;
 }
