@@ -16,8 +16,12 @@ import {
   formatDateRangeForDescription,
   formatDateToISO,
   getArrivalDepartureDateRange,
+  getTelegramUsername,
+  removeAt,
 } from 'apps/web-app/utils/irl.utils';
 import Link from 'next/link';
+import api from 'apps/web-app/utils/api';
+import { fetchMember } from 'apps/web-app/utils/services/members';
 
 const AddDetailsPopup = (props: any) => {
   const isOpen = props.isOpen;
@@ -27,21 +31,20 @@ const AddDetailsPopup = (props: any) => {
   const eventDetails = props?.eventDetails;
   const isUserGoing = props?.isUserGoing;
   const registeredGuest = props?.registeredGuest;
-  const officeHours = props?.officeHours;
   const showTelegram = props?.showTelegram;
-  const telegram = props?.telegram;
   const focusOHField = props?.focusOHField;
   const router = useRouter();
   const slug = router.query.slug;
 
   const [isLoader, setIsLoader] = useState(false);
   const [formErrors, setFormErrors] = useState<any>({});
+  const [connectDetail, setConnectDetail] = useState<any>({})
   const [formValues, setFormValues] = useState({
     teamUid: '',
-    telegramId: telegram ? removeAt(getTelegramUsername(telegram)) : '',
+    telegramId: '',
     reason: '',
     topics: [],
-    officeHours: officeHours ? officeHours : '',
+    officeHours: '',
     additionalInfo: {
       checkInDate: '',
       checkOutDate: '',
@@ -271,16 +274,16 @@ const AddDetailsPopup = (props: any) => {
 
   const handleTelegramBlur = () => {
     //Reset the telegram value with the profile telegram handle if user removes the telegram handle
-    if (telegram !== '' && formValues.telegramId === '') {
-      setFormValues((prevFormData) => ({ ...prevFormData, telegramId: telegram }));
+    if (connectDetail?.telegramId !== '' && formValues.telegramId === '') {
+      setFormValues((prevFormData) => ({ ...prevFormData, telegramId: removeAt(getTelegramUsername(connectDetail?.telegramId)) }));
     }
     handleHideWarning('telegram-message');
   };
 
   const handleOHBlur = () => {
     //Reset the Office hours value with the profile office hours link if user removes the office hours
-    if (officeHours !== '' && formValues.officeHours === '') {
-      setFormValues((prevFormData) => ({ ...prevFormData, officeHours: officeHours }));
+    if (connectDetail?.officeHours !== '' && formValues.officeHours === '') {
+      setFormValues((prevFormData) => ({ ...prevFormData, officeHours: connectDetail?.officeHours }));
     }
     handleHideWarning('oh-message');
   };
@@ -291,19 +294,6 @@ const AddDetailsPopup = (props: any) => {
       event.preventDefault(); // Prevent form submission
     }
   };
-
-  //remove the @ symbol from telegram
-  function removeAt(text: string) {
-    const textToBeModified = text?.trim();
-    const modifiedText = textToBeModified?.replace(/\B@/g, '');
-    return modifiedText;
-  }
-
-  function getTelegramUsername(input) {
-    const regex = /(?:https?:\/\/)?(?:www\.)?t(?:elegram)?\.me\/([a-zA-Z0-9_]+)/;
-    const match = input.match(regex);
-    return match ? match[1] : input;
-  }
 
   //get additionalinfo from form
   const onAdditionalInfoChange = (event: any) => {
@@ -334,7 +324,7 @@ const AddDetailsPopup = (props: any) => {
     if (isUserGoing) {
       const data = {
         teamUid: registeredGuest?.teamUid,
-        telegramId: removeAt(getTelegramUsername(props.telegram)),
+        telegramId: '',
         reason: registeredGuest.reason ? registeredGuest?.reason?.trim() : '',
         topics: registeredGuest?.topics,
         officeHours: registeredGuest?.officeHours ? registeredGuest.officeHours : '',
@@ -350,6 +340,23 @@ const AddDetailsPopup = (props: any) => {
       setFormValues((prev) => ({ ...prev, teamUid }));
     }
   }, []);
+
+  useEffect(()=>{
+    const getMemberConnectDetails = async() => {
+      setIsLoader(true);
+      try{
+        const response = await fetchMember(userInfo?.uid);
+        const telegram = response?.telegramHandler ? removeAt(getTelegramUsername(response.telegramHandler)) : '';
+        setConnectDetail({telegramId: telegram, officeHours: response?.officeHours ?? ''})
+        setFormValues((prevFormData) => ({ ...prevFormData, telegramId: telegram, officeHours: response?.officeHours ?? '' }));
+        setIsLoader(false);
+      }
+      catch(error){
+        console.error(error);
+      }
+    }
+    getMemberConnectDetails();
+  },[])
 
   const onClearDate = (key) => {
     setFormValues((prev) => ({
