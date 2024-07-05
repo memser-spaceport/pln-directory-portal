@@ -423,6 +423,19 @@ export const ANNOUNCEMENT_BANNER = {
 
 export const ChangeLogList = [
   {
+    title: 'Version 2.1.2 - Enhancements',
+    tag: 'Improvements',
+    date: '05, Jul 2024 ',
+    shortContent: `<p style="font-size: 16px; line-height:24px;">
+    <span style="font-size: 16px">Feel free to connect with your fellow attendees at the events by</span><br/>
+    <ul style="padding-left:32px ; margin-bottom:15px; font-size: 16px; list-style: disc;">
+    <li>Scheduling Office Hours</li>
+    <li>Connecting via Telegram</li>
+    </ul>
+    <span style="font-size: 16px;">Additionally, your Telegram Handles will be automatically displayed at the IRL events you attend, per the related Privacy Settings.</span>
+    </p>`,
+  },
+  {
     title: 'Version 2.1.1 - Enhancements',
     tag: 'Improvements',
     date: '14, Jun 2024 ',
