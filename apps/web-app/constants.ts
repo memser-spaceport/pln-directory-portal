@@ -428,7 +428,7 @@ export const ChangeLogList = [
     date: '05, Jul 2024 ',
     shortContent: `<p style="font-size: 16px; line-height:24px;">
     <span style="font-size: 16px">Feel free to connect with your fellow attendees at the events by</span><br/>
-    <ul style="padding-left:32px ; margin-bottom:15px; font-size: 16px; list-style: disc;">
+    <ul style="padding-left:32px ; margin-bottom:16px; font-size: 16px; list-style: disc;">
     <li>Scheduling Office Hours</li>
     <li>Connecting via Telegram</li>
     </ul>
