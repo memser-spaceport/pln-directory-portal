@@ -202,7 +202,7 @@ const MemberList = (props: any) => {
                     </span>
                   </div>
                 )}
-                <div className="flex w-[160px] flex-col gap-1">
+                <div className="flex w-[170px] flex-col gap-1">
                   {!showTelegram && userInfo.uid === item.memberUid ? (
                     <Tooltip
                     asChild
