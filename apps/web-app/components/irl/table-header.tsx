@@ -301,7 +301,7 @@ const TableHeader = (props: any) => {
               {`Date(s) Attending`}
             </div>
           )}
-            <div className="flex w-[160px] items-center justify-start gap-[10px]">
+            <div className="flex w-[170px] items-center justify-start gap-[10px]">
               Connect
             </div>
         </div>
