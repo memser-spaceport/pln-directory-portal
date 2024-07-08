@@ -38,7 +38,7 @@ const AddDetailsPopup = (props: any) => {
 
   const [isLoader, setIsLoader] = useState(false);
   const [formErrors, setFormErrors] = useState<any>({});
-  const [connectDetail, setConnectDetail] = useState<any>({})
+  const [connectDetail, setConnectDetail] = useState<any>({});
   const [formValues, setFormValues] = useState({
     teamUid: '',
     telegramId: '',
@@ -55,11 +55,6 @@ const AddDetailsPopup = (props: any) => {
   const dateRange = getArrivalDepartureDateRange(eventDetails?.startDate, eventDetails?.endDate, 5);
   const endRange = getArrivalDepartureDateRange(eventDetails?.startDate, eventDetails?.endDate, 4);
   const officeHoursRef = useRef(null);
-
-  if (focusOHField && officeHoursRef.current) {
-    officeHoursRef.current.focus();
-    officeHoursRef.current.scrollIntoView({ behavior: 'smooth' });
-  }
 
   const [departureMinDate, setDepartureMinDate] = useState(getDepartureMinDate());
   // const departureMinDate = formatDateToISO(eventDetails?.startDate);
@@ -274,15 +269,18 @@ const AddDetailsPopup = (props: any) => {
 
   const handleTelegramFocus = () => {
     //update the telegram value when user focus on the field when blank value is saved already
-    if (connectDetail?.telegramId !== '' && registeredGuest?.isTelegramRemoved) {
-      setFormValues((prevFormData) => ({ ...prevFormData, telegramId: removeAt(getTelegramUsername(connectDetail?.telegramId)) }));
+    if (connectDetail?.telegramId !== '' && registeredGuest?.isTelegramRemoved && formValues?.telegramId === '') {
+      setFormValues((prevFormData) => ({
+        ...prevFormData,
+        telegramId: removeAt(getTelegramUsername(connectDetail?.telegramId)),
+      }));
     }
     handleDisplayWarning('telegram-message');
   };
 
   const handleOfficeHoursFocus = () => {
     //update the office hours value when user focus on the field when blank value is saved already
-    if (connectDetail?.officeHours !== '' && registeredGuest?.officeHours === '') {
+    if (connectDetail?.officeHours !== '' && registeredGuest?.officeHours === '' && formValues?.officeHours === '') {
       setFormValues((prevFormData) => ({ ...prevFormData, officeHours: connectDetail?.officeHours }));
     }
     handleDisplayWarning('oh-message');
@@ -351,22 +349,32 @@ const AddDetailsPopup = (props: any) => {
     }
   }, []);
 
-  useEffect(()=>{
-    const getMemberConnectDetails = async() => {
+  useEffect(() => {
+    const getMemberConnectDetails = async () => {
       setIsLoader(true);
-      try{
+      try {
         const response = await fetchMember(userInfo?.uid);
-        const telegram = response?.telegramHandler  ? removeAt(getTelegramUsername(response.telegramHandler)) : '';
-        setConnectDetail({telegramId: telegram, officeHours: response?.officeHours ?? ''})
-        setFormValues((prevFormData) => ({ ...prevFormData, telegramId: !registeredGuest?.isTelegramRemoved ? telegram : '', officeHours: registeredGuest?.officeHours === '' ? '' : response?.officeHours ?? '' }));
+        const telegram = response?.telegramHandler ? removeAt(getTelegramUsername(response.telegramHandler)) : '';
+        setConnectDetail({ telegramId: telegram, officeHours: response?.officeHours ?? '' });
+        setFormValues((prevFormData) => ({
+          ...prevFormData,
+          telegramId: !registeredGuest?.isTelegramRemoved ? telegram : '',
+          officeHours: registeredGuest?.officeHours === '' ? '' : response?.officeHours ?? '',
+        }));
         setIsLoader(false);
-      }
-      catch(error){
+      } catch (error) {
         console.error(error);
       }
-    }
+    };
     getMemberConnectDetails();
-  },[])
+  }, []);
+
+  useEffect(() => {
+    if (focusOHField && officeHoursRef.current) {
+      officeHoursRef.current.focus();
+      officeHoursRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, []);
 
   return (
     <>
@@ -412,12 +420,16 @@ const AddDetailsPopup = (props: any) => {
                           value={formValues?.telegramId}
                           onChange={handleChange}
                           name="telegramId"
-                          placeholder={registeredGuest?.isTelegramRemoved && connectDetail.telegramId!=='' ? connectDetail.telegramId : "Enter handle here"}
+                          placeholder={
+                            registeredGuest?.isTelegramRemoved && connectDetail.telegramId !== ''
+                              ? connectDetail.telegramId
+                              : 'Enter handle here'
+                          }
                           className="focus:border-1 h-10 w-full rounded-lg border border-[#CBD5E1] py-[8px] pl-6 pr-[12px] text-[#475569] placeholder:text-sm placeholder:leading-6 placeholder:text-[#475569] placeholder:opacity-40 focus:border-[#156FF7] focus:outline-none"
                           onKeyDown={handleKeyDown}
                           // onFocus={() => handleDisplayWarning('telegram-message')}
                           onFocus={handleTelegramFocus}
-                          onBlur={()=>handleHideWarning('telegram-message')}
+                          onBlur={() => handleHideWarning('telegram-message')}
                         />
                         <span className="absolute left-2  top-[19px] -translate-y-1/2 transform text-[#475569] ">
                           @
@@ -499,12 +511,16 @@ const AddDetailsPopup = (props: any) => {
                           value={formValues?.officeHours}
                           onChange={handleChange}
                           name="officeHours"
-                          placeholder={registeredGuest?.officeHours === '' && connectDetail?.officeHours !=='' ? connectDetail.officeHours : "Enter link here"}
+                          placeholder={
+                            registeredGuest?.officeHours === '' && connectDetail?.officeHours !== ''
+                              ? connectDetail.officeHours
+                              : 'Enter link here'
+                          }
                           className="focus:border-1 h-10 w-full rounded-lg border border-[#CBD5E1] py-[8px] px-[12px] text-[#475569] placeholder:text-sm placeholder:leading-6 placeholder:text-[#475569] placeholder:opacity-40 focus:border-[#156FF7] focus:outline-none"
                           onKeyDown={handleKeyDown}
                           ref={officeHoursRef}
                           onFocus={handleOfficeHoursFocus}
-                          onBlur={()=>handleHideWarning('oh-message')}
+                          onBlur={() => handleHideWarning('oh-message')}
                         />
                         {formErrors?.officeHours && (
                           <span className="text-[13px] leading-[18px] text-red-500">{formErrors?.officeHours}</span>
