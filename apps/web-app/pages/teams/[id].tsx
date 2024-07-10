@@ -30,6 +30,8 @@ import TeamProfileProjects from 'apps/web-app/components/teams/team-profile/team
 import ProjectsService from 'apps/web-app/services/projects';
 import { getAllFormattedProjects } from 'apps/web-app/services/projects/projects.data.service';
 import { TeamProfileOfficeHours } from 'apps/web-app/components/teams/team-profile/team-profile-office-hours/team-profile-office-hours';
+import { getFocusAreas } from 'apps/web-app/utils/services/focusarea';
+import FocusAreaDisplay from 'apps/web-app/components/shared/directory/focus-area-display';
 
 interface TeamProps {
   team: ITeam;
@@ -40,9 +42,11 @@ interface TeamProps {
   teamsProjectList:any;
   hasProjectsEditAccess: boolean;
   officeHoursFlag: boolean;
+  teamFocusAreas: any;
+  focusAreaList :any;
 }
 
-export default function Team({ team, members, backLink, userInfo, teamsProjectList, hasProjectsEditAccess, isUserLoggedIn, officeHoursFlag }: TeamProps) {
+export default function Team({ team, members, backLink, userInfo, teamsProjectList, hasProjectsEditAccess, isUserLoggedIn, officeHoursFlag, teamFocusAreas,focusAreaList }: TeamProps) {
   const { breadcrumbItems } = useProfileBreadcrumb({
     backLink,
     directoryName: 'Teams',
@@ -71,6 +75,7 @@ export default function Team({ team, members, backLink, userInfo, teamsProjectLi
           {team.fundingStage || team.membershipSources.length ? (
             <TeamProfileFunding {...team} />
           ) : null}
+          {teamFocusAreas && teamFocusAreas?.length > 0 &&<div className='flex gap-2 flex-col pt-5'><h3 className='text-[#64748B] text-[14px] leading-[20px] font-medium'>Focus Area</h3><FocusAreaDisplay rawData={focusAreaList} selectedItems={teamFocusAreas}/></div>}
           <TeamProfileMembers members={members} />
           <TeamProfileProjects projects={teamsProjectList} isUserLoggedIn={isUserLoggedIn} team={team} hasProjectsEditAccess={hasProjectsEditAccess}/>
 
@@ -108,6 +113,8 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
   };
   let team: ITeam;
   let members: IMember[];
+  let teamFocusAreas = [];
+  let focusAreaList = [];
 
   // Check if provided ID follows the Airtable ID format (reqXXXXXXXXXXXXXX), and if so, get the corresponding UID for the team from the web api
   if (AIRTABLE_REGEX.test(id)) {
@@ -125,7 +132,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
         };
   }
 
-  const [teamResponse, teamMembersResponse, teamsResponse] = await Promise.all([
+  const [teamResponse, teamMembersResponse, teamsResponse, focusAreaResponse] = await Promise.all([
     getTeam(id, {
       with: 'logo,technologies,membershipSources,industryTags,fundingStage,teamMemberRoles.member',
     }),
@@ -140,11 +147,13 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
       select:
           'uid,name,logo.url,industryTags.title,teamMemberRoles.role,teamMemberRoles.mainTeam,officeHours',
       pagination: false,
-  })
+  }),
+  getFocusAreas("Team", {})
   ]);
 
   if (teamResponse.status === 200 && teamMembersResponse.status === 200) {
     team = parseTeam(teamResponse.body);
+    teamFocusAreas = (teamResponse.body as any)?.teamFocusAreas ?? [];
     members = orderBy(
       teamMembersResponse.body.map((member) =>
         isUserLoggedIn ? parseTeamMember(member, team.id) : restrictMemberInfo(parseTeamMember(member, team.id))
@@ -158,6 +167,11 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
         break;
       }
     }
+  }
+
+  if(focusAreaResponse.status === 200 && focusAreaResponse.data){
+    focusAreaList = focusAreaResponse.data;
+    focusAreaList = focusAreaList.filter((data) => !data.parentUid);
   }
 
 
@@ -183,11 +197,10 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
         }
       })
   }catch(err){
-    console.log(err);
+    console.error(err);
   }
 
   let officeHoursFlag = false;
-  console.log("officeHours",team['officeHours'])
   officeHoursFlag = team['officeHours'] !== null ? true : false;
   if (!isUserLoggedIn && team['officeHours']) {
     delete team['officeHours'];
@@ -209,7 +222,7 @@ export const getServerSideProps: GetServerSideProps<TeamProps> = async (ctx) => 
   );
 
   return {
-    props: { team, members, backLink, isUserLoggedIn, userInfo, teamsProjectList, hasProjectsEditAccess, officeHoursFlag },
+    props: { team, members, backLink, isUserLoggedIn, userInfo, teamsProjectList, hasProjectsEditAccess, officeHoursFlag, teamFocusAreas, focusAreaList },
   };
 };
 
@@ -240,6 +253,6 @@ const checkForEditRights = (userInfo, selectedProject, isUserLoggedIn, teamsResp
       return false;
 
   } catch (err) {
-      console.log(err);
+      console.error(err);
   }
 }
