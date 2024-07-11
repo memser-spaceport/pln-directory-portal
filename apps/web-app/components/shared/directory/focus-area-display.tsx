@@ -172,6 +172,7 @@ const FocusAreaDisplay = (props: TFocusAreasList) => {
         
         .focusarea__list__row {
           display: flex;
+          flex-wrap: wrap;
           align-items: center;
           gap: 4px;
           border-bottom: 1px solid #cbd5e1;
