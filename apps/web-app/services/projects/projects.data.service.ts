@@ -178,7 +178,7 @@ const formatToSave = (inputs, imageUid) => {
     
     objectToSave['contributingTeams'] = tempCTeam;
     objectToSave['contributions'] = tempContributors;
-    objectToSave['focusAreas'] = [];
+    objectToSave['focusAreas'] = inputs?.projectFocusAreas ?? [];
     return objectToSave;
 }
 
@@ -203,6 +203,7 @@ const getFormattedProject = (project) => {
             // formattedProject['contributors'] = project.contributors ?? null;
             formattedProject['createdBy'] = project.createdBy ?? null;
             formattedProject['score'] = project.score ?? null;
+            formattedProject['projectFocusAreas']= project.projectFocusAreas ?? [];
 
             
             const tempContributors = [];
