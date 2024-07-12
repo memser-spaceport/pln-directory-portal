@@ -423,6 +423,14 @@ export const ANNOUNCEMENT_BANNER = {
 
 export const ChangeLogList = [
   {
+    title: 'Version 2.1.3 - Enhancements',
+    tag: 'Improvements',
+    date: '12, Jul 2024 ',
+    shortContent: `<p style="font-size: 16px; line-height:24px;">
+    Users can now find the Focus Area details on the Teams and Projects detail pages.
+    </p>`,
+  },
+  {
     title: 'Version 2.1.2 - Enhancements',
     tag: 'Improvements',
     date: '05, Jul 2024 ',
