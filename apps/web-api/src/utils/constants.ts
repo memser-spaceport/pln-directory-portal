@@ -99,3 +99,15 @@ export const DEFAULT_MEMBER_ROLES = {
 
 export const PROJECT = 'Project';
 export const TEAM = 'Team';
+
+export const InteractionFailureReasons: { [key: string]: string } = {
+  "Broken Link": "IFR0001",
+  "I plan to schedule soon": "IFR0002",
+  "Preferred slot not available": "IFR0003",
+  "Meeting yet to happen": "IFR0004",
+  "Got Rescheduled": "IFR0005",
+  "Got Cancelled" : "IFR0006",
+  "Member didn’t show up": "IFR0007",
+  "I did not show up":"IFR0008",
+  "Other": "IFR0009"
+};
