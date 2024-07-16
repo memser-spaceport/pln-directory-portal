@@ -35,6 +35,9 @@ import { JoinRequestsModule } from './join-requests/join-requests.module';
 import { FocusAreasModule } from './focus-areas/focus-areas.module';
 import { PLEventsModule } from './pl-events/pl-events.module';
 import { EmptyStringToNullInterceptor } from './interceptors/empty-string-to-null.interceptor';
+import { OfficeHoursModule } from './office-hours/office-hours.module';
+import { MemberFollowUpsModule } from './member-follow-ups/member-follow-ups.module';
+import { MemberFeedbacksModule } from './member-feedbacks/member-feedbacks.module';
 
 @Module({
   controllers: [AppController],
@@ -84,7 +87,10 @@ import { EmptyStringToNullInterceptor } from './interceptors/empty-string-to-nul
     ProjectsModule,
     JoinRequestsModule,
     FocusAreasModule,
-    PLEventsModule
+    PLEventsModule,
+    OfficeHoursModule,
+    MemberFollowUpsModule,
+    MemberFeedbacksModule
   ],
   providers: [
     {
