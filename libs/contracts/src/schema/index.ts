@@ -19,3 +19,6 @@ export * from './pl-event-guest';
 export * from './focus-areas';
 export * from './team-focus-areas';
 export * from './project-focus-areas';
+export * from './member-interaction';
+export * from './member-follow-up';
+export * from './member-feedback';
