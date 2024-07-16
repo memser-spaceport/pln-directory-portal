@@ -82,10 +82,10 @@ model Member {
   eventGuests                  PLEventGuest[]
   teamFocusAreasVersionHistory TeamFocusAreaVersionHistory[]
   modifiedTeams                Team[]                        @relation("LastModification")
-  events                       MemberEvent[]                 @relation("SourceMemberEvents")
-  targetEvents                 MemberEvent[]                 @relation("TargetMemberEvents")
-  actions                      MemberEventAction[]
-  feedbacks                    MemberEventFeedback[]
+  interactions                 MemberInteraction[]           @relation("SourceMemberInteractions")
+  targetInteractions           MemberInteraction[]           @relation("TargetMemberInteractions")
+  followUps                    MemberFollowUp[]
+  feedbacks                    MemberFeedback[]
 }
 
 model MemberRole {
@@ -113,18 +113,15 @@ enum PLEventType {
   INVITE_ONLY
 }
 
-enum MemberEventType {
-  BOOK_OFFICE_HOURS
-}
-
-enum MemberActionStatus {
+enum MemberFollowUpStatus {
   PENDING
   COMPLETED
 }
 
-enum MemberEventFeedbackType {
-  COMPLETED
-  CLOSED
+enum MemberFeedbackResponseType {
+  POSITIVE
+  NEGATIVE
+  NEUTRAL
 }
 
 enum ImageSize {
@@ -451,43 +448,48 @@ model TeamFocusAreaVersionHistory {
   @@unique([focusAreaUid, teamUid, version])
 }
 
-model MemberEvent {
-  id              Int                 @id @default(autoincrement())
-  uid             String              @unique @default(cuid())
-  type            MemberEventType
-  data            Json
-  createdAt       DateTime            @default(now())
-  sourceMemberUid String
-  sourceMember    Member              @relation("SourceMemberEvents", fields: [sourceMemberUid], references: [uid])
-  targetMemberUid String?
-  targetMember    Member?             @relation("TargetMemberEvents", fields: [targetMemberUid], references: [uid])
-  actions         MemberEventAction[]
+model MemberInteraction {
+  id                   Int              @id @default(autoincrement())
+  uid                  String           @unique @default(cuid())
+  data                 Json?
+  hasFollowUp          Boolean          @default(false)
+  sourceMemberUid      String
+  sourceMember         Member           @relation("SourceMemberInteractions", fields: [sourceMemberUid], references: [uid])
+  targetMemberUid      String?
+  targetMember         Member?          @relation("TargetMemberInteractions", fields: [targetMemberUid], references: [uid])
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  interactionFollowUps MemberFollowUp[]
 }
 
-model MemberEventAction {
-  id            Int                  @id @default(autoincrement())
-  uid           String               @unique @default(cuid())
-  status        MemberActionStatus
-  data          Json
-  createdAt     DateTime             @default(now())
-  eventUid      String
-  event         MemberEvent          @relation(fields: [eventUid], references: [uid])
-  createdBy     String
-  creator       Member               @relation(fields: [createdBy], references: [uid])
-  feedbacks     MemberEventFeedback?
-  prevActionUid String?              @unique
-  prevAction    MemberEventAction?   @relation("PreviousAction", fields: [prevActionUid], references: [uid])
-  nextActions   MemberEventAction?   @relation("PreviousAction")
+model MemberFollowUp {
+  id             Int                  @id @default(autoincrement())
+  uid            String               @unique @default(cuid())
+  status         MemberFollowUpStatus
+  type           String
+  data           Json?
+  isDelayed      Boolean              @default(false)
+  interactionUid String?
+  interaction    MemberInteraction?   @relation(fields: [interactionUid], references: [uid])
+  createdBy      String
+  creator        Member               @relation(fields: [createdBy], references: [uid])
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  feedbacks      MemberFeedback?
 }
 
-model MemberEventFeedback {
-  id        Int               @id @default(autoincrement())
-  uid       String            @unique @default(cuid())
-  type      String
-  data      Json
-  createdAt DateTime          @default(now())
-  actionUid String            @unique
-  action    MemberEventAction @relation(fields: [actionUid], references: [uid])
-  createdBy String
-  creator   Member            @relation(fields: [createdBy], references: [uid])
+model MemberFeedback {
+  id          Int                        @id @default(autoincrement())
+  uid         String                     @unique @default(cuid())
+  type        String
+  data        Json?
+  rating      Int?
+  comments    String[]
+  response    MemberFeedbackResponseType
+  followUpUid String                     @unique
+  followUp    MemberFollowUp             @relation(fields: [followUpUid], references: [uid])
+  createdBy   String
+  creator     Member                     @relation(fields: [createdBy], references: [uid])
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
 }

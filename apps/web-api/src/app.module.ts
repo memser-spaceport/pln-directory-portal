@@ -34,6 +34,9 @@ import { ProjectsModule } from './projects/projects.module';
 import { JoinRequestsModule } from './join-requests/join-requests.module';
 import { FocusAreasModule } from './focus-areas/focus-areas.module';
 import { PLEventsModule } from './pl-events/pl-events.module';
+import { OfficeHoursModule } from './office-hours/office-hours.module';
+import { MemberFollowUpsModule } from './member-follow-ups/member-follow-ups.module';
+import { MemberFeedbacksModule } from './member-feedbacks/member-feedbacks.module';
 
 @Module({
   controllers: [AppController],
@@ -83,7 +86,10 @@ import { PLEventsModule } from './pl-events/pl-events.module';
     ProjectsModule,
     JoinRequestsModule,
     FocusAreasModule,
-    PLEventsModule
+    PLEventsModule,
+    OfficeHoursModule,
+    MemberFollowUpsModule,
+    MemberFeedbacksModule
   ],
   providers: [
     {
