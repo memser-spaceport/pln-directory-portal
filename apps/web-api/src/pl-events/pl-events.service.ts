@@ -60,14 +60,16 @@ export class PLEventsService {
                   select:{
                     project:{
                       select:{
-                        name: true
+                        name: true,
+                        isDeleted: true
                       }
                     }
                   }
                 },
                 createdProjects:{
                   select: {
-                    name: true
+                    name: true,
+                    isDeleted: true
                   }
                 }
               }
