@@ -937,7 +937,7 @@ export class ParticipantsRequestService {
     };
 
     // Technologies Mapping
-    if (dataToProcess.technologies && dataToProcess.technologies.length > 0) {
+    if (dataToProcess.technologies) {
       dataToSave['technologies'] = {
         set: dataToProcess.technologies.map((t) => {
           return { uid: t.uid };
