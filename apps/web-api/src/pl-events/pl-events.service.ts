@@ -53,7 +53,17 @@ export class PLEventsService {
                 name: true,
                 image: true,
                 telegramHandler: true,
-                teamMemberRoles: true,
+                teamMemberRoles: {
+                  select:{
+                    team: {
+                      select:{
+                        uid: true,
+                        name: true,
+                        logo: true
+                      }
+                    }
+                  }
+                },
                 preferences: true,
                 officeHours: true,
                 projectContributions: {
@@ -150,13 +160,13 @@ export class PLEventsService {
     member
   ) {
     try {  
-      const event: any = await this.getPLEventBySlug(slug, true);
-      await this.memberService.updateTelegramIfChanged(member, guest.telegramId);
-      await this.memberService.updateOfficeHoursIfChanged(member, guest.officeHours);
+      const event: any = await this.getPLEventBySlug(slug, true); 
+      const isAdmin = this.memberService.checkIfAdminUser(member);
+      await this.updateMemberDetails(guest, member, isAdmin);
       await this.prisma.pLEventGuest.create({
         data:{
           ...guest,
-          memberUid: member?.uid,
+          memberUid: isAdmin ? guest.memberUid : member.uid,
           eventUid: event?.uid
         }
       });
@@ -176,14 +186,14 @@ export class PLEventsService {
     member
   ) {
     try {  
-      const event: any = await this.getPLEventBySlug(slug, true);
-      await this.memberService.updateTelegramIfChanged(member, guest.telegramId);
-      await this.memberService.updateOfficeHoursIfChanged(member, guest.officeHours);
+      const event: any = await this.getPLEventBySlug(slug, true); 
+      const isAdmin = this.memberService.checkIfAdminUser(member);
+      await this.updateMemberDetails(guest, member, isAdmin);
       return await this.prisma.pLEventGuest.update({
         where:{ uid },
         data:{
           ...guest,
-          memberUid: member?.uid,
+          memberUid: this.memberService.checkIfAdminUser(member) ? guest.memberUid : member.uid,
           eventUid: event?.uid
         }
       });  
@@ -191,6 +201,26 @@ export class PLEventsService {
       this.handleErrors(err);
     }
   };
+
+  async deletePLEventGuests(
+    guestUids,
+  ) {
+    try { 
+      await this.prisma.pLEventGuest.deleteMany({
+        where: { 
+         uid: {
+          in: guestUids ? guestUids : []
+         }
+        }
+      });
+      await this.cacheService.reset();
+      return {
+        msg: `success`
+      };   
+    } catch(err) {
+      this.handleErrors(err);
+    }
+  }
 
   async getPLEventsByMember(member) {
     try {
@@ -207,6 +237,17 @@ export class PLEventsService {
       this.handleErrors(err);
     }
   } 
+
+  async updateMemberDetails(guest, member, isAdmin) {
+    if (isAdmin) {
+      const guestMember = await this.memberService.findOne(guest.memberUid);
+      await this.memberService.updateTelegramIfChanged(guestMember, guest.telegramId);
+      await this.memberService.updateOfficeHoursIfChanged(guestMember, guest.officeHours);
+    } else {
+      await this.memberService.updateTelegramIfChanged(member, guest.telegramId);
+      await this.memberService.updateOfficeHoursIfChanged(member, guest.officeHours);
+    }
+  }
 
   private handleErrors(error, message?) {
     this.logger.error(error);
