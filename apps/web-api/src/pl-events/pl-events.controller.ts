@@ -66,9 +66,10 @@ export class PLEventsController {
   ): Promise<any> {
     const userEmail = request["userEmail"];
     const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
-    const result = await this.memberService.isMemberPartOfTeams(member, [body.teamUid]);
+    const result = await this.memberService.isMemberPartOfTeams(member, [body.teamUid]) ||
+      await this.memberService.checkIfAdminUser(member);
     if (!result) {
-      throw new ForbiddenException(`Member with email ${userEmail} is not part of team with uid ${body.teamUid}`);
+      throw new ForbiddenException(`Member with email ${userEmail} is not part of team with uid ${body.teamUid} or isn't admin`);
     }
     return await this.eventService.createPLEventGuest(body as any, slug, member);
   }
@@ -84,11 +85,28 @@ export class PLEventsController {
   ) {
     const userEmail = request["userEmail"];
     const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
-    const result = await this.memberService.isMemberPartOfTeams(member, [body.teamUid]);
+    const result = await this.memberService.isMemberPartOfTeams(member, [body.teamUid]) ||
+      await this.memberService.checkIfAdminUser(member);
     if (!result) {
-      throw new ForbiddenException(`Member with email ${userEmail} is not part of team with uid ${body.teamUid}`);
+      throw new ForbiddenException(`Member with email ${userEmail} is not part of team with uid ${body.teamUid} or isn't admin`);
     }
     return await this.eventService.modifyPLEventGuestByUid(uid, body as any, slug, member);
+  }
+
+  @Api(server.route.deletePLEventGuests)
+  @UsePipes(ZodValidationPipe)
+  @UseGuards(UserTokenValidation)
+  async deletePLEventGuests(
+    @Body() body,
+    @Req() request
+  ) {
+    const userEmail = request["userEmail"];
+    const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
+    const result = await this.memberService.checkIfAdminUser(member);
+    if (!result) {
+      throw new ForbiddenException(`Member with email ${userEmail} is not admin `);
+    }
+    return await this.eventService.deletePLEventGuests(body.guests);
   }
 
   @Api(server.route.getPLEventsByLoggedInMember)

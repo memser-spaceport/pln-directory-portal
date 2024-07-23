@@ -45,6 +45,15 @@ export const apiEvents = contract.router({
     },
     summary: 'Modify a guest in pl event',
   },
+  deletePLEventGuests: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/irl/events/:slug/guests`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'delete a list of guests in pl event',
+  },
   getPLEventsByLoggedInMember: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/irl/me/events`,
