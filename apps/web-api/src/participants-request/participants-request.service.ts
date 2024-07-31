@@ -26,6 +26,8 @@ import axios from 'axios';
 import { LogService } from '../shared/log.service';
 import { Cache } from 'cache-manager';
 import { DEFAULT_MEMBER_ROLES } from '../utils/constants';
+import { SqsService, SqsMessageHandler } from '@ssut/nestjs-sqs';
+import { v4 as uuid } from 'uuid';
 
 @Injectable()
 export class ParticipantsRequestService {
@@ -38,6 +40,7 @@ export class ParticipantsRequestService {
     private forestAdminService: ForestAdminService,
     private logger: LogService,
     @Inject(CACHE_MANAGER) private cacheService: Cache,
+    private sqsService: SqsService
   ) {}
 
   async getAll(userQuery) {
@@ -530,7 +533,15 @@ export class ParticipantsRequestService {
         transactionType
       );
     }
-
+    await this.sqsService.send(process.env.QUEUE || '',
+      {
+        id: uuid(),
+        body: {
+          memberUid: dataFromDB.uid,
+          environment: process.env.ENVIRONMENT 
+        }
+      }
+    );
     if (!disableNotification) {
       await this.awsService.sendEmail('MemberEditRequestCompleted', true, [], {
         memberName: dataToProcess.name,
