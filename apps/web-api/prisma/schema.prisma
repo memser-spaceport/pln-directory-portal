@@ -451,6 +451,7 @@ model TeamFocusAreaVersionHistory {
 model MemberInteraction {
   id                   Int              @id @default(autoincrement())
   uid                  String           @unique @default(cuid())
+  type                 String
   data                 Json?
   hasFollowUp          Boolean          @default(false)
   sourceMemberUid      String

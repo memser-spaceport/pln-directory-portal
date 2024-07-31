@@ -50,7 +50,6 @@ export class OfficeHoursController {
   @UseGuards(UserTokenValidation)
   @NoCache()
   async findAll(
-    @Param('uid') interactionUid: string,
     @Req() request: Request
   ) {
     const queryableFields = prismaQueryableFieldsFromZod(
