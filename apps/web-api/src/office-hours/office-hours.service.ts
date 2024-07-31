@@ -30,25 +30,30 @@ export class OfficeHoursService {
     private readonly feedbackService: MemberFeedbacksService
   ) {}
 
-  async createInteraction(interaction: Prisma.MemberInteractionUncheckedCreateInput, loggedInMember) {
+  async createInteraction(
+    interaction: Prisma.MemberInteractionUncheckedCreateInput,
+    loggedInMember
+  ) {
     try {
-      const result = await this.prisma.memberInteraction.create({
-        data:{
-          ...interaction,
-          sourceMemberUid: loggedInMember?.uid
-        }
+      return this.prisma.$transaction(async(tx) => {
+        const result = await tx.memberInteraction.create({
+          data:{
+            ...interaction,
+            sourceMemberUid: loggedInMember?.uid
+          }
+        });
+        if (result?.hasFollowUp) {
+          await this.createInteractionFollowUp(result, loggedInMember, MemberFollowUpType.Enum.MEETING_INITIATED, tx);
+          await this.createInteractionFollowUp(result, loggedInMember, MemberFollowUpType.Enum.MEETING_SCHEDULED, tx);
+        };
+        return result;
       });
-      if (result?.hasFollowUp) {
-        await this.createInteractionFollowUp(result, loggedInMember, MemberFollowUpType.Enum.MEETING_INITIATED);
-        await this.createInteractionFollowUp(result, loggedInMember, MemberFollowUpType.Enum.MEETING_SCHEDULED);
-      };
-      return result;
     } catch(exception) {
       this.handleErrors(exception);
     }
   }
 
-  async createInteractionFollowUp(interaction, loggedInMember, type, scheduledAt?) {
+  async createInteractionFollowUp(interaction, loggedInMember, type, tx?, scheduledAt?) {
     const followUp: any = {
       status: MemberFollowUpStatus.Enum.PENDING,
       interactionUid: interaction?.uid,
@@ -62,37 +67,55 @@ export class OfficeHoursService {
     if (scheduledAt != null) {
       followUp.createdAt = scheduledAt;
     }
-    return await this.followUpService.createFollowUp(followUp, interaction);
+    return await this.followUpService.createFollowUp(followUp, interaction, tx);
   }
 
   async createInteractionFeedback(feedback, member, followUp) {
     feedback.comments = feedback.comments?.map(comment => InteractionFailureReasons[comment]) || [];
-    if (
-      followUp.type === MemberFollowUpType.Enum.MEETING_INITIATED &&
-      feedback.response === MemberFeedbackResponseType.Enum.NEGATIVE
-    ) {}
-    if ( 
-      feedback.response === MemberFeedbackResponseType.Enum.NEGATIVE && 
-      feedback.comments?.includes('IFR0004')
-    ) {
-      await this.createInteractionFollowUp(
-        followUp.interaction,
-        member, 
-        MemberFollowUpType.Enum.MEETING_YET_TO_HAPPEN
-      ); 
-    }
-    if ( 
-      feedback.response === MemberFeedbackResponseType.Enum.NEGATIVE && 
-      feedback.comments?.includes('IFR0005')
-    ) {
-      await this.createInteractionFollowUp(
-        followUp.interaction,
-        member,
-        MemberFollowUpType.Enum.MEETING_RESCHEDULED,
-        feedback?.data?.scheduledAt
-      ); 
-    }
-    return await this.feedbackService.createFeedback(feedback, member, followUp);
+    return await this.prisma.$transaction(async (tx) => {
+      if (
+        followUp.type === MemberFollowUpType.Enum.MEETING_INITIATED &&
+        feedback.response === MemberFeedbackResponseType.Enum.NEGATIVE
+      ) {
+        const delayedFollowUps = await this.followUpService.getFollowUps({ 
+          where: { 
+            interactionUid: followUp.interactionUid,
+            type: MemberFollowUpType.Enum.MEETING_SCHEDULED  
+          } 
+        }, tx);
+        if (delayedFollowUps?.length) {
+          await this.followUpService.updateFollowUpStatusByUid(
+            delayedFollowUps[0]?.uid, 
+            MemberFollowUpStatus.Enum.COMPLETED,
+            tx
+          );
+        }
+      }
+      if ( 
+        feedback.response === MemberFeedbackResponseType.Enum.NEGATIVE && 
+        feedback.comments?.includes('IFR0004')
+      ) {
+        await this.createInteractionFollowUp(
+          followUp.interaction,
+          member, 
+          MemberFollowUpType.Enum.MEETING_YET_TO_HAPPEN,
+          tx
+        ); 
+      }
+      if ( 
+        feedback.response === MemberFeedbackResponseType.Enum.NEGATIVE && 
+        feedback.comments?.includes('IFR0005')
+      ) {
+        await this.createInteractionFollowUp(
+          followUp.interaction,
+          member,
+          MemberFollowUpType.Enum.MEETING_RESCHEDULED,
+          tx,
+          feedback?.data?.scheduledAt
+        ); 
+      }
+      return await this.feedbackService.createFeedback(feedback, member, followUp, tx);
+    });
   }
 
   private handleErrors(error, message?) {

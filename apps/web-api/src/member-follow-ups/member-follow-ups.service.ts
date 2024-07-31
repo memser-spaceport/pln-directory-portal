@@ -15,9 +15,13 @@ export class MemberFollowUpsService {
     private logger: LogService
   ) {}
 
-  async createFollowUp(followUp: Prisma.MemberFollowUpUncheckedCreateInput, interaction) {
+  async createFollowUp(
+    followUp: Prisma.MemberFollowUpUncheckedCreateInput,
+    interaction, 
+    tx?: Prisma.TransactionClient
+  ) { 
     try {
-      await this.prisma.memberFollowUp.create({
+      await (tx || this.prisma).memberFollowUp.create({
         data: {
           ...followUp
         }
@@ -27,23 +31,44 @@ export class MemberFollowUpsService {
     }
   }
 
-  async getFollowUps(query: Prisma.MemberFollowUpFindManyArgs) {
+  async getFollowUps(
+    query: Prisma.MemberFollowUpFindManyArgs, 
+    tx?: Prisma.TransactionClient
+  ) {
     try {
-      const followUps = await this.prisma.memberFollowUp.findMany({
+      return await (tx || this.prisma).memberFollowUp.findMany({
         ...query,
         include: {
-          interaction: true
+          interaction: {
+            select: {
+              uid: true,
+              type: true,
+              sourceMember: {
+                select: {
+                  name:true
+                }
+              },
+              targetMember:  {
+                select: {
+                  name:true
+                }
+              }      
+            }
+          }
         }
       });
-      return followUps;
     } catch(error) {
       this.handleErrors(error);
     }
   }
 
-  async updateFollowUpStatusByUid(uid: string, status) {
+  async updateFollowUpStatusByUid(
+    uid: string, 
+    status, 
+    tx?: Prisma.TransactionClient
+  ) {
     try {
-      return await this.prisma.memberFollowUp.update({
+      return await (tx || this.prisma).memberFollowUp.update({
         where: {
           uid
         },

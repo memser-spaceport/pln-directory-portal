@@ -20,16 +20,21 @@ export class MemberFeedbacksService {
     private followUpService: MemberFollowUpsService
   ) {}
 
-  async createFeedback(feedback: Prisma.MemberFeedbackUncheckedCreateInput, loggedInMember, followUp) {
+  async createFeedback(
+    feedback: Prisma.MemberFeedbackUncheckedCreateInput,
+    loggedInMember,
+    followUp, 
+    tx?: Prisma.TransactionClient
+  ) {
     try {
-      const result = await this.prisma.memberFeedback.create({
+      const result = await (tx || this.prisma).memberFeedback.create({
         data: {
           ...feedback,
           createdBy: loggedInMember.uid,
           followUpUid: followUp.uid
         }
       });
-      await this.followUpService.updateFollowUpStatusByUid(followUp.uid, MemberFollowUpStatus.Enum.COMPLETED)
+      await this.followUpService.updateFollowUpStatusByUid(followUp.uid, MemberFollowUpStatus.Enum.COMPLETED, tx)
       return result;
     } catch(error) {
       this.handleErrors(error);
