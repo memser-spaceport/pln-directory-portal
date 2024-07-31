@@ -19,7 +19,7 @@ export const apiMemberInteractions = contract.router({
   },
   getMemberInteractionFollowUps: {
     method: 'GET',
-    path: `${getAPIVersionAsPath('1')}/members/:memberUid/interactions/:uid/follow-ups`,
+    path: `${getAPIVersionAsPath('1')}/members/:memberUid/interactions/follow-ups`,
     query: MemberFollowUpQueryParams,
     responses: {
       200: ResponseMemberFollowUpWithRelationsSchema.array(),
