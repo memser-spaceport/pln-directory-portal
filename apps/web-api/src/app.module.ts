@@ -37,6 +37,7 @@ import { PLEventsModule } from './pl-events/pl-events.module';
 import { OfficeHoursModule } from './office-hours/office-hours.module';
 import { MemberFollowUpsModule } from './member-follow-ups/member-follow-ups.module';
 import { MemberFeedbacksModule } from './member-feedbacks/member-feedbacks.module';
+import { EmptyStringToNullInterceptor } from './interceptors/empty-string-to-null.interceptor';
 
 @Module({
   controllers: [AppController],
@@ -103,6 +104,10 @@ import { MemberFeedbacksModule } from './member-feedbacks/member-feedbacks.modul
     {
       provide: APP_INTERCEPTOR,
       useClass: ConcealEntityIDInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: EmptyStringToNullInterceptor
     },
     {
       provide: APP_FILTER,
