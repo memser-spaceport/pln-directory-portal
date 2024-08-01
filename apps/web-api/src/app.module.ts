@@ -34,6 +34,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { JoinRequestsModule } from './join-requests/join-requests.module';
 import { FocusAreasModule } from './focus-areas/focus-areas.module';
 import { PLEventsModule } from './pl-events/pl-events.module';
+import { EmptyStringToNullInterceptor } from './interceptors/empty-string-to-null.interceptor';
 
 @Module({
   controllers: [AppController],
@@ -97,6 +98,10 @@ import { PLEventsModule } from './pl-events/pl-events.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: ConcealEntityIDInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: EmptyStringToNullInterceptor
     },
     {
       provide: APP_FILTER,
