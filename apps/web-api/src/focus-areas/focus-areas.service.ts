@@ -24,6 +24,9 @@ export class FocusAreasService {
         include: {
           children: true,
           ...this.buildAncestorFocusAreasFilterByType(type, query)
+        },
+        orderBy: {
+          createdAt: "desc"
         }
       };
     }
@@ -31,6 +34,9 @@ export class FocusAreasService {
       include: {
         children: this.buildQueryByLevel(level - 1, type, query),
         ...this.buildAncestorFocusAreasFilterByType(type, query)
+      },
+      orderBy: {
+        createdAt: "desc"
       }
     };
   }
