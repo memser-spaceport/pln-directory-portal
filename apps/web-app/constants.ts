@@ -580,7 +580,7 @@ export const tagColors = [
   { name: 'Fixed', color: '#4871D9' },
 ];
 
-//API route for filters in home page
+//API route for filters in Home Page
 export const FILTER_API_ROUTES = {
   FOCUS_AREA: '/v1/focus-areas',
 };
