@@ -45,12 +45,14 @@ export class MemberFollowUpsService {
               type: true,
               sourceMember: {
                 select: {
-                  name:true
+                  name:true,
+                  image:true
                 }
               },
               targetMember:  {
                 select: {
-                  name:true
+                  name:true,
+                  image:true
                 }
               }      
             }
@@ -88,7 +90,10 @@ export class MemberFollowUpsService {
     return {
       OR: [
         {
-          isDelayed: false 
+          isDelayed: false ,
+          createdAt: {
+            lte: new Date()
+          }
         },
         {
           isDelayed: true,
