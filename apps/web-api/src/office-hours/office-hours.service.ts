@@ -53,6 +53,19 @@ export class OfficeHoursService {
     }
   }
 
+  async findInteractions(queryOptions: Prisma.MemberInteractionFindManyArgs) {
+    try {
+      return await this.prisma.memberInteraction.findMany({
+        ...queryOptions,
+        include: {
+          interactionFollowUps: true
+        }
+      });
+    } catch(exception) {
+      this.handleErrors(exception);
+    }
+  };
+
   async createInteractionFollowUp(interaction, loggedInMember, type, tx?, scheduledAt?) {
     const followUp: any = {
       status: MemberFollowUpStatus.Enum.PENDING,
@@ -65,13 +78,13 @@ export class OfficeHoursService {
       isDelayed: this.delayedFollowUps.includes(type)
     };
     if (scheduledAt != null) {
-      followUp.createdAt = scheduledAt;
+      followUp.createdAt = new Date(scheduledAt);
     }
     return await this.followUpService.createFollowUp(followUp, interaction, tx);
   }
 
   async createInteractionFeedback(feedback, member, followUp) {
-    feedback.comments = feedback.comments?.map(comment => InteractionFailureReasons[comment]) || [];
+    feedback.comments = feedback.comments?.map(comment => InteractionFailureReasons[comment] || comment) || [];
     return await this.prisma.$transaction(async (tx) => {
       if (
         followUp.type === MemberFollowUpType.Enum.MEETING_INITIATED &&
@@ -101,8 +114,7 @@ export class OfficeHoursService {
           MemberFollowUpType.Enum.MEETING_YET_TO_HAPPEN,
           tx
         ); 
-      }
-      if ( 
+      } else if ( 
         feedback.response === MemberFeedbackResponseType.Enum.NEGATIVE && 
         feedback.comments?.includes('IFR0005')
       ) {

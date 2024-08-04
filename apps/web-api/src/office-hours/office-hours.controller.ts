@@ -1,4 +1,4 @@
-import { Body, Controller, NotFoundException, Req, UseGuards, UsePipes, Param } from '@nestjs/common';
+import { Body, Controller, NotFoundException, Req, UseGuards, UsePipes, Param, ForbiddenException } from '@nestjs/common';
 import { Api, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
 import { NoCache } from '../decorators/no-cache.decorator';
@@ -19,8 +19,6 @@ import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { OfficeHoursService } from './office-hours.service';
 import { MemberFollowUpsService } from '../member-follow-ups/member-follow-ups.service';
-import { MemberFeedbacksService } from '../member-feedbacks/member-feedbacks.service';
-
 
 const server = initNestServer(apiMemberInteractions);
 
@@ -41,6 +39,22 @@ export class OfficeHoursController {
     @Req() request: Request
   ): Promise<any> {
     const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
+    const interval = parseInt(process.env.INTERACTION_INTERVAL_DELAY_IN_MILLISECONDS || '1800000')
+    const result = await this.interactionService.findInteractions({
+      where: {
+        sourceMemberUid: member?.uid,
+        targetMemberUid: body?.targetMemberUid,
+        createdAt: {
+          gte: new Date(new Date().getTime() - interval)
+        }
+      }
+    });
+    if (result && result.length > 0) {
+      throw new ForbiddenException(`Interaction with same user within ${interval / (60 * 1000)} minutes is forbidden`);
+    }
+    if (member.uid === body.targetMemberUid) {
+      throw new ForbiddenException('Interacte with yourself is forbidden');
+    }
     return await this.interactionService.createInteraction(body as any, member);
   }
 
