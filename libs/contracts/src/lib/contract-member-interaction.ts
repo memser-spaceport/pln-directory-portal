@@ -26,6 +26,15 @@ export const apiMemberInteractions = contract.router({
     },
     summary: 'Get member interaction follow ups',
   },
+  closeMemberInteractionFollowUp: {
+    method: 'PATCH',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/interactions/:interactionUid/follow-ups/:followUpUid`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'close a member interaction follow up'
+  },
   createMemberInteractionFeedback: {
     method: 'POST',
     path: `${getAPIVersionAsPath('1')}/members/:uid/follow-ups/:uid/feedbacks`,

@@ -10,7 +10,7 @@ export const MemberFollowUpType = z.enum([
   "MEETING_RESCHEDULED"
 ]);
 
-export const MemberFollowUpStatus = z.enum(["PENDING", "COMPLETED"]);
+export const MemberFollowUpStatus = z.enum(["PENDING", "COMPLETED", "CLOSED"]);
 
 const MemberFollowUpSchema = z.object({
   id: z.number().int(),

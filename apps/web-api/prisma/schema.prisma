@@ -116,6 +116,7 @@ enum PLEventType {
 enum MemberFollowUpStatus {
   PENDING
   COMPLETED
+  CLOSED
 }
 
 enum MemberFeedbackResponseType {
