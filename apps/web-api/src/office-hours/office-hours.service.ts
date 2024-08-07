@@ -56,10 +56,7 @@ export class OfficeHoursService {
   async findInteractions(queryOptions: Prisma.MemberInteractionFindManyArgs) {
     try {
       return await this.prisma.memberInteraction.findMany({
-        ...queryOptions,
-        include: {
-          interactionFollowUps: true
-        }
+        ...queryOptions
       });
     } catch(exception) {
       this.handleErrors(exception);
@@ -128,6 +125,14 @@ export class OfficeHoursService {
       }
       return await this.feedbackService.createFeedback(feedback, member, followUp, tx);
     });
+  }
+
+  async closeMemberInteractionFollowUpByID(followUpUid) {
+    try {
+      return await this.followUpService.updateFollowUpStatusByUid(followUpUid, MemberFollowUpStatus.Enum.CLOSED);
+    } catch(error) {
+      this.handleErrors(error, followUpUid);
+    }   
   }
 
   private handleErrors(error, message?) {
