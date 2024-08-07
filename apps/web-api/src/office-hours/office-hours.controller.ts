@@ -13,7 +13,8 @@ import {
    CreateMemberFeedbackSchemaDto,
    MemberFollowUpQueryParams,
    ResponseMemberFollowUpWithRelationsSchema,
-   MemberFollowUpStatus
+   MemberFollowUpStatus,
+   MemberFollowUpType
 } from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
@@ -40,20 +41,28 @@ export class OfficeHoursController {
   ): Promise<any> {
     const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
     const interval = parseInt(process.env.INTERACTION_INTERVAL_DELAY_IN_MILLISECONDS || '1800000')
-    const result = await this.interactionService.findInteractions({
+    const result: any = await this.interactionService.findInteractions({
       where: {
         sourceMemberUid: member?.uid,
         targetMemberUid: body?.targetMemberUid,
         createdAt: {
           gte: new Date(new Date().getTime() - interval)
         }
+      },
+      include: {
+        interactionFollowUps: {
+          where: {
+            type: MemberFollowUpType.Enum.MEETING_INITIATED,
+            status: MemberFollowUpStatus.Enum.PENDING
+          }
+        }
       }
     });
-    if (result && result.length > 0) {
+    if (result && result.length > 0 && result[0]?.interactionFollowUps?.length > 0) {
       throw new ForbiddenException(`Interaction with same user within ${interval / (60 * 1000)} minutes is forbidden`);
     }
     if (member.uid === body.targetMemberUid) {
-      throw new ForbiddenException('Interacte with yourself is forbidden');
+      throw new ForbiddenException('Interaction with yourself is forbidden');
     }
     return await this.interactionService.createInteraction(body as any, member);
   }
@@ -69,6 +78,8 @@ export class OfficeHoursController {
     const queryableFields = prismaQueryableFieldsFromZod(
       ResponseMemberFollowUpWithRelationsSchema
     );
+    const { status } : any = request.query;
+    delete request.query.status;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
     const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
@@ -77,7 +88,7 @@ export class OfficeHoursController {
         builtQuery.where,
         {
           createdBy: member?.uid,
-          status: MemberFollowUpStatus.Enum.PENDING
+          status: status ? { in: status.split(',') } : {}
         },
         this.followUpService.buildDelayedFollowUpQuery()
       ]
@@ -105,5 +116,29 @@ export class OfficeHoursController {
       throw new NotFoundException(`There is no follow-up associated with the given ID: ${interactionFollowUpUid}`);
     }
     return await this.interactionService.createInteractionFeedback(body as any, member, followUps?.[0]);
+  }
+
+  @Api(server.route.closeMemberInteractionFollowUp)
+  @UsePipes(ZodValidationPipe)
+  @UseGuards(UserTokenValidation)
+  async closeMemberInteractionFollowUp(
+    @Param('interactionUid') interactionUid: string,
+    @Param('followUpUid') followUpUid: string,
+    @Req() request: Request
+  ): Promise<any> {
+    const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
+    const followUps = await this.followUpService.getFollowUps({
+      where: {
+        uid : followUpUid,
+        interactionUid,
+        createdBy: member?.uid,
+        status:  MemberFollowUpStatus.Enum.PENDING
+      }
+    });
+    if (followUps && followUps.length === 0) {
+      throw new NotFoundException(`No pending follow-up found for the given ID: ${followUpUid}.
+       It may have been closed or does not exist.`);
+    }
+    return await this.interactionService.closeMemberInteractionFollowUpByID(followUpUid);
   }
 }
