@@ -26,6 +26,8 @@ import axios from 'axios';
 import { LogService } from '../shared/log.service';
 import { Cache } from 'cache-manager';
 import { DEFAULT_MEMBER_ROLES } from '../utils/constants';
+import { CONTINENTS } from '../utils/constants';
+import { getCountryData, getCountryCode } from 'countries-list';
 
 @Injectable()
 export class ParticipantsRequestService {
@@ -168,22 +170,6 @@ export class ParticipantsRequestService {
         : requestData.newData.email.toLowerCase().trim();
     const postData = { ...requestData, uniqueIdentifier };
     requestData[uniqueIdentifier] = uniqueIdentifier;
-    if (requestData.participantType === ParticipantType.MEMBER.toString()) {
-      const { city, country, region } = postData.newData;
-      if (city || country || region) {
-        const result: any = await this.locationTransferService.fetchLocation(
-          city,
-          country,
-          null,
-          region,
-          null
-        );
-        if (!result || !result?.location) {
-          throw new BadRequestException('Invalid Location info');
-        }
-      }
-    }
-
     const slackConfig = {
       requestLabel: '',
       url: '',
@@ -348,29 +334,8 @@ export class ParticipantsRequestService {
       dataToSave['image'] = { connect: { uid: dataToProcess.imageUid } };
     }
 
-    // Unique Location Uid needs to be formulated based on city, country & region using google places api and mapped to member
-    const { city, country, region } = dataToProcess;
-    if (city || country || region) {
-      const result: any = await this.locationTransferService.fetchLocation(
-        city,
-        country,
-        null,
-        region,
-        null
-      );
-      if (result && result?.location?.placeId) {
-        const finalLocation: any = await this.prisma.location.upsert({
-          where: { placeId: result?.location?.placeId },
-          update: result?.location,
-          create: result?.location,
-        });
-        if (finalLocation && finalLocation.uid) {
-          dataToSave['location'] = { connect: { uid: finalLocation.uid } };
-        }
-      } else {
-        throw new BadRequestException('Invalid Location info');
-      }
-    }
+    // Location Mapping
+    await this.upsertMemberLocation(dataToSave, dataToProcess, this.prisma);
 
     // Insert member details
     const newMember = await this.prisma.member.create({
@@ -479,35 +444,8 @@ export class ParticipantsRequestService {
       dataToSave['image'] = { disconnect: true };
     }
 
-    // Unique Location Uid needs to be formulated based on city, country & region using google places api and mapped to member
-    const { city, country, region } = dataToProcess;
-    if (city || country || region) {
-      const result: any = await this.locationTransferService.fetchLocation(
-        city,
-        country,
-        null,
-        region,
-        null
-      );
-      if (result && result?.location?.placeId) {
-        const finalLocation: any = await this.prisma.location.upsert({
-          where: { placeId: result?.location?.placeId },
-          update: result?.location,
-          create: result?.location,
-        });
-        if (
-          finalLocation &&
-          finalLocation.uid &&
-          existingData?.location?.uid !== finalLocation.uid
-        ) {
-          dataToSave['location'] = { connect: { uid: finalLocation.uid } };
-        }
-      } else {
-        throw new BadRequestException('Invalid Location info');
-      }
-    } else {
-      dataToSave['location'] = { disconnect: true };
-    }
+    // Location Mapping
+    await this.upsertMemberLocation(dataToSave, dataToProcess, transactionType);
 
     if (transactionType === this.prisma) {
       await this.prisma.$transaction(async (tx) => {
@@ -1062,5 +1000,47 @@ export class ParticipantsRequestService {
   
   generateMemberProfileURL(value) {
     return generateProfileURL(value);
+  }
+
+  async upsertMemberLocation(dataToSave, dataToProcess, tx?) {
+    const { city, country, region } = dataToProcess;
+    if (city || country || region) {
+      const location: any = await this.prisma.location.findFirst({ 
+        where: {  
+          ...(city && { city }),
+          ...(country && { country }),
+          ...(region && { region })                      
+        } 
+      });
+      if (location && location.uid) {
+        dataToSave['location'] = { 
+          connect: { uid: location.uid } 
+        };
+      } else if(location === null) {
+        const continent = getCountryData(getCountryCode(country) as any).continent;
+        const geometry = await this.locationTransferService.getCoordinates({ country, region, city });
+        if (geometry) {
+          const newLocation = await tx.location.create({
+            data:{
+              city: city,
+              metroArea: city,
+              country: country,
+              region: region,
+              placeId: geometry.place_id,
+              longitude: geometry.lng,
+              latitude: geometry.lat,
+              continent : CONTINENTS[continent] ? CONTINENTS[continent]  : 'Not Defined'
+            } 
+          });
+          dataToSave['location'] = { 
+            connect: { uid: newLocation.uid } 
+          };
+        } else {
+          throw new BadRequestException('Invalid location Information')
+        }
+      }
+    } else {
+      dataToSave['location'] = { disconnect: true };
+    }
   }
 }

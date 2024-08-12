@@ -23,4 +23,49 @@ export const apiLocations = contract.router({
     },
     summary: 'Validate location',
   },
+  getCountries: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/locations/countries`,
+    query: contract.query,
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Get all countries',
+  },
+  getStates: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/locations/states`,
+    query: contract.query,
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Get all states',
+  },
+  getStatesByCountry: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/locations/countries/:country/states`,
+    query: contract.query,
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Get all states by country',
+  },
+  getCitiesByCountry: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/locations/countries/:country/cities`,
+    query: contract.query,
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Get all cities by country',
+  },
+  getCitiesByCountryAndState: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/locations/countries/:country/states/:state/cities`,
+    query: contract.query,
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Get all cities by country and state',
+  }
 });
