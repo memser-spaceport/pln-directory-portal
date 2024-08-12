@@ -1,4 +1,4 @@
-import { Controller, Req, Body, UsePipes, BadRequestException, UseGuards } from '@nestjs/common';
+import { Controller, Req, Body, UsePipes, BadRequestException, UseGuards, Param } from '@nestjs/common';
 import { Api, initNestServer } from '@ts-rest/nest';
 import { apiLocations } from '../../../../libs/contracts/src/lib/contract-locations';
 import { LocationsService } from './locations.service';
@@ -44,5 +44,29 @@ export class LocationsController {
       throw new BadRequestException('Invalid Location Info');
     }
     return result;
+  }
+  @Api(server.route.getCountries)
+  async getCountries() {
+    return this.locationsService.fetchCountries();
+  }
+
+  @Api(server.route.getStates)
+  async getStates() {
+    return this.locationsService.fetchStates();
+  }
+
+  @Api(server.route.getStatesByCountry)
+  async getStatesByCountry(@Param('country') country: string) {
+    return this.locationsService.fetchStatesByCountry(country);
+  }
+
+  @Api(server.route.getCitiesByCountry)
+  async getCitiesByState(@Param('country') country: string) {
+    return this.locationsService.fetchCitiesByCountry(country);
+  }
+
+  @Api(server.route.getCitiesByCountryAndState)
+  async getCitiesByCountryAndState(@Param('country') country: string, @Param('state') state: string) {
+    return this.locationsService.fetchCitiesByCountryAndState(country, state);
   }
 }

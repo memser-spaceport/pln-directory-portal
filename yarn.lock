@@ -11616,6 +11616,11 @@ cosmiconfig@^6.0.0:
     path-type "^4.0.0"
     yaml "^1.7.2"
 
+countries-list@^3.1.1:
+  version "3.1.1"
+  resolved "https://registry.yarnpkg.com/countries-list/-/countries-list-3.1.1.tgz#f3a339a06228ff053c0e8e44f17fa5ad4f3cab58"
+  integrity sha512-nPklKJ5qtmY5MdBKw1NiBAoyx5Sa7p2yPpljZyQ7gyCN1m+eMFs9I6CT37Mxt8zvR5L3VzD3DJBE4WQzX3WF4A==
+
 cp-file@^7.0.0:
   version "7.0.0"
   resolved "https://registry.npmjs.org/cp-file/-/cp-file-7.0.0.tgz"

@@ -111,3 +111,14 @@ export const InteractionFailureReasons: { [key: string]: string } = {
   "Call quality issues": "IFR0009",
   "Meeting link didn't work": "IFR00010"
 };
+
+
+export const CONTINENTS = {
+  AF: 'Africa',
+  AN: 'Antarctica',
+  AS: 'Asia',
+  EU: 'Europe',
+  NA: 'North America',
+  OC: 'Oceania',
+  SA: 'South America',
+}

@@ -475,23 +475,6 @@ export class MembersService {
     ) {
       throw new BadRequestException();
     }
-    if (
-      participantsRequest.participantType === ParticipantType.MEMBER.toString()
-    ) {
-      const { city, country, region } = participantsRequest.newData;
-      if (city || country || region) {
-        const result: any = await this.locationTransferService.fetchLocation(
-          city,
-          country,
-          null,
-          region,
-          null
-        );
-        if (!result || !result?.location) {
-          throw new BadRequestException('Invalid Location info');
-        }
-      }
-    }
     let result;
     try {
       await this.prisma.$transaction(async (tx) => {

@@ -174,4 +174,39 @@ export class LocationTransferService {
 
     return { status: 'OK', location: finalResult };
   }
+
+  async  getCoordinates({ country, region, city }) {
+    let location = '';
+    if (city && region && country) {
+      location = `${city}, ${region}, ${country}`;
+    } else if (city && country) {
+      location = `${city}, ${country}`;
+    } else if (region && country) {
+      location = `${region}, ${country}`;
+    } else if (country) {
+      location = country;
+    }
+    try {
+      const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(location)}&key=${apiKey}`;
+      const response = await axios.get(url);
+      const { results } = response.data;
+      if (results.length > 0) {
+        const { lat, lng } = results[0].geometry.location;
+        const { place_id } = results[0];
+        return { lat, lng, place_id };
+      } 
+      return null;
+    } catch (error) {
+      if (error.response) {
+        const status = error.response.status;
+        console.error(`Google Maps API error: ${status}`);
+      } else if (error.request) {
+        console.error('Network error: Unable to reach Google Maps API.');
+      } else {
+        console.error('Error fetching coordinates for the location:', error.message);
+      }
+      return null;
+    }
+  }
 }
