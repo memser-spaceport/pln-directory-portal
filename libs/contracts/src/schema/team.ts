@@ -19,6 +19,7 @@ export const TeamSchema = z.object({
   twitterHandler: z.string().nullish(),
   shortDescription: z.string().nullish(),
   longDescription: z.string().nullish(),
+  isFeatured: z.boolean().nullish(),
   plnFriend: z.boolean(),
   startDate: z.date().or(z.string()).nullish(),
   endDate: z.date().or(z.string()).nullish(),
