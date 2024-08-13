@@ -39,6 +39,7 @@ export const MemberSchema = z.object({
   officeHours: z.string().nullish(),
   airtableRecId: z.string().nullish(),
   plnFriend: z.boolean(),
+  isFeatured: z.boolean().nullish(),
   createdAt: z.string(),
   updatedAt: z.string(),
   locationUid: z.string(),

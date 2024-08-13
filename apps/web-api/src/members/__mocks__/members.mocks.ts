@@ -45,6 +45,7 @@ export async function createMember({ amount }: TestFactorySeederParams) {
       moreDetails: 'moreDetails',
       officeHours: 'officeHours',
       plnFriend: true,
+      isFeatured: false,
       airtableRecId: `airtable-rec-id-${sequence}`,
       externalId: `external-${sequence}`,
       plnStartDate: new Date(),

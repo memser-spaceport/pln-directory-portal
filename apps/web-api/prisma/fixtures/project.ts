@@ -45,6 +45,7 @@ const ProjectFactory = Factory.define<Omit<Project, 'id'>>(
       readMe: faker.lorem.paragraph(),
       createdBy: '',
       maintainingTeamUid: '',
+      isFeatured: faker.datatype.boolean(),
       projectLinks: [{
         name: faker.company.name(),
         url: faker.internet.url()
