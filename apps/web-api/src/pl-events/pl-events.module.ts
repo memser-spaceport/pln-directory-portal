@@ -9,6 +9,7 @@ import { MembersModule } from '../members/members.module';
   providers: [
     PLEventsService,
   ],
+  exports: [PLEventsService],
   imports:[MembersModule]
 })
 export class PLEventsModule {}

@@ -38,6 +38,7 @@ import { EmptyStringToNullInterceptor } from './interceptors/empty-string-to-nul
 import { OfficeHoursModule } from './office-hours/office-hours.module';
 import { MemberFollowUpsModule } from './member-follow-ups/member-follow-ups.module';
 import { MemberFeedbacksModule } from './member-feedbacks/member-feedbacks.module';
+import { HomeModule } from './home/home.module';
 
 @Module({
   controllers: [AppController],
@@ -90,7 +91,8 @@ import { MemberFeedbacksModule } from './member-feedbacks/member-feedbacks.modul
     PLEventsModule,
     OfficeHoursModule,
     MemberFollowUpsModule,
-    MemberFeedbacksModule
+    MemberFeedbacksModule,
+    HomeModule
   ],
   providers: [
     {

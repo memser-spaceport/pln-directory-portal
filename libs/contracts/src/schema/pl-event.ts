@@ -14,6 +14,7 @@ export const PLEventSchema = z.object({
   eventsCount: z.number().int(),
   logoUid: z.string().nullish(),
   bannerUid: z.string().nullish(),
+  isFeatured: z.boolean().nullish(),
   description: z.string().optional(),
   shortDescription: z.string().optional(),
   websiteURL: z.string().url().optional(),

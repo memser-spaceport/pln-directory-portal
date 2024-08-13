@@ -30,6 +30,7 @@ model Team {
   shortDescription             String?
   longDescription              String?
   plnFriend                    Boolean                       @default(false)
+  isFeatured                   Boolean?                      @default(false)
   airtableRecId                String?                       @unique
   createdAt                    DateTime                      @default(now())
   updatedAt                    DateTime                      @updatedAt
@@ -68,6 +69,7 @@ model Member {
   airtableRecId                String?                       @unique
   externalId                   String?                       @unique
   openToWork                   Boolean?                      @default(false)
+  isFeatured                   Boolean?                      @default(false)
   createdAt                    DateTime                      @default(now())
   updatedAt                    DateTime                      @updatedAt
   approvedAt                   DateTime                      @default(now())
@@ -330,6 +332,7 @@ model Project {
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
   isDeleted          Boolean               @default(false)
+  isFeatured         Boolean?              @default(false)
   projectFocusAreas  ProjectFocusArea[]
   contributions      ProjectContribution[]
 }
@@ -348,6 +351,7 @@ model PLEvent {
   description      String?
   shortDescription String?
   websiteURL       String?
+  isFeatured       Boolean?       @default(false)
   location         String
   slugURL          String         @unique
   resources        Json[]
@@ -495,3 +499,5 @@ model MemberFeedback {
   createdAt   DateTime                   @default(now())
   updatedAt   DateTime                   @updatedAt
 }
+
+

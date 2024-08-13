@@ -39,6 +39,7 @@ export async function createTeam({ amount }: TestFactorySeederParams) {
       shortDescription: faker.lorem.sentence(),
       longDescription: faker.lorem.paragraph(),
       plnFriend: true,
+      isFeatured: true,
       airtableRecId: `airtable-rec-id-${sequence}`,
       createdAt: new Date(),
       updatedAt: new Date(),

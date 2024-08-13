@@ -17,6 +17,7 @@ const ProjectSchema = z.object({
   tagline: z.string(),
   score: z.number().optional().nullable(),
   description: z.string(),
+  isFeatured: z.boolean().nullish(),
   contactEmail: z.string().email().nullish().transform((email)=> {
     return email && email.toLowerCase()
   }),
