@@ -2007,6 +2007,22 @@
         "validations": []
       },
       {
+        "defaultValue": false,
+        "enums": null,
+        "field": "isFeatured",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "Boolean",
+        "validations": []
+      },
+      {
         "defaultValue": null,
         "enums": null,
         "field": "linkedinHandler",
@@ -3188,6 +3204,22 @@
         "validations": []
       },
       {
+        "defaultValue": false,
+        "enums": null,
+        "field": "isFeatured",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "Boolean",
+        "validations": []
+      },
+      {
         "defaultValue": null,
         "enums": null,
         "field": "location",
@@ -4009,6 +4041,22 @@
         "validations": [
           {"type": "is present", "message": "Failed validation rule: 'Present'"}
         ]
+      },
+      {
+        "defaultValue": false,
+        "enums": null,
+        "field": "isFeatured",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "Boolean",
+        "validations": []
       },
       {
         "defaultValue": null,
@@ -4855,6 +4903,22 @@
         "isVirtual": false,
         "reference": null,
         "type": "Number",
+        "validations": []
+      },
+      {
+        "defaultValue": false,
+        "enums": null,
+        "field": "isFeatured",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "Boolean",
         "validations": []
       },
       {

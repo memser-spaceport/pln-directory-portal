@@ -96,6 +96,18 @@ export class ProjectsService {
         isDeleted: false
       };
       queryOptions.include = {
+        contributions: { 
+          select: { 
+            uid: true,
+            member: { 
+              select: { 
+                uid: true, 
+                name: true, 
+                image: true
+              }
+            }
+          }
+        }, 
         maintainingTeam: { select: { uid: true, name: true, logo: true }},
         creator: { select: { uid: true, name: true, image: true }},
         logo: true
