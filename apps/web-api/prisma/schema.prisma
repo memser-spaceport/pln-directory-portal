@@ -48,6 +48,7 @@ model Team {
   eventGuests                  PLEventGuest[]
   teamFocusAreas               TeamFocusArea[]
   teamFocusAreasVersionHistory TeamFocusAreaVersionHistory[]
+  relatedQuestions             QuestionAndAnswer[]           @relation("TeamRelatedQuestionAndAnswers")
 }
 
 model Member {
@@ -88,6 +89,8 @@ model Member {
   targetInteractions           MemberInteraction[]           @relation("TargetMemberInteractions")
   followUps                    MemberFollowUp[]
   feedbacks                    MemberFeedback[]
+  createdQuestions             QuestionAndAnswer[]           @relation("MemberCreatedQuestionAndAnswers")
+  modifiedQuestions            QuestionAndAnswer[]           @relation("MemberModifiedQuestionAndAnswers")
 }
 
 model MemberRole {
@@ -335,33 +338,35 @@ model Project {
   isFeatured         Boolean?              @default(false)
   projectFocusAreas  ProjectFocusArea[]
   contributions      ProjectContribution[]
+  relatedQuestions   QuestionAndAnswer[]   @relation("ProjectRelatedQuestionAndAnswers")
 }
 
 model PLEvent {
-  id               Int            @id @default(autoincrement())
-  uid              String         @unique @default(cuid())
+  id               Int                 @id @default(autoincrement())
+  uid              String              @unique @default(cuid())
   type             PLEventType?
   eventsCount      Int?
   telegramId       String?
   logoUid          String?
-  logo             Image?         @relation("logo", fields: [logoUid], references: [uid])
+  logo             Image?              @relation("logo", fields: [logoUid], references: [uid])
   bannerUid        String?
-  banner           Image?         @relation("banner", fields: [bannerUid], references: [uid])
+  banner           Image?              @relation("banner", fields: [bannerUid], references: [uid])
   name             String
   description      String?
   shortDescription String?
   websiteURL       String?
-  isFeatured       Boolean?       @default(false)
+  isFeatured       Boolean?            @default(false)
   location         String
-  slugURL          String         @unique
+  slugURL          String              @unique
   resources        Json[]
   priority         Int?
   additionalInfo   Json?
   startDate        DateTime
   endDate          DateTime
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
   eventGuests      PLEventGuest[]
+  relatedQuestions QuestionAndAnswer[] @relation("PLEventRelatedQuestionAndAnswers")
 }
 
 model PLEventGuest {
@@ -500,4 +505,29 @@ model MemberFeedback {
   updatedAt   DateTime                   @updatedAt
 }
 
-
+model QuestionAndAnswer {
+  id               Int      @id @default(autoincrement())
+  uid              String   @unique @default(cuid())
+  title            String?
+  content          String
+  viewCount        Int?
+  shareCount       Int?
+  slug             String   @unique
+  isActive         Boolean  @default(true)
+  teamUid          String?
+  team             Team?    @relation("TeamRelatedQuestionAndAnswers", fields: [teamUid], references: [uid])
+  projectUid       String?
+  project          Project? @relation("ProjectRelatedQuestionAndAnswers", fields: [projectUid], references: [uid])
+  eventUid         String?
+  plevent          PLEvent? @relation("PLEventRelatedQuestionAndAnswers", fields: [eventUid], references: [uid])
+  createdBy        String
+  creator          Member?  @relation("MemberCreatedQuestionAndAnswers", fields: [createdBy], references: [uid])
+  modifiedBy       String
+  modifier         Member?  @relation("MemberModifiedQuestionAndAnswers", fields: [modifiedBy], references: [uid])
+  answer           String?
+  answerSources    Json[]
+  answerSourceFrom String?
+  relatedQuestions Json[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
