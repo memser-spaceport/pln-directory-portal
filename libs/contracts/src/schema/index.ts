@@ -22,3 +22,4 @@ export * from './project-focus-areas';
 export * from './member-interaction';
 export * from './member-follow-up';
 export * from './member-feedback';
+export * from './question-answer';
