@@ -50,6 +50,15 @@ export class FocusAreasService {
               ...this.buildTeamFilter(query)
             }
           },
+          select: {
+            team: {
+              select: {
+                uid: true,
+                name: true,
+                logo: true
+              }
+            }
+          },
           distinct: "teamUid"
         }
       }
@@ -60,6 +69,15 @@ export class FocusAreasService {
           where: {
             project: {
               ...this.buildProjectFilter(query)
+            }
+          },
+          select: {
+            project: {
+              select: {
+                uid: true,
+                name: true,
+                logo: true
+              }
             }
           },
           distinct: "projectUid"
