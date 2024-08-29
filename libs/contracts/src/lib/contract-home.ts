@@ -1,73 +1,64 @@
 import { initContract } from '@ts-rest/core';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 import {
-  QuestionAndAnswerQueryParams,
-  ResponseQuestionAndAnswerSchemaWithRelations
+  DiscoveryQuestionQueryParams,
+  ResponseDiscoveryQuestionSchemaWithRelations
 } from '../schema';
 const contract = initContract();
 
 export const apiHome = contract.router({
   getAllFeaturedData: {
     method: 'GET',
-    path: `${getAPIVersionAsPath('1')}/home/featured/all`,
+    path: `${getAPIVersionAsPath('1')}/home/featured`,
     query: contract.query,
     responses: {
       200: contract.response<unknown>()
     },
     summary: 'Get all featured members, projects, teams and events'
   },
-  getAllQuestionAndAnswers: {
+  getAllDiscoveryQuestions: {
     method: 'GET',
-    path: `${getAPIVersionAsPath('1')}/home/question-answers`,
-    query: QuestionAndAnswerQueryParams,
+    path: `${getAPIVersionAsPath('1')}/home/discovery/questions`,
+    query: DiscoveryQuestionQueryParams,
     responses: {
-      200: ResponseQuestionAndAnswerSchemaWithRelations.array()
+      200: ResponseDiscoveryQuestionSchemaWithRelations.array()
     },
-    summary: 'Get all the question & answers',
+    summary: 'Get all the discovery question',
   },
-  getQuestionAndAnswer: {
+  getDiscoveryQuestion: {
     method: 'GET',
-    path: `${getAPIVersionAsPath('1')}/home/question-answers/:slug`,
-    query: QuestionAndAnswerQueryParams,
+    path: `${getAPIVersionAsPath('1')}/home/discovery/questions/:slug`,
+    query: DiscoveryQuestionQueryParams,
     responses: {
-      200: ResponseQuestionAndAnswerSchemaWithRelations.array()
+      200: ResponseDiscoveryQuestionSchemaWithRelations.array()
     },
-    summary: 'Get question & answers',
+    summary: 'Get discovery question',
   },
-  createQuestionAndAnswer: {
+  createDiscoveryQuestion: {
     method: 'POST',
-    path: `${getAPIVersionAsPath('1')}/home/question-answers`,
+    path: `${getAPIVersionAsPath('1')}/home/discovery/questions`,
     body: contract.body<unknown>(),
     responses: {
       200: contract.response<unknown>()
     },
-    summary: 'Create a new question & answer',
+    summary: 'Create a new discovery question',
   },
-  updateQuestionAndAnswer: {
+  updateDiscoveryQuestion: {
     method: 'PUT',
-    path: `${getAPIVersionAsPath('1')}/home/question-answers/:slug`,
+    path: `${getAPIVersionAsPath('1')}/home/discovery/questions/:slug`,
     body: contract.body<unknown>(),
     responses: {
       200: contract.response<unknown>()
     },
-    summary: 'Update a question & answer by slug'
+    summary: 'Update a discovery question by slug'
   },
-  updateQuestionAndAnswerViewCount: {
+  updateDiscoveryQuestionShareCountOrViewCount: {
     method: 'PATCH',
-    path: `${getAPIVersionAsPath('1')}/home/question-answers/:slug/view-count`,
+    path: `${getAPIVersionAsPath('1')}/home/discovery/questions/:slug`,
     body: contract.body<unknown>(),
     responses: {
       200: contract.response<unknown>()
     },
-    summary: 'Update view count of a question & answer by slug'
-  },
-  updateQuestionAndAnswerShareCount: {
-    method: 'PATCH',
-    path: `${getAPIVersionAsPath('1')}/home/question-answers/:slug/share-count`,
-    body: contract.body<unknown>(),
-    responses: {
-      200: contract.response<unknown>()
-    },
-    summary: 'Update share count of a question & answer by slug'
+    summary: 'Update view/share count of a discovery question by slug'
   }
 });

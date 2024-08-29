@@ -1,4 +1,4 @@
-import { Controller, Req, Body, Param, UsePipes, UseGuards, ForbiddenException, ConflictException } from '@nestjs/common';
+import { Controller, Req, Body, Param, UsePipes, UseGuards, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { Api, initNestServer } from '@ts-rest/nest';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { Request } from 'express';
@@ -7,17 +7,18 @@ import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { apiHome } from 'libs/contracts/src/lib/contract-home';
 import { HomeService } from './home.service';
 import { 
-  QuestionAndAnswerQueryParams,
-  ResponseQuestionAndAnswerSchemaWithRelations,
-  ResponseQuestionAndAnswerSchema,
-  CreateQuestionAndAnswerSchemaDto,
-  UpdateQuestionAndAnswerSchemaDto
+  DiscoveryQuestionQueryParams,
+  ResponseDiscoveryQuestionSchemaWithRelations,
+  ResponseDiscoveryQuestionSchema,
+  CreateDiscoveryQuestionSchemaDto,
+  UpdateDiscoveryQuestionSchemaDto
 } from 'libs/contracts/src/schema';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { MembersService } from '../members/members.service'; 
 import { NoCache } from '../decorators/no-cache.decorator';
 import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
+import { HuskyService } from '../husky/husky.service';
 
 const server = initNestServer(apiHome);
 type RouteShape = typeof server.routeShapes;
@@ -26,7 +27,8 @@ type RouteShape = typeof server.routeShapes;
 export class HomeController {
   constructor(
     private homeService: HomeService,
-    private memberService: MembersService
+    private memberService: MembersService,
+    private huskyService:  HuskyService
   ) {}
   
   @Api(server.route.getAllFeaturedData)
@@ -34,34 +36,34 @@ export class HomeController {
     return await this.homeService.fetchAllFeaturedData();
   }
 
-  @Api(server.route.getAllQuestionAndAnswers) 
-  @ApiQueryFromZod(QuestionAndAnswerQueryParams)
-  @ApiOkResponseFromZod(ResponseQuestionAndAnswerSchemaWithRelations.array())
+  @Api(server.route.getAllDiscoveryQuestions) 
+  @ApiQueryFromZod(DiscoveryQuestionQueryParams)
+  @ApiOkResponseFromZod(ResponseDiscoveryQuestionSchemaWithRelations.array())
   @NoCache()
-  async getQuestionAndAnswers(@Req() request: Request) {
+  async getDiscoveryQuestions(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(
-      ResponseQuestionAndAnswerSchema
+      ResponseDiscoveryQuestionSchema
     );
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
-    return await this.homeService.fetchQuestionAndAnswers(builtQuery);
+    return await this.huskyService.fetchDiscoverQuestions(builtQuery);
   }
 
 
-  @Api(server.route.getQuestionAndAnswer) 
-  @ApiQueryFromZod(QuestionAndAnswerQueryParams)
-  @ApiOkResponseFromZod(ResponseQuestionAndAnswerSchemaWithRelations)
+  @Api(server.route.getDiscoveryQuestion) 
+  @ApiQueryFromZod(DiscoveryQuestionQueryParams)
+  @ApiOkResponseFromZod(ResponseDiscoveryQuestionSchemaWithRelations)
   @NoCache()
-  async getQuestionAndAnswer(@Param('slug') slug: string) 
+  async getDiscoveryQuestion(@Param('slug') slug: string) 
   {
-    return await this.homeService.fetchQuestionAndAnswerBySlug(slug);
+    return await this.huskyService.fetchDiscoverQuestionBySlug(slug);
   }
 
-  @Api(server.route.createQuestionAndAnswer)
+  @Api(server.route.createDiscoveryQuestion)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
-  async addQuestionAndAnswer(
-    @Body() questionAndAnswer: CreateQuestionAndAnswerSchemaDto,
+  async addDiscoveryQuestion(
+    @Body() discoveryQuestion: CreateDiscoveryQuestionSchemaDto,
     @Req() request
   ) {
     const userEmail = request["userEmail"];
@@ -70,15 +72,15 @@ export class HomeController {
     if (!result) {
       throw new ForbiddenException(`Member with email ${userEmail} isn't admin`);
     }
-    return await this.homeService.createQuestionAndAnswer(questionAndAnswer as any, member);
+    return await this.huskyService.createDiscoverQuestion(discoveryQuestion as any, member);
   }
 
-  @Api(server.route.updateQuestionAndAnswer)
+  @Api(server.route.updateDiscoveryQuestion)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
-  async modifyQuestionAndAnswer(
+  async modifyDiscoveryQuestion(
     @Param('slug') slug: string,
-    @Body() questionAndAnswer: UpdateQuestionAndAnswerSchemaDto,
+    @Body() discoveryQuestion: UpdateDiscoveryQuestionSchemaDto,
     @Req() request
   ) {
     const userEmail = request["userEmail"];
@@ -87,20 +89,22 @@ export class HomeController {
     if (!result) {
       throw new ForbiddenException(`Member with email ${userEmail} isn't admin`);
     }
-    return await this.homeService.updateQuestionAndAnswerBySlug(slug, questionAndAnswer as any, member);
+    return await this.huskyService.updateDiscoveryQuestionBySlug(slug, discoveryQuestion as any, member);
   }
 
-  @Api(server.route.updateQuestionAndAnswerViewCount)
-  async modifyQuestionAndAnswerViewCount(
-    @Param('slug') slug: string
+  @Api(server.route.updateDiscoveryQuestionShareCountOrViewCount)
+  async modifyDiscoveryQuestionShareCountOrViewCount(
+    @Param('slug') slug: string,
+    @Body() body
   ) {
-    return await this.homeService.updateQuestionAndAnswerViewCount(slug);
-  }
-
-  @Api(server.route.updateQuestionAndAnswerShareCount)
-  async modifyQuestionAndAnswerShareCount(
-    @Param('slug') slug: string
-  ) {
-    return await this.homeService.updateQuestionAndAnswerShareCount(slug);
+    const attribute = body.attribute;
+    switch (attribute) {
+      case "shareCount":  
+        return this.huskyService.updateDiscoveryQuestionShareCount(slug);
+      case "viewCount":
+        return this.huskyService.updateDiscoveryQuestionViewCount(slug);
+      default:
+        throw new BadRequestException(`Invalid attribute: ${attribute}`);
+    }
   }
 }
