@@ -5,8 +5,7 @@ import { ResponseMemberWithRelationsSchema } from './member';
 import { ResponseTeamWithRelationsSchema } from './team';
 import { ResponsePLEventSchemaWithRelationsSchema } from './pl-event'; 
 
-
-export const QuestionAndAnswerSchema = z.object({
+export const DiscoveryQuestionSchema = z.object({
   id: z.number().int(),
   uid: z.string(),
   title: z.string().optional(),
@@ -25,7 +24,7 @@ export const QuestionAndAnswerSchema = z.object({
   updatedAt: z.string()
 });
 
-export const CreateQuestionAndAnswerSchema = QuestionAndAnswerSchema.pick({
+export const CreateDiscoveryQuestionSchema = DiscoveryQuestionSchema.pick({
   title: true,
   content: true,
   viewCount: true,
@@ -40,31 +39,31 @@ export const CreateQuestionAndAnswerSchema = QuestionAndAnswerSchema.pick({
   answerSourceFrom:true
 });
 
-export const ResponseQuestionAndAnswerSchema = QuestionAndAnswerSchema.omit({ id: true }).strict();
+export const ResponseDiscoveryQuestionSchema = DiscoveryQuestionSchema.omit({ id: true }).strict();
 
-export const ResponseQuestionAndAnswerSchemaWithRelations = ResponseQuestionAndAnswerSchema.extend({
+export const ResponseDiscoveryQuestionSchemaWithRelations = ResponseDiscoveryQuestionSchema.extend({
   team: ResponseTeamWithRelationsSchema.optional(),
   plevent: ResponsePLEventSchemaWithRelationsSchema.optional(), 
   creator: ResponseMemberWithRelationsSchema.optional(),
   modifier: ResponseMemberWithRelationsSchema.optional()
 });
 
-export const QuestionAndAnswerRelationalFields = ResponseQuestionAndAnswerSchemaWithRelations.pick({
+export const DiscoveryQuestionRelationalFields = ResponseDiscoveryQuestionSchemaWithRelations.pick({
   team: true,
   creator: true,
   modifier: true
 }).strip();
 
-export const QuestionAndAnswerQueryableFields = ResponseQuestionAndAnswerSchema.keyof();
+export const DiscoveryQuestionQueryableFields = ResponseDiscoveryQuestionSchema.keyof();
 
-export const QuestionAndAnswerQueryParams = QueryParams({
-  queryableFields: QuestionAndAnswerQueryableFields,
-  relationalFields: QuestionAndAnswerRelationalFields
+export const DiscoveryQuestionQueryParams = QueryParams({
+  queryableFields: DiscoveryQuestionQueryableFields,
+  relationalFields: DiscoveryQuestionRelationalFields
 });
 
-export const QuestionAndAnswerDetailQueryParams = QuestionAndAnswerQueryParams.unwrap()
+export const DiscoveryQuestionDetailQueryParams = DiscoveryQuestionQueryParams.unwrap()
   .pick(RETRIEVAL_QUERY_FILTERS)
   .optional();
 
-export class CreateQuestionAndAnswerSchemaDto extends createZodDto(CreateQuestionAndAnswerSchema) {}
-export class UpdateQuestionAndAnswerSchemaDto extends createZodDto(CreateQuestionAndAnswerSchema) {}
+export class CreateDiscoveryQuestionSchemaDto extends createZodDto(CreateDiscoveryQuestionSchema) {}
+export class UpdateDiscoveryQuestionSchemaDto extends createZodDto(CreateDiscoveryQuestionSchema) {}

@@ -48,7 +48,7 @@ model Team {
   eventGuests                  PLEventGuest[]
   teamFocusAreas               TeamFocusArea[]
   teamFocusAreasVersionHistory TeamFocusAreaVersionHistory[]
-  relatedQuestions             QuestionAndAnswer[]           @relation("TeamRelatedQuestionAndAnswers")
+  relatedQuestions             DiscoveryQuestion[]           @relation("TeamRelatedDiscoveryQuestions")
 }
 
 model Member {
@@ -65,6 +65,7 @@ model Member {
   telegramHandler              String?
   officeHours                  String?
   moreDetails                  String?
+  bio                          String?
   plnFriend                    Boolean                       @default(false)
   plnStartDate                 DateTime?
   airtableRecId                String?                       @unique
@@ -89,8 +90,8 @@ model Member {
   targetInteractions           MemberInteraction[]           @relation("TargetMemberInteractions")
   followUps                    MemberFollowUp[]
   feedbacks                    MemberFeedback[]
-  createdQuestions             QuestionAndAnswer[]           @relation("MemberCreatedQuestionAndAnswers")
-  modifiedQuestions            QuestionAndAnswer[]           @relation("MemberModifiedQuestionAndAnswers")
+  createdQuestions             DiscoveryQuestion[]           @relation("MemberCreatedDiscoveryQuestions")
+  modifiedQuestions            DiscoveryQuestion[]           @relation("MemberModifiedDiscoveryQuestions")
 }
 
 model MemberRole {
@@ -338,7 +339,7 @@ model Project {
   isFeatured         Boolean?              @default(false)
   projectFocusAreas  ProjectFocusArea[]
   contributions      ProjectContribution[]
-  relatedQuestions   QuestionAndAnswer[]   @relation("ProjectRelatedQuestionAndAnswers")
+  relatedQuestions   DiscoveryQuestion[]   @relation("ProjectRelatedDiscoveryQuestions")
 }
 
 model PLEvent {
@@ -366,7 +367,7 @@ model PLEvent {
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   eventGuests      PLEventGuest[]
-  relatedQuestions QuestionAndAnswer[] @relation("PLEventRelatedQuestionAndAnswers")
+  relatedQuestions DiscoveryQuestion[] @relation("PLEventRelatedDiscoveryQuestions")
 }
 
 model PLEventGuest {
@@ -505,7 +506,7 @@ model MemberFeedback {
   updatedAt   DateTime                   @updatedAt
 }
 
-model QuestionAndAnswer {
+model DiscoveryQuestion {
   id               Int      @id @default(autoincrement())
   uid              String   @unique @default(cuid())
   title            String?
@@ -515,15 +516,15 @@ model QuestionAndAnswer {
   slug             String   @unique
   isActive         Boolean  @default(true)
   teamUid          String?
-  team             Team?    @relation("TeamRelatedQuestionAndAnswers", fields: [teamUid], references: [uid])
+  team             Team?    @relation("TeamRelatedDiscoveryQuestions", fields: [teamUid], references: [uid])
   projectUid       String?
-  project          Project? @relation("ProjectRelatedQuestionAndAnswers", fields: [projectUid], references: [uid])
+  project          Project? @relation("ProjectRelatedDiscoveryQuestions", fields: [projectUid], references: [uid])
   eventUid         String?
-  plevent          PLEvent? @relation("PLEventRelatedQuestionAndAnswers", fields: [eventUid], references: [uid])
+  plevent          PLEvent? @relation("PLEventRelatedDiscoveryQuestions", fields: [eventUid], references: [uid])
   createdBy        String
-  creator          Member?  @relation("MemberCreatedQuestionAndAnswers", fields: [createdBy], references: [uid])
+  creator          Member?  @relation("MemberCreatedDiscoveryQuestions", fields: [createdBy], references: [uid])
   modifiedBy       String
-  modifier         Member?  @relation("MemberModifiedQuestionAndAnswers", fields: [modifiedBy], references: [uid])
+  modifier         Member?  @relation("MemberModifiedDiscoveryQuestions", fields: [modifiedBy], references: [uid])
   answer           String?
   answerSources    Json[]
   answerSourceFrom String?

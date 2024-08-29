@@ -5,6 +5,7 @@ import { MembersModule } from '../members/members.module';
 import { TeamsModule } from '../teams/teams.module';
 import { ProjectsModule} from '../projects/projects.module';
 import { PLEventsModule } from '../pl-events/pl-events.module';
+import { HuskyModule } from '../husky/husky.module';
 
 @Module({
   controllers: [HomeController],
@@ -15,7 +16,8 @@ import { PLEventsModule } from '../pl-events/pl-events.module';
     MembersModule,
     TeamsModule,
     ProjectsModule,
-    PLEventsModule
+    PLEventsModule,
+    HuskyModule
   ],
   exports: [
     HomeService
