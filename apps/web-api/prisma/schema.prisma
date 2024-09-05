@@ -517,10 +517,13 @@ model DiscoveryQuestion {
   isActive         Boolean  @default(true)
   teamUid          String?
   team             Team?    @relation("TeamRelatedDiscoveryQuestions", fields: [teamUid], references: [uid])
+  teamName         String?
   projectUid       String?
   project          Project? @relation("ProjectRelatedDiscoveryQuestions", fields: [projectUid], references: [uid])
+  projectName      String?
   eventUid         String?
   plevent          PLEvent? @relation("PLEventRelatedDiscoveryQuestions", fields: [eventUid], references: [uid])
+  eventName        String?
   createdBy        String
   creator          Member?  @relation("MemberCreatedDiscoveryQuestions", fields: [createdBy], references: [uid])
   modifiedBy       String
