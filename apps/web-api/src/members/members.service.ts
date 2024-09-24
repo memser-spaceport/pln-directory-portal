@@ -148,9 +148,10 @@ export class MembersService {
 
   findOne(
     uid: string,
-    queryOptions: Omit<Prisma.MemberFindUniqueArgsBase, 'where'> = {}
+    queryOptions: Omit<Prisma.MemberFindUniqueArgsBase, 'where'> = {},
+    tx?: Prisma.TransactionClient
   ) {
-    return this.prisma.member.findUniqueOrThrow({
+    return (tx || this.prisma).member.findUniqueOrThrow({
       where: { uid },
       ...queryOptions,
       include: {
@@ -668,9 +669,9 @@ export class MembersService {
     return { };
   }
 
-  async updateTelegramIfChanged(member, telegram) {
-    if (telegram != '' && member.telegramHandler != telegram) {
-      member = await this.prisma.member.update({
+  async updateTelegramIfChanged(member, telegram, tx?:Prisma.TransactionClient) {
+    if (telegram && telegram != '' && member.telegramHandler != telegram) {
+      member = await (tx || this.prisma).member.update({
         where: { uid: member.uid },
         data: {
           telegramHandler: telegram
@@ -680,9 +681,9 @@ export class MembersService {
     return member;
   }
 
-  async updateOfficeHoursIfChanged(member, officeHours) {
-    if (officeHours != '' && member.officeHours != officeHours) {
-      member = await this.prisma.member.update({
+  async updateOfficeHoursIfChanged(member, officeHours, tx?:Prisma.TransactionClient) {
+    if (officeHours && officeHours != '' && member.officeHours != officeHours) {
+      member = await (tx || this.prisma).member.update({
         where: { uid: member.uid },
         data: {
           officeHours

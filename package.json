@@ -82,6 +82,7 @@
     "lexical": "^0.12.2",
     "lodash": "^4.17.21",
     "md-editor-rt": "^4.8.2",
+    "moment-timezone": "^0.5.45",
     "ncsrf": "^1.0.3",
     "nest-commander": "^3.3.0",
     "nest-winston": "^1.9.2",

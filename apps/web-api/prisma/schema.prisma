@@ -342,6 +342,23 @@ model Project {
   relatedQuestions   DiscoveryQuestion[]   @relation("ProjectRelatedDiscoveryQuestions")
 }
 
+model PLEventLocation {
+  id             Int       @id @default(autoincrement())
+  uid            String    @unique @default(cuid())
+  location       String
+  timezone       String
+  latitude       String?
+  longitude      String?
+  flag           String?
+  icon           String?
+  resources      Json[]
+  additionalInfo Json?
+  priority       Int?
+  events         PLEvent[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
 model PLEvent {
   id               Int                 @id @default(autoincrement())
   uid              String              @unique @default(cuid())
@@ -357,7 +374,6 @@ model PLEvent {
   shortDescription String?
   websiteURL       String?
   isFeatured       Boolean?            @default(false)
-  location         String
   slugURL          String              @unique
   resources        Json[]
   priority         Int?
@@ -366,8 +382,10 @@ model PLEvent {
   endDate          DateTime
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
-  eventGuests      PLEventGuest[]
   relatedQuestions DiscoveryQuestion[] @relation("PLEventRelatedDiscoveryQuestions")
+  locationUid      String?
+  location         PLEventLocation?    @relation(fields: [locationUid], references: [uid])
+  eventGuests      PLEventGuest[]
 }
 
 model PLEventGuest {
@@ -386,6 +404,8 @@ model PLEventGuest {
   event          PLEvent  @relation(fields: [eventUid], references: [uid], onDelete: Cascade)
   additionalInfo Json?
   topics         String[]
+  isHost         Boolean  @default(false)
+  isSpeaker      Boolean  @default(false)
 }
 
 model FocusArea {
