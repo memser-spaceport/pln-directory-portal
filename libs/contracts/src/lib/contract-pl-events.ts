@@ -1,58 +1,50 @@
 import { initContract } from '@ts-rest/core';
 import {
   PLEventDetailQueryParams,
-  PLEventQueryParams,
   ResponsePLEventSchemaWithRelationsSchema,
+  PLEventLocationQueryParams,
+  ResponsePLEventLocationWithRelationsSchema
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
 const contract = initContract();
 
 export const apiEvents = contract.router({
-  getPLEvents: {
+  getPLEventBySlug: {
     method: 'GET',
-    path: `${getAPIVersionAsPath('1')}/irl/events`,
-    query: PLEventQueryParams,
-    responses: {
-      200: ResponsePLEventSchemaWithRelationsSchema.array(),
-    },
-    summary: 'Get all pl events',
-  },
-  getPLEvent: {
-    method: 'GET',
-    path: `${getAPIVersionAsPath('1')}/irl/events/:slug`,
+    path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/events/:slug`,
     query: PLEventDetailQueryParams,
     responses: {
       200: ResponsePLEventSchemaWithRelationsSchema,
     },
-    summary: 'Get a pl event',
+    summary: 'Get a pl event with guests by slug and location',
   },
-  createPLEventGuest: {
+  createPLEventGuestByLocation: {
     method: 'POST',
-    path: `${getAPIVersionAsPath('1')}/irl/events/:slug/guest`,
+    path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/guests`,
     body: contract.body<unknown>(),
     responses: {
       200: contract.response<unknown>(),
     },
-    summary: 'create a guest in pl event',
+    summary: 'create guests in pl events',
   },
-  modifyPLEventGuest: {
+  modifyPLEventGuestByLocation: {
     method: 'PUT',
-    path: `${getAPIVersionAsPath('1')}/irl/events/:slug/guest/:uid`,
+    path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/guests/:guestUid`,
     body: contract.body<unknown>(),
     responses: {
       200: contract.response<unknown>(),
     },
-    summary: 'Modify a guest in pl event',
+    summary: 'Modify guests in pl events',
   },
-  deletePLEventGuests: {
+  deletePLEventGuestsByLocation: {
     method: 'POST',
-    path: `${getAPIVersionAsPath('1')}/irl/events/:slug/guests`,
+    path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/events/guests`,
     body: contract.body<unknown>(),
     responses: {
       200: contract.response<unknown>(),
     },
-    summary: 'delete a list of guests in pl event',
+    summary: 'delete guests from events',
   },
   getPLEventsByLoggedInMember: {
     method: 'GET',
@@ -62,5 +54,23 @@ export const apiEvents = contract.router({
       200: ResponsePLEventSchemaWithRelationsSchema,
     },
     summary: 'Get events by logged in member',
+  },
+  getPLEventLocations: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/irl/locations`,
+    query: PLEventLocationQueryParams,
+    responses: {
+      200: ResponsePLEventLocationWithRelationsSchema.array(),
+    },
+    summary: 'Get all pl event locations'
+  },
+  getPLEventGuestsByLocation: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/guests`,
+    query: contract.query,
+    responses: {
+      200:  contract.response<unknown>(),
+    },
+    summary: 'Get pl event guests by location and type',
   }
 });

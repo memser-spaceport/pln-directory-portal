@@ -4,11 +4,13 @@ import { Api, initNestServer, ApiDecorator } from '@ts-rest/nest';
 import { Request } from 'express';
 import { apiEvents } from 'libs/contracts/src/lib/contract-pl-events';
 import {
+  PLEventLocationQueryParams,
+  ResponsePLEventLocationWithRelationsSchema,
   PLEventQueryParams,
   ResponsePLEventSchemaWithRelationsSchema,
-  ResponsePLEventSchema,
   CreatePLEventGuestSchemaDto,
-  UpdatePLEventGuestSchemaDto
+  UpdatePLEventGuestSchemaDto,
+  DeletePLEventGuestsSchemaDto
 } from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
@@ -19,34 +21,40 @@ import { ZodValidationPipe } from 'nestjs-zod';
 import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { NoCache } from '../decorators/no-cache.decorator';
-import {MembersService} from '../members/members.service';
+import { MembersService } from '../members/members.service';
+import { PLEventLocationsService } from './pl-event-locations.service';
+import { PLEventGuestsService } from './pl-event-guests.service';
 
 const server = initNestServer(apiEvents);
 type RouteShape = typeof server.routeShapes;
 
 @Controller()
 export class PLEventsController {
-  constructor(private readonly eventService: PLEventsService, private memberService: MembersService) {}
+  constructor(
+    private readonly memberService: MembersService,
+    private readonly eventService: PLEventsService, 
+    private readonly eventLocationService: PLEventLocationsService,
+    private readonly eventGuestService: PLEventGuestsService
+  ) {}
 
-  @Api(server.route.getPLEvents)
-  @ApiQueryFromZod(PLEventQueryParams)
-  @ApiOkResponseFromZod(ResponsePLEventSchemaWithRelationsSchema.array())
-  findAll(@Req() request: Request) {
-    const queryableFields = prismaQueryableFieldsFromZod(
-      ResponsePLEventSchema
-    );
-    const builder = new PrismaQueryBuilder(queryableFields);
-    const builtQuery = builder.build(request.query);
-    return this.eventService.getPLEvents(builtQuery);
+  @Api(server.route.getPLEventGuestsByLocation)
+  @UseGuards(UserAuthValidateGuard)
+  @NoCache()
+  findPLEventGuestsByLocation(
+    @Req() request: Request,
+    @Param('uid') locationUid: string
+  ) {
+    const { type } = request.query;
+    return this.eventGuestService.getPLEventGuestsByLocationAndType(locationUid, type as string, request["isUserLoggedIn"]);
   }
 
-  @Api(server.route.getPLEvent)
+  @Api(server.route.getPLEventBySlug)
   @ApiParam({ name: 'slug', type: 'string' })
   @ApiOkResponseFromZod(ResponsePLEventSchemaWithRelationsSchema)
   @UseGuards(UserAuthValidateGuard)
   @NoCache()
   async findOne(
-    @ApiDecorator() { params: { slug } }: RouteShape['getPLEvent'],
+    @ApiDecorator() { params: { slug } }: RouteShape['getPLEventBySlug'],
     @Req() request: Request
   ) {
     const event = await this.eventService.getPLEventBySlug(slug, request["isUserLoggedIn"]);
@@ -56,11 +64,11 @@ export class PLEventsController {
     return event;
   }
 
-  @Api(server.route.createPLEventGuest)
+  @Api(server.route.createPLEventGuestByLocation)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
-  async createPLEventGuest(
-    @Param('slug') slug: string,
+  async createPLEventGuestByLocation(
+    @Param("uid") locationUid,
     @Body() body: CreatePLEventGuestSchemaDto,
     @Req() request
   ): Promise<any> {
@@ -69,17 +77,24 @@ export class PLEventsController {
     const result = await this.memberService.isMemberPartOfTeams(member, [body.teamUid]) ||
       await this.memberService.checkIfAdminUser(member);
     if (!result) {
-      throw new ForbiddenException(`Member with email ${userEmail} is not part of team with uid ${body.teamUid} or isn't admin`);
+      throw new ForbiddenException(`Member with email ${userEmail} is not part of 
+        team with uid ${body.teamUid} or isn't admin.`);
     }
-    return await this.eventService.createPLEventGuest(body as any, slug, member);
+    const location = await this.eventLocationService.getPLEventLocationByUid(locationUid);
+    if (
+      !this.memberService.checkIfAdminUser(member) && 
+      !this.eventGuestService.checkIfEventsAreUpcoming(location.upcomingEvents, body.events)
+    ) {
+      throw new ForbiddenException(`Member with email ${userEmail} isn't admin to access past events or future events`);
+    }
+    return await this.eventGuestService.createPLEventGuestByLocation(body, member);
   }
 
-  @Api(server.route.modifyPLEventGuest)
+  @Api(server.route.modifyPLEventGuestByLocation)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
-  async modifyPLEventGuest(
-    @Param('slug') slug: string,
-    @Param('uid') uid: string,
+  async modifyPLEventGuestByLocation(
+    @Param("uid") locationUid,
     @Body() body: UpdatePLEventGuestSchemaDto,
     @Req() request
   ) {
@@ -90,23 +105,32 @@ export class PLEventsController {
     if (!result) {
       throw new ForbiddenException(`Member with email ${userEmail} is not part of team with uid ${body.teamUid} or isn't admin`);
     }
-    return await this.eventService.modifyPLEventGuestByUid(uid, body as any, slug, member);
+    const location = await this.eventLocationService.getPLEventLocationByUid(locationUid);
+    if (
+      !this.memberService.checkIfAdminUser(member) && 
+      !this.eventGuestService.checkIfEventsAreUpcoming(location.upcomingEvents, body.events)
+    ) {
+      throw new ForbiddenException(`Member with email ${userEmail} isn't admin to access past events or future events`);
+    }
+    return await this.eventGuestService.modifyPLEventGuestByLocation(body, location, member);
   }
 
-  @Api(server.route.deletePLEventGuests)
+  @Api(server.route.deletePLEventGuestsByLocation)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
-  async deletePLEventGuests(
-    @Body() body,
+  async deletePLEventGuestsByLocation(
+    @Param("uid") locationUid,
+    @Body() body: DeletePLEventGuestsSchemaDto,
     @Req() request
   ) {
     const userEmail = request["userEmail"];
     const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
     const result = await this.memberService.checkIfAdminUser(member);
-    if (!result) {
-      throw new ForbiddenException(`Member with email ${userEmail} is not admin `);
+    if (!result && body.membersAndEvents?.length === 0 
+      && body.membersAndEvents[0]?.memberUid != member.uid) {
+        throw new ForbiddenException(`Member with email ${userEmail} is not admin`);
     }
-    return await this.eventService.deletePLEventGuests(body.guests);
+    return await this.eventGuestService.deletePLEventGuests(body.membersAndEvents);
   }
 
   @Api(server.route.getPLEventsByLoggedInMember)
@@ -121,4 +145,16 @@ export class PLEventsController {
     return await this.eventService.getPLEventsByMember(member);
   }
 
+  @Api(server.route.getPLEventLocations)
+  @ApiQueryFromZod(PLEventLocationQueryParams)
+  @ApiOkResponseFromZod(ResponsePLEventLocationWithRelationsSchema.array())
+  @NoCache()
+  findLocations(@Req() request: Request) {
+    const queryableFields = prismaQueryableFieldsFromZod(
+      ResponsePLEventLocationWithRelationsSchema
+    );
+    const builder = new PrismaQueryBuilder(queryableFields);
+    const builtQuery = builder.build(request.query);
+    return this.eventLocationService.getPLEventLocations(builtQuery);
+  }
 }

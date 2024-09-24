@@ -2,6 +2,7 @@ import { z,  } from "zod";
 import { createZodDto } from '@abitia/zod-dto';
 import { ResponsePLEventGuestSchema } from "./pl-event-guest";
 import { ResponseImageSchema } from "./image";
+import { ResponsePLEventLocationSchema } from "./pl-event-location"
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 
 export const PLEventSchema = z.object({
@@ -30,7 +31,7 @@ export const PLEventSchema = z.object({
   additionalInfo: z.any(),
   startDate: z.string(),
   endDate: z.string(),
-  location: z.string(),
+  locationUid: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string()
 });
@@ -45,7 +46,7 @@ export const PLCreateEventSchema = PLEventSchema.pick({
   resources: true,
   startDate: true,
   endDate: true,
-  location: true
+  locationUid: true
 });
 
 export const ResponsePLEventSchema = PLEventSchema.omit({ id: true }).strict();
@@ -53,13 +54,15 @@ export const ResponsePLEventSchema = PLEventSchema.omit({ id: true }).strict();
 export const ResponsePLEventSchemaWithRelationsSchema = ResponsePLEventSchema.extend({
   logo: ResponseImageSchema.optional(),
   banner: ResponseImageSchema.optional(),
-  eventGuests: ResponsePLEventGuestSchema.array().optional()
+  eventGuests: ResponsePLEventGuestSchema.array().optional(),
+  location: ResponsePLEventLocationSchema.optional()
 });
 
 export const PLEventRelationalFields = ResponsePLEventSchemaWithRelationsSchema.pick({
   logo: true,
   banner: true,
-  eventGuests: true
+  eventGuests: true,
+  location: true
 }).strip();
 
 export const PLEventQueryableFields = ResponsePLEventSchema.keyof();
