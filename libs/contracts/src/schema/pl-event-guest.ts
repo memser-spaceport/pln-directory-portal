@@ -4,6 +4,32 @@ import { QueryParams } from './query-params';
 import { ResponseMemberSchema } from './member'; 
 import { ResponseTeamSchema  } from "./team";
 
+export const CreatePLEventGuestSchema = z.object({
+  teamUid: z.string(),
+  memberUid: z.string(),
+  telegramId: z.string().optional(),
+  reason: z.string().optional(),
+  additionalInfo: z.any(),
+  topics: z.array(z.string()).optional(),
+  officeHours: z.string(),
+  events: z.array(z.object({
+    uid: z.string(),
+    isHost: z.boolean().optional(),
+    isSpeaker: z.boolean().optional(),
+    hostSubEvents: z.array(
+      z.object({
+        name: z.string(),
+        link: z.string().url(),
+      })
+    ).optional(),
+    speakerSubEvents: z.array(
+      z.object({
+        name: z.string(),
+        link: z.string().url(),
+    })).optional()
+  }))
+});
+
 export const PLEventGuestSchema = z.object({
   id: z.number().int(),
   uid: z.string(),
@@ -16,14 +42,6 @@ export const PLEventGuestSchema = z.object({
   updatedAt: z.string(),
   additionalInfo: z.any(),
   topics: z.array(z.string()).optional()
-});
-
-export const CreatePLEventGuestSchema = PLEventGuestSchema.pick({
-  teamUid: true,
-  telegramId: true,
-  reason: true,
-  additionalInfo: true,
-  topics: true
 });
 
 export const ResponsePLEventGuestSchema = PLEventGuestSchema.omit({ id: true }).strict();
@@ -45,5 +63,15 @@ export const PLEventGuestQueryParams = QueryParams({
   relationalFields: PLEventGuestRelationalFields,
 });
 
+export const DeletePLEventGuestsSchema = z.object({
+  membersAndEvents: z.array(
+    z.object({
+      memberUid: z.string(),
+      eventUid: z.string()
+    }
+  ))
+});
+
 export class CreatePLEventGuestSchemaDto extends createZodDto(CreatePLEventGuestSchema) {}
 export class UpdatePLEventGuestSchemaDto extends createZodDto(CreatePLEventGuestSchema) {}
+export class DeletePLEventGuestsSchemaDto extends createZodDto(DeletePLEventGuestsSchema) {}
