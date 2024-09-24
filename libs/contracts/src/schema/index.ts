@@ -23,3 +23,4 @@ export * from './member-interaction';
 export * from './member-follow-up';
 export * from './member-feedback';
 export * from './discovery-question';
+export * from './pl-event-location';
