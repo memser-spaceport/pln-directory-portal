@@ -608,4 +608,5 @@ export const EVENT_TYPE = {
   INVITE_ONLY:"INVITE_ONLY"
 }
 
+//OH guideline URL
 export const OH_GUIDELINE_URL = "https://protosphere.plnetwork.io/posts/Office-Hours-Guidelines-and-Tips-clsdgrbkk000ypocoqsceyfaq"
