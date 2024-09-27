@@ -13,6 +13,9 @@ export class FocusAreasService {
       include: {
         children: this.buildQueryByLevel(4, type, query), // level denotes depth of children.
         ...this.buildAncestorFocusAreasFilterByType(type, query)
+      },
+      orderBy: {
+        createdAt: "desc"
       }
     });
     return result;
