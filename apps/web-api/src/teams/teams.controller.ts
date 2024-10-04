@@ -39,7 +39,8 @@ export class TeamsController {
     builtQuery.where = {
       AND: [
         builtQuery.where ? builtQuery.where : {},
-        this.teamsService.buildFocusAreaFilters(focusAreas)
+        this.teamsService.buildFocusAreaFilters(focusAreas),
+        this.teamsService.buildRecentTeamsFilter(request.query)
       ]
     }
     return this.teamsService.findAll(builtQuery);

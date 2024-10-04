@@ -74,6 +74,7 @@ export const CreateMemberSchema = MemberSchema.pick({
   officeHours: true,
   plnFriend: true,
   locationUid: true,
+  bio: true
 });
 
 export const MemberRelationalFields = ResponseMemberWithRelationsSchema.pick({
