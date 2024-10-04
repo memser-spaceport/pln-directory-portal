@@ -464,6 +464,7 @@ export class ParticipantsRequestService {
     dataToSave['moreDetails'] = dataToProcess.moreDetails;
     dataToSave['plnStartDate'] = dataToProcess.plnStartDate;
     dataToSave['openToWork'] = dataToProcess.openToWork;
+    dataToSave['bio'] = dataToProcess.bio; 
 
     // Skills relation mapping
     dataToSave['skills'] = {
