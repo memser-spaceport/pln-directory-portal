@@ -48,6 +48,7 @@ export class MemberController {
         builtQuery.where,
         this.membersService.buildNameFilters(queryParams),
         this.membersService.buildRoleFilters(queryParams),
+        this.membersService.buildRecentMembersFilter(queryParams)
       ],
     };
     return await this.membersService.findAll(builtQuery);

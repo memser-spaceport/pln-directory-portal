@@ -53,7 +53,8 @@ export class ProjectsController {
     builtQuery.where = {
       AND: [
         builtQuery.where ? builtQuery.where : {},
-        this.projectsService.buildFocusAreaFilters(focusAreas)
+        this.projectsService.buildFocusAreaFilters(focusAreas),
+        this.projectsService.buildRecentProjectsFilter(req.query)
       ]
     }
     return this.projectsService.getProjects(builtQuery);

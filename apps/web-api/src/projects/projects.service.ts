@@ -374,4 +374,25 @@ export class ProjectsService {
       });
     } 
   }
+
+  /**
+   * This method constructs a dynamic filter query for retrieving recent projects
+   * created within a specified number of days, based on the 'is_recent' query parameter
+   * and an environment variable to configure the timeline.
+   * 
+   * @param queryParams - HTTP request query parameters object
+   * @returns Constructed query with a 'createdAt' filter if 'is_recent' is set to 'true',
+   *          or an empty object if 'is_recent' is not provided or set to 'false'.
+   */
+  buildRecentProjectsFilter(queryParams) { 
+    const { isRecent } = queryParams;
+    if (isRecent === 'true') {
+      return {
+        createdAt: {
+          gte: new Date(Date.now() - (parseInt(process.env.RECENT_RECORD_DURATION_IN_DAYS || '30') * 24 * 60 * 60 * 1000))
+        }
+      };
+    }
+    return {};
+  }
 }

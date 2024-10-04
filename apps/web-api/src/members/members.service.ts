@@ -602,6 +602,27 @@ export class MembersService {
   }
 
   /**
+   * This method constructs a dynamic filter query for retrieving recent members
+   * created within a specified number of days, based on the 'recent' query parameter
+   * and an environment variable to configure the timeline.
+   * 
+   * @param queryParams - HTTP request query parameters object
+   * @returns Constructed query with a 'createdAt' filter if 'recent' is set to 'true',
+   *          or an empty object if 'recent' is not provided or set to 'false'.
+   */
+  buildRecentMembersFilter(queryParams) { 
+    const { isRecent } = queryParams;
+    if (isRecent === 'true') {
+      return {
+        createdAt: {
+          gte: new Date(Date.now() - (parseInt(process.env.RECENT_RECORD_DURATION_IN_DAYS || '30') * 24 * 60 * 60 * 1000))
+        }
+      };
+    }
+    return {};
+  }
+
+  /**
    * This method construct the dynamic query to search either by roleTags or
    * by role name from the teamMemberRole table from query params
    * @param queryParams HTTP request query params object
