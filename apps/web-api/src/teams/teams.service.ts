@@ -754,6 +754,7 @@ export class TeamsService {
     return error;
   }
 
+
   async insertManyFromAirtable(airtableTeams: z.infer<typeof AirtableTeamSchema>[]) {
     const fundingStages = await this.prisma.fundingStage.findMany();
     const industryTags = await this.prisma.industryTag.findMany();
