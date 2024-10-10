@@ -22,9 +22,7 @@ describe('TeamsService', () => {
 
   beforeAll(() => {
     // Fix to avoid circular dependency issue:
-    ({ ResponseTeamWithRelationsSchema } = jest.requireActual(
-      'libs/contracts/src/schema/team'
-    ));
+    ({ ResponseTeamWithRelationsSchema } = jest.requireActual('libs/contracts/src/schema/team'));
   });
 
   beforeEach(async () => {
@@ -47,44 +45,34 @@ describe('TeamsService', () => {
   });
 
   function mockUserTokenValidation(userEmail) {
-    return (UserTokenValidation.prototype.canActivate as jest.Mock).mockImplementation(
-      (context: ExecutionContext) => {
-        const request = context.switchToHttp().getRequest();
-        request.userEmail = userEmail;
-        return true;
-      }
-    );
+    return (UserTokenValidation.prototype.canActivate as jest.Mock).mockImplementation((context: ExecutionContext) => {
+      const request = context.switchToHttp().getRequest();
+      request.userEmail = userEmail;
+      return true;
+    });
   }
 
   describe('When getting an member by uid', () => {
     it('should return the member with a valid schema', async () => {
-      await supertest(app.getHttpServer())
-        .get('/v1/members/uid-1')
-        .expect(200);
+      await supertest(app.getHttpServer()).get('/v1/members/uid-1').expect(200);
     });
   });
 
   describe('When getting all teams', () => {
     it('should list all the teams with a valid schema', async () => {
-      const response = await supertest(app.getHttpServer())
-        .get('/v1/teams')
-        .expect(200);
+      const response = await supertest(app.getHttpServer()).get('/v1/teams').expect(200);
       const teams = response.body;
       expect(teams).toHaveLength(5);
-      const hasValidSchema =
-        ResponseTeamWithRelationsSchema.array().safeParse(teams).success;
+      const hasValidSchema = ResponseTeamWithRelationsSchema.array().safeParse(teams).success;
       expect(hasValidSchema).toBeTruthy();
     });
 
     describe('and with an invalid query param', () => {
       it('should list all the teams with a valid schema', async () => {
-        const response = await supertest(app.getHttpServer())
-          .get('/v1/teams')
-          .expect(200);
+        const response = await supertest(app.getHttpServer()).get('/v1/teams').expect(200);
         const teams = response.body;
         expect(teams).toHaveLength(5);
-        const hasValidSchema =
-          ResponseTeamWithRelationsSchema.array().safeParse(teams).success;
+        const hasValidSchema = ResponseTeamWithRelationsSchema.array().safeParse(teams).success;
         expect(hasValidSchema).toBeTruthy();
       });
     });
@@ -92,14 +80,11 @@ describe('TeamsService', () => {
     describe('and with a valid query param', () => {
       it('should list filtered teams with a valid schema', async () => {
         const response = await supertest(app.getHttpServer())
-          .get(
-            '/v1/teams?name=Team+1&with=members,fundingStage,teamMemberRoles'
-          )
+          .get('/v1/teams?name=Team+1&with=members,fundingStage,teamMemberRoles')
           .expect(200);
         const teams = response.body;
         expect(teams).toHaveLength(1);
-        const hasValidSchema =
-          ResponseTeamWithRelationsSchema.array().safeParse(teams).success;
+        const hasValidSchema = ResponseTeamWithRelationsSchema.array().safeParse(teams).success;
         expect(hasValidSchema).toBeTruthy();
       });
     });
@@ -107,12 +92,9 @@ describe('TeamsService', () => {
 
   describe('When getting an team by uid', () => {
     it('should return the team with a valid schema', async () => {
-      const response = await supertest(app.getHttpServer())
-        .get('/v1/teams/uid-1')
-        .expect(200);
+      const response = await supertest(app.getHttpServer()).get('/v1/teams/uid-1').expect(200);
       const team = response.body;
-      const hasValidSchema =
-        ResponseTeamWithRelationsSchema.safeParse(team).success;
+      const hasValidSchema = ResponseTeamWithRelationsSchema.safeParse(team).success;
       expect(hasValidSchema).toBeTruthy();
     });
   });
@@ -128,25 +110,36 @@ describe('TeamsService', () => {
     });
   });
   describe('When trying to update a team detail', () => {
-    it('should throw error on insufficient role permission to update team', async () => {
+    it('should update team by uid', async () => {
       mockUserTokenValidation('email-1@mail.com');
-      const team = await supertest(app.getHttpServer())
-        .get('/v1/teams/uid-1');
+      const team = await supertest(app.getHttpServer()).get('/v1/teams/uid-1');
       const requestPayload = await getUpdateTeamPayload();
-      await supertest(app.getHttpServer())
-        .put(`/v1/teams/${team.body.uid}`)
-        .send(requestPayload)
-        .expect(400);
+      console.log({ team });
+      await supertest(app.getHttpServer()).put(`/v1/teams/uid-1`).send(requestPayload).expect(200);
     });
+
     it('should throw error on non existing member email id in request to update team', async () => {
       mockUserTokenValidation('email-2@mail.com');
-      const team = await supertest(app.getHttpServer())
-        .get('/v1/teams/uid-1');
+      const team = await supertest(app.getHttpServer()).get('/v1/teams/uid-1');
       const requestPayload = await getUpdateTeamPayload();
-      await supertest(app.getHttpServer())
-        .put(`/v1/teams/${team.body.uid}`)
-        .send(requestPayload)
-        .expect(401);
+      await supertest(app.getHttpServer()).put(`/v1/teams/${team.body.uid}`).send(requestPayload).expect(401);
+    });
+
+
+    it('should throw error bad request', async () => {
+      mockUserTokenValidation('email-1@mail.com');
+      const team = await supertest(app.getHttpServer()).get('/v1/teams/uid-1');
+      const requestPayload = await getUpdateTeamPayload();
+      requestPayload.participantType = '';
+      requestPayload.uniqueIdentifier = '';
+      await supertest(app.getHttpServer()).put(`/v1/teams/${team.body.uid}`).send(requestPayload).expect(400);
+    });
+    
+    it('should throw error forbidden error', async () => {
+      mockUserTokenValidation('email-3@mail.com');
+      const team = await supertest(app.getHttpServer()).get('/v1/teams/uid-1');
+      const requestPayload = await getUpdateTeamPayload();
+      await supertest(app.getHttpServer()).put(`/v1/teams/${team.body.uid}`).send(requestPayload).expect(403);
     });
   });
 });
