@@ -99,6 +99,12 @@ export class MemberController {
     return await this.membersService.updatePreference(id, preference);
   }
 
+  @Api(server.route.updateMember)
+  @UseGuards(UserTokenValidation)
+  async updateMember(@Param('uid') uid, @Body() body) {
+    return await this.membersService.updateMember(uid, body);
+  }
+
   @Api(server.route.getMemberPreferences)
   @UseGuards(AuthGuard)
   @NoCache()

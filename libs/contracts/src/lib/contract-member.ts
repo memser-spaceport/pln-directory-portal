@@ -46,6 +46,15 @@ export const apiMembers = contract.router({
     },
     summary: 'Update member preference',
   },
+  updateMember: {
+    method: 'PATCH',
+    path: `${getAPIVersionAsPath('1')}/members/:uid`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Update member',
+  },
   getMemberPreferences: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/members/:uid/preferences`,

@@ -61,16 +61,18 @@ export class PLEventGuestsService {
   async modifyPLEventGuestByLocation(
     data: UpdatePLEventGuestSchemaDto, 
     location: FormattedLocationWithEvents, 
-    member: Member
+    member: Member,
+    type: string
   ) {
     try {
+      const events = type === "upcoming" ? location.upcomingEvents : location.pastEvents;
       return await this.prisma.$transaction(async (tx) => {
         const isAdmin = this.memberService.checkIfAdminUser(member);
         await tx.pLEventGuest.deleteMany({
           where: {
             memberUid: isAdmin ? data.memberUid : member.uid,
             eventUid: {
-              in: location.upcomingEvents.map(event => event.uid)
+              in: events.map(event => event.uid)
             }
           }
         });
@@ -131,15 +133,39 @@ export class PLEventGuestsService {
             in: events.map(event => event.uid)
           }
         },
-        include: isUserLoggedIn ? {
+        select: isUserLoggedIn ? {
+          uid: true,
+          reason: true,
+          telegramId: true,
+          memberUid: true,
+          teamUid: true,
+          topics: true,
+          officeHours: true,
+          additionalInfo: true,
+          isHost: true,
+          isSpeaker: true,
           event: {
-            include: {
-              logo: true
+            select: {
+              slugURL: true,
+              uid: true,
+              name: true,
+              type: true,
+              description: true,
+              startDate: true,
+              endDate: true,
+              logo: true,
+              banner: true,
+              resources: true,
+              additionalInfo: true
             }
           },
           member: {
-            include:{
+            select: {
+              name: true,
               image: true,
+              telegramHandler: true,
+              preferences: true,
+              officeHours: true,
               teamMemberRoles: {
                 select:{
                   team: {
@@ -175,7 +201,8 @@ export class PLEventGuestsService {
               name: true,
               logo: true
             }
-          }
+          },
+          createdAt: true,
         }:
         {
           team: {
@@ -183,7 +210,14 @@ export class PLEventGuestsService {
               name: true,
               logo: true
             }
-          }
+          },
+          event: {
+            select: {
+              type: true
+            }
+          },
+          memberUid: true,
+          createdAt: true,
         }
       });
       this.restrictTelegramBasedOnMemberPreference(result, isUserLoggedIn);

@@ -551,6 +551,17 @@ export class MembersService {
     return response;
   }
 
+  async updateMember(uid, member) {
+    const response = this.prisma.member.update(
+      {
+        where: { uid },
+        data: { ...member }
+    }
+    );
+    this.cacheService.reset();
+    return response;
+  }
+
   async getPreferences(uid) {
     const resp:any = await this.prisma.member.findUnique(
       {
