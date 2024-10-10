@@ -7,6 +7,8 @@ import { ResponseMembershipSourceSchema } from './membership-source';
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
 import { ResponseTechnologySchema } from './technology';
+import { ResponseProjectSchema } from './project';
+import { ResponseTeamFocusAreaSchema } from './team-focus-areas';
 
 export const TeamSchema = z.object({
   id: z.number().int(),
@@ -54,7 +56,11 @@ export const ResponseTeamWithRelationsSchema = ResponseTeamSchema.extend({
   industryTags: ResponseIndustryTagSchema.array().optional(),
   fundingStage: ResponseFundingStageSchema.optional(),
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
-  technologies: ResponseTechnologySchema.array().optional()
+  technologies: ResponseTechnologySchema.array().optional(),
+  lastModifiedBy: z.string().nullish(),
+  maintainingProjects: ResponseProjectSchema.array().optional(),
+  contributingProjects: ResponseProjectSchema.array().optional(),
+  teamFocusAreas: ResponseTeamFocusAreaSchema.array().optional(),
 });
 
 export const TeamQueryableFields = ResponseTeamSchema.keyof();
@@ -73,9 +79,7 @@ export const TeamQueryParams = QueryParams({
   relationalFields: TeamRelationalFields,
 });
 
-export const TeamDetailQueryParams = TeamQueryParams.unwrap()
-  .pick(RETRIEVAL_QUERY_FILTERS)
-  .optional();
+export const TeamDetailQueryParams = TeamQueryParams.unwrap().pick(RETRIEVAL_QUERY_FILTERS).optional();
 
 export class TeamDto extends createZodDto(TeamSchema) {}
 
