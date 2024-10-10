@@ -26,7 +26,7 @@ export const PreferenceSchema = z.object({
 });
 
 export const MemberSchema = z.object({
-  id: z.number().int(),
+  id: z.number().int().optional(),
   uid: z.string(),
   name: z.string(),
   email: z.string(),
@@ -61,7 +61,10 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   skills: ResponseSkillSchema.array().optional(),
   memberRoles: ResponseSkillSchema.array().optional(),
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
-  projectContributions: ResponseProjectContributionSchema.array().optional()
+  projectContributions: ResponseProjectContributionSchema.array().optional(),
+  moreDetails: z.string().nullable(),
+  plnStartDate: z.string().nullable(),
+  approvedAt:  z.string().nullable(),
 });
 
 

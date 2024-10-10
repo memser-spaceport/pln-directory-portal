@@ -20,6 +20,7 @@ export class EmailOtpService {
         ) { }
 
     async sendEmailOtp(email) {
+        console.log('111111111111111111111111111111111111--------------------------', email);
         const clientToken = await this.getAuthClientToken();
         const payload = { recipientAddress: email.toLowerCase().trim(), notificationType: 'EMAIL', }
         const header = { headers: { Authorization: `Bearer ${clientToken}` } }
@@ -29,6 +30,8 @@ export class EmailOtpService {
         } catch (error) {
             this.handleAuthErrors(error)
         }
+        console.log('111111111111111111111111111111111111', otpResult);
+
         this.logger.info(`Successfully sent email otp for emailid - ${email}`)
         return otpResult.data;
     }
