@@ -51,8 +51,8 @@ export class PLEventsService {
         include: {
           logo: true,
           banner: true,
-          eventGuests: {
-            include: isUserLoggedIn ? {
+          eventGuests: isUserLoggedIn ? {
+            include: {
               event: {
                 include: {
                   logo: true
@@ -97,12 +97,18 @@ export class PLEventsService {
                   logo: true
                 }
               }
-            }:
-            {
+            } 
+          }:{
+            select: {
               team: {
                 select:{
                   name: true,
                   logo: true
+                }
+              },
+              event: {
+                select: {
+                  type: true
                 }
               }
             }
