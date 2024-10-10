@@ -5,7 +5,8 @@ import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 export const SkillSchema = z.object({
   id: z.number().int(),
   uid: z.string(),
-  title: z.string(),
+  title: z.string().optional(),
+  name: z.string().optional(),
   description: z.string().nullish(),
   createdAt: z.string(),
   updatedAt: z.string(),
