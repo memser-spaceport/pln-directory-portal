@@ -1,4 +1,5 @@
-import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'nestjs-zod/z';
 import { ProjectContributionSchema } from './project-contribution';
 
 export const statusEnum = z.enum(['PENDING', 'APPROVED', 'REJECTED']);
@@ -47,7 +48,7 @@ const newDataMemberSchema = z.object({
   officeHours: z.string().optional().nullable(),
   imageUid: z.string().optional().nullable(),
   moreDetails: z.string().optional().nullable(),
-  projectContributions:  z.array(ProjectContributionSchema).optional()
+  projectContributions:  z.array(ProjectContributionSchema as any).optional()
 });
 
 const newDataTeamSchema = z.object({
@@ -77,7 +78,7 @@ export const ParticipantRequestMemberSchema = z.object({
   oldData: oldDataPostSchema.optional().nullable(),
   newData: newDataMemberSchema,
   referenceUid: z.string().optional().nullable(),
-  requesterEmailId: z.string(),
+  requesterEmailId: z.string().nullish(),
   uniqueIdentifier: z.string(),
 });
 
@@ -92,6 +93,17 @@ export const ParticipantRequestTeamSchema = z.object({
   oldData: oldDataPostSchema.optional().nullable(),
   newData: newDataTeamSchema,
   referenceUid: z.string().optional().nullable(),
-  requesterEmailId: z.string(),
+  requesterEmailId: z.string().nullish(),
   uniqueIdentifier: z.string(),
 });
+
+export const FindUniqueIdentiferSchema = z.object({
+  type: participantTypeEnum,
+  identifier: z.string()
+})
+
+const ProcessParticipantRequest = z.object({
+    status: statusEnum,
+})
+export class ProcessParticipantReqDto extends createZodDto(ProcessParticipantRequest) {}
+export class FindUniqueIdentiferDto extends createZodDto(FindUniqueIdentiferSchema) { }

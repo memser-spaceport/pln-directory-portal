@@ -1,24 +1,18 @@
 /* eslint-disable prettier/prettier */
-import { CacheModule, Module } from '@nestjs/common';
-import { AwsService } from '../utils/aws/aws.service';
-import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
+import {Module, forwardRef } from '@nestjs/common';
+import { MembersModule } from '../members/members.module';
+import { SharedModule } from '../shared/shared.module';
+import { TeamsModule } from '../teams/teams.module';
 import { ParticipantsRequestController } from './participants-request.controller';
 import { ParticipantsRequestService } from './participants-request.service';
-import { UniqueIdentifier } from './unique-identifier/unique-identifier.controller';
-import { RedisService } from '../utils/redis/redis.service';
-import { SlackService } from '../utils/slack/slack.service';
-import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
+import { NotificationService } from '../utils/notification/notification.service';
 @Module({
-  imports: [],
-  controllers: [ParticipantsRequestController, UniqueIdentifier],
+  imports: [forwardRef(() => MembersModule), forwardRef(() => TeamsModule), SharedModule],
+  controllers: [ParticipantsRequestController],
   providers: [
     ParticipantsRequestService,
-    LocationTransferService,
-    AwsService,
-    RedisService,
-    SlackService,
-    ForestAdminService,
+    NotificationService
   ],
-  exports: [ParticipantsRequestService]
+  exports: [ParticipantsRequestService, NotificationService]
 })
 export class ParticipantsRequestModule {}

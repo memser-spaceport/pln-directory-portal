@@ -1,7 +1,8 @@
-import { Body, Controller, Param, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Param, Req, UseGuards, UsePipes, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
+import { ZodValidationPipe } from 'nestjs-zod';
 import {
   MemberDetailQueryParams,
   MemberQueryParams,
@@ -22,6 +23,7 @@ import { NoCache } from '../decorators/no-cache.decorator';
 import { AuthGuard } from '../guards/auth.guard';
 import { UserAccessTokenValidateGuard } from '../guards/user-access-token-validate.guard';
 import { LogService } from '../shared/log.service';
+import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
@@ -30,7 +32,14 @@ type RouteShape = typeof server.routeShapes;
 @NoCache()
 export class MemberController {
   constructor(private readonly membersService: MembersService, private logger: LogService) {}
-
+ 
+  /**
+   * Retrieves a list of members based on query parameters.
+   * Builds a Prisma query from the queryable fields and adds filters for names, roles, and recent members.
+   * 
+   * @param request - HTTP request object containing query parameters
+   * @returns Array of members with related data
+   */
   @Api(server.route.getMembers)
   @ApiQueryFromZod(MemberQueryParams)
   @ApiOkResponseFromZod(ResponseMemberWithRelationsSchema.array())
@@ -54,6 +63,13 @@ export class MemberController {
     return await this.membersService.findAll(builtQuery);
   }
 
+  /**
+   * Retrieves member roles based on query parameters with their counts.
+   * Builds a Prisma query and applies filters to return roles with the count of associated members.
+   * 
+   * @param request - HTTP request object containing query parameters
+   * @returns Array of roles with member counts
+   */
   @Api(server.route.getMemberRoles)
   async getMemberFilters(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
@@ -74,6 +90,14 @@ export class MemberController {
     return await this.membersService.getRolesWithCount(builtQuery, queryParams);
   }
 
+  /**
+   * Retrieves details of a specific member by UID.
+   * Builds a query for member details including relations and profile data.
+   * 
+   * @param request - HTTP request object containing query parameters
+   * @param uid - UID of the member to fetch
+   * @returns Member details with related data
+   */
   @Api(server.route.getMember)
   @ApiParam({ name: 'uid', type: 'string' })
   @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
@@ -88,14 +112,39 @@ export class MemberController {
     return member;
   }
 
+  /**
+   * Updates member details based on the provided participant request data.
+   * Uses a validation pipe to ensure that the request is valid before processing.
+   * 
+   * @param id - ID of the member to update
+   * @param body - Request body containing member data to update
+   * @param req - HTTP request object containing user email
+   * @returns Updated member data
+   */
   @Api(server.route.modifyMember)
   @UseGuards(UserTokenValidation)
-  async updateOne(@Param('id') id, @Body() body, @Req() req) {
+  @UsePipes(new ParticipantsReqValidationPipe())
+  async updateMember(@Param('uid') uid, @Body() participantsRequest, @Req() req) {
     this.logger.info(`Member update request - Initated by -> ${req.userEmail}`);
-    const participantsRequest = body;
-    return await this.membersService.editMemberParticipantsRequest(participantsRequest, req.userEmail);
+    const requestor = await this.membersService.findMemberByEmail(req.userEmail);
+    const { referenceUid } = participantsRequest;
+    if (
+      !requestor.isDirectoryAdmin &&
+      referenceUid !== requestor.uid
+    ) {
+      throw new ForbiddenException(`Member isn't authorized to update the member`);
+    }
+    return await this.membersService.updateMemberFromParticipantsRequest(uid, participantsRequest, requestor.email);
   }
 
+  /**
+   * Updates a member's preference settings.
+   * 
+   * @param id - UID of the member whose preferences will be updated
+   * @param body - Request body containing preference data
+   * @param req - HTTP request object
+   * @returns Updated preference data
+   */
   @Api(server.route.modifyMemberPreference)
   @UseGuards(AuthGuard)
   async updatePrefernce(@Param('uid') id, @Body() body, @Req() req) {
@@ -105,10 +154,16 @@ export class MemberController {
 
   @Api(server.route.updateMember)
   @UseGuards(UserTokenValidation)
-  async updateMember(@Param('uid') uid, @Body() body) {
-    return await this.membersService.updateMember(uid, body);
+  async updateMemberByUid(@Param('uid') uid, @Body() body) {
+    return await this.membersService.updateMemberByUid(uid, body);
   }
 
+  /**
+   * Retrieves a member's preference settings by UID.
+   * 
+   * @param uid - UID of the member whose preferences will be fetched
+   * @returns Member's preferences
+   */
   @Api(server.route.getMemberPreferences)
   @UseGuards(AuthGuard)
   @NoCache()
@@ -116,18 +171,56 @@ export class MemberController {
     return await this.membersService.getPreferences(uid);
   }
 
+  /**
+   * Sends an OTP for email change to the new email provided by the member.
+   * 
+   * @param sendOtpRequest - Request DTO containing the new email
+   * @param req - HTTP request object containing user email
+   * @returns Response indicating success of OTP sending
+   */
   @Api(server.route.sendOtpForEmailChange)
   @UseGuards(UserAccessTokenValidateGuard)
+  @UsePipes(ZodValidationPipe)
   async sendOtpForEmailChange(@Body() sendOtpRequest: SendEmailOtpRequestDto, @Req() req) {
-    return await this.membersService.sendOtpForEmailChange(sendOtpRequest.newEmail, req.userEmail);
+    const oldEmailId = req.userEmail;
+    if (sendOtpRequest.newEmail.toLowerCase().trim() === oldEmailId.toLowerCase().trim()) {
+      throw new BadRequestException('New email cannot be same as old email');
+    }
+    let isMemberAvailable = await this.membersService.isMemberExistForEmailId(oldEmailId);
+    if (!isMemberAvailable) {
+      throw new ForbiddenException('Your email seems to have been updated recently. Please login and try again');
+    }
+    isMemberAvailable = await this.membersService.isMemberExistForEmailId(sendOtpRequest.newEmail);
+    if (isMemberAvailable) {
+      throw new BadRequestException('Above email id is already used. Please try again with different email id.');
+    }
+    return await this.membersService.sendOtpForEmailChange(sendOtpRequest.newEmail);
   }
 
+  /**
+   * Updates a member's email address to a new one.
+   * 
+   * @param changeEmailRequest - Request DTO containing the new email address
+   * @param req - HTTP request object containing user email
+   * @returns Updated member data with new email
+   */
   @Api(server.route.updateMemberEmail)
   @UseGuards(UserAccessTokenValidateGuard)
+  @UsePipes(ZodValidationPipe)
   async updateMemberEmail(@Body() changeEmailRequest: ChangeEmailRequestDto, @Req() req) {
-    return await this.membersService.updateMemberEmail(changeEmailRequest.newEmail, req.userEmail);
+    const memberInfo = await this.membersService.findMemberByEmail(req.userEmail);
+    if(!memberInfo || !memberInfo.externalId) {
+      throw new ForbiddenException("Please login again and try")
+    }
+    return await this.membersService.updateMemberEmail(changeEmailRequest.newEmail, req.userEmail, memberInfo);
   }
 
+  /**
+   * Retrieves GitHub projects associated with the member identified by UID.
+   * 
+   * @param uid - UID of the member whose GitHub projects will be fetched
+   * @returns Array of GitHub projects associated with the member
+   */
   @Api(server.route.getMemberGitHubProjects)
   async getGitProjects(@Param('uid') uid) {
     return await this.membersService.getGitProjects(uid);
