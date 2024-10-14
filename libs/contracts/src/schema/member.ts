@@ -107,11 +107,11 @@ export class ResponseMemberSchemaDto extends createZodDto(
 export type TMemberResponse = z.infer<typeof ResponseMemberWithRelationsSchema>;
 
 const ChangeEmailRequestSchema = z.object({
-  newEmail: z.string(),
+  newEmail: z.string().email(),
 })
 
 const SendEmailOtpRequestSchema = z.object({
-  newEmail: z.string()
+  newEmail: z.string().email(),
 })
 
 export class SendEmailOtpRequestDto extends createZodDto(SendEmailOtpRequestSchema) {}

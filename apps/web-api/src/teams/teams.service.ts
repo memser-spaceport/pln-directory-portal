@@ -1,97 +1,641 @@
 import {
   Injectable,
-  UnauthorizedException,
+  ConflictException,
   ForbiddenException,
-  InternalServerErrorException,
   BadRequestException,
-  HttpException,
+  NotFoundException,
+  Inject,
+  forwardRef,
+  CACHE_MANAGER
 } from '@nestjs/common';
-import { Prisma, ParticipantType } from '@prisma/client';
 import * as path from 'path';
 import { z } from 'zod';
+import { Prisma, Team, Member, ParticipantsRequest } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schema';
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
+import { NotificationService } from '../utils/notification/notification.service';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { hashFileName } from '../utils/hashing';
-import { ParticipantRequestTeamSchema } from 'libs/contracts/src/schema/participants-request';
+import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
+import { MembersService } from '../members/members.service';
+import { LogService } from '../shared/log.service'; 
+import { Cache } from 'cache-manager';
+import { copyObj, buildMultiRelationMapping, buildRelationMapping } from '../utils/helper/helper';
 
 @Injectable()
 export class TeamsService {
   constructor(
     private prisma: PrismaService,
     private fileMigrationService: FileMigrationService,
-    private participantsRequestService: ParticipantsRequestService
+    @Inject(forwardRef(() => ParticipantsRequestService))
+    private participantsRequestService: ParticipantsRequestService,
+    @Inject(forwardRef(() => MembersService))
+    private membersService: MembersService,
+    private logger: LogService,
+    private forestadminService: ForestAdminService,
+    private notificationService: NotificationService,
+    @Inject(CACHE_MANAGER) private cacheService: Cache
   ) {}
 
-  async findAll(queryOptions: Prisma.TeamFindManyArgs) {
-    return this.prisma.team.findMany({
-      ...queryOptions
-    });
+  /**
+   * Find all teams based on provided query options.
+   * Allows flexibility in filtering, sorting, and pagination through Prisma.TeamFindManyArgs.
+   *
+   * @param queryOptions - Prisma query options to customize the result set 
+   *   (filter, pagination, sorting, etc.)
+   * @returns A list of teams that match the query options
+   */
+  async findAll(queryOptions: Prisma.TeamFindManyArgs): Promise<Team[]> {
+    try {
+      return this.prisma.team.findMany({ ...queryOptions }); 
+    } catch(err) {
+      return this.handleErrors(err);
+    }
   }
 
-  async findOne(
+  /**
+   * Find a single team by its unique identifier (UID).
+   * Retrieves detailed information about the team, 
+   * including related data like projects, technologies, and team focus areas.
+   * 
+   * @param uid - Unique identifier for the team
+   * @param queryOptions - Additional Prisma query options (excluding 'where') for
+   *   customizing the result set
+   * @returns The team object with all related information or throws an error if not found
+   * @throws {NotFoundException} If the team with the given UID is not found
+   */
+  async findTeamByUid(
     uid: string,
     queryOptions: Omit<Prisma.TeamFindUniqueArgsBase, 'where'> = {}
+  ): Promise<Team> {
+    try {
+      const team = await this.prisma.team.findUniqueOrThrow({
+        where: { uid },
+        ...queryOptions,
+        include: {
+          fundingStage: true,
+          industryTags: true,
+          logo: true,
+          membershipSources: true,
+          technologies: true,
+          maintainingProjects: {
+            orderBy: { name: 'asc' },
+            include: {
+              logo: { select: { url: true, uid: true } },
+              maintainingTeam: { select: { name: true, logo: { select: { url: true, uid: true } } } },
+              contributingTeams: true,
+            },
+          },
+          contributingProjects: {
+            orderBy: { name: 'asc' },
+            include: {
+              logo: { select: { url: true, uid: true } },
+              maintainingTeam: { select: { name: true, logo: { select: { url: true, uid: true } } } },
+              contributingTeams: true,
+            },
+          },
+          teamFocusAreas: {
+            select: {
+              focusArea: { select: { uid: true, title: true } },
+            },
+          },
+        },
+      });
+      team.teamFocusAreas = this.removeDuplicateFocusAreas(team.teamFocusAreas);
+      return team;
+    } catch(err) {
+      return this.handleErrors(err, uid);
+    }
+  }
+
+  /**
+   * Find a team by its name.
+   * 
+   * @param name - The name of the team to find
+   * @returns The team object if found, otherwise null
+   */
+  async findTeamByName(name: string): Promise<Team> {
+    try {
+      return this.prisma.team.findUniqueOrThrow({
+        where: { name },
+      });
+    } catch(err) {
+      return this.handleErrors(err);
+    }
+  };
+
+  /**
+   * Creates a new team in the database within a transaction.
+   * 
+   * @param team - The data for the new team to be created
+   * @param tx - The transaction client to ensure atomicity
+   * @returns The created team record
+   */
+  async createTeam(
+    team: Prisma.TeamUncheckedCreateInput, 
+    tx: Prisma.TransactionClient
+  ): Promise<Team> {
+    try {
+      return await tx.team.create({
+        data: team,
+      });
+    } catch(err) {
+      return this.handleErrors(err);
+    }
+  }
+
+  /**
+   * Updates the team data in the database within a transaction.
+   * 
+   * @param teamUid - Unique identifier of the team being updated
+   * @param team - The new data to be applied to the team
+   * @param tx - The transaction client to ensure atomicity
+   * @returns The updated team record
+   */
+  async updateTeamByUid(
+    uid: string,
+    team: Prisma.TeamUncheckedUpdateInput,
+    tx: Prisma.TransactionClient,
+  ): Promise<Team> {
+    try {
+      return await tx.team.update({
+        where: { uid },
+        data: team,
+      });
+    } catch(err) {
+      return this.handleErrors(err, `${uid}`);
+    }
+  }
+
+  /**
+   * Updates the existing team with new information.
+   * updates the team, logs the update in the participants request table,
+   * resets the cache, and triggers post-update actions like Airtable synchronization.
+   * 
+   * @param teamUid - Unique identifier of the team to be updated
+   * @param teamParticipantRequest - Data containing the updated team information
+   * @param requestorEmail - Email of the person making the request
+   * @returns A success message if the operation is successful
+   */
+  async updateTeamFromParticipantsRequest(
+    teamUid: string,
+    teamParticipantRequest: ParticipantsRequest,
+    requestorEmail: string
+  ): Promise<Team> {
+    const updatedTeam: any = teamParticipantRequest.newData;
+    const existingTeam = await this.findTeamByUid(teamUid);
+    let result;
+    await this.prisma.$transaction(async (tx) => {
+      const team = await this.formatTeam(teamUid, updatedTeam, tx, "Update");
+      result = await this.updateTeamByUid(teamUid, team, tx);
+      await this.logParticipantRequest(requestorEmail, updatedTeam, existingTeam.uid, tx);
+    });
+    this.notificationService.notifyForTeamEditApproval(updatedTeam.name, teamUid, requestorEmail);
+    await this.postUpdateActions();
+    return result;
+  }
+
+  /**
+   * Creates a new team from the participants request data.
+   * resets the cache, and triggers post-update actions like Airtable synchronization.
+   * @param teamParticipantRequest - The request containing the team details.
+   * @param requestorEmail - The email of the requestor.
+   * @returns The newly created team.
+   */
+  async createTeamFromParticipantsRequest(
+    teamParticipantRequest: ParticipantsRequest,
+    tx: Prisma.TransactionClient
+  ): Promise<Team> {
+    const newTeam: any = teamParticipantRequest.newData;
+    const formattedTeam = await this.formatTeam(null, newTeam, tx);
+    const createdTeam = await this.createTeam(formattedTeam, tx);
+    return createdTeam;
+  } 
+
+  /**
+   * Format team data for creation or update
+   * 
+   * @param teamUid - The unique identifier for the team (used for updates)
+   * @param teamData - Raw team data to be formatted
+   * @param tx - Transaction client for atomic operations
+   * @param type - Operation type ('create' or 'update')
+   * @returns - Formatted team data for Prisma query
+   */
+  async formatTeam(
+    teamUid: string | null,
+    teamData: Partial<Team>,
+    tx: Prisma.TransactionClient,
+    type: string = 'create'
   ) {
-    const team = await this.prisma.team.findUniqueOrThrow({
-      where: { uid },
-      ...queryOptions,
-      include: {
-        fundingStage: true,
-        industryTags: true,
-        logo: true,
-        membershipSources: true,
-        technologies: true,
-        maintainingProjects:{
-          orderBy: [
-            {
-              name: 'asc'
-            }
-          ],
-          include: {
-            logo: { select: { url: true, uid: true } },     
-            maintainingTeam: {
-              select: {
-                name: true,
-                logo: { select: { url: true, uid: true } },
-              },
-            },
-            contributingTeams: true
+    const team: any = {};
+    const directFields = [
+      'name', 'blog', 'contactMethod', 'twitterHandler',
+      'linkedinHandler', 'telegramHandler', 'officeHours',
+      'shortDescription', 'website', 'airtableRecId',
+      'longDescription', 'moreDetails'
+    ];
+    copyObj(teamData, team, directFields);
+    // Handle one-to-one or one-to-many mappings
+    team['fundingStage'] = buildRelationMapping('fundingStage', teamData);
+    team['industryTags'] = buildMultiRelationMapping('industryTags', teamData, type);
+    team['technologies'] = buildMultiRelationMapping('technologies', teamData, type);
+    team['membershipSources'] = buildMultiRelationMapping('membershipSources', teamData, type);
+    if (type === 'create') {
+      team['teamFocusAreas'] = await this.createTeamWithFocusAreas(teamData, tx);
+    } 
+    if (teamUid) {
+      team['teamFocusAreas'] = await this.updateTeamWithFocusAreas(teamUid, teamData, tx);
+    }
+    team['logo'] = teamData.logoUid
+      ? { connect: { uid: teamData.logoUid } }
+      : type === 'update' ? { disconnect: true } : undefined;
+    return team;
+  }
+
+  /**
+   * Validates the permissions of the requestor. The requestor must either be an admin or the leader of the team.
+   * 
+   * @param requestorEmail - The email of the person requesting the update
+   * @param teamUid - The unique identifier of the team being updated
+   * @returns The requestor's member data if validation passes
+   * @throws {UnauthorizedException} If the requestor is not found
+   * @throws {ForbiddenException} If the requestor does not have sufficient permissions
+   */
+  async validateRequestor(requestorEmail: string, teamUid: string): Promise<Member> {
+    const requestor = await this.membersService.findMemberByEmail(requestorEmail);
+    if (!requestor.isDirectoryAdmin && !requestor.leadingTeams.includes(teamUid)) {
+      throw new ForbiddenException('Requestor does not have permission to update this team');
+    }
+    return requestor;
+  }
+
+  /**
+   * Removes duplicate focus areas from the team object based on their UID.
+   * Ensures that each focus area is unique in the result set.
+   * 
+   * @param focusAreas - An array of focus areas associated with the team
+   * @returns A deduplicated array of focus areas
+   */
+  private removeDuplicateFocusAreas(focusAreas):any {
+    const uniqueFocusAreas = {};
+    focusAreas.forEach(item => {
+      const { uid, title } = item.focusArea;
+      uniqueFocusAreas[uid] = { uid, title };
+    });
+    return Object.values(uniqueFocusAreas);
+  };
+
+  /**
+   * Logs the participant request in the participants request table for audit and tracking purposes.
+   * 
+   * @param requestorEmail - Email of the requestor who is updating the team
+   * @param newTeamData - The new data being applied to the team
+   * @param referenceUid - Unique identifier of the existing team to be referenced
+   * @param tx - The transaction client to ensure atomicity
+   */
+  private async logParticipantRequest(
+    requestorEmail: string,
+    newTeamData,
+    referenceUid: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    await this.participantsRequestService.add({
+      status: 'AUTOAPPROVED',
+      requesterEmailId: requestorEmail,
+      referenceUid,
+      uniqueIdentifier: newTeamData?.name || '',
+      participantType: 'TEAM',
+      newData: { ...newTeamData },
+    },
+    tx
+    );
+  }
+
+  /**
+   * Executes post-update actions such as resetting the cache and triggering Airtable sync.
+   * This ensures that the system is up-to-date with the latest changes.
+   */
+  private async postUpdateActions(): Promise<void> {
+    await this.cacheService.reset();
+    await this.forestadminService.triggerAirtableSync();
+  }
+
+  /**
+   * Utility function to map single relational data
+   * 
+   * @param field - The field name to map
+   * @param rawData - The raw data input
+   * @returns - Relation object for Prisma query
+   */
+  private buildRelationMapping(field: string, rawData: any) {
+    return rawData[field]?.uid
+      ? { connect: { uid: rawData[field].uid } }
+      : undefined;
+  }
+
+  /**
+   * Utility function to map multiple relational data
+   * 
+   * @param field - The field name to map
+   * @param rawData - The raw data input
+   * @param type - Operation type ('create' or 'update')
+   * @returns - Multi-relation object for Prisma query
+   */
+  private buildMultiRelationMapping(field: string, rawData: any, type: string) {
+    const dataExists = rawData[field]?.length > 0;
+    if (!dataExists) {
+      return type === 'update' ? { set: [] } : undefined;
+    }
+    return {
+      [type === 'create' ? 'connect' : 'set']: rawData[field].map((item: any) => ({ uid: item.uid }))
+    };
+  }
+
+  /**
+   * Creates focus area mappings for a new team.
+   * 
+   * @param team - The team object containing focus areas
+   * @param transaction - The transaction client for atomic operations
+   * @returns - Data for bulk insertion of focus areas
+   */
+  async createTeamWithFocusAreas(team, transaction: Prisma.TransactionClient) {
+    if (team.focusAreas && team.focusAreas.length > 0) {
+      let teamFocusAreas:any = [];
+      const focusAreaHierarchies = await transaction.focusAreaHierarchy.findMany({
+        where: {
+          subFocusAreaUid: {
+            in: team.focusAreas.map(area => area.uid)
           }
-        },
-        contributingProjects: {
-          orderBy: [
-            {
-              name: 'asc'
-            }
-          ],
-          include: {
-            logo: { select: { url: true, uid: true } },     
-            maintainingTeam: {
-              select: {
-                name: true,
-                logo: { select: { url: true, uid: true } },
-              },
-            },
-            contributingTeams: true
-          }
-        },
+        }
+      });
+      focusAreaHierarchies.map(areaHierarchy => {
+        teamFocusAreas.push({
+          focusAreaUid: areaHierarchy.subFocusAreaUid,
+          ancestorAreaUid: areaHierarchy.focusAreaUid
+        });
+      });
+      team.focusAreas.map(area => {
+        teamFocusAreas.push({
+          focusAreaUid: area.uid,
+          ancestorAreaUid: area.uid
+        });
+      });
+      return {
+        createMany: {
+          data: teamFocusAreas
+        }
+      }
+    }
+    return {};
+  }
+ 
+  /**
+   * Updates focus areas for an existing team.
+   * 
+   * @param teamUid - The unique identifier of the team
+   * @param team - The team object containing new focus areas
+   * @param transaction - The transaction client for atomic operations
+   * @returns - Data for bulk insertion of updated focus areas
+   */
+  async updateTeamWithFocusAreas(teamUid: string, team, transaction: Prisma.TransactionClient) {
+    await transaction.teamFocusArea.deleteMany({
+      where: { teamUid }
+    });
+    if (!team.focusAreas || team.focusAreas.length === 0) {
+      return {};
+    }
+    return await this.createTeamWithFocusAreas(team, transaction);
+  }
+ 
+  /**
+   * Builds filter for focus areas by splitting the input and matching ancestor titles.
+   * @param focusAreas - Comma-separated focus area titles
+   * @returns - Prisma filter for teamFocusAreas
+   */
+  buildFocusAreaFilters(focusAreas) {
+    if (focusAreas?.split(',')?.length > 0) {
+      return {
         teamFocusAreas: {
-          select: {
-            focusArea: {
-              select: { 
-                uid: true,
-                title: true 
+          some: {
+            ancestorArea:{
+              title: {
+                in: focusAreas?.split(',')
               }
             }
           }
         }
-      },
-    });
-    team.teamFocusAreas = this.removeDuplicateFocusAreas(team.teamFocusAreas);
-    return team;
+      }
+    }
+    return {};
   }
+ 
+  /**
+   * Constructs the team filter based on multiple query parameters.
+   * @param queryParams - Query parameters from the request
+   * @returns - Prisma AND filter combining all conditions
+   */
+  buildTeamFilter(queryParams){
+    const { 
+      name,
+      plnFriend, 
+      industryTags, 
+      technologies,
+      membershipSources,
+      fundingStage,
+      officeHours  
+    } = queryParams;
+    const filter:any = [];
+    this.buildNameAndPLNFriendFilter(name, plnFriend, filter);
+    this.buildIndustryTagsFilter(industryTags, filter);
+    this.buildTechnologiesFilter(technologies, filter);
+    this.buildMembershipSourcesFilter(membershipSources, filter);
+    this.buildFundingStageFilter(fundingStage, filter);
+    this.buildOfficeHoursFilter(officeHours, filter);
+    this.buildRecentTeamsFilter(queryParams, filter);
+    return { 
+      AND: filter
+    };
+  };
+
+  /**
+   * Adds name and PLN friend filter conditions to the filter array.
+   * @param name - Team name to search for (case-insensitive)
+   * @param plnFriend - Boolean to filter teams that are PLN friends
+   * @param filter - Filter array to be appended to
+   */
+  buildNameAndPLNFriendFilter(name, plnFriend, filter) {
+    if (name) {
+      filter.push({ 
+        name: {
+          contains: name,
+          mode: 'insensitive'
+        }
+      });
+    }  
+    if (!(plnFriend === "true")) {
+      filter.push({  
+        plnFriend: false
+      }); 
+    }
+  }
+
+  /**
+   * Adds industry tags filter to the filter array.
+   * @param industryTags - Comma-separated industry tags
+   * @param filter - Filter array to be appended to
+   */
+  buildIndustryTagsFilter(industryTags, filter) {
+    const tags = industryTags?.split(',').map(tag=> tag.trim());
+    if (tags?.length > 0) {
+      tags.map((tag)=> {
+        filter.push({
+          industryTags:{
+            some: {
+              title: { 
+                in: tag 
+              }
+            }
+          }
+        });
+      });
+    }
+  }
+
+  /**
+   * Adds technology tags filter to the filter array.
+   * @param technologies - Comma-separated technology tags
+   * @param filter - Filter array to be appended to
+   */
+  buildTechnologiesFilter(technologies, filter) {
+    const tags = technologies?.split(',').map(tech => tech.trim());
+    if (tags?.length > 0) {
+      tags.map((tag)=> {
+        filter.push({
+          technologies: {
+            some: {
+              title: { 
+                in: tag 
+              }
+            }
+          }
+        });
+      });
+    }
+  }
+
+  /**
+   * Adds membership sources filter to the filter array.
+   * @param membershipSources - Comma-separated membership source titles
+   * @param filter - Filter array to be appended to
+   */
+  buildMembershipSourcesFilter(membershipSources, filter) {
+    const sources = membershipSources?.split(',').map(source => source.trim());
+    if (sources?.length > 0) {
+      sources.map((source)=> {
+        filter.push({
+          membershipSources: {
+            some: {
+              title: { 
+                in: source 
+              }
+            }
+          }
+        });
+      });
+    }
+  }
+
+  /**
+   * Adds funding stage filter to the filter array.
+   * @param fundingStage - Title of the funding stage
+   * @param filter - Filter array to be appended to
+   */
+  buildFundingStageFilter(fundingStage, filter) {
+    if (fundingStage?.length > 0) {
+      filter.push({
+        fundingStage: {
+          title: fundingStage.trim()
+        }
+      });
+    }
+  }
+
+  /**
+   * Adds office hours filter to the filter array.
+   * @param officeHours - Boolean to check if teams have office hours
+   * @param filter - Filter array to be appended to
+   */
+  buildOfficeHoursFilter(officeHours, filter) {
+    if (officeHours === "true") {
+      filter.push({
+        officeHours: { not: null }
+      });
+    }
+  }
+
+  /**
+   * Constructs a dynamic filter query for retrieving recent teams based on the 'is_recent' query parameter.
+   * If 'is_recent' is set to 'true', it creates a 'createdAt' filter to retrieve records created within a
+   * specified number of days. The number of days is configured via an environment variable.
+   * 
+   * If a filter array is passed, it pushes the 'createdAt' filter to the existing filters.
+   * 
+   * @param queryParams - HTTP request query parameters object
+   * @param filter - Optional existing filter array to which the recent filter will be added if provided
+   * @returns The constructed query with a 'createdAt' filter if 'is_recent' is 'true',
+   *          or an empty object if 'is_recent' is not provided or set to 'false'.
+   */
+  buildRecentTeamsFilter(queryParams, filter?) { 
+    const { isRecent } = queryParams;
+    const recentFilter = {
+      createdAt: {
+        gte: new Date(Date.now() - (parseInt(process.env.RECENT_RECORD_DURATION_IN_DAYS || '30') * 24 * 60 * 60 * 1000))
+      }
+    };
+    if (isRecent === 'true' && !filter) {
+      return recentFilter;
+    } 
+    if (isRecent === 'true' && filter) {
+      filter.push(recentFilter);
+    }
+    return {};
+  }
+
+  /**
+   * Handles database-related errors specifically for the Team entity.
+   * Logs the error and throws an appropriate HTTP exception based on the error type.
+   * 
+   * @param {any} error - The error object thrown by Prisma or other services.
+   * @param {string} [message] - An optional message to provide additional context, 
+   *                             such as the team UID when an entity is not found.
+   * @throws {ConflictException} - If there's a unique key constraint violation.
+   * @throws {BadRequestException} - If there's a foreign key constraint violation or validation error.
+   * @throws {NotFoundException} - If a team is not found with the provided UID.
+   */
+  private handleErrors(error, message?: string) {
+    this.logger.error(error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      switch (error?.code) {
+        case 'P2002':
+          throw new ConflictException('Unique key constraint error on Team:', error.message);
+        case 'P2003':
+          throw new BadRequestException('Foreign key constraint error on Team', error.message);
+        case 'P2025':
+          throw new NotFoundException('Team not found with uid: ' + message);
+        default:
+          throw error;
+      }
+    }
+    else if (error instanceof Prisma.PrismaClientValidationError) {
+      throw new BadRequestException(
+        'Database field validation error on Team',
+        error.message
+      );
+    }
+    return error;
+  }
+
 
   async insertManyFromAirtable(
     airtableTeams: z.infer<typeof AirtableTeamSchema>[]
@@ -206,224 +750,5 @@ export class TeamsService {
         },
       });
     }
-  }
-
-  async editTeamParticipantsRequest(participantsRequest, userEmail) {
-    const { referenceUid } = participantsRequest;
-    const requestorDetails =
-      await this.participantsRequestService.findMemberByEmail(userEmail);
-    if (!requestorDetails) {
-      throw new UnauthorizedException();
-    }
-    if (
-      !requestorDetails.isDirectoryAdmin &&
-      !requestorDetails.leadingTeams?.includes(referenceUid)
-    ) {
-      throw new ForbiddenException();
-    }
-    participantsRequest.requesterEmailId = requestorDetails.email;
-    participantsRequest.newData.lastModifiedBy = requestorDetails.uid;
-    if (
-      participantsRequest.participantType === ParticipantType.TEAM.toString() &&
-      !ParticipantRequestTeamSchema.safeParse(participantsRequest).success
-    ) {
-      throw new BadRequestException();
-    }
-    let result;
-    try {
-      await this.prisma.$transaction(async (tx) => {
-        result = await this.participantsRequestService.addRequest(
-          participantsRequest,
-          true,
-          tx
-        );
-        if (result?.uid) {
-          result = await this.participantsRequestService.processTeamEditRequest(
-            result.uid,
-            true, // disable the notification
-            true, // enable the auto approval
-            tx
-          );
-        } else {
-          throw new InternalServerErrorException();
-        }
-      });
-    } catch (error) {
-      if (error?.response?.statusCode && error?.response?.message) {
-        throw new HttpException(
-          error?.response?.message,
-          error?.response?.statusCode
-        );
-      } else {
-        throw new BadRequestException(
-          'Oops, something went wrong. Please try again!'
-        );
-      }
-    }
-    return result;
-  }
-
-  buildFocusAreaFilters(focusAreas) {
-    if (focusAreas?.split(',')?.length > 0) {
-      return {
-        teamFocusAreas: {
-          some: {
-            ancestorArea:{
-              title: {
-                in: focusAreas?.split(',')
-              }
-            }
-          }
-        }
-      }
-    }
-    return {};
-  }
-
-  buildTeamFilter(queryParams){
-    const { 
-      name,
-      plnFriend, 
-      industryTags, 
-      technologies,
-      membershipSources,
-      fundingStage,
-      officeHours
-    } = queryParams;
-    const filter:any = [];
-    this.buildNameAndPLNFriendFilter(name, plnFriend, filter);
-    this.buildIndustryTagsFilter(industryTags, filter);
-    this.buildTechnologiesFilter(technologies, filter);
-    this.buildMembershipSourcesFilter(membershipSources, filter);
-    this.buildFundingStageFilter(fundingStage, filter);
-    this.buildOfficeHoursFilter(officeHours, filter);
-    this.buildRecentTeamsFilter(queryParams, filter);
-    return { 
-      AND: filter
-    };
-  };
-
-  buildNameAndPLNFriendFilter(name, plnFriend, filter) {
-    if (name) {
-      filter.push({ 
-        name: {
-          contains: name,
-          mode: 'insensitive'
-        }
-      });
-    }  
-    if (!(plnFriend === "true")) {
-      filter.push({  
-        plnFriend: false
-      }); 
-    }
-  }
-
-  buildIndustryTagsFilter(industryTags, filter) {
-    const tags = industryTags?.split(',').map(tag=> tag.trim());
-    if (tags?.length > 0) {
-      tags.map((tag)=> {
-        filter.push({
-          industryTags:{
-            some: {
-              title: { 
-                in: tag 
-              }
-            }
-          }
-        });
-      });
-    }
-  }
-
-  buildTechnologiesFilter(technologies, filter) {
-    const tags = technologies?.split(',').map(tech => tech.trim());
-    if (tags?.length > 0) {
-      tags.map((tag)=> {
-        filter.push({
-          technologies: {
-            some: {
-              title: { 
-                in: tag 
-              }
-            }
-          }
-        });
-      });
-    }
-  }
-
-  buildMembershipSourcesFilter(membershipSources, filter) {
-    const sources = membershipSources?.split(',').map(source => source.trim());
-    if (sources?.length > 0) {
-      sources.map((source)=> {
-        filter.push({
-          membershipSources: {
-            some: {
-              title: { 
-                in: source 
-              }
-            }
-          }
-        });
-      });
-    }
-  }
-
-  buildFundingStageFilter(fundingStage, filter) {
-    if (fundingStage?.length > 0) {
-      filter.push({
-        fundingStage: {
-          title: fundingStage.trim()
-        }
-      });
-    }
-  }
-
-  removeDuplicateFocusAreas(focusAreas): any {
-    const uniqueFocusAreas = {};
-    focusAreas.forEach(item => {
-        const uid = item.focusArea.uid;
-        const title = item.focusArea.title;
-        uniqueFocusAreas[uid] = { uid, title };
-    });
-    return Object.values(uniqueFocusAreas);
-  }
-
-  buildOfficeHoursFilter(officeHours, filter) {
-    if ((officeHours === "true")) {
-      filter.push({  
-        officeHours: { not: null }
-      });
-    }
-  }
-
-
-  /**
-   * Constructs a dynamic filter query for retrieving recent teams based on the 'is_recent' query parameter.
-   * If 'is_recent' is set to 'true', it creates a 'createdAt' filter to retrieve records created within a
-   * specified number of days. The number of days is configured via an environment variable.
-   * 
-   * If a filter array is passed, it pushes the 'createdAt' filter to the existing filters.
-   * 
-   * @param queryParams - HTTP request query parameters object
-   * @param filter - Optional existing filter array to which the recent filter will be added if provided
-   * @returns The constructed query with a 'createdAt' filter if 'is_recent' is 'true',
-   *          or an empty object if 'is_recent' is not provided or set to 'false'.
-   */
-  buildRecentTeamsFilter(queryParams, filter?) { 
-    const { isRecent } = queryParams;
-    const recentFilter = {
-      createdAt: {
-        gte: new Date(Date.now() - (parseInt(process.env.RECENT_RECORD_DURATION_IN_DAYS || '30') * 24 * 60 * 60 * 1000))
-      }
-    };
-    if (isRecent === 'true' && !filter) {
-      return recentFilter;
-    } 
-    if (isRecent === 'true' && filter) {
-      filter.push(recentFilter);
-    }
-    return {};
   }
 }
