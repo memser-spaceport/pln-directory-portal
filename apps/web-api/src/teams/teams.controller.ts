@@ -1,4 +1,4 @@
-import { Controller, Req, UseGuards, Body, Param } from '@nestjs/common';
+import { Controller, Req, UseGuards, Body, Param, UsePipes } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
@@ -17,7 +17,7 @@ import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-f
 import { TeamsService } from './teams.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
-import { ParticipantRequestTeamSchema } from '../../../../libs/contracts/src/schema/participants-request';
+import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
 
 const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
@@ -64,16 +64,14 @@ export class TeamsController {
       ENABLED_RETRIEVAL_PROFILE
     );
     const builtQuery = builder.build(request.query);
-    return this.teamsService.findOne(uid, builtQuery);
+    return this.teamsService.findTeamByUid(uid, builtQuery);
   }
 
   @Api(server.route.modifyTeam)
   @UseGuards(UserTokenValidation)
-  async updateOne(@Param('id') id, @Body() body, @Req() req) {
-    const participantsRequest = body;
-    return await this.teamsService.editTeamParticipantsRequest(
-      participantsRequest,
-      req.userEmail
-    );
+  @UsePipes(new ParticipantsReqValidationPipe())
+  async updateOne(@Param('uid') teamUid, @Body() body, @Req() req) {
+    await this.teamsService.validateRequestor(req.userEmail, teamUid);
+    return await this.teamsService.updateTeamFromParticipantsRequest(teamUid, body, req.userEmail);
   }
 }

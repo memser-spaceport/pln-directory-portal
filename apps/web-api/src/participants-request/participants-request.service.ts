@@ -1,1065 +1,414 @@
 /* eslint-disable prettier/prettier */
-import {
-  BadRequestException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  CACHE_MANAGER,
-  CacheModule,
-  UnauthorizedException,
+import { 
+  BadRequestException, 
+  ConflictException, 
+  NotFoundException, 
+  Inject, 
+  Injectable, 
+  CACHE_MANAGER, 
+  forwardRef 
 } from '@nestjs/common';
-
-import {
-  ApprovalStatus,
-  ParticipantType,
-  Prisma,
-  PrismaClient,
-} from '@prisma/client';
-import { PrismaService } from '../shared/prisma.service';
-import { AwsService } from '../utils/aws/aws.service';
-import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
-import { RedisService } from '../utils/redis/redis.service';
-import { SlackService } from '../utils/slack/slack.service';
-import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
-import { getRandomId, generateProfileURL } from '../utils/helper/helper';
-import axios from 'axios';
-import { LogService } from '../shared/log.service';
+import { ApprovalStatus, ParticipantType } from '@prisma/client';
 import { Cache } from 'cache-manager';
-import { DEFAULT_MEMBER_ROLES } from '../utils/constants';
+import { Prisma, ParticipantsRequest, PrismaClient } from '@prisma/client';
+import { generateProfileURL } from '../utils/helper/helper';
+import { LogService } from '../shared/log.service';
+import { PrismaService } from '../shared/prisma.service';
+import { MembersService } from '../members/members.service';
+import { TeamsService } from '../teams/teams.service';
+import { NotificationService } from '../utils/notification/notification.service';
+import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
+import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 
 @Injectable()
 export class ParticipantsRequestService {
   constructor(
     private prisma: PrismaService,
-    private locationTransferService: LocationTransferService,
-    private awsService: AwsService,
-    private redisService: RedisService,
-    private slackService: SlackService,
-    private forestAdminService: ForestAdminService,
     private logger: LogService,
-    @Inject(CACHE_MANAGER) private cacheService: Cache,
+    private locationTransferService: LocationTransferService,
+    private forestAdminService: ForestAdminService,
+    private notificationService: NotificationService,
+    @Inject(CACHE_MANAGER) 
+    private cacheService: Cache,
+    @Inject(forwardRef(() => MembersService))
+    private membersService: MembersService,
+    @Inject(forwardRef(() => TeamsService)) 
+    private teamsService: TeamsService,
   ) {}
 
-  async getAll(userQuery) {
-    const filters = {};
-
-    if (userQuery.participantType) {
-      filters['participantType'] = { equals: userQuery.participantType };
-    }
-
-    if (userQuery.status) {
-      filters['status'] = { equals: userQuery.status };
-    }
-
-    if (userQuery.uniqueIdentifier) {
-      filters['uniqueIdentifier'] = { equals: userQuery.uniqueIdentifier };
-    }
-
-    if (userQuery.requestType && userQuery.requestType === 'edit') {
-      filters['referenceUid'] = { not: null };
-    }
-
-    if (userQuery.requestType && userQuery.requestType === 'new') {
-      filters['referenceUid'] = { equals: null };
-    }
-
-    if (userQuery.referenceUid) {
-      filters['referenceUid'] = { equals: userQuery.referenceUid };
-    }
-
-    const results = await this.prisma.participantsRequest.findMany({
-      where: filters,
-      orderBy: { createdAt: 'desc' },
-    });
-    return results;
-  }
-
-  async addAutoApprovalEntry(tx, newEntry) {
-    await tx.participantsRequest.create({
-        data: {...newEntry}
-    })
-  }
-
-  async getByUid(uid) {
-    const result = await this.prisma.participantsRequest.findUnique({
-      where: { uid: uid },
-    });
-    return result;
-  }
-
-  async findMemberByEmail(userEmail) {
-    const foundMember = await this.prisma.member.findUnique({
-      where: {
-        email: userEmail,
-      },
-      include: {
-        memberRoles: true,
-        teamMemberRoles: true,
-      },
-    });
-
-    if (!foundMember) {
-      return null;
-    }
-
-    const roleNames = foundMember.memberRoles.map((m) => m.name);
-    const isDirectoryAdmin = roleNames.includes('DIRECTORYADMIN');
-
-    const formattedMemberDetails = {
-      ...foundMember,
-      isDirectoryAdmin,
-      roleNames,
-      leadingTeams: foundMember.teamMemberRoles
-        .filter((role) => role.teamLead)
-        .map((role) => role.teamUid),
-    };
-
-    return formattedMemberDetails;
-  }
-
-  async findDuplicates(uniqueIdentifier, participantType, uid, requestId) {
-    let itemInRequest = await this.prisma.participantsRequest.findMany({
-      where: {
-        participantType,
-        status: ApprovalStatus.PENDING,
-        OR: [{ referenceUid: uid }, { uniqueIdentifier }],
-      },
-    });
-    itemInRequest = itemInRequest?.filter((item) => item.uid !== requestId);
-    if (itemInRequest.length === 0) {
-      if (participantType === 'TEAM') {
-        let teamResult = await this.prisma.team.findMany({
-          where: {
-            name: uniqueIdentifier,
-          },
-        });
-        teamResult = teamResult?.filter((item) => item.uid !== uid);
-        if (teamResult.length > 0) {
-          return { isRequestPending: false, isUniqueIdentifierExist: true };
-        } else {
-          return { isRequestPending: false, isUniqueIdentifierExist: false };
-        }
-      } else {
-        let memResult = await this.prisma.member.findMany({
-          where: {
-            email: uniqueIdentifier.toLowerCase(),
-          },
-        });
-        memResult = memResult?.filter((item) => item.uid !== uid);
-        if (memResult.length > 0) {
-          return { isRequestPending: false, isUniqueIdentifierExist: true };
-        } else {
-          return { isRequestPending: false, isUniqueIdentifierExist: false };
-        }
-      }
-    } else {
-      return { isRequestPending: true };
-    }
-  }
-
-  async addRequest(
-    requestData,
-    disableNotification = false,
-    transactionType: Prisma.TransactionClient | PrismaClient = this.prisma
-  ) {
-    const uniqueIdentifier =
-      requestData.participantType === 'TEAM'
-        ? requestData.newData.name
-        : requestData.newData.email.toLowerCase().trim();
-    const postData = { ...requestData, uniqueIdentifier };
-    requestData[uniqueIdentifier] = uniqueIdentifier;
-    if (requestData.participantType === ParticipantType.MEMBER.toString()) {
-      const { city, country, region } = postData.newData;
-      if (city || country || region) {
-        const result: any = await this.locationTransferService.fetchLocation(
-          city,
-          country,
-          null,
-          region,
-          null
-        );
-        if (!result || !result?.location) {
-          throw new BadRequestException('Invalid Location info');
-        }
-      }
-    }
-
-    const slackConfig = {
-      requestLabel: '',
-      url: '',
-      name: requestData.newData.name,
-    };
-    const result: any = await transactionType.participantsRequest.create({
-      data: { ...postData },
-    });
-    if (
-      result.participantType === ParticipantType.MEMBER.toString() &&
-      result.referenceUid === null
-    ) {
-      slackConfig.requestLabel = 'New Labber Request';
-      slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`;
-      await this.awsService.sendEmail('NewMemberRequest', true, [], {
-        memberName: result.newData.name,
-        requestUid: result.uid,
-        adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`,
-      });
-    } else if (
-      result.participantType === ParticipantType.MEMBER.toString() &&
-      result.referenceUid !== null &&
-      !disableNotification
-    ) {
-      slackConfig.requestLabel = 'Edit Labber Request';
-      slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`;
-      await this.awsService.sendEmail('EditMemberRequest', true, [], {
-        memberName: result.newData.name,
-        requestUid: result.uid,
-        requesterEmailId: requestData.requesterEmailId,
-        adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/member-view?id=${result.uid}`,
-      });
-    } else if (
-      result.participantType === ParticipantType.TEAM.toString() &&
-      result.referenceUid === null
-    ) {
-      slackConfig.requestLabel = 'New Team Request';
-      slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`;
-      await this.awsService.sendEmail('NewTeamRequest', true, [], {
-        teamName: result.newData.name,
-        requestUid: result.uid,
-        adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,
-      });
-    } else if (
-      result.participantType === ParticipantType.TEAM.toString() &&
-      result.referenceUid !== null
-    ) {
-      slackConfig.requestLabel = 'Edit Team Request';
-      slackConfig.url = `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`;
-      if (!disableNotification)
-        await this.awsService.sendEmail('EditTeamRequest', true, [], {
-          teamName: result.newData.name,
-          teamUid: result.referenceUid,
-          requesterEmailId: requestData.requesterEmailId,
-          adminSiteUrl: `${process.env.WEB_ADMIN_UI_BASE_URL}/team-view?id=${result.uid}`,
-        });
-    }
-
-    if (!disableNotification)
-      await this.slackService.notifyToChannel(slackConfig);
-    await this.cacheService.reset()
-    return result;
-  }
-
-  async updateRequest(newData, requestedUid) {
-    const formattedData = { ...newData };
-
-    // remove id and Uid if present
-    delete formattedData.id;
-    delete formattedData.uid;
-    delete formattedData.status;
-    delete formattedData.participantType;
-    await this.prisma.participantsRequest.update({
-      where: { uid: requestedUid },
-      data: { ...formattedData },
-    });
-    await this.cacheService.reset()
-    return { code: 1, message: 'success' };
-  }
-
-  async processRejectRequest(uidToReject) {
-    const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
-      where: { uid: uidToReject },
-    });
-    if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      throw new BadRequestException('Request already processed');
-    }
-    await this.prisma.participantsRequest.update({
-      where: { uid: uidToReject },
-      data: { status: ApprovalStatus.REJECTED },
-    });
-    await this.cacheService.reset()
-    return { code: 1, message: 'Success' };
-  }
-
-  async processMemberCreateRequest(uidToApprove) {
-    // Get
-    const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
-      where: { uid: uidToApprove },
-    });
-
-    if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      throw new BadRequestException('Request already processed');
-    }
-    const dataToProcess: any = dataFromDB.newData;
-    const dataToSave: any = {};
-    const slackConfig = {
-      requestLabel: '',
-      url: '',
-      name: dataToProcess.name,
-    };
-
-    // Mandatory fields
-    dataToSave['name'] = dataToProcess.name;
-    dataToSave['email'] = dataToProcess.email.toLowerCase().trim();
-
-    // Optional fields
-    dataToSave['githubHandler'] = dataToProcess.githubHandler;
-    dataToSave['discordHandler'] = dataToProcess.discordHandler;
-    dataToSave['twitterHandler'] = dataToProcess.twitterHandler;
-    dataToSave['linkedinHandler'] = dataToProcess.linkedinHandler;
-    dataToSave['telegramHandler'] = dataToProcess.telegramHandler;
-    dataToSave['officeHours'] = dataToProcess.officeHours;
-    dataToSave['moreDetails'] = dataToProcess.moreDetails;
-    dataToSave['plnStartDate'] = dataToProcess.plnStartDate;
-    dataToSave['openToWork'] = dataToProcess.openToWork;
-
-    // Team member roles relational mapping
-    dataToSave['teamMemberRoles'] = {
-      createMany: {
-        data: dataToProcess.teamAndRoles.map((t) => {
-          return {
-            role: t.role,
-            mainTeam: false,
-            teamLead: false,
-            teamUid: t.teamUid,
-            roleTags: t.role?.split(',')?.map(item => item.trim())
-          };
+  /**
+   * Find all participant requests based on the query.
+   * Filters are dynamically applied based on the presence of query parameters.
+   * 
+   * @param userQuery - The query object containing filtering options like participantType, status, etc.
+   * @returns A promise that resolves with the filtered participant requests
+   */
+  async getAll(userQuery): Promise<ParticipantsRequest[]> {
+    try {
+      const filters = {
+        ...(userQuery.participantType && {
+          participantType: { equals: userQuery.participantType },
         }),
-      },
-    };
-
-    // Save Experience if available
-    if(Array.isArray(dataToProcess.projectContributions)
-      && dataToProcess.projectContributions?.length > 0) {
-      dataToSave['projectContributions'] = {
-        createMany: {
-          data: dataToProcess.projectContributions
-        },
+        ...(userQuery.status && { status: { equals: userQuery.status } }),
+        ...(userQuery.uniqueIdentifier && {
+          uniqueIdentifier: { equals: userQuery.uniqueIdentifier }
+        }),
+        ...('edit' === userQuery.requestType && { referenceUid: { not: null } }),
+        ...('new' === userQuery.requestType && { referenceUid: { equals: null } }),
+        ...(userQuery.referenceUid && {
+          referenceUid: { equals: userQuery.referenceUid }
+        })
       };
+      return await this.prisma.participantsRequest.findMany({
+        where: filters,
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch(err) {
+      return this.handleErrors(err)
     }
-
-    // Skills relation mapping
-    dataToSave['skills'] = {
-      connect: dataToProcess.skills.map((s) => {
-        return { uid: s.uid };
-      }),
-    };
-
-    // Image Mapping
-    if (dataToProcess.imageUid) {
-      dataToSave['image'] = { connect: { uid: dataToProcess.imageUid } };
-    }
-
-    // Unique Location Uid needs to be formulated based on city, country & region using google places api and mapped to member
-    const { city, country, region } = dataToProcess;
-    if (city || country || region) {
-      const result: any = await this.locationTransferService.fetchLocation(
-        city,
-        country,
-        null,
-        region,
-        null
-      );
-      if (result && result?.location?.placeId) {
-        const finalLocation: any = await this.prisma.location.upsert({
-          where: { placeId: result?.location?.placeId },
-          update: result?.location,
-          create: result?.location,
-        });
-        if (finalLocation && finalLocation.uid) {
-          dataToSave['location'] = { connect: { uid: finalLocation.uid } };
-        }
-      } else {
-        throw new BadRequestException('Invalid Location info');
-      }
-    }
-
-    // Insert member details
-    const newMember = await this.prisma.member.create({
-      data: { ...dataToSave },
-    });
-    await this.prisma.participantsRequest.update({
-      where: { uid: uidToApprove },
-      data: { status: ApprovalStatus.APPROVED },
-    });
-    await this.awsService.sendEmail('MemberCreated', true, [], {
-      memberName: dataToProcess.name,
-      memberUid: newMember.uid,
-      adminSiteUrl: `${process.env.WEB_UI_BASE_URL}/members/${
-        newMember.uid
-      }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
-    });
-    await this.awsService.sendEmail(
-      'NewMemberSuccess',
-      false,
-      [dataToSave.email],
-      {
-        memberName: dataToProcess.name,
-        memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${
-          newMember.uid
-        }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
-      }
-    );
-    slackConfig.requestLabel = 'New Labber Added';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${
-      newMember.uid
-    }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
-    await this.slackService.notifyToChannel(slackConfig);
-    await this.cacheService.reset()
-    //await this.forestAdminService.triggerAirtableSync();
-    return { code: 1, message: 'Success' };
   }
 
-  async processMemberEditRequest(
-    uidToEdit,
-    disableNotification = false,
-    isAutoApproval = false,
-    isDirectoryAdmin = false,
-    transactionType: Prisma.TransactionClient | PrismaClient = this.prisma
-  ) {
-    // Get
-    const dataFromDB: any =
-      await transactionType.participantsRequest.findUnique({
-        where: { uid: uidToEdit },
+  /**
+   * Add a new entry to the participants request table.
+   * 
+   * @param tx - The transactional Prisma client
+   * @param newEntry - The data for the new participants request entry
+   * @returns A promise that resolves with the newly created entry
+   */
+  async add(
+    newEntry: Prisma.ParticipantsRequestUncheckedCreateInput,
+    tx?: Prisma.TransactionClient, 
+  ): Promise<ParticipantsRequest> {
+    try {
+      return await (tx || this.prisma).participantsRequest.create({
+        data: { ...newEntry },
       });
-    if (dataFromDB?.status !== ApprovalStatus.PENDING.toString()) {
-      throw new BadRequestException('Request already processed');
+    } catch(err) {
+      return this.handleErrors(err)
     }
-    const existingData: any = await transactionType.member.findUnique({
-      where: { uid: dataFromDB.referenceUid },
-      include: {
-        image: true,
-        location: true,
-        skills: true,
-        teamMemberRoles: true,
-        memberRoles: true,
-        projectContributions: true
-      },
-    });
-    const dataToProcess = dataFromDB?.newData;
-    const dataToSave: any = {};
-    const slackConfig = {
-      requestLabel: '',
-      url: '',
-      name: dataToProcess.name,
-    };
+  }
 
-    const isEmailChange = existingData.email !== dataToProcess.email ? true: false;
-    if(isEmailChange) {
-      const foundUser: any = await transactionType.member.findUnique({where: {email: dataToProcess.email.toLowerCase().trim()}});
-      if(foundUser && foundUser.email) {
-        throw new BadRequestException("Email already exists. Please try again with different email")
+  /**
+   * Find a single entry from the participants request table that matches the provided UID.
+   * 
+   * @param uid - The UID of the participants request entry to be fetched
+   * @returns A promise that resolves with the matching entry or null if not found
+   */
+  async findOneByUid(uid: string): Promise<ParticipantsRequest | null> {
+    try {
+      return await this.prisma.participantsRequest.findUnique({
+        where: { uid },
+      });
+    } catch(err) {
+      return this.handleErrors(err, uid)
+    }
+  }
+
+  /**
+   * Check if any entry exists in the participants-request table and the members/teams table
+   * for the given identifier.
+   *
+   * @param type - The participant type (either TEAM or MEMBER)
+   * @param identifier - The unique identifier (team name or member email)
+   * @returns A promise that resolves with an object containing flags indicating whether a request is pending and whether the identifier exists
+   */
+  async checkIfIdentifierAlreadyExist(
+    type: ParticipantType,
+    identifier: string
+  ): Promise<{ 
+    isRequestPending: boolean; 
+    isUniqueIdentifierExist: boolean 
+  }> {
+    try {
+      const existingRequest = await this.prisma.participantsRequest.findFirst({
+        where: {
+          status: ApprovalStatus.PENDING,
+          participantType: type,
+          uniqueIdentifier: identifier,
+        },
+      });
+      if (existingRequest) {
+        return { isRequestPending: true, isUniqueIdentifierExist: false };
       }
-    }
-    this.logger.info(`Member update request - Initiaing update for member uid - ${existingData.uid}, requestId -> ${uidToEdit}`)
-    // Mandatory fields
-    dataToSave['name'] = dataToProcess.name;
-    dataToSave['email'] = dataToProcess.email.toLowerCase().trim();
-
-    // Optional fields
-    dataToSave['githubHandler'] = dataToProcess.githubHandler;
-    dataToSave['discordHandler'] = dataToProcess.discordHandler;
-    dataToSave['twitterHandler'] = dataToProcess.twitterHandler;
-    dataToSave['linkedinHandler'] = dataToProcess.linkedinHandler;
-    dataToSave['telegramHandler'] = dataToProcess.telegramHandler;
-    dataToSave['officeHours'] = dataToProcess.officeHours;
-    dataToSave['moreDetails'] = dataToProcess.moreDetails;
-    dataToSave['plnStartDate'] = dataToProcess.plnStartDate;
-    dataToSave['openToWork'] = dataToProcess.openToWork;
-    dataToSave['bio'] = dataToProcess.bio; 
-
-    // Skills relation mapping
-    dataToSave['skills'] = {
-      set: dataToProcess.skills.map((s) => {
-        return { uid: s.uid };
-      }),
-    };
-
-    // Image Mapping
-    if (dataToProcess.imageUid) {
-      dataToSave['image'] = { connect: { uid: dataToProcess.imageUid } };
-    } else {
-      dataToSave['image'] = { disconnect: true };
-    }
-
-    // Unique Location Uid needs to be formulated based on city, country & region using google places api and mapped to member
-    const { city, country, region } = dataToProcess;
-    if (city || country || region) {
-      const result: any = await this.locationTransferService.fetchLocation(
-        city,
-        country,
-        null,
-        region,
-        null
-      );
-      if (result && result?.location?.placeId) {
-        const finalLocation: any = await this.prisma.location.upsert({
-          where: { placeId: result?.location?.placeId },
-          update: result?.location,
-          create: result?.location,
-        });
-        if (
-          finalLocation &&
-          finalLocation.uid &&
-          existingData?.location?.uid !== finalLocation.uid
-        ) {
-          dataToSave['location'] = { connect: { uid: finalLocation.uid } };
-        }
-      } else {
-        throw new BadRequestException('Invalid Location info');
+      const existingEntry = 
+        type === ParticipantType.TEAM 
+          ? await this.teamsService.findTeamByName(identifier) 
+          : await this.membersService.findMemberByEmail(identifier);
+      if (existingEntry) {
+        return { isRequestPending: false, isUniqueIdentifierExist: true };
       }
-    } else {
-      dataToSave['location'] = { disconnect: true };
+      return { isRequestPending: false, isUniqueIdentifierExist: false };
+    } 
+    catch(err) {
+      return this.handleErrors(err)
     }
+  }
 
-    if (transactionType === this.prisma) {
-      await this.prisma.$transaction(async (tx) => {
-        await this.processMemberEditChanges(
-          existingData,
-          dataFromDB,
-          dataToSave,
-          uidToEdit,
-          isAutoApproval,
+  /**
+   * Update a participants request entry by UID.
+   * The function will omit specific fields (like uid, id, status, participantType) from being updated.
+   *
+   * @param participantRequest - The updated data for the participants request
+   * @param requestedUid - The UID of the participants request to update
+   * @returns A success response after updating the request
+   */
+  async updateByUid(
+    uid: string,
+    participantRequest: Prisma.ParticipantsRequestUncheckedUpdateInput,
+  ):Promise<ParticipantsRequest> {
+    try {
+      const formattedData = { ...participantRequest };
+      delete formattedData.id;
+      delete formattedData.uid;
+      delete formattedData.status;
+      delete formattedData.participantType;
+      const result:ParticipantsRequest = await this.prisma.participantsRequest.update({
+        where: { uid },
+        data: formattedData,
+      });
+      await this.cacheService.reset();
+      return result;
+    } catch(err) {
+      return this.handleErrors(err)
+    }
+  }
+
+  /**
+   * Process a reject operation on a pending participants request.
+   * If the request is not in a pending state, an exception is thrown.
+   *
+   * @param uidToReject - The UID of the participants request to reject
+   * @returns A success response after rejecting the request
+   * @throws BadRequestException if the request is already processed
+   */
+  async rejectRequestByUid(uidToReject: string): Promise<ParticipantsRequest> {
+    try {
+      const result:ParticipantsRequest = await this.prisma.participantsRequest.update({
+        where: { uid: uidToReject },
+        data: { status: ApprovalStatus.REJECTED }
+      });
+      await this.cacheService.reset();
+      return result;
+    } catch(err) {
+      return this.handleErrors(err)
+    }
+  }
+
+  /**
+   * Approves a participant request by UID, creating either a new member or a team based on the request type.
+   * 
+   * 1. Validates and processes the new data in the participant request (either MEMBER or TEAM).
+   * 2. Uses a transaction to:
+   *    - Create a new member or team based on the `participantType`.
+   *    - Update the participant request status to `APPROVED`.
+   * 3. Sends a notification based on the type of participant (member or team) after creation.
+   * 4. Resets the cache and triggers an Airtable synchronization.
+   * 
+   * @param uidToApprove - The unique identifier of the participant request to approve.
+   * @param participantsRequest - The participant request data containing details of the request.
+   * @returns The updated participant request with the status set to `APPROVED`.
+   */
+  private async approveRequestByUid(
+    uidToApprove: string, 
+    participantsRequest: ParticipantsRequest
+  ): Promise<ParticipantsRequest> {
+    let result;
+    let createdItem;
+    const dataToProcess: any = participantsRequest;
+    const participantType = participantsRequest.participantType;
+    // Add new member or team and update status to approved
+    await this.prisma.$transaction(async (tx) => {
+      if (participantType === 'MEMBER') {
+        dataToProcess.requesterEmailId = dataToProcess.newData.email.toLowerCase().trim();
+        createdItem = await this.membersService.createMemberFromParticipantsRequest(
+          dataToProcess,
           tx
         );
+      } else {
+        createdItem = await this.teamsService.createTeamFromParticipantsRequest(
+          dataToProcess,
+          tx
+        );
+      }
+      result = await tx.participantsRequest.update({
+        where: { uid: uidToApprove },
+        data: { status: ApprovalStatus.APPROVED },
       });
+    });
+    if (participantType === 'MEMBER') {
+      await this.notificationService.notifyForMemberCreationApproval(
+        createdItem.name,
+        createdItem.uid,
+        dataToProcess.requesterEmailId
+      );
     } else {
-      await this.processMemberEditChanges(
-        existingData,
-        dataFromDB,
-        dataToSave,
-        uidToEdit,
-        isAutoApproval,
-        transactionType
+      await this.notificationService.notifyForTeamCreationApproval(
+        createdItem.name,
+        createdItem.uid,
+        participantsRequest.requesterEmailId
       );
-    }
-
-    if (!disableNotification) {
-      await this.awsService.sendEmail('MemberEditRequestCompleted', true, [], {
-        memberName: dataToProcess.name,
-      });
-      await this.awsService.sendEmail(
-        'EditMemberSuccess',
-        false,
-        [dataFromDB.requesterEmailId],
-        {
-          memberName: dataToProcess.name,
-          memberProfileLink: `${process.env.WEB_UI_BASE_URL}/members/${
-            dataFromDB.referenceUid
-          }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
-        }
-      );
-      slackConfig.requestLabel = 'Edit Labber Request Completed';
-      slackConfig.url = `${process.env.WEB_UI_BASE_URL}/members/${
-        dataFromDB.referenceUid
-      }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
-      await this.slackService.notifyToChannel(slackConfig);
     }
     await this.cacheService.reset();
-    // Send ack email to old & new email of member reg his/her email change.
-    if (isEmailChange && isDirectoryAdmin) {
-      const oldEmail = existingData.email;
-      const newEmail = dataToSave.email;
-      await this.awsService.sendEmail(
-        'MemberEmailChangeAcknowledgement',
-        false,
-        [oldEmail, newEmail],
-        {
-          oldEmail,
-          newEmail,
-          memberName: dataToProcess.name,
-          profileURL: this.generateMemberProfileURL(existingData.uid),
-          loginURL: process.env.LOGIN_URL
-        }
-      );
-    }
-    //await this.forestAdminService.triggerAirtableSync();
-    return { code: 1, message: 'Success' };
+    await this.forestAdminService.triggerAirtableSync();
+    return result;
   }
 
-  async processMemberEditChanges(
-    existingData,
-    dataFromDB,
-    dataToSave,
-    uidToEdit,
-    isAutoApproval,
-    tx
-  ) {
-    const dataToProcess = dataFromDB?.newData;
-    const isEmailChange =
-      existingData.email !== dataToProcess.email ? true : false;
-    const isExternalIdAvailable = existingData.externalId ? true : false;
-    // Team member roles relational mapping
-    const oldTeamUids = [...existingData.teamMemberRoles].map((t) => t.teamUid);
-    const newTeamUids = [...dataToProcess.teamAndRoles].map((t) => t.teamUid);
-    const teamAndRolesUidsToDelete: any[] = [
-      ...existingData.teamMemberRoles,
-    ].filter((t) => !newTeamUids.includes(t.teamUid));
-    const teamAndRolesUidsToUpdate = [...dataToProcess.teamAndRoles].filter(
-      (t, index) => {
-        if (oldTeamUids.includes(t.teamUid)) {
-          const foundIndex = [...existingData.teamMemberRoles].findIndex(
-            (v) => v.teamUid === t.teamUid
-          );
-          if (foundIndex > -1) {
-            const foundValue = [...existingData.teamMemberRoles][foundIndex];
-            if (foundValue.role !== t.role) {
-              let foundDefaultRoleTag = false;
-              foundValue.roleTags?.some(tag => {
-                if (Object.keys(DEFAULT_MEMBER_ROLES).includes(tag)) {
-                  foundDefaultRoleTag = true;
-                  return true
-                }
-              });
-              if (foundDefaultRoleTag) {
-                dataToProcess.teamAndRoles[index].roleTags = foundValue.roleTags;
-              } else {
-                dataToProcess.teamAndRoles[index].roleTags = 
-                  dataToProcess.teamAndRoles[index].role?.split(',')?.map(item => item.trim());
-              }
-              return true;
-            }
-          }
-        }
-        return false;
-      }
-    );
-
-    const teamAndRolesUidsToCreate = [...dataToProcess.teamAndRoles].filter(
-      (t) => !oldTeamUids.includes(t.teamUid)
-    );
-
-    const promisesToDelete = teamAndRolesUidsToDelete.map((v) =>
-      tx.teamMemberRole.delete({
-        where: {
-          memberUid_teamUid: {
-            teamUid: v.teamUid,
-            memberUid: dataFromDB.referenceUid,
-          },
-        },
-      })
-    );
-    const promisesToUpdate = teamAndRolesUidsToUpdate.map((v) =>
-      tx.teamMemberRole.update({
-        where: {
-          memberUid_teamUid: {
-            teamUid: v.teamUid,
-            memberUid: dataFromDB.referenceUid,
-          },
-        },
-        data: { role: v.role, roleTags: v.roleTags },
-      })
-    );
-    await Promise.all(promisesToDelete);
-    await Promise.all(promisesToUpdate);
-    await tx.teamMemberRole.createMany({
-      data: teamAndRolesUidsToCreate.map((t) => {
-        return {
-          role: t.role,
-          mainTeam: false,
-          teamLead: false,
-          teamUid: t.teamUid,
-          memberUid: dataFromDB.referenceUid,
-          roleTags: t.role?.split(',')?.map(item => item.trim())
-        };
-      }),
-    });
-
-    const contributionsToCreate: any = dataToProcess.projectContributions
-      ?.filter(contribution => !contribution.uid);
-    const contributionIdsToDelete:any = [];
-    const contributionIdsToUpdate:any = [];
-    const contributionIds = dataToProcess.projectContributions
-      ?.filter(contribution => contribution.uid).map(contribution => contribution.uid);
-
-    existingData.projectContributions?.map((contribution:any)=> {
-      if(!contributionIds.includes(contribution.uid)) {
-        contributionIdsToDelete.push(contribution.uid);
-      } else {
-        contributionIdsToUpdate.push(contribution.uid);
-      }
-    });
-
-    const contributionToDelete = contributionIdsToDelete.map((uid) =>
-      tx.projectContribution.delete({
-        where: {
-          uid
-        }
-      })
-    );
-    const contributions = dataToProcess.projectContributions.
-      filter(contribution => contributionIdsToUpdate.includes(contribution.uid));
-    const contributionsToUpdate = contributions.map((contribution) =>
-      tx.projectContribution.update({
-        where: {
-          uid: contribution.uid
-        },
-        data: {
-          ...contribution
-        }
-      })
-    );
-    await Promise.all(contributionToDelete);
-    await Promise.all(contributionsToUpdate);
-    await tx.projectContribution.createMany({
-      data: contributionsToCreate.map((contribution) => {
-        contribution.memberUid = dataFromDB.referenceUid;
-        return contribution;
-      }),
-    });
-
-    // Other member Changes
-    
-    await tx.member.update({
-      where: { uid: dataFromDB.referenceUid },
-      data: {
-        ...dataToSave,
-        ...(isEmailChange && isExternalIdAvailable && { externalId: null }),
-      },
-    });
-
-    this.logger.info(`Member update request - attibutes updated, requestId -> ${uidToEdit}`)
-     if (isEmailChange && isExternalIdAvailable) {
-      // try {
-      this.logger.info(`Member update request - Initiating email change - newEmail - ${dataToSave.email}, oldEmail - ${existingData.email}, externalId - ${existingData.externalId}, requestId -> ${uidToEdit}`)
-      const response = await axios.post(
-        `${process.env.AUTH_API_URL}/auth/token`,
-        {
-          client_id: process.env.AUTH_APP_CLIENT_ID,
-          client_secret: process.env.AUTH_APP_CLIENT_SECRET,
-          grant_type: 'client_credentials',
-          grantTypes: [
-            'client_credentials',
-            'authorization_code',
-            'refresh_token',
-          ],
-        }
-      );
-
-      const clientToken = response.data.access_token;
-      const headers = {
-        Authorization: `Bearer ${clientToken}`,
-      };
-      
-      await axios.delete(
-        `${process.env.AUTH_API_URL}/admin/accounts/external/${existingData.externalId}`,
-        { headers: headers }
-      );
-      // } catch (e) {
-      //   if (e?.response?.data?.message && e?.response.status === 404) {
-      //   } else {
-      //     throw e;
-      //   }
-      // }
-      this.logger.info(`Member update request - Email changed,  requestId -> ${uidToEdit}`)
-    } 
-    // Updating status
-    await tx.participantsRequest.update({
-      where: { uid: uidToEdit },
-      data: {
-        status: isAutoApproval
-          ? ApprovalStatus.AUTOAPPROVED
-          : ApprovalStatus.APPROVED,
-      },
-    });
-  }
-
-  async processTeamCreateRequest(uidToApprove) {
-    const dataFromDB: any = await this.prisma.participantsRequest.findUnique({
-      where: { uid: uidToApprove },
-    });
-    if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      throw new BadRequestException('Request already processed');
-    }
-    const dataToProcess: any = dataFromDB.newData;
-    const dataToSave: any = {};
-    const slackConfig = {
-      requestLabel: '',
-      url: '',
-      name: dataToProcess.name,
-    };
-
-    // Mandatory fields
-    dataToSave['name'] = dataToProcess.name;
-    dataToSave['contactMethod'] = dataToProcess.contactMethod;
-    dataToSave['website'] = dataToProcess.website;
-    dataToSave['shortDescription'] = dataToProcess.shortDescription;
-    dataToSave['longDescription'] = dataToProcess.longDescription;
-
-    // Non Mandatory Fields
-    dataToSave['twitterHandler'] = dataToProcess.twitterHandler;
-    dataToSave['linkedinHandler'] = dataToProcess.linkedinHandler;
-    dataToSave['telegramHandler'] = dataToProcess.telegramHandler;
-    dataToSave['airtableRecId'] = dataToProcess.airtableRecId;
-    dataToSave['blog'] = dataToProcess.blog;
-    dataToSave['officeHours'] = dataToProcess.officeHours;
-    dataToSave['shortDescription'] = dataToProcess.shortDescription;
-    dataToSave['longDescription'] = dataToProcess.longDescription;
-    dataToSave['moreDetails'] = dataToProcess.moreDetails;
-
-    // Funding Stage Mapping
-    dataToSave['fundingStage'] = {
-      connect: { uid: dataToProcess.fundingStage.uid },
-    };
-
-    // Industry Tag Mapping
-    dataToSave['industryTags'] = {
-      connect: dataToProcess.industryTags.map((i) => {
-        return { uid: i.uid };
-      }),
-    };
-
-    // Technologies Mapping
-    if (dataToProcess.technologies && dataToProcess.technologies.length > 0) {
-      dataToSave['technologies'] = {
-        connect: dataToProcess.technologies.map((t) => {
-          return { uid: t.uid };
-        }),
-      };
-    }
-
-    // focusAreas Mapping
-    dataToSave['teamFocusAreas'] = {
-      ...await this.createTeamWithFocusAreas(dataToProcess, this.prisma)
-    };
-   
-    // Membership Sources Mapping
-    dataToSave['membershipSources'] = {
-      connect: dataToProcess.membershipSources.map((m) => {
-        return { uid: m.uid };
-      }),
-    };
-
-    // Logo image Mapping
-    if (dataToProcess.logoUid) {
-      dataToSave['logo'] = { connect: { uid: dataToProcess.logoUid } };
-    }
-
-    const newTeam = await this.prisma.team.create({ data: { ...dataToSave } });
-    await this.prisma.participantsRequest.update({
-      where: { uid: uidToApprove },
-      data: { status: ApprovalStatus.APPROVED },
-    });
-    await this.awsService.sendEmail('TeamCreated', true, [], {
-      teamName: dataToProcess.name,
-      teamUid: newTeam.uid,
-      adminSiteUrl: `${process.env.WEB_UI_BASE_URL}/teams/${
-        newTeam.uid
-      }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
-    });
-    await this.awsService.sendEmail(
-      'NewTeamSuccess',
-      false,
-      [dataFromDB.requesterEmailId],
-      {
-        teamName: dataToProcess.name,
-        teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${
-          newTeam.uid
-        }?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`,
-      }
-    );
-    slackConfig.requestLabel = 'New Team Added';
-    slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${
-      newTeam.uid
-    }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
-    await this.slackService.notifyToChannel(slackConfig);
-    await this.cacheService.reset()
-    //await this.forestAdminService.triggerAirtableSync();
-    return { code: 1, message: 'Success' };
-  }
-
-  async processTeamEditRequest(
-    uidToEdit,
-    disableNotification = false,
-    isAutoApproval = false,
-    transactionType: Prisma.TransactionClient | PrismaClient = this.prisma
-  ) {
-    const dataFromDB: any = await transactionType.participantsRequest.findUnique({
-      where: { uid: uidToEdit },
-    });
-    if (dataFromDB.status !== ApprovalStatus.PENDING.toString()) {
-      throw new BadRequestException('Request already processed');
-    }
-    const dataToProcess: any = dataFromDB.newData;
-    const dataToSave: any = {};
-
-    const slackConfig = {
-      requestLabel: '',
-      url: '',
-      name: dataToProcess.name,
-    };
-    const existingData: any = await this.prisma.team.findUnique({
-      where: { uid: dataFromDB.referenceUid },
-      include: {
-        fundingStage: true,
-        industryTags: true,
-        logo: true,
-        membershipSources: true,
-        technologies: true,
-      },
-    });
-
-    // Mandatory fields
-    dataToSave['name'] = dataToProcess.name;
-    dataToSave['contactMethod'] = dataToProcess.contactMethod;
-    dataToSave['website'] = dataToProcess.website;
-    dataToSave['shortDescription'] = dataToProcess.shortDescription;
-    dataToSave['longDescription'] = dataToProcess.longDescription;
-
-    // Non Mandatory Fields
-    dataToSave['twitterHandler'] = dataToProcess.twitterHandler;
-    dataToSave['linkedinHandler'] = dataToProcess.linkedinHandler;
-    dataToSave['telegramHandler'] = dataToProcess.telegramHandler;
-    dataToSave['airtableRecId'] = dataToProcess.airtableRecId;
-    dataToSave['blog'] = dataToProcess.blog;
-    dataToSave['officeHours'] = dataToProcess.officeHours;
-    dataToSave['shortDescription'] = dataToProcess.shortDescription;
-    dataToSave['longDescription'] = dataToProcess.longDescription;
-    dataToSave['moreDetails'] = dataToProcess.moreDetails;
-    dataToSave['lastModifier'] = {
-      connect: { uid:  dataToProcess.lastModifiedBy }
-    };
-
-    // Funding Stage Mapping
-    dataToSave['fundingStage'] = {
-      connect: { uid: dataToProcess.fundingStage.uid },
-    };
-
-    // Logo image Mapping
-    if (dataToProcess.logoUid) {
-      dataToSave['logo'] = { connect: { uid: dataToProcess.logoUid } };
+  /**
+   * Approve/Reject request in participants-request table.
+   * @param statusToProcess
+   * @param uid
+   * @returns
+   */
+  async processRequestByUid(uid:string, participantsRequest:ParticipantsRequest, statusToProcess) {
+    if (statusToProcess === ApprovalStatus.REJECTED) {
+      return await this.rejectRequestByUid(uid);
     } else {
-      dataToSave['logo'] = { disconnect: true };
+      return await this.approveRequestByUid(uid, participantsRequest);
     }
+  }
 
-    // Industry Tag Mapping
-    dataToSave['industryTags'] = {
-      set: dataToProcess.industryTags.map((i) => {
-        return { uid: i.uid };
-      }),
-    };
-
-    // Technologies Mapping
-    if (dataToProcess.technologies) {
-      dataToSave['technologies'] = {
-        set: dataToProcess.technologies.map((t) => {
-          return { uid: t.uid };
-        }),
-      };
-    }
-
-    // Membership Sources Mapping
-    dataToSave['membershipSources'] = {
-      set: dataToProcess.membershipSources.map((m) => {
-        return { uid: m.uid };
-      }),
-    };
-
-    // focusAreas Mapping
-    dataToSave['teamFocusAreas'] = {
-      ...await this.updateTeamWithFocusAreas(dataFromDB.referenceUid, dataToProcess, transactionType)
-    };
-    if (transactionType === this.prisma) {
-      await this.prisma.$transaction(async (tx) => {
-        // Update data
-        await tx.team.update({
-          where: { uid: dataFromDB.referenceUid },
-          data: { ...dataToSave },
-        });
-        // Updating status
-        await tx.participantsRequest.update({
-          where: { uid: uidToEdit },
-          data: {
-            status: isAutoApproval
-              ? ApprovalStatus.AUTOAPPROVED
-              : ApprovalStatus.APPROVED,
-          },
-        });
-      });
-    } else {
-      await transactionType.team.update({
-        where: { uid: dataFromDB.referenceUid },
-        data: { ...dataToSave },
-      });
-      // Updating status
-      await transactionType.participantsRequest.update({
-        where: { uid: uidToEdit },
-        data: {
-          status: isAutoApproval
-            ? ApprovalStatus.AUTOAPPROVED
-            : ApprovalStatus.APPROVED,
-        },
-      });
-    }
-
+  /**
+   * Adds a new participants request.
+   * Validates the request data, checks for duplicate identifiers,
+   * and optionally sends notifications upon successful creation.
+   *
+   * @param {Prisma.ParticipantsRequestUncheckedCreateInput} requestData - The request data for adding a new participant.
+   * @param {boolean} [disableNotification=false] - Flag to disable notification sending.
+   * @param {Prisma.TransactionClient | PrismaClient} [tx=this.prisma] - Database transaction or client.
+   * @returns {Promise<ParticipantsRequest>} - The newly created participant request.
+   * @throws {BadRequestException} - If validation fails or unique identifier already exists.
+   */
+  async addRequest(
+    requestData: Prisma.ParticipantsRequestUncheckedCreateInput,
+    disableNotification: boolean = false,
+    tx: Prisma.TransactionClient | PrismaClient = this.prisma
+  ): Promise<ParticipantsRequest> {
+    const uniqueIdentifier = this.getUniqueIdentifier(requestData);
+    const postData = { ...requestData, uniqueIdentifier };
+    // Add the new request
+    const result: ParticipantsRequest = await this.add({
+      ...postData
+      }, 
+      tx
+    );
     if (!disableNotification) {
-      await this.awsService.sendEmail('TeamEditRequestCompleted', true, [], {
-        teamName: dataToProcess.name,
-      });
-      await this.awsService.sendEmail(
-        'EditTeamSuccess',
-        false,
-        [dataFromDB.requesterEmailId],
-        {
-          teamName: dataToProcess.name,
-          teamProfileLink: `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`,
-        }
-      );
-      slackConfig.requestLabel = 'Edit Team Request Completed ';
-      slackConfig.url = `${process.env.WEB_UI_BASE_URL}/teams/${existingData.uid}`;
-      await this.slackService.notifyToChannel(slackConfig);
+      this.notifyForCreate(result);
     }
-    await this.cacheService.reset()
-    //await this.forestAdminService.triggerAirtableSync();
-    return { code: 1, message: 'Success' };
+    await this.cacheService.reset();
+    return result;
   }
 
-  async createTeamWithFocusAreas(dataToProcess, transaction) {
-    if (dataToProcess.focusAreas && dataToProcess.focusAreas.length > 0) {
-      let teamFocusAreas:any = [];
-      const focusAreaHierarchies = await transaction.focusAreaHierarchy.findMany({
-        where: {
-          subFocusAreaUid: {
-            in: dataToProcess.focusAreas.map(area => area.uid)
-          }
-        }
-      });
-      focusAreaHierarchies.map(areaHierarchy => {
-        teamFocusAreas.push({
-          focusAreaUid: areaHierarchy.subFocusAreaUid,
-          ancestorAreaUid: areaHierarchy.focusAreaUid
-        });
-      });
-      dataToProcess.focusAreas.map(area => {
-        teamFocusAreas.push({
-          focusAreaUid: area.uid,
-          ancestorAreaUid: area.uid
-        });
-      });
-      return {
-        createMany: {
-          data: teamFocusAreas
-        }
+  /**
+   * Validates the location information for a participant if provided.
+   *
+   * @param data - The participant data containing location details (city, country, region).
+   * @throws {BadRequestException} - If the location data is invalid.
+   */
+  async validateLocation(data: any): Promise<void> {
+    const { city, country, region } = data;
+    if (city || country || region) {
+      const result: any = await this.locationTransferService.fetchLocation(city, country, null, region, null);
+      if (!result || !result?.location) {
+        throw new BadRequestException('Invalid Location info');
       }
     }
-    return {};
+  }
+  
+  /**
+   * Extract unique identifier based on participant type.
+   * @param requestData 
+   * @returns string
+   */
+  getUniqueIdentifier(requestData): string {
+    return requestData.participantType === 'TEAM'
+      ? requestData.newData.name
+      : requestData.newData.email.toLowerCase().trim();
+  }
+  
+  /**
+   * Validate if the unique identifier already exists.
+   * @param participantType 
+   * @param uniqueIdentifier 
+   * @throws BadRequestException if identifier already exists
+   */
+  async validateUniqueIdentifier(
+    participantType: ParticipantType, 
+    uniqueIdentifier: string
+  ): Promise<void> {
+    const { isRequestPending, isUniqueIdentifierExist } = await this.checkIfIdentifierAlreadyExist(
+      participantType,
+      uniqueIdentifier
+    );
+    if (isRequestPending || isUniqueIdentifierExist) {
+      const typeLabel = participantType === 'TEAM' ? 'Team name' : 'Member email';
+      throw new BadRequestException(`${typeLabel} already exists`);
+    }
+  }
+  
+  /**
+   * Validate location for members or email for teams.
+   * @param requestData 
+   * @throws BadRequestException if validation fails
+   */
+  async validateParticipantRequest(requestData: any): Promise<void> {
+    if (requestData.participantType === ParticipantType.MEMBER.toString()) {
+      await this.validateLocation(requestData.newData);
+    }
+    if (requestData.participantType === ParticipantType.TEAM.toString() && !requestData.requesterEmailId) {
+      throw new BadRequestException(
+        'Requester email is required for team participation requests. Please provide a valid email address.'
+      );
+    }
+  }
+  
+  /**
+   * Send notification based on the participant type.
+   * @param result 
+   */
+  private notifyForCreate(result: any): void {
+    if (result.participantType === ParticipantType.MEMBER.toString()) {
+      this.notificationService.notifyForCreateMember(result.newData.name, result.uid);
+    } else {
+      this.notificationService.notifyForCreateTeam(result.newData.name, result.uid);
+    }
   }
 
-  async updateTeamWithFocusAreas(teamId, dataToProcess, transaction) {
-    if (dataToProcess.focusAreas && dataToProcess.focusAreas.length > 0) {
-      await transaction.teamFocusArea.deleteMany({
-        where: {
-          teamUid: teamId
-        }
-      });
-      return await this.createTeamWithFocusAreas(dataToProcess, transaction);
-    } else {
-      await transaction.teamFocusArea.deleteMany({
-        where: {
-          teamUid: teamId
-        }
-      });
+  /**
+   * Handles database-related errors specifically for the Participant entity.
+   * Logs the error and throws an appropriate HTTP exception based on the error type.
+   * 
+   * @param {any} error - The error object thrown by Prisma or other services.
+   * @param {string} [message] - An optional message to provide additional context, 
+   *                             such as the participant UID when an entity is not found.
+   * @throws {ConflictException} - If there's a unique key constraint violation.
+   * @throws {BadRequestException} - If there's a foreign key constraint violation or validation error.
+   * @throws {NotFoundException} - If a participant is not found with the provided UID.
+   */
+  private handleErrors(error, message?: string) {
+    this.logger.error(error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      switch (error?.code) {
+        case 'P2002':
+          throw new ConflictException(
+            'Unique key constraint error on Participant:',
+            error.message
+          );
+        case 'P2003':
+          throw new BadRequestException(
+            'Foreign key constraint error on Participant',
+            error.message
+          );
+        case 'P2025':
+          throw new NotFoundException('Participant not found with uid: ' + message);
+        default:
+          throw error;
+      }
+    } else if (error instanceof Prisma.PrismaClientValidationError) {
+      throw new BadRequestException('Database field validation error on Participant', error.message);
     }
-    return {};
+    return error;
   }
+
   
   generateMemberProfileURL(value) {
     return generateProfileURL(value);
