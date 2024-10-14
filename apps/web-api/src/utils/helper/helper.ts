@@ -36,3 +36,46 @@ export const slugify = (name: string) => {
     .replace(/^-+/, '')              // Trim hyphens from start of string
     .replace(/-+$/, '');             // Trim hyphens from end of string
 }
+
+/**
+   * Copies specific fields from the source JSON to the destination object
+   * @param srcJson - Source JSON
+   * @param destJson - Destination object
+   * @param directFields - List of fields to copy
+   */
+export const copyObj = (srcJson: any, destJson: any, directFields: string[]) => {
+  directFields.forEach(field => {
+    destJson[field] = srcJson[field];
+  });
+}
+
+/**
+ * Utility function to map single relational data
+ * 
+ * @param field - The field name to map
+ * @param rawData - The raw data input
+ * @returns - Relation object for Prisma query
+ */
+export const buildRelationMapping = (field: string, rawData: any) => {
+  return rawData[field]?.uid
+    ? { connect: { uid: rawData[field].uid } }
+    : undefined;
+}
+
+/**
+ * Utility function to map multiple relational data
+ * 
+ * @param field - The field name to map
+ * @param rawData - The raw data input
+ * @param type - Operation type ('create' or 'update')
+ * @returns - Multi-relation object for Prisma query
+ */
+export const buildMultiRelationMapping = (field: string, rawData: any, type: string) => {
+  const dataExists = rawData[field]?.length > 0;
+  if (!dataExists) {
+    return type === 'update' ? { set: [] } : undefined;
+  }
+  return {
+    [type === 'create' ? 'connect' : 'set']: rawData[field].map((item: any) => ({ uid: item.uid }))
+  };
+}
