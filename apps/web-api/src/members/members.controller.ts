@@ -65,7 +65,11 @@ export class MemberController {
       delete builtQuery.where?.name;
     }
     builtQuery.where = {
-      AND: [builtQuery.where, this.membersService.buildNameFilters(queryParams)],
+      AND: [
+        builtQuery.where,
+        this.membersService.buildNameFilters(queryParams),
+        this.membersService.buildRecentMembersFilter(queryParams)
+      ],
     };
     return await this.membersService.getRolesWithCount(builtQuery, queryParams);
   }

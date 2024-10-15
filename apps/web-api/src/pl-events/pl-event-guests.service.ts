@@ -133,14 +133,12 @@ export class PLEventGuestsService {
             in: events.map(event => event.uid)
           }
         },
-        select: isUserLoggedIn ? {
+        select: {
           uid: true,
           reason: true,
-          telegramId: true,
           memberUid: true,
           teamUid: true,
           topics: true,
-          officeHours: true,
           additionalInfo: true,
           isHost: true,
           isSpeaker: true,
@@ -163,9 +161,9 @@ export class PLEventGuestsService {
             select: {
               name: true,
               image: true,
-              telegramHandler: true,
+              telegramHandler: isUserLoggedIn ? true : false,
               preferences: true,
-              officeHours: true,
+              officeHours: isUserLoggedIn ? true : false,
               teamMemberRoles: {
                 select:{
                   team: {
@@ -203,21 +201,8 @@ export class PLEventGuestsService {
             }
           },
           createdAt: true,
-        }:
-        {
-          team: {
-            select:{
-              name: true,
-              logo: true
-            }
-          },
-          event: {
-            select: {
-              type: true
-            }
-          },
-          memberUid: true,
-          createdAt: true,
+          telegramId: isUserLoggedIn ? true : false,
+          officeHours: isUserLoggedIn ? true : false
         }
       });
       this.restrictTelegramBasedOnMemberPreference(result, isUserLoggedIn);
