@@ -136,7 +136,7 @@ export class PLEventLocationsService {
     events.forEach((event) => {
       const eventStartDateInZone = moment.utc(event.startDate).tz(timezone);
       const eventEndDateInZone = moment.utc(event.endDate).tz(timezone);
-      if (eventStartDateInZone.isBefore(currentDateTimeInZone)) {
+      if (eventEndDateInZone.isBefore(currentDateTimeInZone)) {
         pastEvents.push({
           ...event,
           startDate: eventStartDateInZone.format(),
