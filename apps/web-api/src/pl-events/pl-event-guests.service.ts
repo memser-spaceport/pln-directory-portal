@@ -43,7 +43,7 @@ export class PLEventGuestsService {
       data.memberUid = isAdmin ? data.memberUid : member.uid;
       const guests = this.formatInputToEventGuests(data);
       const result = await (tx || this.prisma).pLEventGuest.createMany({ data: guests });
-      await this.cacheService.reset();
+      this.cacheService.reset();
       return result;
     } catch(err) {
       this.handleErrors(err);
@@ -151,8 +151,8 @@ export class PLEventGuestsService {
               description: true,
               startDate: true,
               endDate: true,
-              logo: true,
-              banner: true,
+              logo: { select: { url: true } },
+              banner: { select: { url: true } },
               resources: true,
               additionalInfo: true
             }
@@ -160,7 +160,7 @@ export class PLEventGuestsService {
           member: {
             select: {
               name: true,
-              image: true,
+              image: { select: { url: true } },
               telegramHandler: isUserLoggedIn ? true : false,
               preferences: true,
               officeHours: isUserLoggedIn ? true : false,
@@ -170,7 +170,7 @@ export class PLEventGuestsService {
                     select:{
                       uid: true,
                       name: true,
-                      logo: true
+                      logo: { select: { url: true } }
                     }
                   }
                 }
@@ -197,7 +197,7 @@ export class PLEventGuestsService {
             select:{
               uid: true,
               name: true,
-              logo: true
+              logo: { select: { url: true } }
             }
           },
           createdAt: true,
@@ -206,7 +206,7 @@ export class PLEventGuestsService {
         }
       });
       this.restrictTelegramBasedOnMemberPreference(result, isUserLoggedIn);
-      this.restrictOfficeHours(result, isUserLoggedIn);
+      // this.restrictOfficeHours(result, isUserLoggedIn);
       return result;
     }
     catch(err) {
@@ -287,10 +287,10 @@ export class PLEventGuestsService {
   restrictTelegramBasedOnMemberPreference(eventGuests, isUserLoggedIn: boolean) {
     if (isUserLoggedIn && eventGuests) {
       eventGuests = eventGuests.map((guest:any) => {
-        if (!guest.telegramId) {
-          delete guest.member.telegramHandler;
-          return guest; 
-        }
+        // if (!guest.telegramId) {
+        //   delete guest.member.telegramHandler;
+        //   return guest; 
+        // }
         if (!guest.member.preferences) {
           return guest;
         }

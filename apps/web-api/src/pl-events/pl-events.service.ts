@@ -49,8 +49,8 @@ export class PLEventsService {
       const plEvent = await this.prisma.pLEvent.findUniqueOrThrow({
         where: { slugURL: slug },
         include: {
-          logo: true,
-          banner: true,
+          logo: { select: { url: true } },
+          banner: { select: { url: true } },
           eventGuests: {
             select: {
               uid: true,
@@ -66,12 +66,12 @@ export class PLEventsService {
               officeHours: isUserLoggedIn ? true : false,
               event: {
                 include: {
-                  logo: true
+                  logo: { select: { url: true } }
                 }
               },
               member: {
                 select:{
-                  image: true,
+                  image: { select: { url: true } },
                   name: true,
                   preferences: true,
                   telegramHandler: isUserLoggedIn ? true : false,
@@ -82,7 +82,7 @@ export class PLEventsService {
                         select:{
                           uid: true,
                           name: true,
-                          logo: true
+                          logo: { select: { url: true } }
                         }
                       }
                     }
@@ -109,7 +109,7 @@ export class PLEventsService {
                 select:{
                   uid: true,
                   name: true,
-                  logo: true
+                  logo: { select: { url: true } }
                 }
               }
             } 
@@ -119,7 +119,7 @@ export class PLEventsService {
       if (plEvent) {
         this.filterPrivateResources(plEvent, isUserLoggedIn);
         plEvent.eventGuests = this.eventGuestsService.restrictTelegramBasedOnMemberPreference(plEvent?.eventGuests, isUserLoggedIn);
-        plEvent.eventGuests = this.eventGuestsService.restrictOfficeHours(plEvent?.eventGuests, isUserLoggedIn);
+        // plEvent.eventGuests = this.eventGuestsService.restrictOfficeHours(plEvent?.eventGuests, isUserLoggedIn);
       }
       return plEvent;
     } catch(err) {  
