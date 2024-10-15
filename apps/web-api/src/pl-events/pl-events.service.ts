@@ -51,16 +51,31 @@ export class PLEventsService {
         include: {
           logo: true,
           banner: true,
-          eventGuests: isUserLoggedIn ? {
-            include: {
+          eventGuests: {
+            select: {
+              uid: true,
+              reason: true,
+              memberUid: true,
+              teamUid: true,
+              topics: true,
+              additionalInfo: true,
+              isHost: true,
+              isSpeaker: true,
+              createdAt: true,
+              telegramId: isUserLoggedIn ? true : false,
+              officeHours: isUserLoggedIn ? true : false,
               event: {
                 include: {
                   logo: true
                 }
               },
               member: {
-                include:{
+                select:{
                   image: true,
+                  name: true,
+                  preferences: true,
+                  telegramHandler: isUserLoggedIn ? true : false,
+                  officeHours: isUserLoggedIn ? true : false,
                   teamMemberRoles: {
                     select:{
                       team: {
@@ -98,20 +113,6 @@ export class PLEventsService {
                 }
               }
             } 
-          }:{
-            select: {
-              team: {
-                select:{
-                  name: true,
-                  logo: true
-                }
-              },
-              event: {
-                select: {
-                  type: true
-                }
-              }
-            }
           }
         }
       });

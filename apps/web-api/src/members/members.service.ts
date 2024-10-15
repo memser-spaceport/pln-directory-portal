@@ -702,7 +702,7 @@ export class MembersService {
   }
 
   async updateTelegramIfChanged(member, telegram, tx?:Prisma.TransactionClient) {
-    if (telegram && telegram != '' && member.telegramHandler != telegram) {
+    if (member.telegramHandler != telegram) {
       member = await (tx || this.prisma).member.update({
         where: { uid: member.uid },
         data: {
@@ -714,7 +714,7 @@ export class MembersService {
   }
 
   async updateOfficeHoursIfChanged(member, officeHours, tx?:Prisma.TransactionClient) {
-    if (officeHours && officeHours != '' && member.officeHours != officeHours) {
+    if (member.officeHours != officeHours) {
       member = await (tx || this.prisma).member.update({
         where: { uid: member.uid },
         data: {
