@@ -288,7 +288,7 @@ export class TeamsService {
       technologies,
       membershipSources,
       fundingStage,
-      officeHours  
+      officeHours
     } = queryParams;
     const filter:any = [];
     this.buildNameAndPLNFriendFilter(name, plnFriend, filter);
@@ -297,6 +297,7 @@ export class TeamsService {
     this.buildMembershipSourcesFilter(membershipSources, filter);
     this.buildFundingStageFilter(fundingStage, filter);
     this.buildOfficeHoursFilter(officeHours, filter);
+    this.buildRecentTeamsFilter(queryParams, filter);
     return { 
       AND: filter
     };
@@ -397,25 +398,32 @@ export class TeamsService {
     }
   }
 
+
   /**
-   * This method constructs a dynamic filter query for retrieving recent teams
-   * created within a specified number of days, based on the 'is_recent' query parameter
-   * and an environment variable to configure the timeline.
+   * Constructs a dynamic filter query for retrieving recent teams based on the 'is_recent' query parameter.
+   * If 'is_recent' is set to 'true', it creates a 'createdAt' filter to retrieve records created within a
+   * specified number of days. The number of days is configured via an environment variable.
+   * 
+   * If a filter array is passed, it pushes the 'createdAt' filter to the existing filters.
    * 
    * @param queryParams - HTTP request query parameters object
-   * @returns Constructed query with a 'createdAt' filter if 'is_recent' is set to 'true',
+   * @param filter - Optional existing filter array to which the recent filter will be added if provided
+   * @returns The constructed query with a 'createdAt' filter if 'is_recent' is 'true',
    *          or an empty object if 'is_recent' is not provided or set to 'false'.
    */
-  buildRecentTeamsFilter(queryParams) { 
+  buildRecentTeamsFilter(queryParams, filter?) { 
     const { isRecent } = queryParams;
-    if (isRecent === 'true') {
-      return {
-        createdAt: {
-          gte: new Date(Date.now() - (parseInt(process.env.RECENT_RECORD_DURATION_IN_DAYS || '30') * 24 * 60 * 60 * 1000))
-        }
-      };
+    const recentFilter = {
+      createdAt: {
+        gte: new Date(Date.now() - (parseInt(process.env.RECENT_RECORD_DURATION_IN_DAYS || '30') * 24 * 60 * 60 * 1000))
+      }
+    };
+    if (isRecent === 'true' && !filter) {
+      return recentFilter;
+    } 
+    if (isRecent === 'true' && filter) {
+      filter.push(recentFilter);
     }
     return {};
   }
-
 }
