@@ -343,6 +343,7 @@ export class ProjectsService {
     this.buildNameFilter(name, filter);
     this.buildFundingFilter(lookingForFunding, filter);
     this.buildMaintainingTeamFilter(team, filter);
+    this.buildRecentProjectsFilter(query, filter);
     return { 
       AND: filter
     };
@@ -376,22 +377,29 @@ export class ProjectsService {
   }
 
   /**
-   * This method constructs a dynamic filter query for retrieving recent projects
-   * created within a specified number of days, based on the 'is_recent' query parameter
-   * and an environment variable to configure the timeline.
+   * Constructs a dynamic filter query for retrieving recent projects based on the 'is_recent' query parameter.
+   * If 'is_recent' is set to 'true', it creates a 'createdAt' filter to retrieve records created within a
+   * specified number of days. The number of days is configured via an environment variable.
+   * 
+   * If a filter array is passed, it pushes the 'createdAt' filter to the existing filters.
    * 
    * @param queryParams - HTTP request query parameters object
-   * @returns Constructed query with a 'createdAt' filter if 'is_recent' is set to 'true',
+   * @param filter - Optional existing filter array to which the recent filter will be added if provided
+   * @returns The constructed query with a 'createdAt' filter if 'is_recent' is 'true',
    *          or an empty object if 'is_recent' is not provided or set to 'false'.
    */
-  buildRecentProjectsFilter(queryParams) { 
+  buildRecentProjectsFilter(queryParams, filter?) { 
     const { isRecent } = queryParams;
-    if (isRecent === 'true') {
-      return {
-        createdAt: {
-          gte: new Date(Date.now() - (parseInt(process.env.RECENT_RECORD_DURATION_IN_DAYS || '30') * 24 * 60 * 60 * 1000))
-        }
-      };
+    const recentFilter = {
+      createdAt: {
+        gte: new Date(Date.now() - (parseInt(process.env.RECENT_RECORD_DURATION_IN_DAYS || '30') * 24 * 60 * 60 * 1000))
+      }
+    };
+    if (isRecent === 'true' && !filter) {
+      return recentFilter;
+    } 
+    if (isRecent === 'true' && filter) {
+      filter.push(recentFilter);
     }
     return {};
   }
