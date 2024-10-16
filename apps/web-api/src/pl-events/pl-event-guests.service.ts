@@ -207,7 +207,7 @@ export class PLEventGuestsService {
       });
       this.restrictTelegramBasedOnMemberPreference(result, isUserLoggedIn);
       // this.restrictOfficeHours(result, isUserLoggedIn);
-      return result;
+      return result.slice(0, 10);
     }
     catch(err) {
       this.handleErrors(err);

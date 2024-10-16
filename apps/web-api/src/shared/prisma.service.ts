@@ -3,6 +3,16 @@ import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
+
+  constructor() {
+    super({
+      log: process.env.NODE_ENV === 'development' ? [
+        { emit: 'event', level: 'query' },  // Logs query events
+        { emit: 'stdout', level: 'error' }, // Logs errors to console
+      ] : [],
+    });
+  }
+  
   async onModuleInit() {
     await this.$connect();
     // Setting up Prisma Middleware for handling Team updates
@@ -13,6 +23,16 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
       }
       return result;
     });
+
+    // Logging query execution details with proper type assertion
+    if (process.env.NODE_ENV === 'development') {
+      this.$on<any>('query', (e: any) => {
+        console.log(`Query executed at: ${new Date()}`); // Log the timestamp
+        console.log(`Query: ${e.query}`);              // Log the query
+        console.log(`Params: ${e.params}`);            // Log the parameters
+        console.log(`Duration: ${e.duration}ms`);      // Log the execution duration
+      });
+    }
   }
 
   async enableShutdownHooks(app: INestApplication) {
