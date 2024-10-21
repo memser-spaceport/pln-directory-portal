@@ -238,6 +238,43 @@ export class PLEventGuestsService {
   }
 
   /**
+   * This method retrieves event guests by slug.
+   * @param slug The slug of the event
+   * @returns An array of event guests for the specified event
+   *   - Throws an error if the event is not found.
+   */
+  async getPlEventGuestsBySlug(slug: string, query:Prisma.PLEventGuestFindManyArgs) {
+    try {
+      const pLEventGuests = await this.prisma.pLEventGuest.findMany({
+        where: {
+          ...query.where,
+          event: {
+            slugURL: slug
+          }
+        },
+        select: {
+          isHost: true,
+          isSpeaker: true,
+          isFeatured: true,
+          member: {
+            select: {
+              name: true,
+              image: {
+                select: {
+                  url: true
+                }
+              }
+            }
+          }
+        }
+      });
+      return pLEventGuests;
+    } catch(err) {  
+      return this.handleErrors(err, slug);
+    } 
+  }
+
+  /**
    * This method checks whether all provided events are upcoming based on the list of upcoming events.
    * @param upcomingEvents An array of upcoming events
    * @param events An array of events to check

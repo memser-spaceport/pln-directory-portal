@@ -40,6 +40,7 @@ import { MemberFollowUpsModule } from './member-follow-ups/member-follow-ups.mod
 import { MemberFeedbacksModule } from './member-feedbacks/member-feedbacks.module';
 import { HuskyModule } from './husky/husky.module';
 import { HomeModule } from './home/home.module';
+import { InternalsModule } from './internals/internals.module';
 
 @Module({
   controllers: [AppController],
@@ -94,7 +95,8 @@ import { HomeModule } from './home/home.module';
     MemberFollowUpsModule,
     MemberFeedbacksModule,
     HuskyModule,
-    HomeModule
+    HomeModule,
+    InternalsModule
   ],
   providers: [
     {
