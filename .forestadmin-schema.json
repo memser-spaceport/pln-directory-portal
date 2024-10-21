@@ -3974,22 +3974,6 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "grouping_id",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": false,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "String",
-        "validations": []
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
         "field": "id",
         "integration": null,
         "inverseOf": null,
@@ -4002,6 +3986,24 @@
         "reference": null,
         "type": "Number",
         "validations": []
+      },
+      {
+        "defaultValue": false,
+        "enums": null,
+        "field": "isFeatured",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": true,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "Boolean",
+        "validations": [
+          {"type": "is present", "message": "Failed validation rule: 'Present'"}
+        ]
       },
       {
         "defaultValue": false,
