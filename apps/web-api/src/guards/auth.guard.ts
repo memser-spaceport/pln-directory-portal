@@ -76,3 +76,28 @@ export class AuthGuard implements CanActivate {
     return roleFilter.length > 0;
   };
 }
+
+@Injectable()
+export class InternalAuthGuard implements CanActivate {
+  constructor(
+    private authService: AuthService
+  ) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    try {
+      const request = context.switchToHttp().getRequest();
+      const token = this.authService.checkIfTokenAttached(request);
+
+      if (token && token === process.env.INTERNAL_AUTH_TOKEN) {
+        return true;
+      } else {
+        throw new UnauthorizedException(`Invalid Token ${token}`);
+      }
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Something went wrong.', error);
+    }
+  }
+}
