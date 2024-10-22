@@ -404,6 +404,7 @@ model PLEventGuest {
   event          PLEvent  @relation(fields: [eventUid], references: [uid], onDelete: Cascade)
   additionalInfo Json?
   topics         String[]
+  priority       Int?      
   isHost         Boolean  @default(false)
   isSpeaker      Boolean  @default(false)
   isFeatured      Boolean  @default(false)
