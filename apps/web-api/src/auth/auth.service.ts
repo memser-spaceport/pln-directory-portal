@@ -142,7 +142,7 @@ export class AuthService implements OnModuleInit {
     }
 
     // Link account by email
-    const newTokens = await this.linkEmailWithAuthAccount(foundUser.email, idToken);
+    const newTokens = await this.linkEmailWithAuthAccount(foundUser?.email, idToken);
 
     // format userinfo
     const userInfo = this.memberToUserInfo(foundUser);
@@ -231,13 +231,13 @@ export class AuthService implements OnModuleInit {
     return response.data.access_token;
   }
 
-  private async linkEmailWithAuthAccount(email: string, userIdToken: string) {
+  private async linkEmailWithAuthAccount(email: string | null, userIdToken: string) {
     const clientToken = await this.getAuthClientToken();
     let linkResult;
     try {
       linkResult = await this.getAuthApi().put(
         `/admin/accounts`,
-        { token: userIdToken, email: email.toLowerCase().trim() },
+        { token: userIdToken, email: email?.toLowerCase().trim() },
         {
           headers: {
             Authorization: `Bearer ${clientToken}`,
