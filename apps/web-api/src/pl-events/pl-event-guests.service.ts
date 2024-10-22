@@ -256,6 +256,11 @@ export class PLEventGuestsService {
           isHost: true,
           isSpeaker: true,
           isFeatured: true,
+          team: {
+            select: {
+              name: true,
+            }
+          },
           member: {
             select: {
               name: true,
