@@ -70,6 +70,7 @@ export class AuthController {
   @NoCache()
   @UsePipes(ZodValidationPipe)
   async deleteUserAccount(@Body() deleteRequest: DeleteUserAccountDto, @Param() params) {
-    return await this.authService.deleteUserAccount(deleteRequest.token, params.id);
+    await this.authService.deleteUserAccount(deleteRequest.token, params.id);
+    return { message: 'Deleted successfully'};
   }
 }
