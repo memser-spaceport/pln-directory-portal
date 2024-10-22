@@ -44,19 +44,21 @@ export const PLEventGuestSchema = z.object({
   topics: z.array(z.string()).nullish(),
   isFeatured: z.boolean().nullish(),
   isHost: z.boolean().nullish(),
-  isSpeaker: z.boolean().nullish()
+  isSpeaker: z.boolean().nullish(),
+  priority: z.number().int().nullish()
 });
 
 export const ResponsePLEventGuestSchema = PLEventGuestSchema.omit({ id: true }).strict();
 
 export const ResponsePLEventGuestSchemaWithRelationsSchema = ResponsePLEventGuestSchema.extend({
   member: ResponseMemberSchema.optional(),
-  team: ResponseTeamSchema.optional()
+  team: ResponseTeamSchema.optional(),
 });
 
 export const PLEventGuestRelationalFields = ResponsePLEventGuestSchemaWithRelationsSchema.pick({
   member: true,
-  team: true
+  team: true,
+  priority: true
 }).strip();
 
 export const PLEventGuestQueryableFields = PLEventGuestRelationalFields.keyof();
