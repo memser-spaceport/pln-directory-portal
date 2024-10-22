@@ -1,4 +1,3 @@
-/* eslint-disable prettier/prettier */
 import {
   BadRequestException,
   CACHE_MANAGER,
@@ -16,6 +15,7 @@ import { MembersService } from '../members/members.service';
 import { EmailOtpService } from '../otp/email-otp.service';
 import { ModuleRef } from '@nestjs/core';
 import { LogService } from '../shared/log.service';
+
 @Injectable()
 export class AuthService implements OnModuleInit {
   private membersService: MembersService;
@@ -39,6 +39,12 @@ export class AuthService implements OnModuleInit {
     return output.data.uid;
   }
 
+  /**
+   * Deletes the external user account in auth service and ext provider
+   * @param externalAuthToken the access token received from ext provider for the user
+   * @param externalAuthId the external id from ext provider for user
+   * @returns true if deleted successfully
+   */
   async deleteUserAccount(externalAuthToken: string, externalAuthId: string) {
     const clientToken = await this.getAuthClientToken();
     await axios.delete(
@@ -50,7 +56,7 @@ export class AuthService implements OnModuleInit {
         data:  { token: externalAuthToken },
       }
     );
-    return { message: 'Deleted successfully'}
+    return true;
   }
 
   async getTokenAndUserInfo(tokenRequest) {
@@ -105,7 +111,7 @@ export class AuthService implements OnModuleInit {
     throw new ForbiddenException('Invalid User');
   }
 
-  async verifyAndSendEmailOtp(email) {
+  async verifyAndSendEmailOtp(email: string) {
     // Throw error if user email is not available in members directory
     const foundUser = await this.membersService.findMemberByEmail(email);
     if (!foundUser) {
@@ -113,12 +119,11 @@ export class AuthService implements OnModuleInit {
         "The entered email doesn't match an email in the directory records. Please try again or contact support"
       );
     }
-
     // Send OTP
     return await this.emailOtpService.sendEmailOtp(email);
   }
 
-  async resendEmailOtp(otpToken) {
+  async resendEmailOtp(otpToken: string) {
     return await this.emailOtpService.resendEmailOtp(otpToken);
   }
 
@@ -226,7 +231,7 @@ export class AuthService implements OnModuleInit {
     return response.data.access_token;
   }
 
-  private async linkEmailWithAuthAccount(email, userIdToken) {
+  private async linkEmailWithAuthAccount(email: string, userIdToken: string) {
     const clientToken = await this.getAuthClientToken();
     let linkResult;
     try {
@@ -271,7 +276,7 @@ export class AuthService implements OnModuleInit {
     }
   }
 
-  private decodeAuthIdToken(token) {
+  private decodeAuthIdToken(token: string) {
     const decoded: any = jwt_decode(token);
     return { email: decoded.email, externalId: decoded.sub };
   }
