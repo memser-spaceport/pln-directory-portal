@@ -258,7 +258,8 @@ export class PLEventGuestsService {
           isFeatured: true,
           team: {
             select: {
-              name: true,
+              uid: true,
+              name: true
             }
           },
           member: {
@@ -271,7 +272,8 @@ export class PLEventGuestsService {
               }
             }
           }
-        }
+        },
+        orderBy: query.orderBy
       });
       return pLEventGuests;
     } catch(err) {  
