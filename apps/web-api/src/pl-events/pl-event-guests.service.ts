@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, Inject, CACHE_MANAGER } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
-import { Prisma, Member } from '@prisma/client';
+import { Prisma, Member, PLEventGuest } from '@prisma/client';
 import { MembersService } from '../members/members.service';
 import { Cache } from 'cache-manager';
 import { PLEventLocationsService } from './pl-event-locations.service';
@@ -236,23 +236,29 @@ export class PLEventGuestsService {
       await this.memberService.updateOfficeHoursIfChanged(member, guest.officeHours, tx);
     }
   }
-
+  
   /**
-   * This method retrieves event guests by slug.
-   * @param slug The slug of the event
-   * @returns An array of event guests for the specified event
-   *   - Throws an error if the event is not found.
-   */
-  async getPlEventGuestsBySlug(slug: string, query:Prisma.PLEventGuestFindManyArgs) {
+  * Fetches all PLEventGuests for a given location, filtered by the upcoming events at that location.
+  * 
+  * @param {string} locationUid - The UID of the location to get event guests for.
+  * @param {Prisma.PLEventGuestFindManyArgs} query - Optional query arguments, including orderBy.
+  * @returns {Promise<PLEventGuest[]>} - A promise that resolves to an array of PLEventGuest records, including member and team details.
+  * @throws Will log an error and throw an appropriate HTTP exception if something goes wrong.
+  */
+  async getPLEventGuestsByLocation(
+    locationUid: string,
+    query: Prisma.PLEventGuestFindManyArgs
+  ) {
     try {
-      const pLEventGuests = await this.prisma.pLEventGuest.findMany({
+      const events = await this.eventLocationsService.getUpcomingEventsByLocation(locationUid);
+      return await this.prisma.pLEventGuest.findMany({
         where: {
-          ...query.where,
-          event: {
-            slugURL: slug
+          eventUid: {
+            in: events.map(event => event.uid)
           }
         },
         select: {
+          memberUid: true,
           isHost: true,
           isSpeaker: true,
           isFeatured: true,
@@ -273,13 +279,13 @@ export class PLEventGuestsService {
             }
           }
         },
-        orderBy: query.orderBy
+        orderBy: query.orderBy     
       });
-      return pLEventGuests;
-    } catch(err) {  
-      return this.handleErrors(err, slug);
-    } 
-  }
+    }
+    catch(err) {
+      this.handleErrors(err);
+    }
+  };
 
   /**
    * This method checks whether all provided events are upcoming based on the list of upcoming events.

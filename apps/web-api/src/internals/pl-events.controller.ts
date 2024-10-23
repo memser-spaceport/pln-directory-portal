@@ -1,4 +1,4 @@
-import { Controller, UseGuards, Req } from '@nestjs/common';
+import { Controller, UseGuards, Req, Param } from '@nestjs/common';
 import { ApiParam } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Api, initNestServer, ApiDecorator } from '@ts-rest/nest';
@@ -20,11 +20,10 @@ export class PLEventsInternalController {
     private readonly eventGuestsService: PLEventGuestsService, 
   ) {}
 
-  @Api(server.route.getPLEventGuestsBySlug)
-  @ApiParam({ name: 'slug', type: 'string' })
+  @Api(server.route.getPLEventGuestsByLocation)
   @ApiOkResponseFromZod(ResponsePLEventGuestSchemaWithRelationsSchema)
   async fetchEventGuests(
-    @ApiDecorator() { params: { slug } }: RouteShape['getPLEventGuestsBySlug'],
+    @Param("uid") locationUid,
     @Req() request: Request
   ) {
     const queryableFields = prismaQueryableFieldsFromZod(
@@ -32,6 +31,6 @@ export class PLEventsInternalController {
     );
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
-    return await this.eventGuestsService.getPlEventGuestsBySlug(slug, builtQuery);
+    return await this.eventGuestsService.getPLEventGuestsByLocation(locationUid, builtQuery);
   }
 }
