@@ -9,13 +9,6 @@ import { NavbarContextProvider } from '../context/navbar-context';
 import withAuth from '../hoc/withauth';
 import Toaster from '../components/common/toaster';
 
-// export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
-//   getLayout?: (page: ReactElement) => ReactNode
-// }
-
-// type AppPropsWithLayout = AppProps & {
-//   Component: NextPageWithLayout
-// }
 
 function CustomApp({ Component, pageProps }: AppProps) {
   // const getLayout = Component.getLayout ?? ((page) => page)
