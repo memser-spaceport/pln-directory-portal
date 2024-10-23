@@ -8,13 +8,13 @@ import { getAPIVersionAsPath } from '../utils/versioned-path';
 const contract = initContract();
 
 export const apiInternals = contract.router({
-  getPLEventGuestsBySlug: {
+  getPLEventGuestsByLocation: {
     method: 'GET',
-    path: `${getAPIVersionAsPath('1')}/internals/irl/locations/:uid/events/:slug/guests`,
+    path: `${getAPIVersionAsPath('1')}/internals/irl/locations/:uid/events/guests`,
     query: PLEventGuestQueryParams,
     responses: {
       200: ResponsePLEventGuestSchemaWithRelationsSchema,
     },
-    summary: 'Get a pl event with guests by slug',
+    summary: 'Get a pl event with guests by location',
   },
 });
