@@ -5,7 +5,13 @@ import { LogService } from '../shared/log.service';
 import { MembersService } from '../members/members.service';
 import { Cache } from 'cache-manager';
 import { Prisma } from '@prisma/client';
-import { BadRequestException, CACHE_MANAGER, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  CACHE_MANAGER,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 
 describe('ProjectsService', () => {
   let service: ProjectsService;
@@ -33,7 +39,7 @@ describe('ProjectsService', () => {
     isMemberPartOfTeams: jest.fn().mockResolvedValue(true),
     isMemberLeadTeam: jest.fn(),
     checkIfAdminUser: jest.fn(),
-    isMemberAllowedToEdit: jest.fn()
+    isMemberAllowedToEdit: jest.fn(),
   };
   const mockCacheService = {
     reset: jest.fn(),
@@ -95,14 +101,14 @@ describe('ProjectsService', () => {
         { uid: 'contribution-1', isDeleted: true }, // Should be added to contributionsToDelete
         { uid: 'contribution-2', isDeleted: false }, // Should not be added
       ];
-  
+
       // Mocking the member and project retrieval methods
       jest.spyOn(service, 'getMemberInfo').mockResolvedValue('email-1@mail.com' as any);
       jest.spyOn(service, 'getProjectByUid').mockResolvedValue('uid' as any);
       jest.spyOn(service, 'isMemberAllowedToEdit').mockResolvedValue(true);
-  
+
       await service.updateProjectByUid(uid, { contributions } as any, userEmail);
-  
+
       expect(mockPrismaService.project.update).toHaveBeenCalledWith({
         where: { uid },
         data: {
@@ -113,7 +119,7 @@ describe('ProjectsService', () => {
         },
       });
     });
-  
+
     it('should handle contributions correctly when none are marked for deletion', async () => {
       const uid = 'project-uid';
       const userEmail = 'user@example.com';
@@ -121,18 +127,18 @@ describe('ProjectsService', () => {
         { title: 'Contribution 1' }, // No uid, should be added to contributionsToCreate
         { uid: 'contribution-2', isDeleted: false }, // Should not be added to contributionsToDelete
       ];
-  
+
       const getProjectByUid: any = {
         maintainingTeamUid: 'team-uid',
         contributingTeams: [{ uid: 'team-uid' }],
-      }
+      };
       // Mocking the member and project retrieval methods
       jest.spyOn(service, 'getMemberInfo').mockResolvedValue({ uid: 'member-uid' } as any);
       jest.spyOn(service, 'getProjectByUid').mockResolvedValue(getProjectByUid);
       jest.spyOn(service, 'isMemberAllowedToEdit').mockResolvedValue(true);
-  
+
       await service.updateProjectByUid(uid, { contributions } as any, userEmail);
-  
+
       expect(mockPrismaService.project.update).toHaveBeenCalledWith({
         where: { uid },
         data: {
@@ -423,38 +429,35 @@ describe('ProjectsService', () => {
     });
   });
 
-
-
-
   describe('removeDuplicateFocusAreas', () => {
     it('should remove duplicate focus areas based on uid', () => {
       const focusAreas = [
-        { focusArea: { uid: '1', title: 'Focus Area 1' }},
-        { focusArea: { uid: '2', title: 'Focus Area 2' }},
+        { focusArea: { uid: '1', title: 'Focus Area 1' } },
+        { focusArea: { uid: '2', title: 'Focus Area 2' } },
       ];
-  
+
       const result = service.removeDuplicateFocusAreas(focusAreas);
-  
+
       expect(result).toEqual([
         { uid: '1', title: 'Focus Area 1' },
         { uid: '2', title: 'Focus Area 2' },
       ]);
     });
-  
+
     it('should return an empty array if no focus areas are provided', () => {
       const focusAreas = [];
       const result = service.removeDuplicateFocusAreas(focusAreas);
       expect(result).toEqual([]);
     });
-  
+
     it('should return the same array if no duplicates are found', () => {
       const focusAreas = [
-        { focusArea: { uid: '1', title: 'Focus Area 1' }},
-        { focusArea: { uid: '2', title: 'Focus Area 2' }},
+        { focusArea: { uid: '1', title: 'Focus Area 1' } },
+        { focusArea: { uid: '2', title: 'Focus Area 2' } },
       ];
-  
+
       const result = service.removeDuplicateFocusAreas(focusAreas);
-  
+
       expect(result).toEqual([
         { uid: '1', title: 'Focus Area 1' },
         { uid: '2', title: 'Focus Area 2' },
@@ -462,136 +465,143 @@ describe('ProjectsService', () => {
     });
   });
 
-
   describe('buildProjectFilter', () => {
-  
     it('should return filter with default isDeleted filter', () => {
       const query = {};
       const result = service.buildProjectFilter(query);
-  
+
       expect(result).toEqual({
-        AND: [{ isDeleted: false }]
+        AND: [{ isDeleted: false }],
       });
     });
-  
+
     it('should build name filter when name is provided', () => {
       const query = { name: 'test' };
       const result = service.buildProjectFilter(query);
-  
+
       expect(result).toEqual({
-        AND: [
-          { isDeleted: false },
-          { name: { contains: 'test', mode: 'insensitive' } }
-        ]
+        AND: [{ isDeleted: false }, { name: { contains: 'test', mode: 'insensitive' } }],
       });
     });
-  
+
     it('should build funding filter when lookingForFunding is "true"', () => {
       const query = { lookingForFunding: 'true' };
       const result = service.buildProjectFilter(query);
-  
+
       expect(result).toEqual({
-        AND: [
-          { isDeleted: false },
-          { lookingForFunding: true }
-        ]
+        AND: [{ isDeleted: false }, { lookingForFunding: true }],
       });
     });
-  
+
     it('should build maintaining team filter when team is provided', () => {
       const query = { team: 'team-uid' };
       const result = service.buildProjectFilter(query);
-  
+
       expect(result).toEqual({
-        AND: [
-          { isDeleted: false },
-          { maintainingTeamUid: 'team-uid' }
-        ]
+        AND: [{ isDeleted: false }, { maintainingTeamUid: 'team-uid' }],
       });
     });
-  
+
     it('should combine all filters when all query parameters are provided', () => {
       const query = { name: 'test', lookingForFunding: 'true', team: 'team-uid' };
       const result = service.buildProjectFilter(query);
-  
+
       expect(result).toEqual({
         AND: [
           { isDeleted: false },
           { name: { contains: 'test', mode: 'insensitive' } },
           { lookingForFunding: true },
-          { maintainingTeamUid: 'team-uid' }
-        ]
+          { maintainingTeamUid: 'team-uid' },
+        ],
       });
     });
   });
-  
 
   describe(' isMemberAllowedToDelete', () => {
-  
     it('should allow deletion if member is an admin', async () => {
       const mockMember = { uid: 'member-uid' };
       const mockProject = { maintainingTeamUid: 'team-uid', createdBy: 'other-member-uid', uid: 'project-uid' };
-  
+
       // Mocking the responses
       mockMembersService.isMemberLeadTeam.mockResolvedValue(false); // Member is not a lead
-      mockMembersService.checkIfAdminUser.mockReturnValue(true);    // Member is an admin
-  
+      mockMembersService.checkIfAdminUser.mockReturnValue(true); // Member is an admin
+
       const result = await service.isMemberAllowedToDelete(mockMember, mockProject);
-  
+
       expect(result).toBe(true);
       expect(mockMembersService.isMemberLeadTeam).toHaveBeenCalledWith(mockMember, 'team-uid');
       expect(mockMembersService.checkIfAdminUser).toHaveBeenCalledWith(mockMember);
     });
-  
+
     it('should throw ForbiddenException if member is not creator, leader, or admin', async () => {
       const mockMember = { uid: 'member-uid' };
       const mockProject = { maintainingTeamUid: 'team-uid', createdBy: 'other-member-uid', uid: 'project-uid' };
-  
+
       // Mocking the responses
       mockMembersService.isMemberLeadTeam.mockResolvedValue(false); // Not a lead
-      mockMembersService.checkIfAdminUser.mockReturnValue(false);   // Not an admin
-  
-      await expect(service.isMemberAllowedToDelete(mockMember, mockProject)).rejects.toThrow(
-        ForbiddenException
-      );
+      mockMembersService.checkIfAdminUser.mockReturnValue(false); // Not an admin
+
+      await expect(service.isMemberAllowedToDelete(mockMember, mockProject)).rejects.toThrow(ForbiddenException);
     });
   });
-  
+
   describe('handleErrors', () => {
-    it('should log and throw a ConflictException for P2002 error code', () => {
-      const error = new Prisma.PrismaClientKnownRequestError('Unique key constraint error', 'P2002', '2.30.0');
+    it('should throw unhandled Prisma error (default case)', () => {
+      // Mock a different PrismaClientKnownRequestError that does not match any case
+      const mockError = new Prisma.PrismaClientKnownRequestError(
+        'Some unknown error',
+        'P1234', // An arbitrary code that's not handled
+        '4.0.0'
+      );
 
-      expect(() => service['handleErrors'](error)).toThrow(ConflictException);
-      expect(mockLoggerService.error).toHaveBeenCalledWith(error);
+      expect(() => service['handleErrors'](mockError)).toThrow(mockError); // Expecting the same error to be thrown
+
+      // Verify logger.error was called with the error
+      expect(mockLoggerService.error).toHaveBeenCalledWith(mockError);
     });
+    it('should throw non-Prisma error', () => {
+      // Mock a general error (not a PrismaClientKnownRequestError)
+      const mockError = new Error('Some general error');
 
-    it('should log and throw a BadRequestException for P2003 error code', () => {
-      const error = new Prisma.PrismaClientKnownRequestError('Foreign key constraint error', 'P2003', '2.30.0');
+      expect(() => service['handleErrors'](mockError)).toThrow(mockError); // Expecting the same error to be thrown
 
-      expect(() => service['handleErrors'](error)).toThrow(BadRequestException);
-      expect(mockLoggerService.error).toHaveBeenCalledWith(error);
+      // Verify logger.error was called with the error
+      expect(mockLoggerService.error).toHaveBeenCalledWith(mockError);
     });
+  });
+  it('should log and throw a ConflictException for P2002 error code', () => {
+    const error = new Prisma.PrismaClientKnownRequestError('Unique key constraint error', 'P2002', '2.30.0');
 
-    it('should log and throw a NotFoundException for P2025 error code', () => {
-      const error = new Prisma.PrismaClientKnownRequestError('Project not found', 'P2025', '2.30.0');
-      const message = 'project-uid';
+    expect(() => service['handleErrors'](error)).toThrow(ConflictException);
+    expect(mockLoggerService.error).toHaveBeenCalledWith(error);
+  });
 
-      expect(() => service['handleErrors'](error, message)).toThrow(NotFoundException);
-      expect(mockLoggerService.error).toHaveBeenCalledWith(error);
-    });
+  it('should log and throw a BadRequestException for P2003 error code', () => {
+    const error = new Prisma.PrismaClientKnownRequestError('Foreign key constraint error', 'P2003', '2.30.0');
 
-    it('should log and throw a BadRequestException for PrismaClientValidationError', () => {
-      const error = new Prisma.PrismaClientValidationError('Validation error');
+    expect(() => service['handleErrors'](error)).toThrow(BadRequestException);
+    expect(mockLoggerService.error).toHaveBeenCalledWith(error);
+  });
 
-      expect(() => service['handleErrors'](error)).toThrow(BadRequestException);
-      expect(mockLoggerService.error).toHaveBeenCalledWith(error);
-    });
+  it('should log and throw a NotFoundException for P2025 error code', () => {
+    const error = new Prisma.PrismaClientKnownRequestError('Project not found', 'P2025', '2.30.0');
+    const message = 'project-uid';
 
-    it('should log and rethrow unknown errors', () => {
-      const error = new Error('Unknown error');
+    expect(() => service['handleErrors'](error, message)).toThrow(NotFoundException);
+    expect(mockLoggerService.error).toHaveBeenCalledWith(error);
+  });
 
-      expect(() => service['handleErrors'](error)).toThrow(Error);
-      expect(mockLoggerService.error).toHaveBeenCalledWith(error);
-    });
+  it('should log and throw a BadRequestException for PrismaClientValidationError', () => {
+    const error = new Prisma.PrismaClientValidationError('Validation error');
+
+    expect(() => service['handleErrors'](error)).toThrow(BadRequestException);
+    expect(mockLoggerService.error).toHaveBeenCalledWith(error);
+  });
+
+  it('should log and rethrow unknown errors', () => {
+    const error = new Error('Unknown error');
+
+    expect(() => service['handleErrors'](error)).toThrow(Error);
+    expect(mockLoggerService.error).toHaveBeenCalledWith(error);
   });
 });
