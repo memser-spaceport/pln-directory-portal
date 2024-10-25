@@ -6,6 +6,7 @@ import { apiInternals } from 'libs/contracts/src/lib/contract-internals';
 import { ResponsePLEventGuestSchemaWithRelationsSchema } from 'libs/contracts/src/schema';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
+import { PLEventsService } from '../pl-events/pl-events.service';
 import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { InternalAuthGuard } from '../guards/auth.guard';
@@ -18,6 +19,7 @@ type RouteShape = typeof server.routeShapes;
 export class PLEventsInternalController {
   constructor(
     private readonly eventGuestsService: PLEventGuestsService, 
+    private readonly eventService: PLEventsService  
   ) {}
 
   @Api(server.route.getPLEventGuestsByLocation)
@@ -31,6 +33,15 @@ export class PLEventsInternalController {
     );
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
+    if (request.query.searchBy) {
+      delete builtQuery.where?.searchBy;
+      builtQuery.where = {
+        AND: [
+          builtQuery.where,
+          this.eventService.buildSearchFilter(request.query),
+        ]
+      };
+    }
     return await this.eventGuestsService.getPLEventGuestsByLocation(locationUid, builtQuery);
   }
 }
