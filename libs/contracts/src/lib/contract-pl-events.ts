@@ -48,7 +48,7 @@ export const apiEvents = contract.router({
   },
   getPLEventsByLoggedInMember: {
     method: 'GET',
-    path: `${getAPIVersionAsPath('1')}/irl/me/events`,
+    path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/me/events`,
     query: PLEventDetailQueryParams,
     responses: {
       200: ResponsePLEventSchemaWithRelationsSchema,
@@ -72,5 +72,14 @@ export const apiEvents = contract.router({
       200:  contract.response<unknown>(),
     },
     summary: 'Get pl event guests by location and type',
+  },
+  getPLEventTopicsByLocation: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/topics`,
+    query: PLEventDetailQueryParams,
+    responses: {
+      200: ResponsePLEventLocationWithRelationsSchema.array(),
+    },
+    summary: 'Get pl event topics by location and type',
   }
 });
