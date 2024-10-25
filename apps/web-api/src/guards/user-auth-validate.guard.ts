@@ -18,11 +18,9 @@ export class UserAuthValidateGuard implements CanActivate {
     if (!token && request.method !== 'GET') {
       throw new UnauthorizedException();
     }
-
     if (!token && request.method === 'GET') {
       return true;
     }
-
     try {
       const validationResult: any = await axios.post(
         `${process.env.AUTH_API_URL}/auth/introspect`,
@@ -33,6 +31,7 @@ export class UserAuthValidateGuard implements CanActivate {
         validationResult?.data?.email
       ) {
         request['isUserLoggedIn'] = true;
+        request['userEmail'] = validationResult.data.email;
       }
 
       if (!validationResult?.data?.active && request.method !== 'GET') {

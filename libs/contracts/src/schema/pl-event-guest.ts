@@ -48,6 +48,28 @@ export const PLEventGuestSchema = z.object({
   priority: z.number().int().nullish()
 });
 
+
+export const PLEventGuestQuerySchema = z.object({
+  id: z.string(),
+  uid: z.string(),
+  teamUid: z.string(),
+  eventUid: z.string(),
+  locationUid: z.string(),
+  slugURL: z.string(),
+  memberUid: z.string(),
+  telegramId: z.string().nullish(),
+  reason: z.string().nullish(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  additionalInfo: z.any(),
+  topics: z.array(z.string()).nullish(),
+  isFeatured: z.boolean().nullish(),
+  isHost: z.boolean().nullish(),
+  isSpeaker: z.boolean().nullish(),
+  searchBy: z.string()
+});
+
+
 export const ResponsePLEventGuestSchema = PLEventGuestSchema.omit({ id: true }).strict();
 
 export const ResponsePLEventGuestSchemaWithRelationsSchema = ResponsePLEventGuestSchema.extend({
