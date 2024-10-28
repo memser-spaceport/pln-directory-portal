@@ -568,40 +568,40 @@ describe('ProjectsService', () => {
       // Verify logger.error was called with the error
       expect(mockLoggerService.error).toHaveBeenCalledWith(mockError);
     });
-  });
-  it('should log and throw a ConflictException for P2002 error code', () => {
-    const error = new Prisma.PrismaClientKnownRequestError('Unique key constraint error', 'P2002', '2.30.0');
-
-    expect(() => service['handleErrors'](error)).toThrow(ConflictException);
-    expect(mockLoggerService.error).toHaveBeenCalledWith(error);
-  });
-
-  it('should log and throw a BadRequestException for P2003 error code', () => {
-    const error = new Prisma.PrismaClientKnownRequestError('Foreign key constraint error', 'P2003', '2.30.0');
-
-    expect(() => service['handleErrors'](error)).toThrow(BadRequestException);
-    expect(mockLoggerService.error).toHaveBeenCalledWith(error);
-  });
-
-  it('should log and throw a NotFoundException for P2025 error code', () => {
-    const error = new Prisma.PrismaClientKnownRequestError('Project not found', 'P2025', '2.30.0');
-    const message = 'project-uid';
-
-    expect(() => service['handleErrors'](error, message)).toThrow(NotFoundException);
-    expect(mockLoggerService.error).toHaveBeenCalledWith(error);
-  });
-
-  it('should log and throw a BadRequestException for PrismaClientValidationError', () => {
-    const error = new Prisma.PrismaClientValidationError('Validation error');
-
-    expect(() => service['handleErrors'](error)).toThrow(BadRequestException);
-    expect(mockLoggerService.error).toHaveBeenCalledWith(error);
-  });
-
-  it('should log and rethrow unknown errors', () => {
-    const error = new Error('Unknown error');
-
-    expect(() => service['handleErrors'](error)).toThrow(Error);
-    expect(mockLoggerService.error).toHaveBeenCalledWith(error);
+    it('should log and throw a ConflictException for P2002 error code', () => {
+      const error = new Prisma.PrismaClientKnownRequestError('Unique key constraint error', 'P2002', '2.30.0');
+  
+      expect(() => service['handleErrors'](error)).toThrow(ConflictException);
+      expect(mockLoggerService.error).toHaveBeenCalledWith(error);
+    });
+  
+    it('should log and throw a BadRequestException for P2003 error code', () => {
+      const error = new Prisma.PrismaClientKnownRequestError('Foreign key constraint error', 'P2003', '2.30.0');
+  
+      expect(() => service['handleErrors'](error)).toThrow(BadRequestException);
+      expect(mockLoggerService.error).toHaveBeenCalledWith(error);
+    });
+  
+    it('should log and throw a NotFoundException for P2025 error code', () => {
+      const error = new Prisma.PrismaClientKnownRequestError('Project not found', 'P2025', '2.30.0');
+      const message = 'project-uid';
+  
+      expect(() => service['handleErrors'](error, message)).toThrow(NotFoundException);
+      expect(mockLoggerService.error).toHaveBeenCalledWith(error);
+    });
+  
+    it('should log and throw a BadRequestException for PrismaClientValidationError', () => {
+      const error = new Prisma.PrismaClientValidationError('Validation error');
+  
+      expect(() => service['handleErrors'](error)).toThrow(BadRequestException);
+      expect(mockLoggerService.error).toHaveBeenCalledWith(error);
+    });
+  
+    it('should log and rethrow unknown errors', () => {
+      const error = new Error('Unknown error');
+  
+      expect(() => service['handleErrors'](error)).toThrow(Error);
+      expect(mockLoggerService.error).toHaveBeenCalledWith(error);
+    });
   });
 });
