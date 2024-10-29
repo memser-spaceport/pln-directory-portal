@@ -9,9 +9,9 @@ import {
   CreatePLEventGuestSchemaDto,
   UpdatePLEventGuestSchemaDto
 } from 'libs/contracts/src/schema';
-import { 
+import {
   FormattedLocationWithEvents,
-  PLEvent 
+  PLEvent
 } from './pl-event-locations.types';
 
 @Injectable()
@@ -22,7 +22,7 @@ export class PLEventGuestsService {
     private memberService: MembersService,
     private eventLocationsService: PLEventLocationsService,
     @Inject(CACHE_MANAGER) private cacheService: Cache
-  ) {}
+  ) { }
 
   /**
    * This method creates multiple event guests for a specific location.
@@ -34,7 +34,7 @@ export class PLEventGuestsService {
    */
   async createPLEventGuestByLocation(
     data: CreatePLEventGuestSchemaDto,
-    member: Member, 
+    member: Member,
     tx?: Prisma.TransactionClient
   ) {
     try {
@@ -45,7 +45,7 @@ export class PLEventGuestsService {
       const result = await (tx || this.prisma).pLEventGuest.createMany({ data: guests });
       this.cacheService.reset();
       return result;
-    } catch(err) {
+    } catch (err) {
       this.handleErrors(err);
     }
   };
@@ -59,8 +59,8 @@ export class PLEventGuestsService {
    *   - Deletes the existing guests and calls the `createPLEventGuestByLocation` method for new guests.
    */
   async modifyPLEventGuestByLocation(
-    data: UpdatePLEventGuestSchemaDto, 
-    location: FormattedLocationWithEvents, 
+    data: UpdatePLEventGuestSchemaDto,
+    location: FormattedLocationWithEvents,
     member: Member,
     type: string
   ) {
@@ -82,7 +82,7 @@ export class PLEventGuestsService {
       this.handleErrors(err);
     }
   }
-  
+
 
   /**
    * This method deletes event guests for a specific location and given members.
@@ -92,7 +92,7 @@ export class PLEventGuestsService {
    */
   async deletePLEventGuests(membersAndEvents) {
     try {
-      const deleteConditions = membersAndEvents.flatMap(({ memberUid, events }) => 
+      const deleteConditions = membersAndEvents.flatMap(({ memberUid, events }) =>
         events.map(eventUid => ({ memberUid, eventUid }))
       );
       const result = await this.prisma.pLEventGuest.deleteMany({
@@ -126,21 +126,21 @@ export class PLEventGuestsService {
       if (type === "upcoming") {
         events = await this.eventLocationsService.getUpcomingEventsByLocation(locationUid);
       } else {
-        events = await this.eventLocationsService.getPastEventsByLocation(locationUid);  
+        events = await this.eventLocationsService.getPastEventsByLocation(locationUid);
       }
-      if (events.length === 0) 
+      if (events.length === 0)
         return [];
-      events = await this.filterEventsByAttendanceAndAdminStatus(events, member);
+      events = await this.filterEventsByAttendanceAndAdminStatus(filteredEvents, events, member);
       const result = await this.fetchAttendees({
-        eventUids: filteredEvents || events?.map(event => event.uid),
+        eventUids: events?.map(event => event.uid),
         ...query,
-        loggedInMemberUid : member ? member?.uid : null
+        loggedInMemberUid: member ? member?.uid : null
       });
       this.restrictTelegramBasedOnMemberPreference(result, member ? true : false);
       this.restrictOfficeHours(result, member ? true : false);
       return result;
     }
-    catch(err) {
+    catch (err) {
       this.handleErrors(err);
     }
   };
@@ -167,7 +167,7 @@ export class PLEventGuestsService {
       await this.memberService.updateOfficeHoursIfChanged(member, guest.officeHours, tx);
     }
   }
-  
+
   /**
   * Fetches all PLEventGuests for a given location, filtered by the upcoming events at that location.
   * 
@@ -217,10 +217,10 @@ export class PLEventGuestsService {
             }
           }
         },
-        orderBy: query.orderBy     
+        orderBy: query.orderBy
       });
     }
-    catch(err) {
+    catch (err) {
       this.handleErrors(err);
     }
   };
@@ -253,7 +253,7 @@ export class PLEventGuestsService {
       };
       return {
         telegramId: input.telegramId || null,
-        officeHours: input.officeHours || null, 
+        officeHours: input.officeHours || null,
         reason: input.reason || null,
         memberUid: input.memberUid,
         teamUid: input.teamUid,
@@ -274,7 +274,7 @@ export class PLEventGuestsService {
    */
   restrictTelegramBasedOnMemberPreference(eventGuests, isUserLoggedIn: boolean) {
     if (isUserLoggedIn && eventGuests) {
-      eventGuests = eventGuests.map((guest:any) => {
+      eventGuests = eventGuests.map((guest: any) => {
         if (!guest.member.preferences) {
           return guest;
         }
@@ -296,7 +296,7 @@ export class PLEventGuestsService {
    */
   restrictOfficeHours(eventGuests, isUserLoggedIn: boolean) {
     if (eventGuests && isUserLoggedIn) {
-      eventGuests = eventGuests.map((guest:any) => {
+      eventGuests = eventGuests.map((guest: any) => {
         if (!guest.officeHours) {
           delete guest.member.officeHours;
         }
@@ -305,7 +305,7 @@ export class PLEventGuestsService {
     }
     return eventGuests;
   };
-  
+
   /**
    * This method handles various types of database errors, especially related to event guests.
    * @param error The error object caught during operations
@@ -343,18 +343,20 @@ export class PLEventGuestsService {
    * @param {string | null} userId - The UID of the logged-in user, or null if the user is logged out.
    * @returns {Promise<PLEvent[]>} Filtered array of events based on the user’s attendance, login state, and admin status.
    */
-  async filterEventsByAttendanceAndAdminStatus(events: PLEvent[], member): Promise<PLEvent[]> {
+  async filterEventsByAttendanceAndAdminStatus(filteredEventsUid, events: PLEvent[], member): Promise<PLEvent[]> {
     // Scenario 1: If the user is logged out, remove all invite-only events
+    const inviteOnlyEventsUid = events.filter(event => event.type === "INVITE_ONLY").map(event => event.uid);
+    if (filteredEventsUid?.length > 0 && !member) {
+      const publicFilteredUids = filteredEventsUid.filter(uid => !inviteOnlyEventsUid.includes(uid));
+      return events.filter(event => publicFilteredUids.includes(event.uid));
+    }
     if (!member) {
       return events.filter(event => event.type !== "INVITE_ONLY");
     }
-
-    const isAdmin = await this.memberService.checkIfAdminUser(member);
     // If the user is an admin, return all events without filtering
-    if (isAdmin) {
+    if (this.memberService.checkIfAdminUser(member)) {
       return events;
     }
-
     // Scenario 2: If the user is logged in and not an admin, get invite-only events they are attending
     const userAttendedEvents = await this.prisma.pLEvent.findMany({
       where: {
@@ -372,7 +374,13 @@ export class PLEventGuestsService {
     // Create a Set of attended invite-only event UIDs for efficient lookup
     const attendedEventUids = new Set(userAttendedEvents.map(event => event.uid));
     // Filter events to keep non-invite-only events and attended invite-only events
-    return events.filter(event => 
+    if (filteredEventsUid.length > 0) {
+      return filteredEventsUid.filter(eventUid => {
+        const event: any = events.find(event => event.uid === eventUid);
+        return event?.type !== "INVITE_ONLY" || attendedEventUids.has(event?.uid);
+      });
+    }
+    return events.filter(event =>
       event.type !== "INVITE_ONLY" || attendedEventUids.has(event.uid)
     );
   }
@@ -394,10 +402,10 @@ export class PLEventGuestsService {
    * @returns {Promise<Array>} A list of attendees with their associated member, team, and event information.
    */
   async fetchAttendees(queryParams) {
-    const { eventUids, isHost, isSpeaker, topics,  sortBy, sortDirection='asc', search, limit=10, page=1, loggedInMemberUid } = queryParams;
+    const { eventUids, isHost, isSpeaker, topics, sortBy, sortDirection = 'asc', search, limit = 10, page = 1, loggedInMemberUid } = queryParams;
     // Build dynamic query conditions for filtering by eventUids, isHost, and isSpeaker
-    let { conditions, values } = this.buildConditions(eventUids, isHost, isSpeaker, topics);
-    
+    let { conditions, values } = this.buildConditions(eventUids, topics);
+
     // Apply search functionality to filter results based on member, team, or project names
     ({ conditions, values } = this.applySearch(conditions, values, search));
 
@@ -407,77 +415,99 @@ export class PLEventGuestsService {
     // Apply pagination to limit the results and calculate the offset for the current page
     const { limit: paginationLimit, offset } = this.applyPagination(Number(limit), page);
     // Construct the raw SQL query for fetching attendees with joined tables and aggregated JSON data
-    const query:any = `
+    const query: any = `
       SELECT 
-        pg."memberUid",
-        COUNT(pg."memberUid") OVER() AS count,
-        json_object_agg(
-          'info',
-          json_build_object(
-            'reason', pg."reason",
-            'teamUid', pg."teamUid",
-            'topics', pg."topics",
-            'additionalInfo', pg."additionalInfo",
-            'isHost', pg."isHost",
-            'isSpeaker', pg."isSpeaker",
-            'createdAt', pg."createdAt",
-            'telegramId', pg."telegramId",
-            'officeHours', pg."officeHours"
-          )
-        ) AS guest,
-        json_agg(DISTINCT e.*) AS events,
-        json_object_agg(
-          'member',
-          json_build_object(
-            'name', m.name,
-            'image', json_build_object('url', mi.url),
-            'telegramHandler', m."telegramHandler",
-            'preferences', m.preferences,
-            'officeHours', m."officeHours"
-          )
-        ) AS member,
-        json_agg(
-          json_build_object(
-            'role', tmr."role",
-            'team', json_build_object(
-              'uid', tmr_team.uid,
-              'name', tmr_team.name,
-              'logo', json_build_object('url', tmr_logo.url)
+        *,
+        COUNT(*) OVER() AS count FROM (
+        SELECT 
+          pg."memberUid",
+          CASE 
+            WHEN BOOL_OR(pg."isHost") AND NOT BOOL_OR(pg."isSpeaker") THEN 'isHostOnly'
+            WHEN BOOL_OR(pg."isSpeaker") AND NOT BOOL_OR(pg."isHost") THEN 'isSpeakerOnly'
+            WHEN BOOL_OR(pg."isHost") AND BOOL_OR(pg."isSpeaker") THEN 'hostAndSpeaker'
+            ELSE 'none'
+          END AS guest_type,
+          json_object_agg(
+            'info',
+            json_build_object(
+              'reason', pg."reason",
+              'teamUid', pg."teamUid",
+              'topics', pg."topics",
+              'isHost', pg."isHost",
+              'isSpeaker', pg."isSpeaker",
+              'createdAt', pg."createdAt",
+              'telegramId', pg."telegramId",
+              'officeHours', pg."officeHours"
             )
-          )
-        ) as teamMemberRoles, 
-        json_object_agg(
-          'team',
-          json_build_object(
-            'uid', tm.uid,
-            'name', tm.name,
-            'logo', json_build_object('url', tml.url)
-          )
-        ) AS team
-      FROM "PLEventGuest" pg
-      JOIN "PLEvent" e ON e.uid = pg."eventUid"
-      LEFT JOIN "Image" el ON el.uid = e."logoUid"
-      LEFT JOIN "Image" eb ON eb.uid = e."bannerUid"
-      JOIN "Member" m ON m.uid = pg."memberUid"
-      LEFT JOIN "Image" mi ON mi.uid = m."imageUid"
-      LEFT JOIN "TeamMemberRole" tmr ON tmr."memberUid" = m.uid
-      LEFT JOIN "Team" tmr_team ON tmr_team.uid = tmr."teamUid"
-      LEFT JOIN "Image" tmr_logo ON tmr_logo.uid = tmr_team."logoUid"
-      LEFT JOIN "ProjectContribution" pc ON pc."memberUid" = m.uid
-      LEFT JOIN "Project" pc_project ON pc_project.uid = pc."projectUid"
-      LEFT JOIN "Project" cp ON cp."createdBy" = m.uid
-      LEFT JOIN "Team" tm ON tm.uid = pg."teamUid"
-      LEFT JOIN "Image" tml ON tml.uid = tm."logoUid"
-      ${conditions} -- Add the dynamically generated conditions for filtering
-      GROUP BY 
-        pg."memberUid",
-        pg."reason",
-        pg."topics",
-        m.name,
-        tm.name
-      ${orderBy} -- Apply sorting logic
+          ) AS guest,
+          json_agg(
+            DISTINCT jsonb_build_object(
+              'uid', e.uid,
+              'name', e.name,
+              'type', e.type,
+              'startDate', e."startDate",
+              'endDate', e."endDate",
+              'isHost', pg."isHost",      -- Event-specific host details
+              'isSpeaker', pg."isSpeaker", -- Event-specific speaker details
+              'additionalInfo', pg."additionalInfo"
+            )
+          ) AS events,
+          json_object_agg(
+            'member',
+            json_build_object(
+              'name', m.name,
+              'image', json_build_object('url', mi.url),
+              'telegramHandler', m."telegramHandler",
+              'preferences', m.preferences,
+              'officeHours', m."officeHours"
+            )
+          ) AS member,
+          json_agg(
+            DISTINCT jsonb_build_object(
+              'role', tmr."role",
+              'team', json_build_object(
+                'uid', tmr_team.uid,
+                'name', tmr_team.name,
+                'logo', json_build_object('url', tmr_logo.url)
+              )
+            )
+          ) as teamMemberRoles, 
+          json_object_agg(
+            'team',
+            json_build_object(
+              'uid', tm.uid,
+              'name', tm.name,
+              'logo', json_build_object('url', tml.url)
+            )
+          ) AS team
+        FROM "PLEventGuest" pg
+        JOIN "PLEvent" e ON e.uid = pg."eventUid"
+        LEFT JOIN "Image" el ON el.uid = e."logoUid"
+        LEFT JOIN "Image" eb ON eb.uid = e."bannerUid"
+        JOIN "Member" m ON m.uid = pg."memberUid"
+        LEFT JOIN "Image" mi ON mi.uid = m."imageUid"
+        LEFT JOIN "TeamMemberRole" tmr ON tmr."memberUid" = m.uid
+        LEFT JOIN "Team" tmr_team ON tmr_team.uid = tmr."teamUid"
+        LEFT JOIN "Image" tmr_logo ON tmr_logo.uid = tmr_team."logoUid"
+        LEFT JOIN "ProjectContribution" pc ON pc."memberUid" = m.uid
+        LEFT JOIN "Project" pc_project ON pc_project.uid = pc."projectUid"
+        LEFT JOIN "Project" cp ON cp."createdBy" = m.uid
+        LEFT JOIN "Team" tm ON tm.uid = pg."teamUid"
+        LEFT JOIN "Image" tml ON tml.uid = tm."logoUid"
+        ${conditions} -- Add the dynamically generated conditions for filtering
+        GROUP BY 
+          pg."memberUid",
+          pg."teamUid",
+          pg."topics",
+          pg."reason",
+          m.name,
+          tm.name
+        ${orderBy} -- Apply sorting logic
+      ) 
+      AS subquery
+      ${this.buildHostAndSpeakerCondition(isHost, isSpeaker)}
       LIMIT $${values.length + 1}
-      OFFSET $${values.length + 2}; -- Apply pagination limit and offset
+      OFFSET $${values.length + 2} -- Apply pagination limit and offset
     `;
     // Add pagination values to the query parameters for limit and offset
     values.push(paginationLimit, offset);
@@ -497,9 +527,9 @@ export class PLEventGuestsService {
   private formatAttendees(result) {
     return result.map((attendee) => {
       return {
-         // Total count of members after filtering, represented by totalMembers
-        count: Number(BigInt(attendee.count || '0n')),  
-        
+        // Total count of members after filtering, represented by totalMembers
+        count: Number(BigInt(attendee.count || '0n')),
+
         memberUid: attendee.memberUid,
         // Spread guest information if available, including attributes like isHost and isSpeaker
         ...attendee?.guest?.info,
@@ -514,40 +544,54 @@ export class PLEventGuestsService {
   }
 
   /**
-   * Builds dynamic conditions for filtering event guests.
-   * Adds conditions for eventUids, isHost, and isSpeaker.
+   * Builds dynamic SQL conditions for filtering event guests based on provided criteria.
+   *
+   * This function creates a SQL conditions string and an array of values for binding in the query.
+   * Conditions are added for filtering by eventUids, isHost, isSpeaker, and topics.
    * 
    * @param {Array} eventUids - List of event UIDs for filtering.
-   * @param {boolean} isHost - Filter by whether the member is a host.
-   * @param {boolean} isSpeaker - Filter by whether the member is a speaker.
    * @param {Array} topics - List of topics to filter by using the overlap operator.
    * @returns {Object} An object containing the SQL conditions string and associated values for query binding.
    */
-  buildConditions(eventUids, isHost, isSpeaker, topics) {
-    if (eventUids?.length === 0) 
-      return { conditions: '', values: [] };
-
-    // Start with a basic condition to filter by event UIDs
-    let conditions = `WHERE pg."eventUid" IN (${eventUids?.map((_, i) => `$${i + 1}`).join(", ")})`;;
-    let values = [...eventUids];
-
-    // Add a condition to filter by host status if provided
-    if (isHost) {
-      conditions += ` AND pg."isHost" = $${values.length + 1}`;
-      values.push(isHost === "true");
+  buildConditions(eventUids, topics) {
+    const conditions: string[] = [];
+    const values: any = [];
+    // Add a condition to filter by event UIDs if provided
+    if (eventUids && eventUids.length > 0) {
+      conditions.push(`pg."eventUid" IN (${eventUids.map((_, i) => `$${i + 1}`).join(", ")})`);
+      values.push(...eventUids);
     }
-    // Add a condition to filter by speaker status if provided
-    if (isSpeaker) {
-      conditions += ` AND pg."isSpeaker" = $${values.length + 1}`;
-      values.push(isSpeaker  === "true");
-    }
-
     // Add a condition for topics if provided, using the overlap operator (&&)
     if (topics && topics.length > 0) {
-      conditions += ` AND pg."topics" && $${values.length + 1}`;
+      conditions.push(`pg."topics" && $${values.length + 1}`);
       values.push(topics);
     }
-    return { conditions, values };
+    // Combine conditions into a single WHERE clause if any conditions are present
+    const conditionsString = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")} ` : '';
+    return { conditions: conditionsString, values };
+  }
+
+  /**
+   * Builds a SQL condition string based on the host and speaker status.
+   *
+   * @param {string} isHost - Indicates if the guest is a host (expected values: "true" or "false").
+   * @param {string} isSpeaker - Indicates if the guest is a speaker (expected values: "true" or "false").
+   * @returns {string} - A SQL condition string to filter guests based on their type.
+   */
+  buildHostAndSpeakerCondition(isHost, isSpeaker) {
+    // Check if the guest is both a host and a speaker
+    if (isHost === "true" && isSpeaker === "true") {
+      return ` WHERE guest_type = 'hostAndSpeaker' `; // Return condition for both host and speaker
+    }
+    // Check if the guest is only a host
+    else if (isHost === "true") {
+      return ` WHERE guest_type = 'isHostOnly' `; // Return condition for host only
+    }
+    // Check if the guest is only a speaker
+    else if (isSpeaker === "true") {
+      return ` WHERE guest_type = 'isSpeakerOnly' `; // Return condition for speaker only
+    }
+    return '';
   }
 
   /**
@@ -558,7 +602,7 @@ export class PLEventGuestsService {
    * @param {string} search - The search term to filter by member name, team name, or project names.
    * @returns {Object} Updated conditions and values for the SQL query after applying search filters.
    */
-  applySearch(conditions:string, values, search:string) {
+  applySearch(conditions: string, values, search: string) {
     // Add a condition to search by member name, team name, or project names (either contributed or created)
     if (search) {
       conditions += ` AND (
@@ -580,13 +624,13 @@ export class PLEventGuestsService {
    *                          Can be 'memberName', 'teamName', or 'eventName'.
    * @returns {string} SQL orderBy clause to apply the sorting.
    */
-  applySorting(sortBy:string, sortDirection:string, uid:string) {
+  applySorting(sortBy: string, sortDirection: string, uid: string) {
     // Apply sorting based on the selected field
     switch (sortBy) {
       case "member":
         return 'ORDER BY m."name" ' + sortDirection;
       case "team":
-        return 'ORDER BY tm."name" '+ sortDirection;
+        return 'ORDER BY tm."name" ' + sortDirection;
       default:
         const loggedInMemberOrder = uid
           ? `CASE WHEN pg."memberUid" = '${uid}' THEN 0 ELSE 1 END,` : '';
@@ -648,4 +692,158 @@ export class PLEventGuestsService {
     const offset = (page - 1) * limit;
     return { limit, offset };
   }
+
+  /**
+   * Retrieves event guest information for a specific member at a specific location.
+   *
+   * This function retrieves upcoming events at the specified location, and then fetches 
+   * the corresponding guest records for a particular member across these events. 
+   * It includes detailed information about the event, member, team, and guest's role 
+   * within the event. Additionally, it applies restrictions on visibility of member 
+   * preferences based on the specified member UID.
+   * 
+   * @param {string} memberUid - The UID of the member whose event guest information is being retrieved.
+   * @param {string} locationUid - The UID of the location for which events are retrieved.
+   * @returns {Promise<PLEventGuest>} An array of event guest records for the specified member 
+   *                           at the specified location.
+   */
+  async getPLEventGuestByUidAndLocation(
+    memberUid: string,
+    locationUid: string,
+    isUserLoggedIn: boolean
+  ) {
+    try {
+      const events = await this.eventLocationsService.getUpcomingEventsByLocation(locationUid);
+      const result = await this.prisma.pLEventGuest.findMany({
+        where: {
+          memberUid,
+          eventUid: {
+            in: events.map(event => event.uid)
+          }
+        },
+        select: {
+          uid: true,
+          reason: true,
+          memberUid: true,
+          teamUid: true,
+          topics: true,
+          additionalInfo: true,
+          isHost: true,
+          isSpeaker: true,
+          event: {
+            select: {
+              slugURL: true,
+              uid: true,
+              name: true,
+              type: true,
+              description: true,
+              startDate: true,
+              endDate: true,
+              logo: { select: { url: true } },
+              banner: { select: { url: true } },
+              resources: true,
+              additionalInfo: true
+            }
+          },
+          member: {
+            select: {
+              name: true,
+              image: { select: { url: true } },
+              telegramHandler: isUserLoggedIn ? true : false,
+              preferences: true,
+              officeHours: isUserLoggedIn ? true : false,
+              teamMemberRoles: {
+                select: {
+                  team: {
+                    select: {
+                      uid: true,
+                      name: true,
+                      logo: { select: { url: true } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          team: {
+            select: {
+              uid: true,
+              name: true,
+              logo: { select: { url: true } }
+            }
+          },
+          createdAt: true,
+          telegramId: isUserLoggedIn ? true : false,
+          officeHours: isUserLoggedIn ? true : false
+        }
+      });
+      this.restrictTelegramBasedOnMemberPreference(result, isUserLoggedIn ? true : false);
+      return result;
+    } catch (err) {
+      this.handleErrors(err);
+    }
+  }
+
+/**
+  * Retrieves event guest information based on their participation type i.e. Host or Speaker.
+  *
+  * This function retrieves event guests based on the particular participation type,
+  * whether by Host , Speaker or both. By default it
+  * 
+  * @param {boolean} queryParam.isHost - Boolean representing whether the querable is host or not.
+  * @param {boolean} queryParam.isSpeaker - Boolean representing whether the querale is speaker or not.
+  * @returns {Promise<PLEventGuest>} An array of event guest records for the specified member 
+  *                           at the specified location.
+  */
+  async getPLEventGuestByParticipationType(queryParam
+  ) {    
+    const isHost = queryParam.isHost === 'true';
+    const isSpeaker = queryParam.isSpeaker === 'true';
+    try {
+      const result = await this.prisma.pLEventGuest.findMany({
+        where: {
+          isHost: isHost,
+          isSpeaker: isSpeaker
+        },
+        select: {
+          uid: true,
+          reason: true,
+          memberUid: true,
+          teamUid: true,
+          topics: true,
+          additionalInfo: true,
+          isHost: true,
+          isSpeaker: true,
+          member: {
+            select: {
+              name: true,
+              image: { select: { url: true } },
+              teamMemberRoles: {
+                select: {
+                  team: {
+                    select: {
+                      uid: true,
+                      name: true,
+                      logo: { select: { url: true } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          team: {
+            select: {
+              uid: true,
+              name: true,
+              logo: { select: { url: true } }
+            }
+          },
+        }
+      });
+      return result;
+    } catch (err) {
+      this.handleErrors(err);
+    }
+  }
+
 }
