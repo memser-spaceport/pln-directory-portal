@@ -190,8 +190,9 @@ export class PLEventsController {
     @Param('uid') locationUid: string,
     @Param('guestUid') guestUid: string
   ) {
+    const { type } = request.query;
     const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
     const memberUid = this.memberService.checkIfAdminUser(member) ? guestUid : member.uid;
-    return await this.eventGuestService.getPLEventGuestByUidAndLocation(memberUid, locationUid, request["isUserLoggedIn"]);
+    return await this.eventGuestService.getPLEventGuestByUidAndLocation(memberUid, locationUid, true, type);
   }
 }

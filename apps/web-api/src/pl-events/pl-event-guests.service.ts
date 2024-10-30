@@ -708,10 +708,16 @@ export class PLEventGuestsService {
   async getPLEventGuestByUidAndLocation(
     memberUid: string,
     locationUid: string,
-    isUserLoggedIn: boolean
+    isUserLoggedIn: boolean,
+    type: string
   ) {
     try {
-      const events = await this.eventLocationsService.getUpcomingEventsByLocation(locationUid);
+      let events;
+      if (type === "upcoming") {
+        events = await this.eventLocationsService.getUpcomingEventsByLocation(locationUid);
+      } else {
+        events = await this.eventLocationsService.getPastEventsByLocation(locationUid);
+      }
       const result = await this.prisma.pLEventGuest.findMany({
         where: {
           memberUid,
