@@ -402,11 +402,7 @@ export class PLEventGuestsService {
   async fetchAttendees(queryParams) {
     const { eventUids, isHost, isSpeaker, topics,  sortBy, sortDirection='asc', search, limit=10, page=1, loggedInMemberUid } = queryParams;
     // Build dynamic query conditions for filtering by eventUids, isHost, and isSpeaker
-    let { conditions, values } = this.buildConditions(eventUids, topics);
-    
-    // Apply search functionality to filter results based on member, team, or project names
-    ({ conditions, values } = this.applySearch(conditions, values, search));
-
+    let { conditions, values } = this.buildConditions(eventUids, topics); 
     // Apply sorting based on the sortBy parameter (default is sorting by memberName)
     const orderBy = this.applySorting(sortBy, sortDirection, loggedInMemberUid);
 
@@ -492,7 +488,7 @@ export class PLEventGuestsService {
         LEFT JOIN "Project" cp ON cp."createdBy" = m.uid
         LEFT JOIN "Team" tm ON tm.uid = pg."teamUid"
         LEFT JOIN "Image" tml ON tml.uid = tm."logoUid"
-        ${conditions} -- Add the dynamically generated conditions for filtering
+        ${this.applySearch(values, search)}
         GROUP BY 
           pg."memberUid",
           pg."teamUid",
@@ -500,6 +496,7 @@ export class PLEventGuestsService {
           pg."reason",
           m.name,
           tm.name
+        ${conditions} -- Add the dynamically generated conditions for filtering
         ${orderBy} -- Apply sorting logic
       ) 
       AS subquery
@@ -556,7 +553,7 @@ export class PLEventGuestsService {
     const values:any = [];
     // Add a condition to filter by event UIDs if provided
     if (eventUids && eventUids.length > 0) {
-      conditions.push(`pg."eventUid" IN (${eventUids.map((_, i) => `$${i + 1}`).join(", ")})`);
+      conditions.push(`ARRAY[${eventUids?.map((_, i) => `$${i + 1}`).join(", ")}] && array_agg(e.uid)`);
       values.push(...eventUids);
     }
     // Add a condition for topics if provided, using the overlap operator (&&)
@@ -565,7 +562,7 @@ export class PLEventGuestsService {
       values.push(topics);
     }
     // Combine conditions into a single WHERE clause if any conditions are present
-    const conditionsString = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")} ` : '';
+    const conditionsString = conditions.length > 0 ? ` Having ${conditions.join(" AND ")} ` : '';
     return { conditions: conditionsString, values };
   }
 
@@ -600,19 +597,18 @@ export class PLEventGuestsService {
    * @param {string} search - The search term to filter by member name, team name, or project names.
    * @returns {Object} Updated conditions and values for the SQL query after applying search filters.
    */
-  applySearch(conditions:string, values, search:string) {
+  applySearch(values, search:string) {
     // Add a condition to search by member name, team name, or project names (either contributed or created)
     if (search) {
-      conditions += ` AND (
-        m."name" ILIKE $${values.length + 1} OR 
-        tm."name" ILIKE $${values.length + 1} OR 
-        pc_project."name" ILIKE $${values.length + 1} OR 
-        cp."name" ILIKE $${values.length + 1}
-      )`;
-      // Append search term to the query values with wildcard matching
       values.push(`%${search}%`);
+      return ` WHERE
+        m."name" ILIKE $${values.length } OR 
+        tm."name" ILIKE $${values.length } OR 
+        pc_project."name" ILIKE $${values.length } OR 
+        cp."name" ILIKE $${values.length } `;
+      // Append search term to the query values with wildcard matching
     }
-    return { conditions, values };
+    return ``;
   }
 
   /**
