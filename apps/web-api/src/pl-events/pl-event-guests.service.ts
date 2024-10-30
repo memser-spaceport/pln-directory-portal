@@ -194,11 +194,14 @@ export class PLEventGuestsService {
           isHost: true,
           isSpeaker: true,
           isFeatured: true,
+          topics: true,
           event: {
             select: {
               uid: true,
               name: true,
-              websiteURL: true
+              websiteURL: true,
+              startDate: true,
+              endDate: true
             }
           },
           team: {
