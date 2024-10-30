@@ -38,7 +38,7 @@ export class PLEventsInternalController {
       builtQuery.where = {
         AND: [
           builtQuery.where,
-          this.eventService.buildSearchFilter(request.query),
+          this.eventGuestsService.buildSearchFilter(request.query),
         ]
       };
     }

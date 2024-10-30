@@ -96,7 +96,12 @@ export class PLEventLocationsService {
               logo: true,
               banner: true,
               resources: true,
-              additionalInfo: true
+              additionalInfo: true,
+              _count: {
+                select: {
+                  eventGuests: true
+                }
+              }
             }
           }
         }
