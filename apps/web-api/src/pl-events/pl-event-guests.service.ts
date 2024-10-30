@@ -128,9 +128,9 @@ export class PLEventGuestsService {
       } else {
         events = await this.eventLocationsService.getPastEventsByLocation(locationUid);  
       }
+      events = await this.filterEventsByAttendanceAndAdminStatus(filteredEvents, events, member);
       if (events.length === 0) 
         return [];
-      events = await this.filterEventsByAttendanceAndAdminStatus(filteredEvents, events, member);
       const result = await this.fetchAttendees({
         eventUids: events?.map(event => event.uid),
         ...query,
@@ -197,7 +197,8 @@ export class PLEventGuestsService {
           event: {
             select: {
               uid: true,
-              name: true
+              name: true,
+              websiteURL: true
             }
           },
           team: {
@@ -344,18 +345,17 @@ export class PLEventGuestsService {
    * @returns {Promise<PLEvent[]>} Filtered array of events based on the user’s attendance, login state, and admin status.
    */
   async filterEventsByAttendanceAndAdminStatus(filteredEventsUid, events: PLEvent[], member): Promise<PLEvent[]> {
-    // Scenario 1: If the user is logged out, remove all invite-only events
-    const inviteOnlyEventsUid = events.filter(event => event.type === "INVITE_ONLY").map(event => event.uid);
     if (filteredEventsUid?.length > 0 && !member) {
-      const publicFilteredUids = filteredEventsUid.filter(uid => !inviteOnlyEventsUid.includes(uid));
-      return events.filter(event => publicFilteredUids.includes(event.uid));
+      return events.filter(event => filteredEventsUid?.includes(event.uid))
+        .filter(event => event.type !== "INVITE_ONLY");
     }
+    // If the user is logged out, remove all invite-only events
     if (!member) {
       return events.filter(event => event.type !== "INVITE_ONLY");
     }
     // If the user is an admin, return all events without filtering
     if (this.memberService.checkIfAdminUser(member)) {
-      return events;
+      return filteredEventsUid?.length ? events.filter(event => filteredEventsUid.includes(event.uid)): events;
     }
     // Scenario 2: If the user is logged in and not an admin, get invite-only events they are attending
     const userAttendedEvents = await this.prisma.pLEvent.findMany({
@@ -374,11 +374,9 @@ export class PLEventGuestsService {
     // Create a Set of attended invite-only event UIDs for efficient lookup
     const attendedEventUids = new Set(userAttendedEvents.map(event => event.uid));
     // Filter events to keep non-invite-only events and attended invite-only events
-    if (filteredEventsUid.length > 0) {
-      return filteredEventsUid.filter(eventUid => {
-        const event:any = events.find(event => event.uid === eventUid);
-        return event?.type !== "INVITE_ONLY" || attendedEventUids.has(event?.uid);
-      });
+    if (filteredEventsUid?.length > 0) {
+      return events.filter(event => filteredEventsUid?.includes(event.uid))
+        .filter(event => event.type !== "INVITE_ONLY" || attendedEventUids.has(event?.uid));
     }
     return events.filter(event => 
       event.type !== "INVITE_ONLY" || attendedEventUids.has(event.uid)
@@ -783,4 +781,36 @@ export class PLEventGuestsService {
       this.handleErrors(err);
     }
   }
+
+  /** 
+   * This method constructs a dynamic query to search for the given text by either
+   * member name or team name based on query parameters.
+   * @param query An object containing `searchBy` (either 'member' or 'team') and `searchText` (the name to search for)
+   * @returns Constructed query based on the given text input, using a `startsWith` filter.
+   */
+  buildSearchFilter(query) {
+    const { searchBy, searchText } = query;
+    if (searchBy === "member") {
+      return {
+        member: {
+          name: {
+            startsWith: searchText,
+            mode: 'insensitive',
+          },
+        }
+      };
+    } else if (searchBy === "team") {
+      return {
+        team: {
+          name: {
+            startsWith: searchText,
+            mode: 'insensitive'
+          }
+        }
+      };
+    } else {
+      return {};
+    }
+  };
+
 }

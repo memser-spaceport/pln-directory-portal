@@ -242,5 +242,4 @@ export class PLEventsService {
     }
     return {};
   };
-
 }
