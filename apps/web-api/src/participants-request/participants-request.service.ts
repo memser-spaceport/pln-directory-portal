@@ -404,7 +404,7 @@ export class ParticipantsRequestService {
     }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.cacheService.reset()
-    await this.forestAdminService.triggerAirtableSync();
+    //await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
 
@@ -571,7 +571,7 @@ export class ParticipantsRequestService {
         }
       );
     }
-    await this.forestAdminService.triggerAirtableSync();
+    //await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
 
@@ -862,7 +862,7 @@ export class ParticipantsRequestService {
     }?utm_source=notification&utm_medium=slack&utm_code=${getRandomId()}`;
     await this.slackService.notifyToChannel(slackConfig);
     await this.cacheService.reset()
-    await this.forestAdminService.triggerAirtableSync();
+    //await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
 
@@ -1008,7 +1008,7 @@ export class ParticipantsRequestService {
       await this.slackService.notifyToChannel(slackConfig);
     }
     await this.cacheService.reset()
-    await this.forestAdminService.triggerAirtableSync();
+    //await this.forestAdminService.triggerAirtableSync();
     return { code: 1, message: 'Success' };
   }
 
