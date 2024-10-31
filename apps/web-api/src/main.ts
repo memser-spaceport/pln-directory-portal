@@ -34,7 +34,7 @@ export async function bootstrap() {
       process.env.ENVIRONMENT === APP_ENV.STAGING,
   });
 
-  await agent.mountOnNestJs(app).start();
+  //await agent.mountOnNestJs(app).start();
   await app.listen(process.env.PORT || 3000);
 }
 
