@@ -31,7 +31,7 @@ export const ROUTE_CONSTANTS = {
 };
 
 export const API_ROUTE = {
-  PARTICIPANTS_REQUEST: APP_CONSTANTS.V1 + 'admin/participants',
+  PARTICIPANTS_REQUEST: APP_CONSTANTS.V1 + 'admin/participants-request',
   TEAMS: APP_CONSTANTS.V1 + 'teams',
   SKILLS: APP_CONSTANTS.V1 + 'skills',
   IMAGES: APP_CONSTANTS.V1 + 'images',
