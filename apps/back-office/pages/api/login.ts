@@ -10,7 +10,7 @@ interface DecodedJwtPayload {
 export default async function login(req, res) {
   const { username, password } = req.body;
   await api
-    .post('/v1/admin/signin', { username: username, password: password })
+    .post('/v1/admin/auth/login', { username: username, password: password })
     .then((response) => {
       if (response?.data?.accessToken) {
         // Set the authentication cookie
