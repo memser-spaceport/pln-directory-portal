@@ -19,7 +19,10 @@ import {
   technologies,
   memberRoles,
   projects,
-  projectRelations
+  projectRelations,
+  eventLocations,
+  events,
+  eventGuests
 } from './fixtures';
 
 /**
@@ -58,8 +61,7 @@ async function load(fixtures) {
           .relations(fixturesToCreate)
           .then((data) => Promise.all(data))
       : null;
-
-    await prisma[camelCase(model)].createMany({
+    await prisma[model].createMany({
       data: fixturesToCreate,
     });
     console.log(`✅ Added ${model} data`);
@@ -102,6 +104,15 @@ load([
   { [Prisma.ModelName.Project]: {
     fixtures: projects,
     relations: projectRelations
+  }},
+  { [Prisma.ModelName.PLEventLocation]: {
+    fixtures: eventLocations
+  } },
+  { [Prisma.ModelName.PLEvent]: {
+    fixtures: events
+  }},
+  { [Prisma.ModelName.PLEventGuest]: {
+    fixtures: eventGuests
   }}
 ])
   .then(async () => {
