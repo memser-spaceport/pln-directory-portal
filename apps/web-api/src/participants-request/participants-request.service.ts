@@ -322,7 +322,7 @@ export class ParticipantsRequestService {
   getUniqueIdentifier(requestData): string {
     return requestData.participantType === 'TEAM'
       ? requestData.newData.name
-      : requestData.newData.email.toLowerCase().trim();
+      : requestData.newData.email?.toLowerCase().trim();
   }
   
   /**
