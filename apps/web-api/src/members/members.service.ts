@@ -25,7 +25,7 @@ import { AuthService } from '../auth/auth.service';
 import { LogService } from '../shared/log.service';
 import { DEFAULT_MEMBER_ROLES } from '../utils/constants';
 import { hashFileName } from '../utils/hashing';
-import { copyObj, buildMultiRelationMapping, buildRelationMapping } from '../utils/helper/helper';
+import { copyObj, buildMultiRelationMapping } from '../utils/helper/helper';
 
 @Injectable()
 export class MembersService {
@@ -403,7 +403,7 @@ export class MembersService {
           participantType: 'MEMBER',
           newData: { 
             oldEmail: oldEmail, 
-            newEmail: newEmail 
+            email: newEmail 
           }},
           false,
           tx
@@ -669,7 +669,7 @@ export class MembersService {
     existingMember,
     transactionType: Prisma.TransactionClient,
   ): Promise<boolean> {
-    const isEmailChanged = existingMember.email !== memberData.email;
+    const isEmailChanged = existingMember.email?.toLowerCase() !== memberData.email?.toLowerCase();
     if (isEmailChanged) {
       const foundUser = await transactionType.member.findUnique({
         where: { email: memberData.email.toLowerCase().trim() },
@@ -701,12 +701,12 @@ export class MembersService {
     const directFields = [
       'name', 'email', 'githubHandler', 'discordHandler', 'bio',
       'twitterHandler', 'linkedinHandler', 'telegramHandler', 
-      'officeHours', 'moreDetails', 'plnStartDate', 'openToWork'
+      'officeHours', 'moreDetails', 'plnStartDate', 'openToWork' 
     ];
     copyObj(memberData, member, directFields);
     member.email = member.email.toLowerCase().trim();
-    member['image'] = buildRelationMapping('image', memberData);
-    member['skills'] = buildMultiRelationMapping('skills', memberData, 'create');
+    member['image'] = memberData.imageUid ? { connect: { uid: memberData.imageUid } } : { disconnect: true };
+    member['skills'] = buildMultiRelationMapping('skills', memberData, type);
     if (type === 'Create') {
       member['teamMemberRoles'] = this.buildTeamMemberRoles(memberData);
       if (Array.isArray(memberData.projectContributions)) {
