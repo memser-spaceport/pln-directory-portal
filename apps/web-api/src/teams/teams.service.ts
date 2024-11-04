@@ -226,7 +226,7 @@ export class TeamsService {
     teamUid: string | null,
     teamData: Partial<Team>,
     tx: Prisma.TransactionClient,
-    type: string = 'create'
+    type: string = 'Create'
   ) {
     const team: any = {};
     const directFields = [
@@ -319,37 +319,6 @@ export class TeamsService {
   private async postUpdateActions(): Promise<void> {
     await this.cacheService.reset();
     await this.forestadminService.triggerAirtableSync();
-  }
-
-  /**
-   * Utility function to map single relational data
-   * 
-   * @param field - The field name to map
-   * @param rawData - The raw data input
-   * @returns - Relation object for Prisma query
-   */
-  private buildRelationMapping(field: string, rawData: any) {
-    return rawData[field]?.uid
-      ? { connect: { uid: rawData[field].uid } }
-      : undefined;
-  }
-
-  /**
-   * Utility function to map multiple relational data
-   * 
-   * @param field - The field name to map
-   * @param rawData - The raw data input
-   * @param type - Operation type ('create' or 'update')
-   * @returns - Multi-relation object for Prisma query
-   */
-  private buildMultiRelationMapping(field: string, rawData: any, type: string) {
-    const dataExists = rawData[field]?.length > 0;
-    if (!dataExists) {
-      return type === 'update' ? { set: [] } : undefined;
-    }
-    return {
-      [type === 'create' ? 'connect' : 'set']: rawData[field].map((item: any) => ({ uid: item.uid }))
-    };
   }
 
   /**

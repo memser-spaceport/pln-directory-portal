@@ -73,9 +73,9 @@ export const buildRelationMapping = (field: string, rawData: any) => {
 export const buildMultiRelationMapping = (field: string, rawData: any, type: string) => {
   const dataExists = rawData[field]?.length > 0;
   if (!dataExists) {
-    return type === 'update' ? { set: [] } : undefined;
+    return type === 'Update' ? { set: [] } : undefined;
   }
   return {
-    [type === 'create' ? 'connect' : 'set']: rawData[field].map((item: any) => ({ uid: item.uid }))
+    [type === 'Create' ? 'connect' : 'set']: rawData[field].map((item: any) => ({ uid: item.uid }))
   };
 }
