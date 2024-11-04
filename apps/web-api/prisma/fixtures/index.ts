@@ -11,3 +11,6 @@ export * from './team-member-roles';
 export * from './teams';
 export * from './member-roles';
 export * from './project';
+export * from './pl-event-locations';
+export * from './pl-events';
+export * from './pl-event-guests';
