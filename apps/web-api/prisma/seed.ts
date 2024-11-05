@@ -25,7 +25,8 @@ import {
   eventGuests,
   focusAreas,
   teamFocusAreas,
-  projectFocusAreas
+  projectFocusAreas,
+  discoveryQuestions
 } from './fixtures';
 
 /**
@@ -126,6 +127,11 @@ load([
   {
     [Prisma.ModelName.ProjectFocusArea]: {
       fixtures: projectFocusAreas
+    }
+  },
+  {
+    [Prisma.ModelName.DiscoveryQuestion]: {
+      fixtures: discoveryQuestions
     }
   }
 ])
