@@ -60,7 +60,7 @@ export class JoinRequestsService {
         this.supportEmails,
         []
       );
-      this.logger.info(`New Join request from ${joinRequest.email} - ${joinRequest.uid} notified to support team ref: ${result.MessageId}`);
+      this.logger.info(`New Join request from ${joinRequest.email} - ${joinRequest.uid} notified to support team ref: ${result?.MessageId}`);
     } else {
       this.logger.error(
         `Cannot send new join request content for ${joinRequest.uid} as ${this.supportEmails} does not contain valid email addresses`
