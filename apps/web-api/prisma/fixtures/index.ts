@@ -17,3 +17,4 @@ export * from './pl-event-guests';
 export * from './focus-areas';
 export * from './team-focus-areas';
 export * from './project-focus-area';
+export * from './discovery-questions';
