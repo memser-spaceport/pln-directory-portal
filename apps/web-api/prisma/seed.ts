@@ -22,7 +22,10 @@ import {
   projectRelations,
   eventLocations,
   events,
-  eventGuests
+  eventGuests,
+  focusAreas,
+  teamFocusAreas,
+  projectFocusAreas
 } from './fixtures';
 
 /**
@@ -113,7 +116,18 @@ load([
   }},
   { [Prisma.ModelName.PLEventGuest]: {
     fixtures: eventGuests
-  }}
+  }},
+  { [Prisma.ModelName.FocusArea]: focusAreas },
+  { 
+    [Prisma.ModelName.TeamFocusArea]: {
+      fixtures: teamFocusAreas
+    }
+  },
+  {
+    [Prisma.ModelName.ProjectFocusArea]: {
+      fixtures: projectFocusAreas
+    }
+  }
 ])
   .then(async () => {
     await prisma.$disconnect();
