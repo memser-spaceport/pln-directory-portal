@@ -194,12 +194,4 @@ export class PLEventsController {
     const memberUid = this.memberService.checkIfAdminUser(member) ? guestUid : member.uid;
     return await this.eventGuestService.getPLEventGuestByUidAndLocation(memberUid, locationUid, request["isUserLoggedIn"]);
   }
-
-  @Api(server.route.getPLEventGuestByParticipationType)
-  @NoCache()
-  async getPLEventGuestByParticipationType(
-    @Req() request,
-  ) {
-    return await this.eventGuestService.getPLEventGuestByParticipationType(request.query);
-  }
 }

@@ -3,8 +3,7 @@ import {
   PLEventDetailQueryParams,
   ResponsePLEventSchemaWithRelationsSchema,
   PLEventLocationQueryParams,
-  ResponsePLEventLocationWithRelationsSchema,
-  ResponsePLEventGuestSchemaWithRelationsSchema
+  ResponsePLEventLocationWithRelationsSchema
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -89,14 +88,6 @@ export const apiEvents = contract.router({
     query: PLEventDetailQueryParams,
     responses: {
       200: ResponsePLEventLocationWithRelationsSchema.array(),
-    },
-  },
-  getPLEventGuestByParticipationType: {
-    method: 'GET',
-    path: `${getAPIVersionAsPath('1')}/irl/guests`,
-    query: PLEventDetailQueryParams,
-    responses: {
-      200: ResponsePLEventGuestSchemaWithRelationsSchema.array(),
     },
   }
 });

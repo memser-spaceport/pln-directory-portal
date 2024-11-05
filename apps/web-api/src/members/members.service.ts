@@ -701,6 +701,28 @@ export class MembersService {
     return { };
   }
 
+    /**
+   * This method construct the dynamic query to search the member by 
+   * their participation type i.e isHost only, isSpeaker only, or both host and speaker
+   * @param queryParams HTTP request query params object
+   * @returns Constructed query based on given participation type
+   */
+    buildParticipationTypeFilter(queryParams) {
+      const isHost = queryParams.isHost === 'true';
+      const isSpeaker = queryParams.isSpeaker === 'true';
+      if (isHost || isSpeaker) {
+        return {
+          eventGuests:{
+            some:{
+              isHost: isHost,
+              isSpeaker: isSpeaker,
+            }
+            }
+        }
+      }
+      return { };
+    }
+
   async updateTelegramIfChanged(member, telegram, tx?:Prisma.TransactionClient) {
     if (member.telegramHandler != telegram) {
       member = await (tx || this.prisma).member.update({

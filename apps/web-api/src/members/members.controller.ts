@@ -34,23 +34,32 @@ export class MemberController {
   @Api(server.route.getMembers)
   @ApiQueryFromZod(MemberQueryParams)
   @ApiOkResponseFromZod(ResponseMemberWithRelationsSchema.array())
+  @NoCache()
   async findAll(@Req() request: Request) {
+    console.log(123)
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(queryParams);
-    const { name__icontains } = queryParams;
+    console.log("built query : "+JSON.stringify(builtQuery, null, 2))
+    const { name__icontains, isHost, isSpeaker } = queryParams;
     if (name__icontains) {
       delete builtQuery.where?.name;
+    }
+    if (isHost || isSpeaker) {
+      delete builtQuery.where?.isHost;
+      delete builtQuery.where?.isSpeaker;
     }
     builtQuery.where = {
       AND: [
         builtQuery.where,
         this.membersService.buildNameFilters(queryParams),
         this.membersService.buildRoleFilters(queryParams),
-        this.membersService.buildRecentMembersFilter(queryParams)
+        this.membersService.buildRecentMembersFilter(queryParams),
+        this.membersService.buildParticipationTypeFilter(queryParams)
       ],
     };
+    console.log("built query 2 : "+JSON.stringify(builtQuery, null, 2))
     return await this.membersService.findAll(builtQuery);
   }
 

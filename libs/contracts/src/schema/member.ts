@@ -48,7 +48,7 @@ export const MemberSchema = z.object({
   linkedinHandler: z.string().nullish(),
   repositories: GitHubRepositorySchema.array().optional(),
   preferences: PreferenceSchema.optional(),
-  projectContributions: z.array(ProjectContributionSchema).optional()
+  projectContributions: z.array(ProjectContributionSchema).optional(),
 });
 
 
@@ -60,7 +60,9 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   location: LocationResponseSchema.optional(),
   skills: ResponseSkillSchema.array().optional(),
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
-  projectContributions: ResponseProjectContributionSchema.array().optional()
+  projectContributions: ResponseProjectContributionSchema.array().optional(),
+  isHost: z.string(),
+  isSpeaker: z.string()
 });
 
 
