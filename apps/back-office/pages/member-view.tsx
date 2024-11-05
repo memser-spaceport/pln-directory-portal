@@ -151,7 +151,7 @@ export default function MemberView(props) {
       requestId: props.id,
     };
     api
-      .post(`/v1/participants-request/unique-identifier`, data)
+      .get(`/v1/participants-request/unique-identifier?type=${data?.participantType}&identifier=${data?.uniqueIdentifier}`)
       .then((response) => {
         setDisableSave(false);
         response?.data &&
