@@ -22,7 +22,7 @@ export class TeamsService {
     private prisma: PrismaService,
     private fileMigrationService: FileMigrationService,
     private participantsRequestService: ParticipantsRequestService
-  ) {}
+  ) { }
 
   async findAll(queryOptions: Prisma.TeamFindManyArgs) {
     return this.prisma.team.findMany({
@@ -43,14 +43,14 @@ export class TeamsService {
         logo: true,
         membershipSources: true,
         technologies: true,
-        maintainingProjects:{
+        maintainingProjects: {
           orderBy: [
             {
               name: 'asc'
             }
           ],
           include: {
-            logo: { select: { url: true, uid: true } },     
+            logo: { select: { url: true, uid: true } },
             maintainingTeam: {
               select: {
                 name: true,
@@ -67,7 +67,7 @@ export class TeamsService {
             }
           ],
           include: {
-            logo: { select: { url: true, uid: true } },     
+            logo: { select: { url: true, uid: true } },
             maintainingTeam: {
               select: {
                 name: true,
@@ -80,9 +80,9 @@ export class TeamsService {
         teamFocusAreas: {
           select: {
             focusArea: {
-              select: { 
+              select: {
                 uid: true,
-                title: true 
+                title: true
               }
             }
           }
@@ -268,7 +268,7 @@ export class TeamsService {
       return {
         teamFocusAreas: {
           some: {
-            ancestorArea:{
+            ancestorArea: {
               title: {
                 in: focusAreas?.split(',')
               }
@@ -280,17 +280,17 @@ export class TeamsService {
     return {};
   }
 
-  buildTeamFilter(queryParams){
-    const { 
+  buildTeamFilter(queryParams) {
+    const {
       name,
-      plnFriend, 
-      industryTags, 
+      plnFriend,
+      industryTags,
       technologies,
       membershipSources,
       fundingStage,
       officeHours
     } = queryParams;
-    const filter:any = [];
+    const filter: any = [];
     this.buildNameAndPLNFriendFilter(name, plnFriend, filter);
     this.buildIndustryTagsFilter(industryTags, filter);
     this.buildTechnologiesFilter(technologies, filter);
@@ -298,36 +298,36 @@ export class TeamsService {
     this.buildFundingStageFilter(fundingStage, filter);
     this.buildOfficeHoursFilter(officeHours, filter);
     this.buildRecentTeamsFilter(queryParams, filter);
-    return { 
+    return {
       AND: filter
     };
   };
 
   buildNameAndPLNFriendFilter(name, plnFriend, filter) {
     if (name) {
-      filter.push({ 
+      filter.push({
         name: {
           contains: name,
           mode: 'insensitive'
         }
       });
-    }  
+    }
     if (!(plnFriend === "true")) {
-      filter.push({  
+      filter.push({
         plnFriend: false
-      }); 
+      });
     }
   }
 
   buildIndustryTagsFilter(industryTags, filter) {
-    const tags = industryTags?.split(',').map(tag=> tag.trim());
+    const tags = industryTags?.split(',').map(tag => tag.trim());
     if (tags?.length > 0) {
-      tags.map((tag)=> {
+      tags.map((tag) => {
         filter.push({
-          industryTags:{
+          industryTags: {
             some: {
-              title: { 
-                in: tag 
+              title: {
+                in: tag
               }
             }
           }
@@ -339,12 +339,12 @@ export class TeamsService {
   buildTechnologiesFilter(technologies, filter) {
     const tags = technologies?.split(',').map(tech => tech.trim());
     if (tags?.length > 0) {
-      tags.map((tag)=> {
+      tags.map((tag) => {
         filter.push({
           technologies: {
             some: {
-              title: { 
-                in: tag 
+              title: {
+                in: tag
               }
             }
           }
@@ -356,12 +356,12 @@ export class TeamsService {
   buildMembershipSourcesFilter(membershipSources, filter) {
     const sources = membershipSources?.split(',').map(source => source.trim());
     if (sources?.length > 0) {
-      sources.map((source)=> {
+      sources.map((source) => {
         filter.push({
           membershipSources: {
             some: {
-              title: { 
-                in: source 
+              title: {
+                in: source
               }
             }
           }
@@ -383,16 +383,16 @@ export class TeamsService {
   removeDuplicateFocusAreas(focusAreas): any {
     const uniqueFocusAreas = {};
     focusAreas.forEach(item => {
-        const uid = item.focusArea.uid;
-        const title = item.focusArea.title;
-        uniqueFocusAreas[uid] = { uid, title };
+      const uid = item.focusArea.uid;
+      const title = item.focusArea.title;
+      uniqueFocusAreas[uid] = { uid, title };
     });
     return Object.values(uniqueFocusAreas);
   }
 
   buildOfficeHoursFilter(officeHours, filter) {
     if ((officeHours === "true")) {
-      filter.push({  
+      filter.push({
         officeHours: { not: null }
       });
     }
@@ -411,7 +411,7 @@ export class TeamsService {
    * @returns The constructed query with a 'createdAt' filter if 'is_recent' is 'true',
    *          or an empty object if 'is_recent' is not provided or set to 'false'.
    */
-  buildRecentTeamsFilter(queryParams, filter?) { 
+  buildRecentTeamsFilter(queryParams, filter?) {
     const { isRecent } = queryParams;
     const recentFilter = {
       createdAt: {
@@ -420,9 +420,29 @@ export class TeamsService {
     };
     if (isRecent === 'true' && !filter) {
       return recentFilter;
-    } 
+    }
     if (isRecent === 'true' && filter) {
       filter.push(recentFilter);
+    }
+    return {};
+  }
+
+  /**
+* This method construct the dynamic query to search the member by 
+* their participation type for host only
+* @param queryParams HTTP request query params object
+* @returns Constructed query based on given participation type
+*/
+  buildParticipationTypeFilter(queryParams) {
+    const isHost = queryParams.isHost === 'true';
+    if (isHost) {
+      return {
+        eventGuests: {
+          some: {
+            isHost: isHost,
+          }
+        }
+      }
     }
     return {};
   }
