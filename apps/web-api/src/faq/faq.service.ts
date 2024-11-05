@@ -92,7 +92,7 @@ export class FaqService {
         this.supportEmails,
         []
       );
-      this.logger.info(`New faq request from ${faq.email} - ${faq.uid} notified to support team ref: ${result.MessageId}`);
+      this.logger.info(`New faq request from ${faq.email} - ${faq.uid} notified to support team ref: ${result?.MessageId}`);
     } else {
       this.logger.error(
         `Cannot send custom question content for ${faq.uid} as ${this.supportEmails} does not contain valid email addresses`
