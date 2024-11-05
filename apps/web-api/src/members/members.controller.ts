@@ -35,7 +35,8 @@ export class MemberController {
  
   /**
    * Retrieves a list of members based on query parameters.
-   * Builds a Prisma query from the queryable fields and adds filters for names, roles, and recent members.
+   * Builds a Prisma query from the queryable fields and adds filters for names, roles, 
+   * participation type (host or speaker) and recent members.
    * 
    * @param request - HTTP request object containing query parameters
    * @returns Array of members with related data
@@ -48,16 +49,21 @@ export class MemberController {
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(queryParams);
-    const { name__icontains } = queryParams;
+    const { name__icontains, isHost, isSpeaker } = queryParams;
     if (name__icontains) {
       delete builtQuery.where?.name;
+    }
+    if (isHost || isSpeaker) {
+      delete builtQuery.where?.isHost;
+      delete builtQuery.where?.isSpeaker;
     }
     builtQuery.where = {
       AND: [
         builtQuery.where,
         this.membersService.buildNameFilters(queryParams),
         this.membersService.buildRoleFilters(queryParams),
-        this.membersService.buildRecentMembersFilter(queryParams)
+        this.membersService.buildRecentMembersFilter(queryParams),
+        this.membersService.buildParticipationTypeFilter(queryParams)
       ],
     };
     return await this.membersService.findAll(builtQuery);

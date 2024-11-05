@@ -60,7 +60,9 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   location: LocationResponseSchema.optional(),
   skills: ResponseSkillSchema.array().optional(),
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
-  projectContributions: ResponseProjectContributionSchema.array().optional()
+  projectContributions: ResponseProjectContributionSchema.array().optional(),
+  isHost: z.string(),
+  isSpeaker: z.string()
 });
 
 
