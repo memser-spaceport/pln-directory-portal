@@ -705,7 +705,8 @@ export class MembersService {
     ];
     copyObj(memberData, member, directFields);
     member.email = member.email.toLowerCase().trim();
-    member['image'] = memberData.imageUid ? { connect: { uid: memberData.imageUid } } : { disconnect: true };
+    member['image'] = memberData.imageUid ? { connect: { uid: memberData.imageUid } } 
+      : type === 'Update' ? { disconnect: true } : undefined ;
     member['skills'] = buildMultiRelationMapping('skills', memberData, type);
     if (type === 'Create') {
       member['teamMemberRoles'] = this.buildTeamMemberRoles(memberData);

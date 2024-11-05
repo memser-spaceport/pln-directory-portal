@@ -13,8 +13,13 @@ const CONFIG = {
 
 @Injectable()
 export class AwsService {
+  isEmailServiceEnabled() {
+    return process.env.IS_EMAIL_ENABLED === 'true';
+  }
   async sendEmail(templateName, includeAdmins, toAddresses, data) {
     try {
+      if (!this.isEmailServiceEnabled()) 
+        return null;
       const AWS_SES = new AWS.SES(CONFIG);
       const adminEmailIdsFromEnv = process.env.SES_ADMIN_EMAIL_IDS;
       const adminEmailIds = adminEmailIdsFromEnv?.split('|') ?? [];
@@ -43,6 +48,8 @@ export class AwsService {
     toAddresses: string[],
     ccAddresses: string[]
   ) {
+    if (!this.isEmailServiceEnabled()) 
+      return null;
     const emailTemplate = fs.readFileSync(
       templateName,
       'utf-8'
