@@ -89,6 +89,11 @@ export class AwsService {
   }
 
   async uploadFileToS3(file, bucketName, fileName: string) {
+    if (process.env.ENVIRONMENT === "development" && (!bucketName || !CONFIG.accessKeyId || !CONFIG.secretAccessKey || !CONFIG.region)) {
+      return {
+        Location: ""
+      };
+    }
     const s3 = new AWS.S3(CONFIG);
     const params = {
       Bucket: bucketName,

@@ -24,7 +24,7 @@ export const teamMemberRoles = async () => {
         teamUid: teamUid.uid,
         memberUid: uid,
         role: faker.name.jobTitle(),
-        mainTeam: false,
+        mainTeam: faker.datatype.boolean(),
         teamLead: faker.datatype.boolean(),
         startDate: faker.date.past(),
         endDate: faker.date.recent(),
