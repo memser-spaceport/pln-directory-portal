@@ -60,4 +60,4 @@ const locationsFactory = Factory.define<Omit<Location, 'id'>>(
   }
 );
 
-export const locations = locationsFactory.buildList(250);
+export const locations = locationsFactory.buildList(25);
