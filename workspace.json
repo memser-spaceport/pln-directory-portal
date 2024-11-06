@@ -17,8 +17,6 @@
     "technologies-data-access": "libs/technologies/data-access",
     "projects-data-access": "libs/projects/data-access",
     "ui": "libs/ui",
-    "web-api": "apps/web-api",
-    "web-app": "apps/web-app",
-    "web-app-e2e": "apps/web-app-e2e"
+    "web-api": "apps/web-api"
   }
 }
