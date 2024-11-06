@@ -67,7 +67,7 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(
   }
 );
 
-export const teams = async () => await teamsFactory.createList(300);
+export const teams = async () => await teamsFactory.createList(40);
 
 export const teamRelations = async (teams) => {
   const industryTagUids = await getUidsFrom(Prisma.ModelName.IndustryTag);

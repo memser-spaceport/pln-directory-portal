@@ -59,7 +59,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
   }
 );
 
-export const members = async () => await membersFactory.createList(800);
+export const members = async () => await membersFactory.createList(25);
 
 export const memberRelations = async (members) => {
   const skillUids = await getUidsFrom(Prisma.ModelName.Skill);
