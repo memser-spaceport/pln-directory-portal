@@ -47,7 +47,6 @@ export class TeamsController {
         this.teamsService.buildParticipationTypeFilter(request.query)
       ]
     }
-    console.log("built query : "+JSON.stringify(builtQuery , null , 2))
     return this.teamsService.findAll(builtQuery);
   }
 

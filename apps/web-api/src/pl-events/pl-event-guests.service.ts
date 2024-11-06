@@ -403,10 +403,12 @@ export class PLEventGuestsService {
    * @returns {Promise<Array>} A list of attendees with their associated member, team, and event information.
    */
   async fetchAttendees(queryParams) {
-    const { eventUids, isHost, isSpeaker, topics, sortBy, sortDirection = 'asc', search, limit = 10, page = 1, loggedInMemberUid, role } = queryParams;
+    const { eventUids, isHost, isSpeaker, topics, sortBy, sortDirection = 'asc', search, limit = 10, page = 1, loggedInMemberUid, isFounder } = queryParams;
     // Build dynamic query conditions for filtering by eventUids, isHost, and isSpeaker
     let { conditions, values } = this.buildConditions(eventUids, topics);
-    const { participationTypeAndRoleCondition, participationTypeAndRoleValues} = this.buildParticipationTypeAndRoleCondition(isHost, isSpeaker, role);
+    const { participationTypeAndRoleCondition, participationTypeAndRoleValues } = this.buildParticipationTypeAndRoleCondition(isHost, isSpeaker, isFounder);
+
+    values = [...values, ...participationTypeAndRoleValues];
 
     // Apply sorting based on the sortBy parameter (default is sorting by memberName)
     const orderBy = this.applySorting(sortBy, sortDirection, loggedInMemberUid);
@@ -414,7 +416,7 @@ export class PLEventGuestsService {
     // Apply pagination to limit the results and calculate the offset for the current page
     const { limit: paginationLimit, offset } = this.applyPagination(Number(limit), page);
     // Construct the raw SQL query for fetching attendees with joined tables and aggregated JSON data
-    const query:any = ` 
+    const query: any = ` 
       SELECT 
         *,
         COUNT(*) OVER() AS count FROM (
@@ -427,7 +429,7 @@ export class PLEventGuestsService {
             ELSE 'none'
           END AS guest_type,
           CASE
-             WHEN tm_role.role ILIKE '%ceo%' THEN 'isCEO'
+             WHEN tm_role.role ILIKE 'founder' THEN 'isFounder'
              ELSE 'none'
           END AS member_role,   
           json_object_agg(
@@ -518,7 +520,7 @@ export class PLEventGuestsService {
     // Add pagination values to the query parameters for limit and offset
     values.push(paginationLimit, offset);
     // Execute the raw query with the built query string and values
-    const result = await this.prisma.$queryRawUnsafe(query, ...values, ...participationTypeAndRoleValues);
+    const result = await this.prisma.$queryRawUnsafe(query, ...values);
     return this.formatAttendees(result);
   }
 
@@ -584,28 +586,28 @@ export class PLEventGuestsService {
    * @param {string} isSpeaker - Indicates if the guest is a speaker (expected values: "true" or "false").
    * @returns {string} - A SQL condition string to filter guests based on their type.
    */
-  buildParticipationTypeAndRoleCondition(isHost, isSpeaker, role) {
+  buildParticipationTypeAndRoleCondition(isHost, isSpeaker, isFounder) {
     const participationTypeAndRoleConditions: string[] = [];
     const participationTypeAndRoleValues: any = [];
     if (isHost === "true" && isSpeaker === "true") {
-      participationTypeAndRoleConditions.push(`guest_type = $${participationTypeAndRoleValues.length + 1}`);
+      participationTypeAndRoleConditions.push(`guest_type = $${participationTypeAndRoleValues.length + 3}`);
       participationTypeAndRoleValues.push('hostAndSpeaker');
     }
     else if (isHost === "true") {
-      participationTypeAndRoleConditions.push(`guest_type = $${participationTypeAndRoleValues.length + 1}`);
+      participationTypeAndRoleConditions.push(`guest_type = $${participationTypeAndRoleValues.length + 3}`);
       participationTypeAndRoleValues.push('isHostOnly');
     }
     else if (isSpeaker === "true") {
-      participationTypeAndRoleConditions.push(`guest_type = $${participationTypeAndRoleValues.length + 1}`);
+      participationTypeAndRoleConditions.push(`guest_type = $${participationTypeAndRoleValues.length + 3}`);
       participationTypeAndRoleValues.push('isSpeakerOnly');
     }
-    if (role && role.toLowerCase().includes("ceo")) {
-      participationTypeAndRoleConditions.push(`member_role = $${participationTypeAndRoleValues.length + 2}`);
-      participationTypeAndRoleValues.push('isCEO');
+    if (isFounder === "true") {
+      participationTypeAndRoleConditions.push(`member_role = $${participationTypeAndRoleValues.length + 3}`);
+      participationTypeAndRoleValues.push('isFounder');
     }
     const conditionsString = participationTypeAndRoleConditions.length > 0 ? `WHERE ${participationTypeAndRoleConditions.join(" AND ")}` : '';
 
-    return { participationTypeAndRoleCondition : conditionsString, participationTypeAndRoleValues };
+    return { participationTypeAndRoleCondition: conditionsString, participationTypeAndRoleValues };
   }
 
 
