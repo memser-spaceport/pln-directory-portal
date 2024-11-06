@@ -9,8 +9,8 @@ const eventLocationFactory = Factory.define<Omit<PLEventLocation, 'id'>>(({ onCr
   return {
     uid: faker.datatype.uuid(),
     location: faker.address.city(),
-    flag: faker.address.countryCode(),
-    icon: faker.internet.url(),
+    flag: "https://plabs-assets.s3.us-west-1.amazonaws.com/images/Thailand-flag.png",
+    icon: "https://plabs-assets.s3.us-west-1.amazonaws.com/images/Bangkok.svg",
     createdAt: faker.date.past(),
     updatedAt: faker.date.recent(),
     timezone: faker.address.timeZone(),

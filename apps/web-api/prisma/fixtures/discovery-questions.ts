@@ -4,9 +4,9 @@ import { faker } from '@faker-js/faker';
 import sample from 'lodash/sample';
 import { prisma } from './../index';
 
-const getUidsFrom = async (model, where = {}) => {
+const getUidsAndNamesFrom = async (model, nameField = 'name', where = {}) => {
   return await prisma[model].findMany({
-    select: { uid: true },
+    select: { uid: true, [nameField]: true },
     where,
   });
 };
@@ -14,9 +14,32 @@ const getUidsFrom = async (model, where = {}) => {
 const discoveryQuestionFactory = Factory.define<Omit<DiscoveryQuestion, 'id'>>(
   ({ sequence, onCreate }) => {
     onCreate(async (discoveryQuestion) => {
-      const memberUids = await getUidsFrom('member');
+      const memberUids = await getUidsAndNamesFrom('member');
       discoveryQuestion.createdBy = sample(memberUids.map((u) => u.uid)) || '';
       discoveryQuestion.modifiedBy = sample(memberUids.map((u) => u.uid)) || '';
+
+      if (sequence >= 4) {
+        // Fetch UIDs and names for event, project, and team only if sequence >= 4
+        const [eventData, projectData, teamData] = await Promise.all([
+          getUidsAndNamesFrom('pLEvent'),
+          getUidsAndNamesFrom('project'),
+          getUidsAndNamesFrom('team'),
+        ]);
+        
+        // Randomly assign one of the UIDs and its corresponding name
+        const assignment = sample([
+          { uidKey: 'eventUid', nameKey: 'eventName', data: eventData },
+          { uidKey: 'projectUid', nameKey: 'projectName', data: projectData },
+          { uidKey: 'teamUid', nameKey: 'teamName', data: teamData }
+        ]);
+
+        if (assignment && assignment.data.length > 0) {
+          const selected = sample(assignment.data);
+          discoveryQuestion[assignment.uidKey] = selected?.uid || null;
+          discoveryQuestion[assignment.nameKey] = selected?.name || null;
+        }
+      }
+
       return discoveryQuestion;
     });
 
@@ -57,5 +80,4 @@ const discoveryQuestionFactory = Factory.define<Omit<DiscoveryQuestion, 'id'>>(
   }
 );
 
-export const discoveryQuestions = async () => await discoveryQuestionFactory.createList(4);
-discoveryQuestions
+export const discoveryQuestions = async () => await discoveryQuestionFactory.createList(15);

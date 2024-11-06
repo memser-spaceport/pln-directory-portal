@@ -38,4 +38,4 @@ const projectFocusAreaFactory = Factory.define<Omit<ProjectFocusArea, 'id'>>(
   }
 );
 
-export const projectFocusAreas = async () => await projectFocusAreaFactory.createList(15);
+export const projectFocusAreas = async () => await projectFocusAreaFactory.createList(8);

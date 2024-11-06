@@ -37,4 +37,4 @@ const teamFocusAreaFactory = Factory.define<Omit<TeamFocusArea, 'id'>>(
   }
 );
 
-export const teamFocusAreas = async () => await teamFocusAreaFactory.createList(15);
+export const teamFocusAreas = async () => await teamFocusAreaFactory.createList(8);

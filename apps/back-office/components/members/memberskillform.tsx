@@ -14,7 +14,7 @@ export default function AddMemberSkillForm(props) {
   const dropDownValues = props?.dropDownValues;
   // const teamNames = getAvailableTeams(dropDownValues.teamNames, teamAndRoles);
   const teamNames = teamAndRoles.map((item) => item.teamUid);
-  const isOpenToWorkEnabled = process.env.NEXT_PUBLIC_ENABLE_OPEN_TO_WORK;
+  const isOpenToWorkEnabled = "true";
   return (
     <>
       <div className="pt-5">
