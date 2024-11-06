@@ -34,8 +34,8 @@ export class AdminService {
    * @returns Boolean indicating if credentials are valid
    */
   private isValidAdminCredentials(username: string, password: string): boolean {
-    const validUsername = process.env.ADMIN_USERNAME;
-    const validPassword = process.env.ADMIN_PASSWORD;
+    const validUsername = process.env.ADMIN_LOGIN_USERNAME;
+    const validPassword = process.env.ADMIN_LOGIN_PASSWORD;
     return username === validUsername && password === validPassword;
   }
 }

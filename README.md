@@ -134,3 +134,25 @@ $ nx run web-api:test
 ```sh
 $ nx run web-api:lint
 ```
+
+
+## Running the Back Office (Admin app)
+This app is used by admin to approve/reject/edit - members and teams join requests
+
+### Set the environment variables
+Set the following environment variables for the back office app:
+
+- `WEB_API_BASE_URL` - Directory Backend API URL configured above. (for local development, use: http://localhost:<PORT>, where PORT is the variable configured in .env file from the above steps. Eg. http://localhost:3000, where PORT=3000)
+- `ADMIN_LOGIN_USERNAME` - Back Office Application Login Username (Set the username you want to use for logging in to the back office app)
+- `ADMIN_LOGIN_PASSWORD` - Back Office Application Login Password (Set the password you want to use for logging in to the back office app)
+
+### Running the Back Office
+
+```sh
+$ yarn nx serve back-office
+```
+
+### Accessing the Back Office
+Application will be available at http://localhost:4201, port 4201 is set in project.json file in back-office app.
+
+Use the username and password you set in the environment variables above to log in to the back office app.
