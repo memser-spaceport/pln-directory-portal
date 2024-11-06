@@ -1,8 +1,5 @@
 // eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
 import { TFocusArea } from 'apps/back-office/utils/teams.types';
-import { APP_ANALYTICS_EVENTS } from 'apps/web-app/constants';
-import useAppAnalytics from 'apps/web-app/hooks/shared/use-app-analytics';
-
 
 interface IFocusAreasList {
   selectedItems: TFocusArea[];

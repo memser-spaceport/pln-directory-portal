@@ -43,5 +43,5 @@
       }
     }
   },
-  "defaultProject": "web-app"
+  "defaultProject": "web-api"
 }
