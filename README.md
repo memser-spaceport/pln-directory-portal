@@ -14,6 +14,50 @@ The folder structure of this project is organized as follows:
 - **apps/web-api/prisma**: Contains the database schema and migration files
 - **libs/contracts**: Contains the API contracts
 
+---
+
+## Prerequisites
+
+Before running this project, ensure the following software is installed on your system:
+
+1. **Docker**  
+   Docker is essential for containerizing the application, making it easier to manage dependencies and deployments.  
+   [Install Docker](https://docs.docker.com/get-docker/)
+
+2. **Docker Compose**  
+   Docker Compose is a tool for defining and running multi-container Docker applications, which allows for easier orchestration of containers.  
+   [Install Docker Compose](https://docs.docker.com/compose/install/)
+
+3. **PostgreSQL**  
+   PostgreSQL is the primary database used in this project. Make sure to have it installed and configured, or use the Docker image provided in the `docker-compose.yml` file.  
+   [Install PostgreSQL](https://www.postgresql.org/download/)
+
+4. **Redis**  
+   Redis is used for caching, which improves performance and scalability. You can also run Redis as a Docker container if you prefer.  
+   [Install Redis](https://redis.io/download)
+
+5. **Node.js**  
+   Node.js is the JavaScript runtime for server-side scripting in this project. Ensure that a compatible version is installed.  
+   [Install Node.js](https://nodejs.org/)
+
+6. **npm (Node Package Manager)**  
+   npm is included with Node.js and is used for installing dependencies and managing packages.  
+   [Learn about npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
+
+7. **NestJS**  
+   NestJS is a framework for building efficient, reliable, and scalable server-side applications. It is the primary framework used in this project.  
+   [Learn about NestJS](https://docs.nestjs.com/)
+
+8. **Prisma**  
+   Prisma is an ORM (Object-Relational Mapper) used for interacting with the database in a type-safe way.  
+   [Learn about Prisma](https://www.prisma.io/docs/)
+
+9. **Zod**  
+   Zod is a TypeScript-first schema validation library used for data validation.  
+   [Learn about Zod](https://zod.dev/)
+
+--- 
+
 ## Logging in Cloudwatch
 
 The application is set to send all the logs to Cloudwatch logs. If you have your own AWS access and secret keys with Cloudwatch permissions, you can configure them in `.env`.
@@ -128,45 +172,13 @@ $ yarn nx build web-api --configuration=production
 ```sh
 $ nx run web-api:test
 ```
+To ensure code reliability and functionality, we use the Jest framework for writing and running test cases. Jest provides a robust environment for unit and integration testing, helping maintain the quality and stability of the application.
 
 ## Lint
 
 ```sh
 $ nx run web-api:lint
 ```
-
----
-
-## Prerequisites
-
-Before running this project, ensure the following software are installed on your system:
-
-1. **Docker**  
-   Docker is essential for containerizing the application, making it easier to manage dependencies and deployments.  
-   [Install Docker](https://docs.docker.com/get-docker/)
-
-2. **Docker Compose**  
-   Docker Compose is a tool for defining and running multi-container Docker applications, which allows for easier orchestration of containers.  
-   [Install Docker Compose](https://docs.docker.com/compose/install/)
-
-3. **PostgreSQL**  
-   PostgreSQL is the primary database used in this project. Make sure to have it installed and configured, or use the Docker image provided in the `docker-compose.yml` file.  
-   [Install PostgreSQL](https://www.postgresql.org/download/)
-
-4. **Redis**  
-   Redis is used for caching, which improves performance and scalability. You can also run Redis as a Docker container if you prefer.  
-   [Install Redis](https://redis.io/download)
-
-5. **Node.js**  
-   Node.js is the JavaScript runtime for server-side scripting in this project. Ensure that a compatible version is installed.  
-   [Install Node.js](https://nodejs.org/)
-
-6. **npm (Node Package Manager)**  
-   npm is included with Node.js and is used for installing dependencies and managing packages.  
-   [Learn about npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
-
----
-
 
 ## Running the Back Office (Admin app)
 This app is used by admin to approve/reject/edit - members and teams join requests
