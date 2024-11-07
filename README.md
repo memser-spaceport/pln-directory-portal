@@ -62,7 +62,7 @@ Before running this project, ensure the following software is installed on your 
 
 The application is set to send all the logs to Cloudwatch logs. If you have your own AWS access and secret keys with Cloudwatch permissions, you can configure them in `.env`.
 
-If you do not want to log in Cloudwatch, you can set `LOG_ENV=local`.
+If you do not want to log in CloudWatch or do not have the necessary AWS keys, you can set `LOG_ENV=local`.
 
 ## Setting up Dependent Services
 
@@ -70,11 +70,11 @@ If you do not want to log in Cloudwatch, you can set `LOG_ENV=local`.
 | - | - | - | - |
 | [Privy](https://www.privy.io/) | External | The hybrid auth solution provider for users to login | Yes |
 | AWS Cloudwatch logs | External | To store logs | No |
-| AWS S3 | External | To store runtime images like profile pictures | Yes (can use default S3 location in `.env.example` for local development) |
+| AWS S3 | External | To store runtime images like profile pictures | Yes (You can skip it for local development but you will not be able to upload profile images) |
 | AWS SES | External | To send email notifications | Yes |
 | PL Auth service (sandbox mode) | Internal | To manage user auth requests and issue tokens, works in OAuth 2.0 standard | Yes |
 | Redis | External | To cache API results for better performance | Yes |
-| Google API | External | For location-based services | Yes |
+| [Google API](https://developers.google.com/maps/documentation/places/web-service/get-api-key) | External | For location-based services | Yes |
 | [Forestadmin](https://www.forestadmin.com/) | External | To manage data directly from/to database. The admin panel for the database | No |
 | Github API Key | External | To get information about projects from Github repo | Yes |
 
@@ -118,20 +118,29 @@ Once this is done, you will have your Postgres and Redis running through Docker 
 
 ### Some Key Environment Variables for Local Mode
 
+  ```sh
+  ENVIRONMENT=development
+  ```
+
 - Generate a Github [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens):
   ```sh
   GITHUB_API_KEY=
   ```
 
-- Make sure it has permission to read and write from the provided S3 bucket:
+- Make sure it has permission to read and write from the provided S3 bucket (If you do not have aws keys, leave it assuming you will not be uploading any profile images):
   ```sh
   AWS_ACCESS_KEY=
   AWS_SECRET_KEY=
   ```
 
-- Must be a public bucket:
+- Must be a public bucket: (Leave it if you do not have any)
   ```sh
   AWS_S3_BUCKET_NAME=
+  ```
+
+- Set to false if you do not have aws keys with ses permission
+  ```sh
+  IS_EMAIL_ENABLED=false
   ```
 
 ## Generate Prisma Schemas and Update the Database
