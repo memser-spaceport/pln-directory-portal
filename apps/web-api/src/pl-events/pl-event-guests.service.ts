@@ -406,9 +406,9 @@ export class PLEventGuestsService {
     const { eventUids, isHost, isSpeaker, topics, sortBy, sortDirection = 'asc', search, limit = 10, page = 1, loggedInMemberUid, isFounder } = queryParams;
     // Build dynamic query conditions for filtering by eventUids, isHost, and isSpeaker
     let { conditions, values } = this.buildConditions(eventUids, topics);
-    const { participationTypeAndRoleCondition, participationTypeAndRoleValues } = this.buildParticipationTypeAndRoleCondition(isHost, isSpeaker, isFounder);
+    const { participationTypeAndRoleCondition, participationTypeAndRoleValues } = this.buildParticipationTypeAndRoleCondition(isHost, isSpeaker, isFounder, values);
 
-    values = [...values, ...participationTypeAndRoleValues];
+    values = [...participationTypeAndRoleValues];
 
     // Apply sorting based on the sortBy parameter (default is sorting by memberName)
     const orderBy = this.applySorting(sortBy, sortDirection, loggedInMemberUid);
@@ -586,23 +586,23 @@ export class PLEventGuestsService {
    * @param {string} isSpeaker - Indicates if the guest is a speaker (expected values: "true" or "false").
    * @returns {string} - A SQL condition string to filter guests based on their type.
    */
-  buildParticipationTypeAndRoleCondition(isHost, isSpeaker, isFounder) {
+  buildParticipationTypeAndRoleCondition(isHost, isSpeaker, isFounder, values) {
     const participationTypeAndRoleConditions: string[] = [];
-    const participationTypeAndRoleValues: any = [];
+    const participationTypeAndRoleValues: any = values;
     if (isHost === "true" && isSpeaker === "true") {
-      participationTypeAndRoleConditions.push(`guest_type = $${participationTypeAndRoleValues.length + 3}`);
+      participationTypeAndRoleConditions.push(`guest_type = $${participationTypeAndRoleValues.length + 1}`);
       participationTypeAndRoleValues.push('hostAndSpeaker');
     }
     else if (isHost === "true") {
-      participationTypeAndRoleConditions.push(`guest_type = $${participationTypeAndRoleValues.length + 3}`);
+      participationTypeAndRoleConditions.push(`guest_type = $${participationTypeAndRoleValues.length + 1}`);
       participationTypeAndRoleValues.push('isHostOnly');
     }
     else if (isSpeaker === "true") {
-      participationTypeAndRoleConditions.push(`guest_type = $${participationTypeAndRoleValues.length + 3}`);
+      participationTypeAndRoleConditions.push(`guest_type = $${participationTypeAndRoleValues.length + 1}`);
       participationTypeAndRoleValues.push('isSpeakerOnly');
     }
     if (isFounder === "true") {
-      participationTypeAndRoleConditions.push(`member_role = $${participationTypeAndRoleValues.length + 3}`);
+      participationTypeAndRoleConditions.push(`member_role = $${participationTypeAndRoleValues.length + 1}`);
       participationTypeAndRoleValues.push('isFounder');
     }
     const conditionsString = participationTypeAndRoleConditions.length > 0 ? `WHERE ${participationTypeAndRoleConditions.join(" AND ")}` : '';
