@@ -76,6 +76,7 @@ const discoveryQuestionFactory = Factory.define<Omit<DiscoveryQuestion, 'id'>>(
       ],
       createdAt: faker.date.past(),
       updatedAt: faker.date.recent(),
+      type: faker.helpers.arrayElement(['CHAT', null]),
     };
   }
 );
