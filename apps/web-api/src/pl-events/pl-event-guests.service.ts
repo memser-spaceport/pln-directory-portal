@@ -500,7 +500,7 @@ export class PLEventGuestsService {
         LEFT JOIN "Team" tm ON tm.uid = pg."teamUid"
         LEFT JOIN "Image" tml ON tml.uid = tm."logoUid"
         LEFT JOIN "TeamMemberRole" tm_role ON tm_role."memberUid" = m.uid 
-        ${this.applySearch(values, search)}
+        ${this.applySearchAndRestrictEvents(values, search, eventUids)}
         GROUP BY 
           pg."memberUid",
           pg."teamUid",
@@ -619,18 +619,19 @@ export class PLEventGuestsService {
    * @param {string} search - The search term to filter by member name, team name, or project names.
    * @returns {Object} Updated conditions and values for the SQL query after applying search filters.
    */
-  applySearch(values, search: string) {
+  applySearchAndRestrictEvents(values, search: string, eventUids:string[]) {
+    const conditions: string[] = [];
     // Add a condition to search by member name, team name, or project names (either contributed or created)
+    conditions.push(`e.uid=ANY(ARRAY[${eventUids?.map((_, i) => `$${i + 1}`).join(", ")}])`);
     if (search) {
       values.push(`%${search}%`);
-      return ` WHERE
-        m."name" ILIKE $${values.length} OR 
+      conditions.push( ` m."name" ILIKE $${values.length} OR 
         tm."name" ILIKE $${values.length} OR 
         pc_project."name" ILIKE $${values.length} OR 
-        cp."name" ILIKE $${values.length} `;
+        cp."name" ILIKE $${values.length} `)
       // Append search term to the query values with wildcard matching
     }
-    return ``;
+    return conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")} ` : '';
   }
 
   /**
