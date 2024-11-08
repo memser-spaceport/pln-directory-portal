@@ -149,6 +149,10 @@ enum ImageSize {
   TINY
 }
 
+enum DiscoveryQuestionType {
+  CHAT
+}
+
 model ParticipantsRequest {
   id               Int             @id @default(autoincrement())
   uid              String          @unique @default(cuid())
@@ -568,6 +572,7 @@ model DiscoveryQuestion {
   relatedQuestions Json[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  type             DiscoveryQuestionType?
 }
 
 model MemberSubscription {
