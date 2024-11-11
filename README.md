@@ -209,3 +209,12 @@ $ yarn nx serve back-office
 Application will be available at http://localhost:4201, port 4201 is set in project.json file in back-office app.
 
 Use the username and password you set in the environment variables above to log in to the back office app.
+
+### Contributing Guidelines
+
+Refer
+  - [Branching Guidelines](./docs/GUIDELINES_BRANCHING.md)
+  - [Commit Guidelines](./docs/GUIDELINES_COMMIT.md)
+  - [Pull Request Guidelines](./docs/GUIDELINES_PULL_REQUEST.md)
+
+And give a PR to develop branch and our team will review and approve it.
