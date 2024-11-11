@@ -14,7 +14,7 @@ Here are a few key points to keep in mind:
 
 1. Pull requests should be assigned to the author of the code changes;
 2. When opening a pull request, label it with the appropriate status and type labels;
-3. Within the description section, identify the changes, the corresponding JIRA tickets and check every item in the available checklist;
+3. Within the description section, identify the changes and check every item in the available checklist;
 4. To be merged, the changes in the pull request must pass the following validation criteria:
    - Successfully lints the NX-specific workspace files;
    - Successfully checks the code format using Prettier;
@@ -30,7 +30,6 @@ All the above steps are mandatory and should be followed strictly to maintain th
 ## Best Practices
 
 - Always review, test and debug code changes before opening a pull request to ensure that the code is working as intended;
-- Avoid large commits and always split them into smaller chunks if possible;
 - Use the appropriate labels when opening pull requests;
 - Follow the validation criteria strictly;
 - Keep the number of open pull requests to a minimum to avoid merge conflicts.
