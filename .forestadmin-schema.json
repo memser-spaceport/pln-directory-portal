@@ -193,7 +193,7 @@
         "enums": null,
         "field": "FocusArea_through_parentUid",
         "integration": null,
-        "inverseOf": "FocusAreas",
+        "inverseOf": "FocusAreas_through_FocusArea_parentUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -208,7 +208,7 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "FocusAreas",
+        "field": "FocusAreas_through_FocusArea_parentUid",
         "integration": null,
         "inverseOf": "FocusArea_through_parentUid",
         "isFilterable": false,
@@ -259,9 +259,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "TeamFocusAreaVersionHistories",
+        "field": "TeamFocusAreaVersionHistories_through_FocusArea_focusAreaUid",
         "integration": null,
-        "inverseOf": "FocusArea",
+        "inverseOf": "FocusArea_through_focusAreaUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -510,9 +510,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Teams",
+        "field": "Teams_through_FundingStage_fundingStageUid",
         "integration": null,
-        "inverseOf": "FundingStage",
+        "inverseOf": "FundingStage_through_fundingStageUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -627,7 +627,7 @@
         "enums": null,
         "field": "Image_through_thumbnailToUid",
         "integration": null,
-        "inverseOf": "Images",
+        "inverseOf": "Images_through_Image_thumbnailToUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -642,7 +642,7 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Images",
+        "field": "Images_through_Image_thumbnailToUid",
         "integration": null,
         "inverseOf": "Image_through_thumbnailToUid",
         "isFilterable": false,
@@ -659,9 +659,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Members",
+        "field": "Members_through_Image_imageUid",
         "integration": null,
-        "inverseOf": "Image",
+        "inverseOf": "Image_through_imageUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -710,9 +710,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Projects",
+        "field": "Projects_through_Image_logoUid",
         "integration": null,
-        "inverseOf": "Image",
+        "inverseOf": "Image_through_logoUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -727,9 +727,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Teams",
+        "field": "Teams_through_Image_logoUid",
         "integration": null,
-        "inverseOf": "Image",
+        "inverseOf": "Image_through_logoUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -917,7 +917,28 @@
       },
       {
         "defaultValue": null,
-        "enums": ["ORIGINAL", "LARGE", "MEDIUM", "SMALL", "TINY"],
+        "enums": [
+          "ORIGINAL",
+          "LARGE",
+          "MEDIUM",
+          "SMALL",
+          "TINY",
+          "ORIGINAL",
+          "LARGE",
+          "MEDIUM",
+          "SMALL",
+          "TINY",
+          "ORIGINAL",
+          "LARGE",
+          "MEDIUM",
+          "SMALL",
+          "TINY",
+          "ORIGINAL",
+          "LARGE",
+          "MEDIUM",
+          "SMALL",
+          "TINY"
+        ],
         "field": "version",
         "integration": null,
         "inverseOf": null,
@@ -968,9 +989,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "IndustryTags",
+        "field": "IndustryTags_through_IndustryCategory_industryCategoryUid",
         "integration": null,
-        "inverseOf": "IndustryCategory",
+        "inverseOf": "IndustryCategory_through_industryCategoryUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -1083,9 +1104,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "IndustryCategory",
+        "field": "IndustryCategory_through_industryCategoryUid",
         "integration": null,
-        "inverseOf": "IndustryTags",
+        "inverseOf": "IndustryTags_through_IndustryCategory_industryCategoryUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -1100,9 +1121,15 @@
       {
         "defaultValue": null,
         "enums": null,
+<<<<<<< HEAD
         "field": "Teams",
         "integration": null,
         "inverseOf": "IndustryTags",
+=======
+        "field": "_IndustryTagToTeams_through_IndustryTag_A",
+        "integration": null,
+        "inverseOf": "IndustryTag_through_A",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -1363,9 +1390,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Members",
+        "field": "Members_through_Location_locationUid",
         "integration": null,
-        "inverseOf": "Location",
+        "inverseOf": "Location_through_locationUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -1643,9 +1670,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Image",
+        "field": "Image_through_imageUid",
         "integration": null,
-        "inverseOf": "Members",
+        "inverseOf": "Members_through_Image_imageUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -1660,9 +1687,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Location",
+        "field": "Location_through_locationUid",
         "integration": null,
-        "inverseOf": "Members",
+        "inverseOf": "Members_through_Location_locationUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -1677,9 +1704,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "MemberFeedbacks",
+        "field": "MemberFeedbacks_through_Member_createdBy",
         "integration": null,
-        "inverseOf": "Member",
+        "inverseOf": "Member_through_createdBy",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -1694,9 +1721,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "MemberFollowUps",
+        "field": "MemberFollowUps_through_Member_createdBy",
         "integration": null,
-        "inverseOf": "Member",
+        "inverseOf": "Member_through_createdBy",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -1745,9 +1772,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "PLEventGuests",
+        "field": "PLEventGuests_through_Member_memberUid",
         "integration": null,
-        "inverseOf": "Member",
+        "inverseOf": "Member_through_memberUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -1762,9 +1789,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "ProjectContributions",
+        "field": "ProjectContributions_through_Member_memberUid",
         "integration": null,
-        "inverseOf": "Member",
+        "inverseOf": "Member_through_memberUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -1779,9 +1806,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Projects",
+        "field": "Projects_through_Member_createdBy",
         "integration": null,
-        "inverseOf": "Member",
+        "inverseOf": "Member_through_createdBy",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -1796,6 +1823,7 @@
       {
         "defaultValue": null,
         "enums": null,
+<<<<<<< HEAD
         "field": "Skills",
         "integration": null,
         "inverseOf": "Members",
@@ -1814,8 +1842,11 @@
         "defaultValue": null,
         "enums": null,
         "field": "TeamFocusAreaVersionHistories",
+=======
+        "field": "TeamFocusAreaVersionHistories_through_Member_modifiedBy",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "integration": null,
-        "inverseOf": "Member",
+        "inverseOf": "Member_through_modifiedBy",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -1830,9 +1861,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "TeamMemberRoles",
+        "field": "TeamMemberRoles_through_Member_memberUid",
         "integration": null,
-        "inverseOf": "Member",
+        "inverseOf": "Member_through_memberUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -1847,9 +1878,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Teams",
+        "field": "Teams_through_Member_lastModifiedBy",
         "integration": null,
-        "inverseOf": "Member",
+        "inverseOf": "Member_through_lastModifiedBy",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -1864,9 +1895,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "_MemberToMemberRoles",
+        "field": "_MemberToMemberRoles_through_Member_A",
         "integration": null,
-        "inverseOf": "Member",
+        "inverseOf": "Member_through_A",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -1882,10 +1913,14 @@
         "defaultValue": null,
         "enums": null,
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
         "field": "_MemberToSkills",
+=======
+        "field": "_MemberToSkills_through_Member_A",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "integration": null,
-        "inverseOf": "Member",
+        "inverseOf": "Member_through_A",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -2399,16 +2434,16 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Member",
+        "field": "MemberFollowUp_through_followUpUid",
         "integration": null,
-        "inverseOf": "MemberFeedbacks",
+        "inverseOf": "MemberFeedback_through_MemberFollowUp_followUpUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
         "isRequired": true,
         "isSortable": true,
         "isVirtual": false,
-        "reference": "Member.uid",
+        "reference": "MemberFollowUp.uid",
         "relationship": "BelongsTo",
         "type": "String",
         "validations": [
@@ -2418,16 +2453,16 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "MemberFollowUp",
+        "field": "Member_through_createdBy",
         "integration": null,
-        "inverseOf": "MemberFeedback",
+        "inverseOf": "MemberFeedbacks_through_Member_createdBy",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
         "isRequired": true,
         "isSortable": true,
         "isVirtual": false,
-        "reference": "MemberFollowUp.uid",
+        "reference": "Member.uid",
         "relationship": "BelongsTo",
         "type": "String",
         "validations": [
@@ -2516,7 +2551,20 @@
       },
       {
         "defaultValue": null,
-        "enums": ["POSITIVE", "NEGATIVE", "NEUTRAL"],
+        "enums": [
+          "POSITIVE",
+          "NEGATIVE",
+          "NEUTRAL",
+          "POSITIVE",
+          "NEGATIVE",
+          "NEUTRAL",
+          "POSITIVE",
+          "NEGATIVE",
+          "NEUTRAL",
+          "POSITIVE",
+          "NEGATIVE",
+          "NEUTRAL"
+        ],
         "field": "response",
         "integration": null,
         "inverseOf": null,
@@ -2601,28 +2649,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Member",
+        "field": "MemberFeedback_through_MemberFollowUp_followUpUid",
         "integration": null,
-        "inverseOf": "MemberFollowUps",
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": "Member.uid",
-        "relationship": "BelongsTo",
-        "type": "String",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "MemberFeedback",
-        "integration": null,
-        "inverseOf": "MemberFollowUp",
+        "inverseOf": "MemberFollowUp_through_followUpUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -2637,9 +2666,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "MemberInteraction",
+        "field": "MemberInteraction_through_interactionUid",
         "integration": null,
-        "inverseOf": "MemberFollowUps",
+        "inverseOf": "MemberFollowUps_through_MemberInteraction_interactionUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -2650,6 +2679,25 @@
         "relationship": "BelongsTo",
         "type": "String",
         "validations": []
+      },
+      {
+        "defaultValue": null,
+        "enums": null,
+        "field": "Member_through_createdBy",
+        "integration": null,
+        "inverseOf": "MemberFollowUps_through_Member_createdBy",
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": true,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": "Member.uid",
+        "relationship": "BelongsTo",
+        "type": "String",
+        "validations": [
+          {"type": "is present", "message": "Failed validation rule: 'Present'"}
+        ]
       },
       {
         "defaultValue": null,
@@ -2719,7 +2767,20 @@
       },
       {
         "defaultValue": null,
-        "enums": ["PENDING", "COMPLETED", "CLOSED"],
+        "enums": [
+          "PENDING",
+          "COMPLETED",
+          "CLOSED",
+          "PENDING",
+          "COMPLETED",
+          "CLOSED",
+          "PENDING",
+          "COMPLETED",
+          "CLOSED",
+          "PENDING",
+          "COMPLETED",
+          "CLOSED"
+        ],
         "field": "status",
         "integration": null,
         "inverseOf": null,
@@ -2804,9 +2865,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "MemberFollowUps",
+        "field": "MemberFollowUps_through_MemberInteraction_interactionUid",
         "integration": null,
-        "inverseOf": "MemberInteraction",
+        "inverseOf": "MemberInteraction_through_interactionUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -2989,9 +3050,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "_MemberToMemberRoles",
+        "field": "_MemberToMemberRoles_through_MemberRole_B",
         "integration": null,
-        "inverseOf": "MemberRole",
+        "inverseOf": "MemberRole_through_B",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -3104,178 +3165,15 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Member",
-        "integration": null,
-        "inverseOf": "MemberSubscriptions",
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": "Member.uid",
-        "relationship": "BelongsTo",
-        "type": "String",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "createdAt",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": false,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Date",
-        "validations": []
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "entityAction",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "String",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": ["EVENT_LOCATION"],
-        "field": "entityType",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Enum",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "entityUid",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "String",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "id",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": true,
-        "isReadOnly": true,
-        "isRequired": false,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Number",
-        "validations": []
-      },
-      {
-        "defaultValue": true,
-        "enums": null,
-        "field": "isActive",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": false,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Boolean",
-        "validations": []
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "uid",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "String",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "updatedAt",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": false,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Date",
-        "validations": []
-      }
-    ],
-    "icon": null,
-    "integration": null,
-    "isReadOnly": false,
-    "isSearchable": true,
-    "isVirtual": false,
-    "name": "MemberSubscription",
-    "onlyForRelationships": false,
-    "paginationType": "page",
-    "segments": []
-  },
-  {
-    "actions": [],
-    "fields": [
-      {
-        "defaultValue": null,
-        "enums": null,
+<<<<<<< HEAD
         "field": "Teams",
         "integration": null,
         "inverseOf": "MembershipSources",
+=======
+        "field": "_MembershipSourceToTeams_through_MembershipSource_A",
+        "integration": null,
+        "inverseOf": "MembershipSource_through_A",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -3422,9 +3320,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "PLEventGuests",
+        "field": "PLEventGuests_through_PLEvent_eventUid",
         "integration": null,
-        "inverseOf": "PLEvent",
+        "inverseOf": "PLEvent_through_eventUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -3671,7 +3569,7 @@
       },
       {
         "defaultValue": null,
-        "enums": ["INVITE_ONLY"],
+        "enums": ["INVITE_ONLY", "INVITE_ONLY", "INVITE_ONLY", "INVITE_ONLY"],
         "field": "type",
         "integration": null,
         "inverseOf": null,
@@ -3752,9 +3650,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Member",
+        "field": "Member_through_memberUid",
         "integration": null,
-        "inverseOf": "PLEventGuests",
+        "inverseOf": "PLEventGuests_through_Member_memberUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -3771,9 +3669,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "PLEvent",
+        "field": "PLEvent_through_eventUid",
         "integration": null,
-        "inverseOf": "PLEventGuests",
+        "inverseOf": "PLEventGuests_through_PLEvent_eventUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -3790,9 +3688,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Team",
+        "field": "Team_through_teamUid",
         "integration": null,
-        "inverseOf": "PLEventGuests",
+        "inverseOf": "PLEventGuests_through_Team_teamUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -4347,7 +4245,16 @@
       },
       {
         "defaultValue": null,
-        "enums": ["MEMBER", "TEAM"],
+        "enums": [
+          "MEMBER",
+          "TEAM",
+          "MEMBER",
+          "TEAM",
+          "MEMBER",
+          "TEAM",
+          "MEMBER",
+          "TEAM"
+        ],
         "field": "participantType",
         "integration": null,
         "inverseOf": null,
@@ -4399,7 +4306,24 @@
       },
       {
         "defaultValue": "PENDING",
-        "enums": ["PENDING", "APPROVED", "REJECTED", "AUTOAPPROVED"],
+        "enums": [
+          "PENDING",
+          "APPROVED",
+          "REJECTED",
+          "AUTOAPPROVED",
+          "PENDING",
+          "APPROVED",
+          "REJECTED",
+          "AUTOAPPROVED",
+          "PENDING",
+          "APPROVED",
+          "REJECTED",
+          "AUTOAPPROVED",
+          "PENDING",
+          "APPROVED",
+          "REJECTED",
+          "AUTOAPPROVED"
+        ],
         "field": "status",
         "integration": null,
         "inverseOf": null,
@@ -4482,9 +4406,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Image",
+        "field": "Image_through_logoUid",
         "integration": null,
-        "inverseOf": "Projects",
+        "inverseOf": "Projects_through_Image_logoUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -4499,9 +4423,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Member",
+        "field": "Member_through_createdBy",
         "integration": null,
-        "inverseOf": "Projects",
+        "inverseOf": "Projects_through_Member_createdBy",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -4518,9 +4442,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "ProjectContributions",
+        "field": "ProjectContributions_through_Project_projectUid",
         "integration": null,
-        "inverseOf": "Project",
+        "inverseOf": "Project_through_projectUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -4535,9 +4459,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "ProjectFocusAreas",
+        "field": "ProjectFocusAreas_through_Project_projectUid",
         "integration": null,
-        "inverseOf": "Project",
+        "inverseOf": "Project_through_projectUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -4552,9 +4476,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Team",
+        "field": "Team_through_maintainingTeamUid",
         "integration": null,
-        "inverseOf": "Projects",
+        "inverseOf": "Projects_through_Team_maintainingTeamUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -4571,9 +4495,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "_contributingTeams",
+        "field": "_contributingTeams_through_Project_A",
         "integration": null,
-        "inverseOf": "Project",
+        "inverseOf": "Project_through_A",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -4886,9 +4810,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Member",
+        "field": "Member_through_memberUid",
         "integration": null,
-        "inverseOf": "ProjectContributions",
+        "inverseOf": "ProjectContributions_through_Member_memberUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -4905,9 +4829,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Project",
+        "field": "Project_through_projectUid",
         "integration": null,
-        "inverseOf": "ProjectContributions",
+        "inverseOf": "ProjectContributions_through_Project_projectUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5090,9 +5014,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Project",
+        "field": "Project_through_projectUid",
         "integration": null,
-        "inverseOf": "ProjectFocusAreas",
+        "inverseOf": "ProjectFocusAreas_through_Project_projectUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5139,9 +5063,15 @@
       {
         "defaultValue": null,
         "enums": null,
+<<<<<<< HEAD
         "field": "Members",
         "integration": null,
         "inverseOf": "Skills",
+=======
+        "field": "_MemberToSkills_through_Skill_B",
+        "integration": null,
+        "inverseOf": "Skill_through_B",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5283,9 +5213,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "FundingStage",
+        "field": "FundingStage_through_fundingStageUid",
         "integration": null,
-        "inverseOf": "Teams",
+        "inverseOf": "Teams_through_FundingStage_fundingStageUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5300,9 +5230,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Image",
+        "field": "Image_through_logoUid",
         "integration": null,
-        "inverseOf": "Teams",
+        "inverseOf": "Teams_through_Image_logoUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5317,6 +5247,7 @@
       {
         "defaultValue": null,
         "enums": null,
+<<<<<<< HEAD
         "field": "IndustryTags",
         "integration": null,
         "inverseOf": "Teams",
@@ -5335,8 +5266,11 @@
         "defaultValue": null,
         "enums": null,
         "field": "Member",
+=======
+        "field": "Member_through_lastModifiedBy",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "integration": null,
-        "inverseOf": "Teams",
+        "inverseOf": "Teams_through_Member_lastModifiedBy",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5351,6 +5285,7 @@
       {
         "defaultValue": null,
         "enums": null,
+<<<<<<< HEAD
         "field": "MembershipSources",
         "integration": null,
         "inverseOf": "Teams",
@@ -5369,8 +5304,11 @@
         "defaultValue": null,
         "enums": null,
         "field": "PLEventGuests",
+=======
+        "field": "PLEventGuests_through_Team_teamUid",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "integration": null,
-        "inverseOf": "Team",
+        "inverseOf": "Team_through_teamUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5385,9 +5323,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Projects",
+        "field": "Projects_through_Team_maintainingTeamUid",
         "integration": null,
-        "inverseOf": "Team",
+        "inverseOf": "Team_through_maintainingTeamUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5402,9 +5340,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "TeamFocusAreaVersionHistories",
+        "field": "TeamFocusAreaVersionHistories_through_Team_teamUid",
         "integration": null,
-        "inverseOf": "Team",
+        "inverseOf": "Team_through_teamUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5419,9 +5357,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "TeamFocusAreas",
+        "field": "TeamFocusAreas_through_Team_teamUid",
         "integration": null,
-        "inverseOf": "Team",
+        "inverseOf": "Team_through_teamUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5436,9 +5374,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "TeamMemberRoles",
+        "field": "TeamMemberRoles_through_Team_teamUid",
         "integration": null,
-        "inverseOf": "Team",
+        "inverseOf": "Team_through_teamUid",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5453,26 +5391,71 @@
       {
         "defaultValue": null,
         "enums": null,
+<<<<<<< HEAD
         "field": "Technologies",
         "integration": null,
         "inverseOf": "Teams",
+=======
+        "field": "_IndustryTagToTeams_through_Team_B",
+        "integration": null,
+        "inverseOf": "Team_through_B",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
         "isRequired": false,
         "isSortable": false,
         "isVirtual": false,
+<<<<<<< HEAD
         "reference": "Technology.id",
         "relationship": "BelongsToMany",
+=======
+        "reference": "_IndustryTagToTeam.id",
+        "relationship": "HasMany",
         "type": ["Number"],
         "validations": []
       },
       {
         "defaultValue": null,
         "enums": null,
-        "field": "_contributingTeams",
+        "field": "_MembershipSourceToTeams_through_Team_B",
         "integration": null,
-        "inverseOf": "Team",
+        "inverseOf": "Team_through_B",
+        "isFilterable": false,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": false,
+        "isVirtual": false,
+        "reference": "_MembershipSourceToTeam.id",
+        "relationship": "HasMany",
+        "type": ["Number"],
+        "validations": []
+      },
+      {
+        "defaultValue": null,
+        "enums": null,
+        "field": "_TeamToTechnologies_through_Team_A",
+        "integration": null,
+        "inverseOf": "Team_through_A",
+        "isFilterable": false,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": false,
+        "isVirtual": false,
+        "reference": "_TeamToTechnology.id",
+        "relationship": "HasMany",
+>>>>>>> bedf0149 (fix: code revert fixed)
+        "type": ["Number"],
+        "validations": []
+      },
+      {
+        "defaultValue": null,
+        "enums": null,
+        "field": "_contributingTeams_through_Team_B",
+        "integration": null,
+        "inverseOf": "Team_through_B",
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5849,9 +5832,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Team",
+        "field": "Team_through_teamUid",
         "integration": null,
-        "inverseOf": "TeamFocusAreas",
+        "inverseOf": "TeamFocusAreas_through_Team_teamUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5898,9 +5881,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "FocusArea",
+        "field": "FocusArea_through_focusAreaUid",
         "integration": null,
-        "inverseOf": "TeamFocusAreaVersionHistories",
+        "inverseOf": "TeamFocusAreaVersionHistories_through_FocusArea_focusAreaUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5915,9 +5898,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Member",
+        "field": "Member_through_modifiedBy",
         "integration": null,
-        "inverseOf": "TeamFocusAreaVersionHistories",
+        "inverseOf": "TeamFocusAreaVersionHistories_through_Member_modifiedBy",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5934,9 +5917,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Team",
+        "field": "Team_through_teamUid",
         "integration": null,
-        "inverseOf": "TeamFocusAreaVersionHistories",
+        "inverseOf": "TeamFocusAreaVersionHistories_through_Team_teamUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6105,9 +6088,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Member",
+        "field": "Member_through_memberUid",
         "integration": null,
-        "inverseOf": "TeamMemberRoles",
+        "inverseOf": "TeamMemberRoles_through_Member_memberUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6124,9 +6107,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Team",
+        "field": "Team_through_teamUid",
         "integration": null,
-        "inverseOf": "TeamMemberRoles",
+        "inverseOf": "TeamMemberRoles_through_Team_teamUid",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6273,9 +6256,15 @@
       {
         "defaultValue": null,
         "enums": null,
+<<<<<<< HEAD
         "field": "Teams",
         "integration": null,
         "inverseOf": "Technologies",
+=======
+        "field": "_TeamToTechnologies_through_Technology_B",
+        "integration": null,
+        "inverseOf": "Technology_through_B",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6388,6 +6377,7 @@
       {
         "defaultValue": null,
         "enums": null,
+<<<<<<< HEAD
         "field": "A",
         "integration": null,
         "inverseOf": null,
@@ -6427,6 +6417,11 @@
         "field": "IndustryTag",
         "integration": null,
         "inverseOf": null,
+=======
+        "field": "IndustryTag_through_A",
+        "integration": null,
+        "inverseOf": "_IndustryTagToTeams_through_IndustryTag_A",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6443,9 +6438,13 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Team",
+        "field": "Team_through_B",
         "integration": null,
+<<<<<<< HEAD
         "inverseOf": null,
+=======
+        "inverseOf": "_IndustryTagToTeams_through_Team_B",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6476,16 +6475,16 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Member",
+        "field": "MemberRole_through_B",
         "integration": null,
-        "inverseOf": "_MemberToMemberRoles",
+        "inverseOf": "_MemberToMemberRoles_through_MemberRole_B",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
         "isRequired": true,
         "isSortable": true,
         "isVirtual": false,
-        "reference": "Member.id",
+        "reference": "MemberRole.id",
         "relationship": "BelongsTo",
         "type": "Number",
         "validations": [
@@ -6495,16 +6494,16 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "MemberRole",
+        "field": "Member_through_A",
         "integration": null,
-        "inverseOf": "_MemberToMemberRoles",
+        "inverseOf": "_MemberToMemberRoles_through_Member_A",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
         "isRequired": true,
         "isSortable": true,
         "isVirtual": false,
-        "reference": "MemberRole.id",
+        "reference": "Member.id",
         "relationship": "BelongsTo",
         "type": "Number",
         "validations": [
@@ -6528,6 +6527,7 @@
       {
         "defaultValue": null,
         "enums": null,
+<<<<<<< HEAD
         "field": "A",
         "integration": null,
         "inverseOf": null,
@@ -6567,6 +6567,11 @@
         "field": "Member",
         "integration": null,
         "inverseOf": null,
+=======
+        "field": "Member_through_A",
+        "integration": null,
+        "inverseOf": "_MemberToSkills_through_Member_A",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6583,9 +6588,13 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Skill",
+        "field": "Skill_through_B",
         "integration": null,
+<<<<<<< HEAD
         "inverseOf": null,
+=======
+        "inverseOf": "_MemberToSkills_through_Skill_B",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6616,6 +6625,7 @@
       {
         "defaultValue": null,
         "enums": null,
+<<<<<<< HEAD
         "field": "A",
         "integration": null,
         "inverseOf": null,
@@ -6655,6 +6665,11 @@
         "field": "MembershipSource",
         "integration": null,
         "inverseOf": null,
+=======
+        "field": "MembershipSource_through_A",
+        "integration": null,
+        "inverseOf": "_MembershipSourceToTeams_through_MembershipSource_A",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6671,9 +6686,13 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Team",
+        "field": "Team_through_B",
         "integration": null,
+<<<<<<< HEAD
         "inverseOf": null,
+=======
+        "inverseOf": "_MembershipSourceToTeams_through_Team_B",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6704,6 +6723,7 @@
       {
         "defaultValue": null,
         "enums": null,
+<<<<<<< HEAD
         "field": "A",
         "integration": null,
         "inverseOf": null,
@@ -6743,6 +6763,11 @@
         "field": "Team",
         "integration": null,
         "inverseOf": null,
+=======
+        "field": "Team_through_A",
+        "integration": null,
+        "inverseOf": "_TeamToTechnologies_through_Team_A",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6759,9 +6784,13 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Technology",
+        "field": "Technology_through_B",
         "integration": null,
+<<<<<<< HEAD
         "inverseOf": null,
+=======
+        "inverseOf": "_TeamToTechnologies_through_Technology_B",
+>>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6792,9 +6821,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Project",
+        "field": "Project_through_A",
         "integration": null,
-        "inverseOf": "_contributingTeams",
+        "inverseOf": "_contributingTeams_through_Project_A",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6811,9 +6840,9 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "Team",
+        "field": "Team_through_B",
         "integration": null,
-        "inverseOf": "_contributingTeams",
+        "inverseOf": "_contributingTeams_through_Team_B",
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
