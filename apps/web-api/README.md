@@ -40,9 +40,10 @@ Before running this project, ensure the following software is installed on your 
    Node.js is the JavaScript runtime for server-side scripting in this project. Ensure that a compatible version is installed.  
    [Install Node.js](https://nodejs.org/)
 
-6. **npm (Node Package Manager)**  
+6. **npm (Node Package Manager) and Yarn**  
    npm is included with Node.js and is used for installing dependencies and managing packages.  
    [Learn about npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
+   [Install Yarn](https://classic.yarnpkg.com/lang/en/docs/install/)
 
 7. **NestJS**  
    NestJS is a framework for building efficient, reliable, and scalable server-side applications. It is the primary framework used in this project.  
@@ -68,12 +69,11 @@ If you do not want to log in CloudWatch or do not have the necessary AWS keys, y
 
 | Name | Type | Purpose | Mandatory |
 | - | - | - | - |
-| [Privy](https://www.privy.io/) | External | The hybrid auth solution provider for users to login | Yes |
+| [Privy](https://www.privy.io/) | External | The hybrid auth solution provider for users to login | Yes, for local we have already provided you with a client id, just use that |
 | AWS Cloudwatch logs | External | To store logs | No |
 | AWS S3 | External | To store runtime images like profile pictures | Yes (You can skip it for local development but you will not be able to upload profile images) |
-| AWS SES | External | To send email notifications | Yes |
-| PL Auth service (sandbox mode) | Internal | To manage user auth requests and issue tokens, works in OAuth 2.0 standard | Yes |
-| Redis | External | To cache API results for better performance | Yes |
+| AWS SES | External | To send email notifications | Yes, but you can skip in local by disabling email in .env |
+| PL Auth service | Internal | To manage user auth requests and issue tokens, works in OAuth 2.0 standard | Yes, for local we have provided you with sandbox url |
 | [Google API](https://developers.google.com/maps/documentation/places/web-service/get-api-key) | External | For location-based services | Yes |
 | [Forestadmin](https://www.forestadmin.com/) | External | To manage data directly from/to database. The admin panel for the database | No |
 | Github API Key | External | To get information about projects from Github repo | Yes |
