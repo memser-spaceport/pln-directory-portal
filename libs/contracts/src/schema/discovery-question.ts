@@ -24,7 +24,8 @@ export const DiscoveryQuestionSchema = z.object({
   relatedQuestions: z.any().optional(),
   answerSourceFrom: z.string().optional(),
   createdAt: z.string(),
-  updatedAt: z.string()
+  updatedAt: z.string(),
+  type: z.enum(['CHAT']).optional()
 });
 
 export const CreateDiscoveryQuestionSchema = DiscoveryQuestionSchema.pick({
@@ -42,7 +43,8 @@ export const CreateDiscoveryQuestionSchema = DiscoveryQuestionSchema.pick({
   answer: true,
   relatedQuestions: true,
   answerSources: true,
-  answerSourceFrom:true
+  answerSourceFrom:true,
+  type: true
 });
 
 export const ResponseDiscoveryQuestionSchema = DiscoveryQuestionSchema.omit({ id: true }).strict();
