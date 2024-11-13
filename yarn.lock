@@ -18553,9 +18553,9 @@ markdown-it@^13.0.1:
     uc.micro "^1.0.5"
 
 markdown-to-jsx@^7.1.3:
-  version "7.1.7"
-  resolved "https://registry.npmjs.org/markdown-to-jsx/-/markdown-to-jsx-7.1.7.tgz"
-  integrity sha512-VI3TyyHlGkO8uFle0IOibzpO1c1iJDcXcS/zBrQrXQQvJ2tpdwVzVZ7XdKsyRz1NdRmre4dqQkMZzUHaKIG/1w==
+  version "7.6.1"
+  resolved "https://registry.yarnpkg.com/markdown-to-jsx/-/markdown-to-jsx-7.6.1.tgz#048b872fee1cf78d8c8268e30b5ae28335a58b73"
+  integrity sha512-kZCvhxW70lZQoP3h75piO/CTmDX87jE0aPzw46u7dRZ4AykBYAYbn4Zu3wav0vBzn4PZ8k0kgknVOeEzdBtMPA==
 
 marked-terminal@^5.0.0:
   version "5.1.1"
