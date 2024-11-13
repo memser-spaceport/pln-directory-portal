@@ -170,6 +170,14 @@ Go to the parent folder:
 $ yarn nx serve web-api
 ```
 
+### API Documentation
+
+The API documentation is available at the following URL:
+
+[API Documentation](http://localhost:3000/api/docs)
+
+Visit this link to explore the API endpoints, parameters, and responses.
+
 ### Production Mode
 
 ```sh

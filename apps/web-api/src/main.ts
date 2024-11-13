@@ -23,7 +23,7 @@ export async function bootstrap() {
     .addTag('PL')
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  SwaggerModule.setup('api/docs', app, document);
 
   // Sentry - Error Reporting
   Sentry.init({

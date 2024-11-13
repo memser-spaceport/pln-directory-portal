@@ -34,7 +34,7 @@ const eventFactory = Factory.define<Omit<PLEvent, 'id'>>(
     const endDate = new Date(startDate.getTime() + faker.datatype.number({ min: 1, max: 30 }) * 24 * 60 * 60 * 1000);
 
     return {
-      uid: faker.datatype.uuid(),
+      uid: `uid_${sequence}`,
       type: faker.helpers.arrayElement(['INVITE_ONLY', null]),
       name: faker.company.name(),
       description: faker.lorem.paragraph(),
