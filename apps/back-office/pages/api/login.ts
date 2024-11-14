@@ -28,7 +28,7 @@ export default async function login(req, res) {
       }
     })
     .catch((err) => {
-      console.log('catcherror', err.response.data.statusCode);
+      console.log('catcherror', err);
       if (err?.response?.data?.statusCode === 401) {
         res.status(401).json({ success: false });
       }
