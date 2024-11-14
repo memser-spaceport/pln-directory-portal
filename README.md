@@ -1,6 +1,6 @@
 # Directory Backend
 
-This is the PL Network backend built with [Nest](https://github.com/nestjs/nest), [Prisma](https://www.prisma.io/), and [PostgresSQL](https://www.postgresql.org/). The parent project is generated using [Nx](https://nx.dev/). Check the docs to learn more.
+This is the PL Network backend built with [Nest](https://github.com/nestjs/nest), [Prisma](https://www.prisma.io/), and [PostgreSQL](https://www.postgresql.org/). The parent project is generated using [Nx](https://nx.dev/). Check the docs to learn more.
 
 It is set up in monorepo (soon will be revamped to single microservice pattern) fashion currently hosting directory backend and directory frontend for admin (soon will be revamped).
 
@@ -187,14 +187,14 @@ $ yarn nx build web-api --configuration=production
 ## Test
 
 ```sh
-$ nx run web-api:test
+$ yarn nx run web-api:test
 ```
 To ensure code reliability and functionality, we use the Jest framework for writing and running test cases. Jest provides a robust environment for unit and integration testing, helping maintain the quality and stability of the application.
 
 ## Lint
 
 ```sh
-$ nx run web-api:lint
+$ yarn nx run web-api:lint
 ```
 
 ## Running the Back Office (Admin app)
@@ -217,6 +217,10 @@ $ yarn nx serve back-office
 Application will be available at http://localhost:4201, port 4201 is set in project.json file in back-office app.
 
 Use the username and password you set in the environment variables above to log in to the back office app.
+
+### Commit Guidelines
+
+Refer [here] (./docs/GUIDELINES_COMMIT.md)
 
 ### Contributing Guidelines
 
