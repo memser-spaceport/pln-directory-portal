@@ -125,8 +125,10 @@ export class PLEventGuestsService {
       const { type, filteredEvents } = query;
       if (type === "upcoming") {
         events = await this.eventLocationsService.getUpcomingEventsByLocation(locationUid);
-      } else {
+      } else if (type === "past") {
         events = await this.eventLocationsService.getPastEventsByLocation(locationUid);  
+      } else {
+        events = (await this.eventLocationsService.getPLEventLocationByUid(locationUid)).events;
       }
       events = await this.filterEventsByAttendanceAndAdminStatus(filteredEvents, events, member);
       if (events.length === 0) 
@@ -657,8 +659,10 @@ export class PLEventGuestsService {
       let events;
       if (type === "upcoming") {
         events = await this.eventLocationsService.getUpcomingEventsByLocation(locationUid);
-      } else {
+      } else if (type === "past") {
         events = await this.eventLocationsService.getPastEventsByLocation(locationUid);
+      } else {
+        events = (await this.eventLocationsService.getPLEventLocationByUid(locationUid)).events;
       }
       let uniqueTopics = await this.prisma.pLEventGuest.findMany({
         where: {
@@ -714,8 +718,10 @@ export class PLEventGuestsService {
       let events;
       if (type === "upcoming") {
         events = await this.eventLocationsService.getUpcomingEventsByLocation(locationUid);
-      } else {
+      } else if (type === "past") {
         events = await this.eventLocationsService.getPastEventsByLocation(locationUid);
+      } else {
+        events = (await this.eventLocationsService.getPLEventLocationByUid(locationUid)).events;
       }
       const result = await this.prisma.pLEventGuest.findMany({
         where: {
