@@ -183,7 +183,7 @@ export class PLEventGuestsService {
     query: Prisma.PLEventGuestFindManyArgs
   ) {
     try {
-      const events = await this.eventLocationsService.getUpcomingEventsByLocation(locationUid);
+      const events = (await this.eventLocationsService.getPLEventLocationByUid(locationUid)).events;
       return await this.prisma.pLEventGuest.findMany({
         where: {
           eventUid: {
