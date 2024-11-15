@@ -1121,15 +1121,9 @@
       {
         "defaultValue": null,
         "enums": null,
-<<<<<<< HEAD
-        "field": "Teams",
-        "integration": null,
-        "inverseOf": "IndustryTags",
-=======
         "field": "_IndustryTagToTeams_through_IndustryTag_A",
         "integration": null,
         "inverseOf": "IndustryTag_through_A",
->>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -1823,28 +1817,7 @@
       {
         "defaultValue": null,
         "enums": null,
-<<<<<<< HEAD
-        "field": "Skills",
-        "integration": null,
-        "inverseOf": "Members",
-        "isFilterable": false,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": false,
-        "isSortable": false,
-        "isVirtual": false,
-        "reference": "Skill.id",
-        "relationship": "BelongsToMany",
-        "type": ["Number"],
-        "validations": []
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "TeamFocusAreaVersionHistories",
-=======
         "field": "TeamFocusAreaVersionHistories_through_Member_modifiedBy",
->>>>>>> bedf0149 (fix: code revert fixed)
         "integration": null,
         "inverseOf": "Member_through_modifiedBy",
         "isFilterable": false,
@@ -1912,13 +1885,7 @@
       {
         "defaultValue": null,
         "enums": null,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-        "field": "_MemberToSkills",
-=======
         "field": "_MemberToSkills_through_Member_A",
->>>>>>> bedf0149 (fix: code revert fixed)
         "integration": null,
         "inverseOf": "Member_through_A",
         "isFilterable": false,
@@ -1935,7 +1902,6 @@
       {
         "defaultValue": null,
         "enums": null,
->>>>>>> 423ca54d (feat: team e2e test-cases done)
         "field": "airtableRecId",
         "integration": null,
         "inverseOf": null,
@@ -3165,15 +3131,9 @@
       {
         "defaultValue": null,
         "enums": null,
-<<<<<<< HEAD
-        "field": "Teams",
-        "integration": null,
-        "inverseOf": "MembershipSources",
-=======
         "field": "_MembershipSourceToTeams_through_MembershipSource_A",
         "integration": null,
         "inverseOf": "MembershipSource_through_A",
->>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5063,15 +5023,9 @@
       {
         "defaultValue": null,
         "enums": null,
-<<<<<<< HEAD
-        "field": "Members",
-        "integration": null,
-        "inverseOf": "Skills",
-=======
         "field": "_MemberToSkills_through_Skill_B",
         "integration": null,
         "inverseOf": "Skill_through_B",
->>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -5247,28 +5201,7 @@
       {
         "defaultValue": null,
         "enums": null,
-<<<<<<< HEAD
-        "field": "IndustryTags",
-        "integration": null,
-        "inverseOf": "Teams",
-        "isFilterable": false,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": false,
-        "isSortable": false,
-        "isVirtual": false,
-        "reference": "IndustryTag.id",
-        "relationship": "BelongsToMany",
-        "type": ["Number"],
-        "validations": []
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "Member",
-=======
         "field": "Member_through_lastModifiedBy",
->>>>>>> bedf0149 (fix: code revert fixed)
         "integration": null,
         "inverseOf": "Teams_through_Member_lastModifiedBy",
         "isFilterable": true,
@@ -5285,28 +5218,7 @@
       {
         "defaultValue": null,
         "enums": null,
-<<<<<<< HEAD
-        "field": "MembershipSources",
-        "integration": null,
-        "inverseOf": "Teams",
-        "isFilterable": false,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": false,
-        "isSortable": false,
-        "isVirtual": false,
-        "reference": "MembershipSource.id",
-        "relationship": "BelongsToMany",
-        "type": ["Number"],
-        "validations": []
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "PLEventGuests",
-=======
         "field": "PLEventGuests_through_Team_teamUid",
->>>>>>> bedf0149 (fix: code revert fixed)
         "integration": null,
         "inverseOf": "Team_through_teamUid",
         "isFilterable": false,
@@ -5391,25 +5303,15 @@
       {
         "defaultValue": null,
         "enums": null,
-<<<<<<< HEAD
-        "field": "Technologies",
-        "integration": null,
-        "inverseOf": "Teams",
-=======
         "field": "_IndustryTagToTeams_through_Team_B",
         "integration": null,
         "inverseOf": "Team_through_B",
->>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
         "isRequired": false,
         "isSortable": false,
         "isVirtual": false,
-<<<<<<< HEAD
-        "reference": "Technology.id",
-        "relationship": "BelongsToMany",
-=======
         "reference": "_IndustryTagToTeam.id",
         "relationship": "HasMany",
         "type": ["Number"],
@@ -5446,7 +5348,6 @@
         "isVirtual": false,
         "reference": "_TeamToTechnology.id",
         "relationship": "HasMany",
->>>>>>> bedf0149 (fix: code revert fixed)
         "type": ["Number"],
         "validations": []
       },
@@ -6256,15 +6157,9 @@
       {
         "defaultValue": null,
         "enums": null,
-<<<<<<< HEAD
-        "field": "Teams",
-        "integration": null,
-        "inverseOf": "Technologies",
-=======
         "field": "_TeamToTechnologies_through_Technology_B",
         "integration": null,
         "inverseOf": "Technology_through_B",
->>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": false,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6377,51 +6272,9 @@
       {
         "defaultValue": null,
         "enums": null,
-<<<<<<< HEAD
-        "field": "A",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": true,
-        "isReadOnly": true,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Number",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "B",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": true,
-        "isReadOnly": true,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Number",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "IndustryTag",
-        "integration": null,
-        "inverseOf": null,
-=======
         "field": "IndustryTag_through_A",
         "integration": null,
         "inverseOf": "_IndustryTagToTeams_through_IndustryTag_A",
->>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6440,11 +6293,7 @@
         "enums": null,
         "field": "Team_through_B",
         "integration": null,
-<<<<<<< HEAD
-        "inverseOf": null,
-=======
         "inverseOf": "_IndustryTagToTeams_through_Team_B",
->>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6527,51 +6376,9 @@
       {
         "defaultValue": null,
         "enums": null,
-<<<<<<< HEAD
-        "field": "A",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": true,
-        "isReadOnly": true,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Number",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "B",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": true,
-        "isReadOnly": true,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Number",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "Member",
-        "integration": null,
-        "inverseOf": null,
-=======
         "field": "Member_through_A",
         "integration": null,
         "inverseOf": "_MemberToSkills_through_Member_A",
->>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6590,11 +6397,7 @@
         "enums": null,
         "field": "Skill_through_B",
         "integration": null,
-<<<<<<< HEAD
-        "inverseOf": null,
-=======
         "inverseOf": "_MemberToSkills_through_Skill_B",
->>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6625,51 +6428,9 @@
       {
         "defaultValue": null,
         "enums": null,
-<<<<<<< HEAD
-        "field": "A",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": true,
-        "isReadOnly": true,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Number",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "B",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": true,
-        "isReadOnly": true,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Number",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "MembershipSource",
-        "integration": null,
-        "inverseOf": null,
-=======
         "field": "MembershipSource_through_A",
         "integration": null,
         "inverseOf": "_MembershipSourceToTeams_through_MembershipSource_A",
->>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6688,11 +6449,7 @@
         "enums": null,
         "field": "Team_through_B",
         "integration": null,
-<<<<<<< HEAD
-        "inverseOf": null,
-=======
         "inverseOf": "_MembershipSourceToTeams_through_Team_B",
->>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6723,51 +6480,9 @@
       {
         "defaultValue": null,
         "enums": null,
-<<<<<<< HEAD
-        "field": "A",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": true,
-        "isReadOnly": true,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Number",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "B",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": true,
-        "isPrimaryKey": true,
-        "isReadOnly": true,
-        "isRequired": true,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Number",
-        "validations": [
-          {"type": "is present", "message": "Failed validation rule: 'Present'"}
-        ]
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "Team",
-        "integration": null,
-        "inverseOf": null,
-=======
         "field": "Team_through_A",
         "integration": null,
         "inverseOf": "_TeamToTechnologies_through_Team_A",
->>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
@@ -6786,11 +6501,7 @@
         "enums": null,
         "field": "Technology_through_B",
         "integration": null,
-<<<<<<< HEAD
-        "inverseOf": null,
-=======
         "inverseOf": "_TeamToTechnologies_through_Technology_B",
->>>>>>> bedf0149 (fix: code revert fixed)
         "isFilterable": true,
         "isPrimaryKey": false,
         "isReadOnly": false,
