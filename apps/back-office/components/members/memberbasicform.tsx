@@ -1,4 +1,4 @@
-import { InputField, ProfileImageUpload } from '@protocol-labs-network/ui';
+import { InputField, ProfileImageUpload, TextArea } from '@protocol-labs-network/ui';
 import { UserIcon } from '@heroicons/react/solid';
 import { ReactComponent as InformationCircleIcon } from '../../public/assets/icons/info_icon.svg';
 
@@ -135,6 +135,18 @@ export default function AddMemberBasicForm(props) {
             className="custom-grey custom-outline-none border"
           />
         </div>
+      </div>
+
+      <div className="inputfield pt-5">
+        <TextArea
+          name="bio"
+          onChange={onChange}
+          disabled={!props.isEditEnabled}
+          maxLength={1000}
+          value={values.bio}
+          label="Bio"
+          className="custom-grey custom-outline-none min-h-[60px] border"
+        />
       </div>
     </>
   );

@@ -66,4 +66,5 @@ export interface IFormValues {
   skills: Skill[];
   openToWork: boolean;
   projectContributions: IProjectContribution[];
+  bio: string;
 }
