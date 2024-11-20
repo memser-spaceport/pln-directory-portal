@@ -9,6 +9,15 @@ import { getAPIVersionAsPath } from '../utils/versioned-path';
 const contract = initContract();
 
 export const apiTeam = contract.router({
+  teamFilters: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/teams/filter`,
+    query: TeamQueryParams,
+    responses: {
+      200: contract.response<any>(),
+    },
+    summary: 'filter teams',
+  },
   getTeams: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/teams`,
