@@ -71,7 +71,7 @@ export class MemberController {
    * @returns Array of roles with member counts
    */
   @Api(server.route.getMemberRoles)
-  async getMemberFilters(@Req() request: Request) {
+  async getMemberRoleFilters(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
@@ -88,6 +88,33 @@ export class MemberController {
       ],
     };
     return await this.membersService.getRolesWithCount(builtQuery, queryParams);
+  }
+  
+  /**
+   * Retrieves member filters.
+   * 
+   * @param request - HTTP request object containing query parameters
+   * @returns return list of member filters.
+   */
+  @Api(server.route.getMemberFilters)
+  async getMembersFilter(@Req() request: Request) {
+    const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
+    const queryParams = request.query;
+    const builder = new PrismaQueryBuilder(queryableFields);
+    const builtQuery = builder.build(queryParams);
+    const { name__icontains } = queryParams;
+    if (name__icontains) {
+      delete builtQuery.where?.name;
+    }
+    builtQuery.where = {
+      AND: [
+        builtQuery.where,
+        this.membersService.buildNameFilters(queryParams),
+        this.membersService.buildRoleFilters(queryParams),
+        this.membersService.buildRecentMembersFilter(queryParams)
+      ],
+    };
+    return await this.membersService.getMemberFilters(builtQuery);
   }
 
   /**

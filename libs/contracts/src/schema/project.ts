@@ -1,5 +1,7 @@
-import { createZodDto } from 'nestjs-zod';
-import { z } from 'nestjs-zod/z';
+import { createZodDto } from '@abitia/zod-dto';
+import { z } from 'zod';
+import { ResponseTeamWithRelationsSchema } from './team';
+import { ResponseMemberWithRelationsSchema } from './member';
 
 const TypeEnum = z.enum(['MAINTENER', 'COLLABORATOR']);
 
@@ -40,11 +42,16 @@ const ProjectSchema = z.object({
     uid: z.string(), 
     title: z.string() 
   }).array().optional(),
-  contributions: ContributionSchema.array().optional()
+  contributions: ContributionSchema.array().optional(),
+  isDeleted: z.boolean().default(false)
 });
 
 export const ResponseProjectSchema = ProjectSchema.omit({ id: true }).strict();
-export const ResponseProjectWithRelationsSchema = ProjectSchema.extend({});
+export const ResponseProjectWithRelationsSchema = ResponseProjectSchema.extend({
+  maintainingTeam: ResponseTeamWithRelationsSchema.optional(),
+  contributingTeams: ResponseTeamWithRelationsSchema.array().optional(),
+  creator: ResponseMemberWithRelationsSchema.optional()
+});
 export const ResponseProjectSuccessSchema = z.object({ success: z.boolean()});
 // omit score and id to avoid update from request
 export class UpdateProjectDto extends createZodDto(ProjectSchema.partial().omit({ id:true, score: true })) {}

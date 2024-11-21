@@ -91,27 +91,6 @@ export class ProjectsService {
 
   async getProjects(queryOptions: Prisma.ProjectFindManyArgs) {
     try {
-      queryOptions.where = {
-        ...queryOptions.where,
-        isDeleted: false
-      };
-      queryOptions.include = {
-        contributions: {
-          select: {
-            uid: true,
-            member: {
-              select: {
-                uid: true,
-                name: true,
-                image: true
-              }
-            }
-          }
-        },
-        maintainingTeam: { select: { uid: true, name: true, logo: true } },
-        creator: { select: { uid: true, name: true, image: true } },
-        logo: true
-      };
       return await this.prisma.project.findMany(queryOptions);
     } catch (err) {
       this.handleErrors(err);
