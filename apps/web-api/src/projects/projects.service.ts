@@ -12,20 +12,20 @@ export class ProjectsService {
     private memberService: MembersService,
     private logger: LogService,
     @Inject(CACHE_MANAGER) private cacheService: Cache
-  ) {}
+  ) { }
 
   async createProject(project: Prisma.ProjectUncheckedCreateInput, userEmail: string) {
     try {
-      const member:any = await this.getMemberInfo(userEmail);
-      const { contributingTeams, contributions, focusAreas} : any = project;
+      const member: any = await this.getMemberInfo(userEmail);
+      const { contributingTeams, contributions, focusAreas }: any = project;
       project.createdBy = member.uid;
-      project['projectFocusAreas'] = {...await this.createProjectWithFocusAreas(focusAreas, this.prisma)};
+      project['projectFocusAreas'] = { ...await this.createProjectWithFocusAreas(focusAreas, this.prisma) };
       delete project['focusAreas'];
       const result = await this.prisma.project.create({
         data: {
           ...project,
           contributingTeams: {
-            connect: contributingTeams?.map(team => { return { uid: team.uid }})
+            connect: contributingTeams?.map(team => { return { uid: team.uid } })
           },
           contributions: {
             create: contributions?.map((contribution) => {
@@ -36,7 +36,7 @@ export class ProjectsService {
       });
       await this.cacheService.reset();
       return result;
-    } catch(err) {
+    } catch (err) {
       this.handleErrors(err);
     }
   }
@@ -47,13 +47,13 @@ export class ProjectsService {
     userEmail: string
   ) {
     try {
-      const member:any = await this.getMemberInfo(userEmail);
-      const existingData:any = await this.getProjectByUid(uid);
+      const member: any = await this.getMemberInfo(userEmail);
+      const existingData: any = await this.getProjectByUid(uid);
       const contributingTeamsUid = existingData?.contributingTeams?.map(team => team.uid) || [];
       await this.isMemberAllowedToEdit(member, [existingData?.maintainingTeamUid, ...contributingTeamsUid], existingData);
-      const { contributingTeams, contributions, focusAreas } : any = project;
-      const contributionsToCreate:any = [];
-      const contributionUidsToDelete:any = [];
+      const { contributingTeams, contributions, focusAreas }: any = project;
+      const contributionsToCreate: any = [];
+      const contributionUidsToDelete: any = [];
       contributions?.map((contribution) => {
         if (!contribution.uid) {
           contributionsToCreate.push(contribution);
@@ -62,8 +62,8 @@ export class ProjectsService {
           contributionUidsToDelete.push({ uid: contribution.uid });
         }
       });
-      return await this.prisma.$transaction(async(tx) => {
-        project['projectFocusAreas'] = {...await this.updateProjectWithFocusAreas(uid, focusAreas, tx)};
+      return await this.prisma.$transaction(async (tx) => {
+        project['projectFocusAreas'] = { ...await this.updateProjectWithFocusAreas(uid, focusAreas, tx) };
         delete project['focusAreas'];
         const result = await tx.project.update({
           where: {
@@ -72,8 +72,8 @@ export class ProjectsService {
           data: {
             ...project,
             contributingTeams: {
-              disconnect: contributingTeamsUid?.map(uid => { return { uid }}),
-              connect: contributingTeams?.map(team => { return { uid: team.uid }}) || []
+              disconnect: contributingTeamsUid?.map(uid => { return { uid } }),
+              connect: contributingTeams?.map(team => { return { uid: team.uid } }) || []
             },
             contributions: {
               create: contributionsToCreate,
@@ -84,7 +84,7 @@ export class ProjectsService {
         await this.cacheService.reset();
         return result;
       });
-    } catch(err) {
+    } catch (err) {
       this.handleErrors(err, `${uid}`);
     }
   }
@@ -96,24 +96,24 @@ export class ProjectsService {
         isDeleted: false
       };
       queryOptions.include = {
-        contributions: { 
-          select: { 
+        contributions: {
+          select: {
             uid: true,
-            member: { 
-              select: { 
-                uid: true, 
-                name: true, 
+            member: {
+              select: {
+                uid: true,
+                name: true,
                 image: true
               }
             }
           }
-        }, 
-        maintainingTeam: { select: { uid: true, name: true, logo: true }},
-        creator: { select: { uid: true, name: true, image: true }},
+        },
+        maintainingTeam: { select: { uid: true, name: true, logo: true } },
+        creator: { select: { uid: true, name: true, image: true } },
         logo: true
       };
       return await this.prisma.project.findMany(queryOptions);
-    } catch(err) {
+    } catch (err) {
       this.handleErrors(err);
     }
   }
@@ -125,23 +125,23 @@ export class ProjectsService {
       const project = await this.prisma.project.findUniqueOrThrow({
         where: { uid },
         include: {
-          maintainingTeam: { select: { uid: true, name: true, logo: true }},
-          contributingTeams: { select: { uid: true, name: true, logo: true }},
-          contributions: { 
-            select: { 
+          maintainingTeam: { select: { uid: true, name: true, logo: true } },
+          contributingTeams: { select: { uid: true, name: true, logo: true } },
+          contributions: {
+            select: {
               uid: true,
-              member: { 
-                select: { 
-                  uid: true, 
-                  name: true, 
-                  image: true ,
-                  teamMemberRoles:{
-                    select:{
-                      mainTeam:true,
-                      teamLead:true,
-                      role:true,
-                      team:{
-                        select:{
+              member: {
+                select: {
+                  uid: true,
+                  name: true,
+                  image: true,
+                  teamMemberRoles: {
+                    select: {
+                      mainTeam: true,
+                      teamLead: true,
+                      role: true,
+                      team: {
+                        select: {
                           uid: true,
                           name: true
                         }
@@ -149,18 +149,18 @@ export class ProjectsService {
                     }
                   }
                 }
-              }, 
+              },
               projectUid: true
             }
           },
-          creator: { select: { uid: true, name: true, image: true }},
+          creator: { select: { uid: true, name: true, image: true } },
           logo: true,
           projectFocusAreas: {
             select: {
               focusArea: {
                 select: {
                   uid: true,
-                  title: true 
+                  title: true
                 }
               }
             }
@@ -169,7 +169,7 @@ export class ProjectsService {
       });
       project['projectFocusAreas'] = this.removeDuplicateFocusAreas(project?.projectFocusAreas);
       return project;
-    } catch(err) {
+    } catch (err) {
       this.handleErrors(err, `${uid}`);
     }
   }
@@ -178,7 +178,7 @@ export class ProjectsService {
     uid: string,
     userEmail: string
   ) {
-    const member:any = await this.getMemberInfo(userEmail);
+    const member: any = await this.getMemberInfo(userEmail);
     const existingData = await this.getProjectByUid(uid);
     await this.isMemberAllowedToDelete(member, existingData);
     try {
@@ -188,7 +188,7 @@ export class ProjectsService {
       });
       await this.cacheService.reset();
       return result;
-    } catch(err) {
+    } catch (err) {
       this.handleErrors(err, `${uid}`);
     }
   }
@@ -216,7 +216,7 @@ export class ProjectsService {
     return await this.memberService.findMemberByEmail(memberEmail)
   };
 
-  async isMemberAllowedToEdit(member, teams, project ) {
+  async isMemberAllowedToEdit(member, teams, project) {
     const res = await this.memberService.isMemberPartOfTeams(member, teams);
     if (res || this.memberService.checkIfAdminUser(member) || member.uid === project.createdBy) {
       return true;
@@ -236,7 +236,7 @@ export class ProjectsService {
 
   async createProjectWithFocusAreas(focusAreas, transaction) {
     if (focusAreas && focusAreas.length) {
-      const projectFocusAreas:any = [];
+      const projectFocusAreas: any = [];
       const focusAreaHierarchies = await transaction.focusAreaHierarchy.findMany({
         where: {
           subFocusAreaUid: {
@@ -261,7 +261,7 @@ export class ProjectsService {
           data: projectFocusAreas
         }
       }
-     }
+    }
   }
 
   async isFocusAreaModified(projectId, focusAreas, transaction) {
@@ -275,10 +275,10 @@ export class ProjectsService {
 
     if (newFocusAreaUIds.length !== focusAreasUIds.length) {
       return true;
-    } 
+    }
 
     if (projectFocusAreas.length === 0 && focusAreas.length === 0) {
-      return false 
+      return false
     }
     return !focusAreasUIds.every(area => newFocusAreaUIds.includes(area));
   }
@@ -309,7 +309,7 @@ export class ProjectsService {
       return {
         projectFocusAreas: {
           some: {
-            ancestorArea:{
+            ancestorArea: {
               title: {
                 in: focusAreas?.split(',')
               }
@@ -324,56 +324,56 @@ export class ProjectsService {
   removeDuplicateFocusAreas(focusAreas): any {
     const uniqueFocusAreas = {};
     focusAreas.forEach(item => {
-        const uid = item.focusArea.uid;
-        const title = item.focusArea.title;
-        uniqueFocusAreas[uid] = { uid, title };
+      const uid = item.focusArea.uid;
+      const title = item.focusArea.title;
+      uniqueFocusAreas[uid] = { uid, title };
     });
     return Object.values(uniqueFocusAreas);
   }
 
-  buildProjectFilter(query){
-    const { 
+  buildProjectFilter(query) {
+    const {
       name,
       lookingForFunding,
       team
     } = query;
-    const filter:any = [{
+    const filter: any = [{
       isDeleted: false
     }];
     this.buildNameFilter(name, filter);
     this.buildFundingFilter(lookingForFunding, filter);
     this.buildMaintainingTeamFilter(team, filter);
     this.buildRecentProjectsFilter(query, filter);
-    return { 
+    return {
       AND: filter
     };
   }
 
   buildNameFilter(name, filter) {
     if (name) {
-      filter.push({ 
+      filter.push({
         name: {
           contains: name,
           mode: 'insensitive'
         }
       });
-    }  
+    }
   }
 
   buildFundingFilter(funding, filter) {
     if (funding === "true") {
-      filter.push({ 
+      filter.push({
         lookingForFunding: true
       });
-    } 
+    }
   }
 
   buildMaintainingTeamFilter(team, filter) {
     if (team) {
-      filter.push({ 
+      filter.push({
         maintainingTeamUid: team
       });
-    } 
+    }
   }
 
   /**
@@ -388,7 +388,7 @@ export class ProjectsService {
    * @returns The constructed query with a 'createdAt' filter if 'is_recent' is 'true',
    *          or an empty object if 'is_recent' is not provided or set to 'false'.
    */
-  buildRecentProjectsFilter(queryParams, filter?) { 
+  buildRecentProjectsFilter(queryParams, filter?) {
     const { isRecent } = queryParams;
     const recentFilter = {
       createdAt: {
@@ -397,10 +397,35 @@ export class ProjectsService {
     };
     if (isRecent === 'true' && !filter) {
       return recentFilter;
-    } 
+    }
     if (isRecent === 'true' && filter) {
       filter.push(recentFilter);
     }
     return {};
+  }
+
+  /**
+   * Fetches team names that maintain atleast a single project.
+   * 
+   * @returns Set of team names.
+   */
+  async getProjectFilters() {
+    const maintainingTeams = await this.prisma.team.findMany({
+      where: {
+        maintainingProjects: {
+          some: {},
+        }
+      },
+      select: {
+        uid: true,
+        name: true,
+        logo: {
+          select: {
+            url: true
+          }
+        }
+      }
+    })
+    return { maintainedBy: maintainingTeams.map((team) => ({ uid: team.uid, name: team.name, logo: team.logo?.url })) };
   }
 }

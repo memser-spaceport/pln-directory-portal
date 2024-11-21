@@ -19,7 +19,13 @@ type RouteShape = typeof server.routeShapes;
 
 @Controller()
 export class ProjectsController {
-  constructor(private readonly projectsService: ProjectsService) {}
+  constructor(private readonly projectsService: ProjectsService) { }
+
+  @Api(server.route.getProjectFilters)
+  @NoCache()
+  async getProjectFilters() {
+    return await this.projectsService.getProjectFilters();
+  }
 
   @Api(server.route.createProject)
   @UsePipes(ZodValidationPipe)
@@ -40,7 +46,7 @@ export class ProjectsController {
   ) {
     return this.projectsService.updateProjectByUid(uid, body as any, request.userEmail);
   }
-  
+
   @Api(server.route.getProjects)
   @ApiOkResponseFromZod(ResponseProjectWithRelationsSchema.array())
   async findAll(@Req() req) {
@@ -49,7 +55,7 @@ export class ProjectsController {
     );
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(req.query);
-    const { focusAreas } : any = req.query;
+    const { focusAreas }: any = req.query;
     builtQuery.where = {
       AND: [
         builtQuery.where ? builtQuery.where : {},
@@ -82,4 +88,5 @@ export class ProjectsController {
   ) {
     return this.projectsService.removeProjectByUid(uid, request.userEmail);
   }
+
 }
