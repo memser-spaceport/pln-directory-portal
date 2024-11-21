@@ -28,6 +28,15 @@ export const apiMembers = contract.router({
     },
     summary: 'Get member roles',
   },
+  getMemberFilters: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members/filters`,
+    query: MemberQueryParams,
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Get member filter values',
+  },
   getMember: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/members/:uid`,

@@ -1293,6 +1293,55 @@ export class MembersService {
   }
 
   /**
+   * Fetches filter tags for members for facilitating easy searching.
+   * @param queryParams HTTP request query params object 
+   * @returns Set of skills, locations that contain at least one member.
+   */
+  async getMemberFilters(queryParams) {
+    // Fetch unique skills
+    const skills = await this.prisma.skill.findMany({
+      where: {
+        members: {
+          some: { ...queryParams.where },
+        },
+      },
+      select: {
+        title: true,
+      },
+    });
+
+    // Fetch unique locations
+    const locations = await this.prisma.location.findMany({
+      where: {
+        members: {
+          some: { ...queryParams.where },
+        },
+      },
+      select: {
+        city: true,
+        continent: true,
+        country: true,
+        region: true,
+      },
+    });
+
+    // Deduplicate cities, countries, and regions using Set
+    const uniqueCities = [...new Set(locations.map((location) => location.city).filter(Boolean))];
+    const uniqueCountries = [...new Set(locations.map((location) => location.country).filter(Boolean))];
+    const uniqueRegions = [...new Set(locations.map((location) => location.region).filter(Boolean))];
+
+    // Return deduplicated skills and locations
+    return {
+      skills: skills.map((skill) => skill.title),
+      cities: uniqueCities,
+      countries: uniqueCountries,
+      regions: uniqueRegions,
+    };
+  }
+
+  
+
+  /**
    * Updates the member's field if the value has changed.
    * 
    * @param member - The member object to check for updates.
