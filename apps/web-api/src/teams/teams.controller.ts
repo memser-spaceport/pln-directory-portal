@@ -18,24 +18,22 @@ import { TeamsService } from './teams.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
-import { request } from 'http';
 
 const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
 @Controller()
 export class TeamsController {
-  constructor(private readonly teamsService: TeamsService) {}
+  constructor(private readonly teamsService: TeamsService) { }
 
   @Api(server.route.teamFilters)
   @ApiQueryFromZod(TeamQueryParams)
-  @NoCache()
   async getTeamFilters(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(
       ResponseTeamWithRelationsSchema
     );
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
-    const { focusAreas } : any = request.query;
+    const { focusAreas }: any = request.query;
     builtQuery.where = {
       AND: [
         builtQuery.where ? builtQuery.where : {},
@@ -56,7 +54,7 @@ export class TeamsController {
     );
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
-    const { focusAreas } : any = request.query;
+    const { focusAreas }: any = request.query;
     builtQuery.where = {
       AND: [
         builtQuery.where ? builtQuery.where : {},

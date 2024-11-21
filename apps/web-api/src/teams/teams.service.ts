@@ -732,11 +732,10 @@ export class TeamsService {
       this.prisma.industryTag.findMany({
         where: {
           teams: {
-            some: {...queryParams.where},
+            some: { ...queryParams.where },
           },
         },
         select: {
-          uid: true,
           title: true,
         },
       }),
@@ -744,11 +743,10 @@ export class TeamsService {
       this.prisma.membershipSource.findMany({
         where: {
           teams: {
-            some: {...queryParams.where},
+            some: { ...queryParams.where },
           },
         },
         select: {
-          uid: true,
           title: true,
         },
       }),
@@ -756,11 +754,10 @@ export class TeamsService {
       this.prisma.fundingStage.findMany({
         where: {
           teams: {
-            some: {...queryParams.where},
+            some: { ...queryParams.where },
           },
         },
         select: {
-          uid: true,
           title: true,
         },
       }),
@@ -768,20 +765,19 @@ export class TeamsService {
       this.prisma.technology.findMany({
         where: {
           teams: {
-            some: {...queryParams.where},
+            some: { ...queryParams.where },
           },
         },
         select: {
-          uid: true,
           title: true,
         },
       }),
     ]);
     return {
-      industryTags: industryTags.map((tag) => ({ uid: tag.uid, title: tag.title })),
-      membershipSources: membershipSources.map((source) => ({ uid: source.uid, title: source.title })),
-      fundingStages: fundingStages.map((stage) => ({ uid: stage.uid, title: stage.title })),
-      technologies: technologies.map((tech) =>({ uid: tech.uid, title: tech.title })),
+      industryTags: industryTags.map((tag) => tag.title),
+      membershipSources: membershipSources.map((source) => source.title),
+      fundingStages: fundingStages.map((stage) => stage.title),
+      technologies: technologies.map((tech) => tech.title),
     };
   }
 }

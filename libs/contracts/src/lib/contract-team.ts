@@ -11,7 +11,7 @@ const contract = initContract();
 export const apiTeam = contract.router({
   teamFilters: {
     method: 'GET',
-    path: `${getAPIVersionAsPath('1')}/teams/filter`,
+    path: `${getAPIVersionAsPath('1')}/teams/filters`,
     query: TeamQueryParams,
     responses: {
       200: contract.response<any>(),
