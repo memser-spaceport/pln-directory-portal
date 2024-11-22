@@ -46,9 +46,13 @@ export class TeamsService {
    *   (filter, pagination, sorting, etc.)
    * @returns A list of teams that match the query options
    */
-  async findAll(queryOptions: Prisma.TeamFindManyArgs): Promise<Team[]> {
+  async findAll(queryOptions: Prisma.TeamFindManyArgs): Promise<{ count: Number, teams: Team[] }> {
     try {
-      return this.prisma.team.findMany({ ...queryOptions });
+      const [teams, teamsCount] = await Promise.all([
+        this.prisma.team.findMany(queryOptions),
+        this.prisma.team.count({ where: queryOptions.where }),
+      ]);
+      return { count: teamsCount, teams: teams };
     } catch (err) {
       return this.handleErrors(err);
     }
