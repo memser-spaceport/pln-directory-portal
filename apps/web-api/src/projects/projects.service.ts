@@ -91,7 +91,11 @@ export class ProjectsService {
 
   async getProjects(queryOptions: Prisma.ProjectFindManyArgs) {
     try {
-      return await this.prisma.project.findMany(queryOptions);
+      const [projects, projectsCount] = await Promise.all([
+        this.prisma.project.findMany(queryOptions),
+        this.prisma.project.count({ where: queryOptions.where }),
+      ]);
+      return { count: projectsCount, projects: projects }
     } catch (err) {
       this.handleErrors(err);
     }

@@ -47,7 +47,6 @@ export class TeamsController {
   @Api(server.route.getTeams)
   @ApiQueryFromZod(TeamQueryParams)
   @ApiOkResponseFromZod(ResponseTeamWithRelationsSchema.array())
-  @NoCache()
   findAll(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(
       ResponseTeamWithRelationsSchema

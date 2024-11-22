@@ -75,9 +75,13 @@ export class MembersService {
    *                       the members. These options are based on Prisma's `MemberFindManyArgs`.
    * @returns A promise that resolves to an array of member records matching the query criteria.
    */
-  async findAll(queryOptions: Prisma.MemberFindManyArgs): Promise<Member[]> {
+  async findAll(queryOptions: Prisma.MemberFindManyArgs): Promise<{count:Number, members:Member[]}> {
     try {
-      return await this.prisma.member.findMany(queryOptions);
+      const [members, membersCount] = await Promise.all([
+        this.prisma.member.findMany(queryOptions),
+        this.prisma.member.count({ where: queryOptions.where }),
+      ]);
+      return { count: membersCount, members: members }
     } catch(error) {
       return this.handleErrors(error);
     }
