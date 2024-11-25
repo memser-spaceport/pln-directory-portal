@@ -178,6 +178,9 @@ export class MembersService {
           formattedDefaultRoles.push({ ...defaultRole, count: 0 });
         }
       });
+      if (!searchTerm) {
+        return formattedDefaultRoles;
+      }
       const result: any = await this.getRoleCountForExcludedAndNonSelectedRoles(selectedRoles, members, searchTerm);
       return [...formattedDefaultRoles, ...result];
     } catch (error) {
@@ -1302,7 +1305,6 @@ export class MembersService {
    * @returns Set of skills, locations that contain at least one member.
    */
   async getMemberFilters(queryParams) {
-    // Fetch unique skills
     const skills = await this.prisma.skill.findMany({
       where: {
         members: {
@@ -1313,8 +1315,6 @@ export class MembersService {
         title: true,
       },
     });
-
-    // Fetch unique locations
     const locations = await this.prisma.location.findMany({
       where: {
         members: {
@@ -1326,13 +1326,15 @@ export class MembersService {
         continent: true,
         country: true,
         region: true,
+        metroArea: true
       },
     });
 
     // Deduplicate cities, countries, and regions using Set
     const uniqueCities = [...new Set(locations.map((location) => location.city).filter(Boolean))];
     const uniqueCountries = [...new Set(locations.map((location) => location.country).filter(Boolean))];
-    const uniqueRegions = [...new Set(locations.map((location) => location.region).filter(Boolean))];
+    const uniqueRegions = [...new Set(locations.map((location) => location.continent).filter(Boolean))];
+    const uniqueMetroAreas = [...new Set(locations.map((location) => location.metroArea).filter(Boolean))];
 
     // Return deduplicated skills and locations
     return {
@@ -1340,6 +1342,7 @@ export class MembersService {
       cities: uniqueCities,
       countries: uniqueCountries,
       regions: uniqueRegions,
+      metroAreas: uniqueMetroAreas
     };
   }
 

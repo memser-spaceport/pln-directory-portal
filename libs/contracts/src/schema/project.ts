@@ -2,6 +2,7 @@ import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
 import { ResponseTeamWithRelationsSchema } from './team';
 import { ResponseMemberWithRelationsSchema } from './member';
+import { ResponseImageWithRelationsSchema } from './image';
 
 const TypeEnum = z.enum(['MAINTENER', 'COLLABORATOR']);
 
@@ -14,6 +15,7 @@ const ContributionSchema = z.object({
 
 const ProjectSchema = z.object({
   id: z.number().int(),
+  uid: z.string(),
   logoUid: z.string().optional().nullable(),
   name: z.string(),
   tagline: z.string(),
@@ -48,6 +50,7 @@ const ProjectSchema = z.object({
 
 export const ResponseProjectSchema = ProjectSchema.omit({ id: true }).strict();
 export const ResponseProjectWithRelationsSchema = ResponseProjectSchema.extend({
+  logo: ResponseImageWithRelationsSchema.optional(),
   maintainingTeam: ResponseTeamWithRelationsSchema.optional(),
   contributingTeams: ResponseTeamWithRelationsSchema.array().optional(),
   creator: ResponseMemberWithRelationsSchema.optional()
