@@ -53,6 +53,8 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
       plnStartDate: faker.date.past(),
       updatedAt: faker.date.recent(),
       locationUid: '',
+      signUpSource: faker.company.name(),
+      isVerified: faker.datatype.boolean(),
       openToWork: faker.datatype.boolean(),
       preferences: {showEmail:true,showGithubHandle:true,showTelegram:true,showLinkedin:true,showDiscord:false,showGithubProjects:false,showTwitter:true}
     };

@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Req, UseGuards, UsePipes, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Body, Controller, Param, Req, UseGuards, UsePipes, UseInterceptors, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
@@ -24,6 +24,7 @@ import { AuthGuard } from '../guards/auth.guard';
 import { UserAccessTokenValidateGuard } from '../guards/user-access-token-validate.guard';
 import { LogService } from '../shared/log.service';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
+import { IsVerifiedMemberInterceptor } from '../interceptors/verified-member.interceptor';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
@@ -43,6 +44,7 @@ export class MemberController {
   @Api(server.route.getMembers)
   @ApiQueryFromZod(MemberQueryParams)
   @ApiOkResponseFromZod(ResponseMemberWithRelationsSchema.array())
+  @UseInterceptors(IsVerifiedMemberInterceptor)
   async findAll(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
     const queryParams = request.query;
@@ -71,6 +73,7 @@ export class MemberController {
    * @returns Array of roles with member counts
    */
   @Api(server.route.getMemberRoles)
+  @UseInterceptors(IsVerifiedMemberInterceptor)
   async getMemberRoleFilters(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
     const queryParams = request.query;
@@ -97,6 +100,7 @@ export class MemberController {
    * @returns return list of member filters.
    */
   @Api(server.route.getMemberFilters)
+  @UseInterceptors(IsVerifiedMemberInterceptor)
   async getMembersFilter(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
     const queryParams = request.query;
@@ -130,6 +134,7 @@ export class MemberController {
   @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
   @ApiOkResponseFromZod(ResponseMemberWithRelationsSchema)
   @ApiQueryFromZod(MemberDetailQueryParams)
+  @UseInterceptors(IsVerifiedMemberInterceptor)
   @NoCache()
   async findOne(@Req() request: Request, @ApiDecorator() { params: { uid } }: RouteShape['getMember']) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);

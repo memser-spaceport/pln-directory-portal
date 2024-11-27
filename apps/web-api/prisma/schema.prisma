@@ -66,12 +66,14 @@ model Member {
   officeHours                  String?
   moreDetails                  String?
   bio                          String?
-  plnFriend                    Boolean                       @default(false)
+  plnFriend                    Boolean?                      @default(false)
   plnStartDate                 DateTime?
   airtableRecId                String?                       @unique
   externalId                   String?                       @unique
   openToWork                   Boolean?                      @default(false)
   isFeatured                   Boolean?                      @default(false)
+  isVerified                   Boolean?                      @default(false)
+  signUpSource                 String? 
   createdAt                    DateTime                      @default(now())
   updatedAt                    DateTime                      @updatedAt
   approvedAt                   DateTime                      @default(now())

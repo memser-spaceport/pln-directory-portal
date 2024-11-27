@@ -35,8 +35,8 @@ const newDataMemberSchema = z.object({
   name: z.string(),
   email: z.string(),
   plnStartDate: z.string().optional().nullable(),
-  teamAndRoles: z.array(teamMappingSchema).nonempty(),
-  skills: z.array(skillsMappingSchema).nonempty(),
+  teamAndRoles: z.array(teamMappingSchema).optional(),
+  skills: z.array(skillsMappingSchema).optional(),
   city: z.string().optional().nullable(),
   country: z.string().optional().nullable(),
   region: z.string().optional().nullable(),
@@ -48,7 +48,13 @@ const newDataMemberSchema = z.object({
   officeHours: z.string().optional().nullable(),
   imageUid: z.string().optional().nullable(),
   moreDetails: z.string().optional().nullable(),
-  projectContributions:  z.array(ProjectContributionSchema as any).optional()
+  projectContributions:  z.array(ProjectContributionSchema as any).optional(),
+  bio: z.string().nullish(),
+  signUpSource: z.string().nullish(),
+  isFeatured: z.boolean().nullish(),
+  locationUid: z.string().nullable(),
+  openToWork: z.boolean().nullable(),
+  isVerified: z.boolean().nullish()
 });
 
 const newDataTeamSchema = z.object({
