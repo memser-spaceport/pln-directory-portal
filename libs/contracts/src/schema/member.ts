@@ -30,7 +30,7 @@ export const MemberSchema = z.object({
   uid: z.string(),
   name: z.string(),
   email: z.string(),
-  externalId: z.string(),
+  externalId: z.string().nullish(),
   imageUid: z.string().nullish(),
   githubHandler: z.string().nullish(),
   discordHandler: z.string().nullish(),
@@ -38,18 +38,19 @@ export const MemberSchema = z.object({
   telegramHandler: z.string().nullish(),
   officeHours: z.string().nullish(),
   airtableRecId: z.string().nullish(),
-  plnFriend: z.boolean(),
+  plnFriend: z.boolean().nullable(),
   bio: z.string().nullish(),
+  signUpSource: z.string().nullish(),
   isFeatured: z.boolean().nullish(),
   createdAt: z.string(),
   updatedAt: z.string(),
-  locationUid: z.string(),
-  openToWork: z.boolean(),
+  locationUid: z.string().nullable(),
+  openToWork: z.boolean().nullable(),
   linkedinHandler: z.string().nullish(),
   repositories: GitHubRepositorySchema.array().optional(),
   preferences: PreferenceSchema.optional(),
   projectContributions: z.array(ProjectContributionSchema).optional(),
-  isVerified:z.boolean().default(false)
+  isVerified:z.boolean().nullish()
 });
 
 
@@ -75,7 +76,12 @@ export const CreateMemberSchema = MemberSchema.pick({
   officeHours: true,
   plnFriend: true,
   locationUid: true,
-  bio: true
+  bio: true,
+  signUpSource: true,
+  isFeatured: true,
+  openToWork: true,
+  linkedinHandler: true,
+  telegramHandler: true
 });
 
 export const MemberRelationalFields = ResponseMemberWithRelationsSchema.pick({
