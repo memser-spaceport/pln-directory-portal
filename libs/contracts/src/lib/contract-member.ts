@@ -10,6 +10,16 @@ import { getAPIVersionAsPath } from '../utils/versioned-path';
 const contract = initContract();
 
 export const apiMembers = contract.router({
+  updateMemberVerificationStatus: {
+    method:'PUT',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/verify`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Verify a member',
+
+  },
   getMembers: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/members`,

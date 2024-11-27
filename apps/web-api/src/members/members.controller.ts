@@ -31,8 +31,8 @@ type RouteShape = typeof server.routeShapes;
 @Controller()
 @NoCache()
 export class MemberController {
-  constructor(private readonly membersService: MembersService, private logger: LogService) {}
- 
+  constructor(private readonly membersService: MembersService, private logger: LogService) { }
+
   /**
    * Retrieves a list of members based on query parameters.
    * Builds a Prisma query from the queryable fields and adds filters for names, roles, and recent members.
@@ -182,6 +182,9 @@ export class MemberController {
   @Api(server.route.updateMember)
   @UseGuards(UserTokenValidation)
   async updateMemberByUid(@Param('uid') uid, @Body() body) {
+    if (body.isVerified) {
+      delete body.isVerified;
+    }
     return await this.membersService.updateMemberByUid(uid, body);
   }
 
@@ -236,7 +239,7 @@ export class MemberController {
   @UsePipes(ZodValidationPipe)
   async updateMemberEmail(@Body() changeEmailRequest: ChangeEmailRequestDto, @Req() req) {
     const memberInfo = await this.membersService.findMemberByEmail(req.userEmail);
-    if(!memberInfo || !memberInfo.externalId) {
+    if (!memberInfo || !memberInfo.externalId) {
       throw new ForbiddenException("Please login again and try")
     }
     return await this.membersService.updateMemberEmail(changeEmailRequest.newEmail, req.userEmail, memberInfo);
@@ -251,5 +254,24 @@ export class MemberController {
   @Api(server.route.getMemberGitHubProjects)
   async getGitProjects(@Param('uid') uid) {
     return await this.membersService.getGitProjects(uid);
+  }
+
+  /**
+   * Updates a member as verified member.
+   * 
+   * @param uid - uid of the member to be updated
+   * @param req - HTTP request object containing user details
+   * @returns Updated member data with new details.
+   */
+  @Api(server.route.updateMemberVerificationStatus)
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  async updateMemberVerificationStatus(@Param('uid') uid, @Body() body, @Req() req) {
+    this.logger.info(`Member verification request - Initated by -> ${req.userEmail}`);
+    const member = await this.membersService.findMemberByEmail(req.userEmail);
+    if (!this.membersService.checkIfAdminUser(member)) {
+      throw new ForbiddenException(`Member with email ${req.userEmail} isn't admin to verify a member`);
+    }
+    return await this.membersService.updateMemberByUid(uid, { ...body, isVerified: true });
   }
 }

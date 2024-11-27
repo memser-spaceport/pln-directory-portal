@@ -48,7 +48,8 @@ export const MemberSchema = z.object({
   linkedinHandler: z.string().nullish(),
   repositories: GitHubRepositorySchema.array().optional(),
   preferences: PreferenceSchema.optional(),
-  projectContributions: z.array(ProjectContributionSchema).optional()
+  projectContributions: z.array(ProjectContributionSchema).optional(),
+  isVerified:z.boolean().default(false)
 });
 
 
