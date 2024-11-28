@@ -650,7 +650,7 @@ export class MembersService {
         memberUid, 
         {
           ...member,
-          ...(isEmailChanged && isExternalIdAvailable && { externalId: null })
+          ...(isEmailChanged && isExternalIdAvailable && { externalId: null }),
         }, 
         tx
       );
@@ -708,7 +708,7 @@ export class MembersService {
     const directFields = [
       'name', 'email', 'githubHandler', 'discordHandler', 'bio',
       'twitterHandler', 'linkedinHandler', 'telegramHandler', 
-      'officeHours', 'moreDetails', 'plnStartDate', 'openToWork' 
+      'officeHours', 'moreDetails', 'plnStartDate', 'openToWork', "isVerified" 
     ];
     copyObj(memberData, member, directFields);
     member.email = member.email.toLowerCase().trim();

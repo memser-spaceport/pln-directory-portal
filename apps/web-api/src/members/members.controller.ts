@@ -25,6 +25,7 @@ import { UserAccessTokenValidateGuard } from '../guards/user-access-token-valida
 import { LogService } from '../shared/log.service';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
 import { IsVerifiedMemberInterceptor } from '../interceptors/verified-member.interceptor';
+import { isEmpty } from 'lodash';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
@@ -166,6 +167,9 @@ export class MemberController {
     ) {
       throw new ForbiddenException(`Member isn't authorized to update the member`);
     }
+    if(!isEmpty(participantsRequest.newData.isVerified) && !this.membersService.checkIfAdminUser(requestor)) {
+      throw new ForbiddenException(`Member isn't authorized to verify a member`);
+    }
     return await this.membersService.updateMemberFromParticipantsRequest(uid, participantsRequest, requestor.email);
   }
 
@@ -187,7 +191,7 @@ export class MemberController {
   @Api(server.route.updateMember)
   @UseGuards(UserTokenValidation)
   async updateMemberByUid(@Param('uid') uid, @Body() body) {
-    if (body.isVerified) {
+    if (!isEmpty(body.isVerified)) {
       delete body.isVerified;
     }
     return await this.membersService.updateMemberByUid(uid, body);
@@ -259,24 +263,5 @@ export class MemberController {
   @Api(server.route.getMemberGitHubProjects)
   async getGitProjects(@Param('uid') uid) {
     return await this.membersService.getGitProjects(uid);
-  }
-
-  /**
-   * Updates a member as verified member.
-   * 
-   * @param uid - uid of the member to be updated
-   * @param req - HTTP request object containing user details
-   * @returns Updated member data with new details.
-   */
-  @Api(server.route.updateMemberVerificationStatus)
-  @UseGuards(UserTokenValidation)
-  @UsePipes(ZodValidationPipe)
-  async updateMemberVerificationStatus(@Param('uid') uid, @Body() body, @Req() req) {
-    this.logger.info(`Member verification request - Initated by -> ${req.userEmail}`);
-    const member = await this.membersService.findMemberByEmail(req.userEmail);
-    if (!this.membersService.checkIfAdminUser(member)) {
-      throw new ForbiddenException(`Member with email ${req.userEmail} isn't admin to verify a member`);
-    }
-    return await this.membersService.updateMemberByUid(uid, { ...body, isVerified: true });
   }
 }
