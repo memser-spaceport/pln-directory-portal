@@ -97,11 +97,15 @@ export class PLEventLocationsService {
               banner: true,
               resources: true,
               additionalInfo: true,
+              priority: true,
               _count: {
                 select: {
                   eventGuests: true
                 }
               }
+            },
+            orderBy: {
+              priority: "asc"
             }
           }
         }
