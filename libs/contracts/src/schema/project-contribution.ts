@@ -3,7 +3,7 @@ import { compareDateWithoutTime, compareMonthYear } from '../../src/utils/date-u
 
 const ProjectContribution = z.object({
   role: z.string(),
-  currentProject: z.boolean(),
+  currentProject: z.boolean().optional(),
   startDate: z.string().nullish(),
   endDate: z.string().optional(),
   description: z.string().optional().nullish(),

@@ -54,7 +54,10 @@ const newDataMemberSchema = z.object({
   isFeatured: z.boolean().nullish(),
   locationUid: z.string().nullable(),
   openToWork: z.boolean().nullable(),
-  isVerified: z.boolean().nullish()
+  isVerified: z.boolean().nullish(),
+  isUserConsent:  z.boolean().nullish(),
+  isSubscribedToNewsletter: z.boolean().nullish(),
+  teamOrProjectURL: z.string().nullish()
 });
 
 const newDataTeamSchema = z.object({
