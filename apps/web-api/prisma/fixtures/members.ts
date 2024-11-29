@@ -55,6 +55,9 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
       locationUid: '',
       signUpSource: faker.company.name(),
       isVerified: faker.datatype.boolean(),
+      isUserConsent: faker.datatype.boolean(),
+      isSubscribedToNewsletter: faker.datatype.boolean(),
+      teamOrProjectURL: faker.internet.url(),
       openToWork: faker.datatype.boolean(),
       preferences: {showEmail:true,showGithubHandle:true,showTelegram:true,showLinkedin:true,showDiscord:false,showGithubProjects:false,showTwitter:true}
     };

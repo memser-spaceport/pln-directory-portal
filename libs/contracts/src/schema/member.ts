@@ -50,7 +50,10 @@ export const MemberSchema = z.object({
   repositories: GitHubRepositorySchema.array().optional(),
   preferences: PreferenceSchema.optional(),
   projectContributions: z.array(ProjectContributionSchema).optional(),
-  isVerified:z.boolean().nullish()
+  isVerified:z.boolean().nullish(),
+  isUserConsent: z.boolean().nullish(),
+  isSubscribedToNewsletter: z.boolean().nullish(),
+  teamOrProjectURL: z.string().nullish()
 });
 
 

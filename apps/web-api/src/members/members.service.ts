@@ -708,7 +708,9 @@ export class MembersService {
     const directFields = [
       'name', 'email', 'githubHandler', 'discordHandler', 'bio',
       'twitterHandler', 'linkedinHandler', 'telegramHandler', 
-      'officeHours', 'moreDetails', 'plnStartDate', 'openToWork', "isVerified" 
+      'officeHours', 'moreDetails', 'plnStartDate', 'openToWork',
+      'isVerified', 'signUpSource', 'isUserConsent', 'isSubscribedToNewsletter', 
+      'teamOrProjectURL' 
     ];
     copyObj(memberData, member, directFields);
     member.email = member.email.toLowerCase().trim();
