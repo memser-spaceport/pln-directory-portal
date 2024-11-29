@@ -1,4 +1,4 @@
-import { 
+import {
   Injectable,
   InternalServerErrorException
 } from '@nestjs/common';
@@ -6,7 +6,6 @@ import { MembersService } from '../members/members.service';
 import { TeamsService } from '../teams/teams.service';
 import { PLEventsService } from '../pl-events/pl-events.service';
 import { ProjectsService } from '../projects/projects.service';
-
 @Injectable()
 export class HomeService {
   constructor(
@@ -14,7 +13,7 @@ export class HomeService {
     private teamsService: TeamsService,
     private plEventsService: PLEventsService,
     private projectsService: ProjectsService
-  ) {}
+  ) { }
 
   async fetchAllFeaturedData() {
     try {
@@ -44,5 +43,72 @@ export class HomeService {
     } catch (error) {
       throw new InternalServerErrorException(`Error occured while retrieving featured data: ${error.message}`);
     }
+  }
+
+  /**
+   * Retrieves a list of teams and projects based on search term.
+   * Builds a Prisma query from the queryable fields and adds filters for team and project name.
+   * 
+   * @param request - HTTP request object containing query parameters
+   * @returns Array of projects and teams.
+   */
+  async fetchTeamsAndProjects(queryParams) {
+    let result: any[] = []
+    const entities: string[] = queryParams.include?.split(",");
+    if (entities.includes('teams')) {
+      const resultantTeams = await this.fetchTeams(queryParams.name_icontains);
+      resultantTeams.teams.forEach((team) => result.push({ ...team, category: "TEAM" }));
+    }
+    if (entities.includes('projects')) {
+      const resultantProjects = await this.fetchProjects(queryParams.name_icontains);
+      resultantProjects?.projects.forEach((project) => result.push({ ...project, category: "PROJECT" }));
+    }
+    return [...result].sort((team, project) => team.name.localeCompare(project.name))
+  }
+
+  private fetchTeams(name_icontains) {
+    return this.teamsService.findAll({
+      where: {
+        name: {
+          startsWith: name_icontains,
+          mode: 'insensitive'
+        }
+      },
+      select: {
+        uid: true,
+        name: true,
+        logo: {
+          select: {
+            url: true,
+          }
+        }
+      },
+      orderBy: {
+        name: 'asc'
+      }
+    })
+  }
+
+  private fetchProjects(name_icontains) {
+    return this.projectsService.getProjects({
+      where: {
+        name: {
+          startsWith: name_icontains,
+          mode: 'insensitive'
+        }
+      },
+      select: {
+        uid: true,
+        name: true,
+        logo: {
+          select: {
+            url: true,
+          }
+        }
+      },
+      orderBy: {
+        name: 'asc'
+      }
+    })
   }
 }

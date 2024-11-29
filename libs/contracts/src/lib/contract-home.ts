@@ -7,6 +7,15 @@ import {
 const contract = initContract();
 
 export const apiHome = contract.router({
+  getTeamsAndProjects: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/home/entities`,
+    query: contract.query,
+    responses: {
+      200: contract.response<unknown>()
+    },
+    summary: 'Get all featured members, projects, teams and events'
+  },
   getAllFeaturedData: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/home/featured`,
