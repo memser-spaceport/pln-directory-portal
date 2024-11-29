@@ -56,21 +56,21 @@ export class HomeService {
     let result: any[] = []
     const entities: string[] = queryParams.include?.split(",");
     if (entities.includes('teams')) {
-      const resultantTeams = await this.fetchTeams(queryParams.name_icontains);
+      const resultantTeams = await this.fetchTeamsBySearchTerm(queryParams.name);
       resultantTeams.teams.forEach((team) => result.push({ ...team, category: "TEAM" }));
     }
     if (entities.includes('projects')) {
-      const resultantProjects = await this.fetchProjects(queryParams.name_icontains);
+      const resultantProjects = await this.fetchProjectsBySearchTerm(queryParams.name);
       resultantProjects?.projects.forEach((project) => result.push({ ...project, category: "PROJECT" }));
     }
     return [...result].sort((team, project) => team.name.localeCompare(project.name))
   }
 
-  private fetchTeams(name_icontains) {
+  private fetchTeamsBySearchTerm(name) {
     return this.teamsService.findAll({
       where: {
         name: {
-          startsWith: name_icontains,
+          startsWith: name,
           mode: 'insensitive'
         }
       },
@@ -89,11 +89,11 @@ export class HomeService {
     })
   }
 
-  private fetchProjects(name_icontains) {
+  private fetchProjectsBySearchTerm(name) {
     return this.projectsService.getProjects({
       where: {
         name: {
-          startsWith: name_icontains,
+          startsWith: name,
           mode: 'insensitive'
         }
       },
