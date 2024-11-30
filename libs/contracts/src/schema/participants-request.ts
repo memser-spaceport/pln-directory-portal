@@ -48,14 +48,14 @@ const newDataMemberSchema = z.object({
   officeHours: z.string().optional().nullable(),
   imageUid: z.string().optional().nullable(),
   moreDetails: z.string().optional().nullable(),
-  projectContributions:  z.array(ProjectContributionSchema as any).optional(),
+  projectContributions: z.array(ProjectContributionSchema as any).optional(),
   bio: z.string().nullish(),
   signUpSource: z.string().nullish(),
   isFeatured: z.boolean().nullish(),
   locationUid: z.string().nullable(),
   openToWork: z.boolean().nullable(),
   isVerified: z.boolean().nullish(),
-  isUserConsent:  z.boolean().nullish(),
+  isUserConsent: z.boolean().nullish(),
   isSubscribedToNewsletter: z.boolean().nullish(),
   teamOrProjectURL: z.string().nullish()
 });
@@ -112,7 +112,13 @@ export const FindUniqueIdentiferSchema = z.object({
 })
 
 const ProcessParticipantRequest = z.object({
-    status: statusEnum,
+  status: statusEnum,
 })
-export class ProcessParticipantReqDto extends createZodDto(ProcessParticipantRequest) {}
+const ProcessBulkRequest = z.object({
+  uid: z.string(),
+  status: statusEnum,
+  participantType: participantTypeEnum
+})
+export class ProcessBulkParticipantRequest extends createZodDto(ProcessBulkRequest) { }
+export class ProcessParticipantReqDto extends createZodDto(ProcessParticipantRequest) { }
 export class FindUniqueIdentiferDto extends createZodDto(FindUniqueIdentiferSchema) { }
