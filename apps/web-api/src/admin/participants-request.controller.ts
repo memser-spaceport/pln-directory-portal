@@ -9,7 +9,8 @@ import {
   UseGuards,
   UsePipes,
   BadRequestException,
-  NotFoundException
+  NotFoundException,
+  Post
 } from '@nestjs/common';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
@@ -30,7 +31,7 @@ export class AdminParticipantsRequestController {
    * @param body - The request body containing array of uids and status of participants to be processed;
    * @returns The result of processing the participants request
    */
-  @Patch('/')
+  @Post('/')
   async processBulkRequest(
     @Body() body: ProcessBulkParticipantRequest[]
   ): Promise<any> {
