@@ -1,5 +1,5 @@
-import { createZodDto } from 'nestjs-zod';
-import { z } from 'nestjs-zod/z';
+import { createZodDto } from '@abitia/zod-dto';
+import { z } from 'zod';
 
 const TypeEnum = z.enum(['MAINTENER', 'COLLABORATOR']);
 
@@ -11,7 +11,7 @@ const ContributionSchema = z.object({
 });
 
 const ProjectSchema = z.object({
-  id: z.number().int(),
+  id: z.number().int().optional(),
   logoUid: z.string().optional().nullable(),
   name: z.string(),
   tagline: z.string(),
