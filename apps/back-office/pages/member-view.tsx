@@ -29,32 +29,32 @@ function validateBasicForm(formValues, imageUrl) {
   if (!formValues.email.trim() || !formValues.email?.trim().match(emailRE)) {
     errors.push('Please add valid Email');
   }
-  if (
-    !formValues.requestorEmail?.trim() ||
-    !formValues.requestorEmail?.trim().match(emailRE)
-  ) {
-    errors.push('Please add a valid Requestor Email');
-  }
+  // if (
+  //   !formValues.requestorEmail?.trim() ||
+  //   !formValues.requestorEmail?.trim().match(emailRE)
+  // ) {
+  //   errors.push('Please add a valid Requestor Email');
+  // }
   return errors;
 }
 
-function validateSkillForm(formValues) {
-  const errors = [];
-  if (!formValues.teamAndRoles.length) {
-    errors.push('Please add your Team and Role details');
-  } else {
-    const missingValues = formValues.teamAndRoles.filter(
-      (item) => item.teamUid == '' || item.role == ''
-    );
-    if (missingValues.length) {
-      errors.push('Please add missing Team(s)/Role(s)');
-    }
-  }
-  if (!formValues.skills.length) {
-    errors.push('Please add your skill details');
-  }
-  return errors;
-}
+// function validateSkillForm(formValues) {
+//   const errors = [];
+//   if (!formValues.teamAndRoles.length) {
+//     errors.push('Please add your Team and Role details');
+//   } else {
+//     const missingValues = formValues.teamAndRoles.filter(
+//       (item) => item.teamUid == '' || item.role == ''
+//     );
+//     if (missingValues.length) {
+//       errors.push('Please add missing Team(s)/Role(s)');
+//     }
+//   }
+//   if (!formValues.skills.length) {
+//     errors.push('Please add your skill details');
+//   }
+//   return errors;
+// }
 
 function validateForm(formValues, imageUrl) {
   let errors = [];
@@ -62,10 +62,10 @@ function validateForm(formValues, imageUrl) {
   if (basicFormErrors.length) {
     errors = [...errors, ...basicFormErrors];
   }
-  const skillFormErrors = validateSkillForm(formValues);
-  if (skillFormErrors.length) {
-    errors = [...errors, ...skillFormErrors];
-  }
+  // const skillFormErrors = validateSkillForm(formValues);
+  // if (skillFormErrors.length) {
+  //   errors = [...errors, ...skillFormErrors];
+  // }
   return errors;
 }
 
@@ -130,6 +130,7 @@ export default function MemberView(props) {
       telegramHandler: formValues.telegramHandler?.trim(),
       officeHours: formValues.officeHours?.trim() === ''? null : formValues.officeHours?.trim(),
       comments: formValues.comments?.trim(),
+      teamOrProjectURL: formValues.teamOrProjectURL,
       plnStartDate: formValues.plnStartDate
         ? new Date(formValues.plnStartDate)?.toISOString()
         : null,
@@ -203,7 +204,7 @@ export default function MemberView(props) {
         const data = {
           participantType: ENROLLMENT_TYPE.MEMBER,
           // referenceUid: props.id,
-          requesterEmailId: requestorEmail,
+          requesterEmailId: requestorEmail ? requestorEmail : null,
           uniqueIdentifier: values.email,
           newData: {
             ...values,
@@ -329,7 +330,6 @@ export default function MemberView(props) {
                   </div>
                 )}
                 <InputField
-                  required
                   name="requestorEmail"
                   type="email"
                   disabled={!isEditEnabled}
@@ -454,8 +454,8 @@ export const getServerSideProps = async (context) => {
     oldName = requestData?.oldName ?? requestData?.name;
     status = requestDetailResponse?.data?.status;
     const teamAndRoles =
-      requestData.teamAndRoles?.length &&
-      requestData.teamAndRoles.map((team) => {
+      requestData?.teamAndRoles?.length &&
+      requestData?.teamAndRoles?.map((team) => {
         return {
           role: team.role,
           teamUid: team.teamUid,
@@ -466,27 +466,28 @@ export const getServerSideProps = async (context) => {
       
     formValues = {
       name: requestData?.name,
-      email: requestData.email,
-      imageUid: requestData.imageUid ?? '',
+      email: requestData?.email,
+      imageUid: requestData?.imageUid ?? '',
       imageFile: null,
-      plnStartDate: requestData.plnStartDate
-        ? new Date(requestData.plnStartDate).toISOString().split('T')[0]
+      plnStartDate: requestData?.plnStartDate
+        ? new Date(requestData?.plnStartDate).toISOString().split('T')[0]
         : null,
       city: requestData?.city ?? '',
       region: requestData?.region ?? '',
       country: requestData?.country ?? '',
-      linkedinHandler: requestData.linkedinHandler ?? '',
-      discordHandler: requestData.discordHandler ?? '',
-      twitterHandler: requestData.twitterHandler ?? '',
-      githubHandler: requestData.githubHandler ?? '',
-      telegramHandler: requestData.telegramHandler ?? '',
-      officeHours: requestData.officeHours ?? '',
+      linkedinHandler: requestData?.linkedinHandler ?? '',
+      discordHandler: requestData?.discordHandler ?? '',
+      twitterHandler: requestData?.twitterHandler ?? '',
+      githubHandler: requestData?.githubHandler ?? '',
+      telegramHandler: requestData?.telegramHandler ?? '',
+      officeHours: requestData?.officeHours ?? '',
       requestorEmail: requestDetailResponse?.data?.requesterEmailId ?? '',
       comments: requestData?.comments ?? '',
       teamAndRoles: teamAndRoles || [
         { teamUid: '', teamTitle: '', role: '', rowId: 1 },
       ],
-      skills: requestData.skills?.map((item) => {
+      teamOrProjectURL: requestData?.teamOrProjectURL ?? '',
+      skills: requestData?.skills?.map((item) => {
         return { value: item.uid, label: item.title };
       }),
       openToWork: requestData?.openToWork ?? '',
@@ -510,9 +511,10 @@ export const getServerSideProps = async (context) => {
         .filter((item) => item.status !== APP_CONSTANTS.PENDING_LABEL);
     }
 
-    teams = memberTeamsResponse?.data?.map((item) => {
+    teams = Array.isArray(memberTeamsResponse?.data) ? 
+    memberTeamsResponse?.data?.map((item) => {
       return { value: item.uid, label: item.name };
-    });
+    }) : []; 
     skills = skillsResponse?.data?.map((item) => {
       return { value: item.uid, label: item.title };
     });

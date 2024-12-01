@@ -1,4 +1,4 @@
-import { MultiSelect, Switch } from '@protocol-labs-network/ui';
+import { InputField, MultiSelect, Switch } from '@protocol-labs-network/ui';
 import { TeamAndRoleGrid } from './teamandrole';
 import { ReactComponent as InformationCircleIcon } from '../../public/assets/icons/info_icon.svg';
 
@@ -20,8 +20,8 @@ export default function AddMemberSkillForm(props) {
       <div className="pt-5">
         {teamAndRoles?.length > 0 && (
           <div className="flex flex-row">
-            <span className="basis-6/12 text-sm font-bold">Team*</span>
-            <span className="basis-6/12 pl-1 text-sm font-bold">Role*</span>
+            <span className="basis-6/12 text-sm font-bold">Team</span>
+            <span className="basis-6/12 pl-1 text-sm font-bold">Role</span>
           </div>
         )}
         {teamAndRoles?.map((item, index) => (
@@ -56,11 +56,22 @@ export default function AddMemberSkillForm(props) {
           </span>
         </div>
       </div>
+      <div className="inputfield cityname pt-5">
+        <InputField
+          name="teamOrProjectURL"
+          label="teamOrProjectURL"
+          value={props.formValues.teamOrProjectURL}
+          disabled={!props.isEditEnabled}
+          onChange={props.onChange}
+          placeholder="Enter your team/project url"
+          className="custom-grey custom-outline-none border"
+        />
+      </div>
       <div className="pt-5">
         <MultiSelect
           name="skills"
           options={dropDownValues.skillValues}
-          required={true}
+          // required={true}
           disabled={!props.isEditEnabled}
           selectedValues={props.formValues.skills}
           onChange={props.handleDropDownChange}
