@@ -39,7 +39,7 @@ export function TeamAndRoleGrid(props) {
         <div className="w-full basis-6/12">
           <Autocomplete
             className="custom-grey custom-outline-none border truncate padding-team-autocomplete"
-            required={true}
+            // required={true}
             disabled={!props.isEditEnabled}
             placeholder="Select a team"
             selectedOption={{ value: team?.teamUid, label: team?.teamTitle }}
@@ -51,7 +51,7 @@ export function TeamAndRoleGrid(props) {
         <div className="basis-6/12 pl-6">
           <InputField
             name="role"
-            required={true}
+            // required={true}
             showLabel={false}
             label="Role"
             maxLength={100}
@@ -65,7 +65,7 @@ export function TeamAndRoleGrid(props) {
         <div className="basis-1/12 pl-3 pt-6">
           <div
             className={
-              teamRowId > 1 && props.isEditEnabled
+              teamRowId > 0 && props.isEditEnabled
                 ? `cursor-pointer"`
                 : `invisible`
             }
