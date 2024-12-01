@@ -138,6 +138,7 @@ export default function MemberView(props) {
       openToWork: formValues.openToWork,
       projectContributions:formValues.projectContributions,
       oldName: name,
+      bio: formValues.bio,
     };
     delete formattedData.requestorEmail;
     return formattedData;
@@ -490,7 +491,8 @@ export const getServerSideProps = async (context) => {
         return { value: item.uid, label: item.title };
       }),
       openToWork: requestData?.openToWork ?? '',
-      projectContributions:requestData?.projectContributions ?? []
+      projectContributions:requestData?.projectContributions ?? [],
+      bio: requestData?.bio ?? '',
     };
     imageUrl = requestData?.imageUrl ?? '';
 
