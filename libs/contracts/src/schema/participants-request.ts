@@ -113,11 +113,13 @@ export const FindUniqueIdentiferSchema = z.object({
 
 const ProcessParticipantRequest = z.object({
   status: statusEnum,
+  isVerified: z.boolean()
 })
 const ProcessBulkRequest = z.object({
   uid: z.string(),
   status: statusEnum,
-  participantType: participantTypeEnum
+  participantType: participantTypeEnum,
+  isVerified: z.boolean()
 })
 export class ProcessBulkParticipantRequest extends createZodDto(ProcessBulkRequest) { }
 export class ProcessParticipantReqDto extends createZodDto(ProcessParticipantRequest) { }
