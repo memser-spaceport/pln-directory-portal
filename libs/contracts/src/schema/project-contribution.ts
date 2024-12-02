@@ -2,24 +2,16 @@ import { z } from 'zod';
 import { compareDateWithoutTime, compareMonthYear } from '../../src/utils/date-utils';
 
 const ProjectContribution = z.object({
-  role: z.string(),
-  currentProject: z.boolean().optional(),
+  role: z.string().nullish(),
+  currentProject: z.boolean().nullish(),
   startDate: z.string().nullish(),
-  endDate: z.string().optional(),
-  description: z.string().optional().nullish(),
+  endDate: z.string().nullish(),
+  description: z.string().nullish(),
   projectUid: z.string(),
-  uid: z.string().optional()
+  uid: z.string().nullish()
 });
 
 export const ProjectContributionSchema = ProjectContribution.superRefine((data, ctx) => {
-  if (!data.currentProject && !data.endDate) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'End date should not be null for past contribution',
-      fatal: true,
-    });
-  }
-
   if (data.startDate && data.endDate && compareDateWithoutTime(data.startDate, data.endDate) >= 0) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,

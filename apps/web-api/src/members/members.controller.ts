@@ -172,6 +172,18 @@ export class MemberController {
     return await this.membersService.updateMemberFromParticipantsRequest(uid, participantsRequest, requestor.email);
   }
 
+  @Api(server.route.verifyMembers)
+  @UseGuards(UserAccessTokenValidateGuard)
+  async verifyMembers(@Body() body, @Req() request) {
+    const requestor = await this.membersService.findMemberByEmail(request.userEmail);
+    if(!this.membersService.checkIfAdminUser(requestor)) {
+      throw new ForbiddenException(`Member isn't authorized to verify members`);
+    }
+    const { memberIds } = body;
+    return await this.membersService.verifyMembers(memberIds, requestor.email);
+
+  }
+
   /**
    * Updates a member's preference settings.
    * 
@@ -189,9 +201,17 @@ export class MemberController {
 
   @Api(server.route.updateMember)
   @UseGuards(UserTokenValidation)
-  async updateMemberByUid(@Param('uid') uid, @Body() body) {
-    if (!isEmpty(body.isVerified)) {
-      delete body.isVerified;
+  async updateMemberByUid(@Param('uid') uid, @Body() body,  @Req() req) {
+    this.logger.info(`Member update request - Initated by -> ${req.userEmail}`);
+    const requestor = await this.membersService.findMemberByEmail(req.userEmail);
+    if (
+      !requestor.isDirectoryAdmin &&
+      uid !== requestor.uid
+    ) {
+      throw new ForbiddenException(`Member isn't authorized to update the member`);
+    }
+    if(!isEmpty(body.isVerified) && !this.membersService.checkIfAdminUser(requestor)) {
+      throw new ForbiddenException(`Member isn't authorized to verify a member`);
     }
     return await this.membersService.updateMemberByUid(uid, body);
   }

@@ -22,7 +22,8 @@ export const PreferenceSchema = z.object({
   showLinkedin:z.boolean(),
   showDiscord:z.boolean(),
   showGithubProjects:z.boolean(),
-  showTwitter:z.boolean()
+  showTwitter:z.boolean(),
+  showSubscription:z.boolean()
 });
 
 export const MemberSchema = z.object({
@@ -38,14 +39,14 @@ export const MemberSchema = z.object({
   telegramHandler: z.string().nullish(),
   officeHours: z.string().nullish(),
   airtableRecId: z.string().nullish(),
-  plnFriend: z.boolean().nullable(),
+  plnFriend: z.boolean().nullish(),
   bio: z.string().nullish(),
   signUpSource: z.string().nullish(),
   isFeatured: z.boolean().nullish(),
   createdAt: z.string(),
   updatedAt: z.string(),
   locationUid: z.string().nullable(),
-  openToWork: z.boolean().nullable(),
+  openToWork: z.boolean().nullish(),
   linkedinHandler: z.string().nullish(),
   repositories: GitHubRepositorySchema.array().optional(),
   preferences: PreferenceSchema.optional(),
@@ -84,7 +85,13 @@ export const CreateMemberSchema = MemberSchema.pick({
   isFeatured: true,
   openToWork: true,
   linkedinHandler: true,
-  telegramHandler: true
+  telegramHandler: true,
+  isVerified: true,
+  isUserConsent: true,
+  isSubscribedToNewsletter: true,
+  teamOrProjectURL: true,
+  preferences: true,
+  projectContributions: true
 });
 
 export const MemberRelationalFields = ResponseMemberWithRelationsSchema.pick({

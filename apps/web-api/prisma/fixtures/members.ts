@@ -59,7 +59,16 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
       isSubscribedToNewsletter: faker.datatype.boolean(),
       teamOrProjectURL: faker.internet.url(),
       openToWork: faker.datatype.boolean(),
-      preferences: {showEmail:true,showGithubHandle:true,showTelegram:true,showLinkedin:true,showDiscord:false,showGithubProjects:false,showTwitter:true}
+      preferences: {
+        showEmail:true,
+        showGithubHandle:true,
+        showTelegram:true,
+        showLinkedin:true,
+        showDiscord:false,
+        showGithubProjects:false,
+        showTwitter:true,
+        showSubscription:true
+      }
     };
   }
 );

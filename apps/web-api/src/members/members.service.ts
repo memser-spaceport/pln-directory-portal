@@ -1115,6 +1115,47 @@ export class MembersService {
   }
 
   /**
+   * Verify the list of members and log into participant request.
+   * @param memberIds array of member IDs
+   * @param userEmail logged in member email
+   * @returns result
+   */
+  async verifyMembers(memberIds: string[], userEmail:string): Promise<any> {
+    return await this.prisma.$transaction(async (tx) => { 
+      const result = await tx.member.updateMany({
+        where: { uid: { in: memberIds } },
+        data: { 
+          isVerified: true
+        }
+      });
+      if (result.count !== memberIds.length) {
+        throw new NotFoundException('One or more member IDs are invalid.');
+      }
+      const members = await tx.member.findMany({
+        where: { uid: { in: memberIds } }
+      })
+      await Promise.all(members.map(async(member) => {
+        await this.participantsRequestService.add({
+          status: 'AUTOAPPROVED',
+          requesterEmailId: userEmail,
+          referenceUid: member.uid,
+          uniqueIdentifier: member?.email || '',
+          participantType: 'MEMBER',
+          oldData: {
+            isVerified: false
+          },
+          newData: {
+            isVerified: true
+          },
+        },
+        tx
+        );
+      }));
+      return result;
+    });
+  }
+
+  /**
    * Updates the member's preferences and resets the cache.
    * 
    * @param id - The UID of the member.
@@ -1153,6 +1194,7 @@ export class MembersService {
         linkedinHandler: true,
         twitterHandler: true,
         preferences: true,
+        isSubscribedToNewsletter: true
       },
     });
     return this.buildPreferenceResponse(member);
@@ -1177,6 +1219,7 @@ export class MembersService {
     preferences.discord = !!member.discordHandler;
     preferences.linkedin = !!member.linkedinHandler;
     preferences.twitter = !!member.twitterHandler;
+    preferences.subscription = !!member.isSubscribedToNewsletter;
     return preferences;
   }
 
