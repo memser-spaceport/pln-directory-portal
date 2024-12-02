@@ -35,33 +35,54 @@ export class AdminParticipantsRequestController {
   async processBulkRequest(
     @Body() body: ProcessBulkParticipantRequest[]
   ): Promise<any> {
-    let result: any[] = [];
-    for (const request of body) {
-      const participantRequest: ParticipantsRequest | any = await this.participantsRequestService.findOneByUid(request.uid);
-      if (!participantRequest) {
-        result.push({
-          uid: request.uid,
-          error: 'Request not found'
-        });
-        continue;
-      }
-      if (participantRequest?.status !== ApprovalStatus.PENDING) {
-        result.push({
-          uid: request.uid,
-          error: '`Request cannot be processed. It has already been ${participantRequest?.status.toLowerCase())`'
-        });
-        continue;
-      }
-      if (participantRequest?.participantType === ParticipantType.TEAM && !participantRequest.requesterEmailId) {
-        result.push({
-          uid: request.uid,
-          error: 'Requester email is required for team participation requests. Please provide a valid email address.'
-        });
-        continue;
-      }
-      const requestStatus = await this.participantsRequestService.processRequestByUid(request.uid, participantRequest, request.status);
-    }
-    return result;
+    let successCount = 0;
+    const results = await Promise.all(
+      body.map(async (request) => {
+        try {
+          const participantRequest: ParticipantsRequest | null =
+            await this.participantsRequestService.findOneByUid(request.uid);
+
+          if (!participantRequest) {
+            return {
+              uid: request.uid,
+              message: 'Request not found',
+            };
+          }
+
+          if (participantRequest.status !== ApprovalStatus.PENDING) {
+            return {
+              uid: request.uid,
+              message: `Request cannot be processed. It has already been ${participantRequest.status.toLowerCase()}.`,
+            };
+          }
+
+          if (
+            participantRequest.participantType === ParticipantType.TEAM &&
+            !participantRequest.requesterEmailId
+          ) {
+            return {
+              uid: request.uid,
+              message: 'Requester email is required for team participation requests. Please provide a valid email address.',
+            };
+          }
+
+          await this.participantsRequestService.processRequestByUid(
+            request.uid,
+            participantRequest,
+            request.status
+          );
+          successCount++;
+          return { uid: request.uid, message: 'Processed successfully' };
+        } catch (error) {
+          return {
+            uid: request.uid,
+            message: 'An error occurred while processing the request',
+          };
+        }
+      })
+    );
+
+    return { count: successCount, results };
   }
 
   /**
