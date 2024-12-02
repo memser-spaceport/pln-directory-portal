@@ -81,6 +81,15 @@ export const apiMembers = contract.router({
     },
     summary: 'Modify a member',
   },
+  verifyMembers: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/members`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Verify members',
+  },
   sendOtpForEmailChange: {
     method: 'POST',
     path: `${getAPIVersionAsPath('1')}/members/:uid/email/otp`,
