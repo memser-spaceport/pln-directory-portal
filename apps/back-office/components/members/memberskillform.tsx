@@ -59,7 +59,7 @@ export default function AddMemberSkillForm(props) {
       <div className="inputfield cityname pt-5">
         <InputField
           name="teamOrProjectURL"
-          label="teamOrProjectURL"
+          label="Team Or Project URL"
           value={props.formValues.teamOrProjectURL}
           disabled={!props.isEditEnabled}
           onChange={props.onChange}

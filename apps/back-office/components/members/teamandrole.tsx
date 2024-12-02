@@ -39,7 +39,7 @@ export function TeamAndRoleGrid(props) {
         <div className="w-full basis-6/12">
           <Autocomplete
             className="custom-grey custom-outline-none border truncate padding-team-autocomplete"
-            // required={true}
+            required={true}
             disabled={!props.isEditEnabled}
             placeholder="Select a team"
             selectedOption={{ value: team?.teamUid, label: team?.teamTitle }}

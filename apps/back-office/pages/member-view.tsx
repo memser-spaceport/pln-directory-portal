@@ -484,7 +484,7 @@ export const getServerSideProps = async (context) => {
       requestorEmail: requestDetailResponse?.data?.requesterEmailId ?? '',
       comments: requestData?.comments ?? '',
       teamAndRoles: teamAndRoles || [
-        { teamUid: '', teamTitle: '', role: '', rowId: 1 },
+        // { teamUid: '', teamTitle: '', role: '', rowId: 1 },
       ],
       teamOrProjectURL: requestData?.teamOrProjectURL ?? '',
       skills: requestData?.skills?.map((item) => {
