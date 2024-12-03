@@ -1,9 +1,8 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException, Inject, CACHE_MANAGER } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { Prisma, Member } from '@prisma/client';
 import { MembersService } from '../members/members.service';
-import { Cache } from 'cache-manager';
 import { PLEventLocationsService } from './pl-event-locations.service';
 import {
   CreatePLEventGuestSchemaDto,
@@ -13,6 +12,7 @@ import {
   FormattedLocationWithEvents,
   PLEvent 
 } from './pl-event-locations.types';
+import { CacheService } from '../utils/cache/cache.service';
 
 @Injectable()
 export class PLEventGuestsService {
@@ -21,7 +21,7 @@ export class PLEventGuestsService {
     private logger: LogService,
     private memberService: MembersService,
     private eventLocationsService: PLEventLocationsService,
-    @Inject(CACHE_MANAGER) private cacheService: Cache
+    private cacheService: CacheService
   ) {}
 
   /**
@@ -43,7 +43,7 @@ export class PLEventGuestsService {
       data.memberUid = isAdmin ? data.memberUid : member.uid;
       const guests = this.formatInputToEventGuests(data);
       const result = await (tx || this.prisma).pLEventGuest.createMany({ data: guests });
-      this.cacheService.reset();
+      this.cacheService.reset({ service: 'PLEventGuest' });
       return result;
     } catch(err) {
       this.handleErrors(err);
@@ -100,7 +100,7 @@ export class PLEventGuestsService {
           OR: deleteConditions
         }
       });
-      await this.cacheService.reset();
+      await this.cacheService.reset({ service: 'PLEventGuest' });
       return result;
     } catch (err) {
       this.handleErrors(err);

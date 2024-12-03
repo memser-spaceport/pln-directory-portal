@@ -1,9 +1,9 @@
-import { Inject, CACHE_MANAGER, BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, HttpException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { Prisma } from '@prisma/client';
 import { MembersService } from '../members/members.service';
-import { Cache } from 'cache-manager';
+import { CacheService } from '../utils/cache/cache.service';
 
 @Injectable()
 export class ProjectsService {
@@ -11,7 +11,7 @@ export class ProjectsService {
     private prisma: PrismaService,
     private memberService: MembersService,
     private logger: LogService,
-    @Inject(CACHE_MANAGER) private cacheService: Cache
+    private cacheService: CacheService
   ) { }
 
   async createProject(project: Prisma.ProjectUncheckedCreateInput, userEmail: string) {
@@ -34,7 +34,7 @@ export class ProjectsService {
           }
         }
       });
-      await this.cacheService.reset();
+      await this.cacheService.reset({ service: 'projects'});
       return result;
     } catch (err) {
       this.handleErrors(err);
@@ -81,7 +81,7 @@ export class ProjectsService {
             }
           }
         });
-        await this.cacheService.reset();
+        await this.cacheService.reset({ service: 'projects'});
         return result;
       });
     } catch (err) {
@@ -169,7 +169,7 @@ export class ProjectsService {
         where: { uid },
         data: { isDeleted: true }
       });
-      await this.cacheService.reset();
+      await this.cacheService.reset({ service: 'projects'});
       return result;
     } catch (err) {
       this.handleErrors(err, `${uid}`);

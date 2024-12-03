@@ -4,9 +4,8 @@ import {
   ForbiddenException,
   BadRequestException,
   NotFoundException,
-  Inject,
   forwardRef,
-  CACHE_MANAGER
+  Inject
 } from '@nestjs/common';
 import * as path from 'path';
 import { z } from 'zod';
@@ -20,8 +19,8 @@ import { hashFileName } from '../utils/hashing';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { MembersService } from '../members/members.service';
 import { LogService } from '../shared/log.service';
-import { Cache } from 'cache-manager';
 import { copyObj, buildMultiRelationMapping, buildRelationMapping } from '../utils/helper/helper';
+import { CacheService } from '../utils/cache/cache.service';
 
 @Injectable()
 export class TeamsService {
@@ -35,7 +34,7 @@ export class TeamsService {
     private logger: LogService,
     private forestadminService: ForestAdminService,
     private notificationService: NotificationService,
-    @Inject(CACHE_MANAGER) private cacheService: Cache
+    private cacheService: CacheService
   ) { }
 
   /**
@@ -321,7 +320,7 @@ export class TeamsService {
    * This ensures that the system is up-to-date with the latest changes.
    */
   private async postUpdateActions(): Promise<void> {
-    await this.cacheService.reset();
+    await this.cacheService.reset({ service: "teams" });
     await this.forestadminService.triggerAirtableSync();
   }
 
