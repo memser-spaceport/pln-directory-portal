@@ -172,6 +172,12 @@ export class MemberController {
     return await this.membersService.updateMemberFromParticipantsRequest(uid, participantsRequest, requestor.email);
   }
 
+  /**
+   * Updates a member to be verfied user.
+   * 
+   * @param body - array of memberIds to be updated.
+   * @returns Array of updation status of the provided memberIds.
+   */
   @Api(server.route.verifyMembers)
   @UseGuards(UserAccessTokenValidateGuard)
   async verifyMembers(@Body() body, @Req() request) {
