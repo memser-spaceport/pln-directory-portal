@@ -1,15 +1,13 @@
 /* eslint-disable prettier/prettier */
-import {
-  BadRequestException,
-  ConflictException,
+import { 
+  BadRequestException, 
+  ConflictException, 
   NotFoundException,
-  Inject,
   Injectable,
-  CACHE_MANAGER,
-  forwardRef
+  forwardRef,
+  Inject 
 } from '@nestjs/common';
 import { ApprovalStatus, ParticipantType } from '@prisma/client';
-import { Cache } from 'cache-manager';
 import { Prisma, ParticipantsRequest, PrismaClient } from '@prisma/client';
 import { generateProfileURL } from '../utils/helper/helper';
 import { LogService } from '../shared/log.service';
@@ -19,6 +17,7 @@ import { TeamsService } from '../teams/teams.service';
 import { NotificationService } from '../utils/notification/notification.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
+import { CacheService } from '../utils/cache/cache.service';
 
 @Injectable()
 export class ParticipantsRequestService {
@@ -28,8 +27,7 @@ export class ParticipantsRequestService {
     private locationTransferService: LocationTransferService,
     private forestAdminService: ForestAdminService,
     private notificationService: NotificationService,
-    @Inject(CACHE_MANAGER)
-    private cacheService: Cache,
+    private cacheService: CacheService,
     @Inject(forwardRef(() => MembersService))
     private membersService: MembersService,
     @Inject(forwardRef(() => TeamsService))
@@ -166,7 +164,7 @@ export class ParticipantsRequestService {
         where: { uid },
         data: formattedData,
       });
-      await this.cacheService.reset();
+      await this.cacheService.reset({ service: "participants-requests" });
       return result;
     } catch (err) {
       return this.handleErrors(err)
@@ -187,7 +185,7 @@ export class ParticipantsRequestService {
         where: { uid: uidToReject },
         data: { status: ApprovalStatus.REJECTED }
       });
-      await this.cacheService.reset();
+      await this.cacheService.reset({ service: "participants-requests" });
       return result;
     } catch (err) {
       return this.handleErrors(err)
@@ -250,7 +248,7 @@ export class ParticipantsRequestService {
         participantsRequest.requesterEmailId
       );
     }
-    await this.cacheService.reset();
+    await this.cacheService.reset({ service: "participants-requests" });
     await this.forestAdminService.triggerAirtableSync();
     return result;
   }
@@ -296,7 +294,7 @@ export class ParticipantsRequestService {
     if (!disableNotification) {
       this.notifyForCreate(result);
     }
-    await this.cacheService.reset();
+    await this.cacheService.reset({ service: "participants-requests" });
     return result;
   }
 

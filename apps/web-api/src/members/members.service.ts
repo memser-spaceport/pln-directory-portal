@@ -1,7 +1,6 @@
 /* eslint-disable prettier/prettier */
 import {
   BadRequestException,
-  CACHE_MANAGER,
   ConflictException,
   NotFoundException,
   Inject,
@@ -11,7 +10,6 @@ import {
 import { z } from 'zod';
 import axios from 'axios';
 import * as path from 'path';
-import { Cache } from 'cache-manager';
 import { Prisma, Member, ParticipantsRequest } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
@@ -26,6 +24,7 @@ import { LogService } from '../shared/log.service';
 import { DEFAULT_MEMBER_ROLES } from '../utils/constants';
 import { hashFileName } from '../utils/hashing';
 import { copyObj, buildMultiRelationMapping } from '../utils/helper/helper';
+import { CacheService } from '../utils/cache/cache.service';
 
 @Injectable()
 export class MembersService {
@@ -41,8 +40,8 @@ export class MembersService {
     private participantsRequestService: ParticipantsRequestService,
     @Inject(forwardRef(() => NotificationService))
     private notificationService: NotificationService,
-    @Inject(CACHE_MANAGER) private cacheService: Cache
-  ) { }
+    private cacheService: CacheService
+  ) {}
 
   /**
    * Creates a new member in the database within a transaction.
@@ -427,7 +426,7 @@ export class MembersService {
         newTokens = await this.authService.updateEmailInAuth(newEmail, oldEmail, memberInfo.externalId)
       });
       this.logger.info(`Email has been successfully updated from ${oldEmail} to ${newEmail}`)
-      await this.cacheService.reset();
+      await this.cacheService.reset({ service: 'members'});
       return {
         refreshToken: newTokens.refresh_token,
         idToken: newTokens.id_token,
@@ -1166,7 +1165,7 @@ export class MembersService {
    */
   async updatePreference(id: string, preferences: any): Promise<Member> {
     const updatedMember = await this.updateMemberByUid(id, { preferences });
-    await this.cacheService.reset();
+    await this.cacheService.reset({ service: 'members'});
     return updatedMember;
   }
 
@@ -1175,7 +1174,7 @@ export class MembersService {
    * This ensures that the system is up-to-date with the latest changes.
    */
   private async postUpdateActions(): Promise<void> {
-    await this.cacheService.reset();
+    await this.cacheService.reset({ service: 'members'});
     await this.forestadminService.triggerAirtableSync();
   }
 

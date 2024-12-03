@@ -10,6 +10,7 @@ import { ImagesController } from '../images/images.controller';
 import { ImagesService } from '../images/images.service';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { FileEncryptionService } from '../utils/file-encryption/file-encryption.service';
+import { CacheService } from '../utils/cache/cache.service'; 
 
 @Global()
 @Module({
@@ -26,6 +27,7 @@ import { FileEncryptionService } from '../utils/file-encryption/file-encryption.
     ImagesService,
     FileUploadService,
     FileEncryptionService,
+    CacheService
   ],
   exports: [
     PrismaService,
@@ -39,6 +41,7 @@ import { FileEncryptionService } from '../utils/file-encryption/file-encryption.
     ImagesService,
     FileUploadService,
     FileEncryptionService,
+    CacheService
   ],
 })
 export class SharedModule {}
