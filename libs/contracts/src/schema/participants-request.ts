@@ -6,7 +6,7 @@ export const statusEnum = z.enum(['PENDING', 'APPROVED', 'REJECTED']);
 export const participantTypeEnum = z.enum(['MEMBER', 'TEAM']);
 const oldDataPostSchema = z.object({});
 const teamMappingSchema = z.object({
-  role: z.string().optional(),
+  role: z.string().nullish().optional(),
   teamUid: z.string(),
   teamTitle: z.string(),
 });

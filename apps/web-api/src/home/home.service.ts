@@ -66,6 +66,13 @@ export class HomeService {
     return [...result].sort((team, project) => team.name.localeCompare(project.name))
   }
 
+  /**
+   * Retrieves a list of teams based on search term.
+   * Builds a Prisma query from the queryable fields and adds filters for team name.
+   * 
+   * @param name - name of the team to be searched for.
+   * @returns Array of resultant teams.
+   */
   private fetchTeamsBySearchTerm(name) {
     return this.teamsService.findAll({
       where: {
@@ -89,6 +96,13 @@ export class HomeService {
     })
   }
 
+  /**
+   * Retrieves a list of projects based on search term.
+   * Builds a Prisma query from the queryable fields and adds filters for project name.
+   * 
+   * @param name - name of the project to be searched for.
+   * @returns Array of resultant projects.
+   */
   private fetchProjectsBySearchTerm(name) {
     return this.projectsService.getProjects({
       where: {
