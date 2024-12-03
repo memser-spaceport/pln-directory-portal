@@ -12,8 +12,6 @@ export default function PendingList(props) {
   const { setIsOpenRequest, setMemberList, setTeamList, isTeamActive, setShowMenu } = useNavbarContext();
   setShowMenu(true);
 
-  console.log('pln admin', props.plnadmin);
-
   useEffect(() => {
     setMemberList([...props.memberList, ...props.unverifiedMembers]);
     setTeamList(props.teamList);
