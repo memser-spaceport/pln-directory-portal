@@ -40,10 +40,10 @@ const MemberTable = (props: any) => {
   };
 
   const onMemberSelectHandler = (id: any) => {
-    setIsAllSelected(false);
     if (selectedMembers.includes(id)) {
+      setIsAllSelected(false);
       const filteredMembes = selectedMembers.filter((uid) => uid !== id);
-      setSelectedMembes(filteredMembes);
+      setSelectedMembes([...filteredMembes]);
       if (filteredMembes.length === members.length) {
         setIsAllSelected(true);
       }
