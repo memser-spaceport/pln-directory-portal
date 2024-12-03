@@ -7,8 +7,8 @@ import { useNavbarContext } from '../context/navbar-context';
 import MemberRequestList from './member-request-list';
 
 export default function RequestList({ list, type, plnadmin }) {
-  const [dataList, setDataList] = useState([]);
-  const { isTeamActive } = useNavbarContext();
+  const [dataList, setDataList] = useState(list);
+  const { isTeamActive, setMemberList } = useNavbarContext();
 
   useEffect(() => {
     setDataList(list);
@@ -46,14 +46,9 @@ export default function RequestList({ list, type, plnadmin }) {
               />
             </div>
           )}
-          {dataList.length > 0 && (
-            <>
-              {isTeamActive && <TeamRequestList teams={dataList} />}
-              {!isTeamActive && <MemberRequestList type={type} members={dataList} plnadmin={plnadmin} />}
-            </>
-          )}
-
-          {dataList.length === 0 && (
+          {dataList.length > 0 && <>{isTeamActive && <TeamRequestList teams={[...dataList]} />}</>}
+          {!isTeamActive && <MemberRequestList type={type} members={[...dataList]} plnadmin={plnadmin} />}
+          {dataList.length === 0 && isTeamActive && (
             <div
               className="h-[60px] w-[656px] border-b border-[#E2E8F0]
             bg-[#FFFFFF] drop-shadow-[0_0_1px_rgba(15,23,42,0.12)] hover:bg-[#F8FAFC]"

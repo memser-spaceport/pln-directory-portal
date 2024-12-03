@@ -44,6 +44,7 @@ export const API_ROUTE = {
   INDUSTRIES: APP_CONSTANTS.V1 + 'industry-tags',
   TECHNOLOGIES: APP_CONSTANTS.V1 + 'technologies',
   MEMBERS: APP_CONSTANTS.V1 + 'members',
+  ADMIN_APPROVAL: APP_CONSTANTS.V1 + 'admin/members',
 };
 
 export const TOKEN = 'plnetwork@1';

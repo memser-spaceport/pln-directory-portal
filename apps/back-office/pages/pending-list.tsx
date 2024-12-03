@@ -9,7 +9,7 @@ import { ApprovalLayout } from '../layout/approval-layout';
 import { parseCookies } from 'nookies';
 
 export default function PendingList(props) {
-  const { setIsOpenRequest, setMemberList, setTeamList, isTeamActive, setShowMenu } = useNavbarContext();
+  const { setIsOpenRequest, setMemberList, setTeamList, isTeamActive, setShowMenu, memberList, teamList } = useNavbarContext();
   setShowMenu(true);
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export default function PendingList(props) {
     <ApprovalLayout>
       <RequestList
         plnadmin={props.plnadmin}
-        list={isTeamActive ? props.teamList : [...props.memberList, ...props.unverifiedMembers]}
+        list={isTeamActive ? [...props.teamList] : [...props.memberList, ...props.unverifiedMembers]}
         type={APP_CONSTANTS.PENDING_LABEL}
       />
     </ApprovalLayout>

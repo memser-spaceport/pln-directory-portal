@@ -1,22 +1,21 @@
 import api from 'apps/back-office/utils/api';
 import APP_CONSTANTS, { API_ROUTE, ENROLLMENT_TYPE, ROUTE_CONSTANTS } from 'apps/back-office/utils/constants';
 import router from 'next/router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import Loader from '../common/loader';
 import { useNavbarContext } from 'apps/back-office/context/navbar-context';
 
 const MemberTable = (props: any) => {
-  const members = props?.members ?? [];
-  const setAllMembers = props?.setAllMembers;
   const selectedTab = props?.selectedTab ?? '';
+  const allMembers = props?.allMembers ?? [];
+  const updateMembers = props?.updateMembers;
 
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [selectedMembers, setSelectedMembes] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSort, setIsSort] = useState(false);
   const { setMemberList } = useNavbarContext();
-
 
   // const onSortClickHandler = () => {
   //   setIsSort(!isSort);
@@ -35,7 +34,7 @@ const MemberTable = (props: any) => {
     if (isAllSelected) {
       setSelectedMembes([]);
     } else {
-      setSelectedMembes(members.map((member: any) => member.id));
+      setSelectedMembes(allMembers.map((member: any) => member.id));
     }
   };
 
@@ -43,14 +42,14 @@ const MemberTable = (props: any) => {
     if (selectedMembers.includes(id)) {
       setIsAllSelected(false);
       const filteredMembes = selectedMembers.filter((uid) => uid !== id);
-      setSelectedMembes([...filteredMembes]);
-      if (filteredMembes.length === members.length) {
+      setSelectedMembes(filteredMembes);
+      if (filteredMembes.length === allMembers.length) {
         setIsAllSelected(true);
       }
     } else {
       const addedMembes = [...selectedMembers, id];
       setSelectedMembes(addedMembes);
-      if (addedMembes.length === members.length) {
+      if (addedMembes.length === allMembers.length) {
         setIsAllSelected(true);
       }
     }
@@ -67,45 +66,12 @@ const MemberTable = (props: any) => {
     });
   }
 
-  const onSuccessHandler = async () => {
-    setIsLoading(true);
-    const config = {
-      headers: {
-        authorization: `Bearer ${props.plnadmin}`,
-      },
-    };
-    const listData = await api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}?status=PENDING`, config);
-    const unVerifiedMembes = await api.get(`${API_ROUTE.MEMBERS}?isVerified=false&pagination=false`, config);
-    const pendingMembers = listData.data.filter((item) => item.participantType === ENROLLMENT_TYPE.MEMBER);
-
-    const formattedPendingMembes = pendingMembers?.map((data) => {
-      return {
-        id: data.uid,
-        name: data.newData.name,
-        status: data.status,
-      };
-    });
-    const filteredUnVerifiedMembers = unVerifiedMembes.data.members.map((data) => {
-      return {
-        id: data.uid,
-        name: data.name,
-        isVerified: data?.isVerified || false,
-      };
-    });
-
-    setMemberList([...formattedPendingMembes, ...filteredUnVerifiedMembers]);
-
-    setAllMembers({
-      pending: formattedPendingMembes,
-      unverified: filteredUnVerifiedMembers,
-    });
-  };
-
   async function approvelClickHandler(id: any, status: any, isVerified: any) {
     const data = {
       status: status,
       participantType: ENROLLMENT_TYPE.MEMBER,
       isVerified,
+      uid: id,
     };
     const configuration = {
       headers: {
@@ -114,19 +80,17 @@ const MemberTable = (props: any) => {
     };
     setIsLoading(true);
     try {
-      let message="";
+      let message = '';
       setIsLoading(true);
       if (selectedTab === APP_CONSTANTS.PENDING_FLAG) {
-        await api.patch(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, data, configuration);
-       message = `Successfully ${APP_CONSTANTS.UNVERIFIED_FLAG}`;
-
+        await api.post(`${API_ROUTE.PARTICIPANTS_REQUEST}`, [data], configuration);
+        message = `Successfully ${(status ===  APP_CONSTANTS.REJECTED_FLAG ? APP_CONSTANTS.REJECTED_LABEL : APP_CONSTANTS.VERIFIED_FLAG)}`;
       } else {
-        await api.post(`${API_ROUTE.MEMBERS}/${id}`, [id], configuration);
-       message = `Successfully ${APP_CONSTANTS.VERIFIED_FLAG}`;
-
+        await api.post(`${API_ROUTE.ADMIN_APPROVAL}`, { memberIds: [id] }, configuration);
+        message = `Successfully ${APP_CONSTANTS.VERIFIED_FLAG}`;
       }
 
-      onSuccessHandler();
+      updateMembers();
       toast(message);
     } catch (error: any) {
       if (error.response?.status === 500) {
@@ -158,16 +122,16 @@ const MemberTable = (props: any) => {
       },
     };
     try {
-      setIsAllSelected(false);
       setSelectedMembes([]);
       setIsLoading(true);
       if (selectedTab === APP_CONSTANTS.PENDING_FLAG) {
         await api.post(`${API_ROUTE.PARTICIPANTS_REQUEST}`, data, configuration);
       } else {
         const data = selectedMembers?.map((memberId: any) => memberId);
-        await api.post(`${API_ROUTE.MEMBERS}`, { memberIds: data }, configuration);
+        await api.post(`${API_ROUTE.ADMIN_APPROVAL}`, { memberIds: data }, configuration);
       }
-      onSuccessHandler();
+      updateMembers();
+      setIsAllSelected(false);
       const message = `Successfully ${APP_CONSTANTS.APPROVED_LABEL}`;
       toast(message);
     } catch (error: any) {
@@ -201,7 +165,7 @@ const MemberTable = (props: any) => {
     try {
       setIsLoading(true);
       await api.post(`${API_ROUTE.PARTICIPANTS_REQUEST}`, data, configuration);
-      onSuccessHandler();
+      updateMembers();
       setSelectedMembes([]);
       setIsAllSelected(false);
       const message = `Successfully ${APP_CONSTANTS.REJECTED_LABEL}`;
@@ -224,7 +188,7 @@ const MemberTable = (props: any) => {
   return (
     <>
       {isLoading && <Loader />}
-      {members?.length > 0 && (
+      {allMembers?.length > 0 && (
         <div className="bg-white  shadow-[0px_0px_1px_0px_#0F172A1F]">
           {/* Header */}
           <div className="sticky top-0 flex rounded-t-[8px] border-b border-b-[#E2E8F0] bg-white py-[8px] px-[24px]">
@@ -246,7 +210,7 @@ const MemberTable = (props: any) => {
           </div>
           {/* Members */}
           <div className="">
-            {members?.map((member: any, index: number) => {
+            {allMembers?.map((member: any, index: number) => {
               const isSelected = selectedMembers.includes(member.id) || isAllSelected;
               const isDisableOptions = selectedMembers.length > 0;
               return (
@@ -337,7 +301,7 @@ const MemberTable = (props: any) => {
           </div>
         </div>
       )}
-      {members?.length === 0 && (
+      {allMembers?.length === 0 && (
         <div
           className="h-[60px] w-[656px] border-b border-[#E2E8F0]
     bg-[#FFFFFF] drop-shadow-[0_0_1px_rgba(15,23,42,0.12)] hover:bg-[#F8FAFC]"
