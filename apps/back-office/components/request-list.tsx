@@ -6,7 +6,7 @@ import TeamRequestList from './team-request-list';
 import { useNavbarContext } from '../context/navbar-context';
 import MemberRequestList from './member-request-list';
 
-export default function RequestList({ list, type, plnadmin}) {
+export default function RequestList({ list, type, plnadmin }) {
   const [dataList, setDataList] = useState([]);
   const { isTeamActive } = useNavbarContext();
 
@@ -20,14 +20,9 @@ export default function RequestList({ list, type, plnadmin}) {
     if (input === '') {
       setDataList(backupList);
     } else {
-      setDataList(
-        backupList.filter((req) =>
-          req.name.toLowerCase().includes(input.toLowerCase())
-        )
-      );
+      setDataList(backupList.filter((req) => req.name.toLowerCase().includes(input.toLowerCase())));
     }
   }
-
 
   return (
     <>
@@ -53,10 +48,10 @@ export default function RequestList({ list, type, plnadmin}) {
           )}
           {dataList.length > 0 && (
             <>
-          {isTeamActive && <TeamRequestList teams={list} />}
-          {!isTeamActive && <MemberRequestList members={list} plnadmin={plnadmin} />}
-          </>
-        )}
+              {isTeamActive && <TeamRequestList teams={dataList} />}
+              {!isTeamActive && <MemberRequestList type={type} members={dataList} plnadmin={plnadmin} />}
+            </>
+          )}
 
           {dataList.length === 0 && (
             <div
@@ -68,9 +63,7 @@ export default function RequestList({ list, type, plnadmin}) {
                 className="h-full w-full items-center pl-[24px] pr-[24px] pt-[20px]
               text-[14px] leading-[20px] text-[#475569]"
               >
-                <span className="text-sm font-semibold">
-                  {APP_CONSTANTS.NO_DATA_AVAILABLE_LABEL}
-                </span>
+                <span className="text-sm font-semibold">{APP_CONSTANTS.NO_DATA_AVAILABLE_LABEL}</span>
               </div>
             </div>
           )}

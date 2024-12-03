@@ -457,7 +457,7 @@ export const getServerSideProps = async (context) => {
       requestData?.teamAndRoles?.length &&
       requestData?.teamAndRoles?.map((team) => {
         return {
-          role: team.role,
+          role: team.role  ?? "",
           teamUid: team.teamUid,
           teamTitle: team.teamTitle,
           rowId: counter++,
