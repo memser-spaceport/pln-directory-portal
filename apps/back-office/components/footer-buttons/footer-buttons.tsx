@@ -3,6 +3,7 @@ import api from '../../utils/api';
 import router from 'next/router';
 import APP_CONSTANTS, {
   API_ROUTE,
+  ENROLLMENT_TYPE,
   ROUTE_CONSTANTS,
 } from '../../utils/constants';
 import { toast } from 'react-toastify';
@@ -11,19 +12,12 @@ export function FooterButtons(props) {
   const saveButtonClassName = props.disableSave
     ? 'shadow-special-button-default inline-flex w-full justify-center rounded-full bg-slate-400 px-6 py-2 text-base font-semibold leading-6 text-white outline-none'
     : 'on-focus leading-3.5 text-md mb-2 mr-2 flex items-center rounded-full border border-blue-600 bg-blue-600 px-4 py-3 text-left font-medium text-white last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full';
-  async function handleAprroveOrReject(
-    id,
-    type,
-    referenceUid,
-    isApproved,
-    setLoader
-  ) {
+  async function approvelClickHandler(id: any, status: any, isVerified: any, setLoader) {
     const data = {
-      status: isApproved
-        ? APP_CONSTANTS.APPROVED_FLAG
-        : APP_CONSTANTS.REJECTED_FLAG,
-      participantType: type,
-      ...(referenceUid && { referenceUid: referenceUid }),
+      status: status,
+      participantType: ENROLLMENT_TYPE.MEMBER,
+      isVerified,
+      uid: id,
     };
     const configuration = {
       headers: {
@@ -31,35 +25,31 @@ export function FooterButtons(props) {
       },
     };
     setLoader(true);
-    await api
-      .patch(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, data, configuration)
-      .then((res) => {
-        if (res?.data?.code == 1) {
-          const message = `${
-            isApproved
-              ? APP_CONSTANTS.APPROVED_LABEL
-              : APP_CONSTANTS.REJECTED_LABEL
-          } successfully`;
-          toast(message);
-        } else {
-          toast(res?.data?.message);
-        }
+    try {
+      let message = "";
+      setLoader(true);
+      await api.patch(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, data, configuration)
+      message = status === "REJECTED"
+        ? `Successfully ${APP_CONSTANTS.REJECTED_LABEL}`
+        : `Successfully ${isVerified ? APP_CONSTANTS.VERIFIED_FLAG : APP_CONSTANTS.UNVERIFIED_FLAG}`;
+
+      toast(message);
+      router.push({
+        pathname: ROUTE_CONSTANTS.PENDING_LIST,
+      });
+    } catch (error: any) {
+      if (error.response?.status === 500) {
         router.push({
-          pathname: ROUTE_CONSTANTS.PENDING_LIST,
+          pathname: ROUTE_CONSTANTS.INTERNAL_SERVER_ERROR,
         });
-      })
-      .catch((e) => {
-        if (e.response.status === 500) {
-          router.push({
-            pathname: ROUTE_CONSTANTS.INTERNAL_SERVER_ERROR,
-          });
-        } else if (e.response.status === 400) {
-          toast(e?.response?.data?.message);
-        } else {
-          toast(e?.message);
-        }
-      })
-      .finally(() => setLoader(false));
+      } else if (error.response?.status === 400) {
+        toast(error.response?.data?.message || 'Bad request');
+      } else {
+        toast(error.message || 'An unexpected error occurred');
+      }
+    } finally {
+      setLoader(false);
+    }
   }
 
   return (
@@ -85,46 +75,41 @@ export function FooterButtons(props) {
         </div>
         <div className="col-span-3 justify-self-end">
           <div className="flex items-end space-x-3">
-            <div>
-              <button
-                className={`on-focus leading-3.5 text-md mb-2 mr-2 flex items-center rounded-full border border-slate-300 px-4 py-2 text-left font-medium text-white last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full ${
-                  props.isEditEnabled && 'bg-slate-400'
-                } ${!props.isEditEnabled && ' bg-[#D65229]'}`}
-                disabled={props.isEditEnabled}
-                onClick={() =>
-                  handleAprroveOrReject(
-                    props?.id,
-                    props?.type,
-                    props?.referenceUid,
-                    false,
-                    props?.setLoader
-                  )
-                }
-              >
-                <XIcon className="stroke-3 h-6 w-6 pr-1" />
-                <span>Reject</span>
-              </button>
-            </div>
-            <div>
-              <button
-                className={`on-focus leading-3.5 text-md mb-2 mr-2 flex items-center rounded-full border border-slate-300  px-5 py-2 text-left font-medium text-white last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full ${
-                  props.isEditEnabled && 'bg-slate-400'
-                } ${!props.isEditEnabled && 'bg-[#0F9F5A]'}`}
-                disabled={props.isEditEnabled}
-                onClick={() =>
-                  handleAprroveOrReject(
-                    props?.id,
-                    props?.type,
-                    props?.referenceUid,
-                    true,
-                    props?.setLoader
-                  )
-                }
-              >
-                <CheckIcon className="stroke-3 h-6 w-6 pr-1" />
-                <span>Approve</span>
-              </button>
-            </div>
+            <button
+              className={`flex items-center gap-[4px] rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400]  ${props.isEditEnabled && 'bg-slate-400 text-[#FFFFFF]'}`}
+              disabled={props.isEditEnabled}
+              onClick={() => approvelClickHandler(props?.id, "APPROVED", true, props?.setLoader)}
+            >
+              {!props.isEditEnabled ?
+                <img height={20} width={20} src="assets/images/verified.svg" alt="verified" /> :
+                <img height={20} width={20} src="/assets/icons/upgrade-rounded.svg" alt="verified" />
+              }
+              Verified
+            </button>
+
+            <button
+              onClick={() => approvelClickHandler(props?.id, "APPROVED", false, props?.setLoader)}
+              disabled={props.isEditEnabled}
+              className={`flex items-center gap-[4px] rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400] ${props.isEditEnabled && 'bg-slate-400 text-[#FFFFFF]'}`}
+            >
+              {!props.isEditEnabled ?
+                <img height={20} width={20} src="assets/images/unverified.svg" alt="verified" /> :
+                <img height={20} width={20} src="/assets/icons/upgrade-rounded.svg" alt="verified" />
+              }
+              Unverified
+            </button>
+
+            <button
+              onClick={() => approvelClickHandler(props?.id, "REJECTED", false, props?.setLoader)}
+              disabled={props.isEditEnabled}
+              className={`rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400] ${props.isEditEnabled && 'bg-slate-400 text-[#FFFFFF]'}`}
+            >
+              {!props.isEditEnabled ?
+                <img height={20} width={20} src="/assets/images/delete.svg" alt="verified" />
+                :
+                <img height={16} width={16} src="assets/icons/TrashIcon.svg" alt="delete" />
+              }
+            </button>
           </div>
         </div>
       </nav>
