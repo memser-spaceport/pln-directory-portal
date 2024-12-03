@@ -11,9 +11,10 @@ ADD COLUMN  "signUpSource" TEXT,
 ADD COLUMN  "isSubscribedToNewsletter" BOOLEAN DEFAULT false,
 ADD COLUMN  "isUserConsent" BOOLEAN DEFAULT false,
 ADD COLUMN  "teamOrProjectURL" TEXT;
+
+-- Modify the "plnFriend" column to drop NOT NULL constraint
+ALTER TABLE "Member" 
 ALTER COLUMN "plnFriend" DROP NOT NULL;
 
--- CreateIndex
-CREATE UNIQUE INDEX "PLEventGuest_memberUid_teamUid_eventUid_key" ON "PLEventGuest"("memberUid", "teamUid", "eventUid");
 
 

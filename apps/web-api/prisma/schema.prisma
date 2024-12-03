@@ -413,7 +413,6 @@ model PLEventGuest {
   isHost         Boolean  @default(false)
   isSpeaker      Boolean  @default(false)
   isFeatured      Boolean  @default(false)
-  @@unique([memberUid, teamUid, eventUid])
 }
 
 model FocusArea {
