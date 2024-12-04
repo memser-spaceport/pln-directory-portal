@@ -46,6 +46,7 @@ export class MemberController {
   @ApiQueryFromZod(MemberQueryParams)
   @ApiOkResponseFromZod(ResponseMemberWithRelationsSchema.array())
   @UseInterceptors(IsVerifiedMemberInterceptor)
+  @NoCache()
   async findAll(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
     const queryParams = request.query;
@@ -75,6 +76,7 @@ export class MemberController {
    */
   @Api(server.route.getMemberRoles)
   @UseInterceptors(IsVerifiedMemberInterceptor)
+  @NoCache()
   async getMemberRoleFilters(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
     const queryParams = request.query;
@@ -102,6 +104,7 @@ export class MemberController {
    */
   @Api(server.route.getMemberFilters)
   @UseInterceptors(IsVerifiedMemberInterceptor)
+  @NoCache()
   async getMembersFilter(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
     const queryParams = request.query;
