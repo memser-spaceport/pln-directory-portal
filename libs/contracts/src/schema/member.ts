@@ -42,6 +42,8 @@ export const MemberSchema = z.object({
   plnFriend: z.boolean().nullish(),
   bio: z.string().nullish(),
   signUpSource: z.string().nullish(),
+  signUpMedium: z.string().nullish(),
+  signUpCampaign: z.string().nullish(),
   isFeatured: z.boolean().nullish(),
   createdAt: z.string(),
   updatedAt: z.string(),
