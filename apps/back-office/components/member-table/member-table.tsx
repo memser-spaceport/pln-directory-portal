@@ -58,10 +58,12 @@ const MemberTable = (props: any) => {
   function redirectToDetail(request) {
     setIsLoading(true);
     const route = ROUTE_CONSTANTS.MEMBER_VIEW;
+    const from = selectedTab === APP_CONSTANTS.PENDING_FLAG ? "pending": "approved";
     router.push({
       pathname: route,
       query: {
         id: request.id,
+        from,
       },
     });
   }
@@ -84,7 +86,7 @@ const MemberTable = (props: any) => {
       setIsLoading(true);
       if (selectedTab === APP_CONSTANTS.PENDING_FLAG) {
         await api.post(`${API_ROUTE.PARTICIPANTS_REQUEST}`, [data], configuration);
-        message = `Successfully ${(status ===  APP_CONSTANTS.REJECTED_FLAG ? APP_CONSTANTS.REJECTED_LABEL : APP_CONSTANTS.VERIFIED_FLAG)}`;
+        message = `Successfully ${(status ===  APP_CONSTANTS.REJECTED_FLAG ? APP_CONSTANTS.REJECTED_LABEL : (isVerified ? APP_CONSTANTS.VERIFIED_FLAG : APP_CONSTANTS.UNVERIFIED_FLAG))}`;
       } else {
         await api.post(`${API_ROUTE.ADMIN_APPROVAL}`, { memberIds: [id] }, configuration);
         message = `Successfully ${APP_CONSTANTS.VERIFIED_FLAG}`;
