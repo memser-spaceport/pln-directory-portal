@@ -42,8 +42,6 @@ export class MembersService {
     @Inject(forwardRef(() => NotificationService))
     private notificationService: NotificationService,
     @Inject(CACHE_MANAGER) private cacheService: Cache
-
-  ) { }
   ) { }
 
   /**
@@ -1124,7 +1122,7 @@ export class MembersService {
    * @param userEmail logged in member email
    * @returns result
    */
-  async verifyMembers(memberIds: string[], userEmail:string): Promise<any> {
+  async verifyMembers(memberIds: string[], userEmail): Promise<any> {
     return await this.prisma.$transaction(async (tx) => { 
       const result = await tx.member.updateMany({
         where: { uid: { in: memberIds } },
