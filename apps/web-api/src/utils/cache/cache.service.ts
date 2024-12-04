@@ -15,6 +15,7 @@ export class CacheService {
     members: ['member-filters', 'member-list'],
     projects: ['project-list', 'focus-areas'],
     teams: ['team-filters', 'team-list', 'focus-areas'],
+    'participants-requests': ['member-filters', 'member-list','team-filters', 'team-list', 'focus-areas']
   };
 
   // Reset cache and call API based on service
@@ -41,7 +42,7 @@ export class CacheService {
     }
     const url = `${baseUrl}/api/revalidate`;
     try {
-      await axios.post(
+      const response = await axios.post(
         url,
         { tags },
         {
