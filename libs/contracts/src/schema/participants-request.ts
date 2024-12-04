@@ -51,6 +51,8 @@ const newDataMemberSchema = z.object({
   projectContributions: z.array(ProjectContributionSchema as any).optional(),
   bio: z.string().nullish(),
   signUpSource: z.string().nullish(),
+  signUpMedium: z.string().nullish(),
+  signUpCampaign: z.string().nullish(),
   isFeatured: z.boolean().nullish(),
   locationUid: z.string().nullish(),
   openToWork: z.boolean().nullish(),

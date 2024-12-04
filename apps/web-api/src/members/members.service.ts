@@ -708,8 +708,8 @@ export class MembersService {
       'name', 'email', 'githubHandler', 'discordHandler', 'bio',
       'twitterHandler', 'linkedinHandler', 'telegramHandler',
       'officeHours', 'moreDetails', 'plnStartDate', 'openToWork',
-      'isVerified', 'signUpSource', 'isUserConsent', 'isSubscribedToNewsletter',
-      'teamOrProjectURL'
+      'isVerified', 'signUpSource', 'signUpMedium', 'signUpCampaign', 
+      'isUserConsent', 'isSubscribedToNewsletter', 'teamOrProjectURL', 
     ];
     copyObj(memberData, member, directFields);
     member.email = member.email.toLowerCase().trim();

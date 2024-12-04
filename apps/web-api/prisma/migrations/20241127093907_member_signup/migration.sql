@@ -10,7 +10,9 @@ ADD COLUMN  "isVerified" BOOLEAN DEFAULT false,
 ADD COLUMN  "signUpSource" TEXT,
 ADD COLUMN  "isSubscribedToNewsletter" BOOLEAN DEFAULT false,
 ADD COLUMN  "isUserConsent" BOOLEAN DEFAULT false,
-ADD COLUMN  "teamOrProjectURL" TEXT;
+ADD COLUMN  "teamOrProjectURL" TEXT,
+ADD COLUMN  "signUpCampaign" TEXT,
+ADD COLUMN  "signUpMedium" TEXT;
 
 -- Modify the "plnFriend" column to drop NOT NULL constraint
 ALTER TABLE "Member" 

@@ -54,6 +54,8 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
       updatedAt: faker.date.recent(),
       locationUid: '',
       signUpSource: faker.company.name(),
+      signUpCampaign: faker.company.name(),
+      signUpMedium: faker.company.name(),
       isVerified: faker.datatype.boolean(),
       isUserConsent: faker.datatype.boolean(),
       isSubscribedToNewsletter: faker.datatype.boolean(),

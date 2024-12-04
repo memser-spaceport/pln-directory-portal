@@ -74,6 +74,8 @@ model Member {
   isFeatured                   Boolean?                      @default(false)
   isVerified                   Boolean?                      @default(false)
   signUpSource                 String? 
+  signUpMedium                 String?
+  signUpCampaign               String?
   isUserConsent                Boolean?                      @default(false)
   isSubscribedToNewsletter     Boolean?                      @default(false)
   teamOrProjectURL             String?          
