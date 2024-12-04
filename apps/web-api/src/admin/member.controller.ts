@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { MembersService } from '../members/members.service';
 
@@ -19,4 +19,19 @@ export class MemberController {
     const { memberIds } = body;
     return await this.membersService.verifyMembers(memberIds, requestor?.email);
   }
+
+  /**
+   * Updates a member to a verfied user.
+   * 
+   * @param body - participation request data with updated member details
+   * @returns updated member object
+   */
+  @Patch("/:uid")
+  @UseGuards(AdminAuthGuard)
+  async updateMemberAndVerify(@Param('uid') uid, @Body() participantsRequest) {
+    const requestor = await this.membersService.findMemberByRole();
+    const requestorEmail = requestor?.email ?? '';
+    return await this.membersService.updateMemberFromParticipantsRequest(uid, participantsRequest, requestorEmail);
+  }
+
 }
