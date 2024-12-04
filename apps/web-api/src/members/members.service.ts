@@ -44,6 +44,7 @@ export class MembersService {
     @Inject(CACHE_MANAGER) private cacheService: Cache
 
   ) { }
+  ) { }
 
   /**
    * Creates a new member in the database within a transaction.
@@ -719,7 +720,9 @@ export class MembersService {
       : type === 'Update' ? { disconnect: true } : undefined;
     member['skills'] = buildMultiRelationMapping('skills', memberData, type);
     if (type === 'Create') {
-      member['teamMemberRoles'] = this.buildTeamMemberRoles(memberData);
+      if (Array.isArray(memberData.teamMemberRoles)) {
+        member['teamMemberRoles'] = this.buildTeamMemberRoles(memberData);
+      }
       if (Array.isArray(memberData.projectContributions)) {
         member['projectContributions'] = {
           createMany: { data: memberData.projectContributions },
@@ -1121,8 +1124,8 @@ export class MembersService {
    * @param userEmail logged in member email
    * @returns result
    */
-  async verifyMembers(memberIds: string[], userEmail: any): Promise<any> {
-    return await this.prisma.$transaction(async (tx) => {
+  async verifyMembers(memberIds: string[], userEmail:string): Promise<any> {
+    return await this.prisma.$transaction(async (tx) => { 
       const result = await tx.member.updateMany({
         where: { uid: { in: memberIds } },
         data: {
