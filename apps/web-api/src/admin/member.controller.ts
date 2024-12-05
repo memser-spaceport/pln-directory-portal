@@ -31,7 +31,7 @@ export class MemberController {
   async updateMemberAndVerify(@Param('uid') uid, @Body() participantsRequest) {
     const requestor = await this.membersService.findMemberByRole();
     const requestorEmail = requestor?.email ?? '';
-    return await this.membersService.updateMemberFromParticipantsRequest(uid, participantsRequest, requestorEmail);
+    return await this.membersService.updateMemberFromParticipantsRequest(uid, participantsRequest, requestorEmail, true);
   }
 
 }
