@@ -105,7 +105,7 @@ export class NotificationService {
    * @param memberEmailId The email address of the member
    * @returns Sends an email notifying approval and posts a notification to Slack.
    */
-  async notifyForMemberEditApproval(memberName: string, uid: string, memberEmailId: string) {
+  async notifyForMemberEditApproval(memberName: string, uid: string, memberEmailIds: string[]) {
     const memberUrl = `${process.env.WEB_UI_BASE_URL}/members/${uid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`;
     const slackConfig = { requestLabel: 'Edit Labber Request Completed', url: memberUrl, name: memberName };
     await this.awsService.sendEmail(
@@ -113,7 +113,7 @@ export class NotificationService {
       { memberName, memberUid: uid, adminSiteUrl: memberUrl }
     );
     await this.awsService.sendEmail(
-      'EditMemberSuccess', false, [memberEmailId], 
+      'EditMemberSuccess', false, memberEmailIds, 
       { memberName, memberProfileLink: memberUrl }
     );
     await this.slackService.notifyToChannel(slackConfig);

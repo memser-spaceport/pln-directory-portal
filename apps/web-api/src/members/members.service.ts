@@ -634,7 +634,8 @@ export class MembersService {
   async updateMemberFromParticipantsRequest(
     memberUid: string,
     memberParticipantsRequest: ParticipantsRequest,
-    requestorEmail: string
+    requestorEmail: string,
+    isDirectoryAdmin=false
   ): Promise<Member> {
     let result;
     await this.prisma.$transaction(async (tx) => {
@@ -655,7 +656,9 @@ export class MembersService {
       );
       await this.updateMemberEmailChange(memberUid, isEmailChanged, isExternalIdAvailable, memberData, existingMember);
       await this.logParticipantRequest(requestorEmail, memberData, existingMember.uid, tx);
-      this.notificationService.notifyForMemberEditApproval(memberData.name, memberUid, requestorEmail);
+      if (isEmailChanged && isDirectoryAdmin) {
+        this.notificationService.notifyForMemberEditApproval(memberData.name, memberUid, [existingMember.email, memberData.email]);
+      }
       this.logger.info(`Member update request - completed, requestId -> ${result.uid}, requestor -> ${requestorEmail}`)
     });
     await this.postUpdateActions();

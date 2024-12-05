@@ -172,7 +172,7 @@ export class MemberController {
     if (!isEmpty(participantsRequest.newData.isVerified) && !this.membersService.checkIfAdminUser(requestor)) {
       throw new ForbiddenException(`Member isn't authorized to verify a member`);
     }
-    return await this.membersService.updateMemberFromParticipantsRequest(uid, participantsRequest, requestor.email);
+    return await this.membersService.updateMemberFromParticipantsRequest(uid, participantsRequest, requestor.email, requestor.isDirectoryAdmin);
   }
 
   /**
