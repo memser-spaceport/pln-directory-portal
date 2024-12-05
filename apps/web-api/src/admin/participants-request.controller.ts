@@ -9,13 +9,14 @@ import {
   UseGuards,
   UsePipes,
   BadRequestException,
-  NotFoundException
+  NotFoundException,
+  Post
 } from '@nestjs/common';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
-import { ProcessParticipantReqDto } from 'libs/contracts/src/schema';
+import { ProcessBulkParticipantRequest, ProcessParticipantReqDto } from 'libs/contracts/src/schema';
 import { ApprovalStatus, ParticipantsRequest, ParticipantType } from '@prisma/client';
 
 @Controller('v1/admin/participants-request')
@@ -23,7 +24,20 @@ import { ApprovalStatus, ParticipantsRequest, ParticipantType } from '@prisma/cl
 export class AdminParticipantsRequestController {
   constructor(
     private readonly participantsRequestService: ParticipantsRequestService
-  ) {}
+  ) { }
+
+  /**
+   * Process (approve/reject) multiple pending participants requests.
+   * @param body - The request body containing array of uids and status of participants to be processed;
+   * @returns The result of processing the participants request
+   */
+  @Post('/')
+  async processBulkRequest(
+    @Body() body: ProcessBulkParticipantRequest[]
+  ): Promise<any> {
+    const participationRequests = body;
+    return await this.participantsRequestService.processBulkRequest(participationRequests);
+  }
 
   /**
    * Retrieve all participants requests based on query parameters.
@@ -87,7 +101,7 @@ export class AdminParticipantsRequestController {
         'Requester email is required for team participation requests. Please provide a valid email address.'
       );
     }
-    return await this.participantsRequestService.processRequestByUid(uid, participantRequest, body.status);
+    return await this.participantsRequestService.processRequestByUid(uid, participantRequest, body.status, body.isVerified);
   }
+
 }
-  

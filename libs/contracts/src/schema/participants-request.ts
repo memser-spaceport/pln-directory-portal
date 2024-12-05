@@ -6,7 +6,7 @@ export const statusEnum = z.enum(['PENDING', 'APPROVED', 'REJECTED']);
 export const participantTypeEnum = z.enum(['MEMBER', 'TEAM']);
 const oldDataPostSchema = z.object({});
 const teamMappingSchema = z.object({
-  role: z.string(),
+  role: z.string().nullish().optional(),
   teamUid: z.string(),
   teamTitle: z.string(),
 });
@@ -35,8 +35,8 @@ const newDataMemberSchema = z.object({
   name: z.string(),
   email: z.string(),
   plnStartDate: z.string().optional().nullable(),
-  teamAndRoles: z.array(teamMappingSchema).nonempty(),
-  skills: z.array(skillsMappingSchema).nonempty(),
+  teamAndRoles: z.array(teamMappingSchema).optional(),
+  skills: z.array(skillsMappingSchema).optional(),
   city: z.string().optional().nullable(),
   country: z.string().optional().nullable(),
   region: z.string().optional().nullable(),
@@ -46,9 +46,20 @@ const newDataMemberSchema = z.object({
   linkedinHandler: z.string().optional().nullable(),
   telegramHandler: z.string().optional().nullable(),
   officeHours: z.string().optional().nullable(),
-  imageUid: z.string().optional().nullable(),
-  moreDetails: z.string().optional().nullable(),
-  projectContributions:  z.array(ProjectContributionSchema as any).optional()
+  imageUid: z.string().optional().nullish(),
+  moreDetails: z.string().optional().nullish(),
+  projectContributions: z.array(ProjectContributionSchema as any).optional(),
+  bio: z.string().nullish(),
+  signUpSource: z.string().nullish(),
+  signUpMedium: z.string().nullish(),
+  signUpCampaign: z.string().nullish(),
+  isFeatured: z.boolean().nullish(),
+  locationUid: z.string().nullish(),
+  openToWork: z.boolean().nullish(),
+  isVerified: z.boolean().nullish(),
+  isUserConsent: z.boolean().nullish(),
+  isSubscribedToNewsletter: z.boolean().nullish(),
+  teamOrProjectURL: z.string().nullish()
 });
 
 const newDataTeamSchema = z.object({
@@ -103,7 +114,15 @@ export const FindUniqueIdentiferSchema = z.object({
 })
 
 const ProcessParticipantRequest = z.object({
-    status: statusEnum,
+  status: statusEnum,
+  isVerified: z.boolean()
 })
-export class ProcessParticipantReqDto extends createZodDto(ProcessParticipantRequest) {}
+const ProcessBulkRequest = z.object({
+  uid: z.string(),
+  status: statusEnum,
+  participantType: participantTypeEnum,
+  isVerified: z.boolean()
+})
+export class ProcessBulkParticipantRequest extends createZodDto(ProcessBulkRequest) { }
+export class ProcessParticipantReqDto extends createZodDto(ProcessParticipantRequest) { }
 export class FindUniqueIdentiferDto extends createZodDto(FindUniqueIdentiferSchema) { }

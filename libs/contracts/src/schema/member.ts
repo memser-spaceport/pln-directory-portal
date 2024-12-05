@@ -22,7 +22,8 @@ export const PreferenceSchema = z.object({
   showLinkedin:z.boolean(),
   showDiscord:z.boolean(),
   showGithubProjects:z.boolean(),
-  showTwitter:z.boolean()
+  showTwitter:z.boolean(),
+  showSubscription:z.boolean()
 });
 
 export const MemberSchema = z.object({
@@ -30,7 +31,7 @@ export const MemberSchema = z.object({
   uid: z.string(),
   name: z.string(),
   email: z.string(),
-  externalId: z.string(),
+  externalId: z.string().nullish(),
   imageUid: z.string().nullish(),
   githubHandler: z.string().nullish(),
   discordHandler: z.string().nullish(),
@@ -38,17 +39,24 @@ export const MemberSchema = z.object({
   telegramHandler: z.string().nullish(),
   officeHours: z.string().nullish(),
   airtableRecId: z.string().nullish(),
-  plnFriend: z.boolean(),
+  plnFriend: z.boolean().nullish(),
   bio: z.string().nullish(),
+  signUpSource: z.string().nullish(),
+  signUpMedium: z.string().nullish(),
+  signUpCampaign: z.string().nullish(),
   isFeatured: z.boolean().nullish(),
   createdAt: z.string(),
   updatedAt: z.string(),
-  locationUid: z.string(),
-  openToWork: z.boolean(),
+  locationUid: z.string().nullable(),
+  openToWork: z.boolean().nullish(),
   linkedinHandler: z.string().nullish(),
   repositories: GitHubRepositorySchema.array().optional(),
   preferences: PreferenceSchema.optional(),
-  projectContributions: z.array(ProjectContributionSchema).optional()
+  projectContributions: z.array(ProjectContributionSchema).optional(),
+  isVerified:z.boolean().nullish(),
+  isUserConsent: z.boolean().nullish(),
+  isSubscribedToNewsletter: z.boolean().nullish(),
+  teamOrProjectURL: z.string().nullish()
 });
 
 
@@ -74,7 +82,18 @@ export const CreateMemberSchema = MemberSchema.pick({
   officeHours: true,
   plnFriend: true,
   locationUid: true,
-  bio: true
+  bio: true,
+  signUpSource: true,
+  isFeatured: true,
+  openToWork: true,
+  linkedinHandler: true,
+  telegramHandler: true,
+  isVerified: true,
+  isUserConsent: true,
+  isSubscribedToNewsletter: true,
+  teamOrProjectURL: true,
+  preferences: true,
+  projectContributions: true
 });
 
 export const MemberRelationalFields = ResponseMemberWithRelationsSchema.pick({

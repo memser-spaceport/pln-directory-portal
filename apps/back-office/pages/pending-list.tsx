@@ -9,41 +9,27 @@ import { ApprovalLayout } from '../layout/approval-layout';
 import { parseCookies } from 'nookies';
 
 export default function PendingList(props) {
-  const {
-    setIsOpenRequest,
-    setMemberList,
-    setTeamList,
-    isTeamActive,
-    setShowMenu,
-  } = useNavbarContext();
+  const { setIsOpenRequest, setMemberList, setTeamList, isTeamActive, setShowMenu, memberList, teamList } = useNavbarContext();
   setShowMenu(true);
 
   useEffect(() => {
-    setMemberList(props.memberList);
+    setMemberList([...props.memberList, ...props.unverifiedMembers]);
     setTeamList(props.teamList);
     setIsOpenRequest(true);
-  }, [
-    isTeamActive,
-    setMemberList,
-    props.memberList,
-    props.teamList,
-    setTeamList,
-    setIsOpenRequest,
-  ]);
+  }, [isTeamActive, setMemberList, props.memberList, props.teamList, setTeamList, setIsOpenRequest]);
 
   return (
     <ApprovalLayout>
       <RequestList
-        list={isTeamActive ? props.teamList : props.memberList}
+        plnadmin={props.plnadmin}
+        list={isTeamActive ? [...props.teamList] : [...props.memberList, ...props.unverifiedMembers]}
         type={APP_CONSTANTS.PENDING_LABEL}
       />
     </ApprovalLayout>
   );
 }
 
-export const getServerSideProps: GetServerSideProps<IRequest> = async (
-  context
-) => {
+export const getServerSideProps: GetServerSideProps<IRequest> = async (context) => {
   const { plnadmin } = parseCookies(context);
 
   if (!plnadmin) {
@@ -61,21 +47,18 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (
       authorization: `Bearer ${plnadmin}`,
     },
   };
-  const listData = await api.get(
-    `${API_ROUTE.PARTICIPANTS_REQUEST}?status=PENDING`,
-    config
-  );
+  const listData = await api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}?status=PENDING`, config);
+  const unVerifiedMembes = await api.get(`${API_ROUTE.MEMBERS}?isVerified=false&pagination=false`, config);
+
   let memberResponse = [];
   let teamResponse = [];
   let team = [];
   let member = [];
+  let membersCount = 0;
+  let unverifiedMembers = [];
   if (listData.data) {
-    teamResponse = listData.data.filter(
-      (item) => item.participantType === ENROLLMENT_TYPE.TEAM
-    );
-    memberResponse = listData.data.filter(
-      (item) => item.participantType === ENROLLMENT_TYPE.MEMBER
-    );
+    teamResponse = listData.data.filter((item) => item.participantType === ENROLLMENT_TYPE.TEAM);
+    memberResponse = listData.data.filter((item) => item.participantType === ENROLLMENT_TYPE.MEMBER);
     member = memberResponse?.map((data) => {
       return {
         id: data.uid,
@@ -83,6 +66,14 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (
         status: data.status,
       };
     });
+    unverifiedMembers = unVerifiedMembes.data.members.map((data) => {
+      return {
+        id: data.uid,
+        name: data.name,
+        isVerified: data?.isVerified || false,
+      };
+    });
+
     team = teamResponse?.map((data) => {
       return {
         id: data.uid,
@@ -91,12 +82,15 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (
       };
     });
   }
+  membersCount = member?.length + unverifiedMembers?.length;
   return {
     props: {
       memberList: member,
+      unverifiedMembers: unverifiedMembers,
       teamList: team,
       teamCount: team?.length ?? 0,
-      memberCount: member?.length ?? 0,
+      memberCount: membersCount ?? 0,
+      plnadmin,
     },
   };
 };

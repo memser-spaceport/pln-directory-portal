@@ -2,6 +2,7 @@ import { UserGroupIcon, UserIcon } from '@heroicons/react/solid';
 import APP_CONSTANTS, { ROUTE_CONSTANTS } from '../../utils/constants';
 import { useNavbarContext } from '../../context/navbar-context';
 import { useRouter } from 'next/router';
+import { useEffect } from 'react';
 
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
 
@@ -18,6 +19,7 @@ export function Menu() {
     setIsTeamActive,
     isTeamActive,
     isOpenRequest,
+    setMemberList,
   } = useNavbarContext();
   // const [isTeamActive, setIsTeamActive] = useState<boolean>(true);
   const MENU_ITEMS: IMenuItem[] = [

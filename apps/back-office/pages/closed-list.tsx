@@ -13,31 +13,19 @@ type RequestList = {
 };
 
 export default function ClosedList(props) {
-  const {
-    setIsOpenRequest,
-    setMemberList,
-    setTeamList,
-    isTeamActive,
-    setShowMenu,
-  } = useNavbarContext();
+  const { setIsOpenRequest, setMemberList, setTeamList, isTeamActive, setShowMenu } = useNavbarContext();
   setShowMenu(true);
 
   useEffect(() => {
     setMemberList(props.memberList);
     setTeamList(props.teamList);
     setIsOpenRequest(false);
-  }, [
-    isTeamActive,
-    setMemberList,
-    props.memberList,
-    props.teamList,
-    setTeamList,
-    setIsOpenRequest,
-  ]);
+  }, [isTeamActive, setMemberList, props.memberList, props.teamList, setTeamList, setIsOpenRequest]);
 
   return (
     <ApprovalLayout>
       <RequestList
+        plnadmin={props.plnadmin}
         list={isTeamActive ? props.teamList : props.memberList}
         type={APP_CONSTANTS.CLOSED_FLAG}
       />
@@ -45,9 +33,7 @@ export default function ClosedList(props) {
   );
 }
 
-export const getServerSideProps: GetServerSideProps<IRequest> = async (
-  context
-) => {
+export const getServerSideProps: GetServerSideProps<IRequest> = async (context) => {
   const { plnadmin } = parseCookies(context);
 
   if (!plnadmin) {
@@ -76,7 +62,7 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (
     teamResponse = listData.data.filter(
       (item) =>
         item.participantType === ENROLLMENT_TYPE.TEAM &&
-        item.status !== APP_CONSTANTS.PENDING_LABEL && 
+        item.status !== APP_CONSTANTS.PENDING_LABEL &&
         item.status !== APP_CONSTANTS.AUTO_APPROVED_LABEL
     );
     memberResponse = listData.data.filter(
@@ -88,14 +74,14 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (
     member = memberResponse?.map((data) => {
       return {
         id: data.uid,
-        name: data.newData.name,
+        name: data.newData.name ?? '',
         status: data.status,
       };
     });
     team = teamResponse?.map((data) => {
       return {
         id: data.uid,
-        name: data.newData.name,
+        name: data.newData.name ?? '',
         status: data.status,
       };
     });
@@ -107,6 +93,7 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (
       teamList: team,
       teamCount: team?.length ?? 0,
       memberCount: member?.length ?? 0,
+      plnadmin,
     },
   };
 };

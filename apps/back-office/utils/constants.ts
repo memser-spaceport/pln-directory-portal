@@ -2,6 +2,10 @@ const APP_CONSTANTS = {
   AUTO_APPROVED_LABEL:'AUTOAPPROVED',
   APPROVED_LABEL: 'Approved',
   PENDING_LABEL: 'PENDING',
+  PENDING_FLAG: "Pending",
+  UNVERIFIED_LABEL: 'UNVERIFIED',
+  UNVERIFIED_FLAG: 'Unverified',
+  VERIFIED_FLAG: 'Verified',
   REJECTED_LABEL: 'Rejected',
   APPROVED_FLAG: 'APPROVED',
   REJECTED_FLAG: 'REJECTED',
@@ -40,6 +44,7 @@ export const API_ROUTE = {
   INDUSTRIES: APP_CONSTANTS.V1 + 'industry-tags',
   TECHNOLOGIES: APP_CONSTANTS.V1 + 'technologies',
   MEMBERS: APP_CONSTANTS.V1 + 'members',
+  ADMIN_APPROVAL: APP_CONSTANTS.V1 + 'admin/members',
 };
 
 export const TOKEN = 'plnetwork@1';
