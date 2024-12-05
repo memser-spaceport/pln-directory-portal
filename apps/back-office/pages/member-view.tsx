@@ -535,14 +535,26 @@ export const getServerSideProps = async (context) => {
       });
     }
     } else {
-      const approvedApiResponse = await api.get(`${API_ROUTE.MEMBERS}/${id}`, config);
+      const approvedApiResponse = await api.get(`${API_ROUTE.MEMBERS}/${id}?with=image`, config);
+      const skillsResponse = await api.get(API_ROUTE.SKILLS);
 
+      let counter = 1;
       if (approvedApiResponse.status === 200) {
         const requestData = approvedApiResponse?.data;
+        const teamAndRoles =
+      requestData?.teamMemberRoles?.length &&
+      requestData?.teamMemberRoles?.map((team) => {
+        return {
+          role: team.role ?? "",
+          teamUid: team.teamUid,
+          teamTitle: team.team.name,
+          rowId: counter++,
+        };
+      });
         formValues = {
           name: requestData?.name,
           email: requestData?.email,
-          imageUid: requestData?.imageUid ?? '',
+          imageUid: requestData?.image?.url ?? '',
           imageFile: null,
           plnStartDate: requestData?.plnStartDate
             ? new Date(requestData?.plnStartDate).toISOString().split('T')[0]
@@ -557,7 +569,7 @@ export const getServerSideProps = async (context) => {
           telegramHandler: requestData?.telegramHandler ?? '',
           officeHours: requestData?.officeHours ?? '',
           comments: requestData?.comments ?? '',
-          teamAndRoles: // teamAndRoles || 
+          teamAndRoles: teamAndRoles || 
             [
               // { teamUid: '', teamTitle: '', role: '', rowId: 1 },
             ],
@@ -572,7 +584,9 @@ export const getServerSideProps = async (context) => {
         teamList = approvedApiResponse?.data?.teamList ?? [];
         memberList = approvedApiResponse?.data?.memberList ?? [];
         teams = approvedApiResponse?.data?.teams ?? [];
-        skills = approvedApiResponse?.data?.skills ?? [];
+        skills = skillsResponse?.data?.map((item) => {
+          return { value: item.uid, label: item.title };
+        });
         status= APP_CONSTANTS.PENDING_LABEL;
       }
     }
