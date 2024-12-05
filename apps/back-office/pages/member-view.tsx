@@ -211,7 +211,7 @@ export default function MemberView(props) {
             imageUid: image?.uid ?? values.imageUid,
             imageUrl: image?.url ?? imageUrl,
           },
-        };
+        };   
         const configuration = {
           headers: {
             authorization: `Bearer ${props.plnadmin}`,
@@ -554,7 +554,7 @@ export const getServerSideProps = async (context) => {
         formValues = {
           name: requestData?.name,
           email: requestData?.email,
-          imageUid: requestData?.image?.url ?? '',
+          imageUid: requestData?.imageUid ?? '',
           imageFile: null,
           plnStartDate: requestData?.plnStartDate
             ? new Date(requestData?.plnStartDate).toISOString().split('T')[0]
@@ -580,7 +580,7 @@ export const getServerSideProps = async (context) => {
           openToWork: requestData?.openToWork ?? '',
           projectContributions: requestData?.projectContributions ?? []
         };
-        imageUrl = requestData?.imageUrl ?? '';
+        imageUrl = requestData?.image?.url ?? '',
         teamList = approvedApiResponse?.data?.teamList ?? [];
         memberList = approvedApiResponse?.data?.memberList ?? [];
         teams = approvedApiResponse?.data?.teams ?? [];
