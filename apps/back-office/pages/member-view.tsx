@@ -85,7 +85,7 @@ export default function MemberView(props) {
   const [disableSave, setDisableSave] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [resetImg, setResetImg] = useState(false); 
+  const [resetImg, setResetImg] = useState(false);
   const {
     setIsOpenRequest,
     setMemberList,
@@ -102,7 +102,7 @@ export default function MemberView(props) {
   useEffect(() => {
     setDropDownValues({ skillValues: props?.skills, teamNames: props?.teams });
   }, [props]);
-  
+
   const handleResetImg = () => {
     setResetImg(false);
   }
@@ -128,7 +128,7 @@ export default function MemberView(props) {
       twitterHandler: formValues.twitterHandler?.trim(),
       githubHandler: formValues.githubHandler?.trim(),
       telegramHandler: formValues.telegramHandler?.trim(),
-      officeHours: formValues.officeHours?.trim() === ''? null : formValues.officeHours?.trim(),
+      officeHours: formValues.officeHours?.trim() === '' ? null : formValues.officeHours?.trim(),
       comments: formValues.comments?.trim(),
       teamOrProjectURL: formValues.teamOrProjectURL,
       plnStartDate: formValues.plnStartDate
@@ -137,7 +137,7 @@ export default function MemberView(props) {
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
-      projectContributions:formValues.projectContributions,
+      projectContributions: formValues.projectContributions,
       oldName: name,
     };
     delete formattedData.requestorEmail;
@@ -212,13 +212,25 @@ export default function MemberView(props) {
             imageUrl: image?.url ?? imageUrl,
           },
         };
-                const configuration = {
+        const configuration = {
           headers: {
             authorization: `Bearer ${props.plnadmin}`,
           },
         };
 
-        await api
+        if(props?.from === "approved") {
+          await api.patch(
+            `${API_ROUTE.ADMIN_APPROVAL}/${props.id}`,
+            data,
+            configuration
+          )
+          .then((response) => {
+            setSaveCompleted(true);
+            setIsEditEnabled(false);
+            setResetImg(true);
+          });
+        } else {
+          await api
           .put(
             `${API_ROUTE.PARTICIPANTS_REQUEST}/${props.id}`,
             data,
@@ -229,6 +241,7 @@ export default function MemberView(props) {
             setIsEditEnabled(false);
             setResetImg(true);
           });
+        }
       } catch (err) {
         toast(err?.message);
         console.log('error', err);
@@ -386,6 +399,7 @@ export default function MemberView(props) {
           referenceUid={props.referenceUid}
           setLoader={setIsLoading}
           token={props.plnadmin}
+          from={props.from}
         />
       )}
     </>
@@ -393,9 +407,10 @@ export default function MemberView(props) {
 }
 
 export const getServerSideProps = async (context) => {
-  const { id, backLink = ROUTE_CONSTANTS.PENDING_LIST } = context.query as {
+  const { id, from, backLink = ROUTE_CONSTANTS.PENDING_LIST } = context.query as {
     id: string;
     backLink: string;
+    from: string;
   };
   const { plnadmin } = parseCookies(context);
 
@@ -421,119 +436,162 @@ export const getServerSideProps = async (context) => {
   let teamList = [];
   let oldName = '';
 
-  // Check if provided ID is an Airtable ID, and if so, get the corresponding backend UID
+  
+  if (from !== "approved") {
+    const [
+      requestDetailResponse,
+      allRequestResponse,
+      memberTeamsResponse,
+      skillsResponse,
+    ] = await Promise.all([
+      api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, config),
+      api.get(API_ROUTE.PARTICIPANTS_REQUEST, config),
+      api.get(API_ROUTE.TEAMS),
+      api.get(API_ROUTE.SKILLS),
+    ]);
 
-  const [
-    requestDetailResponse,
-    allRequestResponse,
-    memberTeamsResponse,
-    skillsResponse,
-  ] = await Promise.all([
-    api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, config),
-    api.get(API_ROUTE.PARTICIPANTS_REQUEST, config),
-    api.get(API_ROUTE.TEAMS),
-    api.get(API_ROUTE.SKILLS),
-  ]);
+    if (
+      requestDetailResponse.status === 200 &&
+      allRequestResponse.status === 200 &&
+      memberTeamsResponse.status === 200 &&
+      skillsResponse.status === 200
+    ) {
+      teamList = allRequestResponse?.data?.filter(
+        (item) => item.participantType === ENROLLMENT_TYPE.TEAM
+      );
+      memberList = allRequestResponse?.data?.filter(
+        (item) => item.participantType === ENROLLMENT_TYPE.MEMBER
+      );
 
-  if (
-    requestDetailResponse.status === 200 &&
-    allRequestResponse.status === 200 &&
-    memberTeamsResponse.status === 200 &&
-    skillsResponse.status === 200
-  ) {
-    teamList = allRequestResponse?.data?.filter(
-      (item) => item.participantType === ENROLLMENT_TYPE.TEAM
-    );
-    memberList = allRequestResponse?.data?.filter(
-      (item) => item.participantType === ENROLLMENT_TYPE.MEMBER
-    );
+      let counter = 1;
+      referenceUid = requestDetailResponse?.data?.referenceUid ?? '';
+      const requestData = requestDetailResponse?.data?.newData;
+      oldName = requestData?.oldName ?? requestData?.name;
+      status = requestDetailResponse?.data?.status;
+      const teamAndRoles =
+        requestData?.teamAndRoles?.length &&
+        requestData?.teamAndRoles?.map((team) => {
+          return {
+            role: team.role ?? "",
+            teamUid: team.teamUid,
+            teamTitle: team.teamTitle,
+            rowId: counter++,
+          };
+        });
 
-    let counter = 1;
-    referenceUid = requestDetailResponse?.data?.referenceUid ?? '';
-    const requestData = requestDetailResponse?.data?.newData;
-    oldName = requestData?.oldName ?? requestData?.name;
-    status = requestDetailResponse?.data?.status;
-    const teamAndRoles =
-      requestData?.teamAndRoles?.length &&
-      requestData?.teamAndRoles?.map((team) => {
-        return {
-          role: team.role  ?? "",
-          teamUid: team.teamUid,
-          teamTitle: team.teamTitle,
-          rowId: counter++,
-        };
-      });
-      
-    formValues = {
-      name: requestData?.name,
-      email: requestData?.email,
-      imageUid: requestData?.imageUid ?? '',
-      imageFile: null,
-      plnStartDate: requestData?.plnStartDate
-        ? new Date(requestData?.plnStartDate).toISOString().split('T')[0]
-        : null,
-      city: requestData?.city ?? '',
-      region: requestData?.region ?? '',
-      country: requestData?.country ?? '',
-      linkedinHandler: requestData?.linkedinHandler ?? '',
-      discordHandler: requestData?.discordHandler ?? '',
-      twitterHandler: requestData?.twitterHandler ?? '',
-      githubHandler: requestData?.githubHandler ?? '',
-      telegramHandler: requestData?.telegramHandler ?? '',
-      officeHours: requestData?.officeHours ?? '',
-      requestorEmail: requestDetailResponse?.data?.requesterEmailId ?? '',
-      comments: requestData?.comments ?? '',
-      teamAndRoles: teamAndRoles || [
-        // { teamUid: '', teamTitle: '', role: '', rowId: 1 },
-      ],
-      teamOrProjectURL: requestData?.teamOrProjectURL ?? '',
-      skills: requestData?.skills?.map((item) => {
+      formValues = {
+        name: requestData?.name,
+        email: requestData?.email,
+        imageUid: requestData?.imageUid ?? '',
+        imageFile: null,
+        plnStartDate: requestData?.plnStartDate
+          ? new Date(requestData?.plnStartDate).toISOString().split('T')[0]
+          : null,
+        city: requestData?.city ?? '',
+        region: requestData?.region ?? '',
+        country: requestData?.country ?? '',
+        linkedinHandler: requestData?.linkedinHandler ?? '',
+        discordHandler: requestData?.discordHandler ?? '',
+        twitterHandler: requestData?.twitterHandler ?? '',
+        githubHandler: requestData?.githubHandler ?? '',
+        telegramHandler: requestData?.telegramHandler ?? '',
+        officeHours: requestData?.officeHours ?? '',
+        requestorEmail: requestDetailResponse?.data?.requesterEmailId ?? '',
+        comments: requestData?.comments ?? '',
+        teamAndRoles: teamAndRoles || [
+          // { teamUid: '', teamTitle: '', role: '', rowId: 1 },
+        ],
+        teamOrProjectURL: requestData?.teamOrProjectURL ?? '',
+        skills: requestData?.skills?.map((item) => {
+          return { value: item.uid, label: item.title };
+        }) || [],
+        openToWork: requestData?.openToWork ?? '',
+        projectContributions: requestData?.projectContributions ?? []
+      };
+      imageUrl = requestData?.imageUrl ?? '';
+
+      if (status == APP_CONSTANTS.PENDING_LABEL) {
+        teamList = allRequestResponse?.data
+          ?.filter((item) => item.participantType === ENROLLMENT_TYPE.TEAM)
+          ?.filter((item) => item.status === APP_CONSTANTS.PENDING_LABEL);
+        memberList = allRequestResponse?.data
+          ?.filter((item) => item.participantType === ENROLLMENT_TYPE.MEMBER)
+          .filter((item) => item.status === APP_CONSTANTS.PENDING_LABEL);
+      } else {
+        teamList = allRequestResponse?.data
+          ?.filter((item) => item.participantType === ENROLLMENT_TYPE.TEAM)
+          ?.filter((item) => item.status !== APP_CONSTANTS.PENDING_LABEL);
+        memberList = allRequestResponse?.data
+          ?.filter((item) => item.participantType === ENROLLMENT_TYPE.MEMBER)
+          .filter((item) => item.status !== APP_CONSTANTS.PENDING_LABEL);
+      }
+
+      teams = Array.isArray(memberTeamsResponse?.data) ?
+        memberTeamsResponse?.data?.map((item) => {
+          return { value: item.uid, label: item.name };
+        }) : [];
+      skills = skillsResponse?.data?.map((item) => {
         return { value: item.uid, label: item.title };
-      }),
-      openToWork: requestData?.openToWork ?? '',
-      projectContributions:requestData?.projectContributions ?? []
-    };
-    imageUrl = requestData?.imageUrl ?? '';
-
-    if (status == APP_CONSTANTS.PENDING_LABEL) {
-      teamList = allRequestResponse?.data
-        ?.filter((item) => item.participantType === ENROLLMENT_TYPE.TEAM)
-        ?.filter((item) => item.status === APP_CONSTANTS.PENDING_LABEL);
-      memberList = allRequestResponse?.data
-        ?.filter((item) => item.participantType === ENROLLMENT_TYPE.MEMBER)
-        .filter((item) => item.status === APP_CONSTANTS.PENDING_LABEL);
+      });
+    }
     } else {
-      teamList = allRequestResponse?.data
-        ?.filter((item) => item.participantType === ENROLLMENT_TYPE.TEAM)
-        ?.filter((item) => item.status !== APP_CONSTANTS.PENDING_LABEL);
-      memberList = allRequestResponse?.data
-        ?.filter((item) => item.participantType === ENROLLMENT_TYPE.MEMBER)
-        .filter((item) => item.status !== APP_CONSTANTS.PENDING_LABEL);
+      const approvedApiResponse = await api.get(`${API_ROUTE.MEMBERS}/${id}`, config);
+
+      if (approvedApiResponse.status === 200) {
+        const requestData = approvedApiResponse?.data;
+        formValues = {
+          name: requestData?.name,
+          email: requestData?.email,
+          imageUid: requestData?.imageUid ?? '',
+          imageFile: null,
+          plnStartDate: requestData?.plnStartDate
+            ? new Date(requestData?.plnStartDate).toISOString().split('T')[0]
+            : null,
+          city: requestData?.city ?? '',
+          region: requestData?.region ?? '',
+          country: requestData?.country ?? '',
+          linkedinHandler: requestData?.linkedinHandler ?? '',
+          discordHandler: requestData?.discordHandler ?? '',
+          twitterHandler: requestData?.twitterHandler ?? '',
+          githubHandler: requestData?.githubHandler ?? '',
+          telegramHandler: requestData?.telegramHandler ?? '',
+          officeHours: requestData?.officeHours ?? '',
+          comments: requestData?.comments ?? '',
+          teamAndRoles: // teamAndRoles || 
+            [
+              // { teamUid: '', teamTitle: '', role: '', rowId: 1 },
+            ],
+          teamOrProjectURL: requestData?.teamOrProjectURL ?? '',
+          skills: requestData?.skills?.map((item) => {
+            return { value: item.uid, label: item.title };
+          }),
+          openToWork: requestData?.openToWork ?? '',
+          projectContributions: requestData?.projectContributions ?? []
+        };
+        imageUrl = requestData?.imageUrl ?? '';
+        teamList = approvedApiResponse?.data?.teamList ?? [];
+        memberList = approvedApiResponse?.data?.memberList ?? [];
+        teams = approvedApiResponse?.data?.teams ?? [];
+        skills = approvedApiResponse?.data?.skills ?? [];
+        status= APP_CONSTANTS.PENDING_LABEL;
+      }
     }
 
-    teams = Array.isArray(memberTeamsResponse?.data) ? 
-    memberTeamsResponse?.data?.map((item) => {
-      return { value: item.uid, label: item.name };
-    }) : []; 
-    skills = skillsResponse?.data?.map((item) => {
-      return { value: item.uid, label: item.title };
-    });
-  }
-
-  return {
-    props: {
-      formValues,
-      teams,
-      skills,
-      id,
-      referenceUid,
-      imageUrl,
-      status,
-      backLink,
-      teamList,
-      memberList,
-      plnadmin,
-      oldName,
-    },
+    return {
+      props: {
+        formValues,
+        teams,
+        skills,
+        id,
+        // referenceUid,
+        imageUrl,
+        status,
+        backLink,
+        teamList,
+        memberList,
+        plnadmin,
+        oldName,
+        from,
+      },
+    };
   };
-};

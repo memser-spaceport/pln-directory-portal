@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import Loader from '../common/loader';
 import { useNavbarContext } from 'apps/back-office/context/navbar-context';
+import Modal from '../modal/modal';
 
 const MemberTable = (props: any) => {
   const selectedTab = props?.selectedTab ?? '';
@@ -16,6 +17,9 @@ const MemberTable = (props: any) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSort, setIsSort] = useState(false);
   const { setMemberList } = useNavbarContext();
+  const [openModal, setOpenModal] = useState(false);
+  const [rejectId, setRejectId] = useState([]);
+
 
   // const onSortClickHandler = () => {
   //   setIsSort(!isSort);
@@ -58,7 +62,7 @@ const MemberTable = (props: any) => {
   function redirectToDetail(request) {
     setIsLoading(true);
     const route = ROUTE_CONSTANTS.MEMBER_VIEW;
-    const from = selectedTab === APP_CONSTANTS.PENDING_FLAG ? "pending": "approved";
+    const from = selectedTab === APP_CONSTANTS.PENDING_FLAG ? "pending" : "approved";
     router.push({
       pathname: route,
       query: {
@@ -86,7 +90,7 @@ const MemberTable = (props: any) => {
       setIsLoading(true);
       if (selectedTab === APP_CONSTANTS.PENDING_FLAG) {
         await api.post(`${API_ROUTE.PARTICIPANTS_REQUEST}`, [data], configuration);
-        message = `Successfully ${(status ===  APP_CONSTANTS.REJECTED_FLAG ? APP_CONSTANTS.REJECTED_LABEL : (isVerified ? APP_CONSTANTS.VERIFIED_FLAG : APP_CONSTANTS.UNVERIFIED_FLAG))}`;
+        message = `Successfully ${(status === APP_CONSTANTS.REJECTED_FLAG ? APP_CONSTANTS.REJECTED_LABEL : (isVerified ? APP_CONSTANTS.VERIFIED_FLAG : APP_CONSTANTS.UNVERIFIED_FLAG))}`;
       } else {
         await api.post(`${API_ROUTE.ADMIN_APPROVAL}`, { memberIds: [id] }, configuration);
         message = `Successfully ${APP_CONSTANTS.VERIFIED_FLAG}`;
@@ -171,6 +175,7 @@ const MemberTable = (props: any) => {
       setSelectedMembes([]);
       setIsAllSelected(false);
       const message = `Successfully ${APP_CONSTANTS.REJECTED_LABEL}`;
+      setOpenModal(false)
       toast(message);
     } catch (error: any) {
       if (error.response?.status === 500) {
@@ -183,22 +188,35 @@ const MemberTable = (props: any) => {
         toast(error.message || 'An unexpected error occurred');
       }
     } finally {
+      setOpenModal(false);
       setIsLoading(false);
     }
   };
+
+  const handleOpen = (id: any) => {
+    setOpenModal(true);
+    if (Array.isArray(id)) {
+      setRejectId(id); 
+    } else {
+      setRejectId(id); 
+    }
+  }
+
+  const onClose = () => {
+    setOpenModal(false);
+  }
 
   return (
     <>
       {isLoading && <Loader />}
       {allMembers?.length > 0 && (
-        <div className="bg-white  shadow-[0px_0px_1px_0px_#0F172A1F]">
+        <div className="bg-white shadow-[0px_0px_1px_0px_#0F172A1F]">
           {/* Header */}
           <div className="sticky top-0 flex rounded-t-[8px] border-b border-b-[#E2E8F0] bg-white py-[8px] px-[24px]">
             <div className="flex w-[45%] items-center gap-[10px]">
               <button
-                className={`flex h-[20px] w-[20px] items-center justify-center rounded-[4px] border border-[#CBD5E1] ${
-                  isAllSelected ? 'bg-[#156FF7]' : ''
-                }`}
+                className={`flex h-[20px] w-[20px] items-center justify-center rounded-[4px] border border-[#CBD5E1] ${isAllSelected ? 'bg-[#156FF7]' : ''
+                  }`}
                 onClick={() => onSelectAllClickHandler()}
               >
                 {isAllSelected && <img alt="mode" src="/assets/images/right_white.svg" />}
@@ -222,9 +240,8 @@ const MemberTable = (props: any) => {
                 >
                   <div className="flex w-[45%] gap-[10px]">
                     <button
-                      className={`flex h-[20px] w-[20px] items-center justify-center rounded-[4px] border border-[#CBD5E1] ${
-                        isSelected ? 'bg-[#156FF7]' : ''
-                      }`}
+                      className={`flex h-[20px] w-[20px] items-center justify-center rounded-[4px] border border-[#CBD5E1] ${isSelected ? 'bg-[#156FF7]' : ''
+                        }`}
                       onClick={() => onMemberSelectHandler(member.id)}
                     >
                       {isSelected && <img alt="mode" src="/assets/images/right_white.svg" />}
@@ -238,33 +255,16 @@ const MemberTable = (props: any) => {
                   <div className="flex gap-[8px]">
                     <button
                       onClick={() => redirectToDetail(member)}
-                      className={`rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400] ${
-                        isDisableOptions ? 'cursor-not-allowed text-[#94A3B8]' : ''
-                      }`}
+                      className={`rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400] ${isDisableOptions ? 'cursor-not-allowed text-[#94A3B8]' : ''
+                        }`}
                     >
                       View
                     </button>
 
-                    <button
-                      className={`flex items-center gap-[4px] rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400] ${
-                        isDisableOptions ? 'cursor-not-allowed text-[#94A3B8]' : ''
-                      }`}
-                      onClick={() => approvelClickHandler(member.id, APP_CONSTANTS.APPROVED_FLAG, true)}
-                    >
-                      <img
-                        height={20}
-                        width={20}
-                        src={!isDisableOptions ? '/assets/images/verified.svg' : '/assets/images/verified-disabled.svg'}
-                        alt="verified"
-                      />
-                      Verified
-                    </button>
-
                     {selectedTab === APP_CONSTANTS.PENDING_FLAG && (
                       <button
-                        className={`flex items-center gap-[4px] rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400] ${
-                          isDisableOptions ? 'cursor-not-allowed text-[#94A3B8]' : ''
-                        }`}
+                        className={`flex items-center gap-[4px] rounded-[8px] px-[8px] py-[4px] border border-[#CBD5E1] text-[13px] font-[400] ${isDisableOptions ? 'cursor-not-allowed text-[#94A3B8]' : ''
+                          }`}
                         onClick={() => approvelClickHandler(member.id, APP_CONSTANTS.APPROVED_FLAG, false)}
                       >
                         <img
@@ -277,16 +277,29 @@ const MemberTable = (props: any) => {
                           }
                           alt="verified"
                         />
-                        Unverified
+                        Unverify
                       </button>
                     )}
 
+                    <button
+                      className={`flex items-center gap-[4px] rounded-[8px] border px-[8px] py-[4px] border-[#CBD5E1] text-[13px] font-[400] ${isDisableOptions ? 'cursor-not-allowed text-[#94A3B8]' : ''
+                        }`}
+                      onClick={() => approvelClickHandler(member.id, APP_CONSTANTS.APPROVED_FLAG, true)}
+                    >
+                      <img
+                        height={20}
+                        width={20}
+                        src={!isDisableOptions ? '/assets/images/verified.svg' : '/assets/images/verified-disabled.svg'}
+                        alt="verified"
+                      />
+                      Verify
+                    </button>
+
                     {selectedTab === APP_CONSTANTS.PENDING_FLAG && (
                       <button
-                        onClick={() => onRemoveClickHandler([member.id])}
-                        className={`rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400] ${
-                          isDisableOptions ? 'cursor-not-allowed text-[#94A3B8]' : ''
-                        }`}
+                        onClick={() => handleOpen([member.id])}
+                        className={`flex items-center gap-[4px] rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400] ${isDisableOptions ? 'cursor-not-allowed text-[#94A3B8]' : ''
+                          }`}
                       >
                         <img
                           height={20}
@@ -294,6 +307,7 @@ const MemberTable = (props: any) => {
                           src={!isDisableOptions ? '/assets/images/delete.svg' : '/assets/images/delete-disabled.svg'}
                           alt="verified"
                         />
+                        Reject
                       </button>
                     )}
                   </div>
@@ -326,36 +340,81 @@ const MemberTable = (props: any) => {
             </div>
 
             <div className="flex gap-[8px]">
-              <button
-                className={`flex items-center gap-[4px] rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400]`}
-                onClick={() => bulkApprovedClickHandler(true)}
-              >
-                <img height={20} width={20} src="/assets/images/verified.svg" alt="verified" />
-                Verified
-              </button>
-
               {selectedTab === APP_CONSTANTS.PENDING_FLAG && (
                 <button
                   onClick={() => bulkApprovedClickHandler(false)}
                   className={`flex items-center gap-[4px] rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400]`}
                 >
                   <img height={20} width={20} src="assets/images/unverified.svg" alt="verified" />
-                  Unverified
+                  Unverify
                 </button>
               )}
 
+              <button
+                className={`flex items-center gap-[4px] rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400]`}
+                onClick={() => bulkApprovedClickHandler(true)}
+              >
+                <img height={20} width={20} src="/assets/images/verified.svg" alt="verified" />
+                Verify
+              </button>
+
               {selectedTab === APP_CONSTANTS.PENDING_FLAG && (
                 <button
-                  onClick={() => onRemoveClickHandler(selectedMembers)}
-                  className={`rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400]`}
+                  onClick={() => handleOpen(selectedMembers)}
+                  className={`flex items-center gap-[4px] rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400]`}
                 >
                   <img height={20} width={20} src="/assets/images/delete.svg" alt="verified" />
+                  Reject
                 </button>
               )}
             </div>
           </div>
         </div>
       )}
+
+      {openModal &&
+        <Modal
+          isOpen={true}
+          onClose={onClose}
+        >
+          <div className="relative h-[21vh] w-[640px] rounded-[8px] bg-white text-[#000000]">
+            <div className='absolute top-[10px] right-[10px]'>
+              <button onClick={onClose}>
+                <img
+                  alt="close"
+                  src="/assets/images/close_gray.svg"
+                  height={20}
+                  width={20}
+                />
+              </button>
+            </div>
+            <div className='p-[30px] flex flex-col justify-between '>
+              <div className='text-2xl font-extrabold leading-8 text-left py-[10px]'>
+                Are you sure you want to reject?
+              </div>
+              <div className='text-sm font-normal leading-5 text-left'>
+                Clicking remove will remove the member from the list.
+              </div>
+
+              <div className="flex gap-[8px] mt-[25px] justify-end">
+                <button
+                  onClick={() => setOpenModal(false)}
+                  className={`flex items-center gap-[4px] rounded-[8px] border border-[#CBD5E1] px-[18px] py-[10px] text-[13px] font-[400]`}
+                >
+                  Cancel
+                </button>
+
+              <button
+                className={`flex items-center gap-[4px] rounded-[8px] border border-[#CBD5E1] px-[18px] py-[10px] text-[13px] font-[400] text-white bg-[#DD2C5A]`}
+                onClick={() => onRemoveClickHandler(rejectId)}
+              >
+                Reject
+              </button>
+            </div>
+            </div>
+          </div>
+        </Modal>
+      }
     </>
   );
 };
