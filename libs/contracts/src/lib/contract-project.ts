@@ -1,12 +1,20 @@
 import { initContract } from '@ts-rest/core';
 import {
-    ResponseProjectWithRelationsSchema
+  ResponseProjectWithRelationsSchema
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
 const contract = initContract();
 
 export const apiProjects = contract.router({
+  getProjectFilters: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/projects/filters`,
+    responses: {
+      200: contract.response<any>(),
+    },
+    summary: 'Get project filters',
+  },
   getProjects: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/projects`,

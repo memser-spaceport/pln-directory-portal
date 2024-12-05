@@ -2,14 +2,12 @@
 import { 
   BadRequestException, 
   ConflictException, 
-  NotFoundException, 
-  Inject, 
-  Injectable, 
-  CACHE_MANAGER, 
-  forwardRef 
+  NotFoundException,
+  Injectable,
+  forwardRef,
+  Inject 
 } from '@nestjs/common';
 import { ApprovalStatus, ParticipantType } from '@prisma/client';
-import { Cache } from 'cache-manager';
 import { Prisma, ParticipantsRequest, PrismaClient } from '@prisma/client';
 import { generateProfileURL } from '../utils/helper/helper';
 import { LogService } from '../shared/log.service';
@@ -19,6 +17,7 @@ import { TeamsService } from '../teams/teams.service';
 import { NotificationService } from '../utils/notification/notification.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
+import { CacheService } from '../utils/cache/cache.service';
 
 @Injectable()
 export class ParticipantsRequestService {
@@ -28,13 +27,12 @@ export class ParticipantsRequestService {
     private locationTransferService: LocationTransferService,
     private forestAdminService: ForestAdminService,
     private notificationService: NotificationService,
-    @Inject(CACHE_MANAGER) 
-    private cacheService: Cache,
+    private cacheService: CacheService,
     @Inject(forwardRef(() => MembersService))
     private membersService: MembersService,
-    @Inject(forwardRef(() => TeamsService)) 
+    @Inject(forwardRef(() => TeamsService))
     private teamsService: TeamsService,
-  ) {}
+  ) { }
 
   /**
    * Find all participant requests based on the query.
@@ -63,7 +61,7 @@ export class ParticipantsRequestService {
         where: filters,
         orderBy: { createdAt: 'desc' },
       });
-    } catch(err) {
+    } catch (err) {
       return this.handleErrors(err)
     }
   }
@@ -77,13 +75,13 @@ export class ParticipantsRequestService {
    */
   async add(
     newEntry: Prisma.ParticipantsRequestUncheckedCreateInput,
-    tx?: Prisma.TransactionClient, 
+    tx?: Prisma.TransactionClient,
   ): Promise<ParticipantsRequest> {
     try {
       return await (tx || this.prisma).participantsRequest.create({
         data: { ...newEntry },
       });
-    } catch(err) {
+    } catch (err) {
       return this.handleErrors(err)
     }
   }
@@ -99,7 +97,7 @@ export class ParticipantsRequestService {
       return await this.prisma.participantsRequest.findUnique({
         where: { uid },
       });
-    } catch(err) {
+    } catch (err) {
       return this.handleErrors(err, uid)
     }
   }
@@ -115,9 +113,9 @@ export class ParticipantsRequestService {
   async checkIfIdentifierAlreadyExist(
     type: ParticipantType,
     identifier: string
-  ): Promise<{ 
-    isRequestPending: boolean; 
-    isUniqueIdentifierExist: boolean 
+  ): Promise<{
+    isRequestPending: boolean;
+    isUniqueIdentifierExist: boolean
   }> {
     try {
       const existingRequest = await this.prisma.participantsRequest.findFirst({
@@ -130,16 +128,16 @@ export class ParticipantsRequestService {
       if (existingRequest) {
         return { isRequestPending: true, isUniqueIdentifierExist: false };
       }
-      const existingEntry = 
-        type === ParticipantType.TEAM 
-          ? await this.teamsService.findTeamByName(identifier) 
+      const existingEntry =
+        type === ParticipantType.TEAM
+          ? await this.teamsService.findTeamByName(identifier)
           : await this.membersService.findMemberByEmail(identifier);
       if (existingEntry) {
         return { isRequestPending: false, isUniqueIdentifierExist: true };
       }
       return { isRequestPending: false, isUniqueIdentifierExist: false };
-    } 
-    catch(err) {
+    }
+    catch (err) {
       return this.handleErrors(err)
     }
   }
@@ -155,20 +153,20 @@ export class ParticipantsRequestService {
   async updateByUid(
     uid: string,
     participantRequest: Prisma.ParticipantsRequestUncheckedUpdateInput,
-  ):Promise<ParticipantsRequest> {
+  ): Promise<ParticipantsRequest> {
     try {
       const formattedData = { ...participantRequest };
       delete formattedData.id;
       delete formattedData.uid;
       delete formattedData.status;
       delete formattedData.participantType;
-      const result:ParticipantsRequest = await this.prisma.participantsRequest.update({
+      const result: ParticipantsRequest = await this.prisma.participantsRequest.update({
         where: { uid },
         data: formattedData,
       });
-      await this.cacheService.reset();
+      await this.cacheService.reset({ service: "participants-requests" });
       return result;
-    } catch(err) {
+    } catch (err) {
       return this.handleErrors(err)
     }
   }
@@ -183,13 +181,13 @@ export class ParticipantsRequestService {
    */
   async rejectRequestByUid(uidToReject: string): Promise<ParticipantsRequest> {
     try {
-      const result:ParticipantsRequest = await this.prisma.participantsRequest.update({
+      const result: ParticipantsRequest = await this.prisma.participantsRequest.update({
         where: { uid: uidToReject },
         data: { status: ApprovalStatus.REJECTED }
       });
-      await this.cacheService.reset();
+      await this.cacheService.reset({ service: "participants-requests" });
       return result;
-    } catch(err) {
+    } catch (err) {
       return this.handleErrors(err)
     }
   }
@@ -209,12 +207,14 @@ export class ParticipantsRequestService {
    * @returns The updated participant request with the status set to `APPROVED`.
    */
   private async approveRequestByUid(
-    uidToApprove: string, 
-    participantsRequest: ParticipantsRequest
+    uidToApprove: string,
+    participantsRequest: ParticipantsRequest,
+    isVerified: boolean
   ): Promise<ParticipantsRequest> {
     let result;
     let createdItem;
     const dataToProcess: any = participantsRequest;
+    dataToProcess.newData.isVerified = isVerified;
     const participantType = participantsRequest.participantType;
     // Add new member or team and update status to approved
     await this.prisma.$transaction(async (tx) => {
@@ -248,7 +248,7 @@ export class ParticipantsRequestService {
         participantsRequest.requesterEmailId
       );
     }
-    await this.cacheService.reset();
+    await this.cacheService.reset({ service: "participants-requests" });
     await this.forestAdminService.triggerAirtableSync();
     return result;
   }
@@ -259,11 +259,11 @@ export class ParticipantsRequestService {
    * @param uid
    * @returns
    */
-  async processRequestByUid(uid:string, participantsRequest:ParticipantsRequest, statusToProcess) {
+  async processRequestByUid(uid: string, participantsRequest: ParticipantsRequest, statusToProcess, isVerified: boolean) {
     if (statusToProcess === ApprovalStatus.REJECTED) {
       return await this.rejectRequestByUid(uid);
     } else {
-      return await this.approveRequestByUid(uid, participantsRequest);
+      return await this.approveRequestByUid(uid, participantsRequest, isVerified);
     }
   }
 
@@ -288,13 +288,13 @@ export class ParticipantsRequestService {
     // Add the new request
     const result: ParticipantsRequest = await this.add({
       ...postData
-      }, 
+    },
       tx
     );
     if (!disableNotification) {
       this.notifyForCreate(result);
     }
-    await this.cacheService.reset();
+    await this.cacheService.reset({ service: "participants-requests" });
     return result;
   }
 
@@ -313,7 +313,7 @@ export class ParticipantsRequestService {
       }
     }
   }
-  
+
   /**
    * Extract unique identifier based on participant type.
    * @param requestData 
@@ -324,7 +324,7 @@ export class ParticipantsRequestService {
       ? requestData.newData.name
       : requestData.newData.email?.toLowerCase().trim();
   }
-  
+
   /**
    * Validate if the unique identifier already exists.
    * @param participantType 
@@ -332,7 +332,7 @@ export class ParticipantsRequestService {
    * @throws BadRequestException if identifier already exists
    */
   async validateUniqueIdentifier(
-    participantType: ParticipantType, 
+    participantType: ParticipantType,
     uniqueIdentifier: string
   ): Promise<void> {
     const { isRequestPending, isUniqueIdentifierExist } = await this.checkIfIdentifierAlreadyExist(
@@ -344,7 +344,7 @@ export class ParticipantsRequestService {
       throw new BadRequestException(`${typeLabel} already exists`);
     }
   }
-  
+
   /**
    * Validate location for members or email for teams.
    * @param requestData 
@@ -360,7 +360,7 @@ export class ParticipantsRequestService {
       );
     }
   }
-  
+
   /**
    * Send notification based on the participant type.
    * @param result 
@@ -409,8 +409,57 @@ export class ParticipantsRequestService {
     return error;
   }
 
-  
+
   generateMemberProfileURL(value) {
     return generateProfileURL(value);
+  }
+
+  /**
+   * Process (approve/reject) multiple pending participants requests.
+   * @param participantRequests - The request body containing array of uids and status of participants to be processed;
+   * @returns The result of processing the participants request along with the success count.
+   */
+  async processBulkRequest(participantRequests) {
+    let successCount = 0;
+    const results = await Promise.all(
+      participantRequests.map(async (request) => {
+        try {
+          const participantRequest: ParticipantsRequest | null =
+            await this.findOneByUid(request.uid);
+          if (!participantRequest) {
+            return {
+              uid: request.uid,
+              message: 'Request not found',
+            };
+          }
+          if (participantRequest.status !== ApprovalStatus.PENDING) {
+            return {
+              uid: request.uid,
+              message: `Request cannot be processed. It has already been ${participantRequest.status.toLowerCase()}.`,
+            };
+          }
+          if (participantRequest.participantType === ParticipantType.TEAM && !participantRequest.requesterEmailId) {
+            return {
+              uid: request.uid,
+              message: 'Requester email is required for team participation requests. Please provide a valid email address.',
+            };
+          }
+          await this.processRequestByUid(
+            request.uid,
+            participantRequest,
+            request.status,
+            request.isVerified
+          );
+          successCount++;
+          return { uid: request.uid, message: 'Processed successfully' };
+        } catch (error) {
+          return {
+            uid: request.uid,
+            message: 'An error occurred while processing the request',
+          };
+        }
+      })
+    );
+    return { count: successCount, results };
   }
 }

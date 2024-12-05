@@ -4,9 +4,8 @@ import {
   ForbiddenException,
   BadRequestException,
   NotFoundException,
-  Inject,
   forwardRef,
-  CACHE_MANAGER
+  Inject
 } from '@nestjs/common';
 import * as path from 'path';
 import { z } from 'zod';
@@ -19,9 +18,9 @@ import { ParticipantsRequestService } from '../participants-request/participants
 import { hashFileName } from '../utils/hashing';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { MembersService } from '../members/members.service';
-import { LogService } from '../shared/log.service'; 
-import { Cache } from 'cache-manager';
+import { LogService } from '../shared/log.service';
 import { copyObj, buildMultiRelationMapping, buildRelationMapping } from '../utils/helper/helper';
+import { CacheService } from '../utils/cache/cache.service';
 
 @Injectable()
 export class TeamsService {
@@ -35,8 +34,8 @@ export class TeamsService {
     private logger: LogService,
     private forestadminService: ForestAdminService,
     private notificationService: NotificationService,
-    @Inject(CACHE_MANAGER) private cacheService: Cache
-  ) {}
+    private cacheService: CacheService
+  ) { }
 
   /**
    * Find all teams based on provided query options.
@@ -46,10 +45,14 @@ export class TeamsService {
    *   (filter, pagination, sorting, etc.)
    * @returns A list of teams that match the query options
    */
-  async findAll(queryOptions: Prisma.TeamFindManyArgs): Promise<Team[]> {
+  async findAll(queryOptions: Prisma.TeamFindManyArgs): Promise<{ count: Number, teams: Team[] }> {
     try {
-      return this.prisma.team.findMany({ ...queryOptions }); 
-    } catch(err) {
+      const [teams, teamsCount] = await Promise.all([
+        this.prisma.team.findMany(queryOptions),
+        this.prisma.team.count({ where: queryOptions.where }),
+      ]);
+      return { count: teamsCount, teams: teams };
+    } catch (err) {
       return this.handleErrors(err);
     }
   }
@@ -104,7 +107,7 @@ export class TeamsService {
       });
       team.teamFocusAreas = this.removeDuplicateFocusAreas(team.teamFocusAreas);
       return team;
-    } catch(err) {
+    } catch (err) {
       return this.handleErrors(err, uid);
     }
   }
@@ -120,7 +123,7 @@ export class TeamsService {
       return this.prisma.team.findUniqueOrThrow({
         where: { name },
       });
-    } catch(err) {
+    } catch (err) {
       return this.handleErrors(err);
     }
   };
@@ -133,14 +136,14 @@ export class TeamsService {
    * @returns The created team record
    */
   async createTeam(
-    team: Prisma.TeamUncheckedCreateInput, 
+    team: Prisma.TeamUncheckedCreateInput,
     tx: Prisma.TransactionClient
   ): Promise<Team> {
     try {
       return await tx.team.create({
         data: team,
       });
-    } catch(err) {
+    } catch (err) {
       return this.handleErrors(err);
     }
   }
@@ -163,7 +166,7 @@ export class TeamsService {
         where: { uid },
         data: team,
       });
-    } catch(err) {
+    } catch (err) {
       return this.handleErrors(err, `${uid}`);
     }
   }
@@ -211,7 +214,7 @@ export class TeamsService {
     const formattedTeam = await this.formatTeam(null, newTeam, tx);
     const createdTeam = await this.createTeam(formattedTeam, tx);
     return createdTeam;
-  } 
+  }
 
   /**
    * Format team data for creation or update
@@ -243,7 +246,7 @@ export class TeamsService {
     team['membershipSources'] = buildMultiRelationMapping('membershipSources', teamData, type);
     if (type === 'create') {
       team['teamFocusAreas'] = await this.createTeamWithFocusAreas(teamData, tx);
-    } 
+    }
     if (teamUid) {
       team['teamFocusAreas'] = await this.updateTeamWithFocusAreas(teamUid, teamData, tx);
     }
@@ -277,7 +280,7 @@ export class TeamsService {
    * @param focusAreas - An array of focus areas associated with the team
    * @returns A deduplicated array of focus areas
    */
-  private removeDuplicateFocusAreas(focusAreas):any {
+  private removeDuplicateFocusAreas(focusAreas): any {
     const uniqueFocusAreas = {};
     focusAreas.forEach(item => {
       const { uid, title } = item.focusArea;
@@ -308,7 +311,7 @@ export class TeamsService {
       participantType: 'TEAM',
       newData: { ...newTeamData },
     },
-    tx
+      tx
     );
   }
 
@@ -317,7 +320,7 @@ export class TeamsService {
    * This ensures that the system is up-to-date with the latest changes.
    */
   private async postUpdateActions(): Promise<void> {
-    await this.cacheService.reset();
+    await this.cacheService.reset({ service: "teams" });
     await this.forestadminService.triggerAirtableSync();
   }
 
@@ -330,7 +333,7 @@ export class TeamsService {
    */
   async createTeamWithFocusAreas(team, transaction: Prisma.TransactionClient) {
     if (team.focusAreas && team.focusAreas.length > 0) {
-      let teamFocusAreas:any = [];
+      let teamFocusAreas: any = [];
       const focusAreaHierarchies = await transaction.focusAreaHierarchy.findMany({
         where: {
           subFocusAreaUid: {
@@ -358,7 +361,7 @@ export class TeamsService {
     }
     return {};
   }
- 
+
   /**
    * Updates focus areas for an existing team.
    * 
@@ -376,7 +379,7 @@ export class TeamsService {
     }
     return await this.createTeamWithFocusAreas(team, transaction);
   }
- 
+
   /**
    * Builds filter for focus areas by splitting the input and matching ancestor titles.
    * @param focusAreas - Comma-separated focus area titles
@@ -387,7 +390,7 @@ export class TeamsService {
       return {
         teamFocusAreas: {
           some: {
-            ancestorArea:{
+            ancestorArea: {
               title: {
                 in: focusAreas?.split(',')
               }
@@ -398,23 +401,23 @@ export class TeamsService {
     }
     return {};
   }
- 
+
   /**
    * Constructs the team filter based on multiple query parameters.
    * @param queryParams - Query parameters from the request
    * @returns - Prisma AND filter combining all conditions
    */
-  buildTeamFilter(queryParams){
-    const { 
+  buildTeamFilter(queryParams) {
+    const {
       name,
-      plnFriend, 
-      industryTags, 
+      plnFriend,
+      industryTags,
       technologies,
       membershipSources,
       fundingStage,
-      officeHours  
+      officeHours
     } = queryParams;
-    const filter:any = [];
+    const filter: any = [];
     this.buildNameAndPLNFriendFilter(name, plnFriend, filter);
     this.buildIndustryTagsFilter(industryTags, filter);
     this.buildTechnologiesFilter(technologies, filter);
@@ -422,7 +425,7 @@ export class TeamsService {
     this.buildFundingStageFilter(fundingStage, filter);
     this.buildOfficeHoursFilter(officeHours, filter);
     this.buildRecentTeamsFilter(queryParams, filter);
-    return { 
+    return {
       AND: filter
     };
   };
@@ -435,17 +438,17 @@ export class TeamsService {
    */
   buildNameAndPLNFriendFilter(name, plnFriend, filter) {
     if (name) {
-      filter.push({ 
+      filter.push({
         name: {
           contains: name,
           mode: 'insensitive'
         }
       });
-    }  
+    }
     if (!(plnFriend === "true")) {
-      filter.push({  
+      filter.push({
         plnFriend: false
-      }); 
+      });
     }
   }
 
@@ -455,14 +458,14 @@ export class TeamsService {
    * @param filter - Filter array to be appended to
    */
   buildIndustryTagsFilter(industryTags, filter) {
-    const tags = industryTags?.split(',').map(tag=> tag.trim());
+    const tags = industryTags?.split(',').map(tag => tag.trim());
     if (tags?.length > 0) {
-      tags.map((tag)=> {
+      tags.map((tag) => {
         filter.push({
-          industryTags:{
+          industryTags: {
             some: {
-              title: { 
-                in: tag 
+              title: {
+                in: tag
               }
             }
           }
@@ -479,12 +482,12 @@ export class TeamsService {
   buildTechnologiesFilter(technologies, filter) {
     const tags = technologies?.split(',').map(tech => tech.trim());
     if (tags?.length > 0) {
-      tags.map((tag)=> {
+      tags.map((tag) => {
         filter.push({
           technologies: {
             some: {
-              title: { 
-                in: tag 
+              title: {
+                in: tag
               }
             }
           }
@@ -501,12 +504,12 @@ export class TeamsService {
   buildMembershipSourcesFilter(membershipSources, filter) {
     const sources = membershipSources?.split(',').map(source => source.trim());
     if (sources?.length > 0) {
-      sources.map((source)=> {
+      sources.map((source) => {
         filter.push({
           membershipSources: {
             some: {
-              title: { 
-                in: source 
+              title: {
+                in: source
               }
             }
           }
@@ -555,7 +558,7 @@ export class TeamsService {
    * @returns The constructed query with a 'createdAt' filter if 'is_recent' is 'true',
    *          or an empty object if 'is_recent' is not provided or set to 'false'.
    */
-  buildRecentTeamsFilter(queryParams, filter?) { 
+  buildRecentTeamsFilter(queryParams, filter?) {
     const { isRecent } = queryParams;
     const recentFilter = {
       createdAt: {
@@ -564,7 +567,7 @@ export class TeamsService {
     };
     if (isRecent === 'true' && !filter) {
       return recentFilter;
-    } 
+    }
     if (isRecent === 'true' && filter) {
       filter.push(recentFilter);
     }
@@ -719,5 +722,65 @@ export class TeamsService {
         },
       });
     }
+  }
+
+  /**
+   * Fetches filter tags for teams for felicitating ease searching.
+   * 
+   * @returns Set of industry tags, membership sources, funding stages 
+   * and technologies that contains atleast one team.
+   */
+  async getTeamFilters(queryParams) {
+    const [industryTags, membershipSources, fundingStages, technologies] = await Promise.all([
+      this.prisma.industryTag.findMany({
+        where: {
+          teams: {
+            some: { ...queryParams.where },
+          },
+        },
+        select: {
+          title: true,
+        },
+      }),
+
+      this.prisma.membershipSource.findMany({
+        where: {
+          teams: {
+            some: { ...queryParams.where },
+          },
+        },
+        select: {
+          title: true,
+        },
+      }),
+
+      this.prisma.fundingStage.findMany({
+        where: {
+          teams: {
+            some: { ...queryParams.where },
+          },
+        },
+        select: {
+          title: true,
+        },
+      }),
+
+      this.prisma.technology.findMany({
+        where: {
+          teams: {
+            some: { ...queryParams.where },
+          },
+        },
+        select: {
+          title: true,
+        },
+      }),
+    ]);
+    return {
+      industryTags: industryTags.map((tag) => tag.title),
+      membershipSources: membershipSources.map((source) => source.title),
+      fundingStages: fundingStages.map((stage) => stage.title),
+      technologies: technologies.map((tech) => tech.title),
+    };
   }
 }

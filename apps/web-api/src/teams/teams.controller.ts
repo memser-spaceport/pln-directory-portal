@@ -23,19 +23,37 @@ const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
 @Controller()
 export class TeamsController {
-  constructor(private readonly teamsService: TeamsService) {}
+  constructor(private readonly teamsService: TeamsService) { }
+
+  @Api(server.route.teamFilters)
+  @ApiQueryFromZod(TeamQueryParams)
+  async getTeamFilters(@Req() request: Request) {
+    const queryableFields = prismaQueryableFieldsFromZod(
+      ResponseTeamWithRelationsSchema
+    );
+    const builder = new PrismaQueryBuilder(queryableFields);
+    const builtQuery = builder.build(request.query);
+    const { focusAreas }: any = request.query;
+    builtQuery.where = {
+      AND: [
+        builtQuery.where ? builtQuery.where : {},
+        this.teamsService.buildFocusAreaFilters(focusAreas),
+        this.teamsService.buildRecentTeamsFilter(request.query)
+      ]
+    }
+    return await this.teamsService.getTeamFilters(builtQuery);
+  }
 
   @Api(server.route.getTeams)
   @ApiQueryFromZod(TeamQueryParams)
   @ApiOkResponseFromZod(ResponseTeamWithRelationsSchema.array())
-  @NoCache()
   findAll(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(
       ResponseTeamWithRelationsSchema
     );
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
-    const { focusAreas } : any = request.query;
+    const { focusAreas }: any = request.query;
     builtQuery.where = {
       AND: [
         builtQuery.where ? builtQuery.where : {},
@@ -74,4 +92,5 @@ export class TeamsController {
     await this.teamsService.validateRequestor(req.userEmail, teamUid);
     return await this.teamsService.updateTeamFromParticipantsRequest(teamUid, body, req.userEmail);
   }
+
 }

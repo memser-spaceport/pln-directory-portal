@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Req, UseGuards, UsePipes, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Body, Controller, Param, Req, UseGuards, UsePipes, UseInterceptors, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
@@ -24,6 +24,8 @@ import { AuthGuard } from '../guards/auth.guard';
 import { UserAccessTokenValidateGuard } from '../guards/user-access-token-validate.guard';
 import { LogService } from '../shared/log.service';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
+import { IsVerifiedMemberInterceptor } from '../interceptors/verified-member.interceptor';
+import { isEmpty } from 'lodash';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
@@ -31,8 +33,8 @@ type RouteShape = typeof server.routeShapes;
 @Controller()
 @NoCache()
 export class MemberController {
-  constructor(private readonly membersService: MembersService, private logger: LogService) {}
- 
+  constructor(private readonly membersService: MembersService, private logger: LogService) { }
+
   /**
    * Retrieves a list of members based on query parameters.
    * Builds a Prisma query from the queryable fields and adds filters for names, roles, and recent members.
@@ -43,6 +45,8 @@ export class MemberController {
   @Api(server.route.getMembers)
   @ApiQueryFromZod(MemberQueryParams)
   @ApiOkResponseFromZod(ResponseMemberWithRelationsSchema.array())
+  @UseInterceptors(IsVerifiedMemberInterceptor)
+  @NoCache()
   async findAll(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
     const queryParams = request.query;
@@ -71,7 +75,9 @@ export class MemberController {
    * @returns Array of roles with member counts
    */
   @Api(server.route.getMemberRoles)
-  async getMemberFilters(@Req() request: Request) {
+  @UseInterceptors(IsVerifiedMemberInterceptor)
+  @NoCache()
+  async getMemberRoleFilters(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
@@ -88,6 +94,35 @@ export class MemberController {
       ],
     };
     return await this.membersService.getRolesWithCount(builtQuery, queryParams);
+  }
+
+  /**
+   * Retrieves member filters.
+   * 
+   * @param request - HTTP request object containing query parameters
+   * @returns return list of member filters.
+   */
+  @Api(server.route.getMemberFilters)
+  @UseInterceptors(IsVerifiedMemberInterceptor)
+  @NoCache()
+  async getMembersFilter(@Req() request: Request) {
+    const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
+    const queryParams = request.query;
+    const builder = new PrismaQueryBuilder(queryableFields);
+    const builtQuery = builder.build(queryParams);
+    const { name__icontains } = queryParams;
+    if (name__icontains) {
+      delete builtQuery.where?.name;
+    }
+    builtQuery.where = {
+      AND: [
+        builtQuery.where,
+        this.membersService.buildNameFilters(queryParams),
+        this.membersService.buildRoleFilters(queryParams),
+        this.membersService.buildRecentMembersFilter(queryParams)
+      ],
+    };
+    return await this.membersService.getMemberFilters(builtQuery);
   }
 
   /**
@@ -134,7 +169,10 @@ export class MemberController {
     ) {
       throw new ForbiddenException(`Member isn't authorized to update the member`);
     }
-    return await this.membersService.updateMemberFromParticipantsRequest(uid, participantsRequest, requestor.email);
+    if (!isEmpty(participantsRequest.newData.isVerified) && !this.membersService.checkIfAdminUser(requestor)) {
+      throw new ForbiddenException(`Member isn't authorized to verify a member`);
+    }
+    return await this.membersService.updateMemberFromParticipantsRequest(uid, participantsRequest, requestor.email, requestor.isDirectoryAdmin);
   }
 
   /**
@@ -154,7 +192,18 @@ export class MemberController {
 
   @Api(server.route.updateMember)
   @UseGuards(UserTokenValidation)
-  async updateMemberByUid(@Param('uid') uid, @Body() body) {
+  async updateMemberByUid(@Param('uid') uid, @Body() body, @Req() req) {
+    this.logger.info(`Member update request - Initated by -> ${req.userEmail}`);
+    const requestor = await this.membersService.findMemberByEmail(req.userEmail);
+    if (
+      !requestor.isDirectoryAdmin &&
+      uid !== requestor.uid
+    ) {
+      throw new ForbiddenException(`Member isn't authorized to update the member`);
+    }
+    if (!isEmpty(body.isVerified) && !this.membersService.checkIfAdminUser(requestor)) {
+      throw new ForbiddenException(`Member isn't authorized to verify a member`);
+    }
     return await this.membersService.updateMemberByUid(uid, body);
   }
 
@@ -209,7 +258,7 @@ export class MemberController {
   @UsePipes(ZodValidationPipe)
   async updateMemberEmail(@Body() changeEmailRequest: ChangeEmailRequestDto, @Req() req) {
     const memberInfo = await this.membersService.findMemberByEmail(req.userEmail);
-    if(!memberInfo || !memberInfo.externalId) {
+    if (!memberInfo || !memberInfo.externalId) {
       throw new ForbiddenException("Please login again and try")
     }
     return await this.membersService.updateMemberEmail(changeEmailRequest.newEmail, req.userEmail, memberInfo);

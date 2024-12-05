@@ -5,12 +5,14 @@ import { ParticipantsRequestModule } from '../participants-request/participants-
 import { SharedModule } from '../shared/shared.module';
 import { AdminParticipantsRequestController } from './participants-request.controller';
 import { AdminAuthController } from './auth.controller';
+import { MemberController } from './member.controller';
+import { MembersModule } from '../members/members.module';
 @Module({
-  imports: [CacheModule.register(), ParticipantsRequestModule, SharedModule],
-  controllers: [AdminParticipantsRequestController, AdminAuthController],
+  imports: [CacheModule.register(), ParticipantsRequestModule, SharedModule, MembersModule],
+  controllers: [AdminParticipantsRequestController, AdminAuthController, MemberController],
   providers: [
     AdminService,
     JwtService
   ],
 })
-export class AdminModule {}
+export class AdminModule { }
