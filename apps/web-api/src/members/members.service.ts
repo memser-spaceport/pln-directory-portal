@@ -657,7 +657,7 @@ export class MembersService {
       await this.updateMemberEmailChange(memberUid, isEmailChanged, isExternalIdAvailable, memberData, existingMember);
       await this.logParticipantRequest(requestorEmail, memberData, existingMember.uid, tx);
       if (isEmailChanged && isDirectoryAdmin) {
-        this.notificationService.notifyForMemberEditApproval(memberData.name, memberUid, [existingMember.email, memberData.email]);
+        this.notificationService.notifyForMemberChangesByAdmin(memberData.name, memberUid, existingMember.email, memberData.email);
       }
       this.logger.info(`Member update request - completed, requestId -> ${result.uid}, requestor -> ${requestorEmail}`)
     });
