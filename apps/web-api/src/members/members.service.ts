@@ -41,7 +41,7 @@ export class MembersService {
     @Inject(forwardRef(() => NotificationService))
     private notificationService: NotificationService,
     private cacheService: CacheService
-  ) {}
+  ) { }
 
   /**
    * Creates a new member in the database within a transaction.
@@ -426,7 +426,7 @@ export class MembersService {
         newTokens = await this.authService.updateEmailInAuth(newEmail, oldEmail, memberInfo.externalId)
       });
       this.logger.info(`Email has been successfully updated from ${oldEmail} to ${newEmail}`)
-      await this.cacheService.reset({ service: 'members'});
+      await this.cacheService.reset({ service: 'members' });
       return {
         refreshToken: newTokens.refresh_token,
         idToken: newTokens.id_token,
@@ -635,7 +635,7 @@ export class MembersService {
     memberUid: string,
     memberParticipantsRequest: ParticipantsRequest,
     requestorEmail: string,
-    isDirectoryAdmin=false
+    isDirectoryAdmin = false
   ): Promise<Member> {
     let result;
     await this.prisma.$transaction(async (tx) => {
@@ -711,8 +711,8 @@ export class MembersService {
       'name', 'email', 'githubHandler', 'discordHandler', 'bio',
       'twitterHandler', 'linkedinHandler', 'telegramHandler',
       'officeHours', 'moreDetails', 'plnStartDate', 'openToWork',
-      'isVerified', 'signUpSource', 'signUpMedium', 'signUpCampaign', 
-      'isUserConsent', 'isSubscribedToNewsletter', 'teamOrProjectURL', 
+      'isVerified', 'signUpSource', 'signUpMedium', 'signUpCampaign',
+      'isUserConsent', 'isSubscribedToNewsletter', 'teamOrProjectURL',
     ];
     copyObj(memberData, member, directFields);
     member.email = member.email.toLowerCase().trim();
@@ -720,7 +720,7 @@ export class MembersService {
       : type === 'Update' ? { disconnect: true } : undefined;
     member['skills'] = buildMultiRelationMapping('skills', memberData, type);
     if (type === 'Create') {
-      if (Array.isArray(memberData.teamMemberRoles)) {
+      if (Array.isArray(memberData.teamAndRoles)) {
         member['teamMemberRoles'] = this.buildTeamMemberRoles(memberData);
       }
       if (Array.isArray(memberData.projectContributions)) {
@@ -1125,7 +1125,7 @@ export class MembersService {
    * @returns result
    */
   async verifyMembers(memberIds: string[], userEmail): Promise<any> {
-    return await this.prisma.$transaction(async (tx) => { 
+    return await this.prisma.$transaction(async (tx) => {
       const result = await tx.member.updateMany({
         where: { uid: { in: memberIds } },
         data: {
@@ -1168,7 +1168,7 @@ export class MembersService {
    */
   async updatePreference(id: string, preferences: any): Promise<Member> {
     const updatedMember = await this.updateMemberByUid(id, { preferences });
-    await this.cacheService.reset({ service: 'members'});
+    await this.cacheService.reset({ service: 'members' });
     return updatedMember;
   }
 
@@ -1177,7 +1177,7 @@ export class MembersService {
    * This ensures that the system is up-to-date with the latest changes.
    */
   private async postUpdateActions(): Promise<void> {
-    await this.cacheService.reset({ service: 'members'});
+    await this.cacheService.reset({ service: 'members' });
     await this.forestadminService.triggerAirtableSync();
   }
 
