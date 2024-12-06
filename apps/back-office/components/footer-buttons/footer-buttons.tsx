@@ -76,7 +76,7 @@ export function FooterButtons(props) {
           isOpen={true}
           onClose={onClose}
         >
-          <div className="relative h-[21vh] w-[640px] rounded-[8px] bg-white text-[#000000]">
+          <div className="relative min-h-[21vh] w-[640px] rounded-[8px] bg-white text-[#000000]">
             <div className='absolute top-[10px] right-[10px]'>
               <button onClick={onClose}>
                 <img
