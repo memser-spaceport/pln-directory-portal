@@ -1127,7 +1127,7 @@ export class MembersService {
    * @returns result
    */
   async verifyMembers(memberIds: string[], userEmail): Promise<any> {
-    return await this.prisma.$transaction(async (tx) => {
+    const response = await this.prisma.$transaction(async (tx) => {
       const result = await tx.member.updateMany({
         where: { uid: { in: memberIds } },
         data: {
@@ -1157,8 +1157,11 @@ export class MembersService {
           tx
         );
       }));
+    
       return result;
     });
+    await this.cacheService.reset({ service: 'members' });
+    return response;
   }
 
   /**
@@ -1427,6 +1430,7 @@ export class MembersService {
   ): Promise<Member> {
     if (member[field] !== newValue) {
       member = await this.updateMemberByUid(member.uid, { [field]: newValue }, tx);
+      await this.cacheService.reset({ service: 'members' });
     }
     return member;
   }
