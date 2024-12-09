@@ -460,6 +460,7 @@ export class ParticipantsRequestService {
         }
       })
     );
+    await this.cacheService.reset({ service: "participants-requests" });
     return { count: successCount, results };
   }
 }
