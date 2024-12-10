@@ -405,8 +405,8 @@ model PLEventGuest {
   updatedAt      DateTime @updatedAt
   memberUid      String
   member         Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
-  teamUid        String
-  team           Team     @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  teamUid        String?
+  team           Team?     @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
   eventUid       String
   event          PLEvent  @relation(fields: [eventUid], references: [uid], onDelete: Cascade)
   additionalInfo Json?
