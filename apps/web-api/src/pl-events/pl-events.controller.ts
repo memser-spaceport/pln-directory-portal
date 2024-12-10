@@ -26,6 +26,7 @@ import { NoCache } from '../decorators/no-cache.decorator';
 import { MembersService } from '../members/members.service';
 import { PLEventLocationsService } from './pl-event-locations.service';
 import { PLEventGuestsService } from './pl-event-guests.service';
+import { isEmpty } from 'lodash';
 
 const server = initNestServer(apiEvents);
 type RouteShape = typeof server.routeShapes;
@@ -90,7 +91,7 @@ export class PLEventsController {
     const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
     const result = await this.memberService.isMemberPartOfTeams(member, [body.teamUid]) ||
       await this.memberService.checkIfAdminUser(member);
-    if (!result) {
+    if (!result && !isEmpty(body.teamUid) ) {
       throw new ForbiddenException(`Member with email ${userEmail} is not part of 
         team with uid ${body.teamUid} or isn't admin.`);
     }
@@ -117,7 +118,7 @@ export class PLEventsController {
     const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
     const result = await this.memberService.isMemberPartOfTeams(member, [body.teamUid]) ||
       await this.memberService.checkIfAdminUser(member);
-    if (!result) {
+    if (!result && !isEmpty(body.teamUid)) {
       throw new ForbiddenException(`Member with email ${userEmail} is not part of team with uid ${body.teamUid} or isn't admin`);
     }
     const location = await this.eventLocationService.getPLEventLocationByUid(locationUid);
