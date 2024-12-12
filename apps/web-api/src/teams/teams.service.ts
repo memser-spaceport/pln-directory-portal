@@ -103,6 +103,35 @@ export class TeamsService {
               focusArea: { select: { uid: true, title: true } },
             },
           },
+          eventGuests: {
+            orderBy: {
+              event: {
+                startDate: 'desc'
+              },
+            },
+            where: {
+              isHost: true,
+            },
+            distinct: ['eventUid'],
+            select: {
+              event: {
+                select: {
+                  uid: true,
+                  name: true,
+                  type: true,
+                  slugURL: true,
+                  startDate: true,
+                  endDate: true,
+                  location:{
+                    select: {
+                      location: true,
+                      timezone: true,
+                    }
+                  },
+                }
+              },
+            },
+          },
         },
       });
       team.teamFocusAreas = this.removeDuplicateFocusAreas(team.teamFocusAreas);
