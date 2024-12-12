@@ -255,6 +255,34 @@ export class MembersService {
               },
             },
           },
+          eventGuests: {
+            orderBy: {
+              event: {
+                startDate: 'desc'
+              },
+            },
+            select: {
+              uid: true,
+              isHost: true,
+              isSpeaker: true,
+              event: {
+                select: {
+                  uid: true,
+                  name: true,
+                  type: true,
+                  slugURL: true,
+                  startDate: true,
+                  endDate: true,
+                  location:{
+                    select: {
+                      location: true,
+                      timezone: true,
+                    }
+                  },
+                }
+              },
+            },
+          },
         },
       });
     } catch (error) {
