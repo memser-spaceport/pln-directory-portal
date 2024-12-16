@@ -75,12 +75,12 @@ model Member {
   openToWork                   Boolean?                      @default(false)
   isFeatured                   Boolean?                      @default(false)
   isVerified                   Boolean?                      @default(false)
-  signUpSource                 String? 
+  signUpSource                 String?
   signUpMedium                 String?
   signUpCampaign               String?
   isUserConsent                Boolean?                      @default(false)
   isSubscribedToNewsletter     Boolean?                      @default(false)
-  teamOrProjectURL             String?          
+  teamOrProjectURL             String?
   createdAt                    DateTime                      @default(now())
   updatedAt                    DateTime                      @updatedAt
   approvedAt                   DateTime                      @default(now())
@@ -101,6 +101,7 @@ model Member {
   feedbacks                    MemberFeedback[]
   createdQuestions             DiscoveryQuestion[]           @relation("MemberCreatedDiscoveryQuestions")
   modifiedQuestions            DiscoveryQuestion[]           @relation("MemberModifiedDiscoveryQuestions")
+  MemberFollow                 MemberFollow[]
 }
 
 model MemberRole {
@@ -410,15 +411,15 @@ model PLEventGuest {
   memberUid      String
   member         Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
   teamUid        String?
-  team           Team?     @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  team           Team?    @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
   eventUid       String
   event          PLEvent  @relation(fields: [eventUid], references: [uid], onDelete: Cascade)
   additionalInfo Json?
   topics         String[]
-  priority       Int?      
+  priority       Int?
   isHost         Boolean  @default(false)
   isSpeaker      Boolean  @default(false)
-  isFeatured      Boolean  @default(false)
+  isFeatured     Boolean  @default(false)
 }
 
 model FocusArea {
@@ -567,4 +568,23 @@ model DiscoveryQuestion {
   relatedQuestions Json[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+model MemberFollow {
+  id                 Int              @id @default(autoincrement())
+  uid                String           @unique @default(uuid())
+  memberUid          String
+  followedEntityUid  String
+  followedEntityType FollowEntityType
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  member             Member           @relation(fields: [memberUid], references: [uid])
+
+  @@index([memberUid, followedEntityUid, followedEntityType])
+}
+
+enum FollowEntityType {
+  EVENT_LOCATION
+  EVENT
+  PROJECT
 }
