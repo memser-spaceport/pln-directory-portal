@@ -10,7 +10,24 @@ export class PLEventsService {
     private prisma: PrismaService,
     private logger: LogService,
     private eventGuestsService: PLEventGuestsService
-  ) {}
+  ) { }
+
+  /**
+   * This method creates a new event associated with a specific location.
+   * 
+   * @param event The event creation payload containing the required event details, such as name, type, description, 
+   *             startDate, endDate, resources, and locationUid.
+   * @returns The newly created event object with details such as name, type, start and end dates, and location.
+   */
+  async createPLEvent(event) {
+    try {
+      return await this.prisma.pLEvent.create({
+        data: event
+      });
+    } catch (error) {
+      this.handleErrors(error);
+    }
+  }
 
   /**
    * This method retrieves multiple events based on the provided query options.
@@ -210,7 +227,7 @@ export class PLEventsService {
           {
             member: {
               name: {
-                contains : searchBy,
+                contains: searchBy,
                 mode: 'insensitive',
               },
             }
