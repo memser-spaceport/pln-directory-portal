@@ -14,11 +14,12 @@ import { MemberFollowsService } from './member-follows.service';
 import { MembersService } from '../members/members.service';
 import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
+import { NoCache } from '../decorators/no-cache.decorator';
 
 const server = initNestServer(apiMemberFollows);
 type RouteShape = typeof server.routeShapes;
 
-@Controller('member-follows')
+@Controller()
 @UseGuards(UserTokenValidation)
 export class MemberFollowsController {
   constructor(
@@ -45,6 +46,7 @@ export class MemberFollowsController {
   @Api(apiMemberFollows.getFollows)
   @ApiQueryFromZod(MemberFollowQueryParams)
   @ApiOkResponseFromZod(ResponseMemberFollowWithRelationsSchema.array())
+  @NoCache()
   async getFollows(@Req() request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberFollowWithRelationsSchema);
     const queryParams = request.query;
