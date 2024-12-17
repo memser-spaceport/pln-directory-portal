@@ -12,7 +12,8 @@ import {
   UpdatePLEventGuestSchemaDto,
   DeletePLEventGuestsSchemaDto,
   PLEventGuestSchema,
-  PLEventGuestQuerySchema
+  PLEventGuestQuerySchema,
+  CreatePLEventSchemaDto
 } from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
@@ -27,6 +28,7 @@ import { MembersService } from '../members/members.service';
 import { PLEventLocationsService } from './pl-event-locations.service';
 import { PLEventGuestsService } from './pl-event-guests.service';
 import { isEmpty } from 'lodash';
+import { AdminAuthGuard } from '../guards/admin-auth.guard';
 
 const server = initNestServer(apiEvents);
 type RouteShape = typeof server.routeShapes;
@@ -39,6 +41,24 @@ export class PLEventsController {
     private readonly eventLocationService: PLEventLocationsService,
     private readonly eventGuestService: PLEventGuestsService
   ) { }
+
+  /**
+   * This method creates a new event associated with a specific location.
+   * 
+   * @param locationUid The unique identifier (UID) of the location where the event will be created.
+   * @param body The event creation payload containing the required event details, such as name, type, description, 
+   *             startDate, endDate, resources, and locationUid.
+   * @returns The newly created event object with details such as name, type, start and end dates, and location.
+   */
+  @Api(server.route.createPLEventByLocation)
+  @UseGuards(AdminAuthGuard)
+  async createPLEventByLocation(
+    @Param('uid') locationUid: string,
+    @Body() body: CreatePLEventSchemaDto,
+  ) {
+    const event = { ...body };
+    return await this.eventService.createPLEvent(event)
+  }
 
   @Api(server.route.getPLEventGuestsByLocation)
   @UseGuards(UserAuthValidateGuard)
@@ -91,7 +111,7 @@ export class PLEventsController {
     const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
     const result = await this.memberService.isMemberPartOfTeams(member, [body.teamUid]) ||
       await this.memberService.checkIfAdminUser(member);
-    if (!result && !isEmpty(body.teamUid) ) {
+    if (!result && !isEmpty(body.teamUid)) {
       throw new ForbiddenException(`Member with email ${userEmail} is not part of 
         team with uid ${body.teamUid} or isn't admin.`);
     }
