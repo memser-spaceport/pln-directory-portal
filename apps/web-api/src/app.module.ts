@@ -42,6 +42,7 @@ import { HuskyModule } from './husky/husky.module';
 import { HomeModule } from './home/home.module';
 import { InternalsModule } from './internals/internals.module';
 import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
+import { MemberFollowsModule } from './member-follows/member-follows.module';
 
 @Module({
   controllers: [AppController],
@@ -99,6 +100,7 @@ import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
     HomeModule,
     InternalsModule,
     OsoMetricsModule,
+    MemberFollowsModule
   ],
   providers: [
     {
