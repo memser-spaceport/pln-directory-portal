@@ -83,7 +83,7 @@ export default function AddMemberSkillForm(props) {
             <InformationCircleIcon />
           </div>
           <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            Sharing your skills help other network members & teams connect with
+            Sharing your skills help other network people & teams connect with
             you.
           </span>
         </div>
@@ -115,7 +115,7 @@ export default function AddMemberSkillForm(props) {
             </div>
             <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
               Enabling this implies you are open to collaborate on shared ideas
-              & projects with other members. This is one way to join forces &
+              & projects with other people. This is one way to join forces &
               reach a common goal.
             </span>
           </div>

@@ -393,7 +393,7 @@ const MemberTable = (props: any) => {
                 Are you sure you want to reject?
               </div>
               <div className='text-sm font-normal leading-5 text-left'>
-                Clicking reject will remove the member from the list.
+                Clicking reject will remove the people from the list.
               </div>
 
               <div className="flex gap-[8px] mt-[25px] justify-end">
