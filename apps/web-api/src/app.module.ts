@@ -41,7 +41,8 @@ import { HuskyModule } from './husky/husky.module';
 import { HomeModule } from './home/home.module';
 import { InternalsModule } from './internals/internals.module';
 import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
-import { MemberFollowsModule } from './member-follows/member-follows.module';
+import { MemberSubscriptionsModule } from './member-subscriptions/member-subscriptions.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   controllers: [AppController],
@@ -65,12 +66,9 @@ import { MemberFollowsModule } from './member-follows/member-follows.module';
     }),
     BullModule.forRoot({
       redis: {
-        path: process.env.REDIS_TLS_URL,
-        tls: {
-          rejectUnauthorized: false,
-          requestCert: true,
-        },
-      },
+        host: process.env.REDIS_HOST,
+        port: Number(process.env.REDIS_PORT || '6379')
+      }
     }),
     MembersModule,
     HealthModule,
@@ -99,7 +97,8 @@ import { MemberFollowsModule } from './member-follows/member-follows.module';
     HomeModule,
     InternalsModule,
     OsoMetricsModule,
-    MemberFollowsModule
+    MemberSubscriptionsModule,
+    NotificationsModule
   ],
   providers: [
     {

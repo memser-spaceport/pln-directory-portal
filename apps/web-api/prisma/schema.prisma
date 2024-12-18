@@ -101,7 +101,7 @@ model Member {
   feedbacks                    MemberFeedback[]
   createdQuestions             DiscoveryQuestion[]           @relation("MemberCreatedDiscoveryQuestions")
   modifiedQuestions            DiscoveryQuestion[]           @relation("MemberModifiedDiscoveryQuestions")
-  MemberFollow                 MemberFollow[]
+  subscriptions                MemberSubscription[]
 }
 
 model MemberRole {
@@ -570,21 +570,38 @@ model DiscoveryQuestion {
   updatedAt        DateTime @updatedAt
 }
 
-model MemberFollow {
-  id                 Int              @id @default(autoincrement())
-  uid                String           @unique @default(uuid())
-  memberUid          String
-  followedEntityUid  String
-  followedEntityType FollowEntityType
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-  member             Member           @relation(fields: [memberUid], references: [uid])
+model MemberSubscription {
+  id           Int                    @id @default(autoincrement())
+  uid          String                 @unique @default(uuid())
+  memberUid    String
+  entityUid    String
+  entityAction String
+  entityType   SubscriptionEntityType
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  member       Member                 @relation(fields: [memberUid], references: [uid])
+  isActive     Boolean                @default(true)
 
-  @@index([memberUid, followedEntityUid, followedEntityType])
+  @@index([memberUid, entityUid, entityType])
 }
 
-enum FollowEntityType {
+model Notification {
+  id           Int                @id @default(autoincrement())
+  uid          String             @unique @default(uuid())
+  entityUid    String
+  entityAction String
+  entityType   String
+  status       NotificationStatus
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum SubscriptionEntityType {
   EVENT_LOCATION
-  EVENT
-  PROJECT
 }
