@@ -3,22 +3,22 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 
 @Injectable()
-export class MemberFollowsService {
-  private readonly logger = new Logger(MemberFollowsService.name);
+export class MemberSubscriptionService {
+  private readonly logger = new Logger(MemberSubscriptionService.name);
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Creates a new follow record in the database.
-   * @param follow - The data for the follow to be created, adhering to Prisma's `MemberFollowUncheckedCreateInput`.
-   * @returns The created follow record.
+   * Creates a new subscription record in the database.
+   * @param subcription - The data for the subscription to be created, adhering to Prisma's `MemberSubscriptionUncheckedCreateInput`.
+   * @returns The created subscription record.
    * @throws ConflictException if a unique constraint is violated.
    * @throws BadRequestException if a validation error occurs.
    */
-  async createFollow(follow: Prisma.MemberFollowUncheckedCreateInput) {
+  async createSubscription(subcription: Prisma.MemberSubscriptionUncheckedCreateInput) {
     try {
-      return await this.prisma.memberFollow.create({
+      return await this.prisma.memberSubscription.create({
         data: {
-          ...follow,
+          ...subcription,
         },
       });
     } catch (error) {
@@ -27,17 +27,21 @@ export class MemberFollowsService {
   }
 
   /**
-   * Deletes a follow record from the database by its unique identifier (uid).
-   * @param uid - The unique identifier of the follow record to delete.
-   * @returns The deleted follow record.
-   * @throws NotFoundException if no follow record is found with the provided uid.
+   * Updates a subscription record in the database by its unique identifier (uid).
+   * @param uid - The unique identifier of the subscription record to update.
+   * @param subcription - The fields to update in the subscription record.
+   * @returns The updated subscription record.
+   * @throws NotFoundException if no subscription record is found with the provided uid.
    */
-  async deleteFollowByUid(uid: string) {
+  async modifySubscription(uid: string, subcription:Prisma.MemberSubscriptionUncheckedUpdateInput) {
     try {
-      return await this.prisma.memberFollow.delete({
+      return await this.prisma.memberSubscription.update({
         where: {
           uid,
         },
+        data: {
+          ...subcription
+        }
       });
     } catch (error) {
       this.handleErrors(error, uid);
@@ -45,7 +49,7 @@ export class MemberFollowsService {
   }
 
   /**
-   * Retrieves multiple member follow records based on the provided query criteria.
+   * Retrieves multiple member subscription records based on the provided query criteria.
    * 
    * This method leverages Prisma's `findMany` to perform a flexible query. 
    * The query object allows the caller to specify filters, sorting, pagination, 
@@ -56,20 +60,19 @@ export class MemberFollowsService {
    *   - `orderBy`: Sorting criteria for the results (e.g., by `createdAt` in ascending order).
    *   - `skip`: The number of records to skip for pagination.
    *   - `take`: The number of records to retrieve (limit for pagination).
-   *   - `include`: Related entities to include in the results (e.g., `member` or `followedEntity`).
+   *   - `include`: Related entities to include in the results (e.g., `member`).
    * 
-   * @returns An array of member follow records matching the query criteria.
+   * @returns An array of member subscription records matching the query criteria.
    * 
    */
-  async getFollows(query: Prisma.MemberFollowFindManyArgs) {
+  async getSubscriptions(query: Prisma.MemberSubscriptionFindManyArgs) {
     try {
-      return await this.prisma.memberFollow.findMany(query);
+      return await this.prisma.memberSubscription.findMany(query);
     } catch (error) {
       this.handleErrors(error);
     }
   }
 
-  
   /**
    * Handles errors occurring during database operations.
    * Logs the error and rethrows it with a more specific exception if applicable.
@@ -82,11 +85,11 @@ export class MemberFollowsService {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       switch (error.code) {
         case 'P2002': // Unique constraint violation
-          throw new ConflictException('Unique key constraint error on follow:', error.message);
+          throw new ConflictException('Unique key constraint error on subscription:', error.message);
         case 'P2003': // Foreign key constraint violation
-          throw new BadRequestException('Foreign key constraint error on follow:', error.message);
+          throw new BadRequestException('Foreign key constraint error on subscription:', error.message);
         case 'P2025': // Record not found
-          throw new NotFoundException('Follow not found with uid: ' + message);
+          throw new NotFoundException('Subscription not found with uid: ' + message);
         default:
           throw error;
       }
