@@ -26,4 +26,4 @@ export * from './discovery-question';
 export * from './pl-event-location';
 export * from './admin';
 export * from './participants-request';
-export * from './member-follow';
+export * from './member-subscription';
