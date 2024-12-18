@@ -41,7 +41,8 @@ import { MemberFeedbacksModule } from './member-feedbacks/member-feedbacks.modul
 import { HuskyModule } from './husky/husky.module';
 import { HomeModule } from './home/home.module';
 import { InternalsModule } from './internals/internals.module';
-import { MemberFollowsModule } from './member-follows/member-follows.module';
+import { MemberSubscriptionsModule } from './member-subscriptions/member-subscriptions.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   controllers: [AppController],
@@ -98,7 +99,8 @@ import { MemberFollowsModule } from './member-follows/member-follows.module';
     HuskyModule,
     HomeModule,
     InternalsModule,
-    MemberFollowsModule
+    MemberSubscriptionsModule,
+    NotificationsModule
   ],
   providers: [
     {
