@@ -37,6 +37,7 @@ export const MemberSchema = z.object({
   discordHandler: z.string().nullish(),
   twitterHandler: z.string().nullish(),
   telegramHandler: z.string().nullish(),
+  telegramUid: z.string().nullable(),
   officeHours: z.string().nullish(),
   airtableRecId: z.string().nullish(),
   plnFriend: z.boolean().nullish(),
@@ -61,7 +62,7 @@ export const MemberSchema = z.object({
 
 
 
-export const ResponseMemberSchema = MemberSchema.omit({ id: true }).strict();
+export const ResponseMemberSchema = MemberSchema.omit({ id: true, telegramUid: true }).strict();
 
 export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   image: ResponseImageWithRelationsSchema.optional(),
@@ -115,7 +116,8 @@ export const MemberDetailQueryParams = MemberQueryParams.unwrap()
   .pick(RETRIEVAL_QUERY_FILTERS)
   .optional();
 
-export class MemberDto extends createZodDto(MemberSchema) {}
+export class MemberDto extends createZodDto(MemberSchema.omit({telegramUid: true})) {}
+export class InternalUpdateMemberDto extends createZodDto(MemberSchema.pick({telegramUid: true, telegramHandler: true})) {}
 
 export class CreateMemberSchemaDto extends createZodDto(CreateMemberSchema) {}
 
