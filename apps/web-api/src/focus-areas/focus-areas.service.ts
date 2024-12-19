@@ -10,13 +10,16 @@ export class FocusAreasService {
   async findAll(query) {
     const { type } = query;
     const result = await this.prisma.focusArea.findMany({
-      include: {
+      select: {
+        uid: true,
+        title: true,
+        description: true,
         children: this.buildQueryByLevel(4, type, query), // level denotes depth of children.
         ...this.buildAncestorFocusAreasFilterByType(type, query)
       },
       orderBy: {
         createdAt: "desc"
-      }
+      },
     });
     return result;
   }
@@ -24,7 +27,10 @@ export class FocusAreasService {
   private buildQueryByLevel(level: number, type, query) {
     if (level === 0) {
       return {
-        include: {
+        select: {
+          uid: true,
+          title: true,
+          description: true,
           children: true,
           ...this.buildAncestorFocusAreasFilterByType(type, query)
         },
@@ -34,7 +40,10 @@ export class FocusAreasService {
       };
     }
     return {
-      include: {
+      select: {
+        uid: true,
+        title: true,
+        description: true,
         children: this.buildQueryByLevel(level - 1, type, query),
         ...this.buildAncestorFocusAreasFilterByType(type, query)
       },
