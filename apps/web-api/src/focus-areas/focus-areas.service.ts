@@ -66,8 +66,7 @@ export class FocusAreasService {
             team: {
               select: {
                 uid: true,
-                name: true,
-                logo: true
+                name: true
               }
             }
           },
@@ -87,8 +86,7 @@ export class FocusAreasService {
             project: {
               select: {
                 uid: true,
-                name: true,
-                logo: true
+                name: true
               }
             }
           },
