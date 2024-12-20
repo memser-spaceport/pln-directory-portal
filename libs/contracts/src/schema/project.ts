@@ -45,7 +45,8 @@ const ProjectSchema = z.object({
     title: z.string() 
   }).array().optional(),
   contributions: ContributionSchema.array().optional(),
-  isDeleted: z.boolean().default(false)
+  isDeleted: z.boolean().default(false),
+  osoProjectName: z.string().optional(),
 });
 
 export const ResponseProjectSchema = ProjectSchema.omit({ id: true }).strict();
