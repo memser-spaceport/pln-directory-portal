@@ -812,4 +812,24 @@ export class TeamsService {
       technologies: technologies.map((tech) => tech.title),
     };
   }
+
+  /**
+   * This method construct the dynamic query to search the member by 
+   * their participation type for host only
+   * @param queryParams HTTP request query params object
+   * @returns Constructed query based on given participation type
+   */
+  buildParticipationTypeFilter(queryParams) {
+    const isHost = queryParams.isHost === 'true';
+    if (isHost) {
+      return {
+        eventGuests: {
+          some: {
+            isHost: isHost,
+          }
+        }
+      }
+    }
+    return {};
+  }
 }
