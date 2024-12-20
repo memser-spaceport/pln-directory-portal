@@ -65,7 +65,8 @@ export class MemberController {
         builtQuery.where,
         this.membersService.buildNameFilters(queryParams),
         this.membersService.buildRoleFilters(queryParams),
-        this.membersService.buildRecentMembersFilter(queryParams)
+        this.membersService.buildRecentMembersFilter(queryParams),
+        this.membersService.buildParticipationTypeFilter(queryParams)
       ],
     };
     return await this.membersService.findAll(builtQuery);
@@ -114,9 +115,13 @@ export class MemberController {
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(queryParams);
-    const { name__icontains } = queryParams;
+    const { name__icontains, isHost, isSpeaker } = queryParams;
     if (name__icontains) {
       delete builtQuery.where?.name;
+    }
+    if (isHost || isSpeaker) {
+      delete builtQuery.where?.isHost;
+      delete builtQuery.where?.isSpeaker;
     }
     builtQuery.where = {
       AND: [
