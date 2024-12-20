@@ -160,7 +160,7 @@ export default function TeamStepOne(props) {
           </div>
           <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
             If your team offers group office hours or open meetings that are
-            open to the public, please share the link so PLN people can join
+            open to the public, please share the link so PLN members can join
             and learn more.
           </span>
         </div>
