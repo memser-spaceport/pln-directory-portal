@@ -103,6 +103,35 @@ export class TeamsService {
               focusArea: { select: { uid: true, title: true } },
             },
           },
+          eventGuests: {
+            orderBy: {
+              event: {
+                startDate: 'desc'
+              },
+            },
+            where: {
+              isHost: true,
+            },
+            distinct: ['eventUid'],
+            select: {
+              event: {
+                select: {
+                  uid: true,
+                  name: true,
+                  type: true,
+                  slugURL: true,
+                  startDate: true,
+                  endDate: true,
+                  location: {
+                    select: {
+                      location: true,
+                      timezone: true,
+                    }
+                  },
+                }
+              },
+            },
+          },
         },
       });
       team.teamFocusAreas = this.removeDuplicateFocusAreas(team.teamFocusAreas);
@@ -415,7 +444,8 @@ export class TeamsService {
       technologies,
       membershipSources,
       fundingStage,
-      officeHours
+      officeHours,
+      isHost
     } = queryParams;
     const filter: any = [];
     this.buildNameAndPLNFriendFilter(name, plnFriend, filter);
@@ -425,6 +455,7 @@ export class TeamsService {
     this.buildFundingStageFilter(fundingStage, filter);
     this.buildOfficeHoursFilter(officeHours, filter);
     this.buildRecentTeamsFilter(queryParams, filter);
+    filter.push(this.buildParticipationTypeFilter(queryParams));
     return {
       AND: filter
     };
@@ -782,5 +813,25 @@ export class TeamsService {
       fundingStages: fundingStages.map((stage) => stage.title),
       technologies: technologies.map((tech) => tech.title),
     };
+  }
+
+  /**
+   * This method construct the dynamic query to search the member by 
+   * their participation type for host only
+   * @param queryParams HTTP request query params object
+   * @returns Constructed query based on given participation type
+   */
+  buildParticipationTypeFilter(queryParams) {
+    const isHost = queryParams.isHost === 'true';
+    if (isHost) {
+      return {
+        eventGuests: {
+          some: {
+            isHost: isHost,
+          }
+        }
+      }
+    }
+    return {};
   }
 }

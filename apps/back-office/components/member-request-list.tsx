@@ -31,7 +31,7 @@ const MemberRequestList = (props: any) => {
     };
     const [listData, unVerifiedMembers] = await Promise.all([
       api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}?status=PENDING`, config),
-      api.get(`${API_ROUTE.MEMBERS}?isVerified=false&pagination=false`, config),
+      api.get(`${API_ROUTE.MEMBERS}?isVerified=false&pagination=false&orderBy=-createdAt`, config),
     ]);
 
     const pendingMembers = listData.data.filter((item) => item.participantType === ENROLLMENT_TYPE.MEMBER);
