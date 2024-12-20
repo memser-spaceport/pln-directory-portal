@@ -12,7 +12,7 @@ export class CacheService {
 
   // Mapping service names to tags
   private serviceTagsMap = {
-    members: ['member-filters', 'member-list'],
+    members: ['member-filters', 'member-list', 'members-roles'],
     projects: ['project-list', 'focus-areas'],
     teams: ['team-filters', 'team-list', 'focus-areas'],
     'participants-requests': ['member-filters', 'member-list','team-filters', 'team-list', 'focus-areas']
