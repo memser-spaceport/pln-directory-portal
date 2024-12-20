@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { OsoCodeMetricsByProjectV1Controller } from './oso_code-metrics-by-project-v1.controller';
-import { OsoCodeMetricsByProjectV1Service } from './oso_code-metrics-by-project-v1.service';
+import { OsoCodeMetricsByProjectV1Controller } from './oso-metrics.controller';
+import { OsoCodeMetricsByProjectV1Service } from './oso-metrics.service';
 
 describe('OsoCodeMetricsByProjectV1Controller', () => {
   let controller: OsoCodeMetricsByProjectV1Controller;
