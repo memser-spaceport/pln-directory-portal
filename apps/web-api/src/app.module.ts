@@ -41,7 +41,7 @@ import { MemberFeedbacksModule } from './member-feedbacks/member-feedbacks.modul
 import { HuskyModule } from './husky/husky.module';
 import { HomeModule } from './home/home.module';
 import { InternalsModule } from './internals/internals.module';
-import { OsoCodeMetricsByProjectV1Module } from './oso_code-metrics-by-project-v1/oso_code-metrics-by-project-v1.module';
+import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
 
 @Module({
   controllers: [AppController],
@@ -98,7 +98,7 @@ import { OsoCodeMetricsByProjectV1Module } from './oso_code-metrics-by-project-v
     HuskyModule,
     HomeModule,
     InternalsModule,
-    OsoCodeMetricsByProjectV1Module,
+    OsoMetricsModule,
   ],
   providers: [
     {
