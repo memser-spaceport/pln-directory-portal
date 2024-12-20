@@ -1,5 +1,6 @@
 import { Global, Logger, Module } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+import { OsoPrismaService } from './oso-prisma.service';
 import { LogService } from './log.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { AwsService } from '../utils/aws/aws.service';
@@ -16,6 +17,7 @@ import { CacheService } from '../utils/cache/cache.service';
 @Module({
   providers: [
     PrismaService,
+    OsoPrismaService,
     LogService,
     Logger,
     ForestAdminService,
@@ -31,6 +33,7 @@ import { CacheService } from '../utils/cache/cache.service';
   ],
   exports: [
     PrismaService,
+    OsoPrismaService,
     LogService,
     ForestAdminService,
     AwsService,
