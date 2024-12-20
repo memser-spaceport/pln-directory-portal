@@ -123,7 +123,8 @@ export class MemberController {
         builtQuery.where,
         this.membersService.buildNameFilters(queryParams),
         this.membersService.buildRoleFilters(queryParams),
-        this.membersService.buildRecentMembersFilter(queryParams)
+        this.membersService.buildRecentMembersFilter(queryParams),
+        this.membersService.buildParticipationTypeFilter(queryParams)
       ],
     };
     return await this.membersService.getMemberFilters(builtQuery);
