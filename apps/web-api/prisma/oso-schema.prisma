@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+  output= "../../../node_modules/.prisma/oso-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("OSO_DATABASE_URL")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by the Prisma Client.
+model artifacts_v1 {
+  artifact_id        String?
+  artifact_name      String?
+  artifact_namespace String?
+  artifact_source    String?
+  artifact_source_id String?
+  artifact_url       String?
+  created_at         DateTime @default(now()) @db.Timestamp(6)
+
+  @@ignore
+}
+
+model code_metrics_by_project_v1 {
+  active_developer_count_6_months     Float?
+  closed_issue_count_6_months         Float?
+  commit_count_6_months               Float?
+  contributor_count                   Float?
+  contributor_count_6_months          Float?
+  display_name                        String?
+  event_source                        String?
+  first_commit_date                   String?
+  fork_count                          Int?
+  fulltime_developer_average_6_months Float?
+  last_commit_date                    String?
+  merged_pull_request_count_6_months  Float?
+  new_contributor_count_6_months      Float?
+  opened_issue_count_6_months         Float?
+  opened_pull_request_count_6_months  Float?
+  project_id                          String   @id
+  project_name                        String?
+  project_namespace                   String?
+  project_source                      String?
+  repository_count                    Int?
+  star_count                          Int?
+  created_at                          DateTime @default(now()) @db.Timestamp(6)
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by the Prisma Client.
+model collections_v1 {
+  collection_id        String?
+  collection_name      String?
+  collection_namespace String?
+  collection_source    String?
+  description          String?
+  display_name         String?
+  created_at           DateTime @default(now()) @db.Timestamp(6)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by the Prisma Client.
+model oso_artifactsV1 {
+  artifactId        String?
+  artifactName      String?
+  artifactNamespace String?
+  artifactSource    String?
+  artifactSourceId  String?
+  artifactUrl       String?
+
+  @@ignore
+}
+
+model oso_codeMetricsByProjectV1 {
+  activeDeveloperCount6Months     Int?
+  closedIssueCount6Months         Int?
+  commitCount6Months              Int?
+  contributorCount                Int?
+  contributorCount6Months         Int?
+  displayName                     String?
+  eventSource                     String?
+  firstCommitDate                 String?
+  forkCount                       String?
+  fulltimeDeveloperAverage6Months Float?
+  lastCommitDate                  String?
+  mergedPullRequestCount6Months   Int?
+  newContributorCount6Months      Int?
+  openedIssueCount6Months         Int?
+  openedPullRequestCount6Months   Int?
+  projectId                       String  @id(map: "oso_codemetricsbyprojectv1_pkey")
+  projectName                     String?
+  projectNamespace                String?
+  projectSource                   String?
+  repositoryCount                 String?
+  starCount                       String?
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by the Prisma Client.
+model oso_collectionsV1 {
+  collectionId        String?
+  collectionName      String?
+  collectionNamespace String?
+  collectionSource    String?
+  description         String?
+  displayName         String?
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by the Prisma Client.
+model oso_projectsByCollectionV1 {
+  collectionId        String?
+  collectionName      String?
+  collectionNamespace String?
+  collectionSource    String?
+  projectId           String?
+  projectName         String?
+  projectNamespace    String?
+  projectSource       String?
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by the Prisma Client.
+model oso_projectsV1 {
+  description      String?
+  displayName      String?
+  projectId        String?
+  projectName      String?
+  projectNamespace String?
+  projectSource    String?
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by the Prisma Client.
+model projects_by_collection_v1 {
+  collection_id        String?
+  collection_name      String?
+  collection_namespace String?
+  collection_source    String?
+  project_id           String?
+  project_name         String?
+  project_namespace    String?
+  project_source       String?
+  created_at           DateTime @default(now()) @db.Timestamp(6)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by the Prisma Client.
+model projects_v1 {
+  description       String?
+  display_name      String?
+  project_id        String?
+  project_name      String?
+  project_namespace String?
+  project_source    String?
+  created_at        DateTime @default(now()) @db.Timestamp(6)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by the Prisma Client.
+model users_v1 {
+  bio                 String?
+  display_name        String?
+  profile_picture_url String?
+  url                 String?
+  user_id             String?
+  user_source         String?
+  user_source_id      String?
+  created_at          DateTime @default(now()) @db.Timestamp(6)
+
+  @@ignore
+}

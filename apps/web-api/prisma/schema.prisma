@@ -344,6 +344,7 @@ model Project {
   updatedAt          DateTime              @updatedAt
   isDeleted          Boolean               @default(false)
   isFeatured         Boolean?              @default(false)
+  osoProjectName     String?
   projectFocusAreas  ProjectFocusArea[]
   contributions      ProjectContribution[]
   relatedQuestions   DiscoveryQuestion[]   @relation("ProjectRelatedDiscoveryQuestions")
