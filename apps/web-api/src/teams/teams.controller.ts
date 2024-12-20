@@ -54,7 +54,7 @@ export class TeamsController {
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
     const { focusAreas, isHost } : any = request.query;
-    if(isHost) {  //Remove isHost from the default query if it is present in queryParams
+    if(isHost) {  //Remove isHost from the default query since it is to be added in eventGuest.
       delete builtQuery.where?.isHost;
     }
     builtQuery.where = {
