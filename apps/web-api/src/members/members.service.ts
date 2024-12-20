@@ -273,7 +273,7 @@ export class MembersService {
                   slugURL: true,
                   startDate: true,
                   endDate: true,
-                  location:{
+                  location: {
                     select: {
                       location: true,
                       timezone: true,
@@ -1185,7 +1185,7 @@ export class MembersService {
           tx
         );
       }));
-    
+
       return result;
     });
     await this.cacheService.reset({ service: 'members' });
