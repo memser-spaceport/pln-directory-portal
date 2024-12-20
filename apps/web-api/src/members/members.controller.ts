@@ -56,7 +56,7 @@ export class MemberController {
     if (name__icontains) {
       delete builtQuery.where?.name;
     }
-    if (isHost || isSpeaker) {
+    if (isHost || isSpeaker) {  //Remove isHost and isSpeaker from the default query if either is present in queryParams
       delete builtQuery.where?.isHost;
       delete builtQuery.where?.isSpeaker;
     }
@@ -119,7 +119,7 @@ export class MemberController {
     if (name__icontains) {
       delete builtQuery.where?.name;
     }
-    if (isHost || isSpeaker) {
+    if (isHost || isSpeaker) { //Remove isHost and isSpeaker from the default query if either is present in queryParams
       delete builtQuery.where?.isHost;
       delete builtQuery.where?.isSpeaker;
     }
