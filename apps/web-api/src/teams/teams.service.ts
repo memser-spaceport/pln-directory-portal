@@ -122,7 +122,7 @@ export class TeamsService {
                   slugURL: true,
                   startDate: true,
                   endDate: true,
-                  location:{
+                  location: {
                     select: {
                       location: true,
                       timezone: true,
