@@ -444,7 +444,8 @@ export class TeamsService {
       technologies,
       membershipSources,
       fundingStage,
-      officeHours
+      officeHours,
+      isHost
     } = queryParams;
     const filter: any = [];
     this.buildNameAndPLNFriendFilter(name, plnFriend, filter);
@@ -454,6 +455,7 @@ export class TeamsService {
     this.buildFundingStageFilter(fundingStage, filter);
     this.buildOfficeHoursFilter(officeHours, filter);
     this.buildRecentTeamsFilter(queryParams, filter);
+    filter.push(this.buildParticipationTypeFilter(queryParams));
     return {
       AND: filter
     };
