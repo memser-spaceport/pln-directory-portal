@@ -1,4 +1,3 @@
-/* eslint-disable prettier/prettier */
 import {
   BadRequestException,
   ConflictException,
@@ -83,6 +82,16 @@ export class MembersService {
     } catch (error) {
       return this.handleErrors(error);
     }
+  }
+
+  /**
+   * Retrieves a member based on unique query options
+   * @param queryOptions - Object containing unique field value pairs
+   * @returns  A promise resolving to member if found else null
+   */
+  async findUnique(queryOptions: Prisma.MemberWhereInput): Promise<Member | null> {
+    //Ideally this should be findUnique but to handle case insensitive we have done this, we should habdle this with lower case handles when saving
+    return await this.prisma.member.findFirst({where: queryOptions});
   }
 
   /**

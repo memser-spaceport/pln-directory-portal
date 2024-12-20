@@ -62,7 +62,8 @@ model Member {
   discordHandler               String?
   twitterHandler               String?
   linkedinHandler              String?
-  telegramHandler              String?
+  telegramHandler              String?                       @unique
+  telegramUid                  String?                       @unique
   officeHours                  String?
   moreDetails                  String?
   bio                          String?
