@@ -14,6 +14,7 @@ export class FocusAreasService {
         uid: true,
         title: true,
         description: true,
+        parentUid: true,
         children: this.buildQueryByLevel(4, type, query), // level denotes depth of children.
         ...this.buildAncestorFocusAreasFilterByType(type, query)
       },
@@ -31,6 +32,7 @@ export class FocusAreasService {
           uid: true,
           title: true,
           description: true,
+          parentUid: true,
           children: true,
           ...this.buildAncestorFocusAreasFilterByType(type, query)
         },
@@ -44,6 +46,7 @@ export class FocusAreasService {
         uid: true,
         title: true,
         description: true,
+        parentUid: true,
         children: this.buildQueryByLevel(level - 1, type, query),
         ...this.buildAncestorFocusAreasFilterByType(type, query)
       },
@@ -66,7 +69,12 @@ export class FocusAreasService {
             team: {
               select: {
                 uid: true,
-                name: true
+                name: true,
+                logo: {
+                  select: {
+                    url: true
+                  }
+                }
               }
             }
           },
@@ -86,7 +94,12 @@ export class FocusAreasService {
             project: {
               select: {
                 uid: true,
-                name: true
+                name: true,
+                logo: {
+                  select: {
+                    url: true
+                  }
+                }
               }
             }
           },
