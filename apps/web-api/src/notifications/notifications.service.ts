@@ -1,5 +1,5 @@
-import { Injectable, ConflictException, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable, ConflictException, BadRequestException, NotFoundException, Logger, forwardRef, Inject } from '@nestjs/common';
+import { NotificationStatus, Prisma, SubscriptionEntityType } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
@@ -11,7 +11,7 @@ export class NotificationService {
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue('notifications') private notificationQ: Queue
-) {}
+  ) { }
 
   /**
    * Creates a new notification record in the database.
@@ -98,7 +98,29 @@ export class NotificationService {
       return null;
     }
   }
-  
+
+  /**
+   * Updates a notification's status in the database by its unique identifier (uid).
+   * @param uid - The unique identifier of the notification record to update.
+   * @param status - updated status of the notification
+   * @returns The updated notification record.
+   * @throws NotFoundException if no notification record is found with the provided uid.
+   */
+  async updateNotificationStatus(uid: string, status: NotificationStatus) {
+    try {
+      return await this.prisma.notification.update({
+        where: {
+          uid,
+        },
+        data: {
+          status: status
+        },
+      });
+    } catch (error) {
+      this.handleErrors(error, uid);
+    }
+  }
+
   /**
    * Handles errors occurring during database operations.
    * Logs the error and rethrows it with a more specific exception if applicable.
@@ -123,5 +145,22 @@ export class NotificationService {
       throw new BadRequestException('Database validation error on notification:', error.message);
     }
     throw error;
+  }
+
+  /**
+   * Generates a notification payload object based on the provided entity UID and action type.
+   *
+   * @param entityUid - The unique identifier of the entity for which the notification is being created.
+   * @param actionType - The type of action associated with the entity (e.g., "CREATE", "UPDATE").
+   * @returns A notification payload object containing the entity UID, action type, entity type, notification status, and additional info.
+   */
+  async getNotificationPayload(entityUid, actionType) {
+    return {
+      entityUid: entityUid,
+      entityAction: actionType,
+      entityType: SubscriptionEntityType.EVENT_LOCATION,
+      status: NotificationStatus.PENDING,
+      additionalInfo: {}
+    }
   }
 }

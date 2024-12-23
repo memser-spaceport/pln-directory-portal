@@ -111,3 +111,10 @@ export const InteractionFailureReasons: { [key: string]: string } = {
   "Call quality issues": "IFR0009",
   "Meeting link didn't work": "IFR00010"
 };
+
+export const EmailTemplate :  { [key: string]: string } = {
+  "EVENT_ADDED": "event added",
+  "HOST_SPEAKER_ADDED": "host_speaker_added"
+};
+
+export const DeliveryChannel = "EMAIL"
