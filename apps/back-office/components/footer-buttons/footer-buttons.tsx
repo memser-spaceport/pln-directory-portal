@@ -12,6 +12,7 @@ import { useState } from 'react';
 
 export function FooterButtons(props) {
   const [openModal, setOpenModal] = useState(false);
+  const teamRoute = router.pathname === "/team-view";
   const saveButtonClassName = props.disableSave
     ? 'shadow-special-button-default inline-flex w-full justify-center rounded-full bg-slate-400 px-6 py-2 text-base font-semibold leading-6 text-white outline-none'
     : 'on-focus leading-3.5 text-md mb-2 mr-2 flex items-center rounded-full border border-blue-600 bg-blue-600 px-4 py-3 text-left font-medium text-white last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full';
@@ -38,7 +39,7 @@ export function FooterButtons(props) {
         await api.patch(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, data, configuration)
         message = status === "REJECTED"
           ? `Successfully ${APP_CONSTANTS.REJECTED_LABEL}`
-          : `Successfully ${isVerified ? APP_CONSTANTS.VERIFIED_FLAG : APP_CONSTANTS.UNVERIFIED_FLAG}`;
+          : `Successfully ${isVerified ? (teamRoute ? APP_CONSTANTS.APPROVED_LABEL : APP_CONSTANTS.VERIFIED_FLAG ): APP_CONSTANTS.UNVERIFIED_FLAG}`;
       }
       setOpenModal(false)
       toast(message);
@@ -92,7 +93,7 @@ export function FooterButtons(props) {
                 Are you sure you want to reject?
               </div>
               <div className='text-sm font-normal leading-5 text-left'>
-                Clicking reject will remove the member from the list.
+                Clicking reject will remove the {teamRoute ? "team" : "member" } from the list.
               </div>
 
               <div className="flex gap-[8px] mt-[25px] justify-end">
@@ -135,7 +136,7 @@ export function FooterButtons(props) {
         </div>
         <div className="col-span-3 justify-self-end">
           <div className="flex items-end space-x-3">
-            {props.from !== "approved" &&
+            {props.from !== "approved" && !teamRoute &&
               <button
                 onClick={() => approvelClickHandler(props?.id, "APPROVED", false, props?.setLoader)}
                 disabled={props.isEditEnabled}
@@ -153,11 +154,22 @@ export function FooterButtons(props) {
               disabled={props.isEditEnabled}
               onClick={() => approvelClickHandler(props?.id, "APPROVED", true, props?.setLoader)}
             >
-              {!props.isEditEnabled ?
-                <img height={20} width={20} src="assets/images/verified.svg" alt="verified" /> :
-                <img height={20} width={20} src="/assets/icons/upgrade-rounded.svg" alt="verified" />
+              {
+                teamRoute ? (
+                  props.isEditEnabled ? (
+                    <img height={16} width={16} src="assets/images/right_white.svg" alt="verified" />
+                  ) : (
+                    <img height={20} width={20} src="assets/icons/tick_green.svg" alt="verified" />
+                  )
+                ) : (
+                  props.isEditEnabled ? (
+                    <img height={20} width={20} src="/assets/icons/upgrade-rounded.svg" alt="verified" />
+                  ) : (
+                    <img height={20} width={20} src="assets/images/verified.svg" alt="verified" />
+                  )
+                )
               }
-              Verify
+              {teamRoute ? 'Approve' : 'Verify' }
             </button>
 
             {props.from !== "approved" &&
