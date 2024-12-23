@@ -192,4 +192,7 @@ export const EmailTemplate :  { [key: string]: string } = {
   "HOST_SPEAKER_ADDED": "HOST_SPEAKER_ADDED"
 };
 
-export const DeliveryChannel = "EMAIL"
+export const NOTIFICATION_CHANNEL: { [key: string]: string } = {
+  "EMAIL": "EMAIL",
+  "TELEGRAM": "TELEGRAM"
+}

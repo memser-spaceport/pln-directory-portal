@@ -29,6 +29,7 @@ CREATE TABLE "Notification" (
     "status" "NotificationStatus" NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "additionalInfo" JSONB,
 
     CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
 );
