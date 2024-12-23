@@ -112,9 +112,12 @@ export const InteractionFailureReasons: { [key: string]: string } = {
   "Meeting link didn't work": "IFR00010"
 };
 
-export const EmailTemplate :  { [key: string]: string } = {
-  "EVENT_ADDED": "event added",
-  "HOST_SPEAKER_ADDED": "host_speaker_added"
+export const EMAIL_TEMPLATES :  { [key: string]: string } = {
+  "EVENT_ADDED": "EVENT_ADDED",
+  "HOST_SPEAKER_ADDED": "HOST_SPEAKER_ADDED"
 };
 
-export const DeliveryChannel = "EMAIL"
+export const NOTIFICATION_CHANNEL: { [key: string]: string } = {
+  "EMAIL": "EMAIL",
+  "TELEGRAM": "TELEGRAM"
+}

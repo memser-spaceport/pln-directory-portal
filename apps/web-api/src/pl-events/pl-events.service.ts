@@ -279,7 +279,7 @@ export class PLEventsService {
     switch (actionType) {
       case "EVENT_ADDED":
         const payload = this.buildEventAdditionPayload(event, notification, requestorEmail)
-        this.notificationService.sendNotification(await payload)
+        await this.notificationService.sendNotification(await payload)
     }
   }
 
