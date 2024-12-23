@@ -586,14 +586,15 @@ model MemberSubscription {
 }
 
 model Notification {
-  id           Int                @id @default(autoincrement())
-  uid          String             @unique @default(uuid())
-  entityUid    String
-  entityAction String
-  entityType   String
-  status       NotificationStatus
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  id             Int                @id @default(autoincrement())
+  uid            String             @unique @default(uuid())
+  entityUid      String
+  entityAction   String
+  entityType     String
+  status         NotificationStatus
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  additionalInfo Json?
 }
 
 enum NotificationStatus {
