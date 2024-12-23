@@ -3,13 +3,17 @@ import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { Prisma, PLEvent, Member } from '@prisma/client';
 import { PLEventGuestsService } from './pl-event-guests.service';
+import { NotificationService } from '../notifications/notifications.service';
+import { MembersService } from '../members/members.service';
 
 @Injectable()
 export class PLEventsService {
   constructor(
     private prisma: PrismaService,
     private logger: LogService,
-    private eventGuestsService: PLEventGuestsService
+    private eventGuestsService: PLEventGuestsService,
+    private notificationService: NotificationService,
+    private memberService: MembersService
   ) { }
 
   /**
@@ -19,11 +23,13 @@ export class PLEventsService {
    *             startDate, endDate, resources, and locationUid.
    * @returns The newly created event object with details such as name, type, start and end dates, and location.
    */
-  async createPLEvent(event) {
+  async createPLEvent(event, requestorEmail) {
     try {
-      return await this.prisma.pLEvent.create({
+      const createdEvent = await this.prisma.pLEvent.create({
         data: event
       });
+      await this.notifySubscribers(createdEvent, createdEvent.locationUid, "EVENT_ADDED", requestorEmail);
+      return createdEvent;
     } catch (error) {
       this.handleErrors(error);
     }
@@ -259,4 +265,38 @@ export class PLEventsService {
     }
     return {};
   };
+
+  /**
+   * Notifies subscribers about specific actions related to an entity.
+   *
+   * @param event - The event data containing information about the entity or action.
+   * @param entityUid - The unique identifier of the entity being acted upon.
+   * @param actionType - The type of action triggering the notification (e.g., "EVENT_ADDED").
+   * @param requestorEmail - The email address of the user initiating the action, used to fetch additional details.
+   */
+  private async notifySubscribers(event, entityUid, actionType, requestorEmail) {
+    const notification = await this.notificationService.getNotificationPayload(entityUid, actionType);
+    switch (actionType) {
+      case "EVENT_ADDED":
+        const payload = this.buildEventAdditionPayload(event, notification, requestorEmail)
+        this.notificationService.sendNotification(await payload)
+    }
+  }
+
+  /**
+   * Constructs an event addition payload for notifications.
+   *
+   * @param event - The event data used to populate the notification payload.
+   * @param notification - The base notification object to be augmented with additional information.
+   * @param requestorEmail - The email address of the user who initiated the event addition, used to fetch requester details.
+   * @returns The updated notification object with additional information about the source (requestor).
+   */
+  private async buildEventAdditionPayload(event, notification, requestorEmail) {
+    const requestor = await this.memberService.findMemberByEmail(requestorEmail);
+    notification.additionalInfo = {
+      sourceUid: requestor.uid,
+      sourceName: requestor.name
+    }
+    return notification;
+  }
 }

@@ -1,16 +1,21 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { NotificationService } from './notifications.service';
 import { BullModule } from '@nestjs/bull';
-import { PrismaService } from '../shared/prisma.service'; 
+import { SharedModule } from '../shared/shared.module';
+import { MemberSubscriptionsModule } from '../member-subscriptions/member-subscriptions.module';
+import { PLEventsModule } from '../pl-events/pl-events.module';
 
 @Module({
   controllers: [],
-  providers: [NotificationService, PrismaService],
+  providers: [NotificationService],
   exports: [NotificationService],
-  imports: [  
+  imports: [
+    SharedModule,
+    MemberSubscriptionsModule,
+    forwardRef(() => PLEventsModule),
     BullModule.registerQueue({
       name: 'notifications',
     })
   ]
 })
-export class NotificationsModule {}
+export class NotificationsModule { }

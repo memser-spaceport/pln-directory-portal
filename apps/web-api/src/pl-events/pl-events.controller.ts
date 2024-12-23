@@ -57,7 +57,8 @@ export class PLEventsController {
     @Body() body: CreatePLEventSchemaDto,
   ) {
     const event = { ...body };
-    return await this.eventService.createPLEvent(event)
+    const requestor = await this.memberService.findMemberByRole();
+    return await this.eventService.createPLEvent(event, requestor?.email)
   }
 
   @Api(server.route.getPLEventGuestsByLocation)
@@ -122,7 +123,7 @@ export class PLEventsController {
     ) {
       throw new ForbiddenException(`Member with email ${userEmail} isn't admin to access past events or future events`);
     }
-    return await this.eventGuestService.createPLEventGuestByLocation(body, member);
+    return await this.eventGuestService.createPLEventGuestByLocation(body, member, locationUid, userEmail);
   }
 
   @Api(server.route.modifyPLEventGuestByLocation)
@@ -148,7 +149,7 @@ export class PLEventsController {
     ) {
       throw new ForbiddenException(`Member with email ${userEmail} isn't admin to access past events or future events`);
     }
-    return await this.eventGuestService.modifyPLEventGuestByLocation(body, location, member, type);
+    return await this.eventGuestService.modifyPLEventGuestByLocation(body, location, member, request["userEmail"], type);
   }
 
   @Api(server.route.deletePLEventGuestsByLocation)
