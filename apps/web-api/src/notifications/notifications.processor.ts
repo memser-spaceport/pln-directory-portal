@@ -5,7 +5,7 @@ import { MemberSubscriptionService } from '../member-subscriptions/member-subscr
 import axios from 'axios';
 import { NotificationStatus, Prisma } from '@prisma/client';
 import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
-import { DeliveryChannel, EmailTemplate } from '../utils/constants';
+import { EMAIL_TEMPLATES, NOTIFICATION_CHANNEL  } from '../utils/constants';
 import { ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 
 @Processor('notifications')
@@ -17,7 +17,7 @@ export class NotificationConsumer {
     private memberSubscriptionService: MemberSubscriptionService,
     private eventGuestService: PLEventGuestsService,
   ) {
-    this.baseUrl = process.env.EMAIL_NOTIFICATION_BASE_URL as string;
+    this.baseUrl = process.env.NOTIFICATION_SERVICE_BASE_URL as string;
     if (!this.baseUrl) {
       this.logger.error('EMAIL_NOTIFICATION_BASE_URL is not defined in the environment variables.');
       return;
@@ -36,7 +36,7 @@ export class NotificationConsumer {
     try {
       this.logger.info(`Processing notification with id: ${job.id}`);
       if (job.name === 'notify') {
-        const { notificationData } = job;
+        const notificationData = job.data;
         createdNotification = await this.notificationService.createNotification(notificationData);
         const subscribers: any[] = await this.getSubscribers(notificationData.entityType, notificationData.entityUid) || [];
         switch (notificationData.entityType) {
@@ -89,11 +89,11 @@ export class NotificationConsumer {
    * @param subscriber - The subscriber details, including their member information.
    * @returns A Promise that resolves to the constructed base notification payload.
    */
-  private async buildEmailNotificationPayload(notificationData, subscriber) {
+  private buildEmailNotificationPayload(notificationData, subscriber) {
     return {
       isPriority: true,
       delivery: {
-        deliveryChannel: DeliveryChannel,
+        deliveryChannel: NOTIFICATION_CHANNEL.EMAIL,
         templateName: "",
         payload: {
           body: {}
@@ -103,7 +103,7 @@ export class NotificationConsumer {
       actionType: notificationData.actionType,
       targetReasonType: "",
       source: {
-        activityId: "ACT12345",
+        activityId: notificationData.entityUid,
         activityType: notificationData.entityType,
         activityUserId: notificationData.additionalInfo.sourceUid,
         activityUserName: notificationData.additionalInfo.sourceName
@@ -113,7 +113,7 @@ export class NotificationConsumer {
         userId: subscriber.memberUid,
         userName: subscriber.member.name,
       },
-      clientId: process.env.EMAIL_NOTIFICATION_CLIENT_ID
+      clientId: process.env.NOTIFICATION_CLIENT_ID
     }
   }
 
@@ -125,12 +125,16 @@ export class NotificationConsumer {
    * @returns A promise that resolves when all notifications have been sent.
    */
   private async sendEventLocationNotification(subscribers, notificationData) {
-    return await subscribers?.map(subscriber => {
-      const message = this.buildEmailNotificationPayload(notificationData, subscriber);
-      axios.post(
-        this.baseUrl,
-        this.generateActionSpecificEmailPayload(message, notificationData, subscriber)
-      );
+    console.log(subscribers);
+    console.log(notificationData);
+    return await subscribers?.map(async(subscriber) => {
+      let payload = this.buildEmailNotificationPayload(notificationData, subscriber);
+      payload = await this.generateActionSpecificEmailPayload(payload, notificationData, subscriber);
+      if (payload)
+        return await axios.post(
+          `${this.baseUrl}/notifications`,
+          payload
+        );
     });
   }
 
@@ -141,28 +145,31 @@ export class NotificationConsumer {
    * @param subscriber - The subscriber details, including member information.
    * @returns The complete email payload tailored for the specific action type.
    */
-  private generateActionSpecificEmailPayload(message, notificationData, subscriber) {
-    switch (notificationData.actionType) {
+  private async generateActionSpecificEmailPayload(message, notificationData, subscriber) {
+    switch (notificationData.entityAction) {
       case "EVENT_ADDED":
-        return this.generateEmailPayloadForEventAddition(message, notificationData, subscriber);
+        return await this.generateEmailPayloadForEventAddition(message, notificationData, subscriber);
       case "HOST_SPEAKER_ADDED":
-        return this.generateEmailPayloadForHostAndSpeakerAddition(message, notificationData.additionalInfo, subscriber);
+        return await this.generateEmailPayloadForHostAndSpeakerAddition(message, notificationData.additionalInfo, subscriber); 
+      default: 
+        return null;
     }
   }
 
   /**
    * Generates the email payload for the "EVENT_ADDED" action.
    * @param message - The base email notification message payload.
-   * @param eventData - Data related to the event, including name and start date.
+   * @param notificationData - Data related to the event, including name and start date.
    * @param subscriber - The subscriber details, including member information.
    * @returns The complete email payload for the event addition action.
    */
-  private generateEmailPayloadForEventAddition(message, eventData, subscriber) {
-    message.delivery.templateName = EmailTemplate.EVENT_ADDED
+  private generateEmailPayloadForEventAddition(message, notificationData, subscriber) {
+    message.delivery.templateName = EMAIL_TEMPLATES.EVENT_ADDED
+    message.actionType = notificationData.entityAction;
     message.delivery.payload.body = {
       subject: "New Event added",
       greeting: `Hello ${subscriber.member.name},`,
-      message: `A new event is been added named ${eventData.additionalInfo.eventName} added in ${location} starting on ${eventData.additionalInfo.startDate}`,
+      message: `A new event is been added named ${notificationData.additionalInfo.eventName} added in ${notificationData.additionalInfo.location} starting on ${notificationData.additionalInfo.startDate}`,
       footer: "If you did not make this change, please contact us immediately."
     };
     return message;
@@ -177,7 +184,7 @@ export class NotificationConsumer {
    */
   private async generateEmailPayloadForHostAndSpeakerAddition(message, guestData, subscriber) {
     const guest = await this.eventGuestService.getHostAndSpeakerDetailsByUid(guestData.memberUid, guestData.eventUid)
-    message.delivery.templateName = EmailTemplate.HOST_SPEAKER_ADDED
+    message.delivery.templateName = EMAIL_TEMPLATES.HOST_SPEAKER_ADDED;
     message.delivery.payload.body = {
       subject: "New Host/Speaker onboarded",
       greeting: `Hello ${subscriber.member.name},`,
