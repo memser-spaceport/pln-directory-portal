@@ -12,11 +12,11 @@ export class CacheService {
 
   // Mapping service names to tags
   private serviceTagsMap = {
-    members: ['member-filters', 'member-list', 'members-roles', "featured", "member-airtable", "all-teams", "member"],
-    projects: ['project-list', 'focus-areas', "project", "team", "all-teams", "featured", "project-oso"],
-    teams: ['team-filters', 'team-list', 'focus-areas', "members", "all-teams", "team", "featured"],
+    members: ['member-filters', 'member-list', 'members-roles', "featured", "member-airtable", "member-repositories", "member-detail"],
+    projects: ['project-list', 'focus-areas', "project-detail", "team-detail", "featured", "project-oso"],
+    teams: ['team-filters', 'team-list', 'focus-areas', "team-detail", "featured"],
     'participants-requests': ['member-filters', 'member-list', 'team-filters', 'team-list', 'focus-areas'],
-    PLEventGuest: ["locations", "guests", "locations-topic", "guest-events", "member-preferences"]
+    PLEventGuest: ["irl-locations", "irl-guests", "irl-locations-topic", "irl-guest-events", "member-preferences"]
   };
 
   // Reset cache and call API based on service
