@@ -3,10 +3,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { Prisma } from '@prisma/client';
-import { 
+import {
   PLEventLocationWithEvents,
   FormattedLocationWithEvents,
-  PLEvent 
+  PLEvent
 } from './pl-event-locations.types';
 
 @Injectable()
@@ -14,7 +14,7 @@ export class PLEventLocationsService {
   constructor(
     private prisma: PrismaService,
     private logger: LogService
-  ) {}
+  ) { }
 
   /**
    * This method retrieves the event location by its UID, including all associated events.
@@ -50,14 +50,14 @@ export class PLEventLocationsService {
       return this.handleErrors(error, uid);
     }
   };
-  
+
   /**
    * This method retrieves all upcoming events for a specified location.
    * @param locationUid The unique identifier of the event location
    * @returns An array of upcoming events for the given location
    *   - The events include details like name, description, and date, formatted in the location's timezone.
    */
-  async getUpcomingEventsByLocation(locationUid: string): Promise<PLEvent[]> {  
+  async getUpcomingEventsByLocation(locationUid: string): Promise<PLEvent[]> {
     const result = await this.getPLEventLocationByUid(locationUid);
     return result?.upcomingEvents;
   }
@@ -112,7 +112,7 @@ export class PLEventLocationsService {
       });
       return locations.map((location) => {
         return this.formatLocation(location);
-      });  
+      });
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -137,11 +137,11 @@ export class PLEventLocationsService {
    * @param timezone The timezone of the location
    * @returns An object containing two arrays: pastEvents and upcomingEvents
    *   - Events are classified as past or upcoming depending on whether their start date is before or after the current time.
-   */  
+   */
   private segregateEventsByTime(events: PLEvent[], timezone: string): { pastEvents: PLEvent[], upcomingEvents: PLEvent[] } {
     const currentDateTimeInZone = moment().tz(timezone);
-    const pastEvents:any = [];
-    const upcomingEvents:any = [];
+    const pastEvents: any = [];
+    const upcomingEvents: any = [];
     events.forEach((event) => {
       const eventStartDateInZone = moment.utc(event.startDate).tz(timezone);
       const eventEndDateInZone = moment.utc(event.endDate).tz(timezone);
@@ -181,4 +181,25 @@ export class PLEventLocationsService {
     }
     throw error;
   };
+
+  /**
+   * Finds a location by its unique identifier.
+   * 
+   * @param {string} uid - The unique identifier of the location to be retrieved.
+   * @returns plEvent location The location object if found, otherwise `null`.
+   * @throws {Error} - If an error occurs during the query, it is passed to the `handleErrors` method.
+   *
+   */
+  async findLocationByUid(uid: string) {
+    try {
+      return this.prisma.pLEventLocation.findUnique({
+        where: { uid },
+        select: {
+          location: true
+        }
+      })
+    } catch (error) {
+      this.handleErrors(error)
+    }
+  }
 }
