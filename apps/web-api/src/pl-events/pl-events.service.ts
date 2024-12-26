@@ -5,6 +5,7 @@ import { Prisma, PLEvent, Member } from '@prisma/client';
 import { PLEventGuestsService } from './pl-event-guests.service';
 import { NotificationService } from '../notifications/notifications.service';
 import { MembersService } from '../members/members.service';
+import { PLEventLocationsService } from './pl-event-locations.service';
 
 @Injectable()
 export class PLEventsService {
@@ -13,7 +14,8 @@ export class PLEventsService {
     private logger: LogService,
     private eventGuestsService: PLEventGuestsService,
     private notificationService: NotificationService,
-    private memberService: MembersService
+    private memberService: MembersService,
+    private locationService: PLEventLocationsService
   ) { }
 
   /**
@@ -292,10 +294,15 @@ export class PLEventsService {
    * @returns The updated notification object with additional information about the source (requestor).
    */
   private async buildEventAdditionPayload(event, notification, requestorEmail) {
+    const location = await this.locationService.findLocationByUid(event.locationUid)
     const requestor = await this.memberService.findMemberByEmail(requestorEmail);
     notification.additionalInfo = {
+      eventName: event.name,
+      startDate: event.startDate,
+      eventDescription: event.description,
       sourceUid: requestor.uid,
-      sourceName: requestor.name
+      sourceName: requestor.name,
+      venue: location
     }
     return notification;
   }
