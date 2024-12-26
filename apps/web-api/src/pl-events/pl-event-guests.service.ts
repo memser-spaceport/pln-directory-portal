@@ -47,7 +47,7 @@ export class PLEventGuestsService {
       data.memberUid = isAdmin ? data.memberUid : member.uid;
       const guests = this.formatInputToEventGuests(data);
       const result = await (tx || this.prisma).pLEventGuest.createMany({ data: guests });
-      await this.notifySubscribers(data.events, locationUid, "HOST_SPEAKER_ADDED", requestorEmail)
+      await this.notifySubscribers(data, locationUid, "HOST_SPEAKER_ADDED", requestorEmail)
       this.cacheService.reset({ service: 'PLEventGuest' });
       return result;
     } catch (err) {
@@ -852,13 +852,19 @@ export class PLEventGuestsService {
         include: {
           member: {
             select: {
-              name: true
+              name: true,
+              bio:true
             }
           },
           event: {
             select: {
               name: true,
-              startDate: true
+              startDate: true,
+              location:{
+                select:{
+                  location: true
+                }
+              }
             }
           }
         }
@@ -873,9 +879,9 @@ export class PLEventGuestsService {
     switch (actionType) {
       case "HOST_SPEAKER_ADDED":
         await Promise.all(
-          guests.map(async (guest) => {
-            if (guest.isHost || guest.isSpeaker) {
-              const payload = this.buildHostSpeakerAdditonPayload(guest, notification, requestorEmail);
+          guests.events.map(async (event) => {
+            if (event.isHost || event.isSpeaker) {
+              const payload = this.buildHostSpeakerAdditonPayload(guests.memberUid, event, notification, requestorEmail);
               this.notificationService.sendNotification(await payload);
             }
           }
@@ -884,11 +890,11 @@ export class PLEventGuestsService {
     }
   }
 
-  private async buildHostSpeakerAdditonPayload(guest, notification, requestorEmail) {
+  private async buildHostSpeakerAdditonPayload(memberUid, event, notification, requestorEmail) {
     const requestor = await this.memberService.findMemberByEmail(requestorEmail);
     notification.additionalInfo = {
-      memberUid: guest.memberUid,
-      eventUid: guest.eventUid,
+      memberUid: memberUid,
+      eventUid: event.eventUid,
       sourceUid: requestor.uid,
       sourceName: requestor.name
     }
