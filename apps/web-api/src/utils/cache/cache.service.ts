@@ -8,14 +8,15 @@ export class CacheService {
   constructor(
     @Inject(CACHE_MANAGER) private cache: Cache,
     private logService: LogService
-  ) {}
+  ) { }
 
   // Mapping service names to tags
   private serviceTagsMap = {
-    members: ['member-filters', 'member-list', 'members-roles'],
-    projects: ['project-list', 'focus-areas'],
-    teams: ['team-filters', 'team-list', 'focus-areas'],
-    'participants-requests': ['member-filters', 'member-list','team-filters', 'team-list', 'focus-areas']
+    members: ['member-filters', 'member-list', 'members-roles', "featured", "member-airtable", "all-teams", "member"],
+    projects: ['project-list', 'focus-areas', "project", "team", "all-teams", "featured", "project-oso"],
+    teams: ['team-filters', 'team-list', 'focus-areas', "members", "all-teams", "team", "featured"],
+    'participants-requests': ['member-filters', 'member-list', 'team-filters', 'team-list', 'focus-areas'],
+    PLEventGuest: ["locations", "guests", "locations-topic", "guest-events", "member-preferences"]
   };
 
   // Reset cache and call API based on service
