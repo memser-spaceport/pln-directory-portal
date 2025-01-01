@@ -11,6 +11,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
+
   redis:
     image: redis:7.0.5
     restart: always
@@ -21,7 +22,35 @@ services:
       REDIS_PORT: ${REDIS_PORT}
     volumes:
       - redis:/data
+
+  redis-cache:
+    image: redis:7.0.5
+    restart: always
+    ports:
+      - '6389:6379'
+    environment:
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+    volumes:
+      - redis_cache_data:/data
+
+  mongodb:
+    image: mongo:5.0
+    restart: always
+    ports:
+      - '27017:27017'
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME}
+    volumes:
+      - mongodb_data:/data/db
+
 volumes:
   db_data:
   redis:
+    driver: local
+  redis_cache_data:
+    driver: local
+  mongodb_data:
     driver: local
