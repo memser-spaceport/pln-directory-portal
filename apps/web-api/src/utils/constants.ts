@@ -111,3 +111,21 @@ export const InteractionFailureReasons: { [key: string]: string } = {
   "Call quality issues": "IFR0009",
   "Meeting link didn't work": "IFR00010"
 };
+
+/********* HUSKY CONSTANTS ********/
+
+export const HUSKY_NO_INFO_PROMPT =
+  'Just return "No information available" as content, and empty followUpQuestions, actions and sources';
+
+export const IGNORED_URLS_FOR_CONCEALID = ['/v1/husky/chat/assistant'];
+export const HUSKY_SOURCES = {
+  TWITTER: 'twitter',
+  WEB: 'web',
+  ALL: 'all',
+}
+
+export const HUSKY_ACTION_TYPES = {
+  TEAM: 'team',
+  PROJECT: 'project',
+  MEMBER: 'member',
+}
