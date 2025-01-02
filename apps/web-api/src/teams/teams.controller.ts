@@ -67,7 +67,15 @@ export class TeamsController {
         this.teamsService.buildFocusAreaFilters(focusAreas),
         this.teamsService.buildRecentTeamsFilter(request.query),
         this.teamsService.buildParticipationTypeFilter(request.query)
-      ]
+      ],
+    };
+    // Check for the office hours blank when OH not null is passed
+    if (request.query['officeHours__not'] === 'null') {
+      builtQuery.where.AND.push({
+        officeHours: {
+          not: '',
+        },
+      });
     }
     return this.teamsService.findAll(builtQuery);
   }
