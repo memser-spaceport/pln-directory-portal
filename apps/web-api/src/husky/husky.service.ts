@@ -229,7 +229,7 @@ export class HuskyService {
     aiStreamingResponse.pipeTextStreamToResponse(res);
   }
 
-  private async fetchAndFormatActionDocsByType(type: string, embedding: any, collectionName: string, limit = 5) {
+  private async fetchAndFormatActionDocsByType(type: string, collectionName: string, embedding: any) {
     const actionDocs = await this.huskyVectorDbService.searchEmbeddings(collectionName, embedding, 5, true);
     return actionDocs.map((doc) => {
       return {
@@ -244,11 +244,19 @@ export class HuskyService {
 
   async getActionDocs(embedding: any) {
     const [memberDocs, teamDocs, projectDocs] = await Promise.all([
-      this.fetchAndFormatActionDocsByType(HUSKY_ACTION_TYPES.MEMBER, process.env.QDRANT_MEMBERS_COLLECTION, embedding),
-      this.fetchAndFormatActionDocsByType(HUSKY_ACTION_TYPES.TEAM, process.env.QDRANT_TEAMS_COLLECTION, embedding),
+      this.fetchAndFormatActionDocsByType(
+        HUSKY_ACTION_TYPES.MEMBER,
+        process.env.QDRANT_MEMBERS_COLLECTION || '',
+        embedding
+      ),
+      this.fetchAndFormatActionDocsByType(
+        HUSKY_ACTION_TYPES.TEAM,
+        process.env.QDRANT_TEAMS_COLLECTION || '',
+        embedding
+      ),
       this.fetchAndFormatActionDocsByType(
         HUSKY_ACTION_TYPES.PROJECT,
-        process.env.QDRANT_PROJECTS_COLLECTION,
+        process.env.QDRANT_PROJECTS_COLLECTION || '',
         embedding
       ),
     ]);
