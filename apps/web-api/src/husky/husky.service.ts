@@ -149,7 +149,10 @@ export class HuskyService {
   /***************  HUSKY   *****************/
 
   async updateFeedback(feedback: any) {
-    await this.huskyPersistentDbService.create(process.env.MONGO_FEEDBACK_COLLECTION || '', feedback);
+    await this.huskyPersistentDbService.create(process.env.MONGO_FEEDBACK_COLLECTION || '', {
+      ...feedback,
+      createdAt: Date.now(),
+    });
   }
 
   async persistChatHistory(uid: string, prompt: string, rephrasedPrompt: string, response: any) {
@@ -157,7 +160,8 @@ export class HuskyService {
       chatThreadId: uid,
       prompt,
       rephrasedPrompt,
-      response: response?.content || '',
+      response: response || '',
+      createdAt: Date.now(),
     });
   }
 
@@ -170,13 +174,13 @@ export class HuskyService {
     return embedding;
   }
 
-  async getChatHistory(uid: string) {
-    const chatHistory = await this.huskyCacheDbService.get(uid);
+  async getChatSummary(uid: string) {
+    const chatHistory = await this.huskyCacheDbService.get(`${uid}:summary`);
     return chatHistory;
   }
 
   async getRephrasedQuesBasedOnHistory(chatId: string, question: string) {
-    const chatHistory = await this.getChatHistory(`${chatId}:summary`);
+    const chatHistory = await this.getChatSummary(`${chatId}:summary`);
     if (chatHistory) {
       const { text } = await generateText({
         model: openai(process.env.OPENAI_LLM_MODEL || ''),
@@ -187,25 +191,16 @@ export class HuskyService {
     return question;
   }
 
-  async updateChatSummary(chatId: string, question: string, response: any) {
-    if (response?.object?.content === 'No information available' || response?.object?.content === '') {
-      return;
-    }
-    const currentConversation = `user: ${question}\n system: ${response?.object?.content}`;
-    const previousSummary = await this.huskyCacheDbService.get(chatId);
-    if (previousSummary) {
-      const { text } = await generateText({
-        model: openai(process.env.OPENAI_LLM_MODEL || ''),
-        prompt: `Given the summary of chat history - ${previousSummary}, and the new conversation - ${currentConversation}, Summarize all the system responses into one and also all user queries into one as short as possible but without losing any context or detail`,
-      });
-      await this.huskyCacheDbService.set(chatId, text);
-    } else {
-      const { text } = await generateText({
-        model: openai(process.env.OPENAI_LLM_MODEL || ''),
-        prompt: `Summarize the following chat conversation to as short as possible without losing any context or details but also maintain the thread of user and system responses: ${currentConversation}`,
-      });
-      await this.huskyCacheDbService.set(`${chatId}:summary`, text);
-    }
+  async updateChatSummary(chatId: string, rawChatHistory: any) {
+    const currentConversation = `user: ${rawChatHistory.user}\n system: ${rawChatHistory.system}`;
+    const previousSummary = await this.huskyCacheDbService.get(`${chatId}:summary`);
+    const { text } = await generateText({
+      model: openai(process.env.OPENAI_LLM_MODEL || ''),
+      prompt: `${
+        previousSummary ? `Given the previous chat history - ${previousSummary} and the new` : ''
+      } Conversation: ${currentConversation}. \n Summarize the above chat conversation to as short as possible without losing any context or details but also maintain the thread of user and system responses`,
+    });
+    await this.huskyCacheDbService.set(`${chatId}:summary`, text);
   }
 
   streamHuskyResponse(
@@ -221,9 +216,9 @@ export class HuskyService {
       prompt: prompt || HUSKY_NO_INFO_PROMPT,
       onFinish: async (response) => {
         if (prompt) {
-          await this.updateChatSummary(chatId, question, response);
+          await this.updateChatSummary(chatId, { user: question, system: response?.object?.content });
         }
-        await this.persistChatHistory(chatId, question, rephrasedQuestion, prompt ? response?.object : { content: '' });
+        await this.persistChatHistory(chatId, question, rephrasedQuestion, response?.object?.content);
       },
     });
     aiStreamingResponse.pipeTextStreamToResponse(res);
@@ -291,8 +286,8 @@ export class HuskyService {
     const context = sortedResults.map((result) => `${result?.text}(Source:${result?.source})`).join('\n');
     return context;
   }
-  createPromptForHuskyChat(question: string, context: string, chatHistorySummary: string, allDocs: any) {
-    const contextLength = Math.min(Math.max(60, context.split(' ').length / 2), 300);
+  createPromptForHuskyChat(question: string, context: string, chatSummary: string, allDocs: any) {
+    const contextLength = Math.min(Math.max(60, context.split(' ').length / 2), 500);
     const aiPrompt = `Given the question - ${question}, And following 'Context' and 'Chat History Summary' (if available)
   Generate a JSON object with the following structure. Make sure you have the content, followUpQuestions, actions and sources separate in the JSON object. Dont add everything in the content itself.:
 
@@ -303,10 +298,10 @@ export class HuskyService {
 
   Dont add any additional information from your Pretrained knowledge. And citation it is important dont miss it.
   If the context is empty, return content as 'No information available' strictly.
-  Dont add sources, followUpQuestions, actions into content strictly.
+  "Strictly" dont add sources, followUpQuestions, actions into content.
 
   Context: ${context}
-  Chat History Summary: ${chatHistorySummary}
+  Chat Conversation Summary: ${chatSummary}
   action list: ${JSON.stringify(allDocs)}
   `;
     return aiPrompt;
