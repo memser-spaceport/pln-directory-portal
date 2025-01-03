@@ -69,6 +69,14 @@ export class MemberController {
         this.membersService.buildParticipationTypeFilter(queryParams)
       ],
     };
+    // Check for the office hours blank when OH not null is passed
+    if (request.query['officeHours__not'] === 'null') {
+      builtQuery.where.AND.push({
+        officeHours: {
+          not: '',
+        },
+      });
+    }
     return await this.membersService.findAll(builtQuery);
   }
 

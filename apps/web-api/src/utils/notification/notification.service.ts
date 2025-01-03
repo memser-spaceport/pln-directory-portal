@@ -1,4 +1,3 @@
-/* eslint-disable prettier/prettier */
 import { Injectable } from '@nestjs/common';
 import { AwsService } from '../aws/aws.service';
 import { SlackService } from '../slack/slack.service';
