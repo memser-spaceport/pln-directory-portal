@@ -8,6 +8,10 @@ export const HuskyChatSchema = z.object({
   name: z.string(),
   directoryId: z.string(),
   source: z.string(),
+  chatSummary: z.object({
+    user: z.string(),
+    system: z.string()
+  }).optional()
 });
 
 export const HuskyFeedbackSchema = z.object({ 
