@@ -8,7 +8,6 @@ import {
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import * as redisStore from 'cache-manager-redis-store';
-import type { ClientOpts } from 'redis';
 import { AppController } from './app.controller';
 import { FundingStagesModule } from './funding-stages/funding-stages.module';
 import { HealthModule } from './health/health.module';
@@ -50,7 +49,7 @@ import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
       ttl: 1,
       limit: 10,
     }),
-   CacheModule.register<ClientOpts>({
+   CacheModule.register<any>({
       store: redisStore,
       url: process.env.REDIS_TLS_URL,
       isGlobal: true,
