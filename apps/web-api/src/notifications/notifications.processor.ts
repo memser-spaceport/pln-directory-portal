@@ -11,17 +11,23 @@ import { isEmpty } from 'lodash';
 
 @Processor('notifications')
 export class NotificationConsumer {
-  private baseUrl: string = "";
+  private notificationServiceBaseUrl: string = "";
+  private notificationServiceSecret: string = "";
   private createdNotification;
   constructor(
-    private readonly notificationService: NotificationService,
     private logger: LogService,
+    private notificationService: NotificationService,
     private memberSubscriptionService: MemberSubscriptionService,
-    private eventGuestService: PLEventGuestsService,
+    private eventGuestService: PLEventGuestsService
   ) {
-    this.baseUrl = process.env.NOTIFICATION_SERVICE_BASE_URL as string;
-    if (!this.baseUrl) {
-      this.logger.error('EMAIL_NOTIFICATION_BASE_URL is not defined in the environment variables.');
+    this.notificationServiceBaseUrl = process.env.NOTIFICATION_SERVICE_BASE_URL as string;
+    this.notificationServiceSecret = process.env.NOTIFICATION_SERVICE_CLIENT_SECRET as string;
+    if (!this.notificationServiceBaseUrl) {
+      this.logger.error('NOTIFICATION_SERVICE_BASE_URL is not defined in the environment variables.');
+      return;
+    }
+    if (!this.notificationServiceSecret) {
+      this.logger.error('NOTIFICATION_SERVICE_CLIENT_SECRET is not defined in the environment variables.');
       return;
     }
   }
@@ -117,8 +123,7 @@ export class NotificationConsumer {
         emailId: subscriber.member.email,
         userId: subscriber.memberUid,
         userName: subscriber.member.name,
-      },
-      clientId: process.env.NOTIFICATION_CLIENT_ID
+      }
     }
   }
 
@@ -173,8 +178,8 @@ export class NotificationConsumer {
     message.delivery.payload.body = {
       subscriberName: subscriber.member.name,
       name: notificationData.additionalInfo.eventName,
-      date: notificationData.additionalInfo.startDate.split("T")[0],
-      time: notificationData.additionalInfo.startDate.split("T")[1],
+      date: notificationData.additionalInfo.startDate?.split("T")[0],
+      time: notificationData.additionalInfo.startDate?.split("T")[1],
       location: notificationData.additionalInfo.venue.location,
       description: notificationData.additionalInfo.eventDescription,
       opportunityType: "",
@@ -217,7 +222,15 @@ export class NotificationConsumer {
    */
   async sendNotification(payload) {
     try {
-      return await axios.post(`${this.baseUrl}/notifications`, payload);
+      return await axios.post(
+        `${this.notificationServiceBaseUrl}/notifications`, 
+        payload, 
+        {
+          headers: {
+            'Authorization': `Basic ${this.notificationServiceSecret}`
+          }
+        }
+      );
     } catch (error) {
       await this.notificationService.updateNotificationStatus(this.createdNotification.uid, NotificationStatus.FAILED)
       if (axios.isAxiosError(error)) {
