@@ -15,7 +15,12 @@ export class RedisCacheDbService implements OnModuleDestroy, HuskyCacheDbService
   }
   
   async set(key: string, value: any): Promise<void> {
-    await this.redis.set(key, JSON.stringify(value));
+    await this.redis.set(
+      key,
+      JSON.stringify(value),
+      'EX',
+      Number(process.env.REDIS_CACHE_EXPIRY_IN_SECONDS || 60 * 60 * 24)
+    );
   }
 
   async get(key: string): Promise<any> {

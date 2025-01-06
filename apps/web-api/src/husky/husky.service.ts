@@ -16,10 +16,11 @@ export class HuskyService {
   constructor(
     private logger: LogService,
     private prisma: PrismaService,
-    private huskyVectorDbService: QdrantVectorDbService,
+    private huskyPersistentDbService: MongoPersistantDbService
+/*     private huskyVectorDbService: QdrantVectorDbService,
     private huskyCacheDbService: RedisCacheDbService,
     private huskyGraphDbService: Neo4jGraphDbService,
-    private huskyPersistentDbService: MongoPersistantDbService
+     */
   ) {}
 
   async fetchDiscoverQuestions(query: Prisma.DiscoveryQuestionFindManyArgs) {
@@ -127,6 +128,13 @@ export class HuskyService {
     }
   }
 
+  async addHuskyFeedback(feedback: any) {
+    await this.huskyPersistentDbService.create(process.env.MONGO_FEEDBACK_COLLECTION || '', {
+      ...feedback,
+      createdAt: Date.now(),
+    });
+  }
+
   private handleErrors(error, message?) {
     this.logger.error(error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -146,14 +154,11 @@ export class HuskyService {
     throw error;
   }
 
-  /***************  HUSKY   *****************/
 
-  async updateFeedback(feedback: any) {
-    await this.huskyPersistentDbService.create(process.env.MONGO_FEEDBACK_COLLECTION || '', {
-      ...feedback,
-      createdAt: Date.now(),
-    });
-  }
+
+  /***************  HUSKY   *****************/
+/* 
+
 
   async persistChatHistory(uid: string, prompt: string, rephrasedPrompt: string, response: any) {
     await this.huskyPersistentDbService.create(process.env.MONGO_CONVERSATION_COLLECTION || '', {
@@ -305,5 +310,5 @@ export class HuskyService {
   action list: ${JSON.stringify(allDocs)}
   `;
     return aiPrompt;
-  }
+  } */
 }
