@@ -149,9 +149,9 @@ STRICT REQUIREMENTS for the output json: Follow the below requirements strictly.
   - First citation of source1.com → 1
   - First citation of source2.com → 2
   - Second citation of source1.com → 1 (not 3).
-- Strictly Never add the 'sources' in the 'content' like - Sources \n 1. example1.com \n 2. example2.com \n 3.example3.com
-- Strictly Never add the 'followUpQuestions' in the 'content'.
-- Strictly Never add the 'actions' in the 'content'
+- **Strictly** Never add the 'sources' in the 'content' like - Sources \n 1. example1.com \n 2. example2.com \n 3.example3.com
+- **Strictly** Never add the 'followUpQuestions' in the 'content'.
+- **Strictly** Never add the 'actions' in the 'content'
 
 2. 'sources' FORMATTING:
 - Include only unique, valid URLs f rom context
@@ -182,59 +182,7 @@ action list: {{allDocs}};
 
 `;
 
-export const rephraseQuestionTemplate = `
-Given:
-Chat Summary: {{chatHistory}}
-New Question: {{question}}
+export const rephraseQuestionTemplate = `Given the chat summary - {{chatHistory}} and the new question - {{question}}, Rephrase the new question if its missing any context. If its not missing any context, return the same question. If its a completely new context, return the new question as it is.`;
 
-Task:
-1. Check if question needs context from chat history
-2. If context missing: Add relevant context to question
-3. If context complete: Return original question
-4. If new topic: Return original question
-
-Return only the final question with no explanations.
-`
-export const chatSummaryTemplate = `
-Given conversation: {{currentConversation}}, generate concise summary in the below format:
-
-TOPICS:
-[Topic- Brief topic label]
-- User: Key points/questions
-- System: Core responses/solutions
-
-Example format:
-Redis 
-- User: Setup, cache size, security
-- System: Config steps, 2GB recommended, firewall rules
-
-Baking 
-- User: Chocolate cake recipe
-- System: Instructions provided
-
-Rules:
-- Keep entries telegram-style - brief but complete
-
-`
-export const chatSummaryWithHistoryTemplate = `
-Given previous summary {{previousSummary}} and new messages {{currentConversation}}, generate concise summary:
-
-TOPICS:
-[Topic ID]: [Brief topic label] ([message range])
-- User: Key points/questions
-- System: Core responses/solutions
-
-Example format:
-Topic 1: Redis
-- User: Setup, cache size, security
-- System: Config steps, 2GB recommended, firewall rules
-
-Topic 2: Baking
-- User: Chocolate cake recipe
-- System: Instructions provided
-
-Rules:
-- Start new topic if context/subject clearly changes
-- Link to previous topic if referenced (format: see Topic 1)
-- Keep entries telegram-style - brief but complete
-`
+export const chatSummaryWithHistoryTemplate = `Given the summary of chat history - {{previousSummary}}, and the new conversation - {{currentConversation}}, Summarize all the system responses into one and also all user queries into one as short as possible but without losing any context or detail`;
+export const chatSummaryTemplate = `Given that chat conversation - {{currentConversation}}, Summarize all the system responses into one and also all user queries into one as short as possible but without losing any context or detail`;

@@ -55,7 +55,7 @@ export class HuskyAiService {
     }
 
     // If Context is valid, then create prompt and stream the response
-    const chatSummaryFromDb = await this.getChatSummary(uid);
+    const chatSummaryFromDb = await this.huskyCacheDbService.get(`${uid}:summary`);
     const prompt = this.createPromptForHuskyChat(question, context, chatSummaryFromDb || '', actionDocs);
     return streamObject({
       model: openai(process.env.OPENAI_LLM_MODEL || ''),
@@ -89,13 +89,9 @@ export class HuskyAiService {
     return embedding;
   }
 
-  async getChatSummary(uid: string) {
-    const chatHistory = await this.huskyCacheDbService.get(`${uid}:summary`);
-    return chatHistory;
-  }
-
   async getRephrasedQuestionBasedOnHistory(chatId: string, question: string) {
-    const chatHistory = await this.getChatSummary(`${chatId}:summary`);
+    const chatHistory = await this.huskyCacheDbService.get(`${chatId}:summary`);
+
     if (chatHistory) {
       const aiPrompt = Handlebars.compile(rephraseQuestionTemplate)({ chatHistory, question });
       const { text } = await generateText({
@@ -111,9 +107,8 @@ export class HuskyAiService {
     const formattedChat = `user: ${rawChatHistory.user}\n system: ${rawChatHistory.system}`;
     const previousSummary = await this.huskyCacheDbService.get(`${chatId}:summary`);
     const aiPrompt = previousSummary
-      ? Handlebars.compile(chatSummaryWithHistoryTemplate)({ previousSummary, formattedChat })
-      : Handlebars.compile(chatSummaryTemplate)({ formattedChat });
-
+      ? Handlebars.compile(chatSummaryWithHistoryTemplate)({ previousSummary, currentConversation: formattedChat })
+      : Handlebars.compile(chatSummaryTemplate)({ currentConversation: formattedChat });
     const { text } = await generateText({
       model: openai(process.env.OPENAI_LLM_MODEL || ''),
       prompt: aiPrompt,
@@ -173,7 +168,7 @@ export class HuskyAiService {
     };
   }
 
-  async getMatchingEmbeddingsBySource(source: string, embedding: any, limit = 15) {
+  async getMatchingEmbeddingsBySource(source: string, embedding: any, limit = 25) {
     const collection =
       source === HUSKY_SOURCES.TWITTER
         ? process.env.QDRANT_TWITTER_COLLECTION || ''
@@ -192,7 +187,11 @@ export class HuskyAiService {
       });
     }
 
-    const sortedResults = formattedResults.sort((a, b) => b?.score - a?.score).slice(0, 10);
+    const sortedResults = formattedResults
+      .sort((a, b) => b?.score - a?.score)
+      .filter((v) => v.score > 0.4)
+      .slice(0, 10);
+
     const context = sortedResults
       .filter((result) => result?.text?.length > 5)
       .map((result) => `${result?.text}${result?.source ? ` (Source:${result?.source})` : ''}`)
@@ -201,7 +200,7 @@ export class HuskyAiService {
   }
 
   createPromptForHuskyChat(question: string, context: string, chatSummary: string, allDocs: any) {
-    const contextLength = Math.min(Math.max(60, context.split(' ').length / 2), 500);
+    const contextLength = Math.min(Math.max(60, context.split(' ').length / 1.5), 600);
     const aiPrompt = Handlebars.compile(aiPromptTemplate)({
       context,
       contextLength,
