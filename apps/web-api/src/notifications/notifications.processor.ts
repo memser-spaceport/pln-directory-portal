@@ -103,23 +103,23 @@ export class NotificationConsumer {
   private buildEmailNotificationPayload(notificationData, subscriber) {
     return {
       isPriority: true,
-      delivery: {
-        deliveryChannel: NOTIFICATION_CHANNEL.EMAIL,
-        templateName: "",
-        payload: {
+      deliveryChannel: NOTIFICATION_CHANNEL.EMAIL,
+      templateName: "",
+      recipientAddress: subscriber.member.email,
+      recipientAddressId: subscriber.member.email,
+      deliveryPayload: {
           body: {}
-        }
       },
       entityType: notificationData.entityType,
       actionType: notificationData.actionType,
       targetReasonType: "",
-      source: {
+      sourceMeta: {
         activityId: notificationData.entityUid,
         activityType: notificationData.entityType,
         activityUserId: notificationData.additionalInfo.sourceUid,
         activityUserName: notificationData.additionalInfo.sourceName
       },
-      target: {
+      targetMeta: {
         emailId: subscriber.member.email,
         userId: subscriber.memberUid,
         userName: subscriber.member.name,
@@ -173,9 +173,9 @@ export class NotificationConsumer {
    * @returns The complete email payload for the event addition action.
    */
   private generateEmailPayloadForEventAddition(message, notificationData, subscriber) {
-    message.delivery.templateName = EMAIL_TEMPLATES.EVENT_ADDED
+    message.templateName = EMAIL_TEMPLATES.EVENT_ADDED
     message.actionType = notificationData.entityAction;
-    message.delivery.payload.body = {
+    message.deliveryPayload.body = {
       subscriberName: subscriber.member.name,
       name: notificationData.additionalInfo.eventName,
       date: notificationData.additionalInfo.startDate?.split("T")[0],
@@ -196,9 +196,9 @@ export class NotificationConsumer {
    */
   private async generateEmailPayloadForHostAndSpeakerAddition(message, notificationData, subscriber) {
     const guest = await this.eventGuestService.getHostAndSpeakerDetailsByUid(notificationData.memberUid, notificationData.eventUid);
-    message.delivery.templateName = EMAIL_TEMPLATES.HOST_SPEAKER_ADDED;
+    message.templateName = EMAIL_TEMPLATES.HOST_SPEAKER_ADDED;
     message.actionType = notificationData.entityAction;
-    message.delivery.payload.body = {
+    message.deliveryPayload.body = {
       subscriberName: subscriber.member.name,
       eventName: guest?.event.name,
       location: guest?.event.location?.location,
