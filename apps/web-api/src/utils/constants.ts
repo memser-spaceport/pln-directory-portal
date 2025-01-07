@@ -187,7 +187,7 @@ export const rephraseQuestionTemplate = `Given the chat summary - {{chatHistory}
 export const chatSummaryWithHistoryTemplate = `Given the summary of chat history - {{previousSummary}}, and the new conversation - {{currentConversation}}, Summarize all the system responses into one and also all user queries into one as short as possible but without losing any context or detail`;
 export const chatSummaryTemplate = `Given that chat conversation - {{currentConversation}}, Summarize all the system responses into one and also all user queries into one as short as possible but without losing any context or detail`;
 
-export const EmailTemplate :  { [key: string]: string } = {
+export const EMAIL_TEMPLATES :  { [key: string]: string } = {
   "EVENT_ADDED": "EVENT_ADDED",
   "HOST_SPEAKER_ADDED": "HOST_SPEAKER_ADDED"
 };
