@@ -62,7 +62,14 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(
       createdAt: faker.date.past(),
       updatedAt: faker.date.recent(),
       fundingStageUid: null,
-      lastModifiedBy: null
+      lastModifiedBy: null,
+      highlightContent: [
+        {
+          text: faker.lorem.words(4),
+          link: faker.internet.url(),
+          showInCardView: faker.datatype.boolean()
+        }
+      ],
     };
   }
 );
