@@ -49,6 +49,7 @@ model Team {
   teamFocusAreas               TeamFocusArea[]
   teamFocusAreasVersionHistory TeamFocusAreaVersionHistory[]
   relatedQuestions             DiscoveryQuestion[]           @relation("TeamRelatedDiscoveryQuestions")
+  highlightContent             Json?
 }
 
 model Member {
@@ -349,6 +350,7 @@ model Project {
   projectFocusAreas  ProjectFocusArea[]
   contributions      ProjectContribution[]
   relatedQuestions   DiscoveryQuestion[]   @relation("ProjectRelatedDiscoveryQuestions")
+  highlightContent   Json?
 }
 
 model PLEventLocation {
