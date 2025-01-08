@@ -48,7 +48,8 @@ const ProjectFactory = Factory.define<Omit<Project, 'id'>>(
       isFeatured: faker.datatype.boolean(),
       highlightContent: [
         {
-          text: faker.lorem.words(4),
+          title: faker.lorem.words(4),
+          description: faker.lorem.word(10),
           link: faker.internet.url(),
           showInCardView: faker.datatype.boolean()
         }

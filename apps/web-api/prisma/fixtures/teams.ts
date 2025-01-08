@@ -65,7 +65,8 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(
       lastModifiedBy: null,
       highlightContent: [
         {
-          text: faker.lorem.words(4),
+          title: faker.lorem.words(4),
+          description: faker.lorem.word(10),
           link: faker.internet.url(),
           showInCardView: faker.datatype.boolean()
         }
