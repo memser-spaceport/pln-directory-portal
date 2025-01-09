@@ -51,7 +51,7 @@ import { NotificationsModule } from './notifications/notifications.module';
       ttl: 1,
       limit: 10,
     }),
-   CacheModule.register<any>({
+    CacheModule.register<any>({
       store: redisStore,
       url: process.env.REDIS_TLS_URL,
       isGlobal: true,
@@ -59,15 +59,15 @@ import { NotificationsModule } from './notifications/notifications.module';
       max: 100, // maximum number of items in cache
       tls: process.env.REDIS_WITH_TLS
         ? {
-            rejectUnauthorized: false,
-            requestCert: true,
-          }
+          rejectUnauthorized: false,
+          requestCert: true,
+        }
         : null,
     }),
     BullModule.forRoot({
       redis: {
-        host: 'localhost',
-        port: 6379,
+        host: process.env.QUEUE_REDIS_HOST,
+        port: Number(process.env.QUEUE_REDIS_PORT || '6379'),
       },
     }),
     MembersModule,
