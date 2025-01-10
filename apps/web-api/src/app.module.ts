@@ -37,8 +37,6 @@ import { EmptyStringToNullInterceptor } from './interceptors/empty-string-to-nul
 import { OfficeHoursModule } from './office-hours/office-hours.module';
 import { MemberFollowUpsModule } from './member-follow-ups/member-follow-ups.module';
 import { MemberFeedbacksModule } from './member-feedbacks/member-feedbacks.module';
-import { HuskyModule } from './husky/husky.module';
-import { HomeModule } from './home/home.module';
 import { InternalsModule } from './internals/internals.module';
 import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
 import { MemberSubscriptionsModule } from './member-subscriptions/member-subscriptions.module';
@@ -65,10 +63,15 @@ import { NotificationsModule } from './notifications/notifications.module';
         : null,
     }),
     BullModule.forRoot({
+      url: process.env.QUEUE_REDIS_WITH_TLS,
       redis: {
-        host: process.env.QUEUE_REDIS_HOST,
-        port: Number(process.env.QUEUE_REDIS_PORT || '6379'),
-        ...(process.env.QUEUE_REDIS_PASSWORD && { password: process.env.QUEUE_REDIS_PASSWORD }) 
+        tls: {
+          rejectUnauthorized: false,
+          requestCert: true,
+        },
+        // host: process.env.QUEUE_REDIS_HOST,
+        // port: Number(process.env.QUEUE_REDIS_PORT || '6379'),
+        // ...(process.env.QUEUE_REDIS_PASSWORD && { password: process.env.QUEUE_REDIS_PASSWORD }) 
       },
     }),
     MembersModule,
@@ -94,8 +97,6 @@ import { NotificationsModule } from './notifications/notifications.module';
     OfficeHoursModule,
     MemberFollowUpsModule,
     MemberFeedbacksModule,
-    HuskyModule,
-    HomeModule,
     InternalsModule,
     OsoMetricsModule,
     MemberSubscriptionsModule,
