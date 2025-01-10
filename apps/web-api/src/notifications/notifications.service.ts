@@ -94,6 +94,7 @@ export class NotificationService {
       this.logger.log(`Notification job added to queue with ID: ${job.id}`);
       return job;
     } catch (error) {
+      console.log("NotificationQ Error : " + error)
       this.logger.error('Failed to add notification to the queue', error);
       return null;
     }
