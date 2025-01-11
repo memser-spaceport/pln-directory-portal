@@ -894,7 +894,7 @@ export class PLEventGuestsService {
     const requestor = await this.memberService.findMemberByEmail(requestorEmail);
     notification.additionalInfo = {
       memberUid: memberUid,
-      eventUid: event.eventUid,
+      eventUid: event.uid,
       sourceUid: requestor.uid,
       sourceName: requestor.name
     }
