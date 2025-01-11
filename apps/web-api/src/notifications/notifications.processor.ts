@@ -195,7 +195,7 @@ export class NotificationConsumer {
    * @returns A Promise that resolves to the complete email payload for the host or speaker addition action.
    */
   private async generateEmailPayloadForHostAndSpeakerAddition(message, notificationData, subscriber) {
-    const guest = await this.eventGuestService.getHostAndSpeakerDetailsByUid(notificationData.memberUid, notificationData.eventUid);
+    const guest = await this.eventGuestService.getHostAndSpeakerDetailsByUid(notificationData.additionalInfo.memberUid, notificationData.additionalInfo.eventUid);
     message.templateName = EMAIL_TEMPLATES.HOST_SPEAKER_ADDED;
     message.actionType = notificationData.entityAction;
     message.deliveryPayload.body = {

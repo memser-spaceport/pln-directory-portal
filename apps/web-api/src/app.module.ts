@@ -69,9 +69,6 @@ import { NotificationsModule } from './notifications/notifications.module';
           rejectUnauthorized: false,
           requestCert: true,
         },
-        // host: process.env.QUEUE_REDIS_HOST,
-        // port: Number(process.env.QUEUE_REDIS_PORT || '6379'),
-        // ...(process.env.QUEUE_REDIS_PASSWORD && { password: process.env.QUEUE_REDIS_PASSWORD }) 
       },
     }),
     MembersModule,
