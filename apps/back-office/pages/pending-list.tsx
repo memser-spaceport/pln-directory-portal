@@ -9,7 +9,8 @@ import { ApprovalLayout } from '../layout/approval-layout';
 import { parseCookies } from 'nookies';
 
 export default function PendingList(props) {
-  const { setIsOpenRequest, setMemberList, setTeamList, isTeamActive, setShowMenu, memberList, teamList } = useNavbarContext();
+  const { setIsOpenRequest, setMemberList, setTeamList, isTeamActive, setShowMenu, memberList, teamList } =
+    useNavbarContext();
   setShowMenu(true);
 
   useEffect(() => {
@@ -47,9 +48,8 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (context) 
       authorization: `Bearer ${plnadmin}`,
     },
   };
-  const listData = await api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}?status=PENDING`, config);
+  const listData = await api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}?status=PENDING&select=logo`, config);
   const unVerifiedMembes = await api.get(`${API_ROUTE.MEMBERS}?isVerified=false&pagination=false`, config);
-
   let memberResponse = [];
   let teamResponse = [];
   let team = [];
@@ -60,10 +60,23 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (context) 
     teamResponse = listData.data.filter((item) => item.participantType === ENROLLMENT_TYPE.TEAM);
     memberResponse = listData.data.filter((item) => item.participantType === ENROLLMENT_TYPE.MEMBER);
     member = memberResponse?.map((data) => {
+      const skills = data?.newData?.skills || [];
+      const teamAndRoles = data?.newData?.teamAndRoles || [];
+      const projectContributions = data?.newData?.projectContributions || [];
+      const isSubscribedToNewsletter = data?.newData?.isSubscribedToNewsletter ?? false;
+      const teamOrProjectURL = data?.newData?.teamOrProjectURL || '';
+      const imageUrl = data?.newData?.imageUrl || '';
       return {
         id: data.uid,
         name: data.newData.name,
         status: data.status,
+        email: data.newData.email,
+        skills: skills,
+        teamAndRoles: teamAndRoles,
+        projectContributions: projectContributions,
+        isSubscribedToNewsletter: isSubscribedToNewsletter,
+        teamOrProjectURL: teamOrProjectURL,
+        imageUrl: imageUrl,
       };
     });
     unverifiedMembers = unVerifiedMembes.data.members.map((data) => {
@@ -79,6 +92,10 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (context) 
         id: data.uid,
         name: data.newData.oldName ?? data.newData.name,
         status: data.status,
+        email: data.newData.email,
+        skills: data.newData.skills,
+        teamAndRoles: data.newData.teamAndRoles,
+        isSubscribedToNewsletter: data.newData.isSubscribedToNewsletter,
       };
     });
   }
