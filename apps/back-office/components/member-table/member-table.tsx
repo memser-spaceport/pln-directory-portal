@@ -258,11 +258,21 @@ const MemberTable = (props: any) => {
                     >
                       {isSelected && <img alt="mode" src="/assets/images/right_white.svg" />}
                     </button>
-                    {member.imageUrl && (
-                      <div className="h-[40px] w-[40px]">
-                        <img src={member.imageUrl} alt="Profile Image" width={40} height={40} className="rounded object-cover" />
-                      </div>
-                    )}
+                    <div className="h-[40px] w-[40px]">
+                      {member.imageUrl ? (
+                        <img
+                          src={member.imageUrl}
+                          className="rounded object-cover w-full h-full"
+                        />
+                      ) : (
+                        <img
+                          src="/assets/icons/default_profile"
+                          alt="Profile Image"
+                          className="rounded object-cover w-full h-full"
+                        />
+                      )}
+                    </div>
+
                     <div className="w-[240px]">
                       <div>
                         <Tooltip
