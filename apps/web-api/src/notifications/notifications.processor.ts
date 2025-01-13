@@ -76,7 +76,8 @@ export class NotificationConsumer {
         where: {
           AND: {
             entityType: entityType,
-            entityUid: entityUid
+            entityUid: entityUid,
+            isActive: true
           }
         },
         include: {
@@ -208,7 +209,8 @@ export class NotificationConsumer {
       eventDate: guest?.event.startDate,
       eventTime: guest?.event.startDate,
       eventVenue: guest?.event.location?.location,
-      speakerHostName: guest?.member.name
+      speakerHostName: guest?.member.name,
+      guestType: notificationData.additionalInfo.guestType
     };
     return message;
   }
