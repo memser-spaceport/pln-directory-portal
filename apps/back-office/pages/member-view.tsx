@@ -399,7 +399,6 @@ export default function MemberView(props) {
           referenceUid={props.referenceUid}
           setLoader={setIsLoading}
           token={props.plnadmin}
-          from={props.from}
         />
       )}
     </>
@@ -466,8 +465,8 @@ export const getServerSideProps = async (context) => {
       let counter = 1;
       referenceUid = requestDetailResponse?.data?.referenceUid ?? '';
       const requestData = requestDetailResponse?.data?.newData;
-      oldName = requestData?.oldName ?? requestData?.name;
-      status = requestDetailResponse?.data?.status;
+      oldName = requestData?.oldName ?? requestData?.name ?? '';
+      status = requestDetailResponse?.data?.status ?? '';
       const teamAndRoles =
         requestData?.teamAndRoles?.length &&
         requestData?.teamAndRoles?.map((team) => {
@@ -480,8 +479,8 @@ export const getServerSideProps = async (context) => {
         });
 
       formValues = {
-        name: requestData?.name,
-        email: requestData?.email,
+        name: requestData?.name ?? '',
+        email: requestData?.email ?? '',
         imageUid: requestData?.imageUid ?? '',
         imageFile: null,
         plnStartDate: requestData?.plnStartDate
@@ -534,62 +533,62 @@ export const getServerSideProps = async (context) => {
         return { value: item.uid, label: item.title };
       });
     }
-    } else {
-      const approvedApiResponse = await api.get(`${API_ROUTE.MEMBERS}/${id}?with=image`, config);
-      const skillsResponse = await api.get(API_ROUTE.SKILLS);
+  } else {
+    const approvedApiResponse = await api.get(`${API_ROUTE.MEMBERS}/${id}?with=image`, config);
+    const skillsResponse = await api.get(API_ROUTE.SKILLS);
 
-      let counter = 1;
-      if (approvedApiResponse.status === 200) {
-        const requestData = approvedApiResponse?.data;
-        const teamAndRoles =
-      requestData?.teamMemberRoles?.length &&
-      requestData?.teamMemberRoles?.map((team) => {
-        return {
-          role: team.role ?? "",
-          teamUid: team.teamUid,
-          teamTitle: team.team.name,
-          rowId: counter++,
-        };
-      });
-        formValues = {
-          name: requestData?.name,
-          email: requestData?.email,
-          imageUid: requestData?.imageUid ?? '',
-          imageFile: null,
-          plnStartDate: requestData?.plnStartDate
-            ? new Date(requestData?.plnStartDate).toISOString().split('T')[0]
-            : null,
-          city: requestData?.city ?? '',
-          region: requestData?.region ?? '',
-          country: requestData?.country ?? '',
-          linkedinHandler: requestData?.linkedinHandler ?? '',
-          discordHandler: requestData?.discordHandler ?? '',
-          twitterHandler: requestData?.twitterHandler ?? '',
-          githubHandler: requestData?.githubHandler ?? '',
-          telegramHandler: requestData?.telegramHandler ?? '',
-          officeHours: requestData?.officeHours ?? '',
-          comments: requestData?.comments ?? '',
-          teamAndRoles: teamAndRoles || 
-            [
-              // { teamUid: '', teamTitle: '', role: '', rowId: 1 },
-            ],
-          teamOrProjectURL: requestData?.teamOrProjectURL ?? '',
-          skills: requestData?.skills?.map((item) => {
-            return { value: item.uid, label: item.title };
-          }),
-          openToWork: requestData?.openToWork ?? '',
-          projectContributions: requestData?.projectContributions ?? []
-        };
-        imageUrl = requestData?.image?.url ?? '',
-        teamList = approvedApiResponse?.data?.teamList ?? [];
-        memberList = approvedApiResponse?.data?.memberList ?? [];
-        teams = approvedApiResponse?.data?.teams ?? [];
-        skills = skillsResponse?.data?.map((item) => {
+    let counter = 1;
+    if (approvedApiResponse.status === 200) {
+      const requestData = approvedApiResponse?.data;
+      const teamAndRoles =
+    requestData?.teamMemberRoles?.length &&
+    requestData?.teamMemberRoles?.map((team) => {
+      return {
+        role: team.role ?? "",
+        teamUid: team.teamUid,
+        teamTitle: team.team.name,
+        rowId: counter++,
+      };
+    });
+      formValues = {
+        name: requestData?.name,
+        email: requestData?.email,
+        imageUid: requestData?.imageUid ?? '',
+        imageFile: null,
+        plnStartDate: requestData?.plnStartDate
+          ? new Date(requestData?.plnStartDate).toISOString().split('T')[0]
+          : null,
+        city: requestData?.city ?? '',
+        region: requestData?.region ?? '',
+        country: requestData?.country ?? '',
+        linkedinHandler: requestData?.linkedinHandler ?? '',
+        discordHandler: requestData?.discordHandler ?? '',
+        twitterHandler: requestData?.twitterHandler ?? '',
+        githubHandler: requestData?.githubHandler ?? '',
+        telegramHandler: requestData?.telegramHandler ?? '',
+        officeHours: requestData?.officeHours ?? '',
+        comments: requestData?.comments ?? '',
+        teamAndRoles: teamAndRoles || 
+          [
+            // { teamUid: '', teamTitle: '', role: '', rowId: 1 },
+          ],
+        teamOrProjectURL: requestData?.teamOrProjectURL ?? '',
+        skills: requestData?.skills?.map((item) => {
           return { value: item.uid, label: item.title };
-        });
-        status= APP_CONSTANTS.PENDING_LABEL;
-      }
+        }),
+        openToWork: requestData?.openToWork ?? '',
+        projectContributions: requestData?.projectContributions ?? []
+      };
+      imageUrl = requestData?.image?.url ?? '',
+      teamList = approvedApiResponse?.data?.teamList ?? [];
+      memberList = approvedApiResponse?.data?.memberList ?? [];
+      teams = approvedApiResponse?.data?.teams ?? [];
+      skills = skillsResponse?.data?.map((item) => {
+        return { value: item.uid, label: item.title };
+      });
+      status= APP_CONSTANTS.PENDING_LABEL;
     }
+  }
 
     return {
       props: {
@@ -605,7 +604,6 @@ export const getServerSideProps = async (context) => {
         memberList,
         plnadmin,
         oldName,
-        from,
       },
     };
   };
