@@ -101,3 +101,18 @@ export const getPendingClosedCount = async () => {
     console.error(error);
   }
 };
+
+// Converts an isoDateTime string to a formatted date-time string in "DD/MM/YYYY, HH:MM" format.  
+// Uses British English (en-GB) locale and 24-hour clock.
+export const formatDateTime = (isoDateTime: string): string => {
+  const date = new Date(isoDateTime);
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  return formatter.format(date);
+};

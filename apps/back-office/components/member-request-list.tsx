@@ -6,6 +6,7 @@ import Loader from './common/loader';
 import router from 'next/router';
 import api from '../utils/api';
 import { useNavbarContext } from '../context/navbar-context';
+import { formatDateTime } from '../utils/services/shared';
 
 const MemberRequestList = (props: any) => {
   const dataList = [...props.members];
@@ -15,7 +16,7 @@ const MemberRequestList = (props: any) => {
 
   const [allMembers, setAllMembers] = useState({ pending: [], unverified: [] });
   const { setMemberList } = useNavbarContext();
-
+  
   useEffect(() => {
     if (type !== APP_CONSTANTS.CLOSED_FLAG) {
       updateMembers();
@@ -138,18 +139,19 @@ const MemberRequestList = (props: any) => {
                     onClick={() => redirectToDetail(request)}
                   >
                     <div
-                      className="h-full w-full items-center pl-[24px] pr-[24px] pt-[20px]
+                      className="h-full w-full flex items-center justify-between pl-[24px] pr-[24px]
                   text-[14px] leading-[20px] text-[#475569]"
                     >
                       <span className="text-sm font-semibold">{request?.name}</span>
                       {request.status !== APP_CONSTANTS.PENDING_LABEL && (
-                        <span
-                          className={`float-right text-[12px] ${
-                            request.status === APP_CONSTANTS.APPROVED_FLAG ? 'text-[#0F9F5A]' : 'text-[#D65229]'
+                        <div
+                          className={`flex flex-col items-end text-[12px] ${
+                            request.status === APP_CONSTANTS.APPROVED_FLAG ? 'text-[#30C593]' : 'text-[#FF7777]'
                           }`}
                         >
                           {request.status === 'REJECTED' ? APP_CONSTANTS.REJECTED_LABEL : APP_CONSTANTS.APPROVED_LABEL}
-                        </span>
+                          <div className="text-[12px] italic font-normal text-[#94A3B8]">on {formatDateTime(request?.approvedAt)}</div>
+                        </div>
                       )}
                     </div>
                   </div>
