@@ -37,6 +37,8 @@ import { EmptyStringToNullInterceptor } from './interceptors/empty-string-to-nul
 import { OfficeHoursModule } from './office-hours/office-hours.module';
 import { MemberFollowUpsModule } from './member-follow-ups/member-follow-ups.module';
 import { MemberFeedbacksModule } from './member-feedbacks/member-feedbacks.module';
+import { HuskyModule } from './husky/husky.module';
+import { HomeModule } from './home/home.module';
 import { InternalsModule } from './internals/internals.module';
 import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
 import { MemberSubscriptionsModule } from './member-subscriptions/member-subscriptions.module';
@@ -94,6 +96,8 @@ import { NotificationsModule } from './notifications/notifications.module';
     OfficeHoursModule,
     MemberFollowUpsModule,
     MemberFeedbacksModule,
+    HuskyModule,
+    HomeModule,
     InternalsModule,
     OsoMetricsModule,
     MemberSubscriptionsModule,
