@@ -853,15 +853,15 @@ export class PLEventGuestsService {
           member: {
             select: {
               name: true,
-              bio:true
+              bio: true
             }
           },
           event: {
             select: {
               name: true,
               startDate: true,
-              location:{
-                select:{
+              location: {
+                select: {
                   location: true
                 }
               }
@@ -880,9 +880,14 @@ export class PLEventGuestsService {
       case "HOST_SPEAKER_ADDED":
         await Promise.all(
           guests.events.map(async (event) => {
-            if (event.isHost || event.isSpeaker) {
-              const payload = this.buildHostSpeakerAdditonPayload(guests.memberUid, event, notification, requestorEmail);
-              this.notificationService.sendNotification(await payload);
+            if ((event.isHost || event.isSpeaker) && !(event.isHost && event.isSpeaker)) {
+              let role = event.isHost ? 'Host' : 'Speaker';
+              const payload = await this.buildHostSpeakerAdditonPayload(guests.memberUid, event, notification, requestorEmail, role);
+              await this.notificationService.sendNotification(payload);
+            } else if (event.isHost && event.isSpeaker) {
+              let role = "Host/Speaker"
+              const payload = await this.buildHostSpeakerAdditonPayload(guests.memberUid, event, notification, requestorEmail, role);
+              await this.notificationService.sendNotification(payload);
             }
           }
           )
@@ -890,13 +895,14 @@ export class PLEventGuestsService {
     }
   }
 
-  private async buildHostSpeakerAdditonPayload(memberUid, event, notification, requestorEmail) {
+  private async buildHostSpeakerAdditonPayload(memberUid, event, notification, requestorEmail, role) {
     const requestor = await this.memberService.findMemberByEmail(requestorEmail);
     notification.additionalInfo = {
       memberUid: memberUid,
       eventUid: event.uid,
       sourceUid: requestor.uid,
-      sourceName: requestor.name
+      sourceName: requestor.name,
+      guestType: role
     }
     return notification;
   }
