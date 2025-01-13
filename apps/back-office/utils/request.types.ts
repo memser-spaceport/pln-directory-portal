@@ -9,4 +9,11 @@ export interface IPendingResponse {
   id: string;
   name: string;
   status: string;
+  email: string;
+  skills: string[];
+  teamAndRoles: string[];
+  projectContributions: string[];
+  isSubscribedToNewsletter: boolean;
+  teamOrProjectURL: string;
+  imageUrl: string;
 }

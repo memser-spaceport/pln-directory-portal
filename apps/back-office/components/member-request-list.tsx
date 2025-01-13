@@ -42,6 +42,13 @@ const MemberRequestList = (props: any) => {
         id: data.uid,
         name: data.newData.name,
         status: data.status,
+        email: data.newData.email,
+        skills: data.newData.skills,
+        teamAndRoles: data.newData.teamAndRoles,
+        projectContributions: data.newData.projectContributions,
+        isSubscribedToNewsletter: data.newData.isSubscribedToNewsletter,
+        teamOrProjectURL: data.newData.teamOrProjectURL,
+        imageUrl: data.newData.imageUrl,
       };
     });
 
@@ -49,6 +56,8 @@ const MemberRequestList = (props: any) => {
       return {
         id: data.uid,
         name: data.name,
+        email: data.email,
+        imageUrl: data.imageUrl,
         isVerified: data?.isVerified || false,
       };
     });
@@ -91,7 +100,7 @@ const MemberRequestList = (props: any) => {
 
   return (
     <>
-      <div className="w-[650px]">
+      <div className="w-[100%]">
         {isLoading && <Loader />}
 
         {type !== APP_CONSTANTS.CLOSED_FLAG && (
