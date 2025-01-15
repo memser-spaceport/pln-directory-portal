@@ -196,3 +196,6 @@ export const NOTIFICATION_CHANNEL: { [key: string]: string } = {
   "EMAIL": "EMAIL",
   "TELEGRAM": "TELEGRAM"
 }
+
+export const CREATE = "CREATE";
+export const UPDATE = "UPDATE";

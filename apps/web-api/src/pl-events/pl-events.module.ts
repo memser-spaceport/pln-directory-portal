@@ -6,7 +6,7 @@ import { PLEventGuestsService } from './pl-event-guests.service';
 import { MembersModule } from '../members/members.module';
 import { JwtService } from '../utils/jwt/jwt.service';
 import { NotificationsModule } from '../notifications/notifications.module';
-
+import { MemberSubscriptionsModule } from '../member-subscriptions/member-subscriptions.module';
 @Module({
   controllers: [PLEventsController],
   providers: [
@@ -20,6 +20,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
     PLEventLocationsService,
     PLEventGuestsService
   ],
-  imports:[MembersModule, forwardRef(() => NotificationsModule)]
+  imports:[
+    MembersModule, 
+    forwardRef(() => NotificationsModule), 
+    MemberSubscriptionsModule
+  ]
 })
 export class PLEventsModule {}
