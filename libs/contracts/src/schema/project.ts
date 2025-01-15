@@ -30,7 +30,6 @@ const ProjectSchema = z.object({
     name: z.string(),
     url: z.string()
   }).array().optional(),
-  highlightContent: z.object({text: z.string(),link:z.string(),showInCardView:z.boolean()}).array().optional(),
   kpis: z.object({ 
     key: z.string(), 
     value: z.string() 

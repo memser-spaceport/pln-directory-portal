@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { FundingStage, Prisma, Team } from '@prisma/client';
+import { FundingStage, Team } from '@prisma/client';
 import { Factory } from 'fishery';
 import { prisma } from '../../../prisma/__mocks__/index';
 import { TestFactorySeederParams } from '../../utils/factory-interfaces';
@@ -23,7 +23,7 @@ async function createFundingStage() {
 export async function createTeam({ amount }: TestFactorySeederParams) {
   const fundingStage = await createFundingStage();
 
-  const teamFactory = Factory.define<Omit<Prisma.TeamCreateManyInput, 'id'>>(({ sequence }) => {
+  const teamFactory = Factory.define<Omit<Team, 'id'>>(({ sequence }) => {
     const team = {
       uid: `uid-${sequence}`,
       name: `Team ${sequence}`,
@@ -44,9 +44,8 @@ export async function createTeam({ amount }: TestFactorySeederParams) {
       createdAt: new Date(),
       updatedAt: new Date(),
       fundingStageUid: fundingStage.uid,
-      lastModifiedBy: null,
-      highlightContent: {},
-    } as Prisma.TeamCreateManyInput;
+      lastModifiedBy: null
+    };
 
     return team;
   });

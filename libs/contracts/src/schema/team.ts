@@ -29,7 +29,6 @@ export const TeamSchema = z.object({
   fundingStageUid: z.string().nullish(),
   linkedinHandler: z.string().nullish(),
   officeHours: z.string().nullish(),
-  highlightContent: z.object({text: z.string(),link:z.string(),showInCardView:z.boolean()}).array().optional()
 });
 
 export const CreateTeamSchema = TeamSchema.pick({

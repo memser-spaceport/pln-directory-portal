@@ -265,7 +265,7 @@ export class TeamsService {
       'name', 'blog', 'contactMethod', 'twitterHandler',
       'linkedinHandler', 'telegramHandler', 'officeHours',
       'shortDescription', 'website', 'airtableRecId',
-      'longDescription', 'moreDetails', 'highlightContent'
+      'longDescription', 'moreDetails'
     ];
     copyObj(teamData, team, directFields);
     // Handle one-to-one or one-to-many mappings
