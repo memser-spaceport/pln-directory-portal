@@ -1,3 +1,4 @@
+import moment from 'moment-timezone';
 import { Controller, Req, Body, Param, NotFoundException, ForbiddenException, UsePipes, UseGuards } from '@nestjs/common';
 import { ApiParam } from '@nestjs/swagger';
 import { Api, initNestServer, ApiDecorator } from '@ts-rest/nest';
@@ -29,6 +30,7 @@ import { PLEventLocationsService } from './pl-event-locations.service';
 import { PLEventGuestsService } from './pl-event-guests.service';
 import { isEmpty } from 'lodash';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
+import { AwsService } from '../utils/aws/aws.service'
 
 const server = initNestServer(apiEvents);
 type RouteShape = typeof server.routeShapes;
@@ -39,7 +41,8 @@ export class PLEventsController {
     private readonly memberService: MembersService,
     private readonly eventService: PLEventsService,
     private readonly eventLocationService: PLEventLocationsService,
-    private readonly eventGuestService: PLEventGuestsService
+    private readonly eventGuestService: PLEventGuestsService,
+    private readonly awsService: AwsService,
   ) { }
 
   /**
@@ -123,6 +126,24 @@ export class PLEventsController {
     ) {
       throw new ForbiddenException(`Member with email ${userEmail} isn't admin to access past events or future events`);
     }
+    const events = body.events;
+    const eventMember: any = await this.memberService.findMemberByUid(request.body.memberUid);
+    if (!eventMember.email) {
+      throw new NotFoundException('The event member does not have a valid email address.');
+    }      
+    events.forEach(async (event: any) => {
+      const eventDetail: any = await this.eventService.getPLEventByEventId(event.uid);
+      const timezone = eventDetail.location.timezone ?? '';
+      const startDate = moment.utc(eventDetail.startDate).tz(timezone);
+      const eventData = {
+        memberName: eventMember.name,
+        eventName: eventDetail.name,
+        eventVenue: eventDetail.location.location,
+        eventDate: startDate.format('LL'),
+        eventTime: startDate.format('LT')
+      };
+      await this.awsService.sendEmail('EventInvitationToMember', true, [eventMember.email], eventData);
+    });
     return await this.eventGuestService.createPLEventGuestByLocation(body, member, locationUid, userEmail);
   }
 

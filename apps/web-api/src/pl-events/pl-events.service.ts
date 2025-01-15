@@ -179,6 +179,30 @@ export class PLEventsService {
   }
 
   /**
+ * Retrieves details of a specific Protocol Labs Event (PLEvent) by its unique identifier (eventId).
+ * 
+ * @param eventId - The unique identifier of the event to retrieve.
+ * 
+ * @returns A Promise that resolves to the details of the specified event, including its associated location.
+ *   - Throws errors if there are issues with the query, including validation or database errors.
+ */
+  async getPLEventByEventId(eventId: string): Promise<PLEvent> {
+    try {
+      const upcomingEvent = await this.prisma.pLEvent.findUniqueOrThrow({
+        where: {
+          uid: eventId
+        },
+        include: {
+          location: true,
+        },
+      });
+      return upcomingEvent;
+    } catch (err) {
+      return this.handleErrors(err);
+    }
+  }
+  
+  /**
    * This method filters out private resources from an event's resources if the user is not logged in.
    * @param plEvent The event object containing the resources array
    * @param isUserLoggedIn A boolean indicating whether the user is logged in
