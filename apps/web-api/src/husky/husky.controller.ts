@@ -8,21 +8,13 @@ import { HuskyAiService } from './husky-ai.service';
 export class HuskyController {
   constructor(private huskyService: HuskyService, private huskyAiService: HuskyAiService) {}
 
-  @UseGuards(UserAccessTokenValidateGuard)
   @Post('v1/husky/chat/assistant')
   async huskyChatAssistant(@Body() body: HuskyChatDto, @Res() res: Response) {
-    const { question, source, uid, chatSummary } = body;
-    const aiStreamingResponse = await this.huskyAiService.createStreamingChatResponse(
-      question,
-      uid,
-      chatSummary,
-      source
-    );
+    const aiStreamingResponse = await this.huskyAiService.createStreamingChatResponse({ ...body });
     aiStreamingResponse.pipeTextStreamToResponse(res);
     return;
   }
 
-  @UseGuards(UserAccessTokenValidateGuard)
   @Post('v1/husky/chat/feedback')
   async huskyChatFeedback(@Body() body: HuskyFeedbackDto) {
     await this.huskyService.addHuskyFeedback({ ...body });

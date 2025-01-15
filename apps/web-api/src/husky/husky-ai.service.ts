@@ -5,7 +5,7 @@ import { MongoPersistantDbService } from './db/mongo-persistant-db.service';
 import { LogService } from '../shared/log.service';
 import { embed, generateText, streamObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { HuskyResponseSchema } from 'libs/contracts/src/schema/husky-chat';
+import { HuskyResponseSchema, HuskyChatInterface } from 'libs/contracts/src/schema/husky-chat';
 import {
   aiPromptTemplate,
   chatSummaryTemplate,
@@ -27,7 +27,19 @@ export class HuskyAiService {
     private huskyPersistentDbService: MongoPersistantDbService
   ) {}
 
-  async createStreamingChatResponse(question: string, uid: string, chatSummary: any, source: string) {
+  async createStreamingChatResponse(chatInfo: HuskyChatInterface) {
+    const { question, uid, chatSummary, source, directoryId, email, name } = chatInfo;
+
+    // User info
+    let userInfo;
+    if (directoryId && email && name) {
+      userInfo = {
+        directoryId,
+        email,
+        name,
+      };
+    }
+
     // Update the chat summary if it is provided
     if (chatSummary) {
       await this.updateChatSummary(uid, chatSummary);
@@ -49,7 +61,7 @@ export class HuskyAiService {
         schema: HuskyResponseSchema,
         prompt: HUSKY_NO_INFO_PROMPT,
         onFinish: async (response) => {
-          await this.persistChatHistory(uid, question, rephrasedQuestion, response?.object?.content);
+          await this.persistChatHistory(uid, question, rephrasedQuestion, response?.object?.content, userInfo);
         },
       });
     }
@@ -65,17 +77,18 @@ export class HuskyAiService {
         if (prompt) {
           await this.updateChatSummary(uid, { user: question, system: response?.object?.content });
         }
-        await this.persistChatHistory(uid, question, rephrasedQuestion, response?.object?.content);
+        await this.persistChatHistory(uid, question, rephrasedQuestion, response?.object?.content, userInfo);
       },
     });
   }
 
-  async persistChatHistory(uid: string, prompt: string, rephrasedPrompt: string, response: any) {
+  async persistChatHistory(uid: string, prompt: string, rephrasedPrompt: string, response: any, userInfo?: any) {
     await this.huskyPersistentDbService.create(process.env.MONGO_CONVERSATION_COLLECTION || '', {
       chatThreadId: uid,
       prompt,
       rephrasedPrompt,
       response: response || '',
+      ...(userInfo && { ...userInfo }),
       createdAt: Date.now(),
     });
   }
