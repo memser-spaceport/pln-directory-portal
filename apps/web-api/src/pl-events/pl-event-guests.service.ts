@@ -14,6 +14,7 @@ import {
 } from './pl-event-locations.types';
 import { CacheService } from '../utils/cache/cache.service';
 import { NotificationService } from '../notifications/notifications.service';
+import { CREATE, UPDATE } from '../utils/constants';
 
 @Injectable()
 export class PLEventGuestsService {
@@ -39,6 +40,7 @@ export class PLEventGuestsService {
     member: Member,
     locationUid: string,
     requestorEmail: string,
+    type: string = CREATE,
     tx?: Prisma.TransactionClient
   ) {
     try {
@@ -47,7 +49,9 @@ export class PLEventGuestsService {
       data.memberUid = isAdmin ? data.memberUid : member.uid;
       const guests = this.formatInputToEventGuests(data);
       const result = await (tx || this.prisma).pLEventGuest.createMany({ data: guests });
-      await this.notifySubscribers(data, locationUid, "HOST_SPEAKER_ADDED", requestorEmail)
+      await this.notifySubscribers(data, locationUid, "HOST_SPEAKER_ADDED", requestorEmail);
+      if (type === CREATE)
+        await this.eventLocationsService.subscribeLocationByUid(locationUid, member.uid);
       this.cacheService.reset({ service: 'PLEventGuest' });
       return result;
     } catch (err) {
@@ -82,7 +86,7 @@ export class PLEventGuestsService {
             }
           }
         });
-        return await this.createPLEventGuestByLocation(data, member, location.uid, requestorEmail, tx);
+        return await this.createPLEventGuestByLocation(data, member, location.uid, requestorEmail, UPDATE, tx);
       });
     } catch (err) {
       this.handleErrors(err);
