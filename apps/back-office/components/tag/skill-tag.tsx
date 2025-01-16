@@ -13,6 +13,7 @@ const SkillTag = ({ value, remainContent }: SkillTagProps) => {
     <>
       {value && (
         <Tooltip
+          asChild
           trigger={<div className="tag">{value}</div>}
           content={remainContent ? `${remainContent.map((skill: SkillDto) => skill.title).join(', ')}` : value}
         />
@@ -29,7 +30,6 @@ const SkillTag = ({ value, remainContent }: SkillTagProps) => {
           border: 1px solid rgb(203, 213, 225);
           background-color: white;
           color: rgb(108, 123, 145);
-          cursor: pointer;
           background-color: rgb(241, 245, 249);
           border: none;
         }
