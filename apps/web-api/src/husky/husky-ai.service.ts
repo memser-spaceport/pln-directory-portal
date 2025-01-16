@@ -60,6 +60,7 @@ export class HuskyAiService {
       return streamObject({
         model: openai(process.env.OPENAI_LLM_MODEL || ''),
         schema: HuskyResponseSchema,
+        temperature: 0.1,
         prompt: HUSKY_NO_INFO_PROMPT,
         onFinish: async (response) => {
           await this.persistChatHistory(uid, question, rephrasedQuestion, response?.object?.content, userInfo);
@@ -74,6 +75,7 @@ export class HuskyAiService {
       model: openai(process.env.OPENAI_LLM_MODEL || ''),
       schema: HuskyResponseSchema,
       prompt: prompt || HUSKY_NO_INFO_PROMPT,
+      temperature: 0.1,
       onFinish: async (response) => {
         if (prompt) {
           await this.updateChatSummary(uid, { user: question, system: response?.object?.content });

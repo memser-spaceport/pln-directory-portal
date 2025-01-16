@@ -138,11 +138,13 @@ export const aiPromptTemplate = `For the given question "{{question}}", using on
 STRICT REQUIREMENTS for the output json: Follow the below requirements strictly.
 
 1. 'content' FORMATTING:
-- Minimum length: {{contextLength}} words
-- Use only information from provided 'context' to summarize.
+- Minimum length: {{contextLength}} words.
+- Use only information from provided 'context' to summarize. Use plain English and be concise. Avoid exaggeration and limit adjectives.
 - Use markdown headers (##) for readability
 - Citations (taken from 'context') must be formatted as [N](url) where N is the source index. 
+- Strictly dont add additonal context or information other than the provided data.
 - Avoid texts like - Additional information can be found at [example](example.com) or find more informtion here at [example2](example2.com) or Learn more at [example3](example3.com), instead just have the citation in [N](url) format where N is source index
+- Avoid texts like - Context is not provided or available. Never mention about context. Just summarize with the data available.
 - NEVER use URL names as citation labels (e.g., NEVER use the format [example1](example1.com) or [example2](example2.com)) only use source index.
 - ALWAYS use same citation label when same url is used in more than one place. Eg 1: If source1.com is first cited as [1](source1.com), all subsequent citations of source1.com must also use [1](source1.com)
 - Another Eg:
