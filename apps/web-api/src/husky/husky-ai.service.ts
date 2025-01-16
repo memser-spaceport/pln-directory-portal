@@ -21,7 +21,6 @@ import Handlebars from 'handlebars';
 @Injectable()
 export class HuskyAiService {
   constructor(
-    private logger: LogService,
     private huskyVectorDbService: QdrantVectorDbService,
     private huskyCacheDbService: RedisCacheDbService,
     private huskyPersistentDbService: MongoPersistantDbService
@@ -48,11 +47,12 @@ export class HuskyAiService {
     // Rephrase the question and get the matching documents to create context
     const rephrasedQuestion = await this.getRephrasedQuestionBasedOnHistory(uid, question);
     const questionEmbedding = await this.getEmbeddingForText(rephrasedQuestion);
-    const [matchingDocs, actionDocs] = await Promise.all([
+    const [nonDirectoryDocs, directoryDocs] = await Promise.all([
       this.getMatchingEmbeddingsBySource(source, questionEmbedding),
       this.getActionDocs(questionEmbedding),
     ]);
-    const context = this.createContextForMatchingDocs(matchingDocs);
+
+    const context = this.createContextWithMatchedDocs(nonDirectoryDocs, directoryDocs);
 
     // Handle the case when there is no context
     if (context === '') {
@@ -68,7 +68,7 @@ export class HuskyAiService {
 
     // If Context is valid, then create prompt and stream the response
     const chatSummaryFromDb = await this.huskyCacheDbService.get(`${uid}:summary`);
-    const prompt = this.createPromptForHuskyChat(question, context, chatSummaryFromDb || '', actionDocs);
+    const prompt = this.createPromptForHuskyChat(question, context, chatSummaryFromDb || '', directoryDocs);
     return streamObject({
       model: openai(process.env.OPENAI_LLM_MODEL || ''),
       schema: HuskyResponseSchema,
@@ -190,26 +190,37 @@ export class HuskyAiService {
     return this.huskyVectorDbService.searchEmbeddings(collection, embedding, limit, true);
   }
 
-  createContextForMatchingDocs(matchingDocs: any[]) {
-    const formattedResults: any[] = [];
-    for (const result of matchingDocs) {
-      formattedResults.push({
-        score: result.score,
-        text: result?.payload?.page_content ?? '',
-        source: result?.payload?.metadata?.url ?? '',
+  createContextWithMatchedDocs(nonDirectoryDocs: any[], directoryDocs: any) {
+    let allDocs: any[] = [];
+    const actionDocKeys = ['memberDocs', 'teamDocs', 'projectDocs'];
+
+    actionDocKeys.forEach((key: string) => {
+      const docs = [...directoryDocs[key]].map((doc: any) => {
+        return {
+          text: doc?.info,
+          score: doc?.score,
+          source: doc?.directoryLink,
+        };
       });
-    }
+      allDocs = [...allDocs, ...docs];
+    });
 
-    const sortedResults = formattedResults
+    const formattedNonDictoryDocs = [...nonDirectoryDocs].map((doc: any) => {
+      return {
+        score: doc.score,
+        text: doc?.payload?.page_content ?? '',
+        source: doc?.payload?.metadata?.url ?? '',
+      };
+    });
+
+    allDocs = [...allDocs, ...formattedNonDictoryDocs];
+
+    return allDocs
       .sort((a, b) => b?.score - a?.score)
-      .filter((v) => v.score > 0.4)
-      .slice(0, 10);
-
-    const context = sortedResults
-      .filter((result) => result?.text?.length > 5)
+      .filter((v) => v.score > 0.45 && v?.text?.length > 5)
+      .slice(0, 10)
       .map((result) => `${result?.text}${result?.source ? ` (Source:${result?.source})` : ''}`)
       .join('\n');
-    return context;
   }
 
   createPromptForHuskyChat(question: string, context: string, chatSummary: string, allDocs: any) {
