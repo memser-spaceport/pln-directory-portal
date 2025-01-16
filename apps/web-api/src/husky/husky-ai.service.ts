@@ -46,7 +46,7 @@ export class HuskyAiService {
     }
 
     // Rephrase the question and get the matching documents to create context
-    const rephrasedQuestion = await this.getRephrasedQuestionBasedOnHistory(uid, question);
+    const rephrasedQuestion = await this.getRephrasedQuestionBasedOnHistory(uid, question.toLowerCase());
     const questionEmbedding = await this.getEmbeddingForText(rephrasedQuestion);
     const [nonDirectoryDocs, directoryDocs] = await Promise.all([
       this.getEmbeddingsBySource(source, questionEmbedding),
@@ -227,7 +227,7 @@ export class HuskyAiService {
   }
 
   createPromptForHuskyChat(question: string, context: string, chatSummary: string, allDocs: any) {
-    const contextLength = Math.min(Math.max(60, context.split(' ').length / 1.5), 600);
+    const contextLength = Math.min(context.split(' ').length / 2.5, 500);
     const aiPrompt = Handlebars.compile(aiPromptTemplate)({
       context,
       contextLength,
