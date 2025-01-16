@@ -9,22 +9,8 @@ import { HuskyAiService } from './husky-ai.service';
 
 @Module({
   controllers: [HuskyController],
-  providers: [
-    HuskyService,
-    HuskyAiService,
-    RedisCacheDbService,
-    QdrantVectorDbService,
-    MongoPersistantDbService,
-    Neo4jGraphDbService,
-  ],
+  providers: [HuskyService, HuskyAiService, RedisCacheDbService, QdrantVectorDbService, MongoPersistantDbService],
   imports: [],
-  exports: [
-    HuskyService,
-    HuskyAiService,
-    RedisCacheDbService,
-    QdrantVectorDbService,
-    MongoPersistantDbService,
-    Neo4jGraphDbService,
-  ],
+  exports: [HuskyService, HuskyAiService, RedisCacheDbService, QdrantVectorDbService, MongoPersistantDbService],
 })
 export class HuskyModule {}
