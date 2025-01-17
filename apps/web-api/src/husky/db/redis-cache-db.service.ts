@@ -2,7 +2,6 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
 import { HuskyCacheDbService } from './husky-db.interface';
 
-
 @Injectable()
 export class RedisCacheDbService implements OnModuleDestroy, HuskyCacheDbService {
   private redis: Redis;
@@ -12,9 +11,14 @@ export class RedisCacheDbService implements OnModuleDestroy, HuskyCacheDbService
       host: process.env.REDIS_CACHE_HOST ,
       port: Number(process.env.REDIS_CACHE_PORT),
       ...(process.env.REDIS_CACHE_PASSWORD && { password: process.env.REDIS_CACHE_PASSWORD }),
+      ...(process.env.REDIS_CACHE_TLS && {
+        tls: {
+          rejectUnauthorized: false,
+        },
+      }),
     });
   }
-  
+
   async set(key: string, value: any): Promise<void> {
     await this.redis.set(
       key,
