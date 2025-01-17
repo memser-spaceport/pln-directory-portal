@@ -14,7 +14,7 @@ export default function PendingList(props) {
   setShowMenu(true);
 
   if (props.isError) return <Error />;
-  
+
   useEffect(() => {
     setMemberList([...props.memberList, ...props.unverifiedMembers]);
     setTeamList(props.teamList);
@@ -61,7 +61,7 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (context) 
     const [listData, unVerifiedMembes, projectData] = await Promise.all([
       api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}?status=PENDING`, config),
       api.get(
-        `${API_ROUTE.MEMBERS}?isVerified=false&pagination=false&orderBy=-createdAt&select=uid,name,teamMemberRoles.team.name,teamMemberRoles.team.uid,projectContributions,email,imageUrl,isVerified,teamOrProjectURL,teamMemberRoles.mainTeam`,
+        `${API_ROUTE.MEMBERS}?isVerified=false&pagination=false&orderBy=-createdAt&select=uid,name,teamMemberRoles.team.name,teamMemberRoles.team.uid,projectContributions,email,image.url,isVerified,teamOrProjectURL,teamMemberRoles.mainTeam`,
         config
       ),
       api.get(`${process.env.WEB_API_BASE_URL}${APP_CONSTANTS.V1}projects`),
@@ -97,9 +97,8 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (context) 
           imageUrl: imageUrl,
         };
       });
-
       unverifiedMembers = unVerifiedMembes.data.members.map((data) => {
-        const imageUrl = data?.imageUrl || '';
+        const imageUrl = data?.image?.url || '';
         const teamOrProjectURL = data?.teamOrProjectURL || '';
         let teamAndRoles = [];
         let projectContributions = [];

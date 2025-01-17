@@ -67,4 +67,5 @@ export interface IFormValues {
   openToWork: boolean;
   projectContributions: IProjectContribution[];
   teamOrProjectURL: string;
+  isSubscribedToNewsletter: boolean
 }
