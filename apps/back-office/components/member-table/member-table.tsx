@@ -1,7 +1,7 @@
 import api from 'apps/back-office/utils/api';
 import APP_CONSTANTS, { API_ROUTE, ENROLLMENT_TYPE, ROUTE_CONSTANTS } from 'apps/back-office/utils/constants';
 import router from 'next/router';
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import Loader from '../common/loader';
 import DeleteModal from '../delete-modal/delete-modal';
@@ -9,10 +9,11 @@ import MemberList from '../member-list/member-list';
 
 const MemberTable = (props: any) => {
   const selectedTab = props?.selectedTab ?? '';
-  const allMembers = props?.allMembers ?? [];
   const updateMembers = props?.updateMembers;
+  const members = props?.allMembers ?? [];
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [selectedMembers, setSelectedMembes] = useState([]);
+  const [allMembers, setAllMembers] = useState(members);
   const [isLoading, setIsLoading] = useState(false);
   const [openModal, setOpenModal] = useState(false);
   const [rejectId, setRejectId] = useState([]);
@@ -25,6 +26,20 @@ const MemberTable = (props: any) => {
       setSelectedMembes(allMembers.map((member: any) => member.id));
     }
   };
+
+  const onSortAscendingByMemberName = () => {
+    const sortedMembers = [...allMembers].sort((a, b) => a.name.localeCompare(b.name));
+    setAllMembers(sortedMembers);
+  };
+
+  const onSortDescendingByMemberName = () => {
+    const sortedMembers = [...allMembers].sort((a, b) => b.name.localeCompare(a.name));
+    setAllMembers(sortedMembers);
+  };
+
+  useEffect(() => {
+    setAllMembers(members);
+  }, [members]);
 
   const onMemberSelectHandler = (id: any) => {
     if (selectedMembers.includes(id)) {
@@ -144,8 +159,8 @@ const MemberTable = (props: any) => {
     }
   }
 
-  const onRemoveClickHandler = async (members: any) => {
-    const data = members.map((memberId: any) => {
+  const onRemoveClickHandler = async (allMembers: any) => {
+    const data = allMembers.map((memberId: any) => {
       return {
         uid: memberId,
         status: APP_CONSTANTS.REJECTED_FLAG,
@@ -209,21 +224,26 @@ const MemberTable = (props: any) => {
               <div className="flex gap-[4px]">
                 <span className="text-[13px] font-bold">Member Name</span>
                 <div
-                  className="flex h-[18px] w-[18px] items-center justify-center rounded"
+                  className="flex h-[18px] w-[18px] flex-col items-center justify-center rounded"
                   style={{ backgroundColor: '#E2E8F0' }}
                 >
-                  <img src="/assets/icons/group.svg" alt="Group" />
+                  <img
+                    src="/assets/images/ascending_icon.svg"
+                    alt="Group"
+                    className="cursor-pointer"
+                    onClick={onSortAscendingByMemberName}
+                  />
+                  <img
+                    src="/assets/images/descending_icon.svg"
+                    alt="Group"
+                    className="cursor-pointer"
+                    onClick={onSortDescendingByMemberName}
+                  />
                 </div>
               </div>
             </div>
             <div className="flex w-[175px] items-center gap-[4px]">
               <span className="flex items-center text-[13px] font-bold">Team/Project Name</span>
-              <div
-                className="flex h-[18px] w-[18px] items-center justify-center rounded"
-                style={{ backgroundColor: '#E2E8F0' }}
-              >
-                <img src="/assets/icons/group.svg" alt="Group" />
-              </div>
             </div>
             <div className="flex w-[240px] items-center">
               {selectedTab === APP_CONSTANTS.PENDING_FLAG && <span className="text-[13px] font-bold">Skills</span>}

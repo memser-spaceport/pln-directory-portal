@@ -34,7 +34,7 @@ const MemberRequestList = (props: any) => {
       const [listData, unVerifiedMembers, projectData] = await Promise.all([
         api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}?status=PENDING`, config),
         api.get(
-          `${API_ROUTE.MEMBERS}?isVerified=false&pagination=false&orderBy=-createdAt&select=uid,name,teamMemberRoles.team.name,teamMemberRoles.team.uid,projectContributions,email,imageUrl,isVerified,teamOrProjectURL,teamMemberRoles.mainTeam`,
+          `${API_ROUTE.MEMBERS}?isVerified=false&pagination=false&orderBy=-createdAt&select=uid,name,teamMemberRoles.team.name,teamMemberRoles.team.uid,projectContributions,email,image.url,isVerified,teamOrProjectURL,teamMemberRoles.mainTeam`,
           config
         ),
         api.get(`${process.env.WEB_API_BASE_URL}${APP_CONSTANTS.V1}projects`),
@@ -68,7 +68,7 @@ const MemberRequestList = (props: any) => {
       const filteredUnVerifiedMembers = unVerifiedMembers.data.members.map((data) => {
         let projectContributions = [];
         let teamAndRoles = [];
-        const imageUrl = data?.imageUrl || '';
+        const imageUrl = data?.image?.url || '';
         const teamOrProjectURL = data?.teamOrProjectURL || '';
         const memberProject = data?.projectContributions?.map((project) => project.projectUid) || [];
 

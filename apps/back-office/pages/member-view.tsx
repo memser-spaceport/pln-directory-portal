@@ -139,6 +139,7 @@ export default function MemberView(props) {
       openToWork: formValues.openToWork,
       projectContributions: formValues.projectContributions,
       oldName: name,
+      isSubscribedToNewsletter: formValues.isSubscribedToNewsletter
     };
     delete formattedData.requestorEmail;
     return formattedData;
@@ -181,6 +182,7 @@ export default function MemberView(props) {
       }
       const requestorEmail = formValues.requestorEmail?.trim();
       const values = formatData();
+
       try {
         let image;
         setIsProcessing(true);
@@ -505,7 +507,8 @@ export const getServerSideProps = async (context) => {
           return { value: item.uid, label: item.title };
         }) || [],
         openToWork: requestData?.openToWork ?? '',
-        projectContributions: requestData?.projectContributions ?? []
+        projectContributions: requestData?.projectContributions ?? [],
+        isSubscribedToNewsletter: requestData?.isSubscribedToNewsletter ?? false
       };
       imageUrl = requestData?.imageUrl ?? '';
 
@@ -577,7 +580,8 @@ export const getServerSideProps = async (context) => {
           return { value: item.uid, label: item.title };
         }),
         openToWork: requestData?.openToWork ?? '',
-        projectContributions: requestData?.projectContributions ?? []
+        projectContributions: requestData?.projectContributions ?? [],
+        isSubscribedToNewsletter: requestData?.isSubscribedToNewsletter ?? false
       };
       imageUrl = requestData?.image?.url ?? '',
       teamList = approvedApiResponse?.data?.teamList ?? [];

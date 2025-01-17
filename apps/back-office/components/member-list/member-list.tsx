@@ -166,16 +166,18 @@ const MemberList = (props: MemberListProps) => {
       <div className="ml-3 flex gap-[8px]">
         <button
           onClick={() => onRedirectToMemberDetail(member)}
+          disabled={isDisableOptions}
           className={`rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400] ${
             isDisableOptions ? 'cursor-not-allowed text-[#94A3B8]' : ''
           }`}
         >
-          {selectedTab === APP_CONSTANTS.PENDING_FLAG ? 'Edit' : 'View Profile'}
+          {selectedTab === APP_CONSTANTS.PENDING_FLAG ? 'View' : 'View Profile'}
         </button>
         <button
           className={`flex items-center justify-center gap-[4px] rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400] ${
             isDisableOptions ? 'cursor-not-allowed text-[#94A3B8]' : ''
           }`}
+          disabled={isDisableOptions}
           onClick={() => onMemberApprovalClickHandler(member.id, APP_CONSTANTS.APPROVED_FLAG, true)}
         >
           <img
@@ -192,6 +194,7 @@ const MemberList = (props: MemberListProps) => {
               className={`flex items-center justify-center gap-[4px] rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400] ${
                 isDisableOptions ? 'cursor-not-allowed text-[#94A3B8]' : ''
               }`}
+              disabled={isDisableOptions}
               onClick={() => onMemberApprovalClickHandler(member.id, APP_CONSTANTS.APPROVED_FLAG, false)}
             >
               <img
@@ -208,6 +211,7 @@ const MemberList = (props: MemberListProps) => {
               className={`flex items-center justify-center gap-[4px] rounded-[8px] border border-[#CBD5E1] px-[8px] py-[4px] text-[13px] font-[400] ${
                 isDisableOptions ? 'cursor-not-allowed text-[#94A3B8]' : ''
               }`}
+              disabled={isDisableOptions}
             >
               <img
                 height={20}
