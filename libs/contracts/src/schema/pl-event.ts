@@ -12,7 +12,7 @@ export const PLEventSchema = z.object({
   type: z.enum(['INVITE_ONLY']).optional(),
   telegramId: z.string().optional(),
   officeHours: z.string().optional(),
-  eventsCount: z.number().int(),
+  eventsCount: z.number().int().optional(),
   logoUid: z.string().nullish(),
   bannerUid: z.string().nullish(),
   isFeatured: z.boolean().nullish(),
@@ -27,8 +27,8 @@ export const PLEventSchema = z.object({
       description: z.string().optional()
     })
   ).optional(),
-  priority: z.number(),
-  additionalInfo: z.any(),
+  priority: z.number().optional(),
+  additionalInfo: z.any().optional(),
   startDate: z.string(),
   endDate: z.string(),
   locationUid: z.string().optional(),
@@ -39,15 +39,26 @@ export const PLEventSchema = z.object({
 export const PLCreateEventSchema = PLEventSchema.pick({
   name: true,
   type: true,
-  description: true,
   telegramId: true,
   officeHours: true,
+  eventsCount: true,
+  logoUid: true,
+  bannerUid: true,
+  isFeatured: true,
+  description: true,
+  shortDescription: true,
   websiteURL: true,
+  slugURL: true,
   resources: true,
+  priority: true,
+  additionalInfo: true,
   startDate: true,
   endDate: true,
-  locationUid: true
+  locationUid: true,
+  createdAt: true,
+  updatedAt: true
 });
+
 
 export const ResponsePLEventSchema = PLEventSchema.omit({ id: true }).strict();
 

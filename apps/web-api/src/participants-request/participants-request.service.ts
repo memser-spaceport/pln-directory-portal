@@ -59,7 +59,7 @@ export class ParticipantsRequestService {
       };
       return await this.prisma.participantsRequest.findMany({
         where: filters,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { updatedAt: 'desc' },
       });
     } catch (err) {
       return this.handleErrors(err)

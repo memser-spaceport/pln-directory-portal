@@ -2,12 +2,6 @@ import { useState, ChangeEvent, useCallback, useEffect } from 'react';
 import TeamStepOne from '../components/teams/teamstepone';
 import TeamStepTwo from '../components/teams/teamsteptwo';
 import TeamStepThree from '../components/teams/teamstepthree';
-// import {
-//   fetchMembershipSources,
-//   fetchFundingStages,
-//   fetchIndustryTags,
-//   fetchProtocol,
-// } from '../utils/services/shared';
 import { IFormValues } from '../utils/teams.types';
 import api from '../utils/api';
 import APP_CONSTANTS, {

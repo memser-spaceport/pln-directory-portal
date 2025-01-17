@@ -6,6 +6,7 @@ import Loader from './common/loader';
 import router from 'next/router';
 import api from '../utils/api';
 import { useNavbarContext } from '../context/navbar-context';
+import { formatDateTime } from '../utils/services/shared';
 
 const MemberRequestList = (props: any) => {
   const dataList = [...props.members];
@@ -29,35 +30,88 @@ const MemberRequestList = (props: any) => {
         authorization: `Bearer ${props.plnadmin}`,
       },
     };
-    const [listData, unVerifiedMembers] = await Promise.all([
-      api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}?status=PENDING`, config),
-      api.get(`${API_ROUTE.MEMBERS}?isVerified=false&pagination=false&orderBy=-createdAt`, config),
-    ]);
+    try {
+      const [listData, unVerifiedMembers, projectData] = await Promise.all([
+        api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}?status=PENDING`, config),
+        api.get(
+          `${API_ROUTE.MEMBERS}?isVerified=false&pagination=false&orderBy=-createdAt&select=uid,name,teamMemberRoles.team.name,teamMemberRoles.team.uid,projectContributions,email,image.url,isVerified,teamOrProjectURL,teamMemberRoles.mainTeam`,
+          config
+        ),
+        api.get(`${process.env.WEB_API_BASE_URL}${APP_CONSTANTS.V1}projects`),
+      ]);
 
-    const pendingMembers = listData.data.filter((item) => item.participantType === ENROLLMENT_TYPE.MEMBER);
+      const pendingMembers = listData.data.filter((item) => item.participantType === ENROLLMENT_TYPE.MEMBER);
+      const formattedPendingMembes = pendingMembers?.map((data) => {
+        let projectContributions = [];
+        const memberProject = data?.newData?.projectContributions?.map((project) => project.projectUid) || [];
 
-    const formattedPendingMembes = pendingMembers?.map((data) => {
-      return {
-        id: data.uid,
-        name: data.newData.name,
-        status: data.status,
-      };
-    });
+        if (memberProject && memberProject.length > 0) {
+          let project = projectData.data.projects.filter((project) => memberProject.includes(project.uid));
+          projectContributions.push({ projectTitle: project.map((name) => name.name) });
+        } else {
+          projectContributions = [];
+        }
+        return {
+          id: data.uid,
+          name: data.newData.name,
+          status: data.status,
+          email: data.newData.email,
+          skills: data.newData.skills,
+          teamAndRoles: data.newData.teamAndRoles,
+          projectContributions: projectContributions,
+          isSubscribedToNewsletter: data.newData.isSubscribedToNewsletter,
+          teamOrProjectURL: data.newData.teamOrProjectURL,
+          imageUrl: data.newData.imageUrl,
+        };
+      });
 
-    const filteredUnVerifiedMembers = unVerifiedMembers.data.members.map((data) => {
-      return {
-        id: data.uid,
-        name: data.name,
-        isVerified: data?.isVerified || false,
-      };
-    });
+      const filteredUnVerifiedMembers = unVerifiedMembers.data.members.map((data) => {
+        let projectContributions = [];
+        let teamAndRoles = [];
+        const imageUrl = data?.image?.url || '';
+        const teamOrProjectURL = data?.teamOrProjectURL || '';
+        const memberProject = data?.projectContributions?.map((project) => project.projectUid) || [];
 
-    setAllMembers({
-      pending: [...formattedPendingMembes],
-      unverified: [...filteredUnVerifiedMembers],
-    });
-    setIsLoading(false);
-    setMemberList([...formattedPendingMembes, ...filteredUnVerifiedMembers]);
+        if (memberProject && memberProject.length > 0) {
+          let project = projectData?.data?.projects?.filter((project) => memberProject?.includes(project.uid));
+          projectContributions.push({ projectTitle: project?.map((name) => name.name) });
+        } else {
+          projectContributions = [];
+        }
+        if (data?.teamMemberRoles[0]?.team) {
+          teamAndRoles.push({
+            teamUid: data.teamMemberRoles[0].team.uid,
+            teamTitle: data.teamMemberRoles[0].team.name,
+          });
+        } else {
+          teamAndRoles = [];
+        }
+        return {
+          id: data.uid,
+          name: data.name,
+          email: data.email,
+          imageUrl: imageUrl,
+          teamAndRoles: teamAndRoles,
+          projectContributions: projectContributions,
+          teamOrProjectURL: teamOrProjectURL,
+          isVerified: data?.isVerified || false,
+        };
+      });
+
+      setAllMembers({
+        pending: [...formattedPendingMembes],
+        unverified: [...filteredUnVerifiedMembers],
+      });
+      setIsLoading(false);
+      setMemberList([...formattedPendingMembes, ...filteredUnVerifiedMembers]);
+    } catch (error) {
+      setAllMembers({
+        pending: [],
+        unverified: [],
+      });
+      setIsLoading(false);
+      setMemberList([]);
+    }
   };
 
   const availableTabs = [
@@ -90,7 +144,7 @@ const MemberRequestList = (props: any) => {
 
   return (
     <>
-      <div className="w-[650px]">
+      <div className="w-[100%]">
         {isLoading && <Loader />}
 
         {type !== APP_CONSTANTS.CLOSED_FLAG && (
@@ -138,18 +192,21 @@ const MemberRequestList = (props: any) => {
                     onClick={() => redirectToDetail(request)}
                   >
                     <div
-                      className="h-full w-full items-center pl-[24px] pr-[24px] pt-[20px]
+                      className="flex h-full w-full items-center justify-between pl-[24px] pr-[24px]
                   text-[14px] leading-[20px] text-[#475569]"
                     >
                       <span className="text-sm font-semibold">{request?.name}</span>
                       {request.status !== APP_CONSTANTS.PENDING_LABEL && (
-                        <span
-                          className={`float-right text-[12px] ${
-                            request.status === APP_CONSTANTS.APPROVED_FLAG ? 'text-[#0F9F5A]' : 'text-[#D65229]'
+                        <div
+                          className={`flex flex-col items-end text-[12px] ${
+                            request.status === APP_CONSTANTS.APPROVED_FLAG ? 'text-[#30C593]' : 'text-[#FF7777]'
                           }`}
                         >
                           {request.status === 'REJECTED' ? APP_CONSTANTS.REJECTED_LABEL : APP_CONSTANTS.APPROVED_LABEL}
-                        </span>
+                          <div className="text-[12px] font-normal italic text-[#94A3B8]">
+                            on {formatDateTime(request?.approvedAt)}
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>

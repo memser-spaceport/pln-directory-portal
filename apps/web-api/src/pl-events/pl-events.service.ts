@@ -3,14 +3,40 @@ import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { Prisma, PLEvent, Member } from '@prisma/client';
 import { PLEventGuestsService } from './pl-event-guests.service';
+import { NotificationService } from '../notifications/notifications.service';
+import { MembersService } from '../members/members.service';
+import { PLEventLocationsService } from './pl-event-locations.service';
 
 @Injectable()
 export class PLEventsService {
   constructor(
     private prisma: PrismaService,
     private logger: LogService,
-    private eventGuestsService: PLEventGuestsService
-  ) {}
+    private eventGuestsService: PLEventGuestsService,
+    private notificationService: NotificationService,
+    private memberService: MembersService,
+    private locationService: PLEventLocationsService
+  ) { }
+
+  /**
+   * This method creates a new event associated with a specific location.
+   * 
+   * @param event The event creation payload containing the required event details, such as name, type, description, 
+   *             startDate, endDate, resources, and locationUid.
+   * @returns The newly created event object with details such as name, type, start and end dates, and location.
+   */
+  async createPLEvent(event, requestorEmail) {
+    try {
+      const createdEvent = await this.prisma.pLEvent.create({
+        data: event
+      });
+      // Info: Disabled for husky release.
+      // await this.notifySubscribers(createdEvent, createdEvent.locationUid, "EVENT_ADDED", requestorEmail);
+      return createdEvent;
+    } catch (error) {
+      this.handleErrors(error);
+    }
+  }
 
   /**
    * This method retrieves multiple events based on the provided query options.
@@ -210,7 +236,7 @@ export class PLEventsService {
           {
             member: {
               name: {
-                contains : searchBy,
+                contains: searchBy,
                 mode: 'insensitive',
               },
             }
@@ -242,4 +268,44 @@ export class PLEventsService {
     }
     return {};
   };
+
+  /**
+   * Notifies subscribers about specific actions related to an entity.
+   *
+   * @param event - The event data containing information about the entity or action.
+   * @param entityUid - The unique identifier of the entity being acted upon.
+   * @param actionType - The type of action triggering the notification (e.g., "EVENT_ADDED").
+   * @param requestorEmail - The email address of the user initiating the action, used to fetch additional details.
+   */
+  private async notifySubscribers(event, entityUid, actionType, requestorEmail) {
+    const notification = await this.notificationService.getNotificationPayload(entityUid, actionType);
+    switch (actionType) {
+      case "EVENT_ADDED":
+        const payload = this.buildEventAdditionPayload(event, notification, requestorEmail)
+        await this.notificationService.sendNotification(await payload)
+    }
+  }
+
+  /**
+   * Constructs an event addition payload for notifications.
+   *
+   * @param event - The event data used to populate the notification payload.
+   * @param notification - The base notification object to be augmented with additional information.
+   * @param requestorEmail - The email address of the user who initiated the event addition, used to fetch requester details.
+   * @returns The updated notification object with additional information about the source (requestor).
+   */
+  private async buildEventAdditionPayload(event, notification, requestorEmail) {
+    const location = await this.locationService.findLocationByUid(event.locationUid)
+    const requestor = await this.memberService.findMemberByEmail(requestorEmail);
+    notification.additionalInfo = {
+      eventName: event.name,
+      startDate: event.startDate,
+      eventDescription: event.description,
+      sourceUid: requestor.uid,
+      sourceName: requestor.name,
+      venue: location
+    }
+    return notification;
+  }
 }
+

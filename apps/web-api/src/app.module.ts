@@ -8,7 +8,6 @@ import {
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import * as redisStore from 'cache-manager-redis-store';
-import type { ClientOpts } from 'redis';
 import { AppController } from './app.controller';
 import { FundingStagesModule } from './funding-stages/funding-stages.module';
 import { HealthModule } from './health/health.module';
@@ -42,6 +41,8 @@ import { HuskyModule } from './husky/husky.module';
 import { HomeModule } from './home/home.module';
 import { InternalsModule } from './internals/internals.module';
 import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
+import { MemberSubscriptionsModule } from './member-subscriptions/member-subscriptions.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   controllers: [AppController],
@@ -50,7 +51,7 @@ import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
       ttl: 1,
       limit: 10,
     }),
-   CacheModule.register<ClientOpts>({
+    CacheModule.register<any>({
       store: redisStore,
       url: process.env.REDIS_TLS_URL,
       isGlobal: true,
@@ -58,14 +59,14 @@ import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
       max: 100, // maximum number of items in cache
       tls: process.env.REDIS_WITH_TLS
         ? {
-            rejectUnauthorized: false,
-            requestCert: true,
-          }
+          rejectUnauthorized: false,
+          requestCert: true,
+        }
         : null,
     }),
     BullModule.forRoot({
+      url: process.env.QUEUE_REDIS_WITH_TLS,
       redis: {
-        path: process.env.REDIS_TLS_URL,
         tls: {
           rejectUnauthorized: false,
           requestCert: true,
@@ -99,6 +100,8 @@ import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
     HomeModule,
     InternalsModule,
     OsoMetricsModule,
+    MemberSubscriptionsModule,
+    NotificationsModule
   ],
   providers: [
     {

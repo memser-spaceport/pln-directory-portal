@@ -32,15 +32,10 @@ export function FooterButtons(props) {
     try {
       let message = "";
       setLoader(true);
-      if (props.from === "approved") {
-        await api.post(`${API_ROUTE.ADMIN_APPROVAL}`, { memberIds: [props.id] }, configuration);
-        message = `Successfully ${APP_CONSTANTS.VERIFIED_FLAG}`;
-      } else {
         await api.patch(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, data, configuration)
         message = status === "REJECTED"
           ? `Successfully ${APP_CONSTANTS.REJECTED_LABEL}`
           : `Successfully ${isVerified ? (teamRoute ? APP_CONSTANTS.APPROVED_LABEL : APP_CONSTANTS.VERIFIED_FLAG ): APP_CONSTANTS.UNVERIFIED_FLAG}`;
-      }
       setOpenModal(false)
       toast(message);
       router.push({
@@ -136,7 +131,7 @@ export function FooterButtons(props) {
         </div>
         <div className="col-span-3 justify-self-end">
           <div className="flex items-end space-x-3">
-            {props.from !== "approved" && !teamRoute &&
+            {!teamRoute &&
               <button
                 onClick={() => approvelClickHandler(props?.id, "APPROVED", false, props?.setLoader)}
                 disabled={props.isEditEnabled}
@@ -172,7 +167,6 @@ export function FooterButtons(props) {
               {teamRoute ? 'Approve' : 'Verify' }
             </button>
 
-            {props.from !== "approved" &&
               <button
                 onClick={() => handleOpen()}
                 disabled={props.isEditEnabled}
@@ -184,7 +178,6 @@ export function FooterButtons(props) {
                   <img height={16} width={16} src="assets/icons/TrashIcon.svg" alt="delete" />}
                 Reject
               </button>
-            }
           </div>
         </div>
       </nav>

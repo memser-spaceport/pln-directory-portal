@@ -74,12 +74,12 @@ model Member {
   openToWork                   Boolean?                      @default(false)
   isFeatured                   Boolean?                      @default(false)
   isVerified                   Boolean?                      @default(false)
-  signUpSource                 String? 
+  signUpSource                 String?
   signUpMedium                 String?
   signUpCampaign               String?
   isUserConsent                Boolean?                      @default(false)
   isSubscribedToNewsletter     Boolean?                      @default(false)
-  teamOrProjectURL             String?          
+  teamOrProjectURL             String?
   createdAt                    DateTime                      @default(now())
   updatedAt                    DateTime                      @updatedAt
   approvedAt                   DateTime                      @default(now())
@@ -100,6 +100,7 @@ model Member {
   feedbacks                    MemberFeedback[]
   createdQuestions             DiscoveryQuestion[]           @relation("MemberCreatedDiscoveryQuestions")
   modifiedQuestions            DiscoveryQuestion[]           @relation("MemberModifiedDiscoveryQuestions")
+  subscriptions                MemberSubscription[]
 }
 
 model MemberRole {
@@ -145,6 +146,10 @@ enum ImageSize {
   MEDIUM
   SMALL
   TINY
+}
+
+enum DiscoveryQuestionType {
+  CHAT
 }
 
 model ParticipantsRequest {
@@ -408,15 +413,15 @@ model PLEventGuest {
   memberUid      String
   member         Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
   teamUid        String?
-  team           Team?     @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  team           Team?    @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
   eventUid       String
   event          PLEvent  @relation(fields: [eventUid], references: [uid], onDelete: Cascade)
   additionalInfo Json?
   topics         String[]
-  priority       Int?      
+  priority       Int?
   isHost         Boolean  @default(false)
   isSpeaker      Boolean  @default(false)
-  isFeatured      Boolean  @default(false)
+  isFeatured     Boolean  @default(false)
 }
 
 model FocusArea {
@@ -565,4 +570,42 @@ model DiscoveryQuestion {
   relatedQuestions Json[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  type             DiscoveryQuestionType?
+}
+
+model MemberSubscription {
+  id           Int                    @id @default(autoincrement())
+  uid          String                 @unique @default(uuid())
+  memberUid    String
+  entityUid    String
+  entityAction String
+  entityType   SubscriptionEntityType
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  member       Member                 @relation(fields: [memberUid], references: [uid])
+  isActive     Boolean                @default(true)
+
+  @@index([memberUid, entityUid, entityType])
+}
+
+model Notification {
+  id             Int                @id @default(autoincrement())
+  uid            String             @unique @default(uuid())
+  entityUid      String
+  entityAction   String
+  entityType     String
+  status         NotificationStatus
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  additionalInfo Json?
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum SubscriptionEntityType {
+  EVENT_LOCATION
 }
