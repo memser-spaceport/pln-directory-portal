@@ -49,9 +49,10 @@ export class PLEventGuestsService {
       data.memberUid = isAdmin ? data.memberUid : member.uid;
       const guests = this.formatInputToEventGuests(data);
       const result = await (tx || this.prisma).pLEventGuest.createMany({ data: guests });
-      await this.notifySubscribers(data, locationUid, "HOST_SPEAKER_ADDED", requestorEmail);
-      if (type === CREATE)
-        await this.eventLocationsService.subscribeLocationByUid(locationUid, member.uid);
+      // Info: Disabled for husky release. 
+      // await this.notifySubscribers(data, locationUid, "HOST_SPEAKER_ADDED", requestorEmail);
+      // if (type === CREATE)
+      //   await this.eventLocationsService.subscribeLocationByUid(locationUid, member.uid);
       this.cacheService.reset({ service: 'PLEventGuest' });
       return result;
     } catch (err) {

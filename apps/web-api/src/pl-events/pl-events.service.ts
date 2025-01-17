@@ -30,7 +30,8 @@ export class PLEventsService {
       const createdEvent = await this.prisma.pLEvent.create({
         data: event
       });
-      await this.notifySubscribers(createdEvent, createdEvent.locationUid, "EVENT_ADDED", requestorEmail);
+      // Info: Disabled for husky release.
+      // await this.notifySubscribers(createdEvent, createdEvent.locationUid, "EVENT_ADDED", requestorEmail);
       return createdEvent;
     } catch (error) {
       this.handleErrors(error);
@@ -307,3 +308,4 @@ export class PLEventsService {
     return notification;
   }
 }
+
