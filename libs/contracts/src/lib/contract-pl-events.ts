@@ -10,6 +10,15 @@ import { getAPIVersionAsPath } from '../utils/versioned-path';
 const contract = initContract();
 
 export const apiEvents = contract.router({
+  createPLEventByLocation: {
+    method: 'POST',
+    body: contract.body<unknown>(),
+    path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/event`,
+    responses: {
+      200: ResponsePLEventSchemaWithRelationsSchema,
+    },
+    summary: 'Create pl event in corresponding location',
+  },
   getPLEventBySlug: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/events/:slug`,

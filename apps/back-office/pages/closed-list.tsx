@@ -21,7 +21,7 @@ export default function ClosedList(props) {
     setTeamList(props.teamList);
     setIsOpenRequest(false);
   }, [isTeamActive, setMemberList, props.memberList, props.teamList, setTeamList, setIsOpenRequest]);
-
+  
   return (
     <ApprovalLayout>
       <RequestList
@@ -35,7 +35,7 @@ export default function ClosedList(props) {
 
 export const getServerSideProps: GetServerSideProps<IRequest> = async (context) => {
   const { plnadmin } = parseCookies(context);
-
+  
   if (!plnadmin) {
     const currentUrl = context.resolvedUrl;
     const loginUrl = `/?backlink=${currentUrl}`;
@@ -76,6 +76,7 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (context) 
         id: data.uid,
         name: data.newData.name ?? '',
         status: data.status,
+        approvedAt: data.updatedAt
       };
     });
     team = teamResponse?.map((data) => {
@@ -83,6 +84,7 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (context) 
         id: data.uid,
         name: data.newData.name ?? '',
         status: data.status,
+        approvedAt: data.updatedAt
       };
     });
   }

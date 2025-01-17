@@ -150,7 +150,7 @@ export class NotificationService {
     );
     await this.awsService.sendEmail(
       'NewTeamSuccess', false, [requesterEmailId], 
-      { teamName, memberProfileLink: teamUrl }
+      { teamName, teamProfileLink: teamUrl }
     );
     await this.slackService.notifyToChannel(slackConfig);
   }

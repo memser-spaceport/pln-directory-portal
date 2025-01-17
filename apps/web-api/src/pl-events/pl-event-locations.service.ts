@@ -1,20 +1,22 @@
 import moment from 'moment-timezone';
+import { Prisma, SubscriptionEntityType } from '@prisma/client';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
-import { Prisma } from '@prisma/client';
-import { 
+import { MemberSubscriptionService } from '../member-subscriptions/member-subscriptions.service';
+import {
   PLEventLocationWithEvents,
   FormattedLocationWithEvents,
-  PLEvent 
+  PLEvent
 } from './pl-event-locations.types';
 
 @Injectable()
 export class PLEventLocationsService {
   constructor(
     private prisma: PrismaService,
-    private logger: LogService
-  ) {}
+    private logger: LogService,
+    private memberSubscriptionService: MemberSubscriptionService
+  ) { }
 
   /**
    * This method retrieves the event location by its UID, including all associated events.
@@ -50,14 +52,14 @@ export class PLEventLocationsService {
       return this.handleErrors(error, uid);
     }
   };
-  
+
   /**
    * This method retrieves all upcoming events for a specified location.
    * @param locationUid The unique identifier of the event location
    * @returns An array of upcoming events for the given location
    *   - The events include details like name, description, and date, formatted in the location's timezone.
    */
-  async getUpcomingEventsByLocation(locationUid: string): Promise<PLEvent[]> {  
+  async getUpcomingEventsByLocation(locationUid: string): Promise<PLEvent[]> {
     const result = await this.getPLEventLocationByUid(locationUid);
     return result?.upcomingEvents;
   }
@@ -93,14 +95,34 @@ export class PLEventLocationsService {
               description: true,
               startDate: true,
               endDate: true,
-              logo: true,
-              banner: true,
+              logo: {
+                select: {
+                  uid: true,
+                  url: true
+                }
+              },
+              banner: {
+                select: {
+                  uid: true,
+                  url: true
+                }
+              },
               resources: true,
               additionalInfo: true,
               priority: true,
-              _count: {
+              eventGuests: {
                 select: {
-                  eventGuests: true
+                  member: {
+                    select: {
+                      uid: true,
+                      image: {
+                        select: {
+                          url: true
+                        }
+                      }
+                    }
+                  },
+                  teamUid: true
                 }
               }
             },
@@ -111,8 +133,15 @@ export class PLEventLocationsService {
         }
       });
       return locations.map((location) => {
-        return this.formatLocation(location);
-      });  
+        const formattedEvents: any = location.events.map((event) => ({
+          ...event,
+          eventGuests: event.eventGuests?.length ? this.groupEventGuestsByMemberUidAndTeamUid(event.eventGuests) : []
+        }));
+        return this.formatLocation({
+          ...location,
+          events: formattedEvents
+        });
+      });
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -132,16 +161,39 @@ export class PLEventLocationsService {
   };
 
   /**
+   * Groups event guests by `memberUid` and `teamUid`.
+   *
+   * @param eventGuests Array of event guest objects to group.
+   * @returns An array of grouped guests, where each group includes `member`, `teamUid`.
+   */
+  groupEventGuestsByMemberUidAndTeamUid(eventGuests: {
+    member: { uid: string; image?: { url: string } | null };
+    teamUid: string | null;
+  }[]){
+    const groupedGuests = {}; 
+    eventGuests?.forEach((guest) => {
+      const key = `${guest.member.uid}-${guest.teamUid}`;
+      if (!groupedGuests[key]) 
+        groupedGuests[key] = {
+          member: guest.member,
+          teamUid: guest.teamUid
+        };
+    });
+    return Object.values(groupedGuests);
+  }
+
+
+  /**
    * This method separates the events of a location into past and upcoming based on the timezone.
    * @param events An array of event objects associated with the location
    * @param timezone The timezone of the location
    * @returns An object containing two arrays: pastEvents and upcomingEvents
    *   - Events are classified as past or upcoming depending on whether their start date is before or after the current time.
-   */  
+   */
   private segregateEventsByTime(events: PLEvent[], timezone: string): { pastEvents: PLEvent[], upcomingEvents: PLEvent[] } {
     const currentDateTimeInZone = moment().tz(timezone);
-    const pastEvents:any = [];
-    const upcomingEvents:any = [];
+    const pastEvents: any = [];
+    const upcomingEvents: any = [];
     events.forEach((event) => {
       const eventStartDateInZone = moment.utc(event.startDate).tz(timezone);
       const eventEndDateInZone = moment.utc(event.endDate).tz(timezone);
@@ -181,4 +233,60 @@ export class PLEventLocationsService {
     }
     throw error;
   };
+
+  /**
+   * Finds a location by its unique identifier.
+   * 
+   * @param {string} uid - The unique identifier of the location to be retrieved.
+   * @returns plEvent location The location object if found, otherwise `null`.
+   * @throws {Error} - If an error occurs during the query, it is passed to the `handleErrors` method.
+   *
+   */
+  async findLocationByUid(uid: string) {
+    try {
+      return this.prisma.pLEventLocation.findUnique({
+        where: { uid },
+        select: {
+          location: true
+        }
+      })
+    } catch (error) {
+      this.handleErrors(error)
+    }
+  }
+
+  /**
+   * Subscribes a member to a location by its unique identifier.
+   *
+   * @function subscribeLocationByUid
+   * @param {string} uid - The unique identifier of the location to subscribe to.
+   * @param {string} memberUid - The unique identifier of the member subscribing to the location.
+   * @param {string} action - Action to perform
+   * @returns {Promise<Object>} - The subscription object returned from the `createSubscription` method.
+   * @throws {Error} - If an error occurs during the subscription process, it will be passed to the `handleErrors` method.
+   *
+   */
+  async subscribeLocationByUid(uid: string, memberUid: string, action:string="Default") {
+    try {
+      const subscriptions = await this.memberSubscriptionService.getSubscriptions({ 
+        where: { 
+          memberUid,
+          entityUid: uid,
+          entityAction: action
+        }
+      });
+      if (subscriptions?.length) {
+        this.logger.info(`Member with uid ${memberUid} is already subscribed to location ${uid}.`);
+        return null;
+      }
+      return await this.memberSubscriptionService.createSubscription({
+        memberUid,
+        entityUid: uid,
+        entityType: SubscriptionEntityType.EVENT_LOCATION,
+        entityAction: action 
+      });
+    } catch (error) {
+      this.handleErrors(error);  
+    }
+  }
 }

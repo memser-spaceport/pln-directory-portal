@@ -1,23 +1,29 @@
-import { 
-	Injectable, 
-	ConflictException, 
-	BadRequestException,
-	NotFoundException
-} from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
-	
+import { openai } from '@ai-sdk/openai';
+import { embed, generateText, streamObject } from 'ai';
+import { Response } from 'express';
+import { HuskyResponseSchema } from 'libs/contracts/src/schema/husky-chat';
+import { QdrantVectorDbService } from './db/qdrant-vector-db.service';
+import { RedisCacheDbService } from './db/redis-cache-db.service';
+import { Neo4jGraphDbService } from './db/neo4j-graph-db.service';
+import { MongoPersistantDbService } from './db/mongo-persistant-db.service';
+import { HUSKY_ACTION_TYPES, HUSKY_NO_INFO_PROMPT, HUSKY_SOURCES } from '../utils/constants';
 @Injectable()
 export class HuskyService {
   constructor(
     private logger: LogService,
-    private prisma: PrismaService
+    private prisma: PrismaService,
+    private huskyPersistentDbService: MongoPersistantDbService
+/*     private huskyVectorDbService: QdrantVectorDbService,
+    private huskyCacheDbService: RedisCacheDbService,
+    private huskyGraphDbService: Neo4jGraphDbService,
+     */
   ) {}
 
-	async fetchDiscoverQuestions(
-    query: Prisma.DiscoveryQuestionFindManyArgs
-  ) {
+  async fetchDiscoverQuestions(query: Prisma.DiscoveryQuestionFindManyArgs) {
     try {
       query.include = {
         ...query.include,
@@ -25,67 +31,59 @@ export class HuskyService {
           select: {
             uid: true,
             logo: true,
-            name: true
-          }
+            name: true,
+          },
         },
         project: {
           select: {
             uid: true,
             logo: true,
-            name: true
-          }
+            name: true,
+          },
         },
         plevent: {
           select: {
             uid: true,
             name: true,
-            logo: true
-          }
-        }
-      }
+            logo: true,
+          },
+        },
+      };
       return await this.prisma.discoveryQuestion.findMany(query);
-    }
-    catch (error) {
+    } catch (error) {
       this.handleErrors(error);
     }
   }
 
-  async fetchDiscoverQuestionBySlug(
-    slug: string
-  ) {
+  async fetchDiscoverQuestionBySlug(slug: string) {
     try {
       return await this.prisma.discoveryQuestion.findUnique({
-        where: { slug }
+        where: { slug },
       });
-    }
-    catch (error) {
+    } catch (error) {
       this.handleErrors(error);
     }
   }
 
-  async createDiscoverQuestion( 
-    discoveryQuestion: Prisma.DiscoveryQuestionUncheckedCreateInput,
-    loggedInMember
-  ) {
+  async createDiscoverQuestion(discoveryQuestion: Prisma.DiscoveryQuestionUncheckedCreateInput, loggedInMember) {
     try {
       return await this.prisma.discoveryQuestion.create({
-         data: {
-          ... {
+        data: {
+          ...{
             createdBy: loggedInMember.uid,
             modifiedBy: loggedInMember.uid,
-            slug: Math.random().toString(36).substring(2, 8)
+            slug: Math.random().toString(36).substring(2, 8),
           },
-          ...discoveryQuestion
-         } 
+          ...discoveryQuestion,
+        },
       });
-    }
-    catch (error) {
+    } catch (error) {
       this.handleErrors(error);
     }
   }
 
   async updateDiscoveryQuestionBySlug(
-    slug: string, 
+    slug: string,
     discoveryQuestion: Prisma.DiscoveryQuestionUncheckedCreateInput,
     loggedInMember
   ) {
@@ -93,44 +91,48 @@ export class HuskyService {
       return this.prisma.discoveryQuestion.update({
         where: { slug },
         data: {
-          ... {
+          ...{
             modifiedBy: loggedInMember.uid,
           },
-          ...discoveryQuestion
-         } 
+          ...discoveryQuestion,
+        },
       });
-    }
-    catch (error) {
+    } catch (error) {
       this.handleErrors(error);
     }
   }
 
-  async updateDiscoveryQuestionShareCount(slug: string) { 
+  async updateDiscoveryQuestionShareCount(slug: string) {
     try {
       return await this.prisma.discoveryQuestion.update({
         where: { slug },
         data: {
-          shareCount: { increment: 1 }
-        }
+          shareCount: { increment: 1 },
+        },
       });
-    }
-    catch (error) {
+    } catch (error) {
       this.handleErrors(error);
     }
   }
 
-  async updateDiscoveryQuestionViewCount(slug: string) { 
+  async updateDiscoveryQuestionViewCount(slug: string) {
     try {
       return await this.prisma.discoveryQuestion.update({
         where: { slug },
         data: {
-          viewCount: { increment: 1 }
-        }
+          viewCount: { increment: 1 },
+        },
       });
-    }
-    catch (error) {
+    } catch (error) {
       this.handleErrors(error);
     }
+  }
+
+  async addHuskyFeedback(feedback: any) {
+    await this.huskyPersistentDbService.create(process.env.MONGO_FEEDBACK_COLLECTION || '', {
+      ...feedback,
+      createdAt: Date.now(),
+    });
   }
 
   private handleErrors(error, message?) {
@@ -150,6 +152,5 @@ export class HuskyService {
       throw new BadRequestException('Database field validation error on discovery question', error.message);
     }
     throw error;
-  };
-	
+  }
 }
