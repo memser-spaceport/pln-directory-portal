@@ -5,7 +5,7 @@ import {
   BadRequestException,
   NotFoundException,
   forwardRef,
-  Inject
+  Inject,
 } from '@nestjs/common';
 import * as path from 'path';
 import { z } from 'zod';
@@ -35,17 +35,17 @@ export class TeamsService {
     private forestadminService: ForestAdminService,
     private notificationService: NotificationService,
     private cacheService: CacheService
-  ) { }
+  ) {}
 
   /**
    * Find all teams based on provided query options.
    * Allows flexibility in filtering, sorting, and pagination through Prisma.TeamFindManyArgs.
    *
-   * @param queryOptions - Prisma query options to customize the result set 
+   * @param queryOptions - Prisma query options to customize the result set
    *   (filter, pagination, sorting, etc.)
    * @returns A list of teams that match the query options
    */
-  async findAll(queryOptions: Prisma.TeamFindManyArgs): Promise<{ count: Number, teams: Team[] }> {
+  async findAll(queryOptions: Prisma.TeamFindManyArgs): Promise<{ count: number; teams: Team[] }> {
     try {
       const [teams, teamsCount] = await Promise.all([
         this.prisma.team.findMany(queryOptions),
@@ -59,19 +59,16 @@ export class TeamsService {
 
   /**
    * Find a single team by its unique identifier (UID).
-   * Retrieves detailed information about the team, 
+   * Retrieves detailed information about the team,
    * including related data like projects, technologies, and team focus areas.
-   * 
+   *
    * @param uid - Unique identifier for the team
    * @param queryOptions - Additional Prisma query options (excluding 'where') for
    *   customizing the result set
    * @returns The team object with all related information or throws an error if not found
    * @throws {NotFoundException} If the team with the given UID is not found
    */
-  async findTeamByUid(
-    uid: string,
-    queryOptions: Omit<Prisma.TeamFindUniqueArgsBase, 'where'> = {}
-  ): Promise<Team> {
+  async findTeamByUid(uid: string, queryOptions: Omit<Prisma.TeamFindUniqueArgsBase, 'where'> = {}): Promise<Team> {
     try {
       const team = await this.prisma.team.findUniqueOrThrow({
         where: { uid },
@@ -106,7 +103,7 @@ export class TeamsService {
           eventGuests: {
             orderBy: {
               event: {
-                startDate: 'desc'
+                startDate: 'desc',
               },
             },
             where: {
@@ -126,9 +123,9 @@ export class TeamsService {
                     select: {
                       location: true,
                       timezone: true,
-                    }
+                    },
                   },
-                }
+                },
               },
             },
           },
@@ -143,7 +140,7 @@ export class TeamsService {
 
   /**
    * Find a team by its name.
-   * 
+   *
    * @param name - The name of the team to find
    * @returns The team object if found, otherwise null
    */
@@ -155,19 +152,16 @@ export class TeamsService {
     } catch (err) {
       return this.handleErrors(err);
     }
-  };
+  }
 
   /**
    * Creates a new team in the database within a transaction.
-   * 
+   *
    * @param team - The data for the new team to be created
    * @param tx - The transaction client to ensure atomicity
    * @returns The created team record
    */
-  async createTeam(
-    team: Prisma.TeamUncheckedCreateInput,
-    tx: Prisma.TransactionClient
-  ): Promise<Team> {
+  async createTeam(team: Prisma.TeamUncheckedCreateInput, tx: Prisma.TransactionClient): Promise<Team> {
     try {
       return await tx.team.create({
         data: team,
@@ -179,7 +173,7 @@ export class TeamsService {
 
   /**
    * Updates the team data in the database within a transaction.
-   * 
+   *
    * @param teamUid - Unique identifier of the team being updated
    * @param team - The new data to be applied to the team
    * @param tx - The transaction client to ensure atomicity
@@ -188,7 +182,7 @@ export class TeamsService {
   async updateTeamByUid(
     uid: string,
     team: Prisma.TeamUncheckedUpdateInput,
-    tx: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient
   ): Promise<Team> {
     try {
       return await tx.team.update({
@@ -204,7 +198,7 @@ export class TeamsService {
    * Updates the existing team with new information.
    * updates the team, logs the update in the participants request table,
    * resets the cache, and triggers post-update actions like Airtable synchronization.
-   * 
+   *
    * @param teamUid - Unique identifier of the team to be updated
    * @param teamParticipantRequest - Data containing the updated team information
    * @param requestorEmail - Email of the person making the request
@@ -219,13 +213,48 @@ export class TeamsService {
     const existingTeam = await this.findTeamByUid(teamUid);
     let result;
     await this.prisma.$transaction(async (tx) => {
-      const team = await this.formatTeam(teamUid, updatedTeam, tx, "Update");
+      const team = await this.formatTeam(teamUid, updatedTeam, tx, 'Update');
       result = await this.updateTeamByUid(teamUid, team, tx);
+      if (updatedTeam?.teamMemberRoles?.length > 0) {
+        for (const teamMemberRole of updatedTeam.teamMemberRoles) {
+          const updatedRole = { ...teamMemberRole };
+          delete updatedRole.status;
+          switch (teamMemberRole?.status) {
+            case 'Update':
+              await this.updateTeamMemberRoleEntry(updatedRole, tx);
+              break;
+
+            case 'Delete':
+              await this.deleteTeamMemberRoleEntry(updatedRole, tx);
+              break;
+
+            default:
+              break;
+          }
+        }
+      }
       await this.logParticipantRequest(requestorEmail, updatedTeam, existingTeam.uid, tx);
     });
     this.notificationService.notifyForTeamEditApproval(updatedTeam.name, teamUid, requestorEmail);
     await this.postUpdateActions();
     return result;
+  }
+
+  private async updateTeamMemberRoleEntry(teamAndRole: any, tx: Prisma.TransactionClient) {
+    await tx.teamMemberRole.update({
+      where: {
+        memberUid_teamUid: { memberUid: teamAndRole?.memberUid, teamUid: teamAndRole?.teamUid },
+      },
+      data: teamAndRole,
+    });
+  }
+
+  private async deleteTeamMemberRoleEntry(teamAndRole: any, tx: Prisma.TransactionClient) {
+    await tx.teamMemberRole.delete({
+      where: {
+        memberUid_teamUid: { memberUid: teamAndRole?.memberUid, teamUid: teamAndRole?.teamUid },
+      },
+    });
   }
 
   /**
@@ -247,24 +276,19 @@ export class TeamsService {
 
   /**
    * Format team data for creation or update
-   * 
+   *
    * @param teamUid - The unique identifier for the team (used for updates)
    * @param teamData - Raw team data to be formatted
    * @param tx - Transaction client for atomic operations
    * @param type - Operation type ('create' or 'update')
    * @returns - Formatted team data for Prisma query
    */
-  async formatTeam(
-    teamUid: string | null,
-    teamData: Partial<Team>,
-    tx: Prisma.TransactionClient,
-    type: string = 'Create'
-  ) {
+  async formatTeam(teamUid: string | null, teamData: Partial<Team>, tx: Prisma.TransactionClient, type = 'Create') {
     const team: any = {};
     const directFields = [
       'name', 'blog', 'contactMethod', 'twitterHandler',
       'linkedinHandler', 'telegramHandler', 'officeHours',
-      'shortDescription', 'website', 'airtableRecId',
+      'shortDescription', 'plnFriend', 'website', 'airtableRecId',
       'longDescription', 'moreDetails'
     ];
     copyObj(teamData, team, directFields);
@@ -281,13 +305,15 @@ export class TeamsService {
     }
     team['logo'] = teamData.logoUid
       ? { connect: { uid: teamData.logoUid } }
-      : type === 'update' ? { disconnect: true } : undefined;
+      : type === 'update'
+      ? { disconnect: true }
+      : undefined;
     return team;
   }
 
   /**
    * Validates the permissions of the requestor. The requestor must either be an admin or the leader of the team.
-   * 
+   *
    * @param requestorEmail - The email of the person requesting the update
    * @param teamUid - The unique identifier of the team being updated
    * @returns The requestor's member data if validation passes
@@ -305,22 +331,22 @@ export class TeamsService {
   /**
    * Removes duplicate focus areas from the team object based on their UID.
    * Ensures that each focus area is unique in the result set.
-   * 
+   *
    * @param focusAreas - An array of focus areas associated with the team
    * @returns A deduplicated array of focus areas
    */
   private removeDuplicateFocusAreas(focusAreas): any {
     const uniqueFocusAreas = {};
-    focusAreas.forEach(item => {
+    focusAreas.forEach((item) => {
       const { uid, title } = item.focusArea;
       uniqueFocusAreas[uid] = { uid, title };
     });
     return Object.values(uniqueFocusAreas);
-  };
+  }
 
   /**
    * Logs the participant request in the participants request table for audit and tracking purposes.
-   * 
+   *
    * @param requestorEmail - Email of the requestor who is updating the team
    * @param newTeamData - The new data being applied to the team
    * @param referenceUid - Unique identifier of the existing team to be referenced
@@ -330,16 +356,17 @@ export class TeamsService {
     requestorEmail: string,
     newTeamData,
     referenceUid: string,
-    tx: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient
   ): Promise<void> {
-    await this.participantsRequestService.add({
-      status: 'AUTOAPPROVED',
-      requesterEmailId: requestorEmail,
-      referenceUid,
-      uniqueIdentifier: newTeamData?.name || '',
-      participantType: 'TEAM',
-      newData: { ...newTeamData },
-    },
+    await this.participantsRequestService.add(
+      {
+        status: 'AUTOAPPROVED',
+        requesterEmailId: requestorEmail,
+        referenceUid,
+        uniqueIdentifier: newTeamData?.name || '',
+        participantType: 'TEAM',
+        newData: { ...newTeamData },
+      },
       tx
     );
   }
@@ -349,51 +376,51 @@ export class TeamsService {
    * This ensures that the system is up-to-date with the latest changes.
    */
   private async postUpdateActions(): Promise<void> {
-    await this.cacheService.reset({ service: "teams" });
+    await this.cacheService.reset({ service: 'teams' });
     await this.forestadminService.triggerAirtableSync();
   }
 
   /**
    * Creates focus area mappings for a new team.
-   * 
+   *
    * @param team - The team object containing focus areas
    * @param transaction - The transaction client for atomic operations
    * @returns - Data for bulk insertion of focus areas
    */
   async createTeamWithFocusAreas(team, transaction: Prisma.TransactionClient) {
     if (team.focusAreas && team.focusAreas.length > 0) {
-      let teamFocusAreas: any = [];
+      const teamFocusAreas: any = [];
       const focusAreaHierarchies = await transaction.focusAreaHierarchy.findMany({
         where: {
           subFocusAreaUid: {
-            in: team.focusAreas.map(area => area.uid)
-          }
-        }
+            in: team.focusAreas.map((area) => area.uid),
+          },
+        },
       });
-      focusAreaHierarchies.map(areaHierarchy => {
+      focusAreaHierarchies.map((areaHierarchy) => {
         teamFocusAreas.push({
           focusAreaUid: areaHierarchy.subFocusAreaUid,
-          ancestorAreaUid: areaHierarchy.focusAreaUid
+          ancestorAreaUid: areaHierarchy.focusAreaUid,
         });
       });
-      team.focusAreas.map(area => {
+      team.focusAreas.map((area) => {
         teamFocusAreas.push({
           focusAreaUid: area.uid,
-          ancestorAreaUid: area.uid
+          ancestorAreaUid: area.uid,
         });
       });
       return {
         createMany: {
-          data: teamFocusAreas
-        }
-      }
+          data: teamFocusAreas,
+        },
+      };
     }
     return {};
   }
 
   /**
    * Updates focus areas for an existing team.
-   * 
+   *
    * @param teamUid - The unique identifier of the team
    * @param team - The team object containing new focus areas
    * @param transaction - The transaction client for atomic operations
@@ -401,7 +428,7 @@ export class TeamsService {
    */
   async updateTeamWithFocusAreas(teamUid: string, team, transaction: Prisma.TransactionClient) {
     await transaction.teamFocusArea.deleteMany({
-      where: { teamUid }
+      where: { teamUid },
     });
     if (!team.focusAreas || team.focusAreas.length === 0) {
       return {};
@@ -421,12 +448,12 @@ export class TeamsService {
           some: {
             ancestorArea: {
               title: {
-                in: focusAreas?.split(',')
-              }
-            }
-          }
-        }
-      }
+                in: focusAreas?.split(','),
+              },
+            },
+          },
+        },
+      };
     }
     return {};
   }
@@ -437,16 +464,8 @@ export class TeamsService {
    * @returns - Prisma AND filter combining all conditions
    */
   buildTeamFilter(queryParams) {
-    const {
-      name,
-      plnFriend,
-      industryTags,
-      technologies,
-      membershipSources,
-      fundingStage,
-      officeHours,
-      isHost
-    } = queryParams;
+    const { name, plnFriend, industryTags, technologies, membershipSources, fundingStage, officeHours, isHost } =
+      queryParams;
     const filter: any = [];
     this.buildNameAndPLNFriendFilter(name, plnFriend, filter);
     this.buildIndustryTagsFilter(industryTags, filter);
@@ -457,9 +476,9 @@ export class TeamsService {
     this.buildRecentTeamsFilter(queryParams, filter);
     filter.push(this.buildParticipationTypeFilter(queryParams));
     return {
-      AND: filter
+      AND: filter,
     };
-  };
+  }
 
   /**
    * Adds name and PLN friend filter conditions to the filter array.
@@ -472,13 +491,13 @@ export class TeamsService {
       filter.push({
         name: {
           contains: name,
-          mode: 'insensitive'
-        }
+          mode: 'insensitive',
+        },
       });
     }
-    if (!(plnFriend === "true")) {
+    if (!(plnFriend === 'true')) {
       filter.push({
-        plnFriend: false
+        plnFriend: false,
       });
     }
   }
@@ -489,17 +508,17 @@ export class TeamsService {
    * @param filter - Filter array to be appended to
    */
   buildIndustryTagsFilter(industryTags, filter) {
-    const tags = industryTags?.split(',').map(tag => tag.trim());
+    const tags = industryTags?.split(',').map((tag) => tag.trim());
     if (tags?.length > 0) {
       tags.map((tag) => {
         filter.push({
           industryTags: {
             some: {
               title: {
-                in: tag
-              }
-            }
-          }
+                in: tag,
+              },
+            },
+          },
         });
       });
     }
@@ -511,17 +530,17 @@ export class TeamsService {
    * @param filter - Filter array to be appended to
    */
   buildTechnologiesFilter(technologies, filter) {
-    const tags = technologies?.split(',').map(tech => tech.trim());
+    const tags = technologies?.split(',').map((tech) => tech.trim());
     if (tags?.length > 0) {
       tags.map((tag) => {
         filter.push({
           technologies: {
             some: {
               title: {
-                in: tag
-              }
-            }
-          }
+                in: tag,
+              },
+            },
+          },
         });
       });
     }
@@ -533,17 +552,17 @@ export class TeamsService {
    * @param filter - Filter array to be appended to
    */
   buildMembershipSourcesFilter(membershipSources, filter) {
-    const sources = membershipSources?.split(',').map(source => source.trim());
+    const sources = membershipSources?.split(',').map((source) => source.trim());
     if (sources?.length > 0) {
       sources.map((source) => {
         filter.push({
           membershipSources: {
             some: {
               title: {
-                in: source
-              }
-            }
-          }
+                in: source,
+              },
+            },
+          },
         });
       });
     }
@@ -558,8 +577,8 @@ export class TeamsService {
     if (fundingStage?.length > 0) {
       filter.push({
         fundingStage: {
-          title: fundingStage.trim()
-        }
+          title: fundingStage.trim(),
+        },
       });
     }
   }
@@ -570,9 +589,9 @@ export class TeamsService {
    * @param filter - Filter array to be appended to
    */
   buildOfficeHoursFilter(officeHours, filter) {
-    if (officeHours === "true") {
+    if (officeHours === 'true') {
       filter.push({
-        officeHours: { not: null }
+        officeHours: { not: null },
       });
     }
   }
@@ -581,9 +600,9 @@ export class TeamsService {
    * Constructs a dynamic filter query for retrieving recent teams based on the 'is_recent' query parameter.
    * If 'is_recent' is set to 'true', it creates a 'createdAt' filter to retrieve records created within a
    * specified number of days. The number of days is configured via an environment variable.
-   * 
+   *
    * If a filter array is passed, it pushes the 'createdAt' filter to the existing filters.
-   * 
+   *
    * @param queryParams - HTTP request query parameters object
    * @param filter - Optional existing filter array to which the recent filter will be added if provided
    * @returns The constructed query with a 'createdAt' filter if 'is_recent' is 'true',
@@ -593,8 +612,8 @@ export class TeamsService {
     const { isRecent } = queryParams;
     const recentFilter = {
       createdAt: {
-        gte: new Date(Date.now() - (parseInt(process.env.RECENT_RECORD_DURATION_IN_DAYS || '30') * 24 * 60 * 60 * 1000))
-      }
+        gte: new Date(Date.now() - parseInt(process.env.RECENT_RECORD_DURATION_IN_DAYS || '30') * 24 * 60 * 60 * 1000),
+      },
     };
     if (isRecent === 'true' && !filter) {
       return recentFilter;
@@ -608,9 +627,9 @@ export class TeamsService {
   /**
    * Handles database-related errors specifically for the Team entity.
    * Logs the error and throws an appropriate HTTP exception based on the error type.
-   * 
+   *
    * @param {any} error - The error object thrown by Prisma or other services.
-   * @param {string} [message] - An optional message to provide additional context, 
+   * @param {string} [message] - An optional message to provide additional context,
    *                             such as the team UID when an entity is not found.
    * @throws {ConflictException} - If there's a unique key constraint violation.
    * @throws {BadRequestException} - If there's a foreign key constraint violation or validation error.
@@ -629,20 +648,13 @@ export class TeamsService {
         default:
           throw error;
       }
-    }
-    else if (error instanceof Prisma.PrismaClientValidationError) {
-      throw new BadRequestException(
-        'Database field validation error on Team',
-        error.message
-      );
+    } else if (error instanceof Prisma.PrismaClientValidationError) {
+      throw new BadRequestException('Database field validation error on Team', error.message);
     }
     return error;
   }
 
-
-  async insertManyFromAirtable(
-    airtableTeams: z.infer<typeof AirtableTeamSchema>[]
-  ) {
+  async insertManyFromAirtable(airtableTeams: z.infer<typeof AirtableTeamSchema>[]) {
     const fundingStages = await this.prisma.fundingStage.findMany();
     const industryTags = await this.prisma.industryTag.findMany();
     const technologies = await this.prisma.technology.findMany();
@@ -670,28 +682,20 @@ export class TeamsService {
 
       const oneToManyRelations = {
         fundingStageUid:
-          fundingStages.find(
-            (fundingStage) =>
-              fundingStage.title === team.fields?.['Funding Stage']
-          )?.uid || null,
+          fundingStages.find((fundingStage) => fundingStage.title === team.fields?.['Funding Stage'])?.uid || null,
       };
 
       const manyToManyRelations = {
         industryTags: {
           connect: industryTags
-            .filter(
-              (tag) =>
-                !!team.fields?.['Tags lookup'] &&
-                team.fields?.['Tags lookup'].includes(tag.title)
-            )
+            .filter((tag) => !!team.fields?.['Tags lookup'] && team.fields?.['Tags lookup'].includes(tag.title))
             .map((tag) => ({ id: tag.id })),
         },
         membershipSources: {
           connect: membershipSources
             .filter(
               (program) =>
-                !!team.fields?.['Accelerator Programs'] &&
-                team.fields?.['Accelerator Programs'].includes(program.title)
+                !!team.fields?.['Accelerator Programs'] && team.fields?.['Accelerator Programs'].includes(program.title)
             )
             .map((tag) => ({ id: tag.id })),
         },
@@ -711,13 +715,9 @@ export class TeamsService {
       if (team.fields.Logo) {
         const logo = team.fields.Logo[0];
 
-        const hashedLogo = logo.filename
-          ? hashFileName(`${path.parse(logo.filename).name}-${logo.id}`)
-          : '';
+        const hashedLogo = logo.filename ? hashFileName(`${path.parse(logo.filename).name}-${logo.id}`) : '';
         image =
-          images.find(
-            (image) => path.parse(image.filename).name === hashedLogo
-          ) ||
+          images.find((image) => path.parse(image.filename).name === hashedLogo) ||
           (await this.fileMigrationService.migrateFile({
             id: logo.id ? logo.id : '',
             url: logo.url ? logo.url : '',
@@ -757,8 +757,8 @@ export class TeamsService {
 
   /**
    * Fetches filter tags for teams for felicitating ease searching.
-   * 
-   * @returns Set of industry tags, membership sources, funding stages 
+   *
+   * @returns Set of industry tags, membership sources, funding stages
    * and technologies that contains atleast one team.
    */
   async getTeamFilters(queryParams) {
@@ -816,7 +816,7 @@ export class TeamsService {
   }
 
   /**
-   * This method construct the dynamic query to search the member by 
+   * This method construct the dynamic query to search the member by
    * their participation type for host only
    * @param queryParams HTTP request query params object
    * @returns Constructed query based on given participation type
@@ -828,9 +828,9 @@ export class TeamsService {
         eventGuests: {
           some: {
             isHost: isHost,
-          }
-        }
-      }
+          },
+        },
+      };
     }
     return {};
   }
