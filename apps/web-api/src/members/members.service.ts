@@ -751,7 +751,7 @@ export class MembersService {
     const directFields = [
       'name', 'email', 'githubHandler', 'discordHandler', 'bio',
       'twitterHandler', 'linkedinHandler', 'telegramHandler',
-      'officeHours', 'moreDetails', 'plnStartDate', 'openToWork',
+      'officeHours', 'moreDetails', 'plnStartDate', 'plnFriend', 'openToWork',
       'isVerified', 'signUpSource', 'signUpMedium', 'signUpCampaign',
       'isUserConsent', 'isSubscribedToNewsletter', 'teamOrProjectURL',
     ];
