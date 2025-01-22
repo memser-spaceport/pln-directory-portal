@@ -21,6 +21,18 @@ const APP_CONSTANTS = {
   V1: '/v1/',
 };
 
+export const TABLE_SORT_ICONS = {
+  DEFAULT: '/assets/icons/group.svg',
+  ASCENDING: '/assets/icons/sort-asc-blue.svg',
+  DESCENDING: '/assets/icons/sort-desc-blue.svg'
+}
+
+export const TABLE_SORT_VALUES = {
+  DEFAULT: 'DEFAULT',
+  ASCENDING: 'ASCENDING',
+  DESCENDING:'DESCENDING',
+}
+
 export const ENROLLMENT_TYPE = {
   MEMBER: 'MEMBER',
   TEAM: 'TEAM',
