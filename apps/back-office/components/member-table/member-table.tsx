@@ -11,13 +11,20 @@ const MemberTable = (props: any) => {
   const selectedTab = props?.selectedTab ?? '';
   const updateMembers = props?.updateMembers;
   const members = props?.allMembers ?? [];
-  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [isAllSelected, setIsAllSelected] = useState<boolean>(false);
   const [selectedMembers, setSelectedMembes] = useState([]);
   const [allMembers, setAllMembers] = useState(members);
-  const [isLoading, setIsLoading] = useState(false);
-  const [openModal, setOpenModal] = useState(false);
+  const [sortOrder, setSortOrder] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [openModal, setOpenModal] = useState<boolean>(false);
   const [rejectId, setRejectId] = useState([]);
-
+  const sortImg =
+    sortOrder === 0
+      ? '/assets/icons/group.svg'
+      : sortOrder === 1
+      ? '/assets/icons/sort-asc-blue.svg'
+      : '/assets/icons/sort-desc-blue.svg';
+      
   const onSelectAllClickHandler = () => {
     setIsAllSelected(!isAllSelected);
     if (isAllSelected) {
@@ -27,14 +34,19 @@ const MemberTable = (props: any) => {
     }
   };
 
-  const onSortAscendingByMemberName = () => {
-    const sortedMembers = [...allMembers].sort((a, b) => a.name.localeCompare(b.name));
-    setAllMembers(sortedMembers);
-  };
-
-  const onSortDescendingByMemberName = () => {
-    const sortedMembers = [...allMembers].sort((a, b) => b.name.localeCompare(a.name));
-    setAllMembers(sortedMembers);
+  const onSortMembersByName = () => {
+    if (sortOrder === 0) {
+      const sortedMembers = [...allMembers].sort((member1, member2) => member1.name.localeCompare(member2.name));
+      setAllMembers(sortedMembers);
+      setSortOrder(1);
+    } else if (sortOrder === 1) {
+      const sortedMembers = [...allMembers].sort((member1, member2) => member2.name.localeCompare(member1.name));
+      setAllMembers(sortedMembers);
+      setSortOrder(2);
+    } else {
+      setAllMembers(members);
+      setSortOrder(0);
+    }
   };
 
   useEffect(() => {
@@ -227,18 +239,7 @@ const MemberTable = (props: any) => {
                   className="flex h-[18px] w-[18px] flex-col items-center justify-center rounded"
                   style={{ backgroundColor: '#E2E8F0' }}
                 >
-                  <img
-                    src="/assets/images/ascending_icon.svg"
-                    alt="Group"
-                    className="cursor-pointer"
-                    onClick={onSortAscendingByMemberName}
-                  />
-                  <img
-                    src="/assets/images/descending_icon.svg"
-                    alt="Group"
-                    className="cursor-pointer"
-                    onClick={onSortDescendingByMemberName}
-                  />
+                  <img src={sortImg} alt="Group" className="cursor-pointer" onClick={onSortMembersByName} />
                 </div>
               </div>
             </div>
