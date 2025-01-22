@@ -21,7 +21,6 @@ const server = initNestServer(apiMemberSubscriptions);
 type RouteShape = typeof server.routeShapes;
 
 @Controller()
-@UseGuards(UserTokenValidation)
 export class MemberSubscriptionController {
   constructor(
     private readonly memberFollowService: MemberSubscriptionService,
@@ -30,6 +29,7 @@ export class MemberSubscriptionController {
 
   @Api(apiMemberSubscriptions.createSubscription)
   @UsePipes(ZodValidationPipe)
+  @UseGuards(UserTokenValidation)
   async createSubscription(
     @Body() body: CreateMemberSubscriptionDto, 
     @Req() request
@@ -40,6 +40,7 @@ export class MemberSubscriptionController {
   }
 
   @Api(apiMemberSubscriptions.modifySubscription)
+  @UseGuards(UserTokenValidation)
   async modifySubscription(
     @Param('uid') uid: string,
     @Body() body: UpdateMemberSubscriptionDto,
