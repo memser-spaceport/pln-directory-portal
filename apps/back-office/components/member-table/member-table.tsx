@@ -1,5 +1,11 @@
 import api from 'apps/back-office/utils/api';
-import APP_CONSTANTS, { API_ROUTE, ENROLLMENT_TYPE, ROUTE_CONSTANTS } from 'apps/back-office/utils/constants';
+import APP_CONSTANTS, {
+  API_ROUTE,
+  ENROLLMENT_TYPE,
+  ROUTE_CONSTANTS,
+  TABLE_SORT_ICONS,
+  TABLE_SORT_VALUES,
+} from 'apps/back-office/utils/constants';
 import router from 'next/router';
 import { Fragment, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
@@ -14,17 +20,11 @@ const MemberTable = (props: any) => {
   const [isAllSelected, setIsAllSelected] = useState<boolean>(false);
   const [selectedMembers, setSelectedMembes] = useState([]);
   const [allMembers, setAllMembers] = useState(members);
-  const [sortOrder, setSortOrder] = useState<number>(0);
+  const [sortOrder, setSortOrder] = useState(TABLE_SORT_VALUES.DEFAULT);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [openModal, setOpenModal] = useState<boolean>(false);
   const [rejectId, setRejectId] = useState([]);
-  const sortImg =
-    sortOrder === 0
-      ? '/assets/icons/group.svg'
-      : sortOrder === 1
-      ? '/assets/icons/sort-asc-blue.svg'
-      : '/assets/icons/sort-desc-blue.svg';
-      
+
   const onSelectAllClickHandler = () => {
     setIsAllSelected(!isAllSelected);
     if (isAllSelected) {
@@ -35,19 +35,26 @@ const MemberTable = (props: any) => {
   };
 
   const onSortMembersByName = () => {
-    if (sortOrder === 0) {
+    const sortOrderKeys = Object.keys(TABLE_SORT_VALUES);
+    const currentSortIndex = sortOrderKeys.indexOf(sortOrder);
+    const nextSortIndex = (currentSortIndex + 1) % sortOrderKeys.length;
+    const nextSortOrder = sortOrderKeys[nextSortIndex];
+
+    if (nextSortOrder === TABLE_SORT_VALUES.ASCENDING) {
       const sortedMembers = [...allMembers].sort((member1, member2) => member1.name.localeCompare(member2.name));
       setAllMembers(sortedMembers);
-      setSortOrder(1);
-    } else if (sortOrder === 1) {
+      setSortOrder(nextSortOrder);
+    } else if (nextSortOrder === TABLE_SORT_VALUES.DESCENDING) {
       const sortedMembers = [...allMembers].sort((member1, member2) => member2.name.localeCompare(member1.name));
       setAllMembers(sortedMembers);
-      setSortOrder(2);
+      setSortOrder(nextSortOrder);
     } else {
       setAllMembers(members);
-      setSortOrder(0);
+      setSortOrder(nextSortOrder);
     }
   };
+  const sortImg = TABLE_SORT_ICONS[sortOrder];
+
 
   useEffect(() => {
     setAllMembers(members);
