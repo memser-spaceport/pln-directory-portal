@@ -879,36 +879,4 @@ export class PLEventGuestsService {
     }
   }
 
-  private async notifySubscribers(guests, entityUid, actionType, requestorEmail) {
-    const notification = await this.notificationService.getNotificationPayload(entityUid, actionType);
-    switch (actionType) {
-      case "HOST_SPEAKER_ADDED":
-        await Promise.all(
-          guests.events.map(async (event) => {
-            if ((event.isHost || event.isSpeaker) && !(event.isHost && event.isSpeaker)) {
-              let role = event.isHost ? 'Host' : 'Speaker';
-              const payload = await this.buildHostSpeakerAdditonPayload(guests.memberUid, event, notification, requestorEmail, role);
-              await this.notificationService.sendNotification(payload);
-            } else if (event.isHost && event.isSpeaker) {
-              let role = "Host/Speaker"
-              const payload = await this.buildHostSpeakerAdditonPayload(guests.memberUid, event, notification, requestorEmail, role);
-              await this.notificationService.sendNotification(payload);
-            }
-          }
-          )
-        );
-    }
-  }
-
-  private async buildHostSpeakerAdditonPayload(memberUid, event, notification, requestorEmail, role) {
-    const requestor = await this.memberService.findMemberByEmail(requestorEmail);
-    notification.additionalInfo = {
-      memberUid: memberUid,
-      eventUid: event.uid,
-      sourceUid: requestor.uid,
-      sourceName: requestor.name,
-      guestType: role
-    }
-    return notification;
-  }
-}
+ }

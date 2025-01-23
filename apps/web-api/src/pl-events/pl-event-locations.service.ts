@@ -9,13 +9,20 @@ import {
   FormattedLocationWithEvents,
   PLEvent
 } from './pl-event-locations.types';
+import { Cron } from '@nestjs/schedule';
+import { NotificationService } from '../notifications/notifications.service';
+import { IRL_THRESHOLD } from '../utils/constants';
+import { MembersService } from '../members/members.service';
+import { isEmpty } from 'lodash';
 
 @Injectable()
 export class PLEventLocationsService {
   constructor(
     private prisma: PrismaService,
     private logger: LogService,
-    private memberSubscriptionService: MemberSubscriptionService
+    private memberSubscriptionService: MemberSubscriptionService,
+    private memberService: MembersService,
+    private notificationService: NotificationService
   ) { }
 
   /**
@@ -169,11 +176,11 @@ export class PLEventLocationsService {
   groupEventGuestsByMemberUidAndTeamUid(eventGuests: {
     member: { uid: string; image?: { url: string } | null };
     teamUid: string | null;
-  }[]){
-    const groupedGuests = {}; 
+  }[]) {
+    const groupedGuests = {};
     eventGuests?.forEach((guest) => {
       const key = `${guest.member.uid}-${guest.teamUid}`;
-      if (!groupedGuests[key]) 
+      if (!groupedGuests[key])
         groupedGuests[key] = {
           member: guest.member,
           teamUid: guest.teamUid
@@ -286,7 +293,180 @@ export class PLEventLocationsService {
         entityAction: action 
       });
     } catch (error) {
-      this.handleErrors(error);  
+      this.handleErrors(error);
     }
   }
+
+  @Cron('10 * * * * *')
+  async handleCron() {
+    try {
+      const query: any = `
+      WITH LatestNotificationDate AS (
+  SELECT 
+    n."entityUid", 
+    MAX(n."createdAt") AS latest_createdAt
+  FROM "Notification" n
+  WHERE n."status"='SENT'
+  GROUP BY n."entityUid"
+)
+SELECT
+  el."uid",
+  el."location",
+  CASE 
+    WHEN COUNT(events.uid) > 0 THEN 
+      jsonb_agg(
+        DISTINCT jsonb_build_object(
+          'uid', events.uid,
+          'name', events.name
+        )
+      ) 
+    ELSE '[null]'::jsonb 
+  END AS events,
+
+  jsonb_agg(
+    DISTINCT CASE
+      WHEN pg."isHost" THEN 
+        jsonb_build_object(
+          'uid', pg."memberUid",
+          'name', m."name"
+        )
+      ELSE NULL
+    END
+  ) FILTER (
+    WHERE pg."isHost" = TRUE 
+      AND (
+        (DATE(pg."createdAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid")  
+          OR (DATE(pg."createdAt") >= CURRENT_DATE))
+        OR (DATE(pg."updatedAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid"))
+        OR (DATE(pg."updatedAt") >= CURRENT_DATE)
+      )
+  ) AS hosts,
+
+  jsonb_agg(
+    DISTINCT CASE
+      WHEN pg."isSpeaker" THEN 
+        jsonb_build_object(
+          'uid', pg."memberUid",
+          'name', m."name"
+        )
+      ELSE NULL
+    END
+  ) FILTER (
+    WHERE pg."isSpeaker" = TRUE 
+      AND (
+        (DATE(pg."createdAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid")  
+          OR (DATE(pg."createdAt") >= CURRENT_DATE))
+        OR (DATE(pg."updatedAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid"))
+        OR (DATE(pg."updatedAt") >= CURRENT_DATE)
+      )
+  ) AS speakers,
+
+  jsonb_build_object(
+    'speakerCount', COUNT(
+      CASE WHEN (
+        (DATE(pg."updatedAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid")
+          OR DATE(pg."updatedAt") >= CURRENT_DATE) 
+        OR (DATE(pg."createdAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") 
+          OR DATE(pg."createdAt") >= CURRENT_DATE)
+      ) AND pg."isSpeaker" THEN 1 END
+    ),
+  
+    'hostCount', COUNT(
+      CASE WHEN (
+        (DATE(pg."updatedAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") 
+          OR DATE(pg."updatedAt") >= CURRENT_DATE) 
+        OR (DATE(pg."createdAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") 
+          OR DATE(pg."createdAt") >= CURRENT_DATE)
+      ) AND pg."isHost" THEN 1 END
+    ), 
+
+    'eventCount', COUNT(DISTINCT events.uid)
+  ) AS participantCount
+
+FROM
+  "PLEventLocation" el
+  JOIN "PLEvent" e ON e."locationUid" = el.uid
+  LEFT JOIN "PLEventGuest" pg ON pg."eventUid" = e.uid
+  LEFT JOIN "Member" m ON m."uid" = pg."memberUid"
+  LEFT JOIN (
+    SELECT DISTINCT
+      e."locationUid",
+      e."uid",
+      e."name"
+    FROM "PLEvent" e
+    WHERE 
+      (DATE(e."updatedAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid") 
+        OR DATE(e."updatedAt") >= CURRENT_DATE) 
+      OR (DATE(e."createdAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid") 
+        OR DATE(e."createdAt") >= CURRENT_DATE)
+  ) AS events ON events."locationUid" = el."uid"
+GROUP BY
+  el."uid",
+  el."location";
+`
+
+      const locations = await this.prisma.$queryRawUnsafe(query);
+      await this.notifySubscribers(locations)
+    } catch (error) {
+
+      this.handleErrors(error)
+    }
+  }
+
+  private async notifySubscribers(data) {
+    await Promise.all(
+      data.map(async (location) => {
+        const participantsCount = await (location.participantcount.hostCount + location.participantcount.speakerCount + location.participantcount.eventCount)
+        if (participantsCount >= IRL_THRESHOLD) {
+          const notification = await this.notificationService.getNotificationPayload(location.uid, "IRL_UPDATE");
+          const payload = await this.buildConsolidatedEmailPayload(location, notification);
+          await this.notificationService.sendNotification(payload)
+        }
+      })
+    );
+  }
+
+  private async buildConsolidatedEmailPayload(locationData, notification) {
+    const requestor = await this.memberService.findMemberByRole();
+    notification.additionalInfo = {
+      subscriberName: "John Doe",
+      location: locationData.location,
+      rsvpLink: process.env.IRL_BASEURL,
+      irlPageLink: process.env.IRL_BASEURL,
+      speakers: await this.buildGuestPayload(locationData.speakers, process.env.IRL_GUEST_BASEUR) || [],
+      hosts: await this.buildGuestPayload(locationData.hosts, process.env.IRL_GUEST_BASEUR) || [],
+      events: await this.buildEventsPayload(locationData.events, process.env.IRL_BASEURL, locationData.location) || [],
+      sourceUid: requestor?.uid,
+      sourceName: requestor?.name,
+      guestBaseUrl: process.env.IRL_GUEST_BASEURL,
+      irlBaseUrl: process.env.IRL_BASEURL,
+      hostCount: locationData.participantcount.hostCount,
+      speakerCount: locationData.participantcount.speakerCount,
+      eventCount: locationData.participantcount.eventCount,
+    }
+    return notification;
+  }
+
+  private async buildEventsPayload(events, baseUrl, location) {
+    if (isEmpty(events)) {
+      return []
+    }
+    await events.slice(0, 3).map(event => {
+      const eventUrl = `${baseUrl}?${location}`;
+      event.url = eventUrl;
+    });
+    return events;
+  }
+
+  private async buildGuestPayload(guests, baseUrl) {
+    if (isEmpty(guests)) {
+      return []
+    }
+    return guests.slice(0, 3).map(guest => {
+      const guestUrl = `${baseUrl}/${guest.uid}`;
+      guest.url = guestUrl;
+      return guest;
+    });
+  }
 }
+
