@@ -305,7 +305,7 @@ export class PLEventLocationsService {
    * It queries the database for location data associated with events, hosts, speakers, and participant counts.
    * After retrieving the data, it notifies subscribers if certain threshold is met
    */
-  @Cron(process.env.IRL_NOTIFICATION_CRON || '0 0 * * *')
+  @Cron( process.env.IRL_NOTIFICATION_CRON || '0 0 * * *')
   async handleCron() {
     try {
       this.logger.info('Notification initiated by cron');
@@ -412,10 +412,10 @@ export class PLEventLocationsService {
             eventCount = location?.events.length;
           }
           if (location.hosts?.length) {
-            hostCount = location?.events?.length;
+            hostCount = location?.events.length;
           }
           if (location.speakers?.length) {
-            speakerCount = location?.speakers?.length;
+            speakerCount = location?.speakers.length;
           }
 
           participantsCount = hostCount + speakerCount + eventCount;
@@ -472,7 +472,12 @@ export class PLEventLocationsService {
     if (isEmpty(events)) {
       return []
     }
-    await events.slice(0, 3).map(event => {           //pass only the first three events in email payload
+    console.log("EVENTS --- "+JSON.stringify(events))
+    await events?.slice(0, 3)?.map(event => {   
+      if(!event || event==null) {
+        return ;
+      }
+      console.log("event-payload  ----- "+JSON.stringify(event))        //pass only the first three events in email payload
       const eventUrl = `${baseUrl}?location=${location}`;
       event.url = eventUrl;
     });
@@ -490,7 +495,10 @@ export class PLEventLocationsService {
     if (isEmpty(guests)) {
       return []
     }
-    await guests.slice(0, 3).map(guest => {                 //pass only the first three guests in email payload
+    await guests?.slice(0, 3)?.map(guest => {  
+      if(!guest || guest==null) {
+        return ;
+      }               //pass only the first three guests in email payload
       const guestUrl = `${baseUrl}/${guest.uid}`;
       guest.url = guestUrl;
     });
