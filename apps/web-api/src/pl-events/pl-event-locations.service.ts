@@ -301,7 +301,7 @@ export class PLEventLocationsService {
    * It queries the database for location data associated with events, hosts, speakers, and participant counts.
    * After retrieving the data, it notifies subscribers if certain threshold is met
    */
-  @Cron('10 * * * * *')
+  @Cron('* 10 * * * *')
   async handleCron() {
     try {
       const query: any = `
