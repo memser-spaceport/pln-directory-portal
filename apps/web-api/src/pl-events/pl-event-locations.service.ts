@@ -388,6 +388,7 @@ export class PLEventLocationsService {
       const locations = await this.prisma.$queryRawUnsafe(query);
       await this.notifySubscribers(locations)
     } catch (error) {
+      console.log("cron_error-----"+JSON.stringify(error))
       this.handleErrors(error)
     }
   }
@@ -426,6 +427,7 @@ export class PLEventLocationsService {
         })
       );
     } catch (error) {
+      console.log("payload_error-----"+JSON.stringify(error))
       this.handleErrors(error)
     }
   }
