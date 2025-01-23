@@ -162,6 +162,13 @@ export class NotificationConsumer {
     }
   }
 
+  /**
+   * Generates an action-specific email payload based on the notification's action type.
+   * @param message - The base email notification message payload.
+   * @param notificationData - The data related to the notification, including action type and additional info.
+   * @param subscriber - The subscriber details, including member information.
+   * @returns The complete email payload tailored for the specific action type.
+   */
   private async generateEmailPayloadForIRLUpdates(message, notificationData, subscriber) {
     message.templateName = EMAIL_TEMPLATES.IRL_UPDATES;
     message.actionType = notificationData.entityAction;
@@ -181,6 +188,12 @@ export class NotificationConsumer {
     return message;
   }
 
+  /**
+   * adds subscriber email addresses in bcc.
+   * @param emailPayload  The base email notification message payload.
+   * @param subscribers The subscriber details, including member information.
+   * @returns The complete email payload tailored for the specific action type.
+   */
   private async addEmailRecipients(emailPayload, subscribers) {
     const subscriberEmails = subscribers.flatMap(subscriber => [subscriber.member.email]);
     emailPayload.recipientsInfo.bcc = subscriberEmails;
