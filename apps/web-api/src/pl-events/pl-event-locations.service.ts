@@ -273,10 +273,10 @@ export class PLEventLocationsService {
    * @throws {Error} - If an error occurs during the subscription process, it will be passed to the `handleErrors` method.
    *
    */
-  async subscribeLocationByUid(uid: string, memberUid: string, action:string="Default") {
+  async subscribeLocationByUid(uid: string, memberUid: string, action: string = "Default") {
     try {
-      const subscriptions = await this.memberSubscriptionService.getSubscriptions({ 
-        where: { 
+      const subscriptions = await this.memberSubscriptionService.getSubscriptions({
+        where: {
           memberUid,
           entityUid: uid,
           entityAction: action
@@ -290,120 +290,114 @@ export class PLEventLocationsService {
         memberUid,
         entityUid: uid,
         entityType: SubscriptionEntityType.EVENT_LOCATION,
-        entityAction: action 
+        entityAction: action
       });
     } catch (error) {
       this.handleErrors(error);
     }
   }
 
+  /**
+   * This method is executed on a cron schedule every two days once
+   * It queries the database for location data associated with events, hosts, speakers, and participant counts.
+   * After retrieving the data, it notifies subscribers if certain threshold is met
+   */
   @Cron('10 * * * * *')
   async handleCron() {
     try {
       const query: any = `
-      WITH LatestNotificationDate AS (
-  SELECT 
-    n."entityUid", 
-    MAX(n."createdAt") AS latest_createdAt
-  FROM "Notification" n
-  WHERE n."status"='SENT'
-  GROUP BY n."entityUid"
-)
-SELECT
-  el."uid",
-  el."location",
-  CASE 
-    WHEN COUNT(events.uid) > 0 THEN 
-      jsonb_agg(
-        DISTINCT jsonb_build_object(
-          'uid', events.uid,
-          'name', events.name
+        WITH LatestNotificationDate AS (
+          SELECT 
+            n."entityUid", 
+            MAX(n."createdAt") AS latest_createdAt
+          FROM "Notification" n
+          WHERE n."status"='SENT'   -- Get the latest 'createdAt' for each 'entityUid' where status is 'SENT'
+          GROUP BY n."entityUid"    -- Group by entityUid to get the latest created date for each entity
         )
-      ) 
-    ELSE '[null]'::jsonb 
-  END AS events,
+        SELECT
+          el."uid",
+          el."location",
+          CASE                                -- cases to seggregate data into hosts and speakers 
+            WHEN COUNT(events.uid) > 0 THEN   -- Aggregate the events if exists
+              jsonb_agg(                      -- Aggregate distinct events as JSON objects
+                DISTINCT jsonb_build_object(
+                'uid', events.uid,
+                'name', events.name
+                )
+              ) 
+            ELSE '[null]'::jsonb 
+          END AS events,
 
-  jsonb_agg(
-    DISTINCT CASE
-      WHEN pg."isHost" THEN 
+        jsonb_agg(
+          DISTINCT CASE
+            WHEN pg."isHost" THEN       -- Aggregate guests if the participant is a host
+              jsonb_build_object(
+                'uid', pg."memberUid",
+                'name', m."name"
+              )
+            ELSE NULL
+          END
+          ) FILTER (                -- Filter hosts by created/updated at or after latest notification date, or today
+          WHERE pg."isHost" = TRUE 
+            AND (                              
+              (DATE(pg."createdAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") OR (DATE(pg."createdAt") >= CURRENT_DATE))
+              OR (DATE(pg."updatedAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid")) OR (DATE(pg."updatedAt") >= CURRENT_DATE)
+            )
+        ) AS hosts,
+
+        jsonb_agg(
+          DISTINCT CASE
+            WHEN pg."isSpeaker" THEN      -- Aggregate guests if the participant is a speaker
+              jsonb_build_object(
+                'uid', pg."memberUid",
+                'name', m."name"
+              )
+            ELSE NULL
+          END
+        ) FILTER (                    -- Filter speakers by created/updated at or after latest notification date, or today
+            WHERE pg."isSpeaker" = TRUE 
+              AND (
+                (DATE(pg."createdAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") OR (DATE(pg."createdAt") >= CURRENT_DATE))
+                OR (DATE(pg."updatedAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid")) OR (DATE(pg."updatedAt") >= CURRENT_DATE)
+          )
+        ) AS speakers,
+
         jsonb_build_object(
-          'uid', pg."memberUid",
-          'name', m."name"
-        )
-      ELSE NULL
-    END
-  ) FILTER (
-    WHERE pg."isHost" = TRUE 
-      AND (
-        (DATE(pg."createdAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid")  
-          OR (DATE(pg."createdAt") >= CURRENT_DATE))
-        OR (DATE(pg."updatedAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid"))
-        OR (DATE(pg."updatedAt") >= CURRENT_DATE)
-      )
-  ) AS hosts,
-
-  jsonb_agg(
-    DISTINCT CASE
-      WHEN pg."isSpeaker" THEN 
-        jsonb_build_object(
-          'uid', pg."memberUid",
-          'name', m."name"
-        )
-      ELSE NULL
-    END
-  ) FILTER (
-    WHERE pg."isSpeaker" = TRUE 
-      AND (
-        (DATE(pg."createdAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid")  
-          OR (DATE(pg."createdAt") >= CURRENT_DATE))
-        OR (DATE(pg."updatedAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid"))
-        OR (DATE(pg."updatedAt") >= CURRENT_DATE)
-      )
-  ) AS speakers,
-
-  jsonb_build_object(
-    'speakerCount', COUNT(
-      CASE WHEN (
-        (DATE(pg."updatedAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid")
-          OR DATE(pg."updatedAt") >= CURRENT_DATE) 
-        OR (DATE(pg."createdAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") 
-          OR DATE(pg."createdAt") >= CURRENT_DATE)
-      ) AND pg."isSpeaker" THEN 1 END
-    ),
+          'speakerCount', COUNT(    -- count of new speakers added after latest notification date, or today
+            CASE WHEN (
+              (DATE(pg."updatedAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") OR DATE(pg."updatedAt") >= CURRENT_DATE) 
+              OR (DATE(pg."createdAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") OR DATE(pg."createdAt") >= CURRENT_DATE)
+            ) AND pg."isSpeaker" THEN 1 END
+          ),
   
-    'hostCount', COUNT(
-      CASE WHEN (
-        (DATE(pg."updatedAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") 
-          OR DATE(pg."updatedAt") >= CURRENT_DATE) 
-        OR (DATE(pg."createdAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") 
-          OR DATE(pg."createdAt") >= CURRENT_DATE)
-      ) AND pg."isHost" THEN 1 END
-    ), 
+          'hostCount', COUNT(      -- count of new hosts added after latest notification date, or today
+            CASE WHEN (
+              (DATE(pg."updatedAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") OR DATE(pg."updatedAt") >= CURRENT_DATE) 
+              OR (DATE(pg."createdAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") OR DATE(pg."createdAt") >= CURRENT_DATE)
+            ) AND pg."isHost" THEN 1 END
+          ), 
 
-    'eventCount', COUNT(DISTINCT events.uid)
-  ) AS participantCount
+          'eventCount', COUNT(DISTINCT events.uid)   --count of new events added after latest notification date,or today
+        ) AS participantCount
 
-FROM
-  "PLEventLocation" el
-  JOIN "PLEvent" e ON e."locationUid" = el.uid
-  LEFT JOIN "PLEventGuest" pg ON pg."eventUid" = e.uid
-  LEFT JOIN "Member" m ON m."uid" = pg."memberUid"
-  LEFT JOIN (
-    SELECT DISTINCT
-      e."locationUid",
-      e."uid",
-      e."name"
-    FROM "PLEvent" e
-    WHERE 
-      (DATE(e."updatedAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid") 
-        OR DATE(e."updatedAt") >= CURRENT_DATE) 
-      OR (DATE(e."createdAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid") 
-        OR DATE(e."createdAt") >= CURRENT_DATE)
-  ) AS events ON events."locationUid" = el."uid"
-GROUP BY
-  el."uid",
-  el."location";
-`
+      FROM
+        "PLEventLocation" el
+        JOIN "PLEvent" e ON e."locationUid" = el.uid
+        LEFT JOIN "PLEventGuest" pg ON pg."eventUid" = e.uid
+        LEFT JOIN "Member" m ON m."uid" = pg."memberUid"
+        LEFT JOIN (
+          SELECT DISTINCT
+            e."locationUid",
+            e."uid",
+            e."name"
+          FROM "PLEvent" e
+          WHERE               --fetch the events added after latest notification date,or today
+            (DATE(e."updatedAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid") OR DATE(e."updatedAt") >= CURRENT_DATE) 
+            OR (DATE(e."createdAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid") OR DATE(e."createdAt") >= CURRENT_DATE)
+           ) AS events ON events."locationUid" = el."uid"
+      GROUP BY
+        el."uid",
+        el."location";`
 
       const locations = await this.prisma.$queryRawUnsafe(query);
       await this.notifySubscribers(locations)
@@ -413,6 +407,15 @@ GROUP BY
     }
   }
 
+  /**
+   * Notifies subscribers based on the fetched location.
+   * 
+   * @param {Array} data - The location data containing the data about latest updates.
+   * 
+   * This method loops through each location and checks for latest updates
+   * if exceeds a threshold (IRL_THRESHOLD) it constructs and sends an email 
+   * notification to the subscribers for that location.
+   */
   private async notifySubscribers(data) {
     await Promise.all(
       data.map(async (location) => {
@@ -426,13 +429,20 @@ GROUP BY
     );
   }
 
+  /**
+   * Builds the consolidated email payload for the notification.
+   * 
+   * @param locationData Data containing records of latest updates in a specific location.
+   * @param notification The notification payload to be sent.
+   * @returns The updated notification payload with additional information for email.
+   */
   private async buildConsolidatedEmailPayload(locationData, notification) {
     const requestor = await this.memberService.findMemberByRole();
     notification.additionalInfo = {
       subscriberName: "John Doe",
       location: locationData.location,
       rsvpLink: process.env.IRL_BASEURL,
-      irlPageLink: process.env.IRL_BASEURL,
+      irlPageLink: `${process.env.IRL_BASEURL}?location=${locationData.location}`,
       speakers: await this.buildGuestPayload(locationData.speakers, process.env.IRL_GUEST_BASEUR) || [],
       hosts: await this.buildGuestPayload(locationData.hosts, process.env.IRL_GUEST_BASEUR) || [],
       events: await this.buildEventsPayload(locationData.events, process.env.IRL_BASEURL, locationData.location) || [],
@@ -447,26 +457,41 @@ GROUP BY
     return notification;
   }
 
+  /**
+   * Builds the events payload for the email based on the events data.
+   * 
+   * @param events The list of events associated with the location.
+   * @param baseUrl The base URL for events.
+   * @param location The location associated with the events.
+   * @returns modified events list with URLs.
+   */
   private async buildEventsPayload(events, baseUrl, location) {
     if (isEmpty(events)) {
       return []
     }
-    await events.slice(0, 3).map(event => {
-      const eventUrl = `${baseUrl}?${location}`;
+    await events.slice(0, 3).map(event => {           //pass only the first three events in email payload
+      const eventUrl = `${baseUrl}?location=${location}`;
       event.url = eventUrl;
     });
     return events;
   }
 
+  /**
+   * Builds the guests payload for the email based on the guest data.
+   * 
+   * @param guests The list of guests added as host/speaker.
+   * @param baseUrl The base URL for member.
+   * @returns modified guests list with URLs.
+   */
   private async buildGuestPayload(guests, baseUrl) {
     if (isEmpty(guests)) {
       return []
     }
-    return guests.slice(0, 3).map(guest => {
+    await guests.slice(0, 3).map(guest => {                 //pass only the first three guests in email payload
       const guestUrl = `${baseUrl}/${guest.uid}`;
       guest.url = guestUrl;
-      return guest;
     });
+    return guests;
   }
 }
 
