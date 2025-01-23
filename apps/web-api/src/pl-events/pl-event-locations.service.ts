@@ -301,7 +301,7 @@ export class PLEventLocationsService {
    * It queries the database for location data associated with events, hosts, speakers, and participant counts.
    * After retrieving the data, it notifies subscribers if certain threshold is met
    */
-  @Cron('* 10 * * * *')
+  @Cron(process.env.IRL_NOTIFICATION_CRON || '0 0 * * *')
   async handleCron() {
     try {
       const query: any = `
@@ -359,25 +359,7 @@ export class PLEventLocationsService {
                 (DATE(pg."createdAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") OR (DATE(pg."createdAt") >= CURRENT_DATE))
                 OR (DATE(pg."updatedAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid")) OR (DATE(pg."updatedAt") >= CURRENT_DATE)
           )
-        ) AS speakers,
-
-        jsonb_build_object(
-          'speakerCount', COUNT(    -- count of new speakers added after latest notification date, or today
-            CASE WHEN (
-              (DATE(pg."updatedAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") OR DATE(pg."updatedAt") >= CURRENT_DATE) 
-              OR (DATE(pg."createdAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") OR DATE(pg."createdAt") >= CURRENT_DATE)
-            ) AND pg."isSpeaker" THEN 1 END
-          ),
-  
-          'hostCount', COUNT(      -- count of new hosts added after latest notification date, or today
-            CASE WHEN (
-              (DATE(pg."updatedAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") OR DATE(pg."updatedAt") >= CURRENT_DATE) 
-              OR (DATE(pg."createdAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") OR DATE(pg."createdAt") >= CURRENT_DATE)
-            ) AND pg."isHost" THEN 1 END
-          ), 
-
-          'eventCount', COUNT(DISTINCT events.uid)   --count of new events added after latest notification date,or today
-        ) AS participantCount
+        ) AS speakers
 
       FROM
         "PLEventLocation" el
@@ -401,7 +383,6 @@ export class PLEventLocationsService {
       const locations = await this.prisma.$queryRawUnsafe(query);
       await this.notifySubscribers(locations)
     } catch (error) {
-
       this.handleErrors(error)
     }
   }
@@ -416,16 +397,32 @@ export class PLEventLocationsService {
    * notification to the subscribers for that location.
    */
   private async notifySubscribers(data) {
-    await Promise.all(
-      data.map(async (location) => {
-        const participantsCount = await (location.participantcount.hostCount + location.participantcount.speakerCount + location.participantcount.eventCount)
-        if (participantsCount >= Number(process.env.IRL_NOTIFICATION_THRESHOLD) || 3) {
-          const notification = await this.notificationService.getNotificationPayload(location.uid, "IRL_UPDATE");
-          const payload = await this.buildConsolidatedEmailPayload(location, notification);
-          await this.notificationService.sendNotification(payload)
-        }
-      })
-    );
+    try {
+      await Promise.all(
+        data.map(async (location) => {
+          let participantsCount = 0;
+          let hostCount, speakerCount, eventCount;
+          if (location.events?.length) {
+            eventCount = location?.events.length;
+          }
+          if (location.hosts?.length) {
+            hostCount = location?.events?.length;
+          }
+          if (location.speakers?.length) {
+            speakerCount = location?.speakers?.length;
+          }
+
+          participantsCount = hostCount + speakerCount + eventCount;
+          if (participantsCount >= Number(process.env.IRL_NOTIFICATION_THRESHOLD) || 3) {
+            const notification = await this.notificationService.getNotificationPayload(location.uid, "IRL_UPDATE");
+            const payload = await this.buildConsolidatedEmailPayload(location, notification, eventCount, hostCount, speakerCount);
+            await this.notificationService.sendNotification(payload)
+          }
+        })
+      );
+    } catch (error) {
+      this.handleErrors(error)
+    }
   }
 
   /**
@@ -435,7 +432,7 @@ export class PLEventLocationsService {
    * @param notification The notification payload to be sent.
    * @returns The updated notification payload with additional information for email.
    */
-  private async buildConsolidatedEmailPayload(locationData, notification) {
+  private async buildConsolidatedEmailPayload(locationData, notification, eventCount, hostCount, speakerCount) {
     const requestor = await this.memberService.findMemberByRole();
     notification.additionalInfo = {
       subscriberName: "John Doe",
@@ -449,9 +446,9 @@ export class PLEventLocationsService {
       sourceName: requestor?.name,
       guestBaseUrl: process.env.IRL_GUEST_BASEURL,
       irlBaseUrl: process.env.IRL_BASEURL,
-      hostCount: locationData.participantcount.hostCount,
-      speakerCount: locationData.participantcount.speakerCount,
-      eventCount: locationData.participantcount.eventCount,
+      hostCount: hostCount,
+      speakerCount: speakerCount,
+      eventCount: eventCount,
     }
     return notification;
   }
