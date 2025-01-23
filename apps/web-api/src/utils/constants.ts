@@ -191,7 +191,8 @@ export const chatSummaryTemplate = `Given that chat conversation - {{currentConv
 
 export const EMAIL_TEMPLATES :  { [key: string]: string } = {
   "EVENT_ADDED": "EVENT_ADDED",
-  "HOST_SPEAKER_ADDED": "HOST_SPEAKER_ADDED"
+  "HOST_SPEAKER_ADDED": "HOST_SPEAKER_ADDED",
+  "IRL_UPDATES":"IRL_UPDATE"
 };
 
 export const NOTIFICATION_CHANNEL: { [key: string]: string } = {
@@ -201,3 +202,4 @@ export const NOTIFICATION_CHANNEL: { [key: string]: string } = {
 
 export const CREATE = "CREATE";
 export const UPDATE = "UPDATE";
+export const IRL_THRESHOLD = 3;

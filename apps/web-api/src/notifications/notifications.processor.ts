@@ -83,9 +83,7 @@ export class NotificationConsumer {
         include: {
           member: {
             select: {
-              name: true,
               email: true,
-              telegramHandler: true
             }
           }
         }
@@ -106,8 +104,7 @@ export class NotificationConsumer {
       isPriority: true,
       deliveryChannel: NOTIFICATION_CHANNEL.EMAIL,
       templateName: "",
-      recipientAddress: subscriber.member.email,
-      recipientAddressId: subscriber.member.email,
+      recipientsInfo:{},
       deliveryPayload: {
           body: {}
       },
@@ -121,9 +118,9 @@ export class NotificationConsumer {
         activityUserName: notificationData.additionalInfo.sourceName
       },
       targetMeta: {
-        emailId: subscriber.member.email,
-        userId: subscriber.memberUid,
-        userName: subscriber.member.name,
+        emailId:"",
+        userId: "",
+        userName: "",
       }
     }
   }
@@ -139,6 +136,7 @@ export class NotificationConsumer {
     try {
       return await subscribers?.map(async (subscriber) => {
         let payload = this.buildEmailNotificationPayload(notificationData, subscriber);
+        await this.addEmailRecipients(payload, subscribers);
         payload = await this.generateActionSpecificEmailPayload(payload, notificationData, subscriber);
         if (payload)
           this.sendNotification(payload);
@@ -157,62 +155,36 @@ export class NotificationConsumer {
    */
   private async generateActionSpecificEmailPayload(message, notificationData, subscriber) {
     switch (notificationData.entityAction) {
-      case "EVENT_ADDED":
-        return await this.generateEmailPayloadForEventAddition(message, notificationData, subscriber);
-      case "HOST_SPEAKER_ADDED":
-        return await this.generateEmailPayloadForHostAndSpeakerAddition(message, notificationData, subscriber);
+      case "IRL_UPDATE":
+        return await this.generateEmailPayloadForIRLUpdates(message, notificationData, subscriber);
       default:
         return null;
     }
   }
 
-  /**
-   * Generates the email payload for the "EVENT_ADDED" action.
-   * @param message - The base email notification message payload.
-   * @param notificationData - Data related to the event, including name and start date.
-   * @param subscriber - The subscriber details, including member information.
-   * @returns The complete email payload for the event addition action.
-   */
-  private generateEmailPayloadForEventAddition(message, notificationData, subscriber) {
-    message.templateName = EMAIL_TEMPLATES.EVENT_ADDED
+  private async generateEmailPayloadForIRLUpdates(message, notificationData, subscriber) {
+    message.templateName = EMAIL_TEMPLATES.IRL_UPDATES;
     message.actionType = notificationData.entityAction;
     message.deliveryPayload.body = {
-      subscriberName: subscriber.member.name,
-      name: notificationData.additionalInfo.eventName,
-      date: notificationData.additionalInfo.startDate?.split("T")[0],
-      time: notificationData.additionalInfo.startDate?.split("T")[1],
-      location: notificationData.additionalInfo.venue.location,
-      description: notificationData.additionalInfo.eventDescription,
-      opportunityType: "",
+      location: notificationData.additionalInfo.location,
+      rsvpLink: notificationData.additionalInfo.rsvpLink,
+      irlPageLink: notificationData.additionalInfo.irlPageLink,
+      speakers: notificationData.additionalInfo.speakers ,
+      hosts: notificationData.additionalInfo.hosts,
+      events: notificationData.additionalInfo.events,
+      guestBaseUrl: notificationData.additionalInfo.guestBaseUrl,
+      irlBaseUrl: notificationData.additionalInfo.irlBaseUrl,
+      hostCount: notificationData.additionalInfo.hostCount,
+      speakerCount: notificationData.additionalInfo.speakerCount,
+      eventCount: notificationData.additionalInfo.eventCount,
     };
     return message;
   }
 
-  /**
-   * Generates the email payload for the "HOST_SPEAKER_ADDED" action.
-   * @param message - The base email notification message payload.
-   * @param guestData - Data related to the host or speaker, including their unique identifier and event details.
-   * @param subscriber - The subscriber details, including member information.
-   * @returns A Promise that resolves to the complete email payload for the host or speaker addition action.
-   */
-  private async generateEmailPayloadForHostAndSpeakerAddition(message, notificationData, subscriber) {
-    const guest = await this.eventGuestService.getHostAndSpeakerDetailsByUid(notificationData.additionalInfo.memberUid, notificationData.additionalInfo.eventUid);
-    message.templateName = EMAIL_TEMPLATES.HOST_SPEAKER_ADDED;
-    message.actionType = notificationData.entityAction;
-    message.deliveryPayload.body = {
-      subscriberName: subscriber.member.name,
-      eventName: guest?.event.name,
-      location: guest?.event.location?.location,
-      hostName: guest?.member.name,
-      hostBio: guest?.member?.bio?.toString(),
-      topic: guest?.topics.toString(),
-      eventDate: guest?.event.startDate,
-      eventTime: guest?.event.startDate,
-      eventVenue: guest?.event.location?.location,
-      speakerHostName: guest?.member.name,
-      guestType: notificationData.additionalInfo.guestType
-    };
-    return message;
+  private async addEmailRecipients(emailPayload, subscribers) {
+    const subscriberEmails = subscribers.flatMap(subscriber => [subscriber.member.email]);
+    emailPayload.recipientsInfo.bcc = subscriberEmails;
+    return emailPayload;
   }
 
   /**

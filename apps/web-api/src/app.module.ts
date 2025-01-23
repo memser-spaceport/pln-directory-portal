@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import * as redisStore from 'cache-manager-redis-store';
 import { AppController } from './app.controller';
 import { FundingStagesModule } from './funding-stages/funding-stages.module';
@@ -73,6 +74,7 @@ import { NotificationsModule } from './notifications/notifications.module';
         },
       },
     }),
+    ScheduleModule.forRoot(),
     MembersModule,
     HealthModule,
     TeamsModule,
