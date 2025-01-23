@@ -11,7 +11,6 @@ import {
 } from './pl-event-locations.types';
 import { Cron } from '@nestjs/schedule';
 import { NotificationService } from '../notifications/notifications.service';
-import { IRL_THRESHOLD } from '../utils/constants';
 import { MembersService } from '../members/members.service';
 import { isEmpty } from 'lodash';
 
@@ -420,7 +419,7 @@ export class PLEventLocationsService {
     await Promise.all(
       data.map(async (location) => {
         const participantsCount = await (location.participantcount.hostCount + location.participantcount.speakerCount + location.participantcount.eventCount)
-        if (participantsCount >= IRL_THRESHOLD) {
+        if (participantsCount >= Number(process.env.IRL_NOTIFICATION_THRESHOLD) || 3) {
           const notification = await this.notificationService.getNotificationPayload(location.uid, "IRL_UPDATE");
           const payload = await this.buildConsolidatedEmailPayload(location, notification);
           await this.notificationService.sendNotification(payload)
