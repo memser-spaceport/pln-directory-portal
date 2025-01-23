@@ -215,24 +215,24 @@ export class TeamsService {
     await this.prisma.$transaction(async (tx) => {
       const team = await this.formatTeam(teamUid, updatedTeam, tx, 'Update');
       result = await this.updateTeamByUid(teamUid, team, tx);
-      // if (updatedTeam?.teamMemberRoles?.length > 0) {
-      //   for (const teamMemberRole of updatedTeam.teamMemberRoles) {
-      //     const updatedRole = { ...teamMemberRole };
-      //     delete updatedRole.status;
-      //     switch (teamMemberRole?.status) {
-      //       case 'Update':
-      //         await this.updateTeamMemberRoleEntry(updatedRole, tx);
-      //         break;
+      if (updatedTeam?.teamMemberRoles?.length > 0) {
+        for (const teamMemberRole of updatedTeam.teamMemberRoles) {
+          const updatedRole = { ...teamMemberRole };
+          delete updatedRole.status;
+          switch (teamMemberRole?.status) {
+            case 'Update':
+              await this.updateTeamMemberRoleEntry(updatedRole, tx);
+              break;
 
-      //       case 'Delete':
-      //         await this.deleteTeamMemberRoleEntry(updatedRole, tx);
-      //         break;
+            case 'Delete':
+              await this.deleteTeamMemberRoleEntry(updatedRole, tx);
+              break;
 
-      //       default:
-      //         break;
-      //     }
-      //   }
-      // }
+            default:
+              break;
+          }
+        }
+      }
       await this.logParticipantRequest(requestorEmail, updatedTeam, existingTeam.uid, tx);
     });
     this.notificationService.notifyForTeamEditApproval(updatedTeam.name, teamUid, requestorEmail);
@@ -240,22 +240,22 @@ export class TeamsService {
     return result;
   }
 
-  // private async updateTeamMemberRoleEntry(teamAndRole: any, tx: Prisma.TransactionClient) {
-  //   await tx.teamMemberRole.update({
-  //     where: {
-  //       memberUid_teamUid: { memberUid: teamAndRole?.memberUid, teamUid: teamAndRole?.teamUid },
-  //     },
-  //     data: teamAndRole,
-  //   });
-  // }
+  private async updateTeamMemberRoleEntry(teamAndRole: any, tx: Prisma.TransactionClient) {
+    await tx.teamMemberRole.update({
+      where: {
+        memberUid_teamUid: { memberUid: teamAndRole?.memberUid, teamUid: teamAndRole?.teamUid },
+      },
+      data: teamAndRole,
+    });
+  }
 
-  // private async deleteTeamMemberRoleEntry(teamAndRole: any, tx: Prisma.TransactionClient) {
-  //   await tx.teamMemberRole.delete({
-  //     where: {
-  //       memberUid_teamUid: { memberUid: teamAndRole?.memberUid, teamUid: teamAndRole?.teamUid },
-  //     },
-  //   });
-  // }
+  private async deleteTeamMemberRoleEntry(teamAndRole: any, tx: Prisma.TransactionClient) {
+    await tx.teamMemberRole.delete({
+      where: {
+        memberUid_teamUid: { memberUid: teamAndRole?.memberUid, teamUid: teamAndRole?.teamUid },
+      },
+    });
+  }
 
   /**
    * Creates a new team from the participants request data.
@@ -286,10 +286,19 @@ export class TeamsService {
   async formatTeam(teamUid: string | null, teamData: Partial<Team>, tx: Prisma.TransactionClient, type = 'Create') {
     const team: any = {};
     const directFields = [
-      'name', 'blog', 'contactMethod', 'twitterHandler',
-      'linkedinHandler', 'telegramHandler', 'officeHours',
-      'shortDescription','website', 'airtableRecId',
-      'longDescription', 'moreDetails'
+      'name',
+      'blog',
+      'contactMethod',
+      'twitterHandler',
+      'linkedinHandler',
+      'telegramHandler',
+      'officeHours',
+      'shortDescription',
+      'plnFriend',
+      'website',
+      'airtableRecId',
+      'longDescription',
+      'moreDetails',
     ];
     copyObj(teamData, team, directFields);
     // Handle one-to-one or one-to-many mappings
