@@ -262,16 +262,16 @@ export class PLEventLocationsService {
   }
 
   /**
-   * Subscribes a member to a location by its unique identifier.
-   *
-   * @function subscribeLocationByUid
-   * @param {string} uid - The unique identifier of the location to subscribe to.
-   * @param {string} memberUid - The unique identifier of the member subscribing to the location.
-   * @param {string} action - Action to perform
-   * @returns {Promise<Object>} - The subscription object returned from the `createSubscription` method.
-   * @throws {Error} - If an error occurs during the subscription process, it will be passed to the `handleErrors` method.
-   *
-   */
+     * Subscribes a member to a location by its unique identifier.
+     *
+     * @function subscribeLocationByUid
+     * @param {string} uid - The unique identifier of the location to subscribe to.
+     * @param {string} memberUid - The unique identifier of the member subscribing to the location.
+     * @param {string} action - Action to perform
+     * @returns {Promise<Object>} - The subscription object returned from the `createSubscription` method.
+     * @throws {Error} - If an error occurs during the subscription process, it will be passed to the `handleErrors` method.
+     *
+     */
   async subscribeLocationByUid(uid: string, memberUid: string, action: string = "Default") {
     try {
       const subscriptions = await this.memberSubscriptionService.getSubscriptions({
@@ -281,6 +281,10 @@ export class PLEventLocationsService {
           entityAction: action
         }
       });
+      if (subscriptions?.length && !subscriptions[0].isActive) {
+        const subscription = subscriptions[0];
+        return await this.memberSubscriptionService.modifySubscription(subscription.uid, { isActive: true });
+      }
       if (subscriptions?.length) {
         this.logger.info(`Member with uid ${memberUid} is already subscribed to location ${uid}.`);
         return null;
@@ -304,6 +308,7 @@ export class PLEventLocationsService {
   @Cron(process.env.IRL_NOTIFICATION_CRON || '0 0 * * *')
   async handleCron() {
     try {
+      this.logger.info('Notification initiated by cron');
       const query: any = `
         WITH LatestNotificationDate AS (
           SELECT 

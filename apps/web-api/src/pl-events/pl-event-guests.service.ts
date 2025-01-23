@@ -50,7 +50,7 @@ export class PLEventGuestsService {
       const guests = this.formatInputToEventGuests(data);
       const result = await (tx || this.prisma).pLEventGuest.createMany({ data: guests });
       if (type === CREATE)
-        await this.eventLocationsService.subscribeLocationByUid(locationUid, member.uid);
+        await this.eventLocationsService.subscribeLocationByUid(locationUid, data.memberUid);
       this.cacheService.reset({ service: 'PLEventGuest' });
       return result;
     } catch (err) {
