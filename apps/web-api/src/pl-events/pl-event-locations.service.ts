@@ -425,7 +425,6 @@ export class PLEventLocationsService {
             const notification = await this.notificationService.getNotificationPayload(location.uid, "IRL_UPDATE");
             const payload = await this.buildConsolidatedEmailPayload(location, notification, eventCount, hostCount, speakerCount);
             await this.notificationService.sendNotification(payload)
-            await this.delay(5000, location.location);
           } else {
             this.logger.info(`Threshold not reached for sending notification in ${location.location}`)
           }
@@ -506,10 +505,5 @@ export class PLEventLocationsService {
     return selectedGuests;
   }
 
-  // This method creates a delay (pause) in the execution for a specified amount of time
-  private async delay(ms: number, location) {
-    this.logger.info(`Processing underway for ${location}`)
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
 }
 

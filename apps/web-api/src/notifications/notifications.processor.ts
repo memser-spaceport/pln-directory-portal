@@ -54,8 +54,11 @@ export class NotificationConsumer {
           case "EVENT_LOCATION":
             await this.sendEventLocationNotification(subscribers, notificationData);
         }
-        await this.notificationService.updateNotificationStatus(this.createdNotification.uid, NotificationStatus.SENT)
+        await this.notificationService.updateNotificationStatus(this.createdNotification.uid, NotificationStatus.SENT);
+
       }
+      this.logger.info(`Processing ended for id: ${job.id}`);
+      await this.delay(10000);
       return;
     } catch (error) {
       this.logger.error(`Error occured while sending notification`, error);
@@ -283,6 +286,10 @@ export class NotificationConsumer {
       throw new BadRequestException('Database validation error on notification:', error.message);
     }
     throw error;
+  }
+  private async delay(ms: number ) {
+    this.logger.info(`Processing underway `)
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
 }
