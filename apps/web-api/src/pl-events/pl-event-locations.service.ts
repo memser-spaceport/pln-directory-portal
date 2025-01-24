@@ -311,79 +311,77 @@ export class PLEventLocationsService {
     try {
       this.logger.info('Notification initiated by cron');
       const query: any = `
-        WITH LatestNotificationDate AS (
-          SELECT 
-            n."entityUid", 
-            MAX(n."createdAt") AS latest_createdAt
-          FROM "Notification" n
-          WHERE n."status"='SENT' AND "entityType"='EVENT_LOCATION'   
-          GROUP BY n."entityUid"    -- Group by entityUid to get the latest created date for each entity
-        )
-        SELECT
-          el."uid",
-          el."location",
-          CASE                                -- cases to seggregate data into hosts and speakers 
-            WHEN COUNT(events.uid) > 0 THEN   -- Aggregate the events if exists
-              jsonb_agg(                      -- Aggregate distinct events as JSON objects
-                DISTINCT jsonb_build_object(
-                'uid', events.uid,
-                'name', events.name
-                )
-              ) 
-              ELSE NULL
-          END AS events,
-
-        jsonb_agg(
-          DISTINCT CASE
-            WHEN pg."isHost" THEN       -- Aggregate guests if the participant is a host
-              jsonb_build_object(
-                'uid', pg."memberUid",
-                'name', m."name"
-              )
-            ELSE NULL
-          END
-          ) FILTER (                -- Filter hosts by created/updated at or after latest notification date, or today
-          WHERE pg."isHost" = TRUE 
-            AND (                              
-              (DATE(pg."createdAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") OR (DATE(pg."createdAt") >= CURRENT_DATE))
-              OR (DATE(pg."updatedAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid")) OR (DATE(pg."updatedAt") >= CURRENT_DATE)
-            )
-        ) AS hosts,
-
-        jsonb_agg(
-          DISTINCT CASE
-            WHEN pg."isSpeaker" THEN      -- Aggregate guests if the participant is a speaker
-              jsonb_build_object(
-                'uid', pg."memberUid",
-                'name', m."name"
-              )
-            ELSE NULL
-          END
-        ) FILTER (                    -- Filter speakers by created/updated at or after latest notification date, or today
-            WHERE pg."isSpeaker" = TRUE 
-              AND (
-                (DATE(pg."createdAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid") OR (DATE(pg."createdAt") >= CURRENT_DATE))
-                OR (DATE(pg."updatedAt") >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid")) OR (DATE(pg."updatedAt") >= CURRENT_DATE)
-          )
-        ) AS speakers
-
-      FROM
-        "PLEventLocation" el
-        JOIN "PLEvent" e ON e."locationUid" = el.uid
-        LEFT JOIN "PLEventGuest" pg ON pg."eventUid" = e.uid
-        LEFT JOIN "Member" m ON m."uid" = pg."memberUid"
-        LEFT JOIN (
-          SELECT DISTINCT
-            e."locationUid",
-            e."uid",
-            e."name"
-          FROM "PLEvent" e
-          WHERE               --fetch the events added after latest notification date,or today 
-            (DATE(e."createdAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid") OR DATE(e."createdAt") >= CURRENT_DATE)
-           ) AS events ON events."locationUid" = el."uid"
-      GROUP BY
+      WITH LatestNotificationDate AS (
+        SELECT 
+          n."entityUid", 
+          MAX(n."createdAt") AS latest_createdAt
+        FROM "Notification" n
+        WHERE (n."status"='SENT'AND "entityType"='EVENT_LOCATION'   
+        AND n."entityAction"='IRL_UPDATE' )  -- Get the latest 'createdAt' for each 'entityUid' where status is 'SENT'
+        GROUP BY n."entityUid"              -- Group by entityUid to get the latest created date for each entity
+      )
+      SELECT
         el."uid",
-        el."location";`
+        el."location",
+        CASE                                -- cases to seggregate data into hosts and speakers 
+          WHEN COUNT(events.uid) > 0 THEN   -- Aggregate the events if exists
+            jsonb_agg(                      -- Aggregate distinct events as JSON objects
+              DISTINCT jsonb_build_object(
+              'uid', events.uid,
+              'name', events.name
+              )
+            ) 
+          ELSE NULL
+        END AS events,
+
+      jsonb_agg(
+        DISTINCT CASE
+          WHEN pg."isHost" THEN       -- Aggregate guests if the participant is a host
+            jsonb_build_object(
+              'uid', pg."memberUid",
+              'name', m."name"
+            )
+          ELSE NULL
+        END
+        ) FILTER (                -- Filter hosts by created/updated at or after latest notification date, or today
+        WHERE pg."isHost" = TRUE 
+          AND (                              
+             (pg."updatedAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid")) 
+          )) AS hosts,
+
+      jsonb_agg(
+        DISTINCT CASE
+          WHEN pg."isSpeaker" THEN      -- Aggregate guests if the participant is a speaker
+            jsonb_build_object(
+              'uid', pg."memberUid",
+              'name', m."name"
+            )
+          ELSE NULL
+        END
+      ) FILTER (                    -- Filter speakers by created/updated at or after latest notification date, or today
+          WHERE pg."isSpeaker" = TRUE 
+            AND (
+              (pg."updatedAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid"))
+        )
+      ) AS speakers
+
+    FROM
+      "PLEventLocation" el
+      JOIN "PLEvent" e ON e."locationUid" = el.uid
+      LEFT JOIN "PLEventGuest" pg ON pg."eventUid" = e.uid
+      LEFT JOIN "Member" m ON m."uid" = pg."memberUid"
+      LEFT JOIN (
+        SELECT DISTINCT
+          e."locationUid",
+          e."uid",
+          e."name"
+        FROM "PLEvent" e
+        WHERE                --fetch the events added after latest notification date,or today
+          (e."createdAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid")) 
+          )AS events ON events."locationUid" = el."uid"
+    GROUP BY
+      el."uid",
+      el."location";`
 
       const locations = await this.prisma.$queryRawUnsafe(query);
       await this.notifySubscribers(locations)
