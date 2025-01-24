@@ -202,3 +202,5 @@ export const NOTIFICATION_CHANNEL: { [key: string]: string } = {
 
 export const CREATE = "CREATE";
 export const UPDATE = "UPDATE";
+
+export const  EventInvitationToMember ="EventInvitationToMember"
