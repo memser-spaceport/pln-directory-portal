@@ -196,7 +196,7 @@ export class NotificationConsumer {
   private async addEmailRecipients(emailPayload, subscribers) {
     try {
       const subscriberEmails = subscribers.flatMap(subscriber => [subscriber.member.email]).filter(email => email != null);;
-      const batchSize = 50;
+      const batchSize = Number(process.env.IRL_NOTIFICATION_BATCH_SIZE) || 50;
       const emailBatches: string[][] = [];
 
       for (let i = 0; i < subscriberEmails.length; i += batchSize) {
