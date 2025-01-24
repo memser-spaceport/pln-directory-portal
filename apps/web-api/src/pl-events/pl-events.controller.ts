@@ -123,6 +123,13 @@ export class PLEventsController {
     ) {
       throw new ForbiddenException(`Member with email ${userEmail} isn't admin to access past events or future events`);
     }
+    const eventMember: any = await this.memberService.findMemberByUid(request.body.memberUid);
+    if (!eventMember.email) {
+      throw new NotFoundException('The event member does not have a valid email address.');
+    }
+    
+    this.memberService.checkIfAdminUser(member) &&
+      (await this.eventService.sendEventInvitationIfAdminAddsMember(eventMember, locationUid, location)); 
     return await this.eventGuestService.createPLEventGuestByLocation(body, member, locationUid, userEmail);
   }
 
