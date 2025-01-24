@@ -197,19 +197,16 @@ export class NotificationConsumer {
     try {
       const subscriberEmails = subscribers.flatMap(subscriber => [subscriber.member.email]).filter(email => email != null);;
       const batchSize = Number(process.env.IRL_NOTIFICATION_BATCH_SIZE) || 50;
-      const emailBatches: string[][] = [];
 
       for (let i = 0; i < subscriberEmails.length; i += batchSize) {
         const emailBatch = subscriberEmails.slice(i, i + batchSize);
-        emailBatches.push(emailBatch);
-      }
-      for (const batch of emailBatches) {
         const batchPayload = { ...emailPayload };         // Create a copy of the original payload for each batch
-        batchPayload.recipientsInfo.bcc = batch;          // Add the batch of emails to the BCC field
+        batchPayload.recipientsInfo.bcc = emailBatch;          // Add the batch of emails to the BCC field
         if (batchPayload) {
           await this.sendNotification(batchPayload);     // Send the notification for this batch
         }
       }
+    
     } catch (error) {
       this.handleErrors(error)
     }
