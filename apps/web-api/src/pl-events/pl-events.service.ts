@@ -6,6 +6,7 @@ import { PLEventGuestsService } from './pl-event-guests.service';
 import { NotificationService } from '../notifications/notifications.service';
 import { MembersService } from '../members/members.service';
 import { PLEventLocationsService } from './pl-event-locations.service';
+import { AwsService } from '../utils/aws/aws.service';
 
 @Injectable()
 export class PLEventsService {
@@ -15,7 +16,8 @@ export class PLEventsService {
     private eventGuestsService: PLEventGuestsService,
     private notificationService: NotificationService,
     private memberService: MembersService,
-    private locationService: PLEventLocationsService
+    private locationService: PLEventLocationsService,
+    private awsService: AwsService,
   ) { }
 
   /**
@@ -176,6 +178,37 @@ export class PLEventsService {
       return this.handleErrors(err);
     }
   }
+
+/**
+ * This method checks if the member has events at the specified location. If no events are found,
+ * an invitation email is sent to the member with the event location details.
+ * 
+ * @param eventMember The member object being checked and invited, including their name and email.
+ * @param locationUid The unique identifier of the event location to check for associated events.
+ * @param location The location object containing details such as the location name.
+ * @returns A Promise that resolves when the email is successfully sent or does nothing if the member already has events at the location.
+ *   - Handles errors such as issues with retrieving events or sending emails.
+ */
+async sendEventInvitationIfAdminAddsMember(
+  eventMember: Member,
+  locationUid: string,
+  location: { location: string }
+): Promise<void> {
+  try {
+    // Check if the member has events associated with the specified location
+    const plEvents = await this.getPLEventsByMemberAndLocation(eventMember, locationUid);
+    if (!plEvents.length) {
+      const eventData = {
+        memberName: eventMember.name,
+        location: location.location,
+        eventLocationURL: `${process.env.WEB_UI_BASE_URL}/irl?location=${location.location}`,
+      };
+      await this.awsService.sendEmail('EventInvitationToMember', true, [eventMember.email], eventData);
+    }
+  } catch (error) {
+    return this.handleErrors(error);
+  }
+}
 
   /**
    * This method filters out private resources from an event's resources if the user is not logged in.
