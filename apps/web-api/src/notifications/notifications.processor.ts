@@ -74,7 +74,7 @@ export class NotificationConsumer {
    */
   private async getSubscribers(entityType, entityUid) {
     try {
-      return await this.memberSubscriptionService.getSubscriptions({
+     return await this.memberSubscriptionService.getSubscriptions({
         where: {
           AND: {
             entityType: entityType,
@@ -90,6 +90,7 @@ export class NotificationConsumer {
           }
         }
       });
+
     } catch (error) {
       this.handleErrors(error)
     }
@@ -198,18 +199,17 @@ export class NotificationConsumer {
    */
   private async addEmailRecipients(emailPayload, subscribers) {
     try {
-      const subscriberEmails = subscribers.flatMap(subscriber => [subscriber.member.email]).filter(email => email != null);;
+      const subscriberEmails = subscribers.flatMap(subscriber => [subscriber.member.email]).filter(email => email != null);
       const batchSize = Number(process.env.IRL_NOTIFICATION_BATCH_SIZE) || 50;
-
       for (let i = 0; i < subscriberEmails.length; i += batchSize) {
         const emailBatch = subscriberEmails.slice(i, i + batchSize);
         const batchPayload = { ...emailPayload };         // Create a copy of the original payload for each batch
         batchPayload.recipientsInfo.bcc = emailBatch;          // Add the batch of emails to the BCC field
-        if (batchPayload) {
+        if (batchPayload && emailBatch.length <= (Number(process.env.IRL_NOTIFICATION_BATCH_SIZE) || 50)) {
           await this.sendNotification(batchPayload);     // Send the notification for this batch
         }
       }
-    
+
     } catch (error) {
       this.handleErrors(error)
     }
@@ -287,7 +287,7 @@ export class NotificationConsumer {
     }
     throw error;
   }
-  private async delay(ms: number ) {
+  private async delay(ms: number) {
     this.logger.info(`Processing underway `)
     return new Promise(resolve => setTimeout(resolve, ms));
   }

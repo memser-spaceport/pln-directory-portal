@@ -89,7 +89,7 @@ export class NotificationService {
     try {
       const job = await this.notificationQ.add('notify', notification, {
         attempts: 3,
-        removeOnFail: false,
+        removeOnFail: true,
         delay: 5000
       });
       this.logger.log(`Notification job added to queue with ID: ${job.id}`);
