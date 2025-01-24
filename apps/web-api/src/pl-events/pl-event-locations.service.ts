@@ -306,7 +306,7 @@ export class PLEventLocationsService {
    * It queries the database for location data associated with events, hosts, speakers, and participant counts.
    * After retrieving the data, it notifies subscribers if certain threshold is met
    */
-  @Cron( process.env.IRL_NOTIFICATION_CRON || '0 0 * * *')
+  @Cron(process.env.IRL_NOTIFICATION_CRON || '0 0 * * *')
   async handleCron() {
     try {
       this.logger.info('Notification initiated by cron');
@@ -316,7 +316,7 @@ export class PLEventLocationsService {
             n."entityUid", 
             MAX(n."createdAt") AS latest_createdAt
           FROM "Notification" n
-          WHERE n."status"='SENT'   -- Get the latest 'createdAt' for each 'entityUid' where status is 'SENT'
+          WHERE n."status"='SENT' AND "entityType"='EVENT_LOCATION'   
           GROUP BY n."entityUid"    -- Group by entityUid to get the latest created date for each entity
         )
         SELECT
@@ -330,7 +330,7 @@ export class PLEventLocationsService {
                 'name', events.name
                 )
               ) 
-            ELSE '[null]'::jsonb 
+              ELSE NULL
           END AS events,
 
         jsonb_agg(
@@ -378,9 +378,8 @@ export class PLEventLocationsService {
             e."uid",
             e."name"
           FROM "PLEvent" e
-          WHERE               --fetch the events added after latest notification date,or today
-            (DATE(e."updatedAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid") OR DATE(e."updatedAt") >= CURRENT_DATE) 
-            OR (DATE(e."createdAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid") OR DATE(e."createdAt") >= CURRENT_DATE)
+          WHERE               --fetch the events added after latest notification date,or today 
+            (DATE(e."createdAt") = (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid") OR DATE(e."createdAt") >= CURRENT_DATE)
            ) AS events ON events."locationUid" = el."uid"
       GROUP BY
         el."uid",
@@ -389,7 +388,6 @@ export class PLEventLocationsService {
       const locations = await this.prisma.$queryRawUnsafe(query);
       await this.notifySubscribers(locations)
     } catch (error) {
-      console.log("cron_error-----"+JSON.stringify(error))
       this.handleErrors(error)
     }
   }
@@ -407,28 +405,32 @@ export class PLEventLocationsService {
     try {
       await Promise.all(
         data.map(async (location) => {
+          this.logger.info(`Processing to send notification for ${location.location}`)
           let participantsCount = 0;
-          let hostCount, speakerCount, eventCount;
-          if (location.events?.length) {
+          let hostCount = 0;
+          let speakerCount = 0;
+          let eventCount = 0;
+          if (location?.events?.length) {
             eventCount = location?.events.length;
           }
-          if (location.hosts?.length) {
-            hostCount = location?.events.length;
+          if (location?.hosts?.length) {
+            hostCount = location?.hosts.length;
           }
-          if (location.speakers?.length) {
+          if (location?.speakers?.length) {
             speakerCount = location?.speakers.length;
           }
 
           participantsCount = hostCount + speakerCount + eventCount;
-          if (participantsCount >= Number(process.env.IRL_NOTIFICATION_THRESHOLD) || 3) {
+          if (participantsCount >= (Number(process.env.IRL_NOTIFICATION_THRESHOLD) || 10)) {
             const notification = await this.notificationService.getNotificationPayload(location.uid, "IRL_UPDATE");
             const payload = await this.buildConsolidatedEmailPayload(location, notification, eventCount, hostCount, speakerCount);
             await this.notificationService.sendNotification(payload)
+          } else {
+            this.logger.info(`Threshold not reached for sending notification in ${location.location}`)
           }
         })
       );
     } catch (error) {
-      console.log("payload_error-----"+JSON.stringify(error))
       this.handleErrors(error)
     }
   }
@@ -443,12 +445,11 @@ export class PLEventLocationsService {
   private async buildConsolidatedEmailPayload(locationData, notification, eventCount, hostCount, speakerCount) {
     const requestor = await this.memberService.findMemberByRole();
     notification.additionalInfo = {
-      subscriberName: "John Doe",
       location: locationData.location,
       rsvpLink: process.env.IRL_BASEURL,
       irlPageLink: `${process.env.IRL_BASEURL}?location=${locationData.location}`,
-      speakers: await this.buildGuestPayload(locationData.speakers, process.env.IRL_GUEST_BASEUR) || [],
-      hosts: await this.buildGuestPayload(locationData.hosts, process.env.IRL_GUEST_BASEUR) || [],
+      speakers: await this.buildGuestPayload(locationData.speakers, process.env.IRL_GUEST_BASEURL) || [],
+      hosts: await this.buildGuestPayload(locationData.hosts, process.env.IRL_GUEST_BASEURL) || [],
       events: await this.buildEventsPayload(locationData.events, process.env.IRL_BASEURL, locationData.location) || [],
       sourceUid: requestor?.uid,
       sourceName: requestor?.name,
@@ -458,6 +459,7 @@ export class PLEventLocationsService {
       speakerCount: speakerCount,
       eventCount: eventCount,
     }
+    this.logger.info(`Successfully built email payload for ${locationData.location}`)
     return notification;
   }
 
@@ -470,19 +472,18 @@ export class PLEventLocationsService {
    * @returns modified events list with URLs.
    */
   private async buildEventsPayload(events, baseUrl, location) {
-    if (isEmpty(events)) {
+    if (isEmpty(events) || events == null) {
       return []
     }
-    console.log("EVENTS --- "+JSON.stringify(events))
-    await events?.slice(0, 3)?.map(event => {   
-      if(!event || event==null) {
-        return ;
+    const selectedEvents = await events?.slice(0, 3)       //pass only the first three events in email payload
+    selectedEvents?.map(event => {
+      if (!event || event == null) {
+        return;
       }
-      console.log("event-payload  ----- "+JSON.stringify(event))        //pass only the first three events in email payload
       const eventUrl = `${baseUrl}?location=${location}`;
       event.url = eventUrl;
     });
-    return events;
+    return selectedEvents;
   }
 
   /**
@@ -493,17 +494,15 @@ export class PLEventLocationsService {
    * @returns modified guests list with URLs.
    */
   private async buildGuestPayload(guests, baseUrl) {
-    if (isEmpty(guests)) {
+    if (isEmpty(guests) || guests == null) {
       return []
     }
-    await guests?.slice(0, 3)?.map(guest => {  
-      if(!guest || guest==null) {
-        return ;
-      }               //pass only the first three guests in email payload
+    const selectedGuests = guests?.slice(0, 3)
+    selectedGuests?.map(guest => {                 //pass only the first three guests in email payload
       const guestUrl = `${baseUrl}/${guest.uid}`;
       guest.url = guestUrl;
     });
-    return guests;
+    return selectedGuests;
   }
 }
 

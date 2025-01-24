@@ -18,7 +18,6 @@ export class NotificationConsumer {
     private logger: LogService,
     private notificationService: NotificationService,
     private memberSubscriptionService: MemberSubscriptionService,
-    private eventGuestService: PLEventGuestsService
   ) {
     this.notificationServiceBaseUrl = process.env.NOTIFICATION_SERVICE_BASE_URL as string;
     this.notificationServiceSecret = process.env.NOTIFICATION_SERVICE_CLIENT_SECRET as string;
@@ -99,29 +98,33 @@ export class NotificationConsumer {
    * @param subscriber - The subscriber details, including their member information.
    * @returns A Promise that resolves to the constructed base notification payload.
    */
-  private buildEmailNotificationPayload(notificationData, subscriber) {
-    return {
-      isPriority: true,
-      deliveryChannel: NOTIFICATION_CHANNEL.EMAIL,
-      templateName: "",
-      recipientsInfo:{},
-      deliveryPayload: {
+  private buildEmailNotificationPayload(notificationData) {
+    try {
+      return {
+        isPriority: true,
+        deliveryChannel: NOTIFICATION_CHANNEL.EMAIL,
+        templateName: "",
+        recipientsInfo: {},
+        deliveryPayload: {
           body: {}
-      },
-      entityType: notificationData.entityType,
-      actionType: notificationData.actionType,
-      targetReasonType: "",
-      sourceMeta: {
-        activityId: notificationData.entityUid,
-        activityType: notificationData.entityType,
-        activityUserId: notificationData.additionalInfo.sourceUid,
-        activityUserName: notificationData.additionalInfo.sourceName
-      },
-      targetMeta: {
-        emailId:"",
-        userId: "",
-        userName: "",
+        },
+        entityType: notificationData.entityType,
+        actionType: notificationData.actionType,
+        targetReasonType: "",
+        sourceMeta: {
+          activityId: notificationData.entityUid,
+          activityType: notificationData.entityType,
+          activityUserId: notificationData.additionalInfo.sourceUid,
+          activityUserName: notificationData.additionalInfo.sourceName
+        },
+        targetMeta: {
+          emailId: "",
+          userId: "",
+          userName: "",
+        }
       }
+    } catch (error) {
+      this.handleErrors(error)
     }
   }
 
@@ -134,13 +137,9 @@ export class NotificationConsumer {
    */
   private async sendEventLocationNotification(subscribers, notificationData) {
     try {
-      return await subscribers?.map(async (subscriber) => {
-        let payload = this.buildEmailNotificationPayload(notificationData, subscriber);
-        await this.addEmailRecipients(payload, subscribers);
-        payload = await this.generateActionSpecificEmailPayload(payload, notificationData, subscriber);
-        if (payload)
-          this.sendNotification(payload);
-      });
+      let payload = this.buildEmailNotificationPayload(notificationData);
+      payload = await this.generateActionSpecificEmailPayload(payload, notificationData);
+      await this.addEmailRecipients(payload, subscribers);
     } catch (error) {
       this.handleErrors(error);
     }
@@ -153,10 +152,10 @@ export class NotificationConsumer {
    * @param subscriber - The subscriber details, including member information.
    * @returns The complete email payload tailored for the specific action type.
    */
-  private async generateActionSpecificEmailPayload(message, notificationData, subscriber) {
+  private async generateActionSpecificEmailPayload(message, notificationData) {
     switch (notificationData.entityAction) {
       case "IRL_UPDATE":
-        return await this.generateEmailPayloadForIRLUpdates(message, notificationData, subscriber);
+        return await this.generateEmailPayloadForIRLUpdates(message, notificationData);
       default:
         return null;
     }
@@ -169,14 +168,14 @@ export class NotificationConsumer {
    * @param subscriber - The subscriber details, including member information.
    * @returns The complete email payload tailored for the specific action type.
    */
-  private async generateEmailPayloadForIRLUpdates(message, notificationData, subscriber) {
+  private async generateEmailPayloadForIRLUpdates(message, notificationData) {
     message.templateName = EMAIL_TEMPLATES.IRL_UPDATES;
     message.actionType = notificationData.entityAction;
     message.deliveryPayload.body = {
       location: notificationData.additionalInfo.location,
       rsvpLink: notificationData.additionalInfo.rsvpLink,
       irlPageLink: notificationData.additionalInfo.irlPageLink,
-      speakers: notificationData.additionalInfo.speakers ,
+      speakers: notificationData.additionalInfo.speakers,
       hosts: notificationData.additionalInfo.hosts,
       events: notificationData.additionalInfo.events,
       guestBaseUrl: notificationData.additionalInfo.guestBaseUrl,
@@ -195,9 +194,26 @@ export class NotificationConsumer {
    * @returns The complete email payload tailored for the specific action type.
    */
   private async addEmailRecipients(emailPayload, subscribers) {
-    const subscriberEmails = subscribers.flatMap(subscriber => [subscriber.member.email]);
-    emailPayload.recipientsInfo.bcc = subscriberEmails;
-    return emailPayload;
+    try {
+      const subscriberEmails = subscribers.flatMap(subscriber => [subscriber.member.email]).filter(email => email != null);;
+      const batchSize = 50;
+      const emailBatches: string[][] = [];
+
+      for (let i = 0; i < subscriberEmails.length; i += batchSize) {
+        const emailBatch = subscriberEmails.slice(i, i + batchSize);
+        emailBatches.push(emailBatch);
+      }
+      for (const batch of emailBatches) {
+        const batchPayload = { ...emailPayload };         // Create a copy of the original payload for each batch
+        batchPayload.recipientsInfo.bcc = batch;          // Add the batch of emails to the BCC field
+        if (batchPayload) {
+          await this.sendNotification(batchPayload);     // Send the notification for this batch
+        }
+      }
+    } catch (error) {
+      this.handleErrors(error)
+    }
+
   }
 
   /**
@@ -210,8 +226,8 @@ export class NotificationConsumer {
   async sendNotification(payload) {
     try {
       return await axios.post(
-        `${this.notificationServiceBaseUrl}/notifications`, 
-        payload, 
+        `${this.notificationServiceBaseUrl}/notifications`,
+        payload,
         {
           headers: {
             'Authorization': `Basic ${this.notificationServiceSecret}`
