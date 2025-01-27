@@ -9,13 +9,19 @@ import {
   FormattedLocationWithEvents,
   PLEvent
 } from './pl-event-locations.types';
+import { Cron } from '@nestjs/schedule';
+import { NotificationService } from '../notifications/notifications.service';
+import { MembersService } from '../members/members.service';
+import { isEmpty } from 'lodash';
 
 @Injectable()
 export class PLEventLocationsService {
   constructor(
     private prisma: PrismaService,
     private logger: LogService,
-    private memberSubscriptionService: MemberSubscriptionService
+    private memberSubscriptionService: MemberSubscriptionService,
+    private memberService: MembersService,
+    private notificationService: NotificationService
   ) { }
 
   /**
@@ -42,7 +48,8 @@ export class PLEventLocationsService {
               logo: true,
               banner: true,
               resources: true,
-              additionalInfo: true
+              additionalInfo: true,
+              location:  true,
             }
           }
         }
@@ -169,11 +176,11 @@ export class PLEventLocationsService {
   groupEventGuestsByMemberUidAndTeamUid(eventGuests: {
     member: { uid: string; image?: { url: string } | null };
     teamUid: string | null;
-  }[]){
-    const groupedGuests = {}; 
+  }[]) {
+    const groupedGuests = {};
     eventGuests?.forEach((guest) => {
       const key = `${guest.member.uid}-${guest.teamUid}`;
-      if (!groupedGuests[key]) 
+      if (!groupedGuests[key])
         groupedGuests[key] = {
           member: guest.member,
           teamUid: guest.teamUid
@@ -256,25 +263,29 @@ export class PLEventLocationsService {
   }
 
   /**
-   * Subscribes a member to a location by its unique identifier.
-   *
-   * @function subscribeLocationByUid
-   * @param {string} uid - The unique identifier of the location to subscribe to.
-   * @param {string} memberUid - The unique identifier of the member subscribing to the location.
-   * @param {string} action - Action to perform
-   * @returns {Promise<Object>} - The subscription object returned from the `createSubscription` method.
-   * @throws {Error} - If an error occurs during the subscription process, it will be passed to the `handleErrors` method.
-   *
-   */
-  async subscribeLocationByUid(uid: string, memberUid: string, action:string="Default") {
+     * Subscribes a member to a location by its unique identifier.
+     *
+     * @function subscribeLocationByUid
+     * @param {string} uid - The unique identifier of the location to subscribe to.
+     * @param {string} memberUid - The unique identifier of the member subscribing to the location.
+     * @param {string} action - Action to perform
+     * @returns {Promise<Object>} - The subscription object returned from the `createSubscription` method.
+     * @throws {Error} - If an error occurs during the subscription process, it will be passed to the `handleErrors` method.
+     *
+     */
+  async subscribeLocationByUid(uid: string, memberUid: string, action: string = "Default") {
     try {
-      const subscriptions = await this.memberSubscriptionService.getSubscriptions({ 
-        where: { 
+      const subscriptions = await this.memberSubscriptionService.getSubscriptions({
+        where: {
           memberUid,
           entityUid: uid,
           entityAction: action
         }
       });
+      if (subscriptions?.length && !subscriptions[0].isActive) {
+        const subscription = subscriptions[0];
+        return await this.memberSubscriptionService.modifySubscription(subscription.uid, { isActive: true });
+      }
       if (subscriptions?.length) {
         this.logger.info(`Member with uid ${memberUid} is already subscribed to location ${uid}.`);
         return null;
@@ -283,10 +294,214 @@ export class PLEventLocationsService {
         memberUid,
         entityUid: uid,
         entityType: SubscriptionEntityType.EVENT_LOCATION,
-        entityAction: action 
+        entityAction: action
       });
     } catch (error) {
-      this.handleErrors(error);  
+      this.handleErrors(error);
     }
   }
+
+  /**
+   * This method is executed on a cron schedule every two days once
+   * It queries the database for location data associated with events, hosts, speakers, and participant counts.
+   * After retrieving the data, it notifies subscribers if certain threshold is met
+   */
+  @Cron(process.env.IRL_NOTIFICATION_CRON || '0 0 * * *')
+  async handleCron() {
+    try {
+      this.logger.info('Notification initiated by cron');
+      const query: any = `
+      WITH LatestNotificationDate AS (
+        SELECT 
+          n."entityUid", 
+          MAX(n."createdAt") AS latest_createdAt
+        FROM "Notification" n
+        WHERE (n."status"='SENT'AND "entityType"='EVENT_LOCATION'   
+        AND n."entityAction"='IRL_UPDATE' )  -- Get the latest 'createdAt' for each 'entityUid' where status is 'SENT'
+        GROUP BY n."entityUid"              -- Group by entityUid to get the latest created date for each entity
+      )
+      SELECT
+        el."uid",
+        el."location",
+        CASE                                -- cases to seggregate data into hosts and speakers 
+          WHEN COUNT(events.uid) > 0 THEN   -- Aggregate the events if exists
+            jsonb_agg(                      -- Aggregate distinct events as JSON objects
+              DISTINCT jsonb_build_object(
+              'uid', events.uid,
+              'name', events.name
+              )
+            ) 
+          ELSE NULL
+        END AS events,
+
+      jsonb_agg(
+        DISTINCT CASE
+          WHEN pg."isHost" THEN       -- Aggregate guests if the participant is a host
+            jsonb_build_object(
+              'uid', pg."memberUid",
+              'name', m."name"
+            )
+          ELSE NULL
+        END
+        ) FILTER (                -- Filter hosts by created/updated at or after latest notification date, or today
+        WHERE pg."isHost" = TRUE 
+          AND (                              
+             (pg."updatedAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid")) 
+          )) AS hosts,
+
+      jsonb_agg(
+        DISTINCT CASE
+          WHEN pg."isSpeaker" THEN      -- Aggregate guests if the participant is a speaker
+            jsonb_build_object(
+              'uid', pg."memberUid",
+              'name', m."name"
+            )
+          ELSE NULL
+        END
+      ) FILTER (                    -- Filter speakers by created/updated at or after latest notification date, or today
+          WHERE pg."isSpeaker" = TRUE 
+            AND (
+              (pg."updatedAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid"))
+        )
+      ) AS speakers
+
+    FROM
+      "PLEventLocation" el
+      JOIN "PLEvent" e ON e."locationUid" = el.uid
+      LEFT JOIN "PLEventGuest" pg ON pg."eventUid" = e.uid
+      LEFT JOIN "Member" m ON m."uid" = pg."memberUid"
+      LEFT JOIN (
+        SELECT DISTINCT
+          e."locationUid",
+          e."uid",
+          e."name"
+        FROM "PLEvent" e
+        WHERE                --fetch the events added after latest notification date,or today
+          (e."createdAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid")) 
+          )AS events ON events."locationUid" = el."uid"
+    GROUP BY
+      el."uid",
+      el."location";`
+
+      const locations = await this.prisma.$queryRawUnsafe(query);
+      await this.notifySubscribers(locations)
+    } catch (error) {
+      this.handleErrors(error)
+    }
+  }
+
+  /**
+   * Notifies subscribers based on the fetched location.
+   * 
+   * @param {Array} data - The location data containing the data about latest updates.
+   * 
+   * This method loops through each location and checks for latest updates
+   * if exceeds a threshold (IRL_THRESHOLD) it constructs and sends an email 
+   * notification to the subscribers for that location.
+   */
+  private async notifySubscribers(data) {
+    try {
+      await Promise.all(
+        data.map(async (location) => {
+          this.logger.info(`Processing to send notification for ${location.location}`)
+          let participantsCount = 0;
+          let hostCount = 0;
+          let speakerCount = 0;
+          let eventCount = 0;
+          if (location?.events?.length) {
+            eventCount = location?.events.length;
+          }
+          if (location?.hosts?.length) {
+            hostCount = location?.hosts.length;
+          }
+          if (location?.speakers?.length) {
+            speakerCount = location?.speakers.length;
+          }
+
+          participantsCount = hostCount + speakerCount + eventCount;
+          if (participantsCount >= (Number(process.env.IRL_NOTIFICATION_THRESHOLD) || 10)) {
+            const notification = await this.notificationService.getNotificationPayload(location.uid, "IRL_UPDATE");
+            const payload = await this.buildConsolidatedEmailPayload(location, notification, eventCount, hostCount, speakerCount);
+            await this.notificationService.sendNotification(payload)
+          } else {
+            this.logger.info(`Threshold not reached for sending notification in ${location.location}`)
+          }
+        })
+      );
+    } catch (error) {
+      this.handleErrors(error)
+    }
+  }
+
+  /**
+   * Builds the consolidated email payload for the notification.
+   * 
+   * @param locationData Data containing records of latest updates in a specific location.
+   * @param notification The notification payload to be sent.
+   * @returns The updated notification payload with additional information for email.
+   */
+  private async buildConsolidatedEmailPayload(locationData, notification, eventCount, hostCount, speakerCount) {
+    const requestor = await this.memberService.findMemberByRole();
+    notification.additionalInfo = {
+      location: locationData.location,
+      rsvpLink: process.env.IRL_BASEURL,
+      irlPageLink: `${process.env.IRL_BASEURL}?location=${locationData.location}`,
+      speakers: await this.buildGuestPayload(locationData.speakers, process.env.IRL_GUEST_BASEURL) || [],
+      hosts: await this.buildGuestPayload(locationData.hosts, process.env.IRL_GUEST_BASEURL) || [],
+      events: await this.buildEventsPayload(locationData.events, process.env.IRL_BASEURL, locationData.location) || [],
+      sourceUid: requestor?.uid,
+      sourceName: requestor?.name,
+      guestBaseUrl: process.env.IRL_GUEST_BASEURL,
+      irlBaseUrl: process.env.IRL_BASEURL,
+      hostCount: hostCount,
+      speakerCount: speakerCount,
+      eventCount: eventCount,
+    }
+    this.logger.info(`Successfully built email payload for ${locationData.location}`)
+    return notification;
+  }
+
+  /**
+   * Builds the events payload for the email based on the events data.
+   * 
+   * @param events The list of events associated with the location.
+   * @param baseUrl The base URL for events.
+   * @param location The location associated with the events.
+   * @returns modified events list with URLs.
+   */
+  private async buildEventsPayload(events, baseUrl, location) {
+    if (isEmpty(events) || events == null) {
+      return []
+    }
+    const selectedEvents = await events?.slice(0, 3)       //pass only the first three events in email payload
+    selectedEvents?.map(event => {
+      if (!event || event == null) {
+        return;
+      }
+      const eventUrl = `${baseUrl}?location=${location}`;
+      event.url = eventUrl;
+    });
+    return selectedEvents;
+  }
+
+  /**
+   * Builds the guests payload for the email based on the guest data.
+   * 
+   * @param guests The list of guests added as host/speaker.
+   * @param baseUrl The base URL for member.
+   * @returns modified guests list with URLs.
+   */
+  private async buildGuestPayload(guests, baseUrl) {
+    if (isEmpty(guests) || guests == null) {
+      return []
+    }
+    const selectedGuests = guests?.slice(0, 3)
+    selectedGuests?.map(guest => {                 //pass only the first three guests in email payload
+      const guestUrl = `${baseUrl}/${guest.uid}`;
+      guest.url = guestUrl;
+    });
+    return selectedGuests;
+  }
+
 }
+

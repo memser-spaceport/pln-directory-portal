@@ -1641,7 +1641,9 @@ export class MembersService {
         },
       },
       select: {
-        email: true
+        uid:true,
+        email: true,
+        name:true
       }
     });
     return member;
