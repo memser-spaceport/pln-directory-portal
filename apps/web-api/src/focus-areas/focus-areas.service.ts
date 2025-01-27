@@ -117,4 +117,35 @@ export class FocusAreasService {
   buildProjectFilter(queryParams) {
     return this.projectService.buildProjectFilter(queryParams);
   }
+
+  async findAllFocusAreasWithRelations() {
+    const [projectFocusAreas, teamFocusAreas] = await Promise.all([
+      this.prisma.projectFocusArea.findMany({
+        include: {
+          focusArea: true,          
+          ancestorArea: true,       
+          project: {                
+            select: {
+              uid: true,
+            },
+          },
+        },
+      }),
+
+      this.prisma.teamFocusArea.findMany({
+        include: {
+          focusArea: true,           
+          ancestorArea: true,       
+          team: {                   
+            select: {
+              uid: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return { projectFocusAreas, teamFocusAreas };
+
+  }
 }

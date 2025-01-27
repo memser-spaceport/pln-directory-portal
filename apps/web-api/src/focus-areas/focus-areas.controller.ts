@@ -11,7 +11,12 @@ type RouteShape = typeof server.routeShapes;
 export class FocusAreaController {
   constructor(private readonly focusAreaService: FocusAreasService) {}
   @Api(server.route.getFocusAreas)
-  findAll(@Req() request: Request) {
-    return this.focusAreaService.findAll(request.query);
+  async findAll(@Req() request: Request) {
+    return await this.focusAreaService.findAll(request.query);
+  }
+
+  @Api(server.route.getFocusAreasWithRelations)
+  async findAllWithRelations(@Req() request: Request) {
+    return await this.focusAreaService.findAllFocusAreasWithRelations();
   }
 }

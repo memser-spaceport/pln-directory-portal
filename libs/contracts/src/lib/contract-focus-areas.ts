@@ -16,5 +16,14 @@ export const apiFocusAreas = contract.router({
       200: ResponseFocusAreaSchema.array(),
     },
     summary: 'Get all focus areas',
+  },
+  getFocusAreasWithRelations: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/focus-areas/all`,
+    query: FocusAreaQueryParams,
+    responses: {
+      200: ResponseFocusAreaSchema.array(),
+    },
+    summary: 'Get all focus areas with teams and projects',
   }
 });
