@@ -123,7 +123,7 @@ export class PLEventsController {
     ) {
       throw new ForbiddenException(`Member with email ${userEmail} isn't admin to access past events or future events`);
     }
-    return await this.eventGuestService.createPLEventGuestByLocation(body, member, locationUid, userEmail);
+    return await this.eventGuestService.createPLEventGuestByLocation(body, member, locationUid, userEmail, location);
   }
 
   @Api(server.route.modifyPLEventGuestByLocation)

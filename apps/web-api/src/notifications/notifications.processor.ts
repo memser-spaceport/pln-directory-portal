@@ -18,7 +18,6 @@ export class NotificationConsumer {
     private logger: LogService,
     private notificationService: NotificationService,
     private memberSubscriptionService: MemberSubscriptionService,
-    private eventGuestService: PLEventGuestsService
   ) {
     this.notificationServiceBaseUrl = process.env.NOTIFICATION_SERVICE_BASE_URL as string;
     this.notificationServiceSecret = process.env.NOTIFICATION_SERVICE_CLIENT_SECRET as string;
@@ -55,8 +54,11 @@ export class NotificationConsumer {
           case "EVENT_LOCATION":
             await this.sendEventLocationNotification(subscribers, notificationData);
         }
-        await this.notificationService.updateNotificationStatus(this.createdNotification.uid, NotificationStatus.SENT)
+        await this.notificationService.updateNotificationStatus(this.createdNotification.uid, NotificationStatus.SENT);
+
       }
+      this.logger.info(`Processing ended for id: ${job.id}`);
+      await this.delay(10000);
       return;
     } catch (error) {
       this.logger.error(`Error occured while sending notification`, error);
@@ -72,7 +74,7 @@ export class NotificationConsumer {
    */
   private async getSubscribers(entityType, entityUid) {
     try {
-      return await this.memberSubscriptionService.getSubscriptions({
+     return await this.memberSubscriptionService.getSubscriptions({
         where: {
           AND: {
             entityType: entityType,
@@ -83,13 +85,12 @@ export class NotificationConsumer {
         include: {
           member: {
             select: {
-              name: true,
               email: true,
-              telegramHandler: true
             }
           }
         }
       });
+
     } catch (error) {
       this.handleErrors(error)
     }
@@ -101,30 +102,33 @@ export class NotificationConsumer {
    * @param subscriber - The subscriber details, including their member information.
    * @returns A Promise that resolves to the constructed base notification payload.
    */
-  private buildEmailNotificationPayload(notificationData, subscriber) {
-    return {
-      isPriority: true,
-      deliveryChannel: NOTIFICATION_CHANNEL.EMAIL,
-      templateName: "",
-      recipientAddress: subscriber.member.email,
-      recipientAddressId: subscriber.member.email,
-      deliveryPayload: {
+  private buildEmailNotificationPayload(notificationData) {
+    try {
+      return {
+        isPriority: true,
+        deliveryChannel: NOTIFICATION_CHANNEL.EMAIL,
+        templateName: "",
+        recipientsInfo: {},
+        deliveryPayload: {
           body: {}
-      },
-      entityType: notificationData.entityType,
-      actionType: notificationData.actionType,
-      targetReasonType: "",
-      sourceMeta: {
-        activityId: notificationData.entityUid,
-        activityType: notificationData.entityType,
-        activityUserId: notificationData.additionalInfo.sourceUid,
-        activityUserName: notificationData.additionalInfo.sourceName
-      },
-      targetMeta: {
-        emailId: subscriber.member.email,
-        userId: subscriber.memberUid,
-        userName: subscriber.member.name,
+        },
+        entityType: notificationData.entityType,
+        actionType: notificationData.actionType,
+        targetReasonType: "",
+        sourceMeta: {
+          activityId: notificationData.entityUid,
+          activityType: notificationData.entityType,
+          activityUserId: notificationData.additionalInfo.sourceUid,
+          activityUserName: notificationData.additionalInfo.sourceName
+        },
+        targetMeta: {
+          emailId: "",
+          userId: "",
+          userName: "",
+        }
       }
+    } catch (error) {
+      this.handleErrors(error)
     }
   }
 
@@ -137,12 +141,9 @@ export class NotificationConsumer {
    */
   private async sendEventLocationNotification(subscribers, notificationData) {
     try {
-      return await subscribers?.map(async (subscriber) => {
-        let payload = this.buildEmailNotificationPayload(notificationData, subscriber);
-        payload = await this.generateActionSpecificEmailPayload(payload, notificationData, subscriber);
-        if (payload)
-          this.sendNotification(payload);
-      });
+      let payload = this.buildEmailNotificationPayload(notificationData);
+      payload = await this.generateActionSpecificEmailPayload(payload, notificationData);
+      await this.addEmailRecipients(payload, subscribers);
     } catch (error) {
       this.handleErrors(error);
     }
@@ -155,64 +156,64 @@ export class NotificationConsumer {
    * @param subscriber - The subscriber details, including member information.
    * @returns The complete email payload tailored for the specific action type.
    */
-  private async generateActionSpecificEmailPayload(message, notificationData, subscriber) {
+  private async generateActionSpecificEmailPayload(message, notificationData) {
     switch (notificationData.entityAction) {
-      case "EVENT_ADDED":
-        return await this.generateEmailPayloadForEventAddition(message, notificationData, subscriber);
-      case "HOST_SPEAKER_ADDED":
-        return await this.generateEmailPayloadForHostAndSpeakerAddition(message, notificationData, subscriber);
+      case "IRL_UPDATE":
+        return await this.generateEmailPayloadForIRLUpdates(message, notificationData);
       default:
         return null;
     }
   }
 
   /**
-   * Generates the email payload for the "EVENT_ADDED" action.
+   * Generates an action-specific email payload based on the notification's action type.
    * @param message - The base email notification message payload.
-   * @param notificationData - Data related to the event, including name and start date.
+   * @param notificationData - The data related to the notification, including action type and additional info.
    * @param subscriber - The subscriber details, including member information.
-   * @returns The complete email payload for the event addition action.
+   * @returns The complete email payload tailored for the specific action type.
    */
-  private generateEmailPayloadForEventAddition(message, notificationData, subscriber) {
-    message.templateName = EMAIL_TEMPLATES.EVENT_ADDED
+  private async generateEmailPayloadForIRLUpdates(message, notificationData) {
+    message.templateName = EMAIL_TEMPLATES.IRL_UPDATES;
     message.actionType = notificationData.entityAction;
     message.deliveryPayload.body = {
-      subscriberName: subscriber.member.name,
-      name: notificationData.additionalInfo.eventName,
-      date: notificationData.additionalInfo.startDate?.split("T")[0],
-      time: notificationData.additionalInfo.startDate?.split("T")[1],
-      location: notificationData.additionalInfo.venue.location,
-      description: notificationData.additionalInfo.eventDescription,
-      opportunityType: "",
+      location: notificationData.additionalInfo.location,
+      rsvpLink: notificationData.additionalInfo.rsvpLink,
+      irlPageLink: notificationData.additionalInfo.irlPageLink,
+      speakers: notificationData.additionalInfo.speakers,
+      hosts: notificationData.additionalInfo.hosts,
+      events: notificationData.additionalInfo.events,
+      guestBaseUrl: notificationData.additionalInfo.guestBaseUrl,
+      irlBaseUrl: notificationData.additionalInfo.irlBaseUrl,
+      hostCount: notificationData.additionalInfo.hostCount,
+      speakerCount: notificationData.additionalInfo.speakerCount,
+      eventCount: notificationData.additionalInfo.eventCount,
     };
     return message;
   }
 
   /**
-   * Generates the email payload for the "HOST_SPEAKER_ADDED" action.
-   * @param message - The base email notification message payload.
-   * @param guestData - Data related to the host or speaker, including their unique identifier and event details.
-   * @param subscriber - The subscriber details, including member information.
-   * @returns A Promise that resolves to the complete email payload for the host or speaker addition action.
+   * adds subscriber email addresses in bcc.
+   * @param emailPayload  The base email notification message payload.
+   * @param subscribers The subscriber details, including member information.
+   * @returns The complete email payload tailored for the specific action type.
    */
-  private async generateEmailPayloadForHostAndSpeakerAddition(message, notificationData, subscriber) {
-    const guest = await this.eventGuestService.getHostAndSpeakerDetailsByUid(notificationData.additionalInfo.memberUid, notificationData.additionalInfo.eventUid);
-    message.templateName = EMAIL_TEMPLATES.HOST_SPEAKER_ADDED;
-    message.actionType = notificationData.entityAction;
-    message.deliveryPayload.body = {
-      subscriberName: subscriber.member.name,
-      eventName: guest?.event.name,
-      location: guest?.event.location?.location,
-      hostName: guest?.member.name,
-      hostBio: guest?.member?.bio?.toString(),
-      topic: guest?.topics.toString(),
-      eventDate: guest?.event.startDate,
-      eventTime: guest?.event.startDate,
-      eventVenue: guest?.event.location?.location,
-      speakerHostName: guest?.member.name,
-      guestType: notificationData.additionalInfo.guestType
-    };
-    return message;
+  private async addEmailRecipients(emailPayload, subscribers) {
+    try {
+      const subscriberEmails = subscribers.flatMap(subscriber => [subscriber.member.email]).filter(email => email != null);
+      const batchSize = Number(process.env.IRL_NOTIFICATION_BATCH_SIZE) || 50;
+      for (let i = 0; i < subscriberEmails.length; i += batchSize) {
+        const emailBatch = subscriberEmails.slice(i, i + batchSize);
+        const batchPayload = { ...emailPayload };         // Create a copy of the original payload for each batch
+        batchPayload.recipientsInfo.bcc = emailBatch;          // Add the batch of emails to the BCC field
+        if (batchPayload && emailBatch.length <= (Number(process.env.IRL_NOTIFICATION_BATCH_SIZE) || 50)) {
+          await this.sendNotification(batchPayload);     // Send the notification for this batch
+        }
+      }
+
+    } catch (error) {
+      this.handleErrors(error)
+    }
+
   }
 
   /**
@@ -225,8 +226,8 @@ export class NotificationConsumer {
   async sendNotification(payload) {
     try {
       return await axios.post(
-        `${this.notificationServiceBaseUrl}/notifications`, 
-        payload, 
+        `${this.notificationServiceBaseUrl}/notifications`,
+        payload,
         {
           headers: {
             'Authorization': `Basic ${this.notificationServiceSecret}`
@@ -285,6 +286,10 @@ export class NotificationConsumer {
       throw new BadRequestException('Database validation error on notification:', error.message);
     }
     throw error;
+  }
+  private async delay(ms: number) {
+    this.logger.info(`Processing underway `)
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
 }

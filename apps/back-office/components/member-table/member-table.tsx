@@ -1,5 +1,11 @@
 import api from 'apps/back-office/utils/api';
-import APP_CONSTANTS, { API_ROUTE, ENROLLMENT_TYPE, ROUTE_CONSTANTS } from 'apps/back-office/utils/constants';
+import APP_CONSTANTS, {
+  API_ROUTE,
+  ENROLLMENT_TYPE,
+  ROUTE_CONSTANTS,
+  TABLE_SORT_ICONS,
+  TABLE_SORT_VALUES,
+} from 'apps/back-office/utils/constants';
 import router from 'next/router';
 import { Fragment, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
@@ -11,11 +17,12 @@ const MemberTable = (props: any) => {
   const selectedTab = props?.selectedTab ?? '';
   const updateMembers = props?.updateMembers;
   const members = props?.allMembers ?? [];
-  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [isAllSelected, setIsAllSelected] = useState<boolean>(false);
   const [selectedMembers, setSelectedMembes] = useState([]);
   const [allMembers, setAllMembers] = useState(members);
-  const [isLoading, setIsLoading] = useState(false);
-  const [openModal, setOpenModal] = useState(false);
+  const [sortOrder, setSortOrder] = useState(TABLE_SORT_VALUES.DEFAULT);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [openModal, setOpenModal] = useState<boolean>(false);
   const [rejectId, setRejectId] = useState([]);
 
   const onSelectAllClickHandler = () => {
@@ -27,15 +34,27 @@ const MemberTable = (props: any) => {
     }
   };
 
-  const onSortAscendingByMemberName = () => {
-    const sortedMembers = [...allMembers].sort((a, b) => a.name.localeCompare(b.name));
-    setAllMembers(sortedMembers);
-  };
+  const onSortMembersByName = () => {
+    const sortOrderKeys = Object.keys(TABLE_SORT_VALUES);
+    const currentSortIndex = sortOrderKeys.indexOf(sortOrder);
+    const nextSortIndex = (currentSortIndex + 1) % sortOrderKeys.length;
+    const nextSortOrder = sortOrderKeys[nextSortIndex];
 
-  const onSortDescendingByMemberName = () => {
-    const sortedMembers = [...allMembers].sort((a, b) => b.name.localeCompare(a.name));
-    setAllMembers(sortedMembers);
+    if (nextSortOrder === TABLE_SORT_VALUES.ASCENDING) {
+      const sortedMembers = [...allMembers].sort((member1, member2) => member1.name.localeCompare(member2.name));
+      setAllMembers(sortedMembers);
+      setSortOrder(nextSortOrder);
+    } else if (nextSortOrder === TABLE_SORT_VALUES.DESCENDING) {
+      const sortedMembers = [...allMembers].sort((member1, member2) => member2.name.localeCompare(member1.name));
+      setAllMembers(sortedMembers);
+      setSortOrder(nextSortOrder);
+    } else {
+      setAllMembers(members);
+      setSortOrder(nextSortOrder);
+    }
   };
+  const sortImg = TABLE_SORT_ICONS[sortOrder];
+
 
   useEffect(() => {
     setAllMembers(members);
@@ -227,18 +246,7 @@ const MemberTable = (props: any) => {
                   className="flex h-[18px] w-[18px] flex-col items-center justify-center rounded"
                   style={{ backgroundColor: '#E2E8F0' }}
                 >
-                  <img
-                    src="/assets/images/ascending_icon.svg"
-                    alt="Group"
-                    className="cursor-pointer"
-                    onClick={onSortAscendingByMemberName}
-                  />
-                  <img
-                    src="/assets/images/descending_icon.svg"
-                    alt="Group"
-                    className="cursor-pointer"
-                    onClick={onSortDescendingByMemberName}
-                  />
+                  <img src={sortImg} alt="Group" className="cursor-pointer" onClick={onSortMembersByName} />
                 </div>
               </div>
             </div>

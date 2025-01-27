@@ -14,7 +14,8 @@ import {
 } from './pl-event-locations.types';
 import { CacheService } from '../utils/cache/cache.service';
 import { NotificationService } from '../notifications/notifications.service';
-import { CREATE, UPDATE } from '../utils/constants';
+import { CREATE, EventInvitationToMember, UPDATE } from '../utils/constants';
+import { AwsService } from '../utils/aws/aws.service';
 
 @Injectable()
 export class PLEventGuestsService {
@@ -24,7 +25,8 @@ export class PLEventGuestsService {
     private memberService: MembersService,
     private eventLocationsService: PLEventLocationsService,
     private cacheService: CacheService,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
+    private awsService: AwsService,
   ) { }
 
   /**
@@ -40,6 +42,7 @@ export class PLEventGuestsService {
     member: Member,
     locationUid: string,
     requestorEmail: string,
+    location: { location: string },
     type: string = CREATE,
     tx?: Prisma.TransactionClient
   ) {
@@ -48,17 +51,67 @@ export class PLEventGuestsService {
       await this.updateMemberDetails(data, member, isAdmin, tx);
       data.memberUid = isAdmin ? data.memberUid : member.uid;
       const guests = this.formatInputToEventGuests(data);
+      const eventMember: Member = await this.memberService.findMemberByUid(data.memberUid);
+      const plEvents: PLEvent[] = await this.getPLEventsByMemberAndLocation(eventMember, locationUid);
       const result = await (tx || this.prisma).pLEventGuest.createMany({ data: guests });
-      // Info: Disabled for husky release. 
-      // await this.notifySubscribers(data, locationUid, "HOST_SPEAKER_ADDED", requestorEmail);
-      // if (type === CREATE)
-      //   await this.eventLocationsService.subscribeLocationByUid(locationUid, member.uid);
+      if (type === CREATE) {
+        await this.eventLocationsService.subscribeLocationByUid(locationUid, data.memberUid);
+        this.memberService.checkIfAdminUser(member) && !plEvents.length &&
+        (await this.sendEventInvitationIfAdminAddsMember(eventMember, location)); 
+      }
       this.cacheService.reset({ service: 'PLEventGuest' });
       return result;
     } catch (err) {
       this.handleErrors(err);
     }
   };
+
+
+/**
+ * This method checks if the member has events at the specified location. If no events are found,
+ * an invitation email is sent to the member with the event location details.
+ * 
+ * @param eventMember The member object being checked and invited, including their name and email.
+ * @param location The location object containing details such as the location name.
+ * @returns A Promise that resolves when the email is successfully sent or does nothing if the member already has events at the location.
+ *   - Handles errors such as issues with retrieving events or sending emails.
+ */
+async sendEventInvitationIfAdminAddsMember(eventMember: Member, location: { location: string }): Promise<any> {
+  try {
+      const eventData = {
+        memberName: eventMember.name,
+        location: location.location,
+        eventLocationURL: `${process.env.WEB_UI_BASE_URL}/irl?location=${location.location}`,
+      };
+      await this.awsService.sendEmail(EventInvitationToMember, true, [eventMember.email], eventData);
+  } catch (error) {
+    return this.handleErrors(error);
+  }
+}
+
+  /**
+   * This method retrieves events associated with a specific member.
+   * @param member The member object, including the member UID
+   * @param locationUid The unique identifier of the event location
+   * @returns An array of event objects where the member is a guest
+   *   - Throws errors if there are issues with the query, including validation or database errors.
+   */
+  async getPLEventsByMemberAndLocation(member: Member, locationUid: string): Promise<any> {
+    try {
+      return this.prisma.pLEvent.findMany({
+        where: {
+          locationUid,
+          eventGuests: {
+            some: {
+              memberUid: member?.uid
+            }
+          }
+        }
+      })
+    } catch (err) {
+      return this.handleErrors(err);
+    }
+  }
 
   /**
    * This method modifies event guests for upcoming events by first deleting existing guests and then creating new ones.
@@ -87,7 +140,7 @@ export class PLEventGuestsService {
             }
           }
         });
-        return await this.createPLEventGuestByLocation(data, member, location.uid, requestorEmail, UPDATE, tx);
+        return await this.createPLEventGuestByLocation(data, member, location.uid, requestorEmail, location, UPDATE, tx);
       });
     } catch (err) {
       this.handleErrors(err);
@@ -879,36 +932,4 @@ export class PLEventGuestsService {
     }
   }
 
-  private async notifySubscribers(guests, entityUid, actionType, requestorEmail) {
-    const notification = await this.notificationService.getNotificationPayload(entityUid, actionType);
-    switch (actionType) {
-      case "HOST_SPEAKER_ADDED":
-        await Promise.all(
-          guests.events.map(async (event) => {
-            if ((event.isHost || event.isSpeaker) && !(event.isHost && event.isSpeaker)) {
-              let role = event.isHost ? 'Host' : 'Speaker';
-              const payload = await this.buildHostSpeakerAdditonPayload(guests.memberUid, event, notification, requestorEmail, role);
-              await this.notificationService.sendNotification(payload);
-            } else if (event.isHost && event.isSpeaker) {
-              let role = "Host/Speaker"
-              const payload = await this.buildHostSpeakerAdditonPayload(guests.memberUid, event, notification, requestorEmail, role);
-              await this.notificationService.sendNotification(payload);
-            }
-          }
-          )
-        );
-    }
-  }
-
-  private async buildHostSpeakerAdditonPayload(memberUid, event, notification, requestorEmail, role) {
-    const requestor = await this.memberService.findMemberByEmail(requestorEmail);
-    notification.additionalInfo = {
-      memberUid: memberUid,
-      eventUid: event.uid,
-      sourceUid: requestor.uid,
-      sourceName: requestor.name,
-      guestType: role
-    }
-    return notification;
-  }
-}
+ }
