@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
@@ -146,6 +147,15 @@ export class ProjectsService {
                   title: true
                 }
               }
+            }
+          },
+          asks: {
+            select: {
+              uid: true,
+              title: true,
+              description: true,
+              tags: true,
+              projectUid: true
             }
           }
         }
@@ -387,12 +397,24 @@ export class ProjectsService {
     return {};
   }
 
+  buildAskTagFilter(queryParams){
+    const { askTags } = queryParams;
+    let tagFilter={}
+    if(askTags){
+      const tags = askTags.split(',')
+      tagFilter={
+        asks: { some: { tags: { hasSome: tags }, }, },
+      };
+    }
+      return tagFilter;
+    }
+
   /**
    * Fetches team names that maintain atleast a single project.
    * 
    * @returns Set of team names.
    */
-  async getProjectFilters() {
+  async getProjectFilters(queryParams) {
     const maintainingTeams = await this.prisma.team.findMany({
       where: {
         maintainingProjects: {
@@ -409,6 +431,72 @@ export class ProjectsService {
         }
       }
     })
-    return { maintainedBy: maintainingTeams.map((team) => ({ uid: team.uid, name: team.name, logo: team.logo?.url })) };
+
+
+    const askTags = await this.prisma.ask.findMany({
+      where: {
+        project: queryParams.where,
+      },
+      select: {
+        tags: true,
+      },
+    })
+    // Flatten the tags and calculate counts
+    const tagCounts = askTags
+    .flatMap(item => item.tags) // Flatten the tags array
+    .reduce((acc, tag) => {
+        acc[tag] = (acc[tag] || 0) + 1; // Count occurrences
+        return acc;
+    }, {});
+    return {
+      askTags: Object.entries(tagCounts).map(([tag, count]) => ({ tag, count }))
+    }
+    // return { maintainedBy: maintainingTeams.map((team) => ({ uid: team.uid, name: team.name, logo: team.logo?.url })) };
+  }
+
+
+  async addEditProjectAsk(projectUid, requestorEmail, data){
+    let res;
+    try{
+      //checking if the member has edit access
+      const member: any = await this.memberService.findMemberByEmail(requestorEmail);
+      const existingData: any = await this.getProjectByUid(projectUid);
+      const contributingTeamsUid = existingData?.contributingTeams?.map(team => team.uid) || [];
+      await this.isMemberAllowedToEdit(
+        member,
+        [existingData?.maintainingTeamUid, ...contributingTeamsUid],
+        existingData
+      );
+
+      if (data.uid) {
+        if (data.isDeleted) {
+          //deleting asks
+          res = await this.prisma.ask.delete({
+            where: { uid: data.uid },
+          });
+        } else {
+          //updating asks
+          res = await this.prisma.ask.update({
+            where: { uid: data.uid },
+            data: {
+              ...data,
+            },
+          });
+        }
+      }else{
+        //creating asks
+        res = await this.prisma.ask.create({
+          data: {
+            ...data,
+            projectUid,
+          },
+        });
+      }
+      await this.cacheService.reset({ service: 'projects'});
+      return res;
+    }catch(err){
+      console.error(err);
+      throw err;
+    }
   }
 }

@@ -59,5 +59,14 @@ export const apiProjects = contract.router({
       200: contract.response<unknown>(),
     },
     summary: 'Remove a project',
+  },
+  patchAskProject: {
+    method: 'PATCH',
+    path: `${getAPIVersionAsPath('1')}/projects/:uid/ask`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'add/edit asks of a project',
   }
 });

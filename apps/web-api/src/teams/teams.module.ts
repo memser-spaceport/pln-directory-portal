@@ -6,7 +6,11 @@ import { ParticipantsRequestModule } from '../participants-request/participants-
 import { MembersModule } from '../members/members.module';
 
 @Module({
-  imports: [forwardRef(() => ParticipantsRequestModule), forwardRef(() => MembersModule), SharedModule],
+  imports: [
+    forwardRef(() => ParticipantsRequestModule),
+    forwardRef(() => MembersModule),
+    SharedModule,
+  ],
   controllers: [TeamsController],
   providers: [TeamsService],
   exports: [TeamsService]

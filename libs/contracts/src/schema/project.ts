@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ResponseTeamWithRelationsSchema } from './team';
 import { ResponseMemberWithRelationsSchema } from './member';
 import { ResponseImageWithRelationsSchema } from './image';
+import { ResponseAskSchema, ResponseAskSchemaWithRelationsSchema } from './ask';
 
 const TypeEnum = z.enum(['MAINTENER', 'COLLABORATOR']);
 
@@ -52,9 +53,10 @@ const ProjectSchema = z.object({
 export const ResponseProjectSchema = ProjectSchema.omit({ id: true }).strict();
 export const ResponseProjectWithRelationsSchema = ResponseProjectSchema.extend({
   logo: ResponseImageWithRelationsSchema.optional(),
-  maintainingTeam: ResponseTeamWithRelationsSchema.optional(),
-  contributingTeams: ResponseTeamWithRelationsSchema.array().optional(),
-  creator: ResponseMemberWithRelationsSchema.optional()
+  maintainingTeam: z.lazy(()=>ResponseTeamWithRelationsSchema).optional(),
+  contributingTeams: z.lazy(()=>ResponseTeamWithRelationsSchema).array().optional(),
+  creator: ResponseMemberWithRelationsSchema.optional(),
+  asks: z.lazy(()=>ResponseAskSchemaWithRelationsSchema).array().optional().nullable()
 });
 export const ResponseProjectSuccessSchema = z.object({ success: z.boolean()});
 // omit score and id to avoid update from request

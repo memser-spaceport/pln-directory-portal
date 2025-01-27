@@ -23,8 +23,26 @@ export class ProjectsController {
 
   @Api(server.route.getProjectFilters)
   @NoCache()
-  async getProjectFilters() {
-    return await this.projectsService.getProjectFilters();
+  async getProjectFilters(@Req() req) {
+    // return await this.projectsService.getProjectFilters();
+    const queryableFields = prismaQueryableFieldsFromZod(
+      ResponseProjectWithRelationsSchema
+    );
+    const builder = new PrismaQueryBuilder(queryableFields);
+    const builtQuery = builder.build(req.query);
+    const { focusAreas }: any = req.query;
+    builtQuery.where = {
+      AND: [
+        {
+          isDeleted: false,
+        },
+        builtQuery.where ? builtQuery.where : {},
+        this.projectsService.buildFocusAreaFilters(focusAreas),
+        this.projectsService.buildRecentProjectsFilter(req.query),
+        this.projectsService.buildAskTagFilter(req.query)
+      ]
+    }
+    return await this.projectsService.getProjectFilters(builtQuery);
   }
 
   @Api(server.route.createProject)
@@ -60,7 +78,8 @@ export class ProjectsController {
       AND: [
         builtQuery.where ? builtQuery.where : {},
         this.projectsService.buildFocusAreaFilters(focusAreas),
-        this.projectsService.buildRecentProjectsFilter(req.query)
+        this.projectsService.buildRecentProjectsFilter(req.query),
+        this.projectsService.buildAskTagFilter(req.query)
       ]
     }
     return this.projectsService.getProjects(builtQuery);
@@ -87,6 +106,12 @@ export class ProjectsController {
     @Req() request
   ) {
     return this.projectsService.removeProjectByUid(uid, request.userEmail);
+  }
+
+  @Api(server.route.patchAskProject)
+  @UseGuards(UserTokenValidation)
+  async addEditAsk(@Param('uid') projectUid, @Body() body, @Req() req) {
+    return await this.projectsService.addEditProjectAsk(projectUid,req.userEmail,body);
   }
 
 }

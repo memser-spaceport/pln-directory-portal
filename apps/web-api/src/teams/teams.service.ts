@@ -129,6 +129,15 @@ export class TeamsService {
               },
             },
           },
+          asks:{
+            select:{
+              uid: true,
+              title:true,
+              tags:true,
+              description:true,
+              teamUid:true
+            }
+          }
         },
       });
       team.teamFocusAreas = this.removeDuplicateFocusAreas(team.teamFocusAreas);
@@ -624,6 +633,22 @@ export class TeamsService {
     return {};
   }
 
+  buildAskTagFilter(queryParams, filter?){
+    const { askTags } = queryParams;
+    let tagFilter={}
+    if(askTags){
+      const tags = askTags.split(',')
+      tagFilter={
+        asks: { some: { tags: { hasSome: tags }, }, },
+      };
+    }
+    if(filter){
+      filter.push(tagFilter)
+    }else{
+      return tagFilter;
+    }
+  }
+
   /**
    * Handles database-related errors specifically for the Team entity.
    * Logs the error and throws an appropriate HTTP exception based on the error type.
@@ -762,7 +787,7 @@ export class TeamsService {
    * and technologies that contains atleast one team.
    */
   async getTeamFilters(queryParams) {
-    const [industryTags, membershipSources, fundingStages, technologies] = await Promise.all([
+    const [industryTags, membershipSources, fundingStages, technologies,askTags] = await Promise.all([
       this.prisma.industryTag.findMany({
         where: {
           teams: {
@@ -806,12 +831,31 @@ export class TeamsService {
           title: true,
         },
       }),
+
+      this.prisma.ask.findMany({
+        where: {
+          team: queryParams.where,
+        },
+        select: {
+          tags: true,
+        },
+      })
     ]);
+
+    // Flatten the tags and calculate counts
+    const tagCounts = askTags
+    .flatMap(item => item.tags) // Flatten the tags array
+    .reduce((acc, tag) => {
+        acc[tag] = (acc[tag] || 0) + 1; // Count occurrences
+        return acc;
+    }, {});
+
     return {
       industryTags: industryTags.map((tag) => tag.title),
       membershipSources: membershipSources.map((source) => source.title),
       fundingStages: fundingStages.map((stage) => stage.title),
       technologies: technologies.map((tech) => tech.title),
+      askTags: Object.entries(tagCounts).map(([tag, count]) => ({ tag, count }))
     };
   }
 
@@ -833,5 +877,73 @@ export class TeamsService {
       };
     }
     return {};
+  }
+
+  async addEditTeamAsk(teamUid, teamName, requesterEmailId, data) {
+    let addEditResponse;
+
+    try {
+      //get existing asks related to teamuid
+      const teamAsks = await this.prisma.ask.findMany({
+        where: { teamUid },
+      });
+
+      await this.prisma.$transaction(async (tx) => {
+        if(data.uid) {
+          if (data.isDeleted) {
+            //deleting asks
+            addEditResponse = await this.prisma.ask.delete({
+              where: { uid: data.uid }
+            });
+          } else {
+            //updating asks
+            addEditResponse = await this.prisma.ask.update({
+              where: { uid: data.uid },
+              data: {
+                ...data,
+              },
+            });
+          }
+        }else {
+          //inserting asks
+          addEditResponse = await tx.ask.create({
+            data: {
+              ...data,
+              teamUid: teamUid,
+            },
+          });
+        }
+
+        const teamAsksAfter = await tx.ask.findMany({
+          where: { teamUid },
+        });
+
+        //logging into participant request
+        await this.participantsRequestService.add(
+          {
+            status: 'AUTOAPPROVED',
+            requesterEmailId,
+            referenceUid: teamUid,
+            uniqueIdentifier: teamName,
+            participantType: 'TEAM',
+            newData: teamAsksAfter as any,
+            oldData: teamAsks as any,
+          },
+          tx
+        );
+      });
+
+      //notifying the team edit
+      // this.notificationService.notifyForTeamEditApproval(teamName, teamUid, requesterEmailId);
+
+      //reseting cache
+      await this.cacheService.reset({ service: 'teams' });
+
+      //syncing up to airtable
+      await this.forestadminService.triggerAirtableSync();
+    } catch (err) {
+      console.error(err);
+    }
+    return addEditResponse;
   }
 }
