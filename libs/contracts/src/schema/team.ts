@@ -7,6 +7,7 @@ import { ResponseMembershipSourceSchema } from './membership-source';
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
 import { ResponseTechnologySchema } from './technology';
+import { ResponseAskSchema, ResponseAskSchemaWithRelationsSchema } from './ask';
 
 export const TeamSchema = z.object({
   id: z.number().int(),
@@ -52,7 +53,8 @@ export const ResponseTeamWithRelationsSchema = ResponseTeamSchema.extend({
   industryTags: ResponseIndustryTagSchema.array().optional(),
   fundingStage: ResponseFundingStageSchema.optional(),
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
-  technologies: ResponseTechnologySchema.array().optional()
+  technologies: ResponseTechnologySchema.array().optional(),
+  asks: ResponseAskSchemaWithRelationsSchema.array().optional()
 });
 
 export const TeamQueryableFields = ResponseTeamSchema.keyof();
@@ -64,6 +66,7 @@ export const TeamRelationalFields = ResponseTeamWithRelationsSchema.pick({
   fundingStage: true,
   teamMemberRoles: true,
   technologies: true,
+  asks: true
 }).strip();
 
 export const TeamQueryParams = QueryParams({

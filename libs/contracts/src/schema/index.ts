@@ -27,3 +27,4 @@ export * from './pl-event-location';
 export * from './admin';
 export * from './participants-request';
 export * from './member-subscription';
+export * from './ask';

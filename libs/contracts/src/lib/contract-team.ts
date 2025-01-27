@@ -45,4 +45,13 @@ export const apiTeam = contract.router({
     },
     summary: 'Modify a team',
   },
+  patchTeam: {
+    method: 'PATCH',
+    path: `${getAPIVersionAsPath('1')}/teams/:uid/ask`,
+    body: contract.body<any>(),
+    responses: {
+      200: contract.response<any>(),
+    },
+    summary: "Modify team's Ask",
+  }
 });
