@@ -5,6 +5,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { Prisma } from '@prisma/client';
 import { MembersService } from '../members/members.service';
 import { CacheService } from '../utils/cache/cache.service';
+import { AskService } from '../asks/asks.service';
 
 @Injectable()
 export class ProjectsService {
@@ -12,7 +13,8 @@ export class ProjectsService {
     private prisma: PrismaService,
     private memberService: MembersService,
     private logger: LogService,
-    private cacheService: CacheService
+    private cacheService: CacheService,
+    private askService: AskService
   ) { }
 
   async createProject(project: Prisma.ProjectUncheckedCreateInput, userEmail: string) {
@@ -441,15 +443,9 @@ export class ProjectsService {
         tags: true,
       },
     })
-    // Flatten the tags and calculate counts
-    const tagCounts = askTags
-    .flatMap(item => item.tags) // Flatten the tags array
-    .reduce((acc, tag) => {
-        acc[tag] = (acc[tag] || 0) + 1; // Count occurrences
-        return acc;
-    }, {});
+    
     return {
-      askTags: Object.entries(tagCounts).map(([tag, count]) => ({ tag, count }))
+      askTags: this.askService.formatAskFilterResponse(askTags)
     }
     // return { maintainedBy: maintainingTeams.map((team) => ({ uid: team.uid, name: team.name, logo: team.logo?.url })) };
   }
