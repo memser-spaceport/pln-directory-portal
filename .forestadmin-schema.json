@@ -5284,22 +5284,6 @@
       {
         "defaultValue": null,
         "enums": null,
-        "field": "highlightContent",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": false,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": false,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Json",
-        "validations": []
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
         "field": "id",
         "integration": null,
         "inverseOf": null,
@@ -6209,22 +6193,6 @@
         "isVirtual": false,
         "reference": null,
         "type": "Date",
-        "validations": []
-      },
-      {
-        "defaultValue": null,
-        "enums": null,
-        "field": "highlightContent",
-        "integration": null,
-        "inverseOf": null,
-        "isFilterable": false,
-        "isPrimaryKey": false,
-        "isReadOnly": false,
-        "isRequired": false,
-        "isSortable": true,
-        "isVirtual": false,
-        "reference": null,
-        "type": "Json",
         "validations": []
       },
       {

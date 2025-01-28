@@ -98,5 +98,13 @@ export const apiEvents = contract.router({
     responses: {
       200: ResponsePLEventLocationWithRelationsSchema.array(),
     },
+  },
+  getPLEventGuestMigration: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/ipfsToS3`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>() ,
+    },
   }
 });

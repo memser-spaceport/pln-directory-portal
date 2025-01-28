@@ -7,13 +7,16 @@ import { MembersModule } from '../members/members.module';
 import { JwtService } from '../utils/jwt/jwt.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { MemberSubscriptionsModule } from '../member-subscriptions/member-subscriptions.module';
+import { AwsService } from '../utils/aws/aws.service';
+
 @Module({
   controllers: [PLEventsController],
   providers: [
     PLEventsService,
     PLEventLocationsService,
     PLEventGuestsService,
-    JwtService
+    JwtService,
+    AwsService
   ],
   exports: [
     PLEventsService,

@@ -217,4 +217,9 @@ export class PLEventsController {
     const memberUid = this.memberService.checkIfAdminUser(member) ? guestUid : member.uid;
     return await this.eventGuestService.getPLEventGuestByUidAndLocation(memberUid, locationUid, true, type);
   }
+
+  @Api(server.route.getPLEventGuestMigration)
+  async getPLEventGuestMigration() {
+    return await this.eventGuestService.migrateIPFSToS3();
+  }
 }

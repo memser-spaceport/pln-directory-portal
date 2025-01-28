@@ -131,7 +131,7 @@ export class PLEventLocationsService {
                   },
                   teamUid: true
                 }
-              }
+              },
             },
             orderBy: {
               priority: "asc"

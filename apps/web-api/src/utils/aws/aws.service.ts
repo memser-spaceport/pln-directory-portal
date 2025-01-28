@@ -94,6 +94,7 @@ export class AwsService {
         Location: ""
       };
     }
+    console.log(CONFIG);
     const s3 = new AWS.S3(CONFIG);
     const params = {
       Bucket: bucketName,

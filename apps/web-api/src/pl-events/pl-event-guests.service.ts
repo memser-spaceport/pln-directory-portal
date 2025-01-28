@@ -16,6 +16,11 @@ import { CacheService } from '../utils/cache/cache.service';
 import { NotificationService } from '../notifications/notifications.service';
 import { CREATE, EventInvitationToMember, UPDATE } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
+import axios from 'axios';
+import pLimit from 'p-limit';
+import createHash from 'create-hash/browser';
+import { createDecipheriv } from 'browserify-aes/decrypter';
+import { Buffer } from 'buffer/';
 
 @Injectable()
 export class PLEventGuestsService {
@@ -26,7 +31,7 @@ export class PLEventGuestsService {
     private eventLocationsService: PLEventLocationsService,
     private cacheService: CacheService,
     private notificationService: NotificationService,
-    private awsService: AwsService,
+    private awsService: AwsService
   ) { }
 
   /**
@@ -932,4 +937,256 @@ async sendEventInvitationIfAdminAddsMember(eventMember: Member, location: { loca
     }
   }
 
- }
+  private async notifySubscribers(guests, entityUid, actionType, requestorEmail) {
+    const notification = await this.notificationService.getNotificationPayload(entityUid, actionType);
+    switch (actionType) {
+      case "HOST_SPEAKER_ADDED":
+        await Promise.all(
+          guests.events.map(async (event) => {
+            if ((event.isHost || event.isSpeaker) && !(event.isHost && event.isSpeaker)) {
+              let role = event.isHost ? 'Host' : 'Speaker';
+              const payload = await this.buildHostSpeakerAdditonPayload(guests.memberUid, event, notification, requestorEmail, role);
+              await this.notificationService.sendNotification(payload);
+            } else if (event.isHost && event.isSpeaker) {
+              let role = "Host/Speaker"
+              const payload = await this.buildHostSpeakerAdditonPayload(guests.memberUid, event, notification, requestorEmail, role);
+              await this.notificationService.sendNotification(payload);
+            }
+          }
+          )
+        );
+    }
+  }
+
+  private async buildHostSpeakerAdditonPayload(memberUid, event, notification, requestorEmail, role) {
+    const requestor = await this.memberService.findMemberByEmail(requestorEmail);
+    notification.additionalInfo = {
+      memberUid: memberUid,
+      eventUid: event.uid,
+      sourceUid: requestor.uid,
+      sourceName: requestor.name,
+      guestType: role
+    }
+    return notification;
+  }
+
+
+  async migrateIPFSToS3() {
+    try {
+      // Fetch the images from the database
+      const images = await this.prisma.image.findMany({
+        where: {
+          url: {
+            startsWith: "https://files.plnetwork.io",
+          },
+        },
+      });
+      console.log("No of images need to be migrated:", images.length);
+      let successCnt = 0;
+      for (const image of images) {
+        try {
+          const imageUrl = image.url;
+          console.log("imageURL", imageUrl)
+          // Extract the file name from the URL
+          const fileName:any = imageUrl.split("/").pop(); // Gets the last segment after the last "/"
+          const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
+          const fileBuffer = Buffer.from(response.data);
+          const contentType = response.headers["content-type"];
+          // Prepare the file object for S3 upload
+          const file = {
+            buffer: fileBuffer,
+            mimetype: contentType,
+          };
+          console.log(file.mimetype);
+          const s3Response = await this.awsService.uploadFileToS3(file, process.env.AWS_S3_BUCKET_NAME, fileName);
+          if (s3Response.Location) {
+            await this.prisma.image.update({
+              where: { 
+                uid: image.uid 
+              },
+              data: {
+                url: s3Response.Location,
+                cid: s3Response.Location
+              }
+            });
+            successCnt += 1;
+          }
+          console.log(`Migrated image ${image.url} to S3: ${s3Response.Location}`);
+        } catch (error) {
+          console.error(`Error migrating image ${image.url}:`, error);
+        }
+      }
+      console.log(`Successfully migrated ${successCnt} images to S3.`);
+      return { msg: "success" };
+    } catch (error) {
+      console.error("Error fetching or uploading the images:", error);
+      throw error;
+    }
+  }
+
+   
+// private hasValidCid(value) {
+//   return /^[a-zA-Z0-9]{50,}$/.test(value); // CID validation
+// }
+
+// private hasValidFilename(value) {
+//   return /^[a-z0-9_.@()%-]+\.(jpg|jpeg|png|webp|pdf|csv)$/i.test(value); // File extension validation
+// }
+
+// private getScryptKey() {
+//   const salt = "n(59bvatjhp-mij0lu3r8!82yw=6_lfb8799ip6-y(c$83e0&b"; // Replace with your salt
+//   const hash = createHash('sha256');
+//   hash.update(salt);
+//   return hash.digest().slice(0, 32); // AES-256 requires a 32-byte key
+// }
+
+// async migrateIPFSToS3() {
+//   try {
+//     // Fetch images from the database
+//     const images = await this.prisma.image.findMany({
+//       where: {
+//         url: {
+//           startsWith: 'https://files.plnetwork.io',
+//         },
+//       },
+//     });
+
+//     console.log('Number of images to migrate:', images.length);
+//     let successCnt = 0;
+
+//     for (const image of images) {
+//       try {
+//         const imageUrl = image.url;
+//         const fileName = imageUrl.split('/').pop();
+
+//         if (!fileName || !this.hasValidFilename(fileName)) {
+//           console.error(`Invalid filename for image ${image.uid}`);
+//           continue;
+//         }
+
+//         // Fetch the file from IPFS
+//         const response = await fetch(imageUrl);
+//         if (!response.ok) {
+//           throw new Error(`Failed to fetch file: ${response.statusText}`);
+//         }
+
+//         // Decrypt the file
+//         const arrayBuffer = await response.arrayBuffer();
+//         const buffer = Buffer.from(arrayBuffer);
+//         const iv = buffer.slice(0, 16); // Initialization vector
+//         const chunk = buffer.slice(16); // Encrypted content
+//         const decipher = createDecipheriv('aes-256-ctr', this.getScryptKey(), iv);
+//         const decryptedData = Buffer.concat([decipher.update(chunk), decipher.final()]);
+
+//         // Prepare the file for S3 upload
+//         const file = {
+//           buffer: decryptedData,
+//           mimetype: response.headers.get('Content-Type') || 'application/octet-stream',
+//         };
+
+//         // Upload to S3
+//         const s3Response = await this.awsService.uploadFileToS3(file, process.env.AWS_S3_BUCKET_NAME, fileName);
+//         if (s3Response.Location) {
+//           // Update the database with the new URL
+//           await this.prisma.image.update({
+//             where: { uid: image.uid },
+//             data: {
+//               url: s3Response.Location,
+//               cid: s3Response.Location,
+//             },
+//           });
+//           successCnt++;
+//           console.log(`Migrated image ${image.uid} to S3: ${s3Response.Location}`);
+//         }
+//       } catch (error) {
+//         console.error(`Error migrating image ${image.url}:`, error);
+//       }
+//     }
+
+//     console.log(`Successfully migrated ${successCnt} images to S3.`);
+//     return { msg: 'success' };
+//   } catch (error) {
+//     console.error('Error fetching or uploading images:', error);
+//     throw error;
+//   }
+// }
+
+
+
+// async migrateIPFSToS3() {
+//   try {
+//     // Fetch the images from the database
+//     const images = await this.prisma.image.findMany({
+//       where: {
+//         url: {
+//           startsWith: "https://files.plnetwork.io",
+//         },
+//       },
+//     });
+
+//     console.log("No of images need to be migrated:", images.length);
+
+//     const limit = pLimit(10); // Limit concurrent operations to 10
+//     let successCnt = 0;
+
+//     // Use Promise.all with pLimit for concurrency control
+//     const migrationResults = await Promise.all(
+//       images.map((image) =>
+//         limit(async () => {
+//           try {
+//             const imageUrl = image.url;
+//             console.log("Processing image:", imageUrl);
+
+//             // Extract the file name from the URL
+//             const fileName = imageUrl.split("/").pop();
+
+//             // Fetch the image with a timeout
+//             const response = await axios.get(imageUrl, {
+            
+//             });
+
+//             const fileBuffer = Buffer.from(response.data);
+//             const contentType = response.headers["content-type"];
+
+//             // Prepare the file object for S3 upload
+//             const file = {
+//               buffer: fileBuffer,
+//               mimetype: contentType,
+//             };
+
+//             // Upload to S3
+//             const s3Response = await this.awsService.uploadFileToS3(
+//               file,
+//               process.env.AWS_S3_BUCKET_NAME,
+//               fileName || ''
+//             );
+
+//             // Update the database if upload is successful
+//             if (s3Response.Location) {
+//               await this.prisma.image.update({
+//                 where: { uid: image.uid },
+//                 data: {
+//                   url: s3Response.Location,
+//                   cid: s3Response.Location,
+//                 },
+//               });
+
+//               successCnt += 1;
+//               console.log(`Migrated image ${imageUrl} to S3: ${s3Response.Location}`);
+//             }
+//           } catch (error) {
+//             console.error(`Error migrating image ${image.url}:`, error.message);
+//           }
+//         })
+//       )
+//     );
+
+//     console.log(`Successfully migrated ${successCnt} images to S3.`);
+//     return { msg: "success", successCount: successCnt };
+//   } catch (error) {
+//     console.error("Error fetching or uploading the images:", error.message);
+//     throw error;
+//   }
+// }
+
+}
