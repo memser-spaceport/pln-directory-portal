@@ -1,36 +1,4 @@
-// import { z } from 'zod';
-// import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
-
-// export const AskSchema = z.object({
-//   id: z.number().int(),
-//   uid: z.string(),
-//   title: z.string(),
-//   description: z.string(),
-//   tags:z.array(z.string()),
-//   teamUid: z.string(),
-//   projectUid: z.string(),
-//   createdAt: z.date(),
-//   updatedAt: z.date(),
-// });
-
-// export const ResponseAskSchema = AskSchema.omit({
-//   id: true,
-// }).strict();
-
-// export const AskQueryableFields = ResponseAskSchema.keyof();
-
-// export const AskQueryParams = QueryParams({
-//   queryableFields: AskQueryableFields,
-// });
-
-// export const AskDetailQueryParams = AskQueryParams.unwrap()
-//   .pick(RETRIEVAL_QUERY_FILTERS)
-//   .optional();
-
-
-
 import { z,  } from "zod";
-import { createZodDto } from '@abitia/zod-dto';
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseTeamSchema } from "./team";
 import { ResponseProjectSchema } from "./project";

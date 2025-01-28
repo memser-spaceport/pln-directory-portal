@@ -21,6 +21,7 @@ import { MembersService } from '../members/members.service';
 import { LogService } from '../shared/log.service';
 import { copyObj, buildMultiRelationMapping, buildRelationMapping } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
+import { AskService } from '../asks/asks.service';
 
 @Injectable()
 export class TeamsService {
@@ -34,7 +35,8 @@ export class TeamsService {
     private logger: LogService,
     private forestadminService: ForestAdminService,
     private notificationService: NotificationService,
-    private cacheService: CacheService
+    private cacheService: CacheService,
+    private askService: AskService
   ) {}
 
   /**
@@ -842,20 +844,13 @@ export class TeamsService {
       })
     ]);
 
-    // Flatten the tags and calculate counts
-    const tagCounts = askTags
-    .flatMap(item => item.tags) // Flatten the tags array
-    .reduce((acc, tag) => {
-        acc[tag] = (acc[tag] || 0) + 1; // Count occurrences
-        return acc;
-    }, {});
 
     return {
       industryTags: industryTags.map((tag) => tag.title),
       membershipSources: membershipSources.map((source) => source.title),
       fundingStages: fundingStages.map((stage) => stage.title),
       technologies: technologies.map((tech) => tech.title),
-      askTags: Object.entries(tagCounts).map(([tag, count]) => ({ tag, count }))
+      askTags: this.askService.formatAskFilterResponse(askTags)
     };
   }
 
