@@ -74,6 +74,9 @@ import { AskModule } from './asks/asks.module';
           requestCert: true,
         },
       },
+      settings: {
+        lockDuration: 20000
+      }
     }),
     ScheduleModule.forRoot(),
     MembersModule,
