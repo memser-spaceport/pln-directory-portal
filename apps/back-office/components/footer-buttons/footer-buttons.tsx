@@ -1,6 +1,6 @@
 import { CheckIcon, XIcon } from '@heroicons/react/outline';
 import api from '../../utils/api';
-import router from 'next/router';
+import { useRouter } from 'next/router';
 import Modal from '../modal/modal';
 import APP_CONSTANTS, {
   API_ROUTE,
@@ -11,6 +11,7 @@ import { toast } from 'react-toastify';
 import { useState } from 'react';
 
 export function FooterButtons(props) {
+  const router = useRouter();
   const [openModal, setOpenModal] = useState(false);
   const teamRoute = router.pathname === "/team-view";
   const saveButtonClassName = props.disableSave
