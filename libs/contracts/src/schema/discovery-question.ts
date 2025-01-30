@@ -25,7 +25,7 @@ export const DiscoveryQuestionSchema = z.object({
   answerSourceFrom: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
-  type: z.enum(['CHAT']).optional()
+  type: z.enum(['CHAT']).nullish().optional()
 });
 
 export const CreateDiscoveryQuestionSchema = DiscoveryQuestionSchema.pick({
