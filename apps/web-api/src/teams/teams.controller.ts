@@ -116,7 +116,7 @@ export class TeamsController {
   @Api(server.route.patchTeam)
   @UseGuards(UserTokenValidation)
   async addAsk(@Param('uid') teamUid, @Body() body, @Req() req) {
-    await this.teamsService.validateAskAddEditRequestor(req.userEmail, teamUid);
+    await this.teamsService.isTeamMemberOrAdmin(req.userEmail, teamUid);
     const res = await this.teamsService.addEditTeamAsk(teamUid,body.teamName,req.userEmail,body.ask);
     return res;
   }
