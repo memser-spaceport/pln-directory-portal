@@ -340,7 +340,7 @@ export class TeamsService {
   }
 
   /**
-   * Validates the permissions of the add/edit ask requestor. The requestor must either be an admin or a member of the team.
+   * Validating if the requestor is either an admin or a member of the team.
    *
    * @param requestorEmail - The email of the person requesting the update
    * @param teamUid - The unique identifier of the team being updated
@@ -348,7 +348,7 @@ export class TeamsService {
    * @throws {UnauthorizedException} If the requestor is not found
    * @throws {ForbiddenException} If the requestor does not have sufficient permissions
    */
-  async validateAskAddEditRequestor(requestorEmail: string, teamUid: string): Promise<Member> {
+  async isTeamMemberOrAdmin(requestorEmail: string, teamUid: string): Promise<Member> {
     const requestor = await this.membersService.findMemberByEmail(requestorEmail);
     const isPartOfTheTeam = requestor?.teamMemberRoles?.find((teams) => teams.teamUid === teamUid);
     if (!requestor.isDirectoryAdmin && !isPartOfTheTeam) {
