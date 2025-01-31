@@ -657,10 +657,16 @@ export class TeamsService {
     const { askTags } = queryParams;
     let tagFilter={}
     if(askTags){
-      const tags = askTags.split(',')
-      tagFilter={
-        asks: { some: { tags: { hasSome: tags }, }, },
-      };
+      if(askTags === 'all'){
+        tagFilter={
+          asks: { some: {}, },
+        };
+      }else{
+        const tags = askTags.split(',')
+        tagFilter={
+          asks: { some: { tags: { hasSome: tags }, }, },
+        };
+      }
     }
     if(filter){
       filter.push(tagFilter)
