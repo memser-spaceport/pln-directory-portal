@@ -81,6 +81,23 @@ export class TeamsController {
         },
       });
     }
+    
+    //when "default" is passed as a parameter to orderBy, teams with asks will appear at the beginning of the list.
+    const orderByQuery: any = request.query.orderBy
+    if(orderByQuery && orderByQuery.includes('default')){
+      let order: any = [
+        {
+          asks: {
+                _count: 'desc',
+              }
+        },
+      ]
+      const queryOrderBy : any= builtQuery.orderBy;
+      if(builtQuery.orderBy){
+        order = [...order,...queryOrderBy]
+      }
+      builtQuery.orderBy = order;
+    }
     return this.teamsService.findAll(builtQuery);
   }
 
