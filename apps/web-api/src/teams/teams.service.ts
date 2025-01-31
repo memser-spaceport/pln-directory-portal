@@ -657,6 +657,7 @@ export class TeamsService {
     const { askTags } = queryParams;
     let tagFilter={}
     if(askTags){
+      //when all is given as value to askTags, all the teams with asks are returned.
       if(askTags === 'all'){
         tagFilter={
           asks: { some: {}, },
