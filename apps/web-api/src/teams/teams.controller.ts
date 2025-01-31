@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { Controller, Req, UseGuards, Body, Param, UsePipes } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
@@ -27,6 +28,7 @@ export class TeamsController {
 
   @Api(server.route.teamFilters)
   @ApiQueryFromZod(TeamQueryParams)
+  @NoCache()
   async getTeamFilters(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(
       ResponseTeamWithRelationsSchema
@@ -42,7 +44,8 @@ export class TeamsController {
         builtQuery.where ? builtQuery.where : {},
         this.teamsService.buildFocusAreaFilters(focusAreas),
         this.teamsService.buildRecentTeamsFilter(request.query),
-        this.teamsService.buildParticipationTypeFilter(request.query)
+        this.teamsService.buildParticipationTypeFilter(request.query),
+        this.teamsService.buildAskTagFilter(request.query)
       ]
     }
     return await this.teamsService.getTeamFilters(builtQuery);
@@ -66,7 +69,8 @@ export class TeamsController {
         builtQuery.where ? builtQuery.where : {},
         this.teamsService.buildFocusAreaFilters(focusAreas),
         this.teamsService.buildRecentTeamsFilter(request.query),
-        this.teamsService.buildParticipationTypeFilter(request.query)
+        this.teamsService.buildParticipationTypeFilter(request.query),
+        this.teamsService.buildAskTagFilter(request.query)
       ],
     };
     // Check for the office hours blank when OH not null is passed
@@ -76,6 +80,23 @@ export class TeamsController {
           not: '',
         },
       });
+    }
+    
+    //when "default" is passed as a parameter to orderBy, teams with asks will appear at the beginning of the list.
+    const orderByQuery: any = request.query.orderBy
+    if(orderByQuery && orderByQuery.includes('default')){
+      let order: any = [
+        {
+          asks: {
+                _count: 'desc',
+              }
+        },
+      ]
+      const queryOrderBy : any= builtQuery.orderBy;
+      if(builtQuery.orderBy){
+        order = [...order,...queryOrderBy]
+      }
+      builtQuery.orderBy = order;
     }
     return this.teamsService.findAll(builtQuery);
   }
@@ -109,4 +130,11 @@ export class TeamsController {
     return await this.teamsService.updateTeamFromParticipantsRequest(teamUid, body, req.userEmail);
   }
 
+  @Api(server.route.patchTeam)
+  @UseGuards(UserTokenValidation)
+  async addAsk(@Param('uid') teamUid, @Body() body, @Req() req) {
+    await this.teamsService.isTeamMemberOrAdmin(req.userEmail, teamUid);
+    const res = await this.teamsService.addEditTeamAsk(teamUid,body.teamName,req.userEmail,body.ask);
+    return res;
+  }
 }

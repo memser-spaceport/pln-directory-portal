@@ -44,6 +44,7 @@ import { InternalsModule } from './internals/internals.module';
 import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
 import { MemberSubscriptionsModule } from './member-subscriptions/member-subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { AskModule } from './asks/asks.module';
 
 @Module({
   controllers: [AppController],
@@ -73,6 +74,9 @@ import { NotificationsModule } from './notifications/notifications.module';
           requestCert: true,
         },
       },
+      settings: {
+        lockDuration: 20000
+      }
     }),
     ScheduleModule.forRoot(),
     MembersModule,
@@ -103,7 +107,8 @@ import { NotificationsModule } from './notifications/notifications.module';
     InternalsModule,
     OsoMetricsModule,
     MemberSubscriptionsModule,
-    NotificationsModule
+    NotificationsModule,
+    AskModule
   ],
   providers: [
     {

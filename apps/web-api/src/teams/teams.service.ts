@@ -21,6 +21,7 @@ import { MembersService } from '../members/members.service';
 import { LogService } from '../shared/log.service';
 import { copyObj, buildMultiRelationMapping, buildRelationMapping } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
+import { AskService } from '../asks/asks.service';
 
 @Injectable()
 export class TeamsService {
@@ -34,7 +35,8 @@ export class TeamsService {
     private logger: LogService,
     private forestadminService: ForestAdminService,
     private notificationService: NotificationService,
-    private cacheService: CacheService
+    private cacheService: CacheService,
+    private askService: AskService
   ) {}
 
   /**
@@ -129,6 +131,15 @@ export class TeamsService {
               },
             },
           },
+          asks:{
+            select:{
+              uid: true,
+              title:true,
+              tags:true,
+              description:true,
+              teamUid:true
+            }
+          }
         },
       });
       team.teamFocusAreas = this.removeDuplicateFocusAreas(team.teamFocusAreas);
@@ -329,6 +340,24 @@ export class TeamsService {
   }
 
   /**
+   * Validating if the requestor is either an admin or a member of the team.
+   *
+   * @param requestorEmail - The email of the person requesting the update
+   * @param teamUid - The unique identifier of the team being updated
+   * @returns The requestor's member data if validation passes
+   * @throws {UnauthorizedException} If the requestor is not found
+   * @throws {ForbiddenException} If the requestor does not have sufficient permissions
+   */
+  async isTeamMemberOrAdmin(requestorEmail: string, teamUid: string): Promise<Member> {
+    const requestor = await this.membersService.findMemberByEmail(requestorEmail);
+    const isPartOfTheTeam = requestor?.teamMemberRoles?.find((teams) => teams.teamUid === teamUid);
+    if (!requestor.isDirectoryAdmin && !isPartOfTheTeam) {
+      throw new ForbiddenException('Requestor does not have permission to update this team');
+    }
+    return requestor;
+  }
+
+  /**
    * Removes duplicate focus areas from the team object based on their UID.
    * Ensures that each focus area is unique in the result set.
    *
@@ -474,6 +503,7 @@ export class TeamsService {
     this.buildFundingStageFilter(fundingStage, filter);
     this.buildOfficeHoursFilter(officeHours, filter);
     this.buildRecentTeamsFilter(queryParams, filter);
+    this.buildAskTagFilter(queryParams, filter);
     filter.push(this.buildParticipationTypeFilter(queryParams));
     return {
       AND: filter,
@@ -624,6 +654,29 @@ export class TeamsService {
     return {};
   }
 
+  buildAskTagFilter(queryParams, filter?){
+    const { askTags } = queryParams;
+    let tagFilter={}
+    if(askTags){
+      //when all is given as value to askTags, all the teams with asks are returned.
+      if(askTags === 'all'){
+        tagFilter={
+          asks: { some: {}, },
+        };
+      }else{
+        const tags = askTags.split(',')
+        tagFilter={
+          asks: { some: { tags: { hasSome: tags }, }, },
+        };
+      }
+    }
+    if(filter){
+      filter.push(tagFilter)
+    }else{
+      return tagFilter;
+    }
+  }
+
   /**
    * Handles database-related errors specifically for the Team entity.
    * Logs the error and throws an appropriate HTTP exception based on the error type.
@@ -762,7 +815,7 @@ export class TeamsService {
    * and technologies that contains atleast one team.
    */
   async getTeamFilters(queryParams) {
-    const [industryTags, membershipSources, fundingStages, technologies] = await Promise.all([
+    const [industryTags, membershipSources, fundingStages, technologies,askTags] = await Promise.all([
       this.prisma.industryTag.findMany({
         where: {
           teams: {
@@ -806,12 +859,24 @@ export class TeamsService {
           title: true,
         },
       }),
+
+      this.prisma.ask.findMany({
+        where: {
+          team: queryParams.where,
+        },
+        select: {
+          tags: true,
+        },
+      })
     ]);
+
+
     return {
       industryTags: industryTags.map((tag) => tag.title),
       membershipSources: membershipSources.map((source) => source.title),
       fundingStages: fundingStages.map((stage) => stage.title),
       technologies: technologies.map((tech) => tech.title),
+      askTags: this.askService.formatAskFilterResponse(askTags)
     };
   }
 
@@ -833,5 +898,73 @@ export class TeamsService {
       };
     }
     return {};
+  }
+
+  async addEditTeamAsk(teamUid, teamName, requesterEmailId, data) {
+    let addEditResponse;
+
+    try {
+      //get existing asks related to teamuid
+      const teamAsks = await this.prisma.ask.findMany({
+        where: { teamUid },
+      });
+
+      await this.prisma.$transaction(async (tx) => {
+        if(data.uid) {
+          if (data.isDeleted) {
+            //deleting asks
+            addEditResponse = await this.prisma.ask.delete({
+              where: { uid: data.uid }
+            });
+          } else {
+            //updating asks
+            addEditResponse = await this.prisma.ask.update({
+              where: { uid: data.uid },
+              data: {
+                ...data,
+              },
+            });
+          }
+        }else {
+          //inserting asks
+          addEditResponse = await tx.ask.create({
+            data: {
+              ...data,
+              teamUid: teamUid,
+            },
+          });
+        }
+
+        const teamAsksAfter = await tx.ask.findMany({
+          where: { teamUid },
+        });
+
+        //logging into participant request
+        await this.participantsRequestService.add(
+          {
+            status: 'AUTOAPPROVED',
+            requesterEmailId,
+            referenceUid: teamUid,
+            uniqueIdentifier: teamName,
+            participantType: 'TEAM',
+            newData: teamAsksAfter as any,
+            oldData: teamAsks as any,
+          },
+          tx
+        );
+      });
+
+      //notifying the team edit
+      // this.notificationService.notifyForTeamEditApproval(teamName, teamUid, requesterEmailId);
+
+      //reseting cache
+      await this.cacheService.reset({ service: 'teams' });
+
+      //syncing up to airtable
+      await this.forestadminService.triggerAirtableSync();
+    } catch (err) {
+      console.error(err);
+    }
+    return addEditResponse;
   }
 }

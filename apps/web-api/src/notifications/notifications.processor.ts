@@ -1,13 +1,12 @@
+import axios from 'axios';
+import { isEmpty } from 'lodash';
 import { Process, Processor } from '@nestjs/bull';
 import { NotificationService } from './notifications.service';
 import { LogService } from '../shared/log.service';
 import { MemberSubscriptionService } from '../member-subscriptions/member-subscriptions.service';
-import axios from 'axios';
 import { NotificationStatus, Prisma } from '@prisma/client';
-import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
 import { EMAIL_TEMPLATES, NOTIFICATION_CHANNEL } from '../utils/constants';
 import { ConflictException, BadRequestException, NotFoundException, HttpException, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
-import { isEmpty } from 'lodash';
 
 @Processor('notifications')
 export class NotificationConsumer {
@@ -37,7 +36,10 @@ export class NotificationConsumer {
    * @returns A Promise that resolves when the notification is processed successfully.
    * @throws Updates the notification status to FAILED if an error occurs.
    */
-  @Process('notify')
+  @Process({
+    name: 'notify',
+    concurrency: 1 // Ensures only one job is processed at a time
+  })
   async process(job) {
     try {
       this.logger.info(`Processing notification with id: ${job.id}`);
@@ -55,15 +57,13 @@ export class NotificationConsumer {
             await this.sendEventLocationNotification(subscribers, notificationData);
         }
         await this.notificationService.updateNotificationStatus(this.createdNotification.uid, NotificationStatus.SENT);
-
       }
       this.logger.info(`Processing ended for id: ${job.id}`);
-      await this.delay(10000);
-      return;
     } catch (error) {
       this.logger.error(`Error occured while sending notification`, error);
       this.handleErrors(error);
     }
+    return;
   }
 
   /**
@@ -285,7 +285,6 @@ export class NotificationConsumer {
     } else if (error instanceof Prisma.PrismaClientValidationError) {
       throw new BadRequestException('Database validation error on notification:', error.message);
     }
-    throw error;
   }
   private async delay(ms: number) {
     this.logger.info(`Processing underway `)
