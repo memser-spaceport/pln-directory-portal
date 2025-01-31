@@ -503,6 +503,7 @@ export class TeamsService {
     this.buildFundingStageFilter(fundingStage, filter);
     this.buildOfficeHoursFilter(officeHours, filter);
     this.buildRecentTeamsFilter(queryParams, filter);
+    this.buildAskTagFilter(queryParams, filter);
     filter.push(this.buildParticipationTypeFilter(queryParams));
     return {
       AND: filter,
