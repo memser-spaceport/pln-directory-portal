@@ -57,7 +57,7 @@ export class PLEventGuestsService {
       if (type === CREATE) {
         await this.eventLocationsService.subscribeLocationByUid(locationUid, data.memberUid);
         this.memberService.checkIfAdminUser(member) && !plEvents.length &&
-        (await this.sendEventInvitationIfAdminAddsMember(eventMember, location)); 
+          (await this.sendEventInvitationIfAdminAddsMember(eventMember, location));
       }
       this.cacheService.reset({ service: 'PLEventGuest' });
       return result;
@@ -67,27 +67,27 @@ export class PLEventGuestsService {
   };
 
 
-/**
- * This method checks if the member has events at the specified location. If no events are found,
- * an invitation email is sent to the member with the event location details.
- * 
- * @param eventMember The member object being checked and invited, including their name and email.
- * @param location The location object containing details such as the location name.
- * @returns A Promise that resolves when the email is successfully sent or does nothing if the member already has events at the location.
- *   - Handles errors such as issues with retrieving events or sending emails.
- */
-async sendEventInvitationIfAdminAddsMember(eventMember: Member, location: { location: string }): Promise<any> {
-  try {
+  /**
+   * This method checks if the member has events at the specified location. If no events are found,
+   * an invitation email is sent to the member with the event location details.
+   * 
+   * @param eventMember The member object being checked and invited, including their name and email.
+   * @param location The location object containing details such as the location name.
+   * @returns A Promise that resolves when the email is successfully sent or does nothing if the member already has events at the location.
+   *   - Handles errors such as issues with retrieving events or sending emails.
+   */
+  async sendEventInvitationIfAdminAddsMember(eventMember: Member, location: { location: string }): Promise<any> {
+    try {
       const eventData = {
         memberName: eventMember.name,
         location: location.location,
         eventLocationURL: `${process.env.WEB_UI_BASE_URL}/irl?location=${location.location}`,
       };
       await this.awsService.sendEmail(EventInvitationToMember, true, [eventMember.email], eventData);
-  } catch (error) {
-    return this.handleErrors(error);
+    } catch (error) {
+      return this.handleErrors(error);
+    }
   }
-}
 
   /**
    * This method retrieves events associated with a specific member.
@@ -932,4 +932,58 @@ async sendEventInvitationIfAdminAddsMember(eventMember: Member, location: { loca
     }
   }
 
- }
+  /**
+   * Retrieves featured locations along with the count of distinct attendees for both upcoming and past events at featured event locations.
+   * @returns Featured location along with events and their attendees details.
+   * Returns an empty array if no locations are found.
+   * @throws Throws an exception if there is an error in querying the database or retrieving event data.
+   */
+  async getFeaturedLocations() {
+    const locations = await this.eventLocationsService.getPLEventLocations({ where: { isFeatured: true } });
+    return Promise.all(locations.map(async (location) => {
+      // Flatten upcoming event UIDs for where clause
+      const upcomingEventUids = location.upcomingEvents.flatMap((event) => event.uid);
+
+      // Flatten past event UIDs for where clause
+      const pastEventUids = location.pastEvents.flatMap((event) => event.uid);
+
+      // Fetch upcoming and past event counts concurrently using Promise.all
+      const [upcomingEventAttendees, pastEventAttendees] = await Promise.all([
+        this.prisma.pLEventGuest.findMany({
+          where: {
+            eventUid: {
+              in: upcomingEventUids,
+            },
+          },
+          select: {
+            memberUid: true,
+          },
+          distinct: ['memberUid'],           // Ensure distinct memberUid values
+        }),
+        this.prisma.pLEventGuest.findMany({
+          where: {
+            eventUid: {
+              in: pastEventUids,
+            },
+          },
+          select: {
+            memberUid: true,
+          },
+          distinct: ['memberUid'],          // Ensure distinct memberUid values
+        }),
+      ]);
+      return {
+        uid: location.uid,
+        location: location.location,
+        flag: location.flag,
+        icon: location.icon,
+        upcomingAttendeesCount: upcomingEventAttendees?.length, // Count of attendees for upcoming events
+        pastAttendeesCount: pastEventAttendees?.length,         // Count of attendees for past events
+        upcomingEvents: location.upcomingEvents,
+        pastEvents: location.pastEvents
+      };
+    }));
+
+  }
+
+}

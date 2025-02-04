@@ -6,13 +6,15 @@ import { MembersService } from '../members/members.service';
 import { TeamsService } from '../teams/teams.service';
 import { PLEventsService } from '../pl-events/pl-events.service';
 import { ProjectsService } from '../projects/projects.service';
+import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
 @Injectable()
 export class HomeService {
   constructor(
     private memberService: MembersService,
     private teamsService: TeamsService,
     private plEventsService: PLEventsService,
-    private projectsService: ProjectsService
+    private projectsService: ProjectsService,
+    private plEventGuestService: PLEventGuestsService
   ) { }
 
   async fetchAllFeaturedData() {
@@ -39,6 +41,7 @@ export class HomeService {
         }),
         events: await this.plEventsService.getPLEvents({ where: { isFeatured: true } }),
         projects: await this.projectsService.getProjects({ where: { isFeatured: true } }),
+        locations: await this.plEventGuestService.getFeaturedLocations(),
       };
     } catch (error) {
       throw new InternalServerErrorException(`Error occured while retrieving featured data: ${error.message}`);
