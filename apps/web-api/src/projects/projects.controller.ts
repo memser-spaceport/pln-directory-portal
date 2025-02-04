@@ -30,7 +30,10 @@ export class ProjectsController {
     );
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(req.query);
-    const { focusAreas }: any = req.query;
+    const { focusAreas, tags }: any = req.query;
+    if (tags) {
+      delete builtQuery.where.tags;
+    }
     builtQuery.where = {
       AND: [
         {
@@ -39,7 +42,8 @@ export class ProjectsController {
         builtQuery.where ? builtQuery.where : {},
         this.projectsService.buildFocusAreaFilters(focusAreas),
         this.projectsService.buildRecentProjectsFilter(req.query),
-        this.projectsService.buildAskTagFilter(req.query)
+        this.projectsService.buildAskTagFilter(req.query),
+        this.projectsService.buildTagFilter(tags)
       ]
     }
     return await this.projectsService.getProjectFilters(builtQuery);
@@ -73,13 +77,17 @@ export class ProjectsController {
     );
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(req.query);
-    const { focusAreas }: any = req.query;
+    const { focusAreas, tags }: any = req.query;
+    if (tags) {
+      delete builtQuery.where.tags;
+    }
     builtQuery.where = {
       AND: [
         builtQuery.where ? builtQuery.where : {},
         this.projectsService.buildFocusAreaFilters(focusAreas),
         this.projectsService.buildRecentProjectsFilter(req.query),
-        this.projectsService.buildAskTagFilter(req.query)
+        this.projectsService.buildAskTagFilter(req.query),
+        this.projectsService.buildTagFilter(tags)
       ]
     }
     return this.projectsService.getProjects(builtQuery);

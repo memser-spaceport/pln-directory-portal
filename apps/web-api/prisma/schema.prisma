@@ -370,6 +370,7 @@ model Project {
   contributions      ProjectContribution[]
   relatedQuestions   DiscoveryQuestion[]   @relation("ProjectRelatedDiscoveryQuestions")
   asks               Ask[]
+  tags               String[]
 }
 
 model PLEventLocation {

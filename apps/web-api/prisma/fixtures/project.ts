@@ -58,6 +58,7 @@ const ProjectFactory = Factory.define<Omit<Project, 'id'>>(
       updatedAt: faker.date.recent(),
       isDeleted: false,
       osoProjectName: faker.random.word(),
+      tags: [faker.word.noun(),faker.word.noun()]
     };
   }
 );
