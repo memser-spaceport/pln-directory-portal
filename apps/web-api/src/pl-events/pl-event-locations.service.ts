@@ -49,7 +49,7 @@ export class PLEventLocationsService {
               banner: true,
               resources: true,
               additionalInfo: true,
-              location:  true,
+              location: true,
             }
           }
         }
@@ -501,6 +501,45 @@ export class PLEventLocationsService {
       guest.url = guestUrl;
     });
     return selectedGuests;
+  }
+
+
+  /**
+   * This method retrieves the event location by its UID, including all associated events and subscribers.
+   * @returns The event location object with associated events
+   *   - The events include details such as name, type, description, startDate, endDate, and additional info.
+   *   - returns empty if no featued location is found.
+   */
+  async getFeaturedLocationsWithSubscribers() {
+    try {
+      const locations = await this.getPLEventLocations({ where: { isFeatured: true } });
+      const result = await Promise.all(locations.map(async (location) => {
+        const subscribers = await this.memberSubscriptionService.getSubscriptions({
+          where: {
+            AND: {
+              entityUid: location.uid,
+              isActive: true,
+            }
+          },
+          include: {
+            member: {
+              select: {
+                uid: true,
+                name: true,
+                image: true,
+              }
+            }
+          }
+        });
+        return {
+          ...location,                    // Spread existing properties of location
+          subscribers: subscribers || []  // Introduce subscribers key
+        };
+      }));
+      return result;
+    } catch (error) {
+      this.handleErrors(error);
+    }
   }
 
 }
