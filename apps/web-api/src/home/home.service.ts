@@ -42,7 +42,7 @@ export class HomeService {
         }),
         events: await this.plEventsService.getPLEvents({ where: { isFeatured: true } }),
         projects: await this.projectsService.getProjects({ where: { isFeatured: true } }),
-        locations: await this.plEventLocationService.getPLEventLocations({ where: { isFeatured: true } }),
+        locations: await this.plEventLocationService.getFeaturedLocationsWithSubscribers()
       };
     } catch (error) {
       throw new InternalServerErrorException(`Error occured while retrieving featured data: ${error.message}`);
