@@ -513,27 +513,31 @@ export class PLEventLocationsService {
   async getFeaturedLocationsWithSubscribers() {
     try {
       const locations = await this.getPLEventLocations({ where: { isFeatured: true } });
-      const result = await Promise.all(locations.map(async (location) => {
-        const subscribers = await this.memberSubscriptionService.getSubscriptions({
-          where: {
-            AND: {
-              entityUid: location.uid,
-              isActive: true,
-            }
-          },
-          include: {
-            member: {
-              select: {
-                uid: true,
-                name: true,
-                image: true,
-              }
+      const locationUids = locations.flatMap(location => location.uid);
+      const subscribers = await this.memberSubscriptionService.getSubscriptions({
+        where: {
+          AND: {
+            entityUid: {
+              in: locationUids
+            },
+            isActive: true,
+          }
+        },
+        include: {
+          member: {
+            select: {
+              uid: true,
+              name: true,
+              image: true,
             }
           }
-        });
+        }
+      });
+      const result = await Promise.all(locations.map(location => {
+        const filteredSubscribers = subscribers?.filter(sub => sub.entityUid == location.uid);
         return {
-          ...location,                    // Spread existing properties of location
-          subscribers: subscribers || []  // Introduce subscribers key
+          ...location,                            // Spread existing properties of location
+          subscribers: filteredSubscribers || []  // Introduce subscribers for corresponding location.
         };
       }));
       return result;
