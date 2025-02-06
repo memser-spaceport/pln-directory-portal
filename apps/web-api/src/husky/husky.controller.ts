@@ -15,6 +15,20 @@ export class HuskyController {
     return;
   }
 
+  @Post('v1/husky/search/directory-contextual')
+  async huskyDirectoryContextualSearch(@Body() body: HuskyChatDto, @Res() res: Response) {
+    const aiStreamingResponse = await this.huskyAiService.processDirectoryContextualSearch({ ...body });
+    aiStreamingResponse.pipeTextStreamToResponse(res);
+    return;
+  }
+
+  @Post('v1/husky/search/directory')
+  async huskyDirectoryNonContextualSearch(@Body() body: HuskyChatDto, @Res() res: Response) {
+    const aiStreamingResponse = await this.huskyAiService.processDirectoryNonContextualSearch({ ...body });
+    res.json(aiStreamingResponse);
+    return;
+  }
+
   @Post('v1/husky/chat/feedback')
   async huskyChatFeedback(@Body() body: HuskyFeedbackDto) {
     await this.huskyService.addHuskyFeedback({ ...body });

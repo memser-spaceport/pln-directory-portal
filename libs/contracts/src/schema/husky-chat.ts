@@ -25,6 +25,11 @@ export const HuskyFeedbackSchema = z.object({
   email: z.string().email().optional(),
 });
 
+export const HuskyNonDirectorySearchSchema = z.object({
+  content: z.string(),
+  sources: z.array(z.string()),
+});
+
 export const HuskyResponseSchema = z.object({
   content: z.string(),
   followUpQuestions: z.array(z.string()),
