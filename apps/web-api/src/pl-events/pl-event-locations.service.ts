@@ -533,13 +533,13 @@ export class PLEventLocationsService {
           }
         }
       });
-      const result = await Promise.all(locations.map(location => {
+      const result = locations.map(location => {
         const filteredSubscribers = subscribers?.filter(sub => sub.entityUid == location.uid);
         return {
           ...location,                            // Spread existing properties of location
           subscribers: filteredSubscribers || []  // Introduce subscribers for corresponding location.
         };
-      }));
+      })
       return result;
     } catch (error) {
       this.handleErrors(error);
