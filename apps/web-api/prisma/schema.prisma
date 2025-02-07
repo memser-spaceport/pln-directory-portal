@@ -51,20 +51,20 @@ model Team {
   relatedQuestions             DiscoveryQuestion[]           @relation("TeamRelatedDiscoveryQuestions")
   asks                         Ask[]
 }
-model Ask {
-  id                           Int                           @id @default(autoincrement())
-  uid                          String                        @unique @default(cuid())
-  title                        String
-  description                  String
-  tags                         String[]
-  team                         Team?                          @relation(fields: [teamUid], references: [uid])
-  teamUid                      String?
-  project                      Project?                        @relation(fields: [projectUid], references: [uid])
-  projectUid                   String?
-  createdAt                    DateTime @default(now())
-  updatedAt                    DateTime @updatedAt
-}
 
+model Ask {
+  id          Int      @id @default(autoincrement())
+  uid         String   @unique @default(cuid())
+  title       String
+  description String
+  tags        String[]
+  team        Team?    @relation(fields: [teamUid], references: [uid])
+  teamUid     String?
+  project     Project? @relation(fields: [projectUid], references: [uid])
+  projectUid  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
 
 model Member {
   id                           Int                           @id @default(autoincrement())
@@ -387,6 +387,7 @@ model PLEventLocation {
   events         PLEvent[]
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  isFeatured     Boolean?  @default(false)
 }
 
 model PLEvent {
@@ -559,33 +560,33 @@ model MemberFeedback {
 }
 
 model DiscoveryQuestion {
-  id               Int      @id @default(autoincrement())
-  uid              String   @unique @default(cuid())
+  id               Int                    @id @default(autoincrement())
+  uid              String                 @unique @default(cuid())
   title            String?
   content          String
   viewCount        Int?
   shareCount       Int?
-  slug             String   @unique
-  isActive         Boolean  @default(true)
+  slug             String                 @unique
+  isActive         Boolean                @default(true)
   teamUid          String?
-  team             Team?    @relation("TeamRelatedDiscoveryQuestions", fields: [teamUid], references: [uid])
+  team             Team?                  @relation("TeamRelatedDiscoveryQuestions", fields: [teamUid], references: [uid])
   teamName         String?
   projectUid       String?
-  project          Project? @relation("ProjectRelatedDiscoveryQuestions", fields: [projectUid], references: [uid])
+  project          Project?               @relation("ProjectRelatedDiscoveryQuestions", fields: [projectUid], references: [uid])
   projectName      String?
   eventUid         String?
-  plevent          PLEvent? @relation("PLEventRelatedDiscoveryQuestions", fields: [eventUid], references: [uid])
+  plevent          PLEvent?               @relation("PLEventRelatedDiscoveryQuestions", fields: [eventUid], references: [uid])
   eventName        String?
   createdBy        String
-  creator          Member?  @relation("MemberCreatedDiscoveryQuestions", fields: [createdBy], references: [uid])
+  creator          Member?                @relation("MemberCreatedDiscoveryQuestions", fields: [createdBy], references: [uid])
   modifiedBy       String
-  modifier         Member?  @relation("MemberModifiedDiscoveryQuestions", fields: [modifiedBy], references: [uid])
+  modifier         Member?                @relation("MemberModifiedDiscoveryQuestions", fields: [modifiedBy], references: [uid])
   answer           String?
   answerSources    Json[]
   answerSourceFrom String?
   relatedQuestions Json[]
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
   type             DiscoveryQuestionType?
 }
 

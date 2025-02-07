@@ -57,7 +57,7 @@ export class PLEventGuestsService {
       if (type === CREATE) {
         await this.eventLocationsService.subscribeLocationByUid(locationUid, data.memberUid);
         this.memberService.checkIfAdminUser(member) && !plEvents.length &&
-        (await this.sendEventInvitationIfAdminAddsMember(eventMember, location)); 
+          (await this.sendEventInvitationIfAdminAddsMember(eventMember, location));
       }
       this.cacheService.reset({ service: 'PLEventGuest' });
       return result;
@@ -67,27 +67,27 @@ export class PLEventGuestsService {
   };
 
 
-/**
- * This method checks if the member has events at the specified location. If no events are found,
- * an invitation email is sent to the member with the event location details.
- * 
- * @param eventMember The member object being checked and invited, including their name and email.
- * @param location The location object containing details such as the location name.
- * @returns A Promise that resolves when the email is successfully sent or does nothing if the member already has events at the location.
- *   - Handles errors such as issues with retrieving events or sending emails.
- */
-async sendEventInvitationIfAdminAddsMember(eventMember: Member, location: { location: string }): Promise<any> {
-  try {
+  /**
+   * This method checks if the member has events at the specified location. If no events are found,
+   * an invitation email is sent to the member with the event location details.
+   * 
+   * @param eventMember The member object being checked and invited, including their name and email.
+   * @param location The location object containing details such as the location name.
+   * @returns A Promise that resolves when the email is successfully sent or does nothing if the member already has events at the location.
+   *   - Handles errors such as issues with retrieving events or sending emails.
+   */
+  async sendEventInvitationIfAdminAddsMember(eventMember: Member, location: { location: string }): Promise<any> {
+    try {
       const eventData = {
         memberName: eventMember.name,
         location: location.location,
         eventLocationURL: `${process.env.WEB_UI_BASE_URL}/irl?location=${location.location}`,
       };
       await this.awsService.sendEmail(EventInvitationToMember, true, [eventMember.email], eventData);
-  } catch (error) {
-    return this.handleErrors(error);
+    } catch (error) {
+      return this.handleErrors(error);
+    }
   }
-}
 
   /**
    * This method retrieves events associated with a specific member.
@@ -932,4 +932,4 @@ async sendEventInvitationIfAdminAddsMember(eventMember: Member, location: { loca
     }
   }
 
- }
+}

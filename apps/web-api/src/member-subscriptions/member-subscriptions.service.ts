@@ -1,11 +1,15 @@
 import { Injectable, ConflictException, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
+import { CacheService } from '../utils/cache/cache.service';
 
 @Injectable()
 export class MemberSubscriptionService {
   private readonly logger = new Logger(MemberSubscriptionService.name);
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private cacheService: CacheService
+  ) { }
 
   /**
    * Creates a new subscription record in the database.
@@ -16,11 +20,13 @@ export class MemberSubscriptionService {
    */
   async createSubscription(subcription: Prisma.MemberSubscriptionUncheckedCreateInput) {
     try {
-      return await this.prisma.memberSubscription.create({
+      const subscriber = await this.prisma.memberSubscription.create({
         data: {
           ...subcription,
         },
       });
+      await this.cacheService.reset({ service: 'member-subscription' });
+      return subscriber;
     } catch (error) {
       this.handleErrors(error);
     }
@@ -33,9 +39,9 @@ export class MemberSubscriptionService {
    * @returns The updated subscription record.
    * @throws NotFoundException if no subscription record is found with the provided uid.
    */
-  async modifySubscription(uid: string, subcription:Prisma.MemberSubscriptionUncheckedUpdateInput) {
+  async modifySubscription(uid: string, subcription: Prisma.MemberSubscriptionUncheckedUpdateInput) {
     try {
-      return await this.prisma.memberSubscription.update({
+      const result = await this.prisma.memberSubscription.update({
         where: {
           uid,
         },
@@ -43,6 +49,8 @@ export class MemberSubscriptionService {
           ...subcription
         }
       });
+      await this.cacheService.reset({ service: 'member-subscription' });
+      return result;
     } catch (error) {
       this.handleErrors(error, uid);
     }
