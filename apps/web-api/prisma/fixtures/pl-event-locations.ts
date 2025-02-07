@@ -18,7 +18,8 @@ const eventLocationFactory = Factory.define<Omit<PLEventLocation, 'id'>>(({ onCr
     longitude: faker.address.longitude(),
     priority: faker.datatype.number(),
     resources:  [{ url: faker.internet.url(), description: faker.lorem.sentence()}],
-    additionalInfo: {}
+    additionalInfo: {},
+    isFeatured: false
   };
 });
 
