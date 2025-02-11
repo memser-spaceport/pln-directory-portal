@@ -513,7 +513,7 @@ export class PLEventLocationsService {
    *   - The events include details such as name, type, description, startDate, endDate, and additional info.
    *   - returns empty if no featued location is found.
    */
-  async getFeaturedLocationsWithSubscribers(member) {
+  async getFeaturedLocationsWithSubscribers(loggedlnMember) {
     try {
       const locations = await this.getPLEventLocations({ where: { isFeatured: true } });
       const locationUids = locations.flatMap(location => location.uid);
@@ -536,15 +536,25 @@ export class PLEventLocationsService {
           }
         }
       });
-      const result = locations.map(async location => {
-        const filteredEvents = await this.plEventGuestService.filterEventsByAttendanceAndAdminStatus([], location?.upcomingEvents, member);
+          const result = await Promise.all(
+      locations.map(async (location) => {
+        // Process upcomingEvents only if they exist
+        const filteredEvents = location.upcomingEvents
+          ? await this.plEventGuestService.filterEventsByAttendanceAndAdminStatus([], location.upcomingEvents, loggedlnMember)
+          : [];
+
+        // Attach filtered events to the location object
         location.upcomingEvents = filteredEvents;
+
+        // Attach subscribers to the location
+
         const filteredSubscribers = subscribers?.filter(sub => sub.entityUid == location.uid);
         return {
           ...location,                            // Spread existing properties of location
           subscribers: filteredSubscribers || []  // Introduce subscribers for corresponding location.
         };
       })
+    );
       return result;
     } catch (error) {
       this.handleErrors(error);

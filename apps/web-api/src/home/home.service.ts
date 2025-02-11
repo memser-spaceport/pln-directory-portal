@@ -18,7 +18,7 @@ export class HomeService {
     private plEventLocationService: PLEventLocationsService
   ) { }
 
-  async fetchAllFeaturedData(member) {
+  async fetchAllFeaturedData(loggedlnMember) {
     try {
       return {
         members: await this.memberService.findAll({
@@ -42,7 +42,7 @@ export class HomeService {
         }),
         events: await this.plEventsService.getPLEvents({ where: { isFeatured: true } }),
         projects: await this.projectsService.getProjects({ where: { isFeatured: true } }),
-        locations: await this.plEventLocationService.getFeaturedLocationsWithSubscribers(member)
+        locations: await this.plEventLocationService.getFeaturedLocationsWithSubscribers(loggedlnMember)
       };
     } catch (error) {
       throw new InternalServerErrorException(`Error occured while retrieving featured data: ${error.message}`);
