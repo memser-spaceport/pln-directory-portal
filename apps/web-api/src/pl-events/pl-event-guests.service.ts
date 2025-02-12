@@ -427,7 +427,7 @@ export class PLEventGuestsService {
     if (this.memberService.checkIfAdminUser(member)) {
       return filteredEventsUid?.length ? events.filter(event => filteredEventsUid.includes(event.uid)) : events;
     }
-    // Scenario 2: If the user is logged in and not an admin, get invite-only events they are attending
+    // Scenario 2: If the user is logged in and not an admin, get invite-only events they are attending 
     const userAttendedEvents = await this.prisma.pLEvent.findMany({
       where: {
         type: "INVITE_ONLY",
@@ -485,10 +485,16 @@ export class PLEventGuestsService {
         COUNT(*) OVER() AS count FROM (
         SELECT 
           pg."memberUid",
-          CASE 
-            WHEN BOOL_OR(pg."isHost") AND NOT BOOL_OR(pg."isSpeaker") THEN 'isHostOnly'
-            WHEN BOOL_OR(pg."isSpeaker") AND NOT BOOL_OR(pg."isHost") THEN 'isSpeakerOnly'
-            WHEN BOOL_OR(pg."isHost") AND BOOL_OR(pg."isSpeaker") THEN 'hostAndSpeaker'
+          CASE   --check the guestType of the guest in the events in specified locations
+            WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${values.length+3})) --eventUid's index in values array
+               AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${values.length+3})) 
+            THEN 'isHostOnly'
+            WHEN BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${values.length+3}))
+               AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${values.length+3})) 
+            THEN 'isSpeakerOnly'
+            WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${values.length+3})) 
+               AND BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${values.length+3})) 
+            THEN 'hostAndSpeaker'
             ELSE 'none'
           END AS guest_type,
           json_object_agg(
@@ -576,6 +582,7 @@ export class PLEventGuestsService {
     `;
     // Add pagination values to the query parameters for limit and offset
     values.push(paginationLimit, offset);
+    values.push(eventUids);
     // Execute the raw query with the built query string and values
     const result = await this.prisma.$queryRawUnsafe(query, ...values);
     return this.formatAttendees(result);
