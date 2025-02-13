@@ -124,6 +124,7 @@ export const HUSKY_ACTION_TYPES = {
   TEAM: 'team',
   PROJECT: 'project',
   MEMBER: 'member',
+  FOCUS_AREA: 'focus_area'
 };
 
 export const aiPromptTemplate = `For the given question "{{question}}", using only the provided 'Context' and 'Chat History Summary' (if available), generate a JSON response following this exact structure:
