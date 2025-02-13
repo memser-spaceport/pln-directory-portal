@@ -125,6 +125,7 @@ export class PLEventLocationsService {
                   member: {
                     select: {
                       uid: true,
+                      name: true,
                       image: {
                         select: {
                           url: true
@@ -132,7 +133,14 @@ export class PLEventLocationsService {
                       }
                     }
                   },
-                  teamUid: true
+                  team:{
+                    select:{
+                      uid: true,
+                      name: true
+                    }
+                  },
+                  isHost: true,
+                  isSpeaker: true
                 }
               }
             },
@@ -177,16 +185,20 @@ export class PLEventLocationsService {
    * @returns An array of grouped guests, where each group includes `member`, `teamUid`.
    */
   groupEventGuestsByMemberUidAndTeamUid(eventGuests: {
-    member: { uid: string; image?: { url: string } | null };
-    teamUid: string | null;
+    member: { uid: string; name: string; image?: { url: string } | null };
+    team: {uid: string; name: string} | null;
+    isHost: boolean;
+    isSpeaker: boolean;
   }[]) {
     const groupedGuests = {};
     eventGuests?.forEach((guest) => {
-      const key = `${guest.member.uid}-${guest.teamUid}`;
+      const key = `${guest.member.uid}-${guest.team?.uid}`;
       if (!groupedGuests[key])
         groupedGuests[key] = {
           member: guest.member,
-          teamUid: guest.teamUid
+          isHost: guest.isHost,
+          isSpeaker: guest.isSpeaker,
+          team: guest.team, 
         };
     });
     return Object.values(groupedGuests);

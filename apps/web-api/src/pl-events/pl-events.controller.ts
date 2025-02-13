@@ -217,4 +217,10 @@ export class PLEventsController {
     const memberUid = this.memberService.checkIfAdminUser(member) ? guestUid : member.uid;
     return await this.eventGuestService.getPLEventGuestByUidAndLocation(memberUid, locationUid, true, type);
   }
+
+  @Api(server.route.getAllPLEventGuests)
+  @NoCache()
+  async getAllPLEventGuest() {
+    return await this.eventGuestService.getAllPLEventGuest();
+  }
 }
