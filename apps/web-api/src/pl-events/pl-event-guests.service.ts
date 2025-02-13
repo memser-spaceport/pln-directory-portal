@@ -933,4 +933,19 @@ export class PLEventGuestsService {
     }
   }
 
+  async getAllPLEventGuest() {
+    return await this.fetchAttendees({
+      eventUids: [],      
+      isHost: undefined,  
+      isSpeaker: undefined,
+      topics: [],         
+      sortBy: 'memberName', 
+      sortDirection: 'asc', 
+      search: '',         
+      limit: 1000,  // Disable pagination
+      page: 1,   // Not needed
+      loggedInMemberUid: null 
+    });
+  }
+
 }
