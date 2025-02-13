@@ -233,4 +233,10 @@ export class PLEventsController {
     }
     return await this.eventSyncService.syncEvents({ locationUid, clientSecret, conference });
   }
+
+  @Api(server.route.getAllPLEventGuests)
+  @NoCache()
+  async getAllPLEventGuest() {
+    return await this.eventGuestService.getAllPLEventGuest();
+  }
 }

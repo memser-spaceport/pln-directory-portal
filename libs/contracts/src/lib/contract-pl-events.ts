@@ -107,5 +107,13 @@ export const apiEvents = contract.router({
       200: contract.response<unknown>(),
     },
     summary: 'sync pl events from events service by location'
+  },
+  getAllPLEventGuests: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/irl/guests`,
+    query: PLEventDetailQueryParams,
+    responses: {
+      200: ResponsePLEventLocationWithRelationsSchema.array(),
+    },
   }
 });
