@@ -156,9 +156,10 @@ export class HuskyAiService {
   private async fetchAndFormatActionDocs(type: string, collectionName: string, embedding: any) {
     const actionDocs = await this.huskyVectorDbService.searchEmbeddings(collectionName, embedding, 5, true);
     return actionDocs.map((doc) => {
+      const metadata: any = doc?.payload?.metadata;
       return {
-        name: doc?.payload?.name ?? '',
-        directoryLink: doc?.payload?.directoryLink ?? '',
+        name: metadata?.name ?? '',
+        directoryLink: metadata?.source ?? '',
         info: doc?.payload?.content ?? '',
         type: type,
         score: doc.score,
@@ -167,7 +168,7 @@ export class HuskyAiService {
   }
 
   async getDirectoryEmbeddings(embedding: any) {
-    const [memberDocs, teamDocs, projectDocs] = await Promise.all([
+    const [memberDocs, teamDocs, projectDocs, focusAreaDocs] = await Promise.all([
       this.fetchAndFormatActionDocs(HUSKY_ACTION_TYPES.MEMBER, process.env.QDRANT_MEMBERS_COLLECTION || '', embedding),
       this.fetchAndFormatActionDocs(HUSKY_ACTION_TYPES.TEAM, process.env.QDRANT_TEAMS_COLLECTION || '', embedding),
       this.fetchAndFormatActionDocs(
@@ -175,27 +176,54 @@ export class HuskyAiService {
         process.env.QDRANT_PROJECTS_COLLECTION || '',
         embedding
       ),
+      this.fetchAndFormatActionDocs(HUSKY_ACTION_TYPES.FOCUS_AREA, process.env.QDRANT_FOCUS_AREAS_COLLECTION || '', embedding)
     ]);
 
     return {
       memberDocs,
       teamDocs,
       projectDocs,
+      focusAreaDocs
     };
   }
 
   async getEmbeddingsBySource(source: string, embedding: any, limit = 25) {
-    const collection =
-      source === HUSKY_SOURCES.TWITTER
-        ? process.env.QDRANT_TWITTER_COLLECTION || ''
-        : process.env.QDRANT_ALL_DOCS_COLLECTION || '';
+    if (source === HUSKY_SOURCES.TWITTER) {
+      const collection = process.env.QDRANT_TWITTER_COLLECTION || '';
+      return this.huskyVectorDbService.searchEmbeddings(collection, embedding, limit, true);
+    } else {
+      // Get results from both collections
+      const [allDocsResults, teamsWebsearchResults] = await Promise.all([
+        this.huskyVectorDbService.searchEmbeddings(process.env.QDRANT_ALL_DOCS_COLLECTION || '', embedding, limit, true),
+        this.huskyVectorDbService.searchEmbeddings(process.env.QDRANT_TEAMS_WEBSEARCH_COLLECTION || '', embedding, limit, true)
+      ]);
 
-    return this.huskyVectorDbService.searchEmbeddings(collection, embedding, limit, true);
+      const formattedTeamsWebsearchResults = teamsWebsearchResults.map((doc) => {
+        return {
+          id: doc.id,
+          version: doc.version,
+          score: doc.score,
+          payload: {
+            metadata: {
+              source: (doc.payload?.metadata as any)?.source ?? '',
+              name: (doc.payload?.metadata as any)?.name ?? '',
+            },
+            page_content: doc.payload?.content,
+          },
+          groupType: (doc.payload as any)?.type ?? '',
+        };
+      });
+
+      // Combine and sort results by score
+      return [...allDocsResults, ...formattedTeamsWebsearchResults]
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
+    }
   }
 
   createContextWithMatchedDocs(nonDirectoryDocs: any[], directoryDocs: any) {
     let allDocs: any[] = [];
-    const actionDocKeys = ['memberDocs', 'teamDocs', 'projectDocs'];
+    const actionDocKeys = ['memberDocs', 'teamDocs', 'projectDocs', 'focusAreaDocs'];
 
     actionDocKeys.forEach((key: string) => {
       const docs = [...directoryDocs[key]].map((doc: any) => {

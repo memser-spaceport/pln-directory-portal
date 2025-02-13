@@ -7,10 +7,7 @@ export class RedisCacheDbService implements OnModuleDestroy, HuskyCacheDbService
   private redis: Redis;
 
   constructor() {
-    this.redis = new Redis({
-      host: process.env.REDIS_CACHE_HOST ,
-      port: Number(process.env.REDIS_CACHE_PORT),
-      ...(process.env.REDIS_CACHE_PASSWORD && { password: process.env.REDIS_CACHE_PASSWORD }),
+    this.redis = new Redis(process.env.REDIS_CACHE_URL as string, {
       ...(process.env.REDIS_CACHE_TLS && {
         tls: {
           rejectUnauthorized: false,
