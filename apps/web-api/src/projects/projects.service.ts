@@ -347,6 +347,7 @@ export class ProjectsService {
     this.buildFundingFilter(lookingForFunding, filter);
     this.buildMaintainingTeamFilter(team, filter);
     this.buildRecentProjectsFilter(query, filter);
+    filter.push(this.buildTagFilter(query.tags));
     return {
       AND: filter
     };
