@@ -1,6 +1,6 @@
 import moment from 'moment-timezone';
 import { Prisma, SubscriptionEntityType } from '@prisma/client';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { MemberSubscriptionService } from '../member-subscriptions/member-subscriptions.service';
@@ -13,6 +13,7 @@ import { Cron } from '@nestjs/schedule';
 import { NotificationService } from '../notifications/notifications.service';
 import { MembersService } from '../members/members.service';
 import { isEmpty } from 'lodash';
+import { PLEventGuestsService } from './pl-event-guests.service';
 
 @Injectable()
 export class PLEventLocationsService {
@@ -21,7 +22,9 @@ export class PLEventLocationsService {
     private logger: LogService,
     private memberSubscriptionService: MemberSubscriptionService,
     private memberService: MembersService,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
+    @Inject(forwardRef(() => PLEventGuestsService))
+    private plEventGuestService : PLEventGuestsService,
   ) { }
 
   /**
@@ -510,7 +513,7 @@ export class PLEventLocationsService {
    *   - The events include details such as name, type, description, startDate, endDate, and additional info.
    *   - returns empty if no featued location is found.
    */
-  async getFeaturedLocationsWithSubscribers() {
+  async getFeaturedLocationsWithSubscribers(loggedlnMember) {
     try {
       const locations = await this.getPLEventLocations({ where: { isFeatured: true } });
       const locationUids = locations.flatMap(location => location.uid);
@@ -533,13 +536,25 @@ export class PLEventLocationsService {
           }
         }
       });
-      const result = locations.map(location => {
+          const result = await Promise.all(
+      locations.map(async (location) => {
+        // Process upcomingEvents only if they exist
+        const filteredEvents = location.upcomingEvents
+          ? await this.plEventGuestService.filterEventsByAttendanceAndAdminStatus([], location.upcomingEvents, loggedlnMember)
+          : [];
+
+        // Attach filtered events to the location object
+        location.upcomingEvents = filteredEvents;
+
+        // Attach subscribers to the location
+
         const filteredSubscribers = subscribers?.filter(sub => sub.entityUid == location.uid);
         return {
           ...location,                            // Spread existing properties of location
           subscribers: filteredSubscribers || []  // Introduce subscribers for corresponding location.
         };
       })
+    );
       return result;
     } catch (error) {
       this.handleErrors(error);
