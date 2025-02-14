@@ -49,7 +49,7 @@ export class HuskyAiService {
     const rephrasedQuestion = await this.getRephrasedQuestionBasedOnHistory(uid, question.toLowerCase());
     const questionEmbedding = await this.getEmbeddingForText(rephrasedQuestion);
     const [nonDirectoryDocs, directoryDocs] = await Promise.all([
-      this.getEmbeddingsBySource(source, questionEmbedding),
+      this.getEmbeddingsBySource(questionEmbedding),
       this.getDirectoryEmbeddings(questionEmbedding),
     ]);
 
@@ -187,14 +187,10 @@ export class HuskyAiService {
     };
   }
 
-  async getEmbeddingsBySource(source: string, embedding: any, limit = 25) {
-    if (source === HUSKY_SOURCES.TWITTER) {
-      const collection = process.env.QDRANT_TWITTER_COLLECTION || '';
-      return this.huskyVectorDbService.searchEmbeddings(collection, embedding, limit, true);
-    } else {
-      // Get results from both collections
-      const [allDocsResults, teamsWebsearchResults] = await Promise.all([
-        this.huskyVectorDbService.searchEmbeddings(process.env.QDRANT_ALL_DOCS_COLLECTION || '', embedding, limit, true),
+  async getEmbeddingsBySource(embedding: any, limit = 25) {
+    // Get results from both collections
+    const [allDocsResults, teamsWebsearchResults] = await Promise.all([
+      this.huskyVectorDbService.searchEmbeddings(process.env.QDRANT_ALL_DOCS_COLLECTION || '', embedding, limit, true),
         this.huskyVectorDbService.searchEmbeddings(process.env.QDRANT_TEAMS_WEBSEARCH_COLLECTION || '', embedding, limit, true)
       ]);
 
@@ -218,7 +214,6 @@ export class HuskyAiService {
       return [...allDocsResults, ...formattedTeamsWebsearchResults]
         .sort((a, b) => b.score - a.score)
         .slice(0, limit);
-    }
   }
 
   createContextWithMatchedDocs(nonDirectoryDocs: any[], directoryDocs: any) {
@@ -240,7 +235,7 @@ export class HuskyAiService {
       return {
         score: doc.score,
         text: doc?.payload?.page_content ?? '',
-        source: doc?.payload?.metadata?.url ?? '',
+        source: doc?.payload?.metadata?.source ?? '',
       };
     });
 
