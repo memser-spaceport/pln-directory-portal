@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, forwardRef, Inject } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { Prisma, Member, NotificationStatus, SubscriptionEntityType } from '@prisma/client';
@@ -23,6 +23,7 @@ export class PLEventGuestsService {
     private prisma: PrismaService,
     private logger: LogService,
     private memberService: MembersService,
+    @Inject(forwardRef(() => PLEventLocationsService))
     private eventLocationsService: PLEventLocationsService,
     private cacheService: CacheService,
     private notificationService: NotificationService,

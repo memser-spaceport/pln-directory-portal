@@ -21,6 +21,7 @@ import { NoCache } from '../decorators/no-cache.decorator';
 import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { HuskyService } from '../husky/husky.service';
+import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
 
 const server = initNestServer(apiHome);
 type RouteShape = typeof server.routeShapes;
@@ -34,8 +35,12 @@ export class HomeController {
   ) { }
 
   @Api(server.route.getAllFeaturedData)
-  async getAllFeaturedData() {
-    return await this.homeService.fetchAllFeaturedData();
+  @UseGuards(UserAuthValidateGuard)
+  async getAllFeaturedData(
+    @Req() request: Request,
+  ) {
+    const loggedlnMember = request['userEmail'] ? await this.memberService.findMemberByEmail(request['userEmail']) : null;
+    return await this.homeService.fetchAllFeaturedData(loggedlnMember);
   }
 
   @Api(server.route.getAllDiscoveryQuestions)
