@@ -32,6 +32,37 @@ const ProjectFactory = Factory.define<Omit<Project, 'id'>>(
       return project;
     });
     const name = faker.helpers.unique(faker.name.firstName);
+    const tags = [
+      "AI",
+      "AI x Crypto",
+      "Blockchain Infrastructure",
+      "Blockchain Security",
+      "Collaboration",
+      "Compute",
+      "Consensus & Scalability",
+      "DAO Tooling",
+      "Data Tooling",
+      "DeFi/Fintech",
+      "Decentralized Identity",
+      "Decentralized Storage",
+      "Developer Tooling",
+      "Digital Human Rights",
+      "Education",
+      "Enterprise Solutions",
+      "Events Tooling",
+      "Funding Mechanisms",
+      "Gaming/Metaverse",
+      "Governance",
+      "Hardware",
+      "IoT",
+      "NFT",
+      "Service Providers",
+      "Social Networking",
+      "Treasury Management",
+      "Verifiable Storage & Privacy",
+      "ZK Proofs"
+    ]
+    const tagsCount = faker.datatype.number({ min: 1, max: 3 });
     return {
       uid: faker.helpers.slugify(`uid-${name.toLowerCase()}`),
       logoUid: '',
@@ -58,6 +89,7 @@ const ProjectFactory = Factory.define<Omit<Project, 'id'>>(
       updatedAt: faker.date.recent(),
       isDeleted: false,
       osoProjectName: faker.random.word(),
+      tags: faker.helpers.arrayElements(tags, tagsCount)
     };
   }
 );
