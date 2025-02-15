@@ -24,10 +24,6 @@ export class ProjectsService {
       project.createdBy = member.uid;
       project['projectFocusAreas'] = { ...await this.createProjectWithFocusAreas(focusAreas, this.prisma) };
       delete project['focusAreas'];
-      // if(project?.tags){
-      //   const tags: any = project.tags;
-      //   project.tags = tags.map(tag => tag.toLowerCase());
-      // }
       const result = await this.prisma.project.create({
         data: {
           ...project,
@@ -72,10 +68,6 @@ export class ProjectsService {
       return await this.prisma.$transaction(async (tx) => {
         project['projectFocusAreas'] = { ...await this.updateProjectWithFocusAreas(uid, focusAreas, tx) };
         delete project['focusAreas'];
-        // if(project?.tags){
-        //   const tags: any = project.tags;
-        //   project.tags = tags.map(tag => tag.toLowerCase());
-        // }
         const result = await tx.project.update({
           where: {
             uid

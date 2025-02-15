@@ -78,7 +78,7 @@ import { AskModule } from './asks/asks.module';
         lockDuration: 20000
       }
     }),
-    // ScheduleModule.forRoot(),
+    ScheduleModule.forRoot(),
     MembersModule,
     HealthModule,
     TeamsModule,
@@ -102,8 +102,8 @@ import { AskModule } from './asks/asks.module';
     OfficeHoursModule,
     MemberFollowUpsModule,
     MemberFeedbacksModule,
-    // HuskyModule,
-    // HomeModule,
+    HuskyModule,
+    HomeModule,
     InternalsModule,
     OsoMetricsModule,
     MemberSubscriptionsModule,
