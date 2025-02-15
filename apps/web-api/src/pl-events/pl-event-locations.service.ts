@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import moment from 'moment-timezone';
 import { Prisma, SubscriptionEntityType } from '@prisma/client';
 import { forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
@@ -515,7 +516,7 @@ export class PLEventLocationsService {
    */
   async getFeaturedLocationsWithSubscribers(loggedlnMember) {
     try {
-      const locations = await this.getPLEventLocations({ where: { isFeatured: true } });
+      const locations = await this.getPLEventLocations({ where: {  } });
       const locationUids = locations.flatMap(location => location.uid);
       const subscribers = await this.memberSubscriptionService.getSubscriptions({
         where: {
