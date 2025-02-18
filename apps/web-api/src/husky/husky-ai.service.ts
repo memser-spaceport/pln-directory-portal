@@ -168,7 +168,7 @@ export class HuskyAiService {
   }
 
   async getDirectoryEmbeddings(embedding: any) {
-    const [memberDocs, teamDocs, projectDocs, focusAreaDocs] = await Promise.all([
+    const [memberDocs, teamDocs, projectDocs, focusAreaDocs, irlEventDocs] = await Promise.all([
       this.fetchAndFormatActionDocs(HUSKY_ACTION_TYPES.MEMBER, process.env.QDRANT_MEMBERS_COLLECTION || '', embedding),
       this.fetchAndFormatActionDocs(HUSKY_ACTION_TYPES.TEAM, process.env.QDRANT_TEAMS_COLLECTION || '', embedding),
       this.fetchAndFormatActionDocs(
@@ -176,14 +176,16 @@ export class HuskyAiService {
         process.env.QDRANT_PROJECTS_COLLECTION || '',
         embedding
       ),
-      this.fetchAndFormatActionDocs(HUSKY_ACTION_TYPES.FOCUS_AREA, process.env.QDRANT_FOCUS_AREAS_COLLECTION || '', embedding)
+      this.fetchAndFormatActionDocs(HUSKY_ACTION_TYPES.FOCUS_AREA, process.env.QDRANT_FOCUS_AREAS_COLLECTION || '', embedding),
+      this.fetchAndFormatActionDocs(HUSKY_ACTION_TYPES.IRL_EVENT, process.env.QDRANT_IRL_EVENTS_COLLECTION || '', embedding),
     ]);
 
     return {
       memberDocs,
       teamDocs,
       projectDocs,
-      focusAreaDocs
+      focusAreaDocs,
+      irlEventDocs,
     };
   }
 
@@ -218,7 +220,7 @@ export class HuskyAiService {
 
   createContextWithMatchedDocs(nonDirectoryDocs: any[], directoryDocs: any) {
     let allDocs: any[] = [];
-    const actionDocKeys = ['memberDocs', 'teamDocs', 'projectDocs', 'focusAreaDocs'];
+    const actionDocKeys = ['memberDocs', 'teamDocs', 'projectDocs', 'focusAreaDocs', 'irlEventDocs'];
 
     actionDocKeys.forEach((key: string) => {
       const docs = [...directoryDocs[key]].map((doc: any) => {
@@ -239,14 +241,12 @@ export class HuskyAiService {
       };
     });
 
-    allDocs = [...allDocs, ...formattedNonDictoryDocs];
+    const nonDirectory = formattedNonDictoryDocs.filter((v) => v.score > 0.35 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 5);
+    const directory = allDocs.filter((v) => v.score > 0.35 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 6);
 
-    return allDocs
-      .sort((a, b) => b?.score - a?.score)
-      .filter((v) => v.score > 0.45 && v?.text?.length > 5)
-      .slice(0, 10)
-      .map((result) => `${result?.text}${result?.source ? ` (Source:${result?.source})` : ''}`)
-      .join('\n');
+    const all = [ ...directory, ...nonDirectory];
+
+    return all.map((result) => `${result?.text}${result?.source ? ` (Source:${result?.source})` : ''}`).join('\n');
   }
 
   createPromptForHuskyChat(question: string, context: string, chatSummary: string, allDocs: any) {
@@ -256,6 +256,7 @@ export class HuskyAiService {
       contextLength,
       question,
       chatSummary,
+      currentDate: new Date().toISOString().split('T')[0],
       allDocs: JSON.stringify(allDocs),
     });
     return aiPrompt;
