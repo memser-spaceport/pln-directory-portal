@@ -124,7 +124,8 @@ export const HUSKY_ACTION_TYPES = {
   TEAM: 'team',
   PROJECT: 'project',
   MEMBER: 'member',
-  FOCUS_AREA: 'focus_area'
+  FOCUS_AREA: 'focus_area',
+  IRL_EVENT: 'irl_event',
 };
 
 export const aiPromptTemplate = `For the given question "{{question}}", using only the provided 'Context' and 'Chat History Summary' (if available), generate a JSON response following this exact structure:
@@ -144,6 +145,7 @@ STRICT REQUIREMENTS for the output json: Follow the below requirements strictly.
 - Use markdown headers (##) for readability
 - Citations (taken from 'context') must be formatted as [N](url) where N is the source index. 
 - Strictly dont add additonal context or information other than the provided data.
+- Given the current date as - {{currentDate}}, if the question is about the upcoming or future events, make sure to choose the items or summarize the items based on the given current date.
 - Avoid texts like - Additional information can be found at [example](example.com) or find more informtion here at [example2](example2.com) or Learn more at [example3](example3.com), instead just have the citation in [N](url) format where N is source index
 - Avoid texts like - Context is not provided or available. Never mention about context. Just summarize with the data available.
 - NEVER use URL names as citation labels (e.g., NEVER use the format [example1](example1.com) or [example2](example2.com)) only use source index.
@@ -174,7 +176,7 @@ STRICT REQUIREMENTS for the output json: Follow the below requirements strictly.
   {
     "name": string,
     "directoryLink": string,
-    "type": "Member" | "Team" | "Project"
+    "type": "Member" | "Team" | "Project"| "Event"
   }
 - Deprioritize items with role "Contributor"
 - Return empty array if no relevant actions available
