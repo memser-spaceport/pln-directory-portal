@@ -470,7 +470,7 @@ export class PLEventGuestsService {
    * @returns {Promise<Array>} A list of attendees with their associated member, team, and event information.
    */
   async fetchAttendees(queryParams) {
-    const { eventUids, isHost, isSpeaker, topics, sortBy, sortDirection = 'asc', search, limit = 10, page = 1, loggedInMemberUid } = queryParams;
+    const { eventUids, isHost, isSpeaker, topics, sortBy, sortDirection = 'asc', search, limit = 10, page = 1, loggedInMemberUid, includeLocations } = queryParams;
     // Build dynamic query conditions for filtering by eventUids, isHost, and isSpeaker
     let { conditions, values } = this.buildConditions(eventUids, topics);
     // Apply sorting based on the sortBy parameter (default is sorting by memberName)
@@ -478,6 +478,10 @@ export class PLEventGuestsService {
 
     // Apply pagination to limit the results and calculate the offset for the current page
     const { limit: paginationLimit, offset } = this.applyPagination(Number(limit), page);
+
+    const selectLocation = includeLocations
+      ? `,'location', l."location"`
+      : ``; // Empty if location is not required
     // Construct the raw SQL query for fetching attendees with joined tables and aggregated JSON data
     const query: any = ` 
       SELECT 
@@ -520,6 +524,7 @@ export class PLEventGuestsService {
               'isHost', pg."isHost",      -- Event-specific host details
               'isSpeaker', pg."isSpeaker", -- Event-specific speaker details
               'additionalInfo', pg."additionalInfo"
+               ${selectLocation}
             )
           ) AS events,
           json_object_agg(
@@ -552,6 +557,7 @@ export class PLEventGuestsService {
           ) AS team
         FROM "PLEventGuest" pg
         JOIN "PLEvent" e ON e.uid = pg."eventUid"
+        ${this.joinEventLocations(includeLocations)}
         LEFT JOIN "Image" el ON el.uid = e."logoUid"
         LEFT JOIN "Image" eb ON eb.uid = e."bannerUid"
         JOIN "Member" m ON m.uid = pg."memberUid"
@@ -586,6 +592,18 @@ export class PLEventGuestsService {
     // Execute the raw query with the built query string and values
     const result = await this.prisma.$queryRawUnsafe(query, ...values);
     return this.formatAttendees(result);
+  }
+
+  /**
+   * 
+   * @param includeLocation query param to specify whether to include location or not
+   * @returns join query for event location is specified
+   */
+  private joinEventLocations(includeLocation: boolean) {
+    if (includeLocation) {
+      return `LEFT JOIN "PLEventLocation" l ON l.uid = e."locationUid"`
+    }
+    return "";
   }
 
   /**
@@ -942,16 +960,17 @@ export class PLEventGuestsService {
 
   async getAllPLEventGuest() {
     return await this.fetchAttendees({
-      eventUids: [],      
-      isHost: undefined,  
+      eventUids: [],
+      isHost: undefined,
       isSpeaker: undefined,
-      topics: [],         
-      sortBy: 'memberName', 
-      sortDirection: 'asc', 
-      search: '',         
-      limit: 1000,  // Disable pagination
-      page: 1,   // Not needed
-      loggedInMemberUid: null 
+      topics: [],
+      sortBy: 'memberName',
+      sortDirection: 'asc',
+      search: '',
+      limit: Number.MAX_SAFE_INTEGER,  // Disable pagination
+      page: 1,
+      loggedInMemberUid: null,
+      includeLocations: true
     });
   }
 

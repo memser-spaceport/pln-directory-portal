@@ -36,6 +36,7 @@ export class HomeController {
 
   @Api(server.route.getAllFeaturedData)
   @UseGuards(UserAuthValidateGuard)
+  @NoCache()
   async getAllFeaturedData(
     @Req() request: Request,
   ) {
