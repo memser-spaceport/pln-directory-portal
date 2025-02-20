@@ -405,6 +405,7 @@ model PLEvent {
   description      String?
   shortDescription String?
   websiteURL       String?
+  externalId       String?
   isFeatured       Boolean?            @default(false)
   slugURL          String              @unique
   resources        Json[]
@@ -414,6 +415,7 @@ model PLEvent {
   endDate          DateTime
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
+  syncedAt         DateTime?            
   relatedQuestions DiscoveryQuestion[] @relation("PLEventRelatedDiscoveryQuestions")
   locationUid      String?
   location         PLEventLocation?    @relation(fields: [locationUid], references: [uid])
