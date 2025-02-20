@@ -939,5 +939,4 @@ export class PLEventGuestsService {
       this.handleErrors(error);
     }
   }
-
 }
