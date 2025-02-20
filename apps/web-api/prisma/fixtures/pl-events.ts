@@ -58,6 +58,7 @@ const eventFactory = Factory.define<Omit<PLEvent, 'id'>>(
       slugURL: `${faker.helpers.slugify(faker.company.name())}-${sequence}`,
       createdAt: faker.date.past(),
       updatedAt: faker.date.recent(),
+      externalId: faker.datatype.uuid()
     };
   }
 );
