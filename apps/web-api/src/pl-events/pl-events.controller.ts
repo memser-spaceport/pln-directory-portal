@@ -1,4 +1,4 @@
-import { Controller, Req, Body, Param, NotFoundException, ForbiddenException, UsePipes, UseGuards } from '@nestjs/common';
+import { Controller, Req, Body, Param, NotFoundException, ForbiddenException, UsePipes, UseGuards, UnauthorizedException } from '@nestjs/common';
 import { ApiParam } from '@nestjs/swagger';
 import { Api, initNestServer, ApiDecorator } from '@ts-rest/nest';
 import { Request, query } from 'express';
@@ -18,6 +18,7 @@ import {
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { PLEventsService } from './pl-events.service';
+import { PLEventSyncService } from './pl-event-sync.service';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
 import { ZodValidationPipe } from 'nestjs-zod';
@@ -39,7 +40,8 @@ export class PLEventsController {
     private readonly memberService: MembersService,
     private readonly eventService: PLEventsService,
     private readonly eventLocationService: PLEventLocationsService,
-    private readonly eventGuestService: PLEventGuestsService
+    private readonly eventGuestService: PLEventGuestsService,
+    private readonly eventSyncService: PLEventSyncService
   ) { }
 
   /**
@@ -216,5 +218,17 @@ export class PLEventsController {
     const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
     const memberUid = this.memberService.checkIfAdminUser(member) ? guestUid : member.uid;
     return await this.eventGuestService.getPLEventGuestByUidAndLocation(memberUid, locationUid, true, type);
+  }
+  
+  @Api(server.route.syncPLEventsByLocation)
+  async syncPLEventsByLocation(
+    @Param('uid') locationUid: string,
+    @Body() body
+  ) {
+    const { clientSecret } = body;
+    if (!clientSecret) {
+      throw new UnauthorizedException('client secret is missing');
+    } 
+    return await this.eventSyncService.syncEvents({ locationUid, clientSecret });
   }
 }

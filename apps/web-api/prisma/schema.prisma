@@ -405,6 +405,7 @@ model PLEvent {
   description      String?
   shortDescription String?
   websiteURL       String?
+  externalId       String?
   isFeatured       Boolean?            @default(false)
   slugURL          String              @unique
   resources        Json[]
