@@ -339,6 +339,7 @@ export class ProjectsService {
     this.buildFundingFilter(lookingForFunding, filter);
     this.buildMaintainingTeamFilter(team, filter);
     this.buildRecentProjectsFilter(query, filter);
+    filter.push(this.buildTagFilter(query.tags));
     return {
       AND: filter
     };
@@ -411,6 +412,17 @@ export class ProjectsService {
       return tagFilter;
     }
 
+    buildTagFilter(tags){
+      let tagFilter={}
+      if(tags){
+        const filterValue = tags.split(',');
+        tagFilter={
+          tags: { hasSome : filterValue },
+        };
+      }
+        return tagFilter;
+      }
+
   /**
    * Fetches team names that maintain atleast a single project.
    * 
@@ -434,22 +446,63 @@ export class ProjectsService {
       }
     })
 
-
-    const askTags = await this.prisma.ask.findMany({
-      where: {
-        project: queryParams.where,
-      },
-      select: {
-        tags: true,
-      },
-    })
+    const [askTags, tags] = await Promise.all([
+      this.prisma.ask.findMany({
+        where: {
+          project: queryParams.where,
+        },
+        select: {
+          tags: true,
+        },
+      }),
+      this.prisma.project.findMany({
+        where : queryParams.where,
+        select: {
+          tags: true,
+        },
+      })
+    ])
     
     return {
-      askTags: this.askService.formatAskFilterResponse(askTags)
+      askTags: this.askService.formatAskFilterResponse(askTags),
+      tags: this.aggregatePropertyCount(tags,'tags')
     }
     // return { maintainedBy: maintainingTeams.map((team) => ({ uid: team.uid, name: team.name, logo: team.logo?.url })) };
   }
 
+  
+  /**
+   * Aggregates the counts of a specified property from an array of objects.
+   *
+   * @param responseArray - The array of objects to aggregate the property counts from.
+   * @param property - The property whose values need to be counted.
+   * @returns An array of objects, each containing a unique property value and its count.
+   *
+   * @example
+   * ```typescript
+   * const responseArray = [
+   *   { tags: ['a', 'b', 'a'] },
+   *   { tags: ['a', 'c'] },
+   *   { tags: ['b', 'c'] }
+   * ];
+   * const property = 'tags';
+   * const result = aggregatePropertyCounts(responseArray, property);
+   * // result: [
+   * //   { value: 'a', count: 3 },
+   * //   { value: 'b', count: 2 },
+   * //   { value: 'c', count: 2 }
+   * // ]
+   * ```
+   */
+  aggregatePropertyCount(responseArray, property) {
+    const propertyCounts = responseArray
+      .flatMap((item) => item[property]) // Flatten the property array
+      .reduce((acc, value) => {
+        acc[value] = (acc[value] || 0) + 1; // Count occurrences
+        return acc;
+      }, {});
+    return Object.entries(propertyCounts).map(([value, count]) => ({ value, count }));
+  }
 
   async addEditProjectAsk(projectUid, requestorEmail, data){
     let res;

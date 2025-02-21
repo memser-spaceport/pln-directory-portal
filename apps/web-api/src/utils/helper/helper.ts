@@ -79,3 +79,22 @@ export const buildMultiRelationMapping = (field: string, rawData: any, type: str
     [type === 'Create' ? 'connect' : 'set']: rawData[field].map((item: any) => ({ uid: item.uid }))
   };
 }
+
+/**
+ * Extracts the filename from a given URL.
+ * @param url - The URL of the image.
+ * @returns The extracted filename.
+ */
+export const getFilenameFromUrl = (url: string): string => {
+  return url?.substring(url?.lastIndexOf('/') + 1);
+};
+
+/**
+ * Extracts the file extension from a given URL.
+ * @param url - The URL of the image.
+ * @returns The file extension (e.g., 'jpeg', 'png') or 'unknown' if not found.
+ */
+export const getFileTypeFromUrl = (url: string): string => {
+  const extension = url?.split('.').pop();
+  return extension ? extension.toLowerCase() : 'unknown';
+};
