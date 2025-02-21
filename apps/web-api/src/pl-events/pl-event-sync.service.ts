@@ -1,12 +1,15 @@
 import axios from 'axios';
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
+import { getFilenameFromUrl, getFileTypeFromUrl } from '../utils/helper/helper';
+import { CacheService } from '../utils/cache/cache.service';
 
 @Injectable()
 export class PLEventSyncService {
   private readonly logger = new Logger(PLEventSyncService.name);
   constructor(
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
+    private cacheService: CacheService,
   ) {}
 
   /**
@@ -37,6 +40,7 @@ export class PLEventSyncService {
       await this.createOrUpdateEvents(events, eventMap, locationUid);
       // Remove events that no longer exist in the external source
       await this.deleteStaleEvents(existingEvents, events);
+      this.cacheService.reset({});
       this.logger.log('Event sync process completed successfully.');
       return events;
     } catch (error) {
@@ -89,7 +93,7 @@ export class PLEventSyncService {
         if (updatedAt > existingEventUpdatedAt) {
           await this.prisma.pLEvent.update({
             where: { uid: existingEvent.uid },
-            data: this.mapEventData(event, locationUid),
+            data: await this.mapEventData(event, locationUid),
           });
           this.logger.log(`Updated event: "${event.event_name}" (ID: ${event.event_id}).`);
         } else {
@@ -97,7 +101,9 @@ export class PLEventSyncService {
         }
       } else {
         // Create a new event if it does not exist in the database
-        const createdEvent = await this.prisma.pLEvent.create({ data: this.mapEventData(event, locationUid) });
+        const createdEvent = await this.prisma.pLEvent.create({ 
+          data: await this.mapEventData(event, locationUid) 
+        });
         this.logger.log(`Created new event: "${createdEvent.name}" (ID: ${createdEvent.externalId}).`);
       }
     }
@@ -129,7 +135,8 @@ export class PLEventSyncService {
    * @param locationUid - Unique identifier for the location.
    * @returns Mapped event object ready for database insertion/update.
    */
-  private mapEventData(event, locationUid) {
+  private async mapEventData(event, locationUid) {
+    const logo = await this.createLogo(this.prisma, event.event_logo);
     return {
       externalId: event.event_id,
       name: event.event_name,
@@ -141,7 +148,31 @@ export class PLEventSyncService {
       createdAt: event.createdAt,
       syncedAt: event.updatedAt,
       slugURL: event.event_id,
-      locationUid
+      locationUid,
+      logoUid: logo?.uid,
     };
+  }
+
+  /**
+   * Creates an image record in the database if a valid image URL is provided.
+   * @param prisma - Prisma client instance.
+   * @param imageUrl - URL of the image.
+   * @returns The created image record or null if no image URL is provided.
+   */
+  async createLogo(prisma, imageUrl: string | null) {
+    if (!imageUrl) return null;
+    return await prisma.image.create({
+      data: {
+        cid: imageUrl,
+        width: 150,
+        height: 150,
+        url: imageUrl,
+        filename: getFilenameFromUrl(imageUrl),
+        size: 500,
+        type: getFileTypeFromUrl(imageUrl), // Get file type dynamically
+        version: 'ORIGINAL',
+        thumbnailToUid: null,
+      }
+    });
   }
 }
