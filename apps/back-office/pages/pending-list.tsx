@@ -134,11 +134,11 @@ export const getServerSideProps: GetServerSideProps<IRequest> = async (context) 
         return {
           id: data.uid,
           name: data.newData.oldName ?? data.newData.name,
-          status: data.status,
-          email: data.newData.email,
-          skills: data.newData.skills,
-          teamAndRoles: data.newData.teamAndRoles,
-          isSubscribedToNewsletter: data.newData.isSubscribedToNewsletter,
+          status: data.status ?? '',
+          email: data.newData.email ?? '',
+          skills: data.newData.skills ?? '',
+          teamAndRoles: data.newData.teamAndRoles ?? '',
+          isSubscribedToNewsletter: data.newData.isSubscribedToNewsletter ?? '',
         };
       });
     }
