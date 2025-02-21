@@ -427,7 +427,7 @@ export class PLEventGuestsService {
     if (this.memberService.checkIfAdminUser(member)) {
       return filteredEventsUid?.length ? events.filter(event => filteredEventsUid.includes(event.uid)) : events;
     }
-    // Scenario 2: If the user is logged in and not an admin, get invite-only events they are attending
+    // Scenario 2: If the user is logged in and not an admin, get invite-only events they are attending 
     const userAttendedEvents = await this.prisma.pLEvent.findMany({
       where: {
         type: "INVITE_ONLY",
@@ -470,7 +470,7 @@ export class PLEventGuestsService {
    * @returns {Promise<Array>} A list of attendees with their associated member, team, and event information.
    */
   async fetchAttendees(queryParams) {
-    const { eventUids, isHost, isSpeaker, topics, sortBy, sortDirection = 'asc', search, limit = 10, page = 1, loggedInMemberUid } = queryParams;
+    const { eventUids, isHost, isSpeaker, topics, sortBy, sortDirection = 'asc', search, limit = 10, page = 1, loggedInMemberUid, includeLocations } = queryParams;
     // Build dynamic query conditions for filtering by eventUids, isHost, and isSpeaker
     let { conditions, values } = this.buildConditions(eventUids, topics);
     // Apply sorting based on the sortBy parameter (default is sorting by memberName)
@@ -478,6 +478,10 @@ export class PLEventGuestsService {
 
     // Apply pagination to limit the results and calculate the offset for the current page
     const { limit: paginationLimit, offset } = this.applyPagination(Number(limit), page);
+
+    const selectLocation = includeLocations
+      ? `,'location', l."location"`
+      : ``; // Empty if location is not required
     // Construct the raw SQL query for fetching attendees with joined tables and aggregated JSON data
     const query: any = ` 
       SELECT 
@@ -485,10 +489,16 @@ export class PLEventGuestsService {
         COUNT(*) OVER() AS count FROM (
         SELECT 
           pg."memberUid",
-          CASE 
-            WHEN BOOL_OR(pg."isHost") AND NOT BOOL_OR(pg."isSpeaker") THEN 'isHostOnly'
-            WHEN BOOL_OR(pg."isSpeaker") AND NOT BOOL_OR(pg."isHost") THEN 'isSpeakerOnly'
-            WHEN BOOL_OR(pg."isHost") AND BOOL_OR(pg."isSpeaker") THEN 'hostAndSpeaker'
+          CASE   --check the guestType of the guest in the events in specified locations
+            WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${values.length+3})) --eventUid's index in values array
+               AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${values.length+3})) 
+            THEN 'isHostOnly'
+            WHEN BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${values.length+3}))
+               AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${values.length+3})) 
+            THEN 'isSpeakerOnly'
+            WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${values.length+3})) 
+               AND BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${values.length+3})) 
+            THEN 'hostAndSpeaker'
             ELSE 'none'
           END AS guest_type,
           json_object_agg(
@@ -514,6 +524,7 @@ export class PLEventGuestsService {
               'isHost', pg."isHost",      -- Event-specific host details
               'isSpeaker', pg."isSpeaker", -- Event-specific speaker details
               'additionalInfo', pg."additionalInfo"
+               ${selectLocation}
             )
           ) AS events,
           json_object_agg(
@@ -546,6 +557,7 @@ export class PLEventGuestsService {
           ) AS team
         FROM "PLEventGuest" pg
         JOIN "PLEvent" e ON e.uid = pg."eventUid"
+        ${this.joinEventLocations(includeLocations)}
         LEFT JOIN "Image" el ON el.uid = e."logoUid"
         LEFT JOIN "Image" eb ON eb.uid = e."bannerUid"
         JOIN "Member" m ON m.uid = pg."memberUid"
@@ -576,9 +588,22 @@ export class PLEventGuestsService {
     `;
     // Add pagination values to the query parameters for limit and offset
     values.push(paginationLimit, offset);
+    values.push(eventUids);
     // Execute the raw query with the built query string and values
     const result = await this.prisma.$queryRawUnsafe(query, ...values);
     return this.formatAttendees(result);
+  }
+
+  /**
+   * 
+   * @param includeLocation query param to specify whether to include location or not
+   * @returns join query for event location is specified
+   */
+  private joinEventLocations(includeLocation: boolean) {
+    if (includeLocation) {
+      return `LEFT JOIN "PLEventLocation" l ON l.uid = e."locationUid"`
+    }
+    return "";
   }
 
   /**
@@ -931,6 +956,22 @@ export class PLEventGuestsService {
     } catch (error) {
       this.handleErrors(error);
     }
+  }
+
+  async getAllPLEventGuest() {
+    return await this.fetchAttendees({
+      eventUids: [],
+      isHost: undefined,
+      isSpeaker: undefined,
+      topics: [],
+      sortBy: 'memberName',
+      sortDirection: 'asc',
+      search: '',
+      limit: Number.MAX_SAFE_INTEGER,  // Disable pagination
+      page: 1,
+      loggedInMemberUid: null,
+      includeLocations: true
+    });
   }
 
 }
