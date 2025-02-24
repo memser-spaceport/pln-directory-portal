@@ -1,24 +1,21 @@
 import {
   Body,
   Controller,
-  Get,
   HttpException,
   HttpStatus,
-  Param,
   Post,
   Res,
   UploadedFile,
-  UseInterceptors,
+  UseInterceptors
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBody, ApiConsumes } from '@nestjs/swagger';
+import { Api, initNestServer } from '@ts-rest/nest';
 import { Response } from 'express';
+import { apiHusky } from 'libs/contracts/src/lib/contract-hucky';
 import { HuskyChatDto, HuskyFeedbackDto } from '../../../../libs/contracts/src/schema/husky-chat';
 import { HuskyAiService } from './husky-ai.service';
 import { HuskyService } from './husky.service';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBody, ApiConsumes } from '@nestjs/swagger';
-import { NoCache } from '../decorators/no-cache.decorator';
-import { Api, initNestServer } from '@ts-rest/nest';
-import { apiHusky } from 'libs/contracts/src/lib/contract-hucky';
 
 const server = initNestServer(apiHusky);
 
@@ -54,7 +51,7 @@ export class HuskyController {
     },
   })
   @UseInterceptors(FileInterceptor('file'))
-  async uploadDocument(@UploadedFile() file: Express.Multer.File) {
+  async uploadDocument(@UploadedFile() file) {
     const allowedMimeTypes = [
       'application/pdf',
       'application/msword',
@@ -66,19 +63,20 @@ export class HuskyController {
       throw new HttpException('Invalid file type. Only documents are allowed.', HttpStatus.BAD_REQUEST);
     }
     const docName = `${Date.now()}-${file.originalname}`;
-    const uploadResult = await this.huskyService.uploadToS3(file, process.env.AWS_S3_BUCKET_NAME || '', docName);
+    const uploadResult = await this.huskyService.uploadToS3(file.buffer, process.env.AWS_S3_BUCKET_NAME || '', docName);
 
     const job = await this.huskyService.queueDocumentProcessing({
       s3Url: uploadResult.Location,
       originalName: file.originalname,
-      mimeType: file.mimetype,
+      mimeType: file.mimetype
     });
 
     return {
       success: true,
       jobId: job.id,
       message: 'File upload has been queued for processing',
-      s3Url: uploadResult.Location,
+      s3Url: uploadResult.Location
     };
   }
+
 }

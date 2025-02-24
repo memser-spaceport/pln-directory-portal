@@ -6,11 +6,31 @@ import { QdrantVectorDbService } from './db/qdrant-vector-db.service';
 import { MongoPersistantDbService } from './db/mongo-persistant-db.service';
 import { Neo4jGraphDbService } from './db/neo4j-graph-db.service';
 import { HuskyAiService } from './husky-ai.service';
+import { BullModule } from '@nestjs/bull';
+import { DocumentProcessor } from './document.processor';
 
 @Module({
   controllers: [HuskyController],
-  providers: [HuskyService, HuskyAiService, RedisCacheDbService, QdrantVectorDbService, MongoPersistantDbService],
-  imports: [],
-  exports: [HuskyService, HuskyAiService, RedisCacheDbService, QdrantVectorDbService, MongoPersistantDbService],
+  providers: [
+    HuskyService,
+    HuskyAiService,
+    RedisCacheDbService,
+    QdrantVectorDbService,
+    MongoPersistantDbService,
+    DocumentProcessor,
+  ],
+  imports: [
+    BullModule.registerQueue({
+      name: 'document-processing',
+    }),
+  ],
+  exports: [
+    HuskyService,
+    HuskyAiService,
+    RedisCacheDbService,
+    QdrantVectorDbService,
+    MongoPersistantDbService,
+    DocumentProcessor,
+  ],
 })
 export class HuskyModule {}

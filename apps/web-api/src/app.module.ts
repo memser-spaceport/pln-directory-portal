@@ -137,7 +137,9 @@ export class AppModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(ContentTypeMiddleware)
-      .exclude({ path: 'v1/images', method: RequestMethod.POST })
+      .exclude({ path: 'v1/images', method: RequestMethod.POST }, {
+        path: 'v1/husky/document/upload', method: RequestMethod.POST
+      })
       .forRoutes(
         { path: '*', method: RequestMethod.POST },
         { path: '*', method: RequestMethod.PUT },

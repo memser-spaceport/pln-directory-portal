@@ -2,6 +2,7 @@ import {
   Controller,
   HttpException,
   HttpStatus,
+  Post,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -43,6 +44,13 @@ export class ImagesController {
   @ApiParam({ name: 'uid', type: 'string' })
   findOne(@ApiDecorator() { params: { uid } }: RouteShape['getImage']) {
     return this.imagesService.findOne(uid);
+  }
+
+  @Post("upload")
+  @UseInterceptors(FileInterceptor('file'))  // 'file' should match the form field name
+  uploadFile(@UploadedFile() file: Express.Multer.File) {
+    console.log(file);  // Debugging: Check if file is received
+    return { message: 'File uploaded successfully!', filename: file.originalname };
   }
 
   @Api(server.route.uploadImage)

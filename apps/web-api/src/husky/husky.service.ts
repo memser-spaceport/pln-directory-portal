@@ -11,17 +11,19 @@ import { RedisCacheDbService } from './db/redis-cache-db.service';
 import { Neo4jGraphDbService } from './db/neo4j-graph-db.service';
 import { MongoPersistantDbService } from './db/mongo-persistant-db.service';
 import { HUSKY_ACTION_TYPES, HUSKY_NO_INFO_PROMPT, HUSKY_SOURCES } from '../utils/constants';
+import { AwsService } from '../utils/aws/aws.service';
+import { Queue } from 'bull';
+import { InjectQueue } from '@nestjs/bull';
+import { S3 } from 'aws-sdk';
 @Injectable()
 export class HuskyService {
   constructor(
     private logger: LogService,
     private prisma: PrismaService,
-    private huskyPersistentDbService: MongoPersistantDbService
-/*     private huskyVectorDbService: QdrantVectorDbService,
-    private huskyCacheDbService: RedisCacheDbService,
-    private huskyGraphDbService: Neo4jGraphDbService,
-     */
-  ) {}
+    private huskyPersistentDbService: MongoPersistantDbService,
+    private awsService: AwsService,
+    @InjectQueue('document-processing') private documentQueue: Queue
+  ){}
 
   async fetchDiscoverQuestions(query: Prisma.DiscoveryQuestionFindManyArgs) {
     try {
@@ -152,5 +154,19 @@ export class HuskyService {
       throw new BadRequestException('Database field validation error on discovery question', error.message);
     }
     throw error;
+  }
+
+  async uploadToS3(file: any, bucketName: string, docName: string) {
+    return await this.awsService.uploadFileToS3(file, process.env.AWS_S3_BUCKET_NAME, docName);
+  }
+
+  async queueDocumentProcessing(data: { s3Url: string; originalName: string; mimeType: string }) {
+    return await this.documentQueue.add('process-document', data, {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 1000,
+      },
+    });
   }
 }
