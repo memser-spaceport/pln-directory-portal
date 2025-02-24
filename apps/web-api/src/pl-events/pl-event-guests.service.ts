@@ -482,6 +482,23 @@ export class PLEventGuestsService {
     const selectLocation = includeLocations
       ? `,'location', l."location"`
       : ``; // Empty if location is not required
+    
+    // Determine the position of the eventUid placeholder in the SQL query's values array
+    // If search is enabled, adjust the position accordingly
+
+    /*
+      Position Breakdown:
+      - LIMIT placeholder → `$${values.length + 1}`
+      - OFFSET placeholder → `$${values.length + 2}`
+      - If search is enabled, an extra placeholder is used for search filters:
+        - Search placeholder → `$${values.length + 3}`
+        - EventUid placeholder → `$${values.length + 4}`
+      - Otherwise:
+        - EventUid placeholder → `$${values.length + 3}`
+    */
+    
+    const eventPosition = search ? values.length + 4 : values.length + 3;
+    
     // Construct the raw SQL query for fetching attendees with joined tables and aggregated JSON data
     const query: any = ` 
       SELECT 
@@ -490,14 +507,14 @@ export class PLEventGuestsService {
         SELECT 
           pg."memberUid",
           CASE   --check the guestType of the guest in the events in specified locations
-            WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${values.length+3})) --eventUid's index in values array
-               AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${values.length+3})) 
+            WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition})) --eventUid's index in values array
+               AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition})) 
             THEN 'isHostOnly'
-            WHEN BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${values.length+3}))
-               AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${values.length+3})) 
+            WHEN BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition}))
+               AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition})) 
             THEN 'isSpeakerOnly'
-            WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${values.length+3})) 
-               AND BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${values.length+3})) 
+            WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition})) 
+               AND BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition})) 
             THEN 'hostAndSpeaker'
             ELSE 'none'
           END AS guest_type,
