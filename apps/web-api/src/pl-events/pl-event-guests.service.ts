@@ -606,6 +606,8 @@ export class PLEventGuestsService {
     // Add pagination values to the query parameters for limit and offset
     values.push(paginationLimit, offset);
     values.push(eventUids);
+    console.log("------------------------Query", query);
+    console.log("------------------------Values", values);
     // Execute the raw query with the built query string and values
     const result = await this.prisma.$queryRawUnsafe(query, ...values);
     return this.formatAttendees(result);
