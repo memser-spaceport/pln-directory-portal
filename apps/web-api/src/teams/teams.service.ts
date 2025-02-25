@@ -239,6 +239,10 @@ export class TeamsService {
               await this.deleteTeamMemberRoleEntry(updatedRole, tx);
               break;
 
+            case 'Add':
+              await this.addNewTeamMemberRoleEntry(updatedRole, tx);
+              break;
+
             default:
               break;
           }
@@ -265,6 +269,12 @@ export class TeamsService {
       where: {
         memberUid_teamUid: { memberUid: teamAndRole?.memberUid, teamUid: teamAndRole?.teamUid },
       },
+    });
+  }
+
+  private async addNewTeamMemberRoleEntry(teamAndRole: any, tx: Prisma.TransactionClient) {
+    await tx.teamMemberRole.create({
+      data: teamAndRole
     });
   }
 
@@ -326,8 +336,8 @@ export class TeamsService {
     team['logo'] = teamData.logoUid
       ? { connect: { uid: teamData.logoUid } }
       : type === 'update'
-      ? { disconnect: true }
-      : undefined;
+        ? { disconnect: true }
+        : undefined;
     return team;
   }
 
