@@ -224,14 +224,14 @@ export class PLEventsController {
     @Param('uid') locationUid: string,
     @Body() body
   ) {
-    const { clientSecret, conference } = body;
+    const { clientSecret, conference, selectedEvents } = body;
     if (!clientSecret) {
       throw new UnauthorizedException('client secret is missing');
     } 
     if (!conference) {
       throw new BadRequestException('conference is missing');
     }
-    return await this.eventSyncService.syncEvents({ locationUid, clientSecret, conference });
+    return await this.eventSyncService.syncEvents({ locationUid, clientSecret, conference, selectedEvents });
   }
 
   @Api(server.route.getAllPLEventGuests)
