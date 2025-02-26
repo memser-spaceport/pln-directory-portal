@@ -46,7 +46,7 @@ export class PLEventSyncService {
       if (isEmpty(selectedEventUids)) {
         await this.deleteStaleEvents(existingEvents, events);
       }
-      this.cacheService.reset({});
+      this.cacheService.reset({ service: 'PLEventGuest' });
       this.logger.log('Event sync process completed successfully.');
       return events;
     } catch (error) {
