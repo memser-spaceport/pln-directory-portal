@@ -3,6 +3,7 @@ import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common
 import { PrismaService } from '../shared/prisma.service';
 import { getFilenameFromUrl, getFileTypeFromUrl } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
+import { isEmpty } from 'lodash';
 
 @Injectable()
 export class PLEventSyncService {
@@ -20,18 +21,21 @@ export class PLEventSyncService {
    */
   async syncEvents(body) {
     try {
-      const { locationUid } = body;
+      const { locationUid, selectedEventUids } = body;
       const events = await this.fetchEventsFromService(body);
       if (!events) return [];
       const existingEvents = await this.prisma.pLEvent.findMany({
-        where: { 
-          externalId: { not: null } 
+        where: {
+          AND:{
+            externalId: { not: null },
+            locationUid: locationUid
+          }
         },
-        select: { 
+        select: {
           uid: true,
-          name: true, 
+          name: true,
           externalId: true,
-          syncedAt: true 
+          syncedAt: true
         },
       });
       // Create a mapping of existing events for quick lookup
@@ -39,8 +43,10 @@ export class PLEventSyncService {
       // Insert or update events based on fetched data
       await this.createOrUpdateEvents(events, eventMap, locationUid);
       // Remove events that no longer exist in the external source
-      await this.deleteStaleEvents(existingEvents, events);
-      this.cacheService.reset({});
+      if (isEmpty(selectedEventUids)) {
+        await this.deleteStaleEvents(existingEvents, events);
+      }
+      this.cacheService.reset({ service: 'PLEventGuest' });
       this.logger.log('Event sync process completed successfully.');
       return events;
     } catch (error) {
@@ -56,9 +62,17 @@ export class PLEventSyncService {
    */
   private async fetchEventsFromService(params) {
     try {
-      const { clientSecret, conference } = params; 
+      const { clientSecret, conference, selectedEventUids } = params;
+      const queryParams = new URLSearchParams({
+        status: 'APPROVED',
+        conference: conference
+      });
+  
+      if (selectedEventUids && selectedEventUids.length > 0) {
+        selectedEventUids.forEach(name => queryParams.append('event_id', name));
+      }
       const response = await axios.get(
-        `${process.env.EVENT_SERVICE_URL}/events?status=APPROVED&conference=${conference}`, 
+        `${process.env.EVENT_SERVICE_URL}/events?${queryParams.toString()}`,
         {
           headers: {
             'x-client-secret': clientSecret,
@@ -101,8 +115,8 @@ export class PLEventSyncService {
         }
       } else {
         // Create a new event if it does not exist in the database
-        const createdEvent = await this.prisma.pLEvent.create({ 
-          data: await this.mapEventData(event, locationUid) 
+        const createdEvent = await this.prisma.pLEvent.create({
+          data: await this.mapEventData(event, locationUid)
         });
         this.logger.log(`Created new event: "${createdEvent.name}" (ID: ${createdEvent.externalId}).`);
       }
