@@ -29,6 +29,7 @@ import { PLEventLocationsService } from './pl-event-locations.service';
 import { PLEventGuestsService } from './pl-event-guests.service';
 import { isEmpty } from 'lodash';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
+import { InternalAuthGuard } from '../guards/auth.guard';
 
 const server = initNestServer(apiEvents);
 type RouteShape = typeof server.routeShapes;
@@ -220,18 +221,19 @@ export class PLEventsController {
   }
   
   @Api(server.route.syncPLEventsByLocation)
+  @UseGuards(InternalAuthGuard)
   async syncPLEventsByLocation(
     @Param('uid') locationUid: string,
     @Body() body
   ) {
-    const { clientSecret, conference } = body;
+    const { clientSecret, conference, selectedEventUids } = body;
     if (!clientSecret) {
       throw new UnauthorizedException('client secret is missing');
     } 
     if (!conference) {
       throw new BadRequestException('conference is missing');
     }
-    return await this.eventSyncService.syncEvents({ locationUid, clientSecret, conference });
+    return await this.eventSyncService.syncEvents({ locationUid, clientSecret, conference, selectedEventUids });
   }
 
   @Api(server.route.getAllPLEventGuests)

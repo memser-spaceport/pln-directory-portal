@@ -8,6 +8,7 @@ import { JwtService } from '../utils/jwt/jwt.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { MemberSubscriptionsModule } from '../member-subscriptions/member-subscriptions.module';
 import { PLEventSyncService } from './pl-event-sync.service';
+import { AuthModule } from '../auth/auth.module';
 @Module({
   controllers: [PLEventsController],
   providers: [
@@ -25,7 +26,8 @@ import { PLEventSyncService } from './pl-event-sync.service';
   imports:[
     MembersModule, 
     forwardRef(() => NotificationsModule), 
-    MemberSubscriptionsModule
+    MemberSubscriptionsModule,
+    AuthModule
   ]
 })
 export class PLEventsModule {}
