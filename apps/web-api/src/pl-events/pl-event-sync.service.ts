@@ -21,7 +21,7 @@ export class PLEventSyncService {
    */
   async syncEvents(body) {
     try {
-      const { locationUid, selectedEvents } = body;
+      const { locationUid, selectedEventUids } = body;
       const events = await this.fetchEventsFromService(body);
       if (!events) return [];
       const existingEvents = await this.prisma.pLEvent.findMany({
@@ -43,7 +43,7 @@ export class PLEventSyncService {
       // Insert or update events based on fetched data
       await this.createOrUpdateEvents(events, eventMap, locationUid);
       // Remove events that no longer exist in the external source
-      if (isEmpty(selectedEvents)) {
+      if (isEmpty(selectedEventUids)) {
         await this.deleteStaleEvents(existingEvents, events);
       }
       this.cacheService.reset({});
@@ -62,14 +62,14 @@ export class PLEventSyncService {
    */
   private async fetchEventsFromService(params) {
     try {
-      const { clientSecret, conference, selectedEvents } = params;
+      const { clientSecret, conference, selectedEventUids } = params;
       const queryParams = new URLSearchParams({
         status: 'APPROVED',
-        conference: conference,
+        conference: conference
       });
   
-      if (selectedEvents && selectedEvents.length > 0) {
-        selectedEvents.forEach(name => queryParams.append('event_name', name));
+      if (selectedEventUids && selectedEventUids.length > 0) {
+        selectedEventUids.forEach(name => queryParams.append('event_id', name));
       }
       const response = await axios.get(
         `${process.env.EVENT_SERVICE_URL}/events?${queryParams.toString()}`,
