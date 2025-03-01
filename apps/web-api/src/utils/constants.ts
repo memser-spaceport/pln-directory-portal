@@ -385,6 +385,18 @@ export const HUSKY_ACTION_TYPES = {
   IRL_EVENT: 'irl_event',
 };
 
+export const PROMPT_FOR_GENERATE_TITLE = `Create a title for the following question and answer 
+Question: {{question}}
+Answer: {{answer}}
+the title should be 10 words or less.
+strictly dont add any other text or information.
+the title should be concise and to the point.
+output should be in json format.
+output json: {title: 'title'}
+if there is no question or answer, return empty string.
+`;
+
+
 export const HUSKY_CONTEXTUAL_SUMMARY_PROMPT = `
  For the given question "{{question}}", using only the provided 'Context' and 'Chat History Summary' (if available), generate a JSON response following this exact structure:
 

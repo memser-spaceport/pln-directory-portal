@@ -18,6 +18,20 @@ export class MongoPersistantDbService implements OnModuleDestroy, HuskyPersisten
     await col.insertOne(message);
   }
 
+  async updateById(collection: string, key: string, value: string, query: any) {
+    const col = this.db.collection(collection);
+    await col.updateOne({ [key]: value }, { $set: query });
+  }
+
+  async findAllById(collection: string, key: string, value: string, type?: string) {
+    const col = this.db.collection(collection);
+    const query: any = { [key]: value };
+    if (type) {
+      query.type = type;
+    } 
+    return await col.find(query).sort({ createdAt: 1 }).toArray();
+  }
+
   // Cleanup resources
   async onModuleDestroy() {
     await this.client.close();

@@ -11,7 +11,9 @@ export const HuskyChatSchema = z.object({
   chatSummary: z.object({
     user: z.string(),
     system: z.string()
-  }).optional()
+  }).optional(),
+  threadUid: z.string(),
+  chatUid: z.string(),
 });
 
 export const HuskyFeedbackSchema = z.object({ 
