@@ -43,15 +43,16 @@ export class HuskyController {
   }
 
   @Post('v1/husky/threads/')
-  async huskyCreateThreadTitle(@Body() body: { email: string; threadUid: string }) {
-    return await this.huskyAiService.createThread(body.threadUid, body.email);
+  async huskyCreateThreadTitle(@Body() body: { email: string; threadUid: string; question: string }) {
+    return await this.huskyAiService.createThread(body.threadUid, body.email, body.question);
   }
 
-  @Get('v1/husky/threads')
+  @NoCache()
+  @Get('v1/husky/threads/:email')
   @UseGuards(UserAccessTokenValidateGuard)
-  async getThreadsByEmail(@Req() req, @Body() body: { email: string }) {
-    const email = req.userEmail;
-    if (email !== body.email) {
+  async getThreadsByEmail(@Req() req, @Param('email') email: string) {
+    const emailFromToken = req.userEmail;
+    if (email !== emailFromToken) {
       throw new ForbiddenException('You are not authorized to access this thread');
     }
     return await this.huskyAiService.getThreadsByEmail(email);

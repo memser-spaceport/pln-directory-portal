@@ -501,33 +501,22 @@ export class HuskyAiService {
     return aiPrompt;
   }
 
-  async createThread(threadUid: string, email: string) {
-    const thread = await this.huskyPersistentDbService.findAllById(
+  async createThread(threadUid: string, email: string, question: string) {
+    const thread = await this.huskyPersistentDbService.findOneById(
       process.env.MONGO_THREAD_COLLECTION || '',
       'threadUid',
       threadUid
     );
     
-    if(thread.length > 0) {
+    if(thread) {
       return {
         threadUid,
-        title: thread[0]?.title
+        title: thread?.title,
       }
     }
-    const chats = await this.huskyPersistentDbService.findAllById(
-      process.env.MONGO_CONVERSATION_COLLECTION || '',
-      'chatThreadId',
-      threadUid,
-      'context'
-    );
 
-    if (!chats) {
-      throw new NotFoundException('Chat thread not found');
-    }
-    const chat = chats[0];
     const prompt = Handlebars.compile(PROMPT_FOR_GENERATE_TITLE)({
-      question: chat?.prompt,
-      answer: chat?.response,
+      question: question,
     });
     const { object } = await generateObject({
       model: openai(process.env.OPENAI_LLM_MODEL || ''),
@@ -536,7 +525,7 @@ export class HuskyAiService {
         title: z.string(),
       }),
     });
-    const title = object?.title;
+    const title = object?.title || '--';
     await this.huskyPersistentDbService.create(process.env.MONGO_THREAD_COLLECTION || '', {
       threadUid,
       title,
