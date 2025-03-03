@@ -549,7 +549,7 @@ export class HuskyAiService {
   }
 
   async getThreadById(uid: string) {
-    const threads = await this.huskyPersistentDbService.findAllById(process.env.MONGO_THREAD_COLLECTION || '', 'threadUid', uid);
+    const threads = await this.huskyPersistentDbService.findAllById(process.env.MONGO_CONVERSATION_COLLECTION || '', 'threadUid', uid);
     const allThreads: any = [];
     threads.map((thread: any) => {
       if(thread?.type === "context") {

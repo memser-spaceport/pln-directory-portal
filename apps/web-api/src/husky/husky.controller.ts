@@ -58,7 +58,7 @@ export class HuskyController {
     return await this.huskyAiService.getThreadsByEmail(email);
   }
 
-  @Get('v1/husky/threads/:uid')
+  @Get('v1/husky/threads/chat/:uid')
   async getThreadById(@Param('uid') uid: string) {
     return await this.huskyAiService.getThreadById(uid);
   }
