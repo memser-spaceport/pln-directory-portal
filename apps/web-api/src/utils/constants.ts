@@ -385,15 +385,13 @@ export const HUSKY_ACTION_TYPES = {
   IRL_EVENT: 'irl_event',
 };
 
-export const PROMPT_FOR_GENERATE_TITLE = `Create a title for the following question and answer 
+export const PROMPT_FOR_GENERATE_TITLE = `Create a title for the following question 
 Question: {{question}}
-Answer: {{answer}}
 the title should be 10 words or less.
-strictly dont add any other text or information.
 the title should be concise and to the point.
 output should be in json format.
 output json: {title: 'title'}
-if there is no question or answer, return empty string.
+if there is no question or answer, return {title: '--'}.
 `;
 
 
