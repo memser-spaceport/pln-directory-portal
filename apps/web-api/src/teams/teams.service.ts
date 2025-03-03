@@ -22,6 +22,7 @@ import { LogService } from '../shared/log.service';
 import { copyObj, buildMultiRelationMapping, buildRelationMapping } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { AskService } from '../asks/asks.service';
+import { isEmpty } from 'lodash';
 
 @Injectable()
 export class TeamsService {
@@ -226,6 +227,8 @@ export class TeamsService {
     await this.prisma.$transaction(async (tx) => {
       const team = await this.formatTeam(teamUid, updatedTeam, tx, 'Update');
       result = await this.updateTeamByUid(teamUid, team, tx);
+      const toAdd: any[] = [];
+      const toDelete: any[] = [];
       if (updatedTeam?.teamMemberRoles?.length > 0) {
         for (const teamMemberRole of updatedTeam.teamMemberRoles) {
           const updatedRole = { ...teamMemberRole };
@@ -236,17 +239,23 @@ export class TeamsService {
               break;
 
             case 'Delete':
-              await this.deleteTeamMemberRoleEntry(updatedRole, tx);
+              toDelete.push(updatedRole)
               break;
 
             case 'Add':
-              await this.addNewTeamMemberRoleEntry(updatedRole, tx);
+              toAdd.push(updatedRole);
               break;
 
             default:
               break;
           }
         }
+      }
+      if (!isEmpty(toAdd)) {
+        await this.addNewTeamMemberRoleEntry(toAdd, tx);
+      }
+      if (!isEmpty(toDelete)) {
+        await this.deleteTeamMemberRoleEntry(toDelete, tx);
       }
       await this.logParticipantRequest(requestorEmail, updatedTeam, existingTeam.uid, tx);
     });
@@ -255,6 +264,12 @@ export class TeamsService {
     return result;
   }
 
+  /**
+   * Updates multiple team member roles in the database.
+   * 
+   * @param teamAndRoles - Array of objects containing `memberUid` and `teamUid` as identifiers, along with update data.
+   * @param tx - Prisma transaction client for atomic execution.
+   */
   private async updateTeamMemberRoleEntry(teamAndRole: any, tx: Prisma.TransactionClient) {
     await tx.teamMemberRole.update({
       where: {
@@ -264,17 +279,30 @@ export class TeamsService {
     });
   }
 
-  private async deleteTeamMemberRoleEntry(teamAndRole: any, tx: Prisma.TransactionClient) {
-    await tx.teamMemberRole.delete({
+  /**
+   * Deletes multiple team member roles in a single query using `deleteMany`.
+   * Ensures deletion only occurs when both `memberUid` and `teamUid` match.
+   * 
+   * @param teamAndRoles - Array of objects containing `memberUid` and `teamUid` pairs to delete.
+   * @param tx - Prisma transaction client for atomic execution.
+   */
+  private async deleteTeamMemberRoleEntry(teamAndRoles: any[], tx: Prisma.TransactionClient) {
+    await tx.teamMemberRole.deleteMany({
       where: {
-        memberUid_teamUid: { memberUid: teamAndRole?.memberUid, teamUid: teamAndRole?.teamUid },
+        OR: teamAndRoles
       },
     });
   }
 
-  private async addNewTeamMemberRoleEntry(teamAndRole: any, tx: Prisma.TransactionClient) {
-    await tx.teamMemberRole.create({
-      data: teamAndRole
+  /**
+   * Inserts multiple new team member roles in a single batch operation using `createMany`.
+   * 
+   * @param teamAndRoles - Array of new team member role objects to be added.
+   * @param tx - Prisma transaction client for atomic execution.
+   */  
+  private async addNewTeamMemberRoleEntry(teamAndRoles: any[], tx: Prisma.TransactionClient) {
+    await tx.teamMemberRole.createMany({
+      data: teamAndRoles
     });
   }
 
