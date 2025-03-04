@@ -42,7 +42,7 @@ export class HuskyController {
     await this.huskyService.addHuskyFeedback({ ...body });
   }
 
-  @Post('v1/husky/threads/')
+  @Post('v1/husky/threads')
   async huskyCreateThreadTitle(@Body() body: { email: string; threadUid: string; question: string }) {
     return await this.huskyAiService.createThread(body.threadUid, body.email, body.question);
   }
@@ -58,6 +58,7 @@ export class HuskyController {
     return await this.huskyAiService.getThreadsByEmail(email);
   }
 
+  @NoCache()
   @Get('v1/husky/threads/chat/:uid')
   async getThreadById(@Param('uid') uid: string) {
     return await this.huskyAiService.getThreadById(uid);

@@ -103,8 +103,8 @@ export class HuskyAiService {
   }
 
   async createAnalyticalResponse(chatInfo: HuskyChatInterface) {
-    const { question, uid, threadUid, chatUid } = chatInfo;
-    const rephrasedQuestion = await this.getRephrasedQuestionBasedOnHistory(uid, question.toLowerCase());
+    const { question, threadUid, chatUid } = chatInfo;
+    const rephrasedQuestion = await this.getRephrasedQuestionBasedOnHistory(threadUid, question.toLowerCase());
     const { object } = await generateObject({
       model: openai(process.env.OPENAI_LLM_MODEL || ''),
       system: promptForTextToSql,
@@ -126,7 +126,7 @@ export class HuskyAiService {
       chatUid: chatId,
       prompt: question,
       data: data,
-      type: "sql",
+      type: 'sql',
       createdAt: Date.now(),
     });
   }
@@ -203,7 +203,7 @@ export class HuskyAiService {
     });
   }
   async createStreamingChatResponse(chatInfo: HuskyChatInterface) {
-    const { question, uid, chatSummary, source, directoryId, email, name, threadUid, chatUid } = chatInfo;
+    const { question, chatSummary, source, directoryId, email, name, threadUid, chatUid } = chatInfo;
 
     // User info
     let userInfo;
@@ -217,11 +217,23 @@ export class HuskyAiService {
 
     // Update the chat summary if it is provided
     if (chatSummary) {
-      await this.updateChatSummary(uid, chatSummary);
+      await this.updateChatSummary(threadUid, chatSummary);
+      this.persistChatHistory(
+        chatSummary.threadUid,
+        chatSummary.chatUid,
+        chatSummary.user,
+        chatSummary.user,
+        chatSummary.system || '',
+        'context',
+        userInfo,
+        chatSummary.sources || [],
+        chatSummary.followUpQuestions || [],
+        chatSummary.actions || []
+      ).then(() => {});
     }
 
     // Rephrase the question and get the matching documents to create context
-    const rephrasedQuestion = await this.getRephrasedQuestionBasedOnHistory(uid, question.toLowerCase());
+    const rephrasedQuestion = await this.getRephrasedQuestionBasedOnHistory(threadUid, question.toLowerCase());
     const questionEmbedding = await this.getEmbeddingForText(rephrasedQuestion);
     const [nonDirectoryDocs, directoryDocs] = await Promise.all([
       this.getEmbeddingsBySource(questionEmbedding),
@@ -238,7 +250,7 @@ export class HuskyAiService {
         temperature: 0.1,
         prompt: HUSKY_NO_INFO_PROMPT,
         onFinish: async (response) => {
-          await this.persistChatHistory(
+          this.persistChatHistory(
             threadUid,
             chatUid,
             question,
@@ -249,13 +261,13 @@ export class HuskyAiService {
             response?.object?.sources || [],
             response?.object?.followUpQuestions || [],
             response?.object?.actions || []
-          );
+          ).then(() => {});
         },
       });
     }
 
     // If Context is valid, then create prompt and stream the response
-    const chatSummaryFromDb = await this.huskyCacheDbService.get(`${uid}:summary`);
+    const chatSummaryFromDb = await this.huskyCacheDbService.get(`${threadUid}:summary`);
     const prompt = this.createPromptForHuskyChat(question, context, chatSummaryFromDb || '', directoryDocs);
     return streamObject({
       model: openai(process.env.OPENAI_LLM_MODEL || ''),
@@ -264,9 +276,9 @@ export class HuskyAiService {
       temperature: 0.1,
       onFinish: async (response) => {
         if (prompt) {
-          await this.updateChatSummary(uid, { user: question, system: response?.object?.content });
+          this.updateChatSummary(threadUid, { user: question, system: response?.object?.content }).then(() => {});
         }
-        await this.persistChatHistory(
+        this.persistChatHistory(
           threadUid,
           chatUid,
           question,
@@ -277,7 +289,7 @@ export class HuskyAiService {
           response?.object?.sources || [],
           response?.object?.followUpQuestions || [],
           response?.object?.actions || []
-        );
+        ).then(() => {});
       },
     });
   }
@@ -549,7 +561,7 @@ export class HuskyAiService {
   }
 
   async getThreadById(uid: string) {
-    const threads = await this.huskyPersistentDbService.findAllById(process.env.MONGO_CONVERSATION_COLLECTION || '', 'threadUid', uid);
+    const threads = await this.huskyPersistentDbService.findAllById(process.env.MONGO_CONVERSATION_COLLECTION || '', 'chatThreadId', uid);
     const allThreads: any = [];
     threads.map((thread: any) => {
       if(thread?.type === "context") {
