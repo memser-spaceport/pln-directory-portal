@@ -10,7 +10,18 @@ export const HuskyChatSchema = z.object({
   source: z.string(),
   chatSummary: z.object({
     user: z.string(),
-    system: z.string()
+    system: z.string(),
+    sources: z.array(z.string()),
+    followUpQuestions: z.array(z.string()),
+    actions: z.array(
+      z.object({
+        name: z.string(),
+        directoryLink: z.string(),
+        type: z.string(),
+      })
+    ),
+    threadUid: z.string(),
+    chatUid: z.string(),
   }).optional(),
   threadUid: z.string(),
   chatUid: z.string(),
