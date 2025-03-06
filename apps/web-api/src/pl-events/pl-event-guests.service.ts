@@ -482,7 +482,7 @@ export class PLEventGuestsService {
     const selectLocation = includeLocations
       ? `,'location', l."location"`
       : ``; // Empty if location is not required
-    
+
     // Determine the position of the eventUid placeholder in the SQL query's values array
     // If search is enabled, adjust the position accordingly
 
@@ -496,9 +496,9 @@ export class PLEventGuestsService {
       - Otherwise:
         - EventUid placeholder → `$${values.length + 3}`
     */
-    
+
     const eventPosition = search ? values.length + 4 : values.length + 3;
-    
+
     // Construct the raw SQL query for fetching attendees with joined tables and aggregated JSON data
     const query: any = ` 
       SELECT 
@@ -741,15 +741,15 @@ export class PLEventGuestsService {
         const loggedInMemberOrder = uid
           ? `CASE WHEN pg."memberUid" = '${uid}' THEN 0 ELSE 1 END,` : '';
         return `
-          ORDER BY 
-            ${loggedInMemberOrder}
-            CASE 
+        ORDER BY 
+        ${loggedInMemberOrder}
+        CASE 
               WHEN pg."reason" IS NOT NULL AND array_length(pg."topics", 1) > 0 THEN 1
               WHEN array_length(pg."topics", 1) > 0 THEN 2
               WHEN pg."reason" IS NOT NULL THEN 3
-            ELSE 4
+          ELSE 4
           END asc,
-          m."name" ${sortDirection}
+        m."name" ${sortDirection}
         `
     }
   }
@@ -991,4 +991,42 @@ export class PLEventGuestsService {
     });
   }
 
+  /**
+   * Retrieves the topics and reason for a guest's participation in past events at a specific location.
+   * @param locationUid The unique identifier for the location.
+   * @param guestUid The unique identifier for the guest.
+   * @returns The guest's topics and reason for participation in the most recent past event.
+   *   - Events are sorted by updatedAt and createdAt in descending order to get latest data.
+   *   - Throws an error if something goes wrong during retrieval.
+   */
+  async getGuestTopics(locationUid: string, guestUid: string) {
+    try {
+      const events = await this.eventLocationsService.getPastEventsByLocation(locationUid);
+      const eventUids = events.map(event => event.uid);
+      const result = await this.prisma.pLEventGuest.findFirst({
+        where: {
+          AND:{
+            eventUid: {
+              in: eventUids
+            },
+            memberUid: guestUid
+          }
+        },
+        orderBy: [
+          { updatedAt: 'desc' },
+          { createdAt: 'desc' }
+        ],
+        select: {
+          topics: true,
+          reason: true
+        }
+      })
+      if(!result) {
+        return [];
+      }
+      return result;
+    } catch (error) {
+      this.handleErrors(error)
+    }
+  }
 }

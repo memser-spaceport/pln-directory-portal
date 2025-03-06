@@ -1538,6 +1538,8 @@ export class MembersService {
       }
     } else if (error instanceof Prisma.PrismaClientValidationError) {
       throw new BadRequestException('Database field validation error on Member', error.message);
+    } else {
+      throw error;
     }
     return error;
   }
