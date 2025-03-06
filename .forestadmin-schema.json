@@ -5,6 +5,172 @@
       {
         "defaultValue": null,
         "enums": null,
+        "field": "Project",
+        "integration": null,
+        "inverseOf": "Asks",
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": "Project.uid",
+        "relationship": "BelongsTo",
+        "type": "String",
+        "validations": []
+      },
+      {
+        "defaultValue": null,
+        "enums": null,
+        "field": "Team",
+        "integration": null,
+        "inverseOf": "Asks",
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": "Team.uid",
+        "relationship": "BelongsTo",
+        "type": "String",
+        "validations": []
+      },
+      {
+        "defaultValue": null,
+        "enums": null,
+        "field": "createdAt",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "Date",
+        "validations": []
+      },
+      {
+        "defaultValue": null,
+        "enums": null,
+        "field": "description",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": true,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "String",
+        "validations": [
+          {"type": "is present", "message": "Failed validation rule: 'Present'"}
+        ]
+      },
+      {
+        "defaultValue": null,
+        "enums": null,
+        "field": "id",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": true,
+        "isReadOnly": true,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "Number",
+        "validations": []
+      },
+      {
+        "defaultValue": null,
+        "enums": null,
+        "field": "tags",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": ["String"],
+        "validations": []
+      },
+      {
+        "defaultValue": null,
+        "enums": null,
+        "field": "title",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": true,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "String",
+        "validations": [
+          {"type": "is present", "message": "Failed validation rule: 'Present'"}
+        ]
+      },
+      {
+        "defaultValue": null,
+        "enums": null,
+        "field": "uid",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": true,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "String",
+        "validations": [
+          {"type": "is present", "message": "Failed validation rule: 'Present'"}
+        ]
+      },
+      {
+        "defaultValue": null,
+        "enums": null,
+        "field": "updatedAt",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "Date",
+        "validations": []
+      }
+    ],
+    "icon": null,
+    "integration": null,
+    "isReadOnly": false,
+    "isSearchable": true,
+    "isVirtual": false,
+    "name": "Ask",
+    "onlyForRelationships": false,
+    "paginationType": "page",
+    "segments": []
+  },
+  {
+    "actions": [],
+    "fields": [
+      {
+        "defaultValue": null,
+        "enums": null,
         "field": "Member_through_createdBy",
         "integration": null,
         "inverseOf": "DiscoveryQuestions_through_Member_createdBy",
@@ -4151,6 +4317,22 @@
       {
         "defaultValue": null,
         "enums": null,
+        "field": "externalId",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "String",
+        "validations": []
+      },
+      {
+        "defaultValue": null,
+        "enums": null,
         "field": "id",
         "integration": null,
         "inverseOf": null,
@@ -4281,6 +4463,22 @@
         "validations": [
           {"type": "is present", "message": "Failed validation rule: 'Present'"}
         ]
+      },
+      {
+        "defaultValue": null,
+        "enums": null,
+        "field": "syncedAt",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "Date",
+        "validations": []
       },
       {
         "defaultValue": null,
@@ -4761,6 +4959,22 @@
         "validations": []
       },
       {
+        "defaultValue": false,
+        "enums": null,
+        "field": "isFeatured",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": "Boolean",
+        "validations": []
+      },
+      {
         "defaultValue": null,
         "enums": null,
         "field": "latitude",
@@ -5108,6 +5322,23 @@
   {
     "actions": [],
     "fields": [
+      {
+        "defaultValue": null,
+        "enums": null,
+        "field": "Asks",
+        "integration": null,
+        "inverseOf": "Project",
+        "isFilterable": false,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": false,
+        "isVirtual": false,
+        "reference": "Ask.uid",
+        "relationship": "HasMany",
+        "type": ["String"],
+        "validations": []
+      },
       {
         "defaultValue": null,
         "enums": null,
@@ -5480,6 +5711,22 @@
         "validations": [
           {"type": "is present", "message": "Failed validation rule: 'Present'"}
         ]
+      },
+      {
+        "defaultValue": null,
+        "enums": null,
+        "field": "tags",
+        "integration": null,
+        "inverseOf": null,
+        "isFilterable": true,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": true,
+        "isVirtual": false,
+        "reference": null,
+        "type": ["String"],
+        "validations": []
       },
       {
         "defaultValue": null,
@@ -5926,6 +6173,23 @@
       }
     ],
     "fields": [
+      {
+        "defaultValue": null,
+        "enums": null,
+        "field": "Asks",
+        "integration": null,
+        "inverseOf": "Team",
+        "isFilterable": false,
+        "isPrimaryKey": false,
+        "isReadOnly": false,
+        "isRequired": false,
+        "isSortable": false,
+        "isVirtual": false,
+        "reference": "Ask.uid",
+        "relationship": "HasMany",
+        "type": ["String"],
+        "validations": []
+      },
       {
         "defaultValue": null,
         "enums": null,

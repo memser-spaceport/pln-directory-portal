@@ -113,7 +113,7 @@ export const HUSKY_NO_INFO_PROMPT = `Create the below JSON object with the conte
  Response JSON: {content: 'No information available for the provided question.', followUpQuestions: [], actions: [], sources: []}
 `;
 
-export const IGNORED_URLS_FOR_CONCEALID = ['/v1/husky/chat/assistant', '/v1/husky/chat/feedback', '/v1/husky/chat/contextual', '/v1/husky/chat/analytical', '/v1/husky/chat/additional-info', 'v1/husky/threads/chat'];
+export const IGNORED_URLS_FOR_CONCEALID = ['/v1/husky/threads', '/v1/husky/chat/assistant', '/v1/husky/chat/feedback', '/v1/husky/chat/contextual', '/v1/husky/chat/analytical', '/v1/husky/chat/additional-info', 'v1/husky/threads/chat'];
 export const promptForTextToSql = `
 Below is an updated version of your prompt that includes clear headings for both developer understanding and for the LLM. This structure will help both parties quickly locate and interpret the necessary details.
 

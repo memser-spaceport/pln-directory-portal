@@ -153,4 +153,16 @@ export class HuskyService {
     }
     throw error;
   }
+
+  async createThread(threadId: string, email: string) {
+    return await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || '', {
+      threadId,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      title: '',
+      contextual: [],
+      analytical: [],
+      email,
+    });
+  }
 }

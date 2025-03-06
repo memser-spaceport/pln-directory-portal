@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
 import { MongoClient, Db } from 'mongodb';
 import { HuskyPersistentDbService } from './husky-db.interface';
 
@@ -20,7 +20,28 @@ export class MongoPersistantDbService implements OnModuleDestroy, HuskyPersisten
 
   async updateById(collection: string, key: string, value: string, query: any) {
     const col = this.db.collection(collection);
-    await col.updateOne({ [key]: value }, { $set: query });
+    await col.updateOne({ [key]: value }, { $set: query }, { upsert: true });
+  }
+
+  async patch(collection: string, key: string, value: string, data: any) {
+    const col = this.db.collection(collection);
+    const existingDoc = await col.findOne({ [key]: value });
+
+    if (!existingDoc) {
+      return null;
+    }
+
+    const updateQuery: any = {};
+
+    Object.keys(data).forEach((field: string) => {
+      if (Array.isArray(existingDoc[field])) {
+        updateQuery[field] = { $push: { [field]: data[field] } };
+      } else {
+        updateQuery[field] = { $set: { [field]: data[field] } };
+      }
+    });
+
+    await col.updateOne({ [key]: value }, updateQuery);
   }
 
   async findAllById(collection: string, key: string, value: string, type?: string) {
@@ -28,7 +49,7 @@ export class MongoPersistantDbService implements OnModuleDestroy, HuskyPersisten
     const query: any = { [key]: value };
     if (type) {
       query.type = type;
-    } 
+    }
     return await col.find(query).sort({ createdAt: 1 }).toArray();
   }
 
@@ -38,8 +59,9 @@ export class MongoPersistantDbService implements OnModuleDestroy, HuskyPersisten
     if (type) {
       query.type = type;
     }
+    console.log('query', query, key, value, type);
     return await col.findOne(query);
-  } 
+  }
 
   // Cleanup resources
   async onModuleDestroy() {
