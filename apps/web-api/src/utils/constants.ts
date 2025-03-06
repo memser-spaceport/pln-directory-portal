@@ -500,6 +500,8 @@ STRICT REQUIREMENTS for the output json: Follow the below requirements strictly.
 - **Strictly** Never add the 'sources' in the 'content' like - Sources \n 1. example1.com \n 2. example2.com \n 3.example3.com
 - **Strictly** Never add the 'followUpQuestions' in the 'content'.
 - **Strictly** Never add the 'actions' in the 'content'
+- **Strictly** avoid promotional adjectives and adverbs. eg. 'significant', 'extraordinary', 'pivotal', 'well-rounded', 'dynamic' etc.
+- **Strictly** summarize the content in a neutral, factual tone. Do not add any subjective opinions, promotional adjectives, or unverified claims. Use only verifiable facts and refrain from using adjectives or adverbs that could imply judgment (e.g., 'significant,' 'extraordinary,' 'pivotal,' 'keenly interested,' etc.). If a role, event, or contribution is mentioned without clear, supporting facts, simply state the fact without any embellishment. For example, instead of 'He plays a pivotal role in engineering,' state 'He is part of the engineering team'; instead of 'He plays a significant role in the development,' say 'He is part of the development team'; and instead of 'He is actively participating in significant events in India,' say 'He is actively participating in events in India.' Make sure the content is based solely on the facts provided in context. Even if the context/source content is using these exaggerated words, change it or modify to make sure promotional adjectives are not used. Keep it as simple as possible and concise
 
 2. 'sources' FORMATTING:
 - Include only unique, valid URLs f rom context
