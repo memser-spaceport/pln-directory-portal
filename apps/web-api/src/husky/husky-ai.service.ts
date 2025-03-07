@@ -50,7 +50,7 @@ export class HuskyAiService {
         chatSummary.sources || [],
         chatSummary.followUpQuestions || [],
         chatSummary.actions || []
-      ).then(() => {});
+      ).then(() => { });
     }
 
     // Rephrase the question and get the matching documents to create context
@@ -79,7 +79,7 @@ export class HuskyAiService {
             response?.object?.sources || [],
             response?.object?.followUpQuestions || [],
             response?.object?.actions || []
-          ).then(() => {});
+          ).then(() => { });
         },
       });
     }
@@ -93,13 +93,13 @@ export class HuskyAiService {
       prompt: prompt || HUSKY_NO_INFO_PROMPT,
       temperature: 0.001,
       onFinish: async (response) => {
-      
+
         if (prompt) {
           this.updateChatSummary(threadId, { user: question, system: response?.object?.content })
-          .then((res) => {
-            return this.updateChatSummaryInMongo(threadId, res)
-          })
-          .then(() => {})
+            .then((res) => {
+              return this.updateChatSummaryInMongo(threadId, res)
+            })
+            .then(() => { })
         }
         this.persistContextualHistory(
           threadId,
@@ -109,7 +109,7 @@ export class HuskyAiService {
           response?.object?.sources || [],
           response?.object?.followUpQuestions || [],
           response?.object?.actions || []
-        ).then(() => {});
+        ).then(() => { });
         //* Update summary in mongo */
 
       },
@@ -139,28 +139,46 @@ export class HuskyAiService {
   ) {
 
     let doc = await this.huskyPersistentDbService.getDocByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
-    if(!doc) {
-      return;
+    if (!doc) {
+      const newDoc = {
+        threadId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        contextual: [
+          {
+            questionId: chatId,
+            question,
+            response: response || '',
+            actions,
+            sources,
+            createdAt: Date.now(),
+            followUpQuestions,
+          }
+        ],
+      }
+      await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || '', newDoc);
+
+    } else {
+      const contextual = doc?.contextual || [];
+      const updatedContextual = [
+        ...contextual,
+        {
+          questionId: chatId,
+          question,
+          response: response || '',
+          actions,
+          sources,
+          createdAt: Date.now(),
+          followUpQuestions,
+        }
+      ]
+
+      doc.updatedAt = Date.now();
+      doc.contextual = updatedContextual;
+      await this.huskyPersistentDbService.updateDocByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId, doc);
     }
 
-    const contextual = doc?.contextual || [];
-    const updatedContextual = [
-      ...contextual,
-      {
-        questionId: chatId,
-        question,
-        response: response || '',
-        actions,
-        sources,
-        createdAt: Date.now(),
-        followUpQuestions,
-      }
-    ]
 
-    doc.updatedAt = Date.now();
-    doc.contextual = updatedContextual;
-
-    await this.huskyPersistentDbService.updateDocByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId, doc);
   }
 
   async getEmbeddingForText(text: string) {
@@ -194,14 +212,14 @@ export class HuskyAiService {
   async updateChatSummary(chatId: string, rawChatHistory: any) {
     const formattedChat = `user: ${rawChatHistory.user}\n system: ${rawChatHistory.system}`;
     const previousSummary = await this.huskyCacheDbService.get(`${chatId}:summary`);
-    
+
     // Define a maximum length for the summary
     const maxLength = 500; // Adjust this value as needed
 
     const aiPrompt = previousSummary
       ? Handlebars.compile(chatSummaryWithHistoryTemplate)({ previousSummary, currentConversation: formattedChat, maxLength })
       : Handlebars.compile(chatSummaryTemplate)({ currentConversation: formattedChat, maxLength });
-    
+
     const { text } = await generateText({
       model: openai(process.env.OPENAI_LLM_MODEL || ''),
       prompt: aiPrompt,
@@ -246,7 +264,7 @@ export class HuskyAiService {
     });
   }
 
-  async getDirectoryEmbeddings(embedding: any, limit = 5  ) {
+  async getDirectoryEmbeddings(embedding: any, limit = 5) {
     const [memberDocs, teamDocs, projectDocs, focusAreaDocs, irlEventDocs] = await Promise.all([
       this.fetchAndFormatActionDocs(HUSKY_ACTION_TYPES.MEMBER, process.env.QDRANT_MEMBERS_COLLECTION || '', embedding, limit),
       this.fetchAndFormatActionDocs(HUSKY_ACTION_TYPES.TEAM, process.env.QDRANT_TEAMS_COLLECTION || '', embedding, limit),
@@ -272,29 +290,29 @@ export class HuskyAiService {
     // Get results from both collections
     const [allDocsResults, teamsWebsearchResults] = await Promise.all([
       this.huskyVectorDbService.searchEmbeddings(process.env.QDRANT_ALL_DOCS_COLLECTION || '', embedding, limit, true),
-        this.huskyVectorDbService.searchEmbeddings(process.env.QDRANT_TEAMS_WEBSEARCH_COLLECTION || '', embedding, limit, true)
-      ]);
+      this.huskyVectorDbService.searchEmbeddings(process.env.QDRANT_TEAMS_WEBSEARCH_COLLECTION || '', embedding, limit, true)
+    ]);
 
-      const formattedTeamsWebsearchResults = teamsWebsearchResults.map((doc) => {
-        return {
-          id: doc.id,
-          version: doc.version,
-          score: doc.score,
-          payload: {
-            metadata: {
-              source: (doc.payload?.metadata as any)?.source ?? '',
-              name: (doc.payload?.metadata as any)?.name ?? '',
-            },
-            page_content: doc.payload?.content,
+    const formattedTeamsWebsearchResults = teamsWebsearchResults.map((doc) => {
+      return {
+        id: doc.id,
+        version: doc.version,
+        score: doc.score,
+        payload: {
+          metadata: {
+            source: (doc.payload?.metadata as any)?.source ?? '',
+            name: (doc.payload?.metadata as any)?.name ?? '',
           },
-          groupType: (doc.payload as any)?.type ?? '',
-        };
-      });
+          page_content: doc.payload?.content,
+        },
+        groupType: (doc.payload as any)?.type ?? '',
+      };
+    });
 
-      // Combine and sort results by score
-      return [...allDocsResults, ...formattedTeamsWebsearchResults]
-        .sort((a, b) => b.score - a.score)
-        .slice(0, limit);
+    // Combine and sort results by score
+    return [...allDocsResults, ...formattedTeamsWebsearchResults]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
   }
 
   async createContextWithMatchedDocs(nonDirectoryDocs: any[], directoryDocs: any, chatId?: string) {
@@ -325,7 +343,7 @@ export class HuskyAiService {
     const nonDirectory = formattedNonDictoryDocs.filter((v) => v.score > 0.35 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 5);
     const directory = allDocs.filter((v) => v.score > 0.35 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 6);
 
-    const all = [ ...directory, ...nonDirectory]
+    const all = [...directory, ...nonDirectory]
 
     if (chatId) {
       const selectedIds = all.map((result) => result?.id);
@@ -376,7 +394,7 @@ export class HuskyAiService {
     );
 
     if (!thread) {
-     throw new NotFoundException('Thread not found');
+      throw new NotFoundException('Thread not found');
     }
 
     const prompt = Handlebars.compile(PROMPT_FOR_GENERATE_TITLE)({
@@ -397,48 +415,39 @@ export class HuskyAiService {
   }
 
   async getThreadsByUserId(userUid: string) {
-   try {
-    const threads = await this.huskyPersistentDbService.findByKeyValue(process.env.MONGO_THREAD_COLLECTION || '', 'directoryId', userUid);
-    return threads
-    .filter((thread) => thread?.title?.length > 0)
-    .sort((a, b) => b.updatedAt - a.updatedAt)
-    .map((thread) => ({
-      threadId: thread?.threadId,
-      title: thread?.title,
-      createdAt: thread?.createdAt,
-      updatedAt: thread?.updatedAt,
-    }))
-
-   } catch (error) {
-    this.logger.error(`Failed to get threads for user ${userUid}:`, error);
-    throw new Error(`Failed to retrieve threads: ${error.message}`);
-   }
-  }
-
-  async getThreadsByEmail(email: string) {
     try {
-      const threads = await this.huskyPersistentDbService.findByKeyValue(process.env.MONGO_THREAD_COLLECTION || '', 'email', email);
-      return threads;
+      const threads = await this.huskyPersistentDbService.findByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'directoryId', userUid);
+      return threads
+        .filter((thread) => thread?.title?.length > 0)
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .map((thread) => ({
+          threadId: thread?.threadId,
+          title: thread?.title,
+          createdAt: thread?.createdAt,
+          updatedAt: thread?.updatedAt,
+        }))
+
     } catch (error) {
-      this.logger.error(`Failed to get threads for email ${email}:`, error);
+      this.logger.error(`Failed to get threads for user ${userUid}:`, error);
       throw new Error(`Failed to retrieve threads: ${error.message}`);
     }
   }
 
+
   async getChatsByThreadId(threadId: string) {
     const threadPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
     const summaryPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', 'threadId', threadId);
-    
+
     const [thread, summaryData] = await Promise.all([threadPromise, summaryPromise]);
-    if(!thread) {
+    if (!thread) {
       return [];
     }
-    
-    if(summaryData) {
+
+    if (summaryData) {
       this.huskyCacheDbService.set(`${threadId}:summary`, summaryData?.summary);
     }
 
-    const chats =  thread?.contextual || [];
+    const chats = thread?.contextual || [];
     return chats.sort((a, b) => a.createdAt - b.createdAt);
   }
 
@@ -446,13 +455,13 @@ export class HuskyAiService {
     const threads = await this.huskyPersistentDbService.findByKeyValue(process.env.MONGO_CONVERSATION_COLLECTION || '', 'chatThreadId', uid);
     const allThreads: any = [];
     threads.map((thread: any) => {
-      if(thread?.type === "context") {
+      if (thread?.type === "context") {
         const filteredSql = threads.filter((sqlThread: any) => sqlThread.type === "sql" && sqlThread.chatUid === thread.chatUid);
         allThreads.push({
           ...thread,
           sqlData: filteredSql[0]?.data
-      })
-    }
+        })
+      }
     })
     return allThreads;
   }
