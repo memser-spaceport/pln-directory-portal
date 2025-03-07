@@ -521,9 +521,7 @@ export class PLEventGuestsService {
           json_object_agg(
             'info',
             json_build_object(
-              'reason', pg."reason",
               'teamUid', pg."teamUid",
-              'topics', pg."topics",
               'isHost', pg."isHost",
               'isSpeaker', pg."isSpeaker",
               'createdAt', pg."createdAt",
@@ -531,19 +529,26 @@ export class PLEventGuestsService {
               'officeHours', pg."officeHours"
             )
           ) AS guest,
-          json_agg(
-            DISTINCT jsonb_build_object(
+          jsonb_agg(
+            jsonb_build_object(
               'uid', e.uid,
               'slugURL', e."slugURL",
               'name', e.name,
               'type', e.type,
               'startDate', e."startDate",
               'endDate', e."endDate",
-              'isHost', pg."isHost",      -- Event-specific host details
-              'isSpeaker', pg."isSpeaker", -- Event-specific speaker details
-              'additionalInfo', pg."additionalInfo"
-               ${selectLocation}
+              'isHost', pg."isHost",
+              'isSpeaker', pg."isSpeaker",
+              'additionalInfo', pg."additionalInfo",
+              'topics', 
+              CASE 
+                WHEN pg."topics" IS NOT NULL THEN to_jsonb(pg."topics") 
+                ELSE '[]'::jsonb 
+              END,
+              'reason', pg."reason"
+              ${selectLocation}
             )
+            ORDER BY e."startDate" DESC
           ) AS events,
           json_object_agg(
             'member',
@@ -592,14 +597,12 @@ export class PLEventGuestsService {
         GROUP BY 
           pg."memberUid",
           pg."teamUid",
-          pg."topics",
-          pg."reason",
           m.name,
           tm.name
         ${conditions} -- Add the dynamically generated conditions for filtering
-        ${orderBy} -- Apply sorting logic
       ) 
       AS subquery
+      ${orderBy} -- Apply sorting logic
       ${this.buildHostAndSpeakerCondition(isHost, isSpeaker)}
       LIMIT $${values.length + 1}
       OFFSET $${values.length + 2} -- Apply pagination limit and offset
@@ -608,7 +611,14 @@ export class PLEventGuestsService {
     values.push(paginationLimit, offset);
     values.push(eventUids);
     // Execute the raw query with the built query string and values
+    console.log('................................queryy', query);
     const result = await this.prisma.$queryRawUnsafe(query, ...values);
+    // console.log(
+    //   JSON.stringify(result, (key, value) =>
+    //     typeof value === "bigint" ? value.toString() : value,
+    //     2
+    //   )
+    // );
     return this.formatAttendees(result);
   }
 
@@ -724,36 +734,45 @@ export class PLEventGuestsService {
     return ``;
   }
 
-  /**
-   * Applies sorting logic to the SQL query based on the provided sortBy parameter.
-   * 
-   * @param {string} sortBy - The field by which to sort the results. 
-   *                          Can be 'memberName', 'teamName', or 'eventName'.
-   * @returns {string} SQL orderBy clause to apply the sorting.
-   */
   applySorting(sortBy: string, sortDirection: string, uid: string) {
-    // Apply sorting based on the selected field
-    switch (sortBy) {
-      case "member":
-        return 'ORDER BY m."name" ' + sortDirection;
-      case "team":
-        return 'ORDER BY tm."name" ' + sortDirection;
-      default:
-        const loggedInMemberOrder = uid
-          ? `CASE WHEN pg."memberUid" = '${uid}' THEN 0 ELSE 1 END,` : '';
-        return `
-          ORDER BY 
-            ${loggedInMemberOrder}
-            CASE 
-              WHEN pg."reason" IS NOT NULL AND array_length(pg."topics", 1) > 0 THEN 1
-              WHEN array_length(pg."topics", 1) > 0 THEN 2
-              WHEN pg."reason" IS NOT NULL THEN 3
-            ELSE 4
-          END asc,
+    // Ensure logged-in user is prioritized
+    const loggedInMemberOrder = uid
+      ? `CASE WHEN pg."memberUid" = '${uid}' THEN 0 ELSE 1 END,`
+      : '';
+  
+    // Sorting logic for member and team
+    if (sortBy === "member") {
+      return `
+        ORDER BY 
+          ${loggedInMemberOrder}
           m."name" ${sortDirection}
-        `
+      `;
+    } else if (sortBy === "team") {
+      return `
+        ORDER BY 
+          ${loggedInMemberOrder}
+          tm."name" ${sortDirection}
+      `;
     }
+  
+    // Sorting logic for event-based sorting
+    return `
+      ORDER BY 
+        ${loggedInMemberOrder}
+      CASE 
+        WHEN jsonb_array_length(COALESCE(events, '[]'::jsonb)) = 0 THEN 4  -- Empty events go last
+        WHEN (events->0->'topics' IS NOT NULL AND jsonb_array_length(events->0->'topics') > 0  
+              AND events->0->>'reason' IS NOT NULL) THEN 1  -- First event has topics & reason
+        WHEN (events->0->'topics' IS NOT NULL AND jsonb_array_length(events->0->'topics') > 0  
+              AND events->0->>'reason' IS NULL) THEN 2  -- First event has topics but reason is null
+        WHEN (events->0->>'reason' IS NOT NULL) THEN 3  -- First event has reason but no topics
+        ELSE 4  -- Default case (Other events go last)
+      END ASC
+    `;
   }
+  
+
+
 
   /**
   * This method retrieves list of unique event topics in provided location uid.
