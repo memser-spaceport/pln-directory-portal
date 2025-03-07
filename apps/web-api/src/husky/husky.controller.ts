@@ -11,30 +11,11 @@ import { UserAccessTokenValidateGuard } from '../guards/user-access-token-valida
 export class HuskyController {
   constructor(private huskyService: HuskyService, private huskyAiService: HuskyAiService) { }
 
-  @Post('v1/husky/chat/assistant')
+  @Post('v1/husky/chat/contextual')
   async huskyChatAssistant(@Body() body: HuskyChatDto, @Res() res: Response) {
-    const aiStreamingResponse = await this.huskyAiService.createStreamingChatResponse({ ...body});
+    const aiStreamingResponse = await this.huskyAiService.createContextualResponse({ ...body});
     aiStreamingResponse.pipeTextStreamToResponse(res);
     return;
-  }
-
-
-  @Post('v1/husky/chat/contextual')
-  async huskyChatAnswer(@Body() body: HuskyChatDto, @Res() res: Response) {
-    const response = await this.huskyAiService.createContextualResponse({ ...body})
-    response.pipeTextStreamToResponse(res);
-    return;
-  }
-
-  @NoCache()
-  @Get('v1/husky/additional-info')
-  async huskyChatAdditionalInfo(@Param('uid') threadId: string, @Param('chatUid') chatUid: string) {
-    return await this.huskyAiService.getChatAdditionalInfo(threadId, chatUid);
-  }
-
-  @Post('v1/husky/chat/analytical')
-  async huskyChatAnalytical(@Body() body: HuskyChatDto) {
-    return await this.huskyAiService.createAnalyticalResponse({ ...body});
   }
   
   @Post('v1/husky/chat/feedback')
@@ -42,25 +23,28 @@ export class HuskyController {
     await this.huskyService.addHuskyFeedback({ ...body });
   }
 
-  @Post('v1/husky/threads')
-  async huskyCreateThreadTitle(@Body() body: { email: string; threadUid: string; question: string }) {
-    return await this.huskyAiService.createThread(body.threadUid, body.email, body.question);
-  }
-
-  @NoCache()
-  @Get('v1/husky/threads/:email')
   @UseGuards(UserAccessTokenValidateGuard)
-  async getThreadsByEmail(@Req() req, @Param('email') email: string) {
-    const emailFromToken = req.userEmail;
-    if (email !== emailFromToken) {
-      throw new ForbiddenException('You are not authorized to access this thread');
-    }
-    return await this.huskyAiService.getThreadsByEmail(email);
+  @Post('v1/husky/threads')
+  async createNewThread(@Body() body: { threadId: string}, @Req() req) {
+    return await this.huskyAiService.createThread(body.threadId, req?.userEmail, req?.userUid);
+  }
+
+  @UseGuards(UserAccessTokenValidateGuard)
+  @Post('v1/husky/threads/:threadId/title')
+  async updateThreadTitle(@Body() body: { question: string}, @Param('threadId') threadId: string, @Req() req) {
+    return await this.huskyAiService.createThreadTitle(threadId, body.question);
   }
 
   @NoCache()
-  @Get('v1/husky/threads/chat/:uid')
-  async getThreadById(@Param('uid') uid: string) {
-    return await this.huskyAiService.getThreadById(uid);
+  @Get('v1/husky/threads')
+  @UseGuards(UserAccessTokenValidateGuard)
+  async getThreadsByEmail(@Req() req) {
+    return await this.huskyAiService.getThreadsByUserId(req?.userUid);
+  }
+
+  @NoCache()
+  @Get('v1/husky/threads/:threadId/chats')
+  async getChatsByThreadId(@Param('threadId') threadId: string) {
+    return await this.huskyAiService.getChatsByThreadId(threadId);
   }
 }

@@ -389,9 +389,7 @@ export const PROMPT_FOR_GENERATE_TITLE = `Create a title for the following quest
 Question: {{question}}
 the title should be 10 words or less.
 the title should be concise and to the point.
-output should be in json format.
-output json: {title: 'title'}
-if there is no question or answer, return {title: '--'}.
+if there is no question or answer, return empty string.
 `;
 
 
@@ -500,6 +498,7 @@ STRICT REQUIREMENTS for the output json: Follow the below requirements strictly.
 - **Strictly** Never add the 'sources' in the 'content' like - Sources \n 1. example1.com \n 2. example2.com \n 3.example3.com
 - **Strictly** Never add the 'followUpQuestions' in the 'content'.
 - **Strictly** Never add the 'actions' in the 'content'
+- **Strictly** If a paragraph contains many comma-separated items (more than 3), format them as a bulleted list for better readability. You can also use sub-bullets if needed. But strictly use bullet points where there are lot of comma-separated items.Example scenarios,  eg: 1. It is hosted by p1, p2, p3. 2. It is attended by m1, m2, m3. 3. It is organized by t1, t2, t3. 4. It is organized by p1, p2, p3. 5. It is organized by m1, m2, m3. 6. It is organized by t1, t2, t3, use bullet points for all these.
 - **Strictly** avoid promotional adjectives and adverbs. eg. 'significant', 'extraordinary', 'pivotal', 'well-rounded', 'dynamic' etc.
 - **Strictly** summarize the content in a neutral, factual tone. Do not add any subjective opinions, promotional adjectives, or unverified claims. Use only verifiable facts and refrain from using adjectives or adverbs that could imply judgment (e.g., 'significant,' 'extraordinary,' 'pivotal,' 'keenly interested,' etc.). If a role, event, or contribution is mentioned without clear, supporting facts, simply state the fact without any embellishment. For example, instead of 'He plays a pivotal role in engineering,' state 'He is part of the engineering team'; instead of 'He plays a significant role in the development,' say 'He is part of the development team'; and instead of 'He is actively participating in significant events in India,' say 'He is actively participating in events in India.' Make sure the content is based solely on the facts provided in context. Even if the context/source content is using these exaggerated words, change it or modify to make sure promotional adjectives are not used. Keep it as simple as possible and concise
 

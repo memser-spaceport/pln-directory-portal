@@ -36,196 +36,17 @@ export class HuskyAiService {
     private postgresSqlDBService: PostgresSqlDb
   ) { }
 
-  async getChatAdditionalInfo(threadUid: string, chatUid: string) {
-    const lastQuestion = await this.huskyCacheDbService.get(`${threadUid}:last-question`);
-    const lastResponse = await this.huskyCacheDbService.get(`${threadUid}:last-response`);
-    const previousChatSummary = await this.huskyCacheDbService.get(`${threadUid}:summary`);
-    const chatSummary = await generateText({
-      model: openai(process.env.OPENAI_LLM_MODEL || ''),
-      prompt: Handlebars.compile(HUSKY_RELATED_INFO_SUMMARY_PROMPT)({
-        question: lastQuestion,
-        response: lastResponse,
-        previousChatSummary: previousChatSummary
-      }),
-    });
-
-    const questionEmbedding = await this.getEmbeddingForText(chatSummary.text);
-    const [nonDirectoryDocs, directoryDocs] = await Promise.all([
-      this.getEmbeddingsBySource(questionEmbedding, 30),
-      this.getDirectoryEmbeddings(questionEmbedding, 10),
-    ]);
-
-    const filteredNonDirectoryDocs = [...nonDirectoryDocs].filter((doc) => doc.score > 0.45);
-    const filteredDirectoryDocs = {
-      memberDocs: {...directoryDocs}?.memberDocs?.filter((doc) => doc.score > 0.35),
-      teamDocs: {...directoryDocs}?.teamDocs?.filter((doc) => doc.score > 0.35),
-      projectDocs: {...directoryDocs}?.projectDocs?.filter((doc) => doc.score > 0.35),
-    }
-  
-    const actionsDocs = {
-      memberDocs: {...directoryDocs}?.memberDocs?.filter(doc => doc.score > 0.45),
-      teamDocs: {...directoryDocs}?.teamDocs?.filter(doc => doc.score > 0.45),
-      projectDocs: {...directoryDocs}?.projectDocs?.filter(doc => doc.score > 0.45),
-    }
- 
-   
-    const context = await this.createContextWithMatchedDocs(filteredNonDirectoryDocs, filteredDirectoryDocs, chatUid);
-
-    const result = await generateObject({
-      model: openai(process.env.OPENAI_LLM_MODEL || ''),
-      schema: z.object({
-        followUpQuestions: z.array(z.string()),
-        actions: z.array(z.object({
-          name: z.string(),
-          type: z.string(),
-            directoryLink: z.string(),
-          })
-        ),
-      }),
-      prompt: Handlebars.compile(HUSKY_RELATED_INFO_PROMPT)({
-        context,
-        actionDocs: JSON.stringify(actionsDocs),
-        question: lastQuestion,
-        response: lastResponse
-      })
-    })
-
-    await this.huskyPersistentDbService.updateById(
-      process.env.MONGO_CONVERSATION_COLLECTION || '',
-      'chatUid',
-      chatUid,
-      {
-        followUpQuestions: result?.object?.followUpQuestions,
-        actions: result?.object?.actions,
-      }
-    );
-    return result?.object
-  }
-
-  async createAnalyticalResponse(chatInfo: HuskyChatInterface) {
-    const { question, threadUid, chatUid } = chatInfo;
-    const rephrasedQuestion = await this.getRephrasedQuestionBasedOnHistory(threadUid, question.toLowerCase());
-    const { object } = await generateObject({
-      model: openai(process.env.OPENAI_LLM_MODEL || ''),
-      system: promptForTextToSql,
-      prompt: rephrasedQuestion,
-      schema: z.object({
-        sql: z.array(z.string()),
-      }),
-    });
-
-    const sqlQueries = object?.sql;
-    const results = await this.processSqlQueries(sqlQueries);
-    await this.persistAnalyticalHistory(threadUid, chatUid, question, results);
-    return results;
-  }
-
-  async persistAnalyticalHistory(threadId: string, chatId: string, question: string, data: any) {
-    await this.huskyPersistentDbService.create(process.env.MONGO_CONVERSATION_COLLECTION || '', {
-      chatThreadId: threadId,
-      chatUid: chatId,
-      prompt: question,
-      data: data,
-      type: 'sql',
-      createdAt: Date.now(),
-    });
-  }
-
-
-
-  async processSqlQueries(sqls: string[]) {
-    const promises: any[] = [];
-    sqls.forEach((sql) => {
-      promises.push(this.postgresSqlDBService.runRawQuery(sql));
-    });
-    const allResults = await Promise.all(promises);
-    let results: any = [];
-    allResults.forEach((result, index) => {
-      results = [...results, ...result]
-    });
-    return results;
-  }
-
   async createContextualResponse(chatInfo: HuskyChatInterface) {
-    const { threadUid, chatUid, question, chatSummary, source, directoryId, email, name } = chatInfo;
-
-    // User info
-    let userInfo;
-    if (directoryId && email && name) {
-      userInfo = {
-        directoryId,
-        email,
-        name,
-      };
-    }
+    const { question, chatSummary, threadId, chatId } = chatInfo;
 
     // Update the chat summary if it is provided
     if (chatSummary) {
-      await this.updateChatSummary(threadUid, chatSummary);
-    }
-
-    // Rephrase the question and get the matching documents to create context
-    const rephrasedQuestion = await this.getRephrasedQuestionBasedOnHistory(threadUid, question.toLowerCase());
-    const questionEmbedding = await this.getEmbeddingForText(rephrasedQuestion);
-    const [nonDirectoryDocs, directoryDocs] = await Promise.all([
-      this.getEmbeddingsBySource(questionEmbedding),
-      this.getDirectoryEmbeddings(questionEmbedding),
-    ]);
-
-    const context = await this.createContextWithMatchedDocs(nonDirectoryDocs, directoryDocs, threadUid);
-    const prompt = this.createPromptForContextualDocs(question, context);
-    return streamObject({
-      model: openai(process.env.OPENAI_LLM_MODEL || ''),
-      schema: z.object({
-        content: z.string(),
-        sources: z.array(z.string()),
-      }),
-      prompt: prompt || HUSKY_NO_INFO_PROMPT,
-      temperature: 0.1,
-      onFinish: async (response) => {
-        if (prompt) {
-          await this.updateLastMessage(threadUid, question, response?.object?.content as string);
-          await this.updateChatSummary(threadUid, { user: question, system: response?.object?.content });
-        }
-        await this.persistChatHistory(
-          threadUid,
-          chatUid,
-          question,
-          rephrasedQuestion,
-          response?.object?.content || '',
-          'context',
-          userInfo,
-          response?.object?.sources || [],
-          [],
-          []
-        );
-      },
-    });
-  }
-  async createStreamingChatResponse(chatInfo: HuskyChatInterface) {
-    const { question, chatSummary, source, directoryId, email, name, threadUid, chatUid } = chatInfo;
-
-    // User info
-    let userInfo;
-    if (directoryId && email && name) {
-      userInfo = {
-        directoryId,
-        email,
-        name,
-      };
-    }
-
-    // Update the chat summary if it is provided
-    if (chatSummary) {
-      await this.updateChatSummary(threadUid, chatSummary);
-      this.persistChatHistory(
-        chatSummary.threadUid,
-        chatSummary.chatUid,
-        chatSummary.user,
+      await this.updateChatSummary(threadId, chatSummary);
+      this.persistContextualHistory(
+        threadId,
+        chatId,
         chatSummary.user,
         chatSummary.system || '',
-        'context',
-        userInfo,
         chatSummary.sources || [],
         chatSummary.followUpQuestions || [],
         chatSummary.actions || []
@@ -233,7 +54,7 @@ export class HuskyAiService {
     }
 
     // Rephrase the question and get the matching documents to create context
-    const rephrasedQuestion = await this.getRephrasedQuestionBasedOnHistory(threadUid, question.toLowerCase());
+    const rephrasedQuestion = await this.getRephrasedQuestionBasedOnHistory(threadId, question.toLowerCase());
     const questionEmbedding = await this.getEmbeddingForText(rephrasedQuestion);
     const [nonDirectoryDocs, directoryDocs] = await Promise.all([
       this.getEmbeddingsBySource(questionEmbedding),
@@ -247,17 +68,14 @@ export class HuskyAiService {
       return streamObject({
         model: openai(process.env.OPENAI_LLM_MODEL || ''),
         schema: HuskyResponseSchema,
-        temperature: 0.1,
+        temperature: 0.001,
         prompt: HUSKY_NO_INFO_PROMPT,
         onFinish: async (response) => {
-          this.persistChatHistory(
-            threadUid,
-            chatUid,
+          this.persistContextualHistory(
+            threadId,
+            chatId,
             question,
-            rephrasedQuestion,
             response?.object?.content || '',
-            'context',
-            userInfo,
             response?.object?.sources || [],
             response?.object?.followUpQuestions || [],
             response?.object?.actions || []
@@ -267,58 +85,66 @@ export class HuskyAiService {
     }
 
     // If Context is valid, then create prompt and stream the response
-    const chatSummaryFromDb = await this.huskyCacheDbService.get(`${threadUid}:summary`);
+    const chatSummaryFromDb = await this.huskyCacheDbService.get(`${threadId}:summary`);
     const prompt = this.createPromptForHuskyChat(question, context, chatSummaryFromDb || '', directoryDocs);
     return streamObject({
       model: openai(process.env.OPENAI_LLM_MODEL || ''),
       schema: HuskyResponseSchema,
       prompt: prompt || HUSKY_NO_INFO_PROMPT,
-      temperature: 0.1,
+      temperature: 0.001,
       onFinish: async (response) => {
+        let summary = '';
         if (prompt) {
-          this.updateChatSummary(threadUid, { user: question, system: response?.object?.content }).then(() => {});
+          summary = await this.updateChatSummary(threadId, { user: question, system: response?.object?.content });
         }
-        this.persistChatHistory(
-          threadUid,
-          chatUid,
+        this.persistContextualHistory(
+          threadId,
+          chatId,
           question,
-          rephrasedQuestion,
-          response?.object?.content || '',
-          'context',
-          userInfo,
+          response?.object?.content || '' as string,
           response?.object?.sources || [],
           response?.object?.followUpQuestions || [],
           response?.object?.actions || []
         ).then(() => {});
+        //* Update summary in mongo */
+
       },
     });
   }
 
-  async persistChatHistory(
-    threadUid: string,
-    chatUid: string,
-    prompt: string,
-    rephrasedPrompt: string,
+  async persistContextualHistory(
+    threadId: string,
+    chatId: string,
+    question: string,
     response: string | null,
-    type: string,
-    userInfo?: any,
     sources: any[] = [],
     followUpQuestions: any[] = [],
     actions: any[] = []
   ) {
-    await this.huskyPersistentDbService.create(process.env.MONGO_CONVERSATION_COLLECTION || '', {
-      chatThreadId: threadUid,
-      chatUid,
-      prompt,
-      rephrasedPrompt,
-      response: response || '',
-      ...(userInfo && { ...userInfo }),
-      sources,
-      followUpQuestions,
-      actions,
-      createdAt: Date.now(),
-      type: type
-    });
+
+    let doc = await this.huskyPersistentDbService.getDocByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
+    if(!doc) {
+      return;
+    }
+
+    const contextual = doc?.contextual || [];
+    const updatedContextual = [
+      ...contextual,
+      {
+        questionId: chatId,
+        question,
+        response: response || '',
+        actions,
+        sources,
+        createdAt: Date.now(),
+        followUpQuestions,
+      }
+    ]
+
+    doc.updatedAt = Date.now();
+    doc.contextual = updatedContextual;
+
+    await this.huskyPersistentDbService.updateDocByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId, doc);
   }
 
   async getEmbeddingForText(text: string) {
@@ -330,8 +156,8 @@ export class HuskyAiService {
     return embedding;
   }
 
-  async getRephrasedQuestionBasedOnHistory(chatId: string, question: string) {
-    const chatHistory = await this.huskyCacheDbService.get(`${chatId}:summary`);
+  async getRephrasedQuestionBasedOnHistory(threadId: string, question: string) {
+    const chatHistory = await this.huskyCacheDbService.get(`${threadId}:summary`);
 
     if (chatHistory) {
       const aiPrompt = Handlebars.compile(rephraseQuestionTemplate)({ chatHistory, question });
@@ -365,6 +191,7 @@ export class HuskyAiService {
       prompt: aiPrompt,
     });
     await this.huskyCacheDbService.set(`${chatId}:summary`, text);
+    return text;
   }
 
   // streamHuskyResponse(
@@ -382,7 +209,7 @@ export class HuskyAiService {
   //       if (prompt) {
   //         await this.updateChatSummary(chatId, { user: question, system: response?.object?.content });
   //       }
-  //       await this.persistChatHistory(chatId, question, rephrasedQuestion, response?.object?.content, null, 'context');
+  //       await this.persistContextualHistory(chatId, question, rephrasedQuestion, response?.object?.content, null, 'context');
   //     },
   //   });
   //   aiStreamingResponse.pipeTextStreamToResponse(res);
@@ -482,7 +309,7 @@ export class HuskyAiService {
     const nonDirectory = formattedNonDictoryDocs.filter((v) => v.score > 0.35 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 5);
     const directory = allDocs.filter((v) => v.score > 0.35 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 6);
 
-    const all = [ ...directory, ...nonDirectory];
+    const all = [ ...directory, ...nonDirectory]
 
     if (chatId) {
       const selectedIds = all.map((result) => result?.id);
@@ -513,46 +340,67 @@ export class HuskyAiService {
     return aiPrompt;
   }
 
-  async createThread(threadUid: string, email: string, question: string) {
-    const thread = await this.huskyPersistentDbService.findOneById(
-      process.env.MONGO_THREAD_COLLECTION || '',
-      'threadUid',
-      threadUid
+  async createThread(threadId: string, email: string, userUid: string) {
+    return await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || '', {
+      threadId,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      title: '',
+      contextual: [],
+      email,
+      directoryId: userUid,
+    });
+  }
+
+  async createThreadTitle(threadId: string, question: string) {
+    const thread = await this.huskyPersistentDbService.findOneByKeyValue(
+      process.env.MONGO_THREADS_COLLECTION || '',
+      'threadId',
+      threadId
     );
-    
-    if(thread) {
+
+    if (thread) {
       return {
-        threadUid,
+        threadId,
         title: thread?.title,
-      }
+      };
     }
 
     const prompt = Handlebars.compile(PROMPT_FOR_GENERATE_TITLE)({
       question: question,
     });
-    const { object } = await generateObject({
+    const { text } = await generateText({
       model: openai(process.env.OPENAI_LLM_MODEL || ''),
       prompt: prompt,
-      schema: z.object({
-        title: z.string(),
-      }),
     });
-    const title = object?.title || '--';
-    await this.huskyPersistentDbService.create(process.env.MONGO_THREAD_COLLECTION || '', {
-      threadUid,
-      title,
-      email,
-      createdAt: Date.now(),
+    const createdTitle = text || '';
+    await this.huskyPersistentDbService.updateByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId, {
+      title: createdTitle,
     });
     return {
-      title,
-      threadUid,
+      title: createdTitle,
+      threadId,
     };
+  }
+
+  async getThreadsByUserId(userUid: string) {
+   try {
+    const threads = await this.huskyPersistentDbService.findByKeyValue(process.env.MONGO_THREAD_COLLECTION || '', 'directoryId', userUid);
+    return threads.sort((a, b) => b.updatedAt - a.updatedAt).map((thread) => ({
+      threadId: thread?.threadId,
+      title: thread?.title,
+      createdAt: thread?.createdAt,
+      updatedAt: thread?.updatedAt,
+    }));
+   } catch (error) {
+    this.logger.error(`Failed to get threads for user ${userUid}:`, error);
+    throw new Error(`Failed to retrieve threads: ${error.message}`);
+   }
   }
 
   async getThreadsByEmail(email: string) {
     try {
-      const threads = await this.huskyPersistentDbService.findAllById(process.env.MONGO_THREAD_COLLECTION || '', 'email', email);
+      const threads = await this.huskyPersistentDbService.findByKeyValue(process.env.MONGO_THREAD_COLLECTION || '', 'email', email);
       return threads;
     } catch (error) {
       this.logger.error(`Failed to get threads for email ${email}:`, error);
@@ -560,8 +408,17 @@ export class HuskyAiService {
     }
   }
 
-  async getThreadById(uid: string) {
-    const threads = await this.huskyPersistentDbService.findAllById(process.env.MONGO_CONVERSATION_COLLECTION || '', 'chatThreadId', uid);
+  async getChatsByThreadId(threadId: string) {
+    const thread = await this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
+    if(!thread) {
+      return [];
+    }
+    const chats =  thread?.contextual || [];
+    return chats.sort((a, b) => a.createdAt - b.createdAt);
+  }
+
+  async getChatById(uid: string) {
+    const threads = await this.huskyPersistentDbService.findByKeyValue(process.env.MONGO_CONVERSATION_COLLECTION || '', 'chatThreadId', uid);
     const allThreads: any = [];
     threads.map((thread: any) => {
       if(thread?.type === "context") {

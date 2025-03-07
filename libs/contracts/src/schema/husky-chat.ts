@@ -20,11 +20,11 @@ export const HuskyChatSchema = z.object({
         type: z.string(),
       })
     ),
-    threadUid: z.string(),
-    chatUid: z.string(),
+    threadId: z.string(),
+    chatId: z.string(),
   }).optional(),
-  threadUid: z.string(),
-  chatUid: z.string(),
+  threadId: z.string(),
+  chatId: z.string(),
 });
 
 export const HuskyFeedbackSchema = z.object({ 
