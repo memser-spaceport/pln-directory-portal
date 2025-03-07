@@ -1,14 +1,15 @@
 import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
 import { HuskySqlDbService } from './husky-db.interface';
 import { Pool, PoolClient } from 'pg';
+import { HUSKY_POSTGRES_ERROR_CODES, HUSKY_POSTGRRES_POOL_CONSTANTS } from '../../utils/constants';
 
 @Injectable()
 export class PostgresSqlDb implements OnModuleDestroy, HuskySqlDbService<any> {
   private pool: Pool;
   private readonly logger = new Logger(PostgresSqlDb.name);
   private isConnected = false;
-  private readonly maxRetries = 3;
-  private readonly retryDelay = 1000; // 1 second
+  private readonly maxRetries = HUSKY_POSTGRRES_POOL_CONSTANTS.maxRetries;
+  private readonly retryDelay = HUSKY_POSTGRRES_POOL_CONSTANTS.retryDelay; // 1 second
 
   constructor() {
     this.initializePool();
@@ -19,15 +20,15 @@ export class PostgresSqlDb implements OnModuleDestroy, HuskySqlDbService<any> {
     try {
       this.pool = new Pool({
         connectionString: process.env.HUSKY_POSTGRES_DB,
-        max: 3, // maximum number of clients in the pool
-        idleTimeoutMillis: 60000, // increased to 1 minute
-        connectionTimeoutMillis: 10000, // increased to 10 seconds
-        maxUses: 7500,
-        keepAlive: true, // Enable keepalive
-        keepAliveInitialDelayMillis: 10000, // Start keepalive after 10 seconds
-        statement_timeout: 30000, // Statement timeout of 30 seconds
-        query_timeout: 30000, // Query timeout of 30 seconds
-        application_name: 'pln-directory-portal', // For better identification in pg_stat_activity
+        max: HUSKY_POSTGRRES_POOL_CONSTANTS.max, // maximum number of clients in the pool
+        idleTimeoutMillis: HUSKY_POSTGRRES_POOL_CONSTANTS.idleTimeoutMillis, // increased to 1 minute
+        connectionTimeoutMillis: HUSKY_POSTGRRES_POOL_CONSTANTS.connectionTimeoutMillis, // increased to 10 seconds
+        maxUses: HUSKY_POSTGRRES_POOL_CONSTANTS.maxUses,
+        keepAlive: HUSKY_POSTGRRES_POOL_CONSTANTS.keepAlive, // Enable keepalive
+        keepAliveInitialDelayMillis: HUSKY_POSTGRRES_POOL_CONSTANTS.keepAliveInitialDelayMillis, // Start keepalive after 10 seconds
+        statement_timeout: HUSKY_POSTGRRES_POOL_CONSTANTS.statement_timeout, // Statement timeout of 30 seconds
+        query_timeout: HUSKY_POSTGRRES_POOL_CONSTANTS.query_timeout, // Query timeout of 30 seconds
+        application_name: HUSKY_POSTGRRES_POOL_CONSTANTS.application_name, // For better identification in pg_stat_activity
       });
 
       // Test the connection
@@ -110,13 +111,13 @@ export class PostgresSqlDb implements OnModuleDestroy, HuskySqlDbService<any> {
 
   private isConnectionError(err: any): boolean {
     return (
-      err.code === 'ECONNRESET' ||
-      err.code === 'ETIMEDOUT' ||
-      err.code === '57P01' || // admin shutdown
-      err.code === '57P02' || // crash shutdown
-      err.code === '57P03' || // cannot connect now
-      err.message.includes('Connection terminated') ||
-      err.message.includes('connection timeout')
+      err.code === HUSKY_POSTGRES_ERROR_CODES.ECONNRESET ||
+      err.code === HUSKY_POSTGRES_ERROR_CODES.ETIMEDOUT ||
+      err.code === HUSKY_POSTGRES_ERROR_CODES.ADMIN_SHUTDOWN || // admin shutdown
+      err.code === HUSKY_POSTGRES_ERROR_CODES.CRASH_SHUTDOWN || // crash shutdown
+      err.code === HUSKY_POSTGRES_ERROR_CODES.CANNOT_CONNECT_NOW || // cannot connect now
+      err.message.includes(HUSKY_POSTGRES_ERROR_CODES.MESSAGE) ||
+      err.message.includes(HUSKY_POSTGRES_ERROR_CODES.CONNECTION_TIMEOUT_MESSAGE)
     );
   }
 

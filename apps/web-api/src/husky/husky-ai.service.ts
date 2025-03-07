@@ -222,26 +222,6 @@ export class HuskyAiService {
     return text;
   }
 
-  // streamHuskyResponse(
-  //   chatId: string,
-  //   question: string,
-  //   rephrasedQuestion: string,
-  //   res: Response,
-  //   prompt: string | null
-  // ) {
-  //   const aiStreamingResponse = streamObject({
-  //     model: openai(process.env.OPENAI_LLM_MODEL || ''),
-  //     schema: HuskyResponseSchema,
-  //     prompt: prompt || HUSKY_NO_INFO_PROMPT,
-  //     onFinish: async (response) => {
-  //       if (prompt) {
-  //         await this.updateChatSummary(chatId, { user: question, system: response?.object?.content });
-  //       }
-  //       await this.persistContextualHistory(chatId, question, rephrasedQuestion, response?.object?.content, null, 'context');
-  //     },
-  //   });
-  //   aiStreamingResponse.pipeTextStreamToResponse(res);
-  // }
 
   private async fetchAndFormatActionDocs(type: string, collectionName: string, embedding: any, limit = 5) {
     const actionDocs = await this.huskyVectorDbService.searchEmbeddings(collectionName, embedding, limit, true);
