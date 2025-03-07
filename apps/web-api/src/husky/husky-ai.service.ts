@@ -23,8 +23,6 @@ import {
 import { Response } from 'express';
 import Handlebars from 'handlebars';
 import { z } from 'zod'
-import { PostgresSqlDb } from './db/postgress-sql-db.service';
-import { pipeDataStreamToResponse } from 'ai';
 
 @Injectable()
 export class HuskyAiService {
@@ -33,7 +31,6 @@ export class HuskyAiService {
     private huskyVectorDbService: QdrantVectorDbService,
     private huskyCacheDbService: RedisCacheDbService,
     private huskyPersistentDbService: MongoPersistantDbService,
-    private postgresSqlDBService: PostgresSqlDb
   ) { }
 
   async createContextualResponse(chatInfo: HuskyChatInterface) {
