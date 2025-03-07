@@ -13,10 +13,76 @@ export class MongoPersistantDbService implements OnModuleDestroy, HuskyPersisten
   }
 
   // Example: Store a chat message
-  async create(collection: string, message: any) {
+  async create(collection: string, data: any) {
     const col = this.db.collection(collection);
-    await col.insertOne(message);
+    await col.insertOne(data);
   }
+
+  async upsertByKeyValue(collection: string, key: string, value: string, data: any) {
+    const col = this.db.collection(collection);
+    await col.updateOne({ [key]: value }, { $set: data }, { upsert: true });
+  }
+
+  async updateDocByKeyValue(collection: string, key: string, value: string, data: any) {
+    const col = this.db.collection(collection);
+    await col.updateOne({ [key]: value }, { $set: data });
+  }
+
+  async getDocByKeyValue(collection: string, key: string, value: string) {
+    const col = this.db.collection(collection);
+    return await col.findOne({ [key]: value });
+  }
+
+  async updateById(collection: string, key: string, value: string, query: any) {
+    const col = this.db.collection(collection);
+    await col.updateOne({ [key]: value }, { $set: query });
+  }
+
+  async updateByKeyValue(collection: string, key: string, value: string, query: any) {
+    const col = this.db.collection(collection);
+    await col.updateOne({ [key]: value }, { $set: query });
+  }
+
+  async patchDocByKeyValue(collection: string, key: string, value: string, data: any) {
+    const col = this.db.collection(collection);
+    const existingDoc = await col.findOne({ [key]: value });
+
+    if (!existingDoc) {
+      return null;
+    }
+
+    const updateQuery: any = {};
+
+    Object.keys(data).forEach((field: string) => {
+      if (Array.isArray(existingDoc[field])) {
+        updateQuery[field] = { $push: { [field]: data[field] } };
+      } else {
+        updateQuery[field] = { $set: { [field]: data[field] } };
+      }
+    });
+
+    await col.updateOne({ [key]: value }, updateQuery);
+  }
+
+  async findByKeyValue(collection: string, key: string, value: string) {
+    const col = this.db.collection(collection);
+    return await col.find({ [key]: value }).sort({ createdAt: 1 }).toArray();
+  }
+
+  async findOneByKeyValue(collection: string, key: string, value: string) {
+    const col = this.db.collection(collection);
+    return await col.findOne({ [key]: value });
+  }
+
+
+  async findOneById(collection: string, key: string, value: string, type?: string) {
+    const col = this.db.collection(collection);
+    const query: any = { [key]: value };
+    if (type) {
+      query.type = type;
+    }
+    return await col.findOne(query);
+  } 
 
   // Cleanup resources
   async onModuleDestroy() {

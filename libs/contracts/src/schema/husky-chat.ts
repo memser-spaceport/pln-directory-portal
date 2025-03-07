@@ -2,16 +2,25 @@ import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
 
 export const HuskyChatSchema = z.object({
-  uid: z.string(),
   question: z.string(),
-  email: z.string().email().optional(),
   name: z.string().optional(),
-  directoryId: z.string().optional(),
-  source: z.string(),
   chatSummary: z.object({
     user: z.string(),
-    system: z.string()
-  }).optional()
+    system: z.string(),
+    sources: z.array(z.string()),
+    followUpQuestions: z.array(z.string()),
+    actions: z.array(
+      z.object({
+        name: z.string(),
+        directoryLink: z.string(),
+        type: z.string(),
+      })
+    ),
+    threadId: z.string(),
+    chatId: z.string(),
+  }).optional(),
+  threadId: z.string(),
+  chatId: z.string(),
 });
 
 export const HuskyFeedbackSchema = z.object({ 
