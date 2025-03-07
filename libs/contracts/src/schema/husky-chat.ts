@@ -2,12 +2,8 @@ import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
 
 export const HuskyChatSchema = z.object({
-  uid: z.string(),
   question: z.string(),
-  email: z.string().email().optional(),
   name: z.string().optional(),
-  directoryId: z.string().optional(),
-  source: z.string(),
   chatSummary: z.object({
     user: z.string(),
     system: z.string(),

@@ -93,9 +93,13 @@ export class HuskyAiService {
       prompt: prompt || HUSKY_NO_INFO_PROMPT,
       temperature: 0.001,
       onFinish: async (response) => {
-        let summary = '';
+      
         if (prompt) {
-          summary = await this.updateChatSummary(threadId, { user: question, system: response?.object?.content });
+          this.updateChatSummary(threadId, { user: question, system: response?.object?.content })
+          .then((res) => {
+            return this.updateChatSummaryInMongo(threadId, res)
+          })
+          .then(() => {})
         }
         this.persistContextualHistory(
           threadId,
@@ -110,6 +114,18 @@ export class HuskyAiService {
 
       },
     });
+  }
+
+  async updateChatSummaryInMongo(threadId: string, summary: string) {
+    console.log('threadId', threadId);
+    console.log('summary', summary);
+    await this.huskyPersistentDbService.upsertByKeyValue(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', 'threadId', threadId, {
+      threadId,
+      summary,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    console.log('updated');
   }
 
   async persistContextualHistory(
@@ -359,11 +375,8 @@ export class HuskyAiService {
       threadId
     );
 
-    if (thread) {
-      return {
-        threadId,
-        title: thread?.title,
-      };
+    if (!thread) {
+     throw new NotFoundException('Thread not found');
     }
 
     const prompt = Handlebars.compile(PROMPT_FOR_GENERATE_TITLE)({
@@ -386,12 +399,16 @@ export class HuskyAiService {
   async getThreadsByUserId(userUid: string) {
    try {
     const threads = await this.huskyPersistentDbService.findByKeyValue(process.env.MONGO_THREAD_COLLECTION || '', 'directoryId', userUid);
-    return threads.sort((a, b) => b.updatedAt - a.updatedAt).map((thread) => ({
+    return threads
+    .filter((thread) => thread?.title?.length > 0)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .map((thread) => ({
       threadId: thread?.threadId,
       title: thread?.title,
       createdAt: thread?.createdAt,
       updatedAt: thread?.updatedAt,
-    }));
+    }))
+
    } catch (error) {
     this.logger.error(`Failed to get threads for user ${userUid}:`, error);
     throw new Error(`Failed to retrieve threads: ${error.message}`);
@@ -409,10 +426,18 @@ export class HuskyAiService {
   }
 
   async getChatsByThreadId(threadId: string) {
-    const thread = await this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
+    const threadPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
+    const summaryPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', 'threadId', threadId);
+    
+    const [thread, summaryData] = await Promise.all([threadPromise, summaryPromise]);
     if(!thread) {
       return [];
     }
+    
+    if(summaryData) {
+      this.huskyCacheDbService.set(`${threadId}:summary`, summaryData?.summary);
+    }
+
     const chats =  thread?.contextual || [];
     return chats.sort((a, b) => a.createdAt - b.createdAt);
   }

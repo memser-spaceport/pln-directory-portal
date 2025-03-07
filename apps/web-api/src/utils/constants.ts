@@ -113,7 +113,7 @@ export const HUSKY_NO_INFO_PROMPT = `Create the below JSON object with the conte
  Response JSON: {content: 'No information available for the provided question.', followUpQuestions: [], actions: [], sources: []}
 `;
 
-export const IGNORED_URLS_FOR_CONCEALID = ['/v1/husky/chat/assistant', '/v1/husky/chat/feedback', '/v1/husky/chat/contextual', '/v1/husky/chat/analytical', '/v1/husky/chat/additional-info', 'v1/husky/threads/chat'];
+export const IGNORED_URLS_FOR_CONCEALID = ['/v1/husky/chat/assistant', '/v1/husky/chat/feedback', '/v1/husky/chat/contextual', '/v1/husky/chat/analytical', '/v1/husky/chat/additional-info', '/husky/threads'];
 export const promptForTextToSql = `
 Below is an updated version of your prompt that includes clear headings for both developer understanding and for the LLM. This structure will help both parties quickly locate and interpret the necessary details.
 
@@ -389,7 +389,9 @@ export const PROMPT_FOR_GENERATE_TITLE = `Create a title for the following quest
 Question: {{question}}
 the title should be 10 words or less.
 the title should be concise and to the point.
-if there is no question or answer, return empty string.
+Dont add any prefix or suffix to the title.
+If the question has valid words, then title must be created and dont add any other symbols.
+if there is no question or answer, return empty.
 `;
 
 

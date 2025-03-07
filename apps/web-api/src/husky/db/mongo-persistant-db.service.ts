@@ -18,6 +18,11 @@ export class MongoPersistantDbService implements OnModuleDestroy, HuskyPersisten
     await col.insertOne(data);
   }
 
+  async upsertByKeyValue(collection: string, key: string, value: string, data: any) {
+    const col = this.db.collection(collection);
+    await col.updateOne({ [key]: value }, { $set: data }, { upsert: true });
+  }
+
   async updateDocByKeyValue(collection: string, key: string, value: string, data: any) {
     const col = this.db.collection(collection);
     await col.updateOne({ [key]: value }, { $set: data });
