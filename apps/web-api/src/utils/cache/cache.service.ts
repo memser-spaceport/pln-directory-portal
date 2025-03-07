@@ -16,7 +16,7 @@ export class CacheService {
     projects: ['project-list', 'focus-areas', "project-detail", "team-detail", "featured", "project-oso"],
     teams: ['team-filters', 'team-list', 'focus-areas', "team-detail", "featured", "team-airtable", 'member-list',"member-detail" ],
     'participants-requests': ['member-filters', 'member-list', 'team-filters', 'team-list', 'focus-areas'],
-    PLEventGuest: ["irl-locations", "irl-guests", "irl-locations-topic", "irl-guest-events", "featured"],
+    PLEventGuest: ["irl-locations", "irl-guests", "irl-locations-topic", "irl-guest-events", "featured","team-detail","member-detail"],
     'member-subscription': ["featured"]
   };
 
