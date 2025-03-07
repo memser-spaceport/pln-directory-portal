@@ -534,6 +534,7 @@ export class PLEventGuestsService {
           json_agg(
             DISTINCT jsonb_build_object(
               'uid', e.uid,
+              'slugURL', e."slugURL",
               'name', e.name,
               'type', e.type,
               'startDate', e."startDate",

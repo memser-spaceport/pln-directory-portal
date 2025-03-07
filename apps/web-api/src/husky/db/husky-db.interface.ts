@@ -19,3 +19,7 @@ export interface HuskyGraphDbService<T> {
 export interface HuskyPersistentDbService<T> {
   create(collection: string, data: T): Promise<T>;
 }
+
+export interface HuskySqlDbService<T> {
+  runRawQuery(query: string): Promise<any>;
+}
