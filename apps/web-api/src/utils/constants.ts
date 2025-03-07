@@ -394,6 +394,32 @@ If the question has valid words, then title must be created and dont add any oth
 if there is no question or answer, return empty.
 `;
 
+export const HUSKY_POSTGRRES_POOL_CONSTANTS = {
+  max: 3, // maximum number of clients in the pool
+  idleTimeoutMillis: 60000, // increased to 1 minute
+  connectionTimeoutMillis: 10000, // increased to 10 seconds
+  maxUses: 7500,
+  keepAlive: true, // Enable keepalive
+  keepAliveInitialDelayMillis: 10000, // Start keepalive after 10 seconds
+  statement_timeout: 30000, // Statement timeout of 30 seconds
+  query_timeout: 30000, // Query timeout of 30 seconds
+  application_name: 'pln-directory-portal', // For better identification in pg_stat_activity
+  maxRetries: 3, // Maximum number of retries
+  retryDelay: 1000, // Delay between retries in milliseconds
+}
+
+export const HUSKY_POSTGRES_ERROR_CODES = {
+  ECONNRESET: 'ECONNRESET',
+  ETIMEDOUT: 'ETIMEDOUT',
+  CONNECTION_ERROR: 'CONNECTION_ERROR',
+  CONNECTION_TIMEOUT: 'CONNECTION_TIMEOUT',
+  ADMIN_SHUTDOWN: '57P01',
+  CRASH_SHUTDOWN: '57P02',
+  CANNOT_CONNECT_NOW: '57P03',
+  MESSAGE: 'Connection terminated',
+  CONNECTION_TIMEOUT_MESSAGE: 'connection timeout',
+  
+}
 
 export const HUSKY_CONTEXTUAL_SUMMARY_PROMPT = `
  For the given question "{{question}}", using only the provided 'Context' and 'Chat History Summary' (if available), generate a JSON response following this exact structure:
