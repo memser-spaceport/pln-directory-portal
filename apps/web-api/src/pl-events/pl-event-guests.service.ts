@@ -201,7 +201,8 @@ export class PLEventGuestsService {
       const result = await this.fetchAttendees({
         eventUids: events?.map(event => event.uid),
         ...query,
-        loggedInMemberUid: member ? member?.uid : null
+        loggedInMemberUid: member ? member?.uid : null,
+        locationUid
       });
       this.restrictTelegramBasedOnMemberPreference(result, member ? true : false);
       this.restrictOfficeHours(result, member ? true : false);
@@ -470,22 +471,30 @@ export class PLEventGuestsService {
    * @returns {Promise<Array>} A list of attendees with their associated member, team, and event information.
    */
   async fetchAttendees(queryParams) {
-    const { eventUids, isHost, isSpeaker, topics, sortBy, sortDirection = 'asc', search, limit = 10, page = 1, loggedInMemberUid, includeLocations } = queryParams;
+    const { 
+      eventUids, 
+      isHost, 
+      isSpeaker, 
+      topics, 
+      sortBy, 
+      sortDirection = 'asc', 
+      search, 
+      limit = 10, 
+      page = 1, 
+      loggedInMemberUid, 
+      includeLocations, 
+      locationUid 
+    } = queryParams;
     // Build dynamic query conditions for filtering by eventUids, isHost, and isSpeaker
     let { conditions, values } = this.buildConditions(eventUids, topics);
     // Apply sorting based on the sortBy parameter (default is sorting by memberName)
     const orderBy = this.applySorting(sortBy, sortDirection, loggedInMemberUid);
-
     // Apply pagination to limit the results and calculate the offset for the current page
     const { limit: paginationLimit, offset } = this.applyPagination(Number(limit), page);
-
-    const selectLocation = includeLocations
-      ? `,'location', l."location"`
-      : ``; // Empty if location is not required
-    
+    // Empty if location is not required 
+    const selectLocation = includeLocations ? `,'location', l."location"` : ``;    
     // Determine the position of the eventUid placeholder in the SQL query's values array
     // If search is enabled, adjust the position accordingly
-
     /*
       Position Breakdown:
       - LIMIT placeholder → `$${values.length + 1}`
@@ -496,11 +505,26 @@ export class PLEventGuestsService {
       - Otherwise:
         - EventUid placeholder → `$${values.length + 3}`
     */
-    
     const eventPosition = search ? values.length + 4 : values.length + 3;
-    
+    // Apply the location condition in event joins
+    const locationCondition =  locationUid ? `AND e."locationUid" = $${eventPosition+1} `: '';
     // Construct the raw SQL query for fetching attendees with joined tables and aggregated JSON data
     const query: any = ` 
+      WITH memberRecentEvent AS (
+        SELECT 
+            DISTINCT ON (pg."memberUid") -- Select distinct records based on memberUid
+            pg."memberUid",      
+            pg."topics" as topics,       -- Topics associated with the event guest
+            NULLIF(TRIM(pg.reason), '') AS reason -- Reason, trimmed and converted to NULL if empty
+        FROM "PLEventGuest" pg
+        LEFT JOIN "PLEvent" e ON pg."eventUid" = e.uid
+        WHERE 
+            e."startDate" IS NOT NULL
+            ${locationCondition}        -- Optional dynamic condition to filter by location
+        ORDER BY 
+            pg."memberUid",     
+            e."startDate" DESC     
+      )
       SELECT 
         *,
         COUNT(*) OVER() AS count FROM (
@@ -521,9 +545,7 @@ export class PLEventGuestsService {
           json_object_agg(
             'info',
             json_build_object(
-              'reason', pg."reason",
               'teamUid', pg."teamUid",
-              'topics', pg."topics",
               'isHost', pg."isHost",
               'isSpeaker', pg."isSpeaker",
               'createdAt', pg."createdAt",
@@ -531,19 +553,25 @@ export class PLEventGuestsService {
               'officeHours', pg."officeHours"
             )
           ) AS guest,
-          json_agg(
-            DISTINCT jsonb_build_object(
-              'uid', e.uid,
-              'slugURL', e."slugURL",
-              'name', e.name,
-              'type', e.type,
-              'startDate', e."startDate",
-              'endDate', e."endDate",
-              'isHost', pg."isHost",      -- Event-specific host details
-              'isSpeaker', pg."isSpeaker", -- Event-specific speaker details
-              'additionalInfo', pg."additionalInfo"
-               ${selectLocation}
-            )
+          COALESCE(
+            JSON_AGG(
+              JSONB_BUILD_OBJECT(
+                'uid', e.uid,
+                'name', e.name,
+                'type', e.type,
+                'isHost', pg."isHost",
+                'isSpeaker', pg."isSpeaker",
+                'reason', pg.reason,
+                'topics', pg.topics,
+                'endDate', e."endDate",
+                'slugURL', e."slugURL",
+                'startDate', e."startDate",
+                'additionalInfo', pg."additionalInfo"
+                ${selectLocation}
+              )
+              ORDER BY e."startDate" DESC
+            ) FILTER (WHERE e.uid IS NOT NULL),
+            '[]'
           ) AS events,
           json_object_agg(
             'member',
@@ -574,7 +602,8 @@ export class PLEventGuestsService {
             )
           ) AS team
         FROM "PLEventGuest" pg
-        JOIN "PLEvent" e ON e.uid = pg."eventUid"
+        JOIN "PLEvent" e ON e.uid = pg."eventUid" 
+        ${locationCondition}
         ${this.joinEventLocations(includeLocations)}
         LEFT JOIN "Image" el ON el.uid = e."logoUid"
         LEFT JOIN "Image" eb ON eb.uid = e."bannerUid"
@@ -588,14 +617,15 @@ export class PLEventGuestsService {
         LEFT JOIN "Project" cp ON cp."createdBy" = m.uid
         LEFT JOIN "Team" tm ON tm.uid = pg."teamUid"
         LEFT JOIN "Image" tml ON tml.uid = tm."logoUid"
+        LEFT JOIN memberRecentEvent mre ON mre."memberUid" = m.uid
         ${this.applySearch(values, search)}
         GROUP BY 
           pg."memberUid",
           pg."teamUid",
-          pg."topics",
-          pg."reason",
           m.name,
-          tm.name
+          tm.name,
+          mre.topics,
+          mre.reason
         ${conditions} -- Add the dynamically generated conditions for filtering
         ${orderBy} -- Apply sorting logic
       ) 
@@ -607,6 +637,7 @@ export class PLEventGuestsService {
     // Add pagination values to the query parameters for limit and offset
     values.push(paginationLimit, offset);
     values.push(eventUids);
+    values.push(locationUid);
     // Execute the raw query with the built query string and values
     const result = await this.prisma.$queryRawUnsafe(query, ...values);
     return this.formatAttendees(result);
@@ -655,7 +686,7 @@ export class PLEventGuestsService {
    * Builds dynamic SQL conditions for filtering event guests based on provided criteria.
    *
    * This function creates a SQL conditions string and an array of values for binding in the query.
-   * Conditions are added for filtering by eventUids, isHost, isSpeaker, and topics.
+   * Conditions are added for filtering by eventUids and topics.
    * 
    * @param {Array} eventUids - List of event UIDs for filtering.
    * @param {Array} topics - List of topics to filter by using the overlap operator.
@@ -671,7 +702,7 @@ export class PLEventGuestsService {
     }
     // Add a condition for topics if provided, using the overlap operator (&&)
     if (topics && topics.length > 0) {
-      conditions.push(`pg."topics" && $${values.length + 1}`);
+      conditions.push(`mre."topics" && $${values.length + 1}`);
       values.push(topics);
     }
     // Combine conditions into a single WHERE clause if any conditions are present
@@ -745,11 +776,11 @@ export class PLEventGuestsService {
           ORDER BY 
             ${loggedInMemberOrder}
             CASE 
-              WHEN pg."reason" IS NOT NULL AND array_length(pg."topics", 1) > 0 THEN 1
-              WHEN array_length(pg."topics", 1) > 0 THEN 2
-              WHEN pg."reason" IS NOT NULL THEN 3
-            ELSE 4
-          END asc,
+              WHEN array_length(mre."topics", 1) > 0 AND mre."reason" IS NOT NULL THEN 1
+              WHEN array_length(mre."topics", 1) > 0 THEN 2
+              WHEN mre."reason" IS NOT NULL THEN 3
+              ELSE 4
+            END ASC,
           m."name" ${sortDirection}
         `
     }
