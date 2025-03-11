@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { QdrantVectorDbService } from './db/qdrant-vector-db.service';
 import { RedisCacheDbService } from './db/redis-cache-db.service';
 import { MongoPersistantDbService } from './db/mongo-persistant-db.service';
 import { LogService } from '../shared/log.service';
-import { createDataStream, createDataStreamResponse, embed, generateObject, generateText, streamObject, streamText } from 'ai';
+import { embed, generateText, streamObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { HuskyResponseSchema, HuskyChatInterface } from 'libs/contracts/src/schema/husky-chat';
 import {
@@ -13,17 +13,12 @@ import {
   HUSKY_ACTION_TYPES,
   HUSKY_NO_INFO_PROMPT,
   HUSKY_CONTEXTUAL_SUMMARY_PROMPT,
-  HUSKY_SOURCES,
-  promptForTextToSql,
   rephraseQuestionTemplate,
-  HUSKY_RELATED_INFO_PROMPT,
-  HUSKY_RELATED_INFO_SUMMARY_PROMPT,
   PROMPT_FOR_GENERATE_TITLE,
 } from '../utils/constants';
-import { Response } from 'express';
 import Handlebars from 'handlebars';
-import { z } from 'zod'
-
+import { PrismaService } from '../shared/prisma.service';
+import { v4 as uuidv4 } from 'uuid';
 @Injectable()
 export class HuskyAiService {
   constructor(
@@ -31,6 +26,7 @@ export class HuskyAiService {
     private huskyVectorDbService: QdrantVectorDbService,
     private huskyCacheDbService: RedisCacheDbService,
     private huskyPersistentDbService: MongoPersistantDbService,
+    private prisma: PrismaService
   ) { }
 
   async createContextualResponse(chatInfo: HuskyChatInterface) {
@@ -107,8 +103,6 @@ export class HuskyAiService {
           response?.object?.followUpQuestions || [],
           response?.object?.actions || []
         ).then(() => { });
-        //* Update summary in mongo */
-
       },
     });
   }
@@ -173,6 +167,54 @@ export class HuskyAiService {
     }
 
 
+  }
+
+  async duplicateThread(threadId: string, userUid: string = '') {
+    const thread = await this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
+    if (!thread) {
+      throw new NotFoundException('Thread not found');
+    }
+    if (thread?.directoryId === userUid) {
+      throw new ForbiddenException('You are not authorized to duplicate this thread');
+    }
+
+    let memberDetails: any = {} 
+    if (userUid) {
+      memberDetails = await this.prisma.member.findUnique({
+        where: {
+          uid: userUid,
+        },
+      select: {
+        name: true,
+        image: true,
+        },
+      });
+    }
+    
+    const newThreadId = uuidv4();
+    await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || '', {
+      ...thread,
+      threadId: newThreadId,
+      directoryId: userUid,
+      memberName: userUid ? memberDetails?.name : '',
+      memberImage: userUid ? memberDetails?.image?.url : '',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    return {
+      threadId: newThreadId,
+    };
+  }
+
+  async deleteThreadById(threadId: string, userUid: string) {
+    const thread = await this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
+    if (!thread) {
+      throw new NotFoundException('Thread not found');
+    }
+    if (thread?.directoryId !== userUid) {
+      throw new ForbiddenException('You are not authorized to delete this thread');
+    }
+    await this.huskyPersistentDbService.deleteDocByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
   }
 
   async getEmbeddingForText(text: string) {
@@ -360,7 +402,7 @@ export class HuskyAiService {
     });
   }
 
-  async createThreadTitle(threadId: string, question: string) {
+  async createThreadTitle(threadId: string, question: string, userUid: string) {
     const thread = await this.huskyPersistentDbService.findOneByKeyValue(
       process.env.MONGO_THREADS_COLLECTION || '',
       'threadId',
@@ -371,8 +413,24 @@ export class HuskyAiService {
       throw new NotFoundException('Thread not found');
     }
 
+    if (thread?.directoryId !== userUid) {
+      throw new ForbiddenException('You are not authorized to update this thread');
+    }
+
+    const memberDetails = await this.prisma.member.findUnique({
+      where: {
+        uid: userUid,
+      },
+      select: {
+        name: true,
+        image: true,
+      },
+    });
+
     const prompt = Handlebars.compile(PROMPT_FOR_GENERATE_TITLE)({
       question: question,
+      memberName: memberDetails?.name,
+      memberImage: memberDetails?.image?.url
     });
     const { text } = await generateText({
       model: openai(process.env.OPENAI_LLM_MODEL || ''),
