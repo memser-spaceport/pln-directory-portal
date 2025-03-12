@@ -190,9 +190,13 @@ export class HuskyAiService {
         },
       });
     }
+
+    if(!memberDetails) {
+      throw new NotFoundException('Member not found');
+    }
     
     const newThreadId = uuidv4();
-    await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || '', {
+    const newThread = {
       ...thread,
       threadId: newThreadId,
       directoryId: userUid,
@@ -200,7 +204,12 @@ export class HuskyAiService {
       memberImage: userUid ? memberDetails?.image?.url : '',
       createdAt: Date.now(),
       updatedAt: Date.now(),
-    });
+    } as { [key: string]: any };
+
+    if(newThread._id) {
+      delete newThread["_id"];
+    }
+    await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || '', newThread);
     return {
       threadId: newThreadId,
     };
@@ -356,8 +365,8 @@ export class HuskyAiService {
       };
     });
 
-    const nonDirectory = formattedNonDictoryDocs.filter((v) => v.score > 0.35 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 5);
-    const directory = allDocs.filter((v) => v.score > 0.35 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 6);
+    const nonDirectory = formattedNonDictoryDocs.filter((v) => v.score > 0.45 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 10);
+    const directory = allDocs.filter((v) => v.score > 0.37 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 10);
 
     const all = [...directory, ...nonDirectory]
 
@@ -466,7 +475,7 @@ export class HuskyAiService {
   }
 
 
-  async getChatsByThreadId(threadId: string) {
+  async getThreadById(threadId: string) {
     const threadPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
     const summaryPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', 'threadId', threadId);
 
@@ -480,7 +489,13 @@ export class HuskyAiService {
     }
 
     const chats = thread?.contextual || [];
-    return chats.sort((a, b) => a.createdAt - b.createdAt);
+    return {
+      chats: chats.sort((a, b) => a.createdAt - b.createdAt),
+      threadId: thread?.threadId,
+      title: thread?.title,
+      memberName: thread?.memberName,
+      memberImage: thread?.memberImage,
+    }
   }
 
   async getChatById(uid: string) {
