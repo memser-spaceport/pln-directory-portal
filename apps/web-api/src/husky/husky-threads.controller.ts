@@ -20,20 +20,25 @@ export class HuskyThreadsController {
     async getThreads(@Req() req) {
       return await this.huskyAiService.getThreadsByUserId(req?.userUid);
     }
+  
+    @NoCache()
+    @Get(':threadId')
+    async getThreadById(@Param('threadId') threadId: string) {
+      return await this.huskyAiService.getThreadById(threadId);
+    }
 
-    
+    @UseGuards(UserTokenCheckGuard)
+    @Post(':threadId')
+    async duplicateThread(@Param('threadId') threadId: string, @Req() req) {
+      return await this.huskyAiService.duplicateThread(threadId, req?.userUid);
+    }
+
     @UseGuards(UserAccessTokenValidateGuard)
     @Delete(':threadId')
     async deleteThread(@Param('threadId') threadId: string, @Req() req) {
       return await this.huskyAiService.deleteThreadById(threadId, req?.userUid);
     }
   
-  
-    @NoCache()
-    @Get(':threadId/chats')
-    async getChatsByThreadId(@Param('threadId') threadId: string) {
-      return await this.huskyAiService.getChatsByThreadId(threadId);
-    }
 
     @UseGuards(UserAccessTokenValidateGuard)
     @Post(':threadId/title')
@@ -41,10 +46,5 @@ export class HuskyThreadsController {
       return await this.huskyAiService.createThreadTitle(threadId, body.question, req?.userUid);
     }
 
-    @UseGuards(UserTokenCheckGuard)
-    @Post(':threadId/duplicate')
-    async duplicateThread(@Param('threadId') threadId: string, @Req() req) {
-      return await this.huskyAiService.duplicateThread(threadId, req?.userUid);
-    }
 
 }
