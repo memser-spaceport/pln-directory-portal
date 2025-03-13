@@ -170,7 +170,9 @@ export class HuskyAiService {
   }
 
   async duplicateThread(threadId: string, email: string = '') {
-    const thread = await this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
+    const threadPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
+    const summaryPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', 'threadId', threadId);
+    const [thread, summary] = await Promise.all([threadPromise, summaryPromise]);
     if (!thread) {
       throw new NotFoundException('Thread not found');
     }
@@ -209,6 +211,17 @@ export class HuskyAiService {
     } as { [key: string]: any };
 
     await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || '', newThread);
+    
+    if (summary) {
+       await Promise.all([
+        this.huskyPersistentDbService.create(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', {
+          ...summary,
+          threadId: newThread.threadId,
+        }),
+        this.huskyCacheDbService.set(`${newThread.threadId}:summary`, summary?.summary),
+      ]);
+    }
+
     return {
       threadId: newThread.threadId,
     };
