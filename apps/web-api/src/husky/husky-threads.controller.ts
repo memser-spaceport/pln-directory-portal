@@ -21,10 +21,11 @@ export class HuskyThreadsController {
       return await this.huskyAiService.getThreadsByEmail(req?.userEmail);
     }
   
+    @UseGuards(UserTokenCheckGuard)
     @NoCache()
     @Get(':threadId')
-    async getThreadById(@Param('threadId') threadId: string) {
-      return await this.huskyAiService.getThreadById(threadId);
+    async getThreadById(@Param('threadId') threadId: string, @Req() req) {
+      return await this.huskyAiService.getThreadById(threadId, req?.userEmail);
     }
 
     @UseGuards(UserTokenCheckGuard)
@@ -41,9 +42,9 @@ export class HuskyThreadsController {
   
 
     @UseGuards(UserAccessTokenValidateGuard)
-    @Post(':threadId/title')
-    async updateThreadTitle(@Body() body: { question: string}, @Param('threadId') threadId: string, @Req() req) {
-      return await this.huskyAiService.createThreadTitle(threadId, body.question, req?.userUid);
+    @Post(':threadId/basic-info')
+    async updateThreadBasicInfo(@Body() body: { question: string}, @Param('threadId') threadId: string, @Req() req) {
+      return await this.huskyAiService.createThreadBasicInfo(threadId, body.question, req?.userEmail);
     }
 
 }
