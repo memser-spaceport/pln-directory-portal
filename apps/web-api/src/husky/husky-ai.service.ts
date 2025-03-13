@@ -174,7 +174,7 @@ export class HuskyAiService {
     if (!thread) {
       throw new NotFoundException('Thread not found');
     }
-    if (email && thread?.email !== email) {
+    if (email && thread?.email === email) {
       throw new ForbiddenException('You are not authorized to duplicate this thread');
     }
 
@@ -195,25 +195,22 @@ export class HuskyAiService {
       throw new NotFoundException('Member not found');
     }
 
-    const newThreadId = uuidv4();
     const newThread = {
-      ...thread,
-      threadId: newThreadId,
-      ...(email && { email: email }),
-      ...(memberDetails && { memberName: memberDetails?.name, memberImage: memberDetails?.image?.url }),
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      threadId: uuidv4(),
+      contextual: thread?.contextual,
+      title: thread?.title,
       createdFrom: threadId,
       originalThreadId: thread.originalThreadId || thread.threadId,
       originalThreadTitle: thread.originalThreadTitle || thread.title,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      ...(email && { email: email }),
+      ...(memberDetails && { memberName: memberDetails?.name, memberImage: memberDetails?.image?.url }),
     } as { [key: string]: any };
 
-    if (newThread._id) {
-      delete newThread["_id"];
-    }
     await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || '', newThread);
     return {
-      threadId: newThreadId,
+      threadId: newThread.threadId,
     };
   }
 
@@ -412,50 +409,6 @@ export class HuskyAiService {
     });
   }
 
-  async createThreadTitle(threadId: string, question: string, userUid: string) {
-    const thread = await this.huskyPersistentDbService.findOneByKeyValue(
-      process.env.MONGO_THREADS_COLLECTION || '',
-      'threadId',
-      threadId
-    );
-
-    if (!thread) {
-      throw new NotFoundException('Thread not found');
-    }
-
-    if (thread?.directoryId !== userUid) {
-      throw new ForbiddenException('You are not authorized to update this thread');
-    }
-
-    const memberDetails = await this.prisma.member.findUnique({
-      where: {
-        uid: userUid,
-      },
-      select: {
-        name: true,
-        image: true,
-      },
-    });
-
-    const prompt = Handlebars.compile(PROMPT_FOR_GENERATE_TITLE)({
-      question: question,
-      memberName: memberDetails?.name,
-      memberImage: memberDetails?.image?.url
-    });
-    const { text } = await generateText({
-      model: openai(process.env.OPENAI_LLM_MODEL || ''),
-      prompt: prompt,
-    });
-    const createdTitle = text || '';
-    await this.huskyPersistentDbService.updateByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId, {
-      title: createdTitle,
-    });
-    return {
-      title: createdTitle,
-      threadId,
-    };
-  }
-
   async createThreadBasicInfo(threadId: string, question: string, email: string = '') {
     const thread = await this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
     if (!thread) {
@@ -514,13 +467,13 @@ export class HuskyAiService {
   }
 
 
-  async getThreadById(threadId: string) {
+  async getThreadById(threadId: string, email: string = '') {
     const threadPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
     const summaryPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', 'threadId', threadId);
 
     const [thread, summaryData] = await Promise.all([threadPromise, summaryPromise]);
     if (!thread) {
-      return [];
+      throw new NotFoundException('Thread not found');
     }
 
     if (summaryData) {
@@ -534,6 +487,7 @@ export class HuskyAiService {
       title: thread?.title,
       memberName: thread?.memberName,
       memberImage: thread?.memberImage,
+      isOwner: thread?.email === email && email !== '',
     }
   }
 
