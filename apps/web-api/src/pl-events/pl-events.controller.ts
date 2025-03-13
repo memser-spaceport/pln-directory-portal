@@ -133,6 +133,7 @@ export class PLEventsController {
   @UseGuards(UserTokenValidation)
   async modifyPLEventGuestByLocation(
     @Param("uid") locationUid,
+    @Param("guestUid") guestUid,
     @Body() body: UpdatePLEventGuestSchemaDto,
     @Req() request
   ) {
@@ -146,8 +147,7 @@ export class PLEventsController {
     }
     const location = await this.eventLocationService.getPLEventLocationByUid(locationUid);
     if (
-      !this.memberService.checkIfAdminUser(member) &&
-      !this.eventGuestService.checkIfEventsAreUpcoming(location.upcomingEvents, body.events)
+      !this.memberService.checkIfAdminUser(member) && guestUid != member.uid
     ) {
       throw new ForbiddenException(`Member with email ${userEmail} isn't admin to access past events or future events`);
     }
