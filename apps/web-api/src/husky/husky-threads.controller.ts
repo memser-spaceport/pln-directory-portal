@@ -30,8 +30,8 @@ export class HuskyThreadsController {
 
     @UseGuards(UserTokenCheckGuard)
     @Post(':threadId')
-    async duplicateThread(@Param('threadId') threadId: string, @Req() req) {
-      return await this.huskyAiService.duplicateThread(threadId, req?.userEmail);
+    async duplicateThread(@Param('threadId') threadId: string, @Req() req, @Body() body: { guestUserId?: string }) {
+      return await this.huskyAiService.duplicateThread(threadId, req?.userEmail, body?.guestUserId);
     }
 
     @UseGuards(UserAccessTokenValidateGuard)

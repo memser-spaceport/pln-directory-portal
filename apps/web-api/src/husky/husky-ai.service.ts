@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { QdrantVectorDbService } from './db/qdrant-vector-db.service';
 import { RedisCacheDbService } from './db/redis-cache-db.service';
 import { MongoPersistantDbService } from './db/mongo-persistant-db.service';
@@ -169,7 +169,10 @@ export class HuskyAiService {
 
   }
 
-  async duplicateThread(threadId: string, email: string = '') {
+  async duplicateThread(threadId: string, email: string = '', guestUserId?: string) {
+    if(email && guestUserId) {
+      throw new BadRequestException('You cannot duplicate a thread with both email and guestUserId');
+    }
     const threadPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
     const summaryPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', 'threadId', threadId);
     const [thread, summary] = await Promise.all([threadPromise, summaryPromise]);
@@ -208,6 +211,7 @@ export class HuskyAiService {
       updatedAt: Date.now(),
       ...(email && { email: email }),
       ...(memberDetails && { memberName: memberDetails?.name, memberImage: memberDetails?.image?.url }),
+      ...(guestUserId && { guestUserId: guestUserId }),
     } as { [key: string]: any };
 
     await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || '', newThread);
@@ -501,6 +505,7 @@ export class HuskyAiService {
       memberName: thread?.memberName,
       memberImage: thread?.memberImage,
       isOwner: thread?.email === email && email !== '',
+      ...(thread?.guestUserId && { guestUserId: thread?.guestUserId }),
     }
   }
 
