@@ -45,7 +45,8 @@ export class PLEventGuestsService {
     requestorEmail: string,
     location: { location: string },
     type: string = CREATE,
-    tx?: Prisma.TransactionClient
+    tx?: Prisma.TransactionClient,
+    eventType?: string
   ) {
     try {
       const isAdmin = this.memberService.checkIfAdminUser(member);
@@ -60,6 +61,7 @@ export class PLEventGuestsService {
         this.memberService.checkIfAdminUser(member) && !plEvents.length &&
           (await this.sendEventInvitationIfAdminAddsMember(eventMember, location));
       }
+      await this.updateGuestTopicsAndReason(data, locationUid, member, eventType, tx);  
       this.cacheService.reset({ service: 'PLEventGuest' });
       return result;
     } catch (err) {
@@ -141,7 +143,7 @@ export class PLEventGuestsService {
             }
           }
         });
-        return await this.createPLEventGuestByLocation(data, member, location.uid, requestorEmail, location, UPDATE, tx);
+        return await this.createPLEventGuestByLocation(data, member, location.uid, requestorEmail, location, UPDATE, tx, type);
       });
     } catch (err) {
       this.handleErrors(err);
@@ -1012,6 +1014,42 @@ export class PLEventGuestsService {
    */
   private getGuestsActiveTeam(teamMemberRoles, team: Partial<Team> | string | null) : Boolean {
     return teamMemberRoles?.some((role) => role?.team?.uid === (typeof team === 'string' ? team : team?.uid));
+  }
+
+  /**
+   * Updates the topics and reason for a member across specific event UIDs.
+   * 
+   * @param data - The update schema containing new topics and reason.
+   * @param locationUid - The unique identifier of the location.
+   * @param member - The member whose topics and reason need to be updated.
+   * @param type - The event type, either "upcoming" or "past" (defaults to "upcoming").
+   * @param tx - (Optional) Prisma transaction client to execute within a transaction context.
+   * 
+   * @returns A Promise that resolves to the result of the update operation.
+   * 
+   * @throws Throws an error if fetching location details or updating records fails.
+   */
+  async updateGuestTopicsAndReason(
+    data: UpdatePLEventGuestSchemaDto,
+    locationUid: string,
+    member: Member,
+    type: string = "upcoming",
+    tx?: Prisma.TransactionClient) {
+    const location = await this.eventLocationsService.getPLEventLocationByUid(locationUid);
+    const events = type === "upcoming" ? location.pastEvents : location.upcomingEvents;
+    const isAdmin = this.memberService.checkIfAdminUser(member);
+    return await (tx || this.prisma).pLEventGuest.updateMany({
+      where: {
+        memberUid: isAdmin ? data.memberUid : member.uid,
+        eventUid: {
+          in: events.map(event => event.uid)
+        }
+      },
+      data: {
+        topics: data.topics,
+        reason: data.reason,
+      }
+    })
   }
 
 }
