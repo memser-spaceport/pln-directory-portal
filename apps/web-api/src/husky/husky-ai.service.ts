@@ -219,7 +219,9 @@ export class HuskyAiService {
     if (summary) {
        await Promise.all([
         this.huskyPersistentDbService.create(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', {
-          ...summary,
+          summary: summary?.summary,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
           threadId: newThread.threadId,
         }),
         this.huskyCacheDbService.set(`${newThread.threadId}:summary`, summary?.summary),
