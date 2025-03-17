@@ -482,7 +482,7 @@ export class PLEventGuestsService {
     const selectLocation = includeLocations
       ? `,'location', l."location"`
       : ``; // Empty if location is not required
-    
+
     // Determine the position of the eventUid placeholder in the SQL query's values array
     // If search is enabled, adjust the position accordingly
 
@@ -496,9 +496,9 @@ export class PLEventGuestsService {
       - Otherwise:
         - EventUid placeholder → `$${values.length + 3}`
     */
-    
+
     const eventPosition = search ? values.length + 4 : values.length + 3;
-    
+
     // Construct the raw SQL query for fetching attendees with joined tables and aggregated JSON data
     const query: any = ` 
       SELECT 
@@ -646,7 +646,7 @@ export class PLEventGuestsService {
           ...attendee?.member?.member,
           teamMemberRoles: attendee?.teammemberroles
         },
-        team: attendee?.team?.team
+        team: this.getGuestsActiveTeam(attendee?.teammemberroles, attendee?.team?.team)
       }
     });
   }
@@ -895,7 +895,13 @@ export class PLEventGuestsService {
         }
       });
       this.restrictTelegramBasedOnMemberPreference(result, isUserLoggedIn ? true : false);
-      return result;
+      const formattedResult = await result.map((guest) => {
+        return {
+          ...guest,
+          team: this.getGuestsActiveTeam(guest.member.teamMemberRoles, guest.team) // Update team object
+        };
+      })
+      return formattedResult;
     } catch (err) {
       this.handleErrors(err);
     }
@@ -990,6 +996,16 @@ export class PLEventGuestsService {
       loggedInMemberUid: null,
       includeLocations: true
     });
+  }
+
+  /**
+   * Determines the active team for a guest.
+   * @param teamMemberRoles - List of roles the guest has in different teams.
+   * @param team - The current team associated with the guest.
+   * @returns The team object if the guest is part of the team, otherwise an empty object.
+   */
+  private getGuestsActiveTeam(teamMemberRoles, team) {
+    return  teamMemberRoles?.some((role) => role?.team?.uid === team?.uid)? team : {}
   }
 
 }
