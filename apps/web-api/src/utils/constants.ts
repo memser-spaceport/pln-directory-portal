@@ -125,6 +125,8 @@ export const HUSKY_ACTION_TYPES = {
   IRL_EVENT: 'irl_event',
 };
 
+export const HUSKY_MAX_CONTEXT_LENGTH = 500;
+
 
 export const HUSKY_POSTGRRES_POOL_CONSTANTS = {
   max: 3, // maximum number of clients in the pool
