@@ -3,25 +3,27 @@ import { QdrantVectorDbService } from './db/qdrant-vector-db.service';
 import { RedisCacheDbService } from './db/redis-cache-db.service';
 import { MongoPersistantDbService } from './db/mongo-persistant-db.service';
 import { LogService } from '../shared/log.service';
-import { embed, generateText, streamObject } from 'ai';
+import { embed, generateObject, generateText, streamObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { HuskyResponseSchema, HuskyChatInterface } from 'libs/contracts/src/schema/husky-chat';
+import { HuskyResponseSchema, HuskyChatInterface, HuskyRephraseQuestionSchema } from 'libs/contracts/src/schema/husky-chat';
 import {
-  aiPromptTemplate,
-  chatSummaryTemplate,
-  chatSummaryWithHistoryTemplate,
   HUSKY_ACTION_TYPES,
-  HUSKY_NO_INFO_PROMPT,
-  HUSKY_CONTEXTUAL_SUMMARY_PROMPT,
-  rephraseQuestionTemplate,
-  PROMPT_FOR_GENERATE_TITLE,
-  HUSKY_CHAT_SUMMARY_SYSTEM_PROMPT,
-  REPHRASE_QUESTION_SYSTEM_PROMPT,
-  CONTEXTUAL_SYSTEM_PROMPT,
+
 } from '../utils/constants';
+
+
+import {
+  CONTEXTUAL_SYSTEM_PROMPT, 
+  HUSKY_CHAT_SUMMARY_SYSTEM_PROMPT, 
+  REPHRASE_QUESTION_SYSTEM_PROMPT, 
+  HUSKY_NO_INFO_PROMPT,
+  PROMPT_FOR_GENERATE_TITLE,
+  HUSKY_CONTEXTUAL_SUMMARY_PROMPT,
+} from '../utils/ai-prompts'
 import Handlebars from 'handlebars';
 import { PrismaService } from '../shared/prisma.service';
 import { v4 as uuidv4 } from 'uuid';
+
 @Injectable()
 export class HuskyAiService {
   constructor(
@@ -51,7 +53,7 @@ export class HuskyAiService {
 
     // Rephrase the question and get the matching documents to create context
     const rephrasedQuestion = await this.getRephrasedQuestionBasedOnHistory(threadId, question.toLowerCase());
-    const questionEmbedding = await this.getEmbeddingForText(rephrasedQuestion);
+    const questionEmbedding = await this.getEmbeddingForText(rephrasedQuestion.qdrantQuery);
     const [nonDirectoryDocs, directoryDocs] = await Promise.all([
       this.getEmbeddingsBySource(questionEmbedding, 20),
       this.getDirectoryEmbeddings(questionEmbedding, 30),
@@ -82,14 +84,14 @@ export class HuskyAiService {
 
     // If Context is valid, then create prompt and stream the response
     const chatSummaryFromDb = await this.huskyCacheDbService.get(`${threadId}:summary`);
-    const prompt = this.createPromptForHuskyChat(question, context, chatSummaryFromDb || '', directoryDocs);
     return streamObject({
       model: openai(process.env.OPENAI_LLM_MODEL || ''),
       schema: HuskyResponseSchema,
       system: CONTEXTUAL_SYSTEM_PROMPT,
       prompt: `
-        - question: ${question}
+        - question: ${rephrasedQuestion.llmQuestion}
         - context: ${context}
+        - contextLength: ${Math.min(context.split(' ').length / 2.5, 500)}
         - chatHistory: ${chatSummaryFromDb}
         - action List: ${JSON.stringify(directoryDocs)}
         - currentDate: ${new Date().toISOString().split('T')[0]}
@@ -97,13 +99,11 @@ export class HuskyAiService {
       temperature: 0.001,
       onFinish: async (response) => {
 
-        if (prompt) {
-          this.updateChatSummary(threadId, { user: question, system: response?.object?.content })
+        this.updateChatSummary(threadId, { user: question, system: response?.object?.content })
             .then((res) => {
               return this.updateChatSummaryInMongo(threadId, res)
             })
             .then(() => { })
-        }
         this.persistContextualHistory(
           threadId,
           chatId,
@@ -265,16 +265,22 @@ export class HuskyAiService {
 
   async getRephrasedQuestionBasedOnHistory(threadId: string, question: string) {
     const chatHistory = await this.huskyCacheDbService.get(`${threadId}:summary`);
-
     if (chatHistory) {
-      const aiPrompt = Handlebars.compile(REPHRASE_QUESTION_SYSTEM_PROMPT)({ chatHistory, question });
-      const { text } = await generateText({
+      const { object } = await generateObject({
         model: openai(process.env.OPENAI_LLM_MODEL || ''),
-        prompt: aiPrompt,
-      });
-      return text;
+        schema: HuskyRephraseQuestionSchema,
+        system: REPHRASE_QUESTION_SYSTEM_PROMPT,
+        prompt: `
+          chatHistory: ${chatHistory}
+          question: ${question}
+        `,
+      }); 
+      return object;
     }
-    return question;
+    return {
+      qdrantQuery: question,
+      llmQuestion: question,
+    };
   }
 
   async updateLastMessage(chatId: string, question: string, response: string) {
@@ -409,19 +415,6 @@ export class HuskyAiService {
     const aiPrompt = Handlebars.compile(HUSKY_CONTEXTUAL_SUMMARY_PROMPT)({
       context,
       question,
-    });
-    return aiPrompt;
-  }
-
-  createPromptForHuskyChat(question: string, context: string, chatSummary: string, allDocs: any) {
-    const contextLength = Math.min(context.split(' ').length / 2.5, 500);
-    const aiPrompt = Handlebars.compile(aiPromptTemplate)({
-      context,
-      contextLength,
-      question,
-      chatSummary,
-      currentDate: new Date().toISOString().split('T')[0],
-      allDocs: JSON.stringify(allDocs),
     });
     return aiPrompt;
   }
