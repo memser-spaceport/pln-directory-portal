@@ -8,6 +8,7 @@ import { openai } from '@ai-sdk/openai';
 import { HuskyResponseSchema, HuskyChatInterface, HuskyRephraseQuestionSchema } from 'libs/contracts/src/schema/husky-chat';
 import {
   HUSKY_ACTION_TYPES,
+  HUSKY_MAX_CONTEXT_LENGTH,
 
 } from '../utils/constants';
 
@@ -91,7 +92,7 @@ export class HuskyAiService {
       prompt: `
         - question: ${rephrasedQuestion.llmQuestion}
         - context: ${context}
-        - contextLength: ${Math.min(context.split(' ').length / 2.5, 500)}
+        - contextLength: ${HUSKY_MAX_CONTEXT_LENGTH}
         - chatHistory: ${chatSummaryFromDb}
         - action List: ${JSON.stringify(directoryDocs)}
         - currentDate: ${new Date().toISOString().split('T')[0]}
