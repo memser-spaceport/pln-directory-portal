@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, forwardRef, Inject } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
-import { Prisma, Member, NotificationStatus, SubscriptionEntityType } from '@prisma/client';
+import { Prisma, Member, NotificationStatus, SubscriptionEntityType, Team } from '@prisma/client';
 import { MembersService } from '../members/members.service';
 import { PLEventLocationsService } from './pl-event-locations.service';
 import {
@@ -555,16 +555,19 @@ export class PLEventGuestsService {
               'officeHours', m."officeHours"
             )
           ) AS member,
-          json_agg(
-            DISTINCT jsonb_build_object(
-              'role', tmr."role",
-              'team', json_build_object(
-                'uid', tmr_team.uid,
-                'name', tmr_team.name,
-                'logo', json_build_object('url', tmr_logo.url)
+          COALESCE(   -- Ensure that if the aggregation results in NULL, it returns an empty JSON array instead
+            jsonb_agg(
+                DISTINCT jsonb_build_object(
+                  'role', tmr."role",
+                  'team', jsonb_build_object(
+                  'uid', tmr_team.uid,
+                  'name', tmr_team.name,
+                  'logo', jsonb_build_object('url', tmr_logo.url)
+                )
               )
-            )
-          ) as teamMemberRoles, 
+            ) FILTER (WHERE tmr."role" IS NOT NULL AND tmr_team.uid IS NOT NULL),  -- Exclude NULL roles and teams from the aggregation
+            '[]'::jsonb     -- Default to an empty JSON array if no valid team member roles exist
+          ) AS teamMemberRoles, 
           json_object_agg(
             'team',
             json_build_object(
@@ -634,19 +637,21 @@ export class PLEventGuestsService {
    */
   private formatAttendees(result) {
     return result.map((attendee) => {
+      let guestInfo = { ...attendee?.guest?.info };
+      guestInfo.teamUid = this.getGuestsActiveTeam(attendee?.teammemberroles, guestInfo?.teamUid) ? guestInfo?.teamUid : null;
       return {
         // Total count of members after filtering, represented by totalMembers
         count: Number(BigInt(attendee.count || '0n')),
 
         memberUid: attendee.memberUid,
         // Spread guest information if available, including attributes like isHost and isSpeaker
-        ...attendee?.guest?.info,
+        ...guestInfo,
         events: attendee.events,
         member: {
           ...attendee?.member?.member,
           teamMemberRoles: attendee?.teammemberroles
         },
-        team: this.getGuestsActiveTeam(attendee?.teammemberroles, attendee?.team?.team)
+        team: this.getGuestsActiveTeam(attendee?.teammemberroles, attendee?.team?.team) ? attendee?.team?.team : {}
       }
     });
   }
@@ -898,7 +903,8 @@ export class PLEventGuestsService {
       const formattedResult = await result.map((guest) => {
         return {
           ...guest,
-          team: this.getGuestsActiveTeam(guest.member.teamMemberRoles, guest.team) // Update team object
+          teamUid: this.getGuestsActiveTeam(guest.member.teamMemberRoles, guest.teamUid) ? guest.teamUid : null,
+          team: this.getGuestsActiveTeam(guest.member.teamMemberRoles, guest.team) ? guest.team : {}// Update team object
         };
       })
       return formattedResult;
@@ -1004,8 +1010,8 @@ export class PLEventGuestsService {
    * @param team - The current team associated with the guest.
    * @returns The team object if the guest is part of the team, otherwise an empty object.
    */
-  private getGuestsActiveTeam(teamMemberRoles, team) {
-    return  teamMemberRoles?.some((role) => role?.team?.uid === team?.uid)? team : {}
+  private getGuestsActiveTeam(teamMemberRoles, team: Partial<Team> | string | null) : Boolean {
+    return teamMemberRoles?.some((role) => role?.team?.uid === (typeof team === 'string' ? team : team?.uid));
   }
 
 }
