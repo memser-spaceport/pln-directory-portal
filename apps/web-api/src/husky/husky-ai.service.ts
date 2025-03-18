@@ -15,6 +15,9 @@ import {
   HUSKY_CONTEXTUAL_SUMMARY_PROMPT,
   rephraseQuestionTemplate,
   PROMPT_FOR_GENERATE_TITLE,
+  HUSKY_CHAT_SUMMARY_SYSTEM_PROMPT,
+  REPHRASE_QUESTION_SYSTEM_PROMPT,
+  CONTEXTUAL_SYSTEM_PROMPT,
 } from '../utils/constants';
 import Handlebars from 'handlebars';
 import { PrismaService } from '../shared/prisma.service';
@@ -50,8 +53,8 @@ export class HuskyAiService {
     const rephrasedQuestion = await this.getRephrasedQuestionBasedOnHistory(threadId, question.toLowerCase());
     const questionEmbedding = await this.getEmbeddingForText(rephrasedQuestion);
     const [nonDirectoryDocs, directoryDocs] = await Promise.all([
-      this.getEmbeddingsBySource(questionEmbedding),
-      this.getDirectoryEmbeddings(questionEmbedding),
+      this.getEmbeddingsBySource(questionEmbedding, 20),
+      this.getDirectoryEmbeddings(questionEmbedding, 30),
     ]);
 
     const context = await this.createContextWithMatchedDocs(nonDirectoryDocs, directoryDocs);
@@ -83,7 +86,14 @@ export class HuskyAiService {
     return streamObject({
       model: openai(process.env.OPENAI_LLM_MODEL || ''),
       schema: HuskyResponseSchema,
-      prompt: prompt || HUSKY_NO_INFO_PROMPT,
+      system: CONTEXTUAL_SYSTEM_PROMPT,
+      prompt: `
+        - question: ${question}
+        - context: ${context}
+        - chatHistory: ${chatSummaryFromDb}
+        - action List: ${JSON.stringify(directoryDocs)}
+        - currentDate: ${new Date().toISOString().split('T')[0]}
+      `,
       temperature: 0.001,
       onFinish: async (response) => {
 
@@ -257,7 +267,7 @@ export class HuskyAiService {
     const chatHistory = await this.huskyCacheDbService.get(`${threadId}:summary`);
 
     if (chatHistory) {
-      const aiPrompt = Handlebars.compile(rephraseQuestionTemplate)({ chatHistory, question });
+      const aiPrompt = Handlebars.compile(REPHRASE_QUESTION_SYSTEM_PROMPT)({ chatHistory, question });
       const { text } = await generateText({
         model: openai(process.env.OPENAI_LLM_MODEL || ''),
         prompt: aiPrompt,
@@ -273,15 +283,14 @@ export class HuskyAiService {
   }
 
   async updateChatSummary(chatId: string, rawChatHistory: any) {
-    const formattedChat = `user: ${rawChatHistory.user}\n system: ${rawChatHistory.system}`;
     const previousSummary = await this.huskyCacheDbService.get(`${chatId}:summary`);
 
     // Define a maximum length for the summary
     const maxLength = 500; // Adjust this value as needed
 
     const aiPrompt = previousSummary
-      ? Handlebars.compile(chatSummaryWithHistoryTemplate)({ previousSummary, currentConversation: formattedChat, maxLength })
-      : Handlebars.compile(chatSummaryTemplate)({ currentConversation: formattedChat, maxLength });
+      ? Handlebars.compile(HUSKY_CHAT_SUMMARY_SYSTEM_PROMPT)({ previousChatHistory: previousSummary, question: rawChatHistory.user, response: rawChatHistory.system, maxLength })
+      : Handlebars.compile(HUSKY_CHAT_SUMMARY_SYSTEM_PROMPT)({ previousChatHistory: '', question: rawChatHistory.user, response: rawChatHistory.system, maxLength });
 
     const { text } = await generateText({
       model: openai(process.env.OPENAI_LLM_MODEL || ''),
@@ -383,8 +392,8 @@ export class HuskyAiService {
       };
     });
 
-    const nonDirectory = formattedNonDictoryDocs.filter((v) => v.score > 0.45 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 10);
-    const directory = allDocs.filter((v) => v.score > 0.37 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 10);
+    const nonDirectory = formattedNonDictoryDocs.filter((v) => v.score > 0.45 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 15);
+    const directory = allDocs.filter((v) => v.score > 0.37 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 15);
 
     const all = [...directory, ...nonDirectory]
 
