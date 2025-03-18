@@ -47,6 +47,12 @@ export const HuskyResponseSchema = z.object({
   ),
 });
 
+export const HuskyRephraseQuestionSchema = z.object({
+  qdrantQuery: z.string(),
+  llmQuestion: z.string(),
+});
+
 export type HuskyChatInterface = z.infer<typeof HuskyChatSchema>;
 export class HuskyChatDto extends createZodDto(HuskyChatSchema) {}
 export class HuskyFeedbackDto extends createZodDto(HuskyFeedbackSchema) {}
+export class HuskyRephraseQuestionDto extends createZodDto(HuskyRephraseQuestionSchema) {}
