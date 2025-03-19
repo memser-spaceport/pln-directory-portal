@@ -485,6 +485,7 @@ export class PLEventGuestsService {
       ? `,'location', l."location"`
       : ``; // Empty if location is not required
 
+
     // Determine the position of the eventUid placeholder in the SQL query's values array
     // If search is enabled, adjust the position accordingly
 
@@ -1053,4 +1054,41 @@ export class PLEventGuestsService {
     })
   }
 
+  /**
+   * Retrieves the topics and reason for a guest's participation in past events at a specific location.
+   * @param locationUid The unique identifier for the location.
+   * @param guestUid The unique identifier for the guest.
+   * @returns The guest's topics and reason for participation in the most recent past event.
+   *   - Events are sorted by updatedAt and createdAt in descending order to get latest data.
+   *   - Throws an error if something goes wrong during retrieval.
+   */
+  async getGuestTopics(locationUid: string, guestUid: string) {
+    try {
+      const location = await this.eventLocationsService.getPLEventLocationByUid(locationUid);
+      const eventUids = location.events.flatMap(event => event.uid);
+      const result = await this.prisma.pLEventGuest.findFirst({
+        where: {
+          AND:{
+            eventUid: {
+              in: eventUids
+            },
+            memberUid: guestUid
+          }
+        },
+        orderBy: [
+          { updatedAt: 'desc' }
+        ],
+        select: {
+          topics: true,
+          reason: true
+        }
+      })
+      if(!result) {
+        return [];
+      }
+      return result;
+    } catch (error) {
+      this.handleErrors(error)
+    }
+  }
 }
