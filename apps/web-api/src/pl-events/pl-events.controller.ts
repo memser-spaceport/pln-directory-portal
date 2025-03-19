@@ -111,6 +111,7 @@ export class PLEventsController {
     @Req() request
   ): Promise<any> {
     const userEmail = request["userEmail"];
+    const { type } = request.query;
     const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
     const result = await this.memberService.isMemberPartOfTeams(member, [body.teamUid]) ||
       await this.memberService.checkIfAdminUser(member);
@@ -125,7 +126,7 @@ export class PLEventsController {
     ) {
       throw new ForbiddenException(`Member with email ${userEmail} isn't admin to access past events or future events`);
     }
-    return await this.eventGuestService.createPLEventGuestByLocation(body, member, locationUid, userEmail, location);
+    return await this.eventGuestService.createPLEventGuestByLocation(body, member, locationUid, userEmail, location, "CREATE", type);
   }
 
   @Api(server.route.modifyPLEventGuestByLocation)

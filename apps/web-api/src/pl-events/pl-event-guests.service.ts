@@ -567,7 +567,7 @@ export class PLEventGuestsService {
                   'logo', jsonb_build_object('url', tmr_logo.url)
                 )
               )
-            ) FILTER (WHERE tmr."role" IS NOT NULL AND tmr_team.uid IS NOT NULL),  -- Exclude NULL roles and teams from the aggregation
+            ) FILTER (WHERE tmr_team.uid IS NOT NULL),  -- Exclude NULL teams from the aggregation
             '[]'::jsonb     -- Default to an empty JSON array if no valid team member roles exist
           ) AS teamMemberRoles, 
           json_object_agg(
@@ -1013,6 +1013,7 @@ export class PLEventGuestsService {
    * @returns The team object if the guest is part of the team, otherwise an empty object.
    */
   private getGuestsActiveTeam(teamMemberRoles, team: Partial<Team> | string | null) : Boolean {
+    // check whether the given team is a members active team
     return teamMemberRoles?.some((role) => role?.team?.uid === (typeof team === 'string' ? team : team?.uid));
   }
 
