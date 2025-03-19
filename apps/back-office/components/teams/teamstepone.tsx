@@ -15,13 +15,12 @@ export default function TeamStepOne(props) {
     <>
       <div className="pt-5">
         <InputField
-          required
           name="requestorEmail"
           type="email"
           label="Requestor Email"
           value={values?.requestorEmail}
           onChange={onChange}
-          disabled={!props.isEditEnabled}
+          disabled={true}
           placeholder="Enter your email address"
           className="custom-grey custom-outline-none border"
         />
@@ -99,7 +98,6 @@ export default function TeamStepOne(props) {
 
       <div className="pt-5">
         <TextArea
-          required
           value={values?.longDescription}
           onChange={onChange}
           maxLength={2000}

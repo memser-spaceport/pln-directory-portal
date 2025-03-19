@@ -27,10 +27,14 @@ const industrTagsMappingSchema = z.object({
   uid: z.string(),
   title: z.string(),
 });
-const fundingStageMappingSchema = z.object({
-  uid: z.string(),
-  title: z.string(),
-});
+const fundingStageMappingSchema = z
+  .object({
+    uid: z.string().nullable(),
+    title: z.string().nullable(),
+  })
+  .nullable();
+
+
 const newDataMemberSchema = z.object({
   name: z.string(),
   email: z.string(),
@@ -64,9 +68,9 @@ const newDataMemberSchema = z.object({
 
 const newDataTeamSchema = z.object({
   name: z.string(),
-  contactMethod: z.string(),
+  contactMethod: z.string().optional().nullable(),
   industryTags: z.array(industrTagsMappingSchema).nonempty(),
-  fundingStage: fundingStageMappingSchema,
+  fundingStage: fundingStageMappingSchema.optional().nullable(),
   technologies: z.array(TechnologiesMappingSchema),
   membershipSources: z
     .array(membershipSourcesMappingSchema)

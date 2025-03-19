@@ -11,7 +11,6 @@ export default function TeamStepThree(props) {
         <InputField
           label="Preferred method of contact"
           name="contactMethod"
-          required={true}
           value={values.contactMethod}
           maxLength={200}
           onChange={handleInputChange}

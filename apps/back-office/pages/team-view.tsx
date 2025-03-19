@@ -20,31 +20,17 @@ import { parseCookies } from 'nookies';
 
 function validateBasicForm(formValues, imageUrl) {
   const errors = [];
-  const emailRE =
-    /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-  if (
-    !formValues.requestorEmail?.trim() ||
-    !formValues.requestorEmail?.trim().match(emailRE)
-  ) {
-    errors.push('Please add a valid Requestor email');
-  }
   if (!formValues.name?.trim()) {
     errors.push('Please add Team Name');
   }
   if (!formValues.shortDescription?.trim()) {
     errors.push('Please add a Description');
   }
-  if (!formValues.longDescription?.trim()) {
-    errors.push('Please add a Long Description');
-  }
   return errors;
 }
 
 function validateProjectDetailForm(formValues) {
   const errors = [];
-  if (!formValues.fundingStage?.value) {
-    errors.push('Please add Funding Stage');
-  }
   if (!formValues.industryTags.length) {
     errors.push('Please add IndustryTags');
   }
@@ -53,9 +39,6 @@ function validateProjectDetailForm(formValues) {
 
 function validateSocialForm(formValues) {
   const errors = [];
-  if (!formValues.contactMethod?.trim()) {
-    errors.push('Please add Preferred method of contact');
-  }
   if (!formValues.website?.trim()) {
     errors.push('Please add website');
   }
