@@ -115,5 +115,13 @@ export const apiEvents = contract.router({
     responses: {
       200: ResponsePLEventLocationWithRelationsSchema.array(),
     },
+  },
+  getPLEventGuestTopics: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/guests/:guestUid/topics`,
+    query: PLEventDetailQueryParams,
+    responses: {
+      200: ResponsePLEventLocationWithRelationsSchema.array(),
+    },
   }
 });
