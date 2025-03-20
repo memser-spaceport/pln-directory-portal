@@ -1050,6 +1050,7 @@ export class PLEventGuestsService {
       data: {
         topics: data.topics,
         reason: data.reason,
+        teamUid: data.teamUid
       }
     })
   }
