@@ -2,25 +2,14 @@ import { Injectable, ConflictException, BadRequestException, NotFoundException }
 import { Prisma } from '@prisma/client';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
-import { openai } from '@ai-sdk/openai';
-import { embed, generateText, streamObject } from 'ai';
-import { Response } from 'express';
-import { HuskyResponseSchema } from 'libs/contracts/src/schema/husky-chat';
-import { QdrantVectorDbService } from './db/qdrant-vector-db.service';
-import { RedisCacheDbService } from './db/redis-cache-db.service';
-import { Neo4jGraphDbService } from './db/neo4j-graph-db.service';
 import { MongoPersistantDbService } from './db/mongo-persistant-db.service';
-import { HUSKY_ACTION_TYPES, HUSKY_NO_INFO_PROMPT, HUSKY_SOURCES } from '../utils/constants';
+
 @Injectable()
 export class HuskyService {
   constructor(
     private logger: LogService,
     private prisma: PrismaService,
     private huskyPersistentDbService: MongoPersistantDbService
-/*     private huskyVectorDbService: QdrantVectorDbService,
-    private huskyCacheDbService: RedisCacheDbService,
-    private huskyGraphDbService: Neo4jGraphDbService,
-     */
   ) {}
 
   async fetchDiscoverQuestions(query: Prisma.DiscoveryQuestionFindManyArgs) {

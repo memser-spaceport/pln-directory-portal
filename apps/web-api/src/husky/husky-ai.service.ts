@@ -1,28 +1,29 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { QdrantVectorDbService } from './db/qdrant-vector-db.service';
 import { RedisCacheDbService } from './db/redis-cache-db.service';
 import { MongoPersistantDbService } from './db/mongo-persistant-db.service';
 import { LogService } from '../shared/log.service';
-import { createDataStream, createDataStreamResponse, embed, generateObject, generateText, streamObject, streamText } from 'ai';
+import { embed, generateObject, generateText, streamObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { HuskyResponseSchema, HuskyChatInterface } from 'libs/contracts/src/schema/husky-chat';
+import { HuskyResponseSchema, HuskyChatInterface, HuskyRephraseQuestionSchema } from 'libs/contracts/src/schema/husky-chat';
 import {
-  aiPromptTemplate,
-  chatSummaryTemplate,
-  chatSummaryWithHistoryTemplate,
   HUSKY_ACTION_TYPES,
-  HUSKY_NO_INFO_PROMPT,
-  HUSKY_CONTEXTUAL_SUMMARY_PROMPT,
-  HUSKY_SOURCES,
-  promptForTextToSql,
-  rephraseQuestionTemplate,
-  HUSKY_RELATED_INFO_PROMPT,
-  HUSKY_RELATED_INFO_SUMMARY_PROMPT,
-  PROMPT_FOR_GENERATE_TITLE,
+  HUSKY_MAX_CONTEXT_LENGTH,
+
 } from '../utils/constants';
-import { Response } from 'express';
+
+
+import {
+  CONTEXTUAL_SYSTEM_PROMPT, 
+  HUSKY_CHAT_SUMMARY_SYSTEM_PROMPT, 
+  REPHRASE_QUESTION_SYSTEM_PROMPT, 
+  HUSKY_NO_INFO_PROMPT,
+  PROMPT_FOR_GENERATE_TITLE,
+  HUSKY_CONTEXTUAL_SUMMARY_PROMPT,
+} from '../utils/ai-prompts'
 import Handlebars from 'handlebars';
-import { z } from 'zod'
+import { PrismaService } from '../shared/prisma.service';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class HuskyAiService {
@@ -31,6 +32,7 @@ export class HuskyAiService {
     private huskyVectorDbService: QdrantVectorDbService,
     private huskyCacheDbService: RedisCacheDbService,
     private huskyPersistentDbService: MongoPersistantDbService,
+    private prisma: PrismaService
   ) { }
 
   async createContextualResponse(chatInfo: HuskyChatInterface) {
@@ -52,10 +54,10 @@ export class HuskyAiService {
 
     // Rephrase the question and get the matching documents to create context
     const rephrasedQuestion = await this.getRephrasedQuestionBasedOnHistory(threadId, question.toLowerCase());
-    const questionEmbedding = await this.getEmbeddingForText(rephrasedQuestion);
+    const questionEmbedding = await this.getEmbeddingForText(rephrasedQuestion.qdrantQuery);
     const [nonDirectoryDocs, directoryDocs] = await Promise.all([
-      this.getEmbeddingsBySource(questionEmbedding),
-      this.getDirectoryEmbeddings(questionEmbedding),
+      this.getEmbeddingsBySource(questionEmbedding, 20),
+      this.getDirectoryEmbeddings(questionEmbedding, 30),
     ]);
 
     const context = await this.createContextWithMatchedDocs(nonDirectoryDocs, directoryDocs);
@@ -83,21 +85,26 @@ export class HuskyAiService {
 
     // If Context is valid, then create prompt and stream the response
     const chatSummaryFromDb = await this.huskyCacheDbService.get(`${threadId}:summary`);
-    const prompt = this.createPromptForHuskyChat(question, context, chatSummaryFromDb || '', directoryDocs);
     return streamObject({
       model: openai(process.env.OPENAI_LLM_MODEL || ''),
       schema: HuskyResponseSchema,
-      prompt: prompt || HUSKY_NO_INFO_PROMPT,
+      system: CONTEXTUAL_SYSTEM_PROMPT,
+      prompt: `
+        - question: ${rephrasedQuestion.llmQuestion}
+        - context: ${context}
+        - contextLength: ${HUSKY_MAX_CONTEXT_LENGTH}
+        - chatHistory: ${chatSummaryFromDb}
+        - action List: ${JSON.stringify(directoryDocs)}
+        - currentDate: ${new Date().toISOString().split('T')[0]}
+      `,
       temperature: 0.001,
       onFinish: async (response) => {
 
-        if (prompt) {
-          this.updateChatSummary(threadId, { user: question, system: response?.object?.content })
+        this.updateChatSummary(threadId, { user: question, system: response?.object?.content })
             .then((res) => {
               return this.updateChatSummaryInMongo(threadId, res)
             })
             .then(() => { })
-        }
         this.persistContextualHistory(
           threadId,
           chatId,
@@ -107,8 +114,6 @@ export class HuskyAiService {
           response?.object?.followUpQuestions || [],
           response?.object?.actions || []
         ).then(() => { });
-        //* Update summary in mongo */
-
       },
     });
   }
@@ -175,6 +180,81 @@ export class HuskyAiService {
 
   }
 
+  async duplicateThread(threadId: string, email: string = '', guestUserId?: string) {
+    if(email && guestUserId) {
+      throw new BadRequestException('You cannot duplicate a thread with both email and guestUserId');
+    }
+    const threadPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
+    const summaryPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', 'threadId', threadId);
+    const [thread, summary] = await Promise.all([threadPromise, summaryPromise]);
+    if (!thread) {
+      throw new NotFoundException('Thread not found');
+    }
+    if (email && thread?.email === email) {
+      throw new ForbiddenException('You are not authorized to duplicate this thread');
+    }
+
+    let memberDetails: any = {}
+    if (email) {
+      memberDetails = await this.prisma.member.findUnique({
+        where: {
+          email: email,
+        },
+        select: {
+          name: true,
+          image: true,
+        },
+      });
+    }
+
+    if (email && !memberDetails) {
+      throw new NotFoundException('Member not found');
+    }
+
+    const newThread = {
+      threadId: uuidv4(),
+      contextual: thread?.contextual,
+      title: thread?.title,
+      createdFrom: threadId,
+      originalThreadId: thread.originalThreadId || thread.threadId,
+      originalThreadTitle: thread.originalThreadTitle || thread.title,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      ...(email && { email: email }),
+      ...(memberDetails && { memberName: memberDetails?.name, memberImage: memberDetails?.image?.url }),
+      ...(guestUserId && { guestUserId: guestUserId }),
+    } as { [key: string]: any };
+
+    await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || '', newThread);
+    
+    if (summary) {
+       await Promise.all([
+        this.huskyPersistentDbService.create(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', {
+          summary: summary?.summary,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          threadId: newThread.threadId,
+        }),
+        this.huskyCacheDbService.set(`${newThread.threadId}:summary`, summary?.summary),
+      ]);
+    }
+
+    return {
+      threadId: newThread.threadId,
+    };
+  }
+
+  async deleteThreadEmail(threadId: string, email: string) {
+    const thread = await this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
+    if (!thread) {
+      throw new NotFoundException('Thread not found');
+    }
+    if (thread?.email !== email) {
+      throw new ForbiddenException('You are not authorized to delete this thread');
+    }
+    await this.huskyPersistentDbService.deleteDocByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
+  }
+
   async getEmbeddingForText(text: string) {
     const embeddingModel = openai.embedding(process.env.OPENAI_EMBEDDING_MODEL || '');
     const { embedding } = await embed({
@@ -186,16 +266,22 @@ export class HuskyAiService {
 
   async getRephrasedQuestionBasedOnHistory(threadId: string, question: string) {
     const chatHistory = await this.huskyCacheDbService.get(`${threadId}:summary`);
-
     if (chatHistory) {
-      const aiPrompt = Handlebars.compile(rephraseQuestionTemplate)({ chatHistory, question });
-      const { text } = await generateText({
+      const { object } = await generateObject({
         model: openai(process.env.OPENAI_LLM_MODEL || ''),
-        prompt: aiPrompt,
-      });
-      return text;
+        schema: HuskyRephraseQuestionSchema,
+        system: REPHRASE_QUESTION_SYSTEM_PROMPT,
+        prompt: `
+          chatHistory: ${chatHistory}
+          question: ${question}
+        `,
+      }); 
+      return object;
     }
-    return question;
+    return {
+      qdrantQuery: question,
+      llmQuestion: question,
+    };
   }
 
   async updateLastMessage(chatId: string, question: string, response: string) {
@@ -204,15 +290,14 @@ export class HuskyAiService {
   }
 
   async updateChatSummary(chatId: string, rawChatHistory: any) {
-    const formattedChat = `user: ${rawChatHistory.user}\n system: ${rawChatHistory.system}`;
     const previousSummary = await this.huskyCacheDbService.get(`${chatId}:summary`);
 
     // Define a maximum length for the summary
     const maxLength = 500; // Adjust this value as needed
 
     const aiPrompt = previousSummary
-      ? Handlebars.compile(chatSummaryWithHistoryTemplate)({ previousSummary, currentConversation: formattedChat, maxLength })
-      : Handlebars.compile(chatSummaryTemplate)({ currentConversation: formattedChat, maxLength });
+      ? Handlebars.compile(HUSKY_CHAT_SUMMARY_SYSTEM_PROMPT)({ previousChatHistory: previousSummary, question: rawChatHistory.user, response: rawChatHistory.system, maxLength })
+      : Handlebars.compile(HUSKY_CHAT_SUMMARY_SYSTEM_PROMPT)({ previousChatHistory: '', question: rawChatHistory.user, response: rawChatHistory.system, maxLength });
 
     const { text } = await generateText({
       model: openai(process.env.OPENAI_LLM_MODEL || ''),
@@ -314,8 +399,8 @@ export class HuskyAiService {
       };
     });
 
-    const nonDirectory = formattedNonDictoryDocs.filter((v) => v.score > 0.35 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 5);
-    const directory = allDocs.filter((v) => v.score > 0.35 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 6);
+    const nonDirectory = formattedNonDictoryDocs.filter((v) => v.score > 0.45 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 15);
+    const directory = allDocs.filter((v) => v.score > 0.37 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 15);
 
     const all = [...directory, ...nonDirectory]
 
@@ -335,40 +420,39 @@ export class HuskyAiService {
     return aiPrompt;
   }
 
-  createPromptForHuskyChat(question: string, context: string, chatSummary: string, allDocs: any) {
-    const contextLength = Math.min(context.split(' ').length / 2.5, 500);
-    const aiPrompt = Handlebars.compile(aiPromptTemplate)({
-      context,
-      contextLength,
-      question,
-      chatSummary,
-      currentDate: new Date().toISOString().split('T')[0],
-      allDocs: JSON.stringify(allDocs),
-    });
-    return aiPrompt;
-  }
-
-  async createThread(threadId: string, email: string, userUid: string) {
+  async createThread(threadId: string, email: string) {
     return await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || '', {
       threadId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       title: '',
       contextual: [],
-      email,
-      directoryId: userUid,
+      ...(email && { email: email }),
     });
   }
 
-  async createThreadTitle(threadId: string, question: string) {
-    const thread = await this.huskyPersistentDbService.findOneByKeyValue(
-      process.env.MONGO_THREADS_COLLECTION || '',
-      'threadId',
-      threadId
-    );
-
+  async createThreadBasicInfo(threadId: string, question: string, email: string = '') {
+    const thread = await this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
     if (!thread) {
       throw new NotFoundException('Thread not found');
+    }
+    if (email && thread?.email !== email) {
+      throw new ForbiddenException('You are not authorized to update this thread');
+    }
+    let memberDetails: any = {}
+    if (email) {
+      memberDetails = await this.prisma.member.findUnique({
+        where: {
+          email: email,
+        },
+        select: {
+          name: true,
+          image: true,
+        },
+      });
+    }
+    if (email && !memberDetails) {
+      throw new NotFoundException('Member not found');
     }
 
     const prompt = Handlebars.compile(PROMPT_FOR_GENERATE_TITLE)({
@@ -380,17 +464,14 @@ export class HuskyAiService {
     });
     const createdTitle = text || '';
     await this.huskyPersistentDbService.updateByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId, {
+      ...(memberDetails && { memberName: memberDetails?.name, memberImage: memberDetails?.image?.url }),
       title: createdTitle,
     });
-    return {
-      title: createdTitle,
-      threadId,
-    };
   }
 
-  async getThreadsByUserId(userUid: string) {
+  async getThreadsByEmail(email: string) {
     try {
-      const threads = await this.huskyPersistentDbService.findByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'directoryId', userUid);
+      const threads = await this.huskyPersistentDbService.findByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'email', email);
       return threads
         .filter((thread) => thread?.title?.length > 0)
         .sort((a, b) => b.updatedAt - a.updatedAt)
@@ -402,19 +483,19 @@ export class HuskyAiService {
         }))
 
     } catch (error) {
-      this.logger.error(`Failed to get threads for user ${userUid}:`, error);
+      this.logger.error(`Failed to get threads for email ${email}:`, error);
       throw new Error(`Failed to retrieve threads: ${error.message}`);
     }
   }
 
 
-  async getChatsByThreadId(threadId: string) {
+  async getThreadById(threadId: string, email: string = '') {
     const threadPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
     const summaryPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', 'threadId', threadId);
 
     const [thread, summaryData] = await Promise.all([threadPromise, summaryPromise]);
     if (!thread) {
-      return [];
+      throw new NotFoundException('Thread not found');
     }
 
     if (summaryData) {
@@ -422,7 +503,15 @@ export class HuskyAiService {
     }
 
     const chats = thread?.contextual || [];
-    return chats.sort((a, b) => a.createdAt - b.createdAt);
+    return {
+      chats: chats.sort((a, b) => a.createdAt - b.createdAt),
+      threadId: thread?.threadId,
+      title: thread?.title,
+      memberName: thread?.memberName,
+      memberImage: thread?.memberImage,
+      isOwner: thread?.email === email && email !== '',
+      ...(thread?.guestUserId && { guestUserId: thread?.guestUserId }),
+    }
   }
 
   async getChatById(uid: string) {

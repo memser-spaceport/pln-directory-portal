@@ -111,6 +111,7 @@ export class PLEventsController {
     @Req() request
   ): Promise<any> {
     const userEmail = request["userEmail"];
+    const { type } = request.query;
     const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
     const result = await this.memberService.isMemberPartOfTeams(member, [body.teamUid]) ||
       await this.memberService.checkIfAdminUser(member);
@@ -125,7 +126,7 @@ export class PLEventsController {
     ) {
       throw new ForbiddenException(`Member with email ${userEmail} isn't admin to access past events or future events`);
     }
-    return await this.eventGuestService.createPLEventGuestByLocation(body, member, locationUid, userEmail, location);
+    return await this.eventGuestService.createPLEventGuestByLocation(body, member, locationUid, userEmail, location, "CREATE", undefined, type);
   }
 
   @Api(server.route.modifyPLEventGuestByLocation)
@@ -133,6 +134,7 @@ export class PLEventsController {
   @UseGuards(UserTokenValidation)
   async modifyPLEventGuestByLocation(
     @Param("uid") locationUid,
+    @Param("guestUid") guestUid,
     @Body() body: UpdatePLEventGuestSchemaDto,
     @Req() request
   ) {
@@ -146,8 +148,7 @@ export class PLEventsController {
     }
     const location = await this.eventLocationService.getPLEventLocationByUid(locationUid);
     if (
-      !this.memberService.checkIfAdminUser(member) &&
-      !this.eventGuestService.checkIfEventsAreUpcoming(location.upcomingEvents, body.events)
+      !this.memberService.checkIfAdminUser(member) && guestUid != member.uid
     ) {
       throw new ForbiddenException(`Member with email ${userEmail} isn't admin to access past events or future events`);
     }
@@ -219,7 +220,7 @@ export class PLEventsController {
     const memberUid = this.memberService.checkIfAdminUser(member) ? guestUid : member.uid;
     return await this.eventGuestService.getPLEventGuestByUidAndLocation(memberUid, locationUid, true, type);
   }
-  
+
   @Api(server.route.syncPLEventsByLocation)
   @UseGuards(InternalAuthGuard)
   async syncPLEventsByLocation(
@@ -229,7 +230,7 @@ export class PLEventsController {
     const { clientSecret, conference, selectedEventUids } = body;
     if (!clientSecret) {
       throw new UnauthorizedException('client secret is missing');
-    } 
+    }
     if (!conference) {
       throw new BadRequestException('conference is missing');
     }
@@ -240,5 +241,22 @@ export class PLEventsController {
   @NoCache()
   async getAllPLEventGuest() {
     return await this.eventGuestService.getAllPLEventGuest();
+  }
+
+  @Api(server.route.getPLEventGuestTopics)
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async getPLEventGuestTopics(
+    @Param('uid') locationUid: string,
+    @Param('guestUid') guestUid: string,
+    @Req() request
+  ) {
+    const userEmail = request["userEmail"];
+    const requestor = await this.memberService.findMemberByEmail(userEmail);
+    const isAdmin = await this.memberService.checkIfAdminUser(requestor);
+    if (isAdmin || requestor.uid == guestUid) {
+      return await this.eventGuestService.getGuestTopics(locationUid, guestUid);
+    }
+    return [];
   }
 }
