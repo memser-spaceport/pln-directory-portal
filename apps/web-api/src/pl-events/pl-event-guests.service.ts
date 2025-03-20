@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, forwardRef, Inject } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
-import { Prisma, Member, NotificationStatus, SubscriptionEntityType } from '@prisma/client';
+import { Prisma, Member, NotificationStatus, SubscriptionEntityType, Team } from '@prisma/client';
 import { MembersService } from '../members/members.service';
 import { PLEventLocationsService } from './pl-event-locations.service';
 import {
@@ -45,7 +45,8 @@ export class PLEventGuestsService {
     requestorEmail: string,
     location: { location: string },
     type: string = CREATE,
-    tx?: Prisma.TransactionClient
+    tx?: Prisma.TransactionClient,
+    eventType?: string
   ) {
     try {
       const isAdmin = this.memberService.checkIfAdminUser(member);
@@ -60,6 +61,7 @@ export class PLEventGuestsService {
         this.memberService.checkIfAdminUser(member) && !plEvents.length &&
           (await this.sendEventInvitationIfAdminAddsMember(eventMember, location));
       }
+      await this.updateGuestTopicsAndReason(data, locationUid, member, eventType, tx);  
       this.cacheService.reset({ service: 'PLEventGuest' });
       return result;
     } catch (err) {
@@ -141,7 +143,7 @@ export class PLEventGuestsService {
             }
           }
         });
-        return await this.createPLEventGuestByLocation(data, member, location.uid, requestorEmail, location, UPDATE, tx);
+        return await this.createPLEventGuestByLocation(data, member, location.uid, requestorEmail, location, UPDATE, tx, type);
       });
     } catch (err) {
       this.handleErrors(err);
@@ -482,7 +484,8 @@ export class PLEventGuestsService {
     const selectLocation = includeLocations
       ? `,'location', l."location"`
       : ``; // Empty if location is not required
-    
+
+
     // Determine the position of the eventUid placeholder in the SQL query's values array
     // If search is enabled, adjust the position accordingly
 
@@ -496,9 +499,9 @@ export class PLEventGuestsService {
       - Otherwise:
         - EventUid placeholder → `$${values.length + 3}`
     */
-    
+
     const eventPosition = search ? values.length + 4 : values.length + 3;
-    
+
     // Construct the raw SQL query for fetching attendees with joined tables and aggregated JSON data
     const query: any = ` 
       SELECT 
@@ -555,16 +558,19 @@ export class PLEventGuestsService {
               'officeHours', m."officeHours"
             )
           ) AS member,
-          json_agg(
-            DISTINCT jsonb_build_object(
-              'role', tmr."role",
-              'team', json_build_object(
-                'uid', tmr_team.uid,
-                'name', tmr_team.name,
-                'logo', json_build_object('url', tmr_logo.url)
+          COALESCE(   -- Ensure that if the aggregation results in NULL, it returns an empty JSON array instead
+            jsonb_agg(
+                DISTINCT jsonb_build_object(
+                  'role', tmr."role",
+                  'team', jsonb_build_object(
+                  'uid', tmr_team.uid,
+                  'name', tmr_team.name,
+                  'logo', jsonb_build_object('url', tmr_logo.url)
+                )
               )
-            )
-          ) as teamMemberRoles, 
+            ) FILTER (WHERE tmr_team.uid IS NOT NULL),  -- Exclude NULL teams from the aggregation
+            '[]'::jsonb     -- Default to an empty JSON array if no valid team member roles exist
+          ) AS teamMemberRoles, 
           json_object_agg(
             'team',
             json_build_object(
@@ -634,19 +640,21 @@ export class PLEventGuestsService {
    */
   private formatAttendees(result) {
     return result.map((attendee) => {
+      let guestInfo = { ...attendee?.guest?.info };
+      guestInfo.teamUid = this.getGuestsActiveTeam(attendee?.teammemberroles, guestInfo?.teamUid) ? guestInfo?.teamUid : null;
       return {
         // Total count of members after filtering, represented by totalMembers
         count: Number(BigInt(attendee.count || '0n')),
 
         memberUid: attendee.memberUid,
         // Spread guest information if available, including attributes like isHost and isSpeaker
-        ...attendee?.guest?.info,
+        ...guestInfo,
         events: attendee.events,
         member: {
           ...attendee?.member?.member,
           teamMemberRoles: attendee?.teammemberroles
         },
-        team: attendee?.team?.team
+        team: this.getGuestsActiveTeam(attendee?.teammemberroles, attendee?.team?.team) ? attendee?.team?.team : {}
       }
     });
   }
@@ -895,7 +903,14 @@ export class PLEventGuestsService {
         }
       });
       this.restrictTelegramBasedOnMemberPreference(result, isUserLoggedIn ? true : false);
-      return result;
+      const formattedResult = await result.map((guest) => {
+        return {
+          ...guest,
+          teamUid: this.getGuestsActiveTeam(guest.member.teamMemberRoles, guest.teamUid) ? guest.teamUid : null,
+          team: this.getGuestsActiveTeam(guest.member.teamMemberRoles, guest.team) ? guest.team : {}// Update team object
+        };
+      })
+      return formattedResult;
     } catch (err) {
       this.handleErrors(err);
     }
@@ -992,4 +1007,89 @@ export class PLEventGuestsService {
     });
   }
 
+  /**
+   * Determines the active team for a guest.
+   * @param teamMemberRoles - List of roles the guest has in different teams.
+   * @param team - The current team associated with the guest.
+   * @returns The team object if the guest is part of the team, otherwise an empty object.
+   */
+  private getGuestsActiveTeam(teamMemberRoles, team: Partial<Team> | string | null) : Boolean {
+    // check whether the given team is a members active team
+    return teamMemberRoles?.some((role) => role?.team?.uid === (typeof team === 'string' ? team : team?.uid));
+  }
+
+  /**
+   * Updates the topics and reason for a member across specific event UIDs.
+   * 
+   * @param data - The update schema containing new topics and reason.
+   * @param locationUid - The unique identifier of the location.
+   * @param member - The member whose topics and reason need to be updated.
+   * @param type - The event type, either "upcoming" or "past" (defaults to "upcoming").
+   * @param tx - (Optional) Prisma transaction client to execute within a transaction context.
+   * 
+   * @returns A Promise that resolves to the result of the update operation.
+   * 
+   * @throws Throws an error if fetching location details or updating records fails.
+   */
+  async updateGuestTopicsAndReason(
+    data: UpdatePLEventGuestSchemaDto,
+    locationUid: string,
+    member: Member,
+    type: string = "upcoming",
+    tx?: Prisma.TransactionClient) {
+    const location = await this.eventLocationsService.getPLEventLocationByUid(locationUid);
+    const events = type === "upcoming" ? location.pastEvents : location.upcomingEvents;
+    const isAdmin = this.memberService.checkIfAdminUser(member);
+    return await (tx || this.prisma).pLEventGuest.updateMany({
+      where: {
+        memberUid: isAdmin ? data.memberUid : member.uid,
+        eventUid: {
+          in: events.map(event => event.uid)
+        }
+      },
+      data: {
+        topics: data.topics,
+        reason: data.reason,
+        teamUid: data.teamUid
+      }
+    })
+  }
+
+  /**
+   * Retrieves the topics and reason for a guest's participation in past events at a specific location.
+   * @param locationUid The unique identifier for the location.
+   * @param guestUid The unique identifier for the guest.
+   * @returns The guest's topics and reason for participation in the most recent past event.
+   *   - Events are sorted by updatedAt and createdAt in descending order to get latest data.
+   *   - Throws an error if something goes wrong during retrieval.
+   */
+  async getGuestTopics(locationUid: string, guestUid: string) {
+    try {
+      const location = await this.eventLocationsService.getPLEventLocationByUid(locationUid);
+      const eventUids = location.events.flatMap(event => event.uid);
+      const result = await this.prisma.pLEventGuest.findFirst({
+        where: {
+          AND:{
+            eventUid: {
+              in: eventUids
+            },
+            memberUid: guestUid
+          }
+        },
+        orderBy: [
+          { updatedAt: 'desc' }
+        ],
+        select: {
+          topics: true,
+          reason: true
+        }
+      })
+      if(!result) {
+        return [];
+      }
+      return result;
+    } catch (error) {
+      this.handleErrors(error)
+    }
+  }
 }

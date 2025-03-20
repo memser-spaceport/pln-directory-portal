@@ -18,6 +18,11 @@ export class MongoPersistantDbService implements OnModuleDestroy, HuskyPersisten
     await col.insertOne(data);
   }
 
+  async deleteDocByKeyValue(collection: string, key: string, value: string) {
+    const col = this.db.collection(collection);
+    await col.updateOne({ [key]: value }, { $set: { isDeleted: true } });
+  }
+
   async upsertByKeyValue(collection: string, key: string, value: string, data: any) {
     const col = this.db.collection(collection);
     await col.updateOne({ [key]: value }, { $set: data }, { upsert: true });
@@ -66,7 +71,7 @@ export class MongoPersistantDbService implements OnModuleDestroy, HuskyPersisten
 
   async findByKeyValue(collection: string, key: string, value: string) {
     const col = this.db.collection(collection);
-    return await col.find({ [key]: value }).sort({ createdAt: 1 }).toArray();
+    return await col.find({ [key]: value, isDeleted: { $ne: true } }).sort({ createdAt: 1 }).toArray();
   }
 
   async findOneByKeyValue(collection: string, key: string, value: string) {
