@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, NotFoundException, forwardRef, Inject } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { Prisma, PLEvent, Member } from '@prisma/client';
@@ -12,6 +12,7 @@ export class PLEventsService {
   constructor(
     private prisma: PrismaService,
     private logger: LogService,
+    @Inject(forwardRef(() => PLEventGuestsService))
     private eventGuestsService: PLEventGuestsService,
     private notificationService: NotificationService,
     private memberService: MembersService,
