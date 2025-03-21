@@ -30,6 +30,7 @@ import { PLEventGuestsService } from './pl-event-guests.service';
 import { isEmpty } from 'lodash';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { InternalAuthGuard } from '../guards/auth.guard';
+import { TeamsService } from '../teams/teams.service';
 
 const server = initNestServer(apiEvents);
 type RouteShape = typeof server.routeShapes;
@@ -41,7 +42,8 @@ export class PLEventsController {
     private readonly eventService: PLEventsService,
     private readonly eventLocationService: PLEventLocationsService,
     private readonly eventGuestService: PLEventGuestsService,
-    private readonly eventSyncService: PLEventSyncService
+    private readonly eventSyncService: PLEventSyncService,
+    private readonly teamService: TeamsService
   ) { }
 
   /**
@@ -259,4 +261,21 @@ export class PLEventsController {
     }
     return [];
   }
+
+  @Api(server.route.getEventContributors)
+  @NoCache()
+  async getAllPLEventContributors() {
+    return await this.teamService.getAllPLEventContibutors();
+  }
+
+  @Api(server.route.getAllAggregatedData)
+  @UseGuards(UserAuthValidateGuard)
+  @NoCache()
+  async getAllAggregatedData(
+    @Req() request: Request 
+  ) {
+    const loggedInMember = request['userEmail'] ? await this.memberService.findMemberByEmail(request['userEmail']) : null;
+    return await this.eventGuestService.getAllAggregatedData(loggedInMember);
+  }
+
 }

@@ -38,7 +38,7 @@ export class TeamsService {
     private notificationService: NotificationService,
     private cacheService: CacheService,
     private askService: AskService
-  ) {}
+  ) { }
 
   /**
    * Find all teams based on provided query options.
@@ -132,8 +132,8 @@ export class TeamsService {
               },
             },
           },
-          asks:{
-            select:{
+          asks: {
+            select: {
               uid: true,
               title:true,
               tags:true,
@@ -299,7 +299,7 @@ export class TeamsService {
    * 
    * @param teamAndRoles - Array of new team member role objects to be added.
    * @param tx - Prisma transaction client for atomic execution.
-   */  
+   */
   private async addNewTeamMemberRoleEntry(teamAndRoles: any[], tx: Prisma.TransactionClient) {
     await tx.teamMemberRole.createMany({
       data: teamAndRoles
@@ -706,20 +706,20 @@ export class TeamsService {
     let tagFilter={}
     if(askTags){
       //when all is given as value to askTags, all the teams with asks are returned.
-      if(askTags === 'all'){
-        tagFilter={
+      if (askTags === 'all') {
+        tagFilter = {
           asks: { some: {}, },
         };
-      }else{
+      } else {
         const tags = askTags.split(',')
-        tagFilter={
+        tagFilter = {
           asks: { some: { tags: { hasSome: tags }, }, },
         };
       }
     }
-    if(filter){
+    if (filter) {
       filter.push(tagFilter)
-    }else{
+    } else {
       return tagFilter;
     }
   }
@@ -862,7 +862,7 @@ export class TeamsService {
    * and technologies that contains atleast one team.
    */
   async getTeamFilters(queryParams) {
-    const [industryTags, membershipSources, fundingStages, technologies,askTags] = await Promise.all([
+    const [industryTags, membershipSources, fundingStages, technologies, askTags] = await Promise.all([
       this.prisma.industryTag.findMany({
         where: {
           teams: {
@@ -957,7 +957,7 @@ export class TeamsService {
       });
 
       await this.prisma.$transaction(async (tx) => {
-        if(data.uid) {
+        if (data.uid) {
           if (data.isDeleted) {
             //deleting asks
             addEditResponse = await this.prisma.ask.delete({
@@ -972,7 +972,7 @@ export class TeamsService {
               },
             });
           }
-        }else {
+        } else {
           //inserting asks
           addEditResponse = await tx.ask.create({
             data: {
@@ -1013,5 +1013,61 @@ export class TeamsService {
       console.error(err);
     }
     return addEditResponse;
+  }
+
+  /**
+   * Retrieves all contributors for PL events.
+   * @returns An array of contributors with their details.
+   */
+  async getAllPLEventContibutors() {
+    try {
+      return await this.prisma.team.findMany({
+        where: {
+          eventGuests: {
+            some: {
+              OR: [
+                { isHost: true },
+                { isSpeaker: true }
+              ]
+            }
+          }
+        },
+        select: {
+          uid: true, 
+          name: true,
+          logo: true,
+          eventGuests: {
+            where: {
+              OR: [
+                { isHost: true },
+                { isSpeaker: true }
+              ]
+            },
+            distinct: ['memberUid'], // Ensures unique members per team
+            select: {
+              uid: true,
+              isHost: true,
+              isSpeaker: true,
+              member: {
+                select: {
+                  uid: true,
+                  name: true,
+                  image: true
+                }
+              },
+              event: {
+                select: {
+                  uid: true,
+                  name: true
+                }
+              }
+            }
+          }
+        }
+      });
+    } catch (error) {
+      this.logger.error(`error occured while fetching event contributors`, error);
+      this.handleErrors(error);
+    }
   }
 }
