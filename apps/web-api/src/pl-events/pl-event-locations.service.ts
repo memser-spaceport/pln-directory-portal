@@ -24,7 +24,7 @@ export class PLEventLocationsService {
     private memberService: MembersService,
     private notificationService: NotificationService,
     @Inject(forwardRef(() => PLEventGuestsService))
-    private plEventGuestService : PLEventGuestsService,
+    private plEventGuestService: PLEventGuestsService,
   ) { }
 
   /**
@@ -525,9 +525,9 @@ export class PLEventLocationsService {
    *   - The events include details such as name, type, description, startDate, endDate, and additional info.
    *   - returns empty if no featued location is found.
    */
-  async getFeaturedLocationsWithSubscribers(loggedlnMember) {
+  async getFeaturedLocationsWithSubscribers(queryOptions: Prisma.PLEventLocationFindManyArgs, loggedlnMember) {
     try {
-      const locations = await this.getPLEventLocations({ where: { isFeatured: true } });
+      const locations = await this.getPLEventLocations({ ...queryOptions });
       const locationUids = locations.flatMap(location => location.uid);
       const subscribers = await this.memberSubscriptionService.getSubscriptions({
         where: {
@@ -548,30 +548,29 @@ export class PLEventLocationsService {
           }
         }
       });
-          const result = await Promise.all(
-      locations.map(async (location) => {
-        // Process upcomingEvents only if they exist
-        const filteredEvents = location.upcomingEvents
-          ? await this.plEventGuestService.filterEventsByAttendanceAndAdminStatus([], location.upcomingEvents, loggedlnMember)
-          : [];
+      const result = await Promise.all(
+        locations.map(async (location) => {
+          // Process upcomingEvents only if they exist
+          const filteredEvents = location.upcomingEvents
+            ? await this.plEventGuestService.filterEventsByAttendanceAndAdminStatus([], location.upcomingEvents, loggedlnMember)
+            : [];
 
-        // Attach filtered events to the location object
-        location.upcomingEvents = filteredEvents;
+          // Attach filtered events to the location object
+          location.upcomingEvents = filteredEvents;
 
-        // Attach subscribers to the location
+          // Attach subscribers to the location
 
-        const filteredSubscribers = subscribers?.filter(sub => sub.entityUid == location.uid);
-        return {
-          ...location,                            // Spread existing properties of location
-          subscribers: filteredSubscribers || []  // Introduce subscribers for corresponding location.
-        };
-      })
-    );
+          const filteredSubscribers = subscribers?.filter(sub => sub.entityUid == location.uid);
+          return {
+            ...location,                            // Spread existing properties of location
+            subscribers: filteredSubscribers || []  // Introduce subscribers for corresponding location.
+          };
+        })
+      );
       return result;
     } catch (error) {
       this.handleErrors(error);
     }
   }
-
 }
 
