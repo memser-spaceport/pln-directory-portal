@@ -24,7 +24,7 @@ export class PLEventLocationsService {
     private memberService: MembersService,
     private notificationService: NotificationService,
     @Inject(forwardRef(() => PLEventGuestsService))
-    private plEventGuestService : PLEventGuestsService,
+    private plEventGuestService: PLEventGuestsService,
   ) { }
 
   /**
@@ -548,30 +548,51 @@ export class PLEventLocationsService {
           }
         }
       });
-          const result = await Promise.all(
-      locations.map(async (location) => {
-        // Process upcomingEvents only if they exist
-        const filteredEvents = location.upcomingEvents
-          ? await this.plEventGuestService.filterEventsByAttendanceAndAdminStatus([], location.upcomingEvents, loggedlnMember)
-          : [];
+      const result = await Promise.all(
+        locations.map(async (location) => {
+          // Process upcomingEvents only if they exist
+          const filteredEvents = location.upcomingEvents
+            ? await this.plEventGuestService.filterEventsByAttendanceAndAdminStatus([], location.upcomingEvents, loggedlnMember)
+            : [];
 
-        // Attach filtered events to the location object
-        location.upcomingEvents = filteredEvents;
+          // Attach filtered events to the location object
+          location.upcomingEvents = filteredEvents;
 
-        // Attach subscribers to the location
+          // Attach subscribers to the location
 
-        const filteredSubscribers = subscribers?.filter(sub => sub.entityUid == location.uid);
-        return {
-          ...location,                            // Spread existing properties of location
-          subscribers: filteredSubscribers || []  // Introduce subscribers for corresponding location.
-        };
-      })
-    );
+          const filteredSubscribers = subscribers?.filter(sub => sub.entityUid == location.uid);
+          return {
+            ...location,                            // Spread existing properties of location
+            subscribers: filteredSubscribers || []  // Introduce subscribers for corresponding location.
+          };
+        })
+      );
       return result;
     } catch (error) {
       this.handleErrors(error);
     }
   }
+
+  /**
+   * This method retrieves multiple locations based on the provided query options.
+   * @param queryOptions Options for querying locations
+   * @returns An array of location objects with additional details such as logo, banner, event guests, and location.
+   */
+  async getAggregatedLocations(queryOptions: Prisma.PLEventFindManyArgs): Promise<PLEvent[]> {
+    return await this.prisma.pLEvent.findMany({
+      ...queryOptions,
+      include: {
+        logo: true,
+        banner: true,
+        eventGuests: {
+          select: {
+            eventUid: true
+          }
+        },
+        location: true
+      }
+    });
+  };
 
 }
 

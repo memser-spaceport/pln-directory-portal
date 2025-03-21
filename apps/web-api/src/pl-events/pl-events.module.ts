@@ -9,6 +9,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { MemberSubscriptionsModule } from '../member-subscriptions/member-subscriptions.module';
 import { PLEventSyncService } from './pl-event-sync.service';
 import { AuthModule } from '../auth/auth.module';
+import { TeamsModule } from '../teams/teams.module';
 @Module({
   controllers: [PLEventsController],
   providers: [
@@ -27,7 +28,8 @@ import { AuthModule } from '../auth/auth.module';
     MembersModule, 
     forwardRef(() => NotificationsModule), 
     MemberSubscriptionsModule,
-    AuthModule
+    AuthModule,
+    TeamsModule
   ]
 })
 export class PLEventsModule {}

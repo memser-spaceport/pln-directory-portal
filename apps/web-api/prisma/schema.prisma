@@ -389,6 +389,7 @@ model PLEventLocation {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   isFeatured     Boolean?  @default(false)
+  isAggregated   Boolean   @default(false)
 }
 
 model PLEvent {
@@ -407,6 +408,7 @@ model PLEvent {
   websiteURL       String?
   externalId       String?
   isFeatured       Boolean?            @default(false)
+  isAggregated     Boolean             @default(false)
   slugURL          String              @unique
   resources        Json[]
   priority         Int?
@@ -415,7 +417,7 @@ model PLEvent {
   endDate          DateTime
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
-  syncedAt         DateTime?            
+  syncedAt         DateTime?
   relatedQuestions DiscoveryQuestion[] @relation("PLEventRelatedDiscoveryQuestions")
   locationUid      String?
   location         PLEventLocation?    @relation(fields: [locationUid], references: [uid])

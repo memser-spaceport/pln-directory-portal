@@ -123,5 +123,21 @@ export const apiEvents = contract.router({
     responses: {
       200: ResponsePLEventLocationWithRelationsSchema.array(),
     },
+  },
+  getEventContributors: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/aggregated/events/contributors`,
+    query: PLEventDetailQueryParams,
+    responses: {
+      200: ResponsePLEventLocationWithRelationsSchema.array(),
+    },
+  },
+  getAllAggregatedData: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/aggregate`,
+    query: PLEventDetailQueryParams,
+    responses: {
+      200: ResponsePLEventLocationWithRelationsSchema.array(),
+    },
   }
 });

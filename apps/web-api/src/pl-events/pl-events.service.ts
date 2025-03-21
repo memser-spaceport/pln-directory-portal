@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, NotFoundException, forwardRef, Inject } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { Prisma, PLEvent, Member } from '@prisma/client';
@@ -12,6 +12,7 @@ export class PLEventsService {
   constructor(
     private prisma: PrismaService,
     private logger: LogService,
+    @Inject(forwardRef(() => PLEventGuestsService))
     private eventGuestsService: PLEventGuestsService,
     private notificationService: NotificationService,
     private memberService: MembersService,
@@ -305,5 +306,26 @@ export class PLEventsService {
     }
     return notification;
   }
+
+  /**
+   * This method retrieves multiple events based on the provided query options.
+   * @param queryOptions Options for querying events, including filters and sorting
+   * @returns An array of event objects with additional details such as logo, banner, event guests, and location.
+   */
+  async getAggregatedEvents(queryOptions: Prisma.PLEventFindManyArgs): Promise<PLEvent[]> {
+    return await this.prisma.pLEvent.findMany({
+      ...queryOptions,
+      include: {
+        logo: true,
+        banner: true,
+        eventGuests: {
+          select: {
+            eventUid: true
+          }
+        },
+        location: true
+      }
+    });
+  };
 }
 
