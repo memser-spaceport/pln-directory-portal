@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException, forwardRef, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, forwardRef, Inject, InternalServerErrorException } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { Prisma, Member, NotificationStatus, SubscriptionEntityType, Team } from '@prisma/client';
@@ -16,6 +16,7 @@ import { CacheService } from '../utils/cache/cache.service';
 import { NotificationService } from '../notifications/notifications.service';
 import { CREATE, EventInvitationToMember, UPDATE } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
+import { PLEventsService } from './pl-events.service';
 
 @Injectable()
 export class PLEventGuestsService {
@@ -28,6 +29,8 @@ export class PLEventGuestsService {
     private cacheService: CacheService,
     private notificationService: NotificationService,
     private awsService: AwsService,
+    @Inject(forwardRef(() => PLEventsService))
+    private eventService: PLEventsService
   ) { }
 
   /**
@@ -1091,6 +1094,24 @@ export class PLEventGuestsService {
       return result;
     } catch (error) {
       this.handleErrors(error)
+    }
+  }
+
+  /**
+   * This method retrieves all aggregated event and location data.
+   * @returns An object containing:
+   * - `events`: An array of aggregated event objects.
+   * - `locations`: An array of aggregated location objects.
+   * @throws an `InternalServerErrorException` if an error occurs during data retrieval.
+   */
+  async getAllAggregatedData(loggedInMember) {
+    try {
+      return {
+        events: await this.eventService.getPLEvents({ where: { isAggregated: true } }),
+        locations: await this.eventLocationsService.getFeaturedLocationsWithSubscribers({ where: { isAggregated: true } }, loggedInMember)
+      };
+    } catch (error) {
+      throw new InternalServerErrorException(`Error occured while retrieving aggregated data: ${error.message}`);
     }
   }
 }
