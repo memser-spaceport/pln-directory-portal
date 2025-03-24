@@ -324,7 +324,7 @@ export class HuskyAiService {
   }
 
   async getDirectoryEmbeddings(embedding: any, limit = 5) {
-    const [memberDocs, teamDocs, projectDocs, focusAreaDocs, irlEventDocs] = await Promise.all([
+    const [memberDocs, teamDocs, projectDocs, focusAreaDocs, irlEventDocs, statsDocs] = await Promise.all([
       this.fetchAndFormatActionDocs(HUSKY_ACTION_TYPES.MEMBER, process.env.QDRANT_MEMBERS_COLLECTION || '', embedding, limit),
       this.fetchAndFormatActionDocs(HUSKY_ACTION_TYPES.TEAM, process.env.QDRANT_TEAMS_COLLECTION || '', embedding, limit),
       this.fetchAndFormatActionDocs(
@@ -334,6 +334,7 @@ export class HuskyAiService {
       ),
       this.fetchAndFormatActionDocs(HUSKY_ACTION_TYPES.FOCUS_AREA, process.env.QDRANT_FOCUS_AREAS_COLLECTION || '', embedding),
       this.fetchAndFormatActionDocs(HUSKY_ACTION_TYPES.IRL_EVENT, process.env.QDRANT_IRL_EVENTS_COLLECTION || '', embedding),
+      this.fetchAndFormatActionDocs(HUSKY_ACTION_TYPES.STATS, process.env.QDRANT_STATS_COLLECTION || '', embedding),
     ]);
 
     return {
@@ -342,6 +343,7 @@ export class HuskyAiService {
       projectDocs,
       focusAreaDocs,
       irlEventDocs,
+      statsDocs,
     };
   }
 
@@ -376,7 +378,7 @@ export class HuskyAiService {
 
   async createContextWithMatchedDocs(nonDirectoryDocs: any[], directoryDocs: any, chatId?: string) {
     let allDocs: any[] = [];
-    const actionDocKeys = ['memberDocs', 'teamDocs', 'projectDocs', 'focusAreaDocs', 'irlEventDocs'];
+    const actionDocKeys = ['memberDocs', 'teamDocs', 'projectDocs', 'focusAreaDocs', 'irlEventDocs', 'statsDocs'];
 
     actionDocKeys.forEach((key: string) => {
       const docs = [...directoryDocs[key]].map((doc: any) => {

@@ -123,6 +123,7 @@ export const HUSKY_ACTION_TYPES = {
   MEMBER: 'member',
   FOCUS_AREA: 'focus_area',
   IRL_EVENT: 'irl_event',
+  STATS: 'stats',
 };
 
 export const HUSKY_MAX_CONTEXT_LENGTH = 500;
