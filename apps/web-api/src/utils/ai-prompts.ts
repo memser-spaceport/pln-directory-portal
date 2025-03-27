@@ -364,7 +364,8 @@ Return a valid JSON object with the following structure:
 - **Accuracy**: Only use information from the provided context
 - **Conciseness**: Provide direct answers without unnecessary introductions or conclusions
 - **Structure**: Use markdown headers (##) for readability
-- **Content Length**: The content should be concise and to the point with max words mentioned in the 'contextLength'.
+- **Content Length**: The content should be to the point not more than 'contextLength'.
+- **Tone**: Use neutral, factual language without promotional adjectives and use conversational tone.
 - **Formatting**:
   - Use tables for structured data with columns and rows, especially when there are more than 1 items to represent.
   - Prioritize table format over list, bullet points in appropriate cases.
@@ -377,17 +378,17 @@ Return a valid JSON object with the following structure:
   - Citations must be in format [N](url) where N is the source index
   - For recurring sources, reuse the same index number
  - **Citation Requirements**
+   
    - Citations (taken from 'context') must be formatted as [N](url) where N is the source index. 
-   - Each cited source must appear in the 'sources' array
-   - Sources must be ordered by first appearance in content
-   - Only use index numbers for citations (e.g., [1], [2]), never URL names
-   - Reuse the same index when citing a source multiple times
-   - NEVER use URL names as citation labels (e.g., NEVER use the format [example1](example1.com) or [example2](example2.com)) only use source index.
+   - Citations Sources must be ordered by first appearance in content
+   - **Strictly** use index numbers as citation labels (e.g., [1](url1), [2](url2))
+   - **Strictly** NEVER use URL names as citation labels (e.g., NEVER use the format [example1](example1.com) or [example2](example2.com) instead use index numbers like [1](url1), [2](url2)) 
    - ALWAYS use same citation label when same url is used in more than one place. Eg 1: If source1.com is first cited as [1](source1.com), all subsequent citations of source1.com must also use [1](source1.com)
    - Another Eg:
-     - First citation of source1.com → 1
-     - First citation of source2.com → 2
-     - Second citation of source1.com → 1 (not 3).
+     - First citation of source1.com → 1 - > [1](source1.com)
+     - First citation of source2.com → 2 - > [2](source2.com)
+     - Second citation of source1.com → 1 (not 3) - > [1](source1.com)
+   - **Strictly** make sure citations are added in the content in the format [N](url) where N is the source index and is valid link in markdown format.
 
 ## Sources
 - Include only unique, valid URLs from the provided context

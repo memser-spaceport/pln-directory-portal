@@ -54,6 +54,7 @@ export class HuskyAiService {
 
     // Rephrase the question and get the matching documents to create context
     const rephrasedQuestion = await this.getRephrasedQuestionBasedOnHistory(threadId, question.toLowerCase());
+    console.log('rephrasedQuestion', rephrasedQuestion);
     const questionEmbedding = await this.getEmbeddingForText(rephrasedQuestion.qdrantQuery);
     const [nonDirectoryDocs, directoryDocs] = await Promise.all([
       this.getEmbeddingsBySource(questionEmbedding, 20),
@@ -61,6 +62,8 @@ export class HuskyAiService {
     ]);
 
     const context = await this.createContextWithMatchedDocs(nonDirectoryDocs, directoryDocs);
+
+    console.log('context', context);
 
     // Handle the case when there is no context
     if (context === '') {
@@ -401,6 +404,8 @@ export class HuskyAiService {
 
     const nonDirectory = formattedNonDictoryDocs.filter((v) => v.score > 0.45 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 15);
     const directory = allDocs.filter((v) => v.score > 0.37 && v?.text?.length > 5).sort((a, b) => b.score - a.score).slice(0, 15);
+
+    console.log('directory', directory);
 
     const all = [...directory, ...nonDirectory]
 
