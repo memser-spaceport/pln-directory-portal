@@ -58,4 +58,14 @@ export class CacheService {
       this.logService.error('Error calling revalidate API:', error.message);
     }
   }
+
+  async flushCache() {
+    try {
+      await this.cache.reset();   //reset the cache
+      return {status: "success"};
+    } catch (error) {
+      this.logService.error('Error while flushing cache : ', error.message);
+      return {status: "failed"}
+    }
+  }
 }
