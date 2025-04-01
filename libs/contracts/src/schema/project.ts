@@ -15,8 +15,7 @@ const ContributionSchema = z.object({
 });
 
 const ProjectSchema = z.object({
-  id: z.number().int(),
-  uid: z.string(),
+  id: z.number().int().optional(),
   logoUid: z.string().optional().nullable(),
   name: z.string(),
   tagline: z.string(),
