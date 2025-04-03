@@ -14,9 +14,10 @@ import {
 } from './pl-event-locations.types';
 import { CacheService } from '../utils/cache/cache.service';
 import { NotificationService } from '../notifications/notifications.service';
-import { CREATE, EventInvitationToMember, UPDATE } from '../utils/constants';
+import { CREATE, EVENT_GUEST_PRESENCE_REQUEST, EventInvitationToMember, UPDATE } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
 import { PLEventsService } from './pl-events.service';
+import { TeamsService } from '../teams/teams.service';
 
 @Injectable()
 export class PLEventGuestsService {
@@ -28,6 +29,7 @@ export class PLEventGuestsService {
     private eventLocationsService: PLEventLocationsService,
     private cacheService: CacheService,
     private notificationService: NotificationService,
+    private teamService: TeamsService,
     private awsService: AwsService,
     @Inject(forwardRef(() => PLEventsService))
     private eventService: PLEventsService
@@ -1112,6 +1114,35 @@ export class PLEventGuestsService {
       };
     } catch (error) {
       throw new InternalServerErrorException(`Error occured while retrieving aggregated data: ${error.message}`);
+    }
+  }
+
+  /**
+   * Sends an email to the Admin to add them as a guest to an event.
+   * @param locationUid The unique identifier for the location.
+   * @param guestUid The unique identifier for the guest.
+   * @param body The body of the request.
+   * @returns if the email is sent successfully.
+   */
+  async sendEventGuestPresenceRequest(locationUid: string, userEmail: string, body, type) {
+    try {
+      let emailData = {
+        locationName: body.locationName,
+        memberName: body.memberName,
+        events: body.events?.map((event) => {
+          return event.eventName
+        }) ?? [],
+        email: userEmail
+      }
+      const team = await this.teamService.findTeamByUid(body.teamUid);
+      if (!team) {
+        throw new NotFoundException('Team not found');
+      }
+      emailData['teamName'] = team.name;
+      
+      return await this.awsService.sendEmail(EVENT_GUEST_PRESENCE_REQUEST, false, [process.env.SES_ADMIN_EMAIL_IDS], emailData);
+    } catch (error) {
+      return this.handleErrors(error);
     }
   }
 }
