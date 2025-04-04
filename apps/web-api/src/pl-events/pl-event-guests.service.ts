@@ -1140,7 +1140,10 @@ export class PLEventGuestsService {
       }
       emailData['teamName'] = team.name;
       
-      return await this.awsService.sendEmail(EVENT_GUEST_PRESENCE_REQUEST, false, [process.env.SES_ADMIN_EMAIL_IDS], emailData);
+      const response = await this.awsService.sendEmail(EVENT_GUEST_PRESENCE_REQUEST, false, [process.env.SES_ADMIN_EMAIL_IDS], emailData);
+      return {
+        message: 'Email sent successfully'
+      }
     } catch (error) {
       return this.handleErrors(error);
     }
