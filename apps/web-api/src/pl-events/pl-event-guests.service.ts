@@ -14,7 +14,7 @@ import {
 } from './pl-event-locations.types';
 import { CacheService } from '../utils/cache/cache.service';
 import { NotificationService } from '../notifications/notifications.service';
-import { CREATE, EVENT_GUEST_PRESENCE_REQUEST, EventInvitationToMember, UPDATE } from '../utils/constants';
+import { CREATE, EVENT_GUEST_PRESENCE_REQUEST_TEMPLATE_NAME, EventInvitationToMember, UPDATE } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
 import { PLEventsService } from './pl-events.service';
 import { TeamsService } from '../teams/teams.service';
@@ -1140,7 +1140,7 @@ export class PLEventGuestsService {
       }
       emailData['teamName'] = team.name;
       
-      const response = await this.awsService.sendEmail(EVENT_GUEST_PRESENCE_REQUEST, false, [process.env.SES_ADMIN_EMAIL_IDS], emailData);
+      const response = await this.awsService.sendEmail(EVENT_GUEST_PRESENCE_REQUEST_TEMPLATE_NAME, false, [process.env.SES_ADMIN_EMAIL_IDS], emailData);
       return {
         message: 'Email sent successfully'
       }

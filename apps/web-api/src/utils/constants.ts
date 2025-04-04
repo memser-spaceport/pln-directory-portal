@@ -179,4 +179,4 @@ export const CREATE = "CREATE";
 export const UPDATE = "UPDATE";
 
 export const  EventInvitationToMember ="EventInvitationToMember";
-export const  EVENT_GUEST_PRESENCE_REQUEST = "EventGuestPresenceRequest";
+export const  EVENT_GUEST_PRESENCE_REQUEST_TEMPLATE_NAME = "EventGuestPresenceRequest";
