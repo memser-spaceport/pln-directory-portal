@@ -1139,8 +1139,7 @@ export class PLEventGuestsService {
         throw new NotFoundException('Team not found');
       }
       emailData['teamName'] = team.name;
-      
-      const response = await this.awsService.sendEmail(EVENT_GUEST_PRESENCE_REQUEST_TEMPLATE_NAME, false, [process.env.SES_ADMIN_EMAIL_IDS], emailData);
+      const response = await this.awsService.sendEmail(EVENT_GUEST_PRESENCE_REQUEST_TEMPLATE_NAME, true, [], emailData);
       return {
         message: 'Email sent successfully'
       }
