@@ -55,6 +55,9 @@ export class AwsService {
       'utf-8'
     );
     Handlebars.registerHelper('eq', (valueOne, valueTwo) => { return valueOne === valueTwo })
+    Handlebars.registerHelper('and', function(...args) {
+      return args.every(Boolean);
+    });
     const template = Handlebars.compile(emailTemplate);
     const renderedHtml = template(data);
     const AWS_SES = new AWS.SES(CONFIG);
