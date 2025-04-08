@@ -285,12 +285,11 @@ export class PLEventsController {
     @Body() body,
     @Req() request
   ) {
-    const { type } = request.query;
     const loggedInMember = request['userEmail'] ? await this.memberService.findMemberByEmail(request['userEmail']) : null;
     if(!loggedInMember) {
       throw new UnauthorizedException('User not logged in');
     }
-    return await this.eventGuestService.sendEventGuestPresenceRequest(locationUid, loggedInMember?.email, body, type);
+    return await this.eventGuestService.sendEventGuestPresenceRequest(loggedInMember?.email, body);
   }
 
 
