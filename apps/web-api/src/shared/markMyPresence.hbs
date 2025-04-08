@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+  <body style="font-family: Arial, sans-serif; line-height: 1.6;">
+    <p>Dear Admin,</p>
+
+    <p>
+      <strong>{{memberName}}</strong> has requested to log attendance for the following event(s) at the location <strong>{{locationName}}</strong>.
+      {{#if teamName}}<br />Team: <strong>{{teamName}}</strong>{{/if}}
+    </p>
+
+    <h3 style="margin-bottom: 5px;">Event Details:</h3>
+    <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+      <thead>
+        <tr style="background-color: #f2f2f2;">
+          <th>Event Name</th>
+          <th>Role</th>
+          <th>Sub-Event Name</th>
+          <th>Sub-Event Link</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each events}}
+          {{#if hostSubEvents.length}}
+            {{#each hostSubEvents}}
+              <tr>
+                {{#if @first}}
+                  <td rowspan="{{../rowspan}}">{{../eventName}}</td>
+                  {{#if ../isHost}}<td rowspan="{{../hostSubEvents.length}}">Host</td>{{/if}}
+                {{/if}}
+                <td>{{this.name}}</td>
+                <td>
+                  {{#if this.link}}
+                    <a href="{{this.link}}">View</a>
+                  {{else}}
+                    —
+                  {{/if}}
+                </td>
+              </tr>
+            {{/each}}
+          {{/if}}
+
+          {{#if speakerSubEvents.length}}
+            {{#each speakerSubEvents}}
+              <tr>
+                {{#if @first}}
+                  {{#if (eq ../hostSubEvents.length 0)}}<td rowspan="{{../rowspan}}">{{../eventName}}</td>{{/if}}
+                  {{#if ../isSpeaker}}<td rowspan="{{../speakerSubEvents.length}}">Speaker</td>{{/if}}
+                {{/if}}
+                <td>{{this.name}}</td>
+                <td>
+                  {{#if this.link}}
+                    <a href="{{this.link}}">View</a>
+                  {{else}}
+                    —
+                  {{/if}}
+                </td>
+              </tr>
+            {{/each}}
+          {{/if}}
+
+          {{#if (and (eq hostSubEvents.length 0) (eq speakerSubEvents.length 0))}}
+            <tr>
+              <td>{{eventName}}</td>
+              <td>Attendee</td>
+              <td>—</td>
+              <td>—</td>
+            </tr>
+          {{/if}}
+        {{/each}}
+      </tbody>
+    </table>
+
+    <p>
+      Please reach out to <a href="mailto:{{email}}">{{email}}</a> if further clarification is needed.
+    </p>
+
+    <p>Best regards,<br />Protocol Labs Team</p>
+  </body>
+</html>
