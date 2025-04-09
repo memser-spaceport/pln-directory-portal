@@ -46,10 +46,16 @@
                   {{#if (eq ../hostSubEvents.length 0)}}<td rowspan="{{../rowspan}}">{{../eventName}}</td>{{/if}}
                   {{#if ../isSpeaker}}<td rowspan="{{../speakerSubEvents.length}}">Speaker</td>{{/if}}
                 {{/if}}
-                <td>{{this.name}}</td>
+                <td>
+                    {{#if this.name}}
+                    {{this.name}}
+                    {{else}}
+                    —
+                    {{/if}}
+                </td>
                 <td>
                   {{#if this.link}}
-                    <a href="{{this.link}}">View</a>
+                    <a href="{{this.link}}">{{this.link}}</a>
                   {{else}}
                     —
                   {{/if}}
