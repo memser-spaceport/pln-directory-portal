@@ -278,4 +278,19 @@ export class PLEventsController {
     return await this.eventGuestService.getAllAggregatedData(loggedInMember);
   }
 
+  @Api(server.route.sendEventGuestPresenceRequest)
+  @UseGuards(UserTokenValidation)
+  async sendEventGuestPresenceRequest(
+    @Param('uid') locationUid: string,
+    @Body() body,
+    @Req() request
+  ) {
+    const loggedInMember = request['userEmail'] ? await this.memberService.findMemberByEmail(request['userEmail']) : null;
+    if(!loggedInMember) {
+      throw new UnauthorizedException('User not logged in');
+    }
+    return await this.eventGuestService.sendEventGuestPresenceRequest(loggedInMember?.email, body);
+  }
+
+
 }

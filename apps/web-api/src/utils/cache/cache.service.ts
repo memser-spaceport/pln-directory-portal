@@ -1,4 +1,4 @@
-import { Injectable, Inject, CACHE_MANAGER } from '@nestjs/common';
+import { Injectable, Inject, CACHE_MANAGER, InternalServerErrorException } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import axios from 'axios';
 import { LogService } from '../../shared/log.service';
@@ -56,6 +56,22 @@ export class CacheService {
       this.logService.info(`Revalidation API called successfully with tags: ${tags.join(', ')}`);
     } catch (error) {
       this.logService.error('Error calling revalidate API:', error.message);
+    }
+  }
+
+  /**
+   * Flushes/resets the  cache, removing all cached items.
+   * This method is useful when you need to clear all cached data,
+   * 
+   * @throws {InternalServerErrorException} Thrown when there's an error while flushing the cache
+   * @returns {Promise<void>} A promise that resolves when the cache is successfully flushed
+   */
+  async flushCache() {
+    try {
+      await this.cache.reset();   //reset the cache
+      return;
+    } catch (error) {
+      throw new InternalServerErrorException('Error while flushing cache : ', error.message);
     }
   }
 }

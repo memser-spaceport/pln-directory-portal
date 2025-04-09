@@ -19,6 +19,15 @@ export const apiEvents = contract.router({
     },
     summary: 'Create pl event in corresponding location',
   },
+  sendEventGuestPresenceRequest: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/me/presence-request`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Send a presence request to the admin to add them as a guest to an event',
+  },
   getPLEventBySlug: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/events/:slug`,
