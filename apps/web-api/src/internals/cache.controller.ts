@@ -1,13 +1,22 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { CacheService } from '../utils/cache/cache.service';
-import { NoCache } from '../decorators/no-cache.decorator';
+import { InternalAuthGuard } from '../guards/auth.guard';
+import { LogService } from '../shared/log.service';
 
 @Controller('cache')
 export class CacheController {
-    constructor(private cacheService: CacheService) { }
+  constructor(private cacheService: CacheService, private logService: LogService) { }
 
-    @Get('/reset')
-    async resetCache() {
-      return await this.cacheService.flushCache();
+  @Get('/reset')
+  @UseGuards(InternalAuthGuard)
+  async resetCache() {
+    try {
+      await this.cacheService.flushCache();
+      return { status: "success", message: "Cache reset successfully" };
+    } catch (error) {
+      this.logService.error('Error while flushing cache : ', error.message);
+      return { status: "failed", message: "Failed to reset cache" };
     }
+
+  }
 }
