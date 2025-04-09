@@ -27,10 +27,14 @@
                   <td rowspan="{{../rowspan}}">{{../eventName}}</td>
                   {{#if ../isHost}}<td rowspan="{{../hostSubEvents.length}}">Host</td>{{/if}}
                 {{/if}}
-                <td>{{this.name}}</td>
+                <td>{{#if this.name}}
+                    {{this.name}}
+                    {{else}}
+                    —
+                    {{/if}}</td>
                 <td>
                   {{#if this.link}}
-                    <a href="{{this.link}}">View</a>
+                    <a href="{{this.link}}">{{this.link}}</a>
                   {{else}}
                     —
                   {{/if}}
