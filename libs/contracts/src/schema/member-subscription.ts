@@ -47,4 +47,10 @@ export const MemberSubscriptionDetailQueryParams = MemberSubscriptionQueryParams
   .optional();
 
 export class CreateMemberSubscriptionDto extends createZodDto(CreateMemberSubscriptionSchema) {}
-export class UpdateMemberSubscriptionDto extends createZodDto(MemberSubscriptionSchema.partial().omit({ id:true, score: true })) {}
+export class UpdateMemberSubscriptionDto extends createZodDto(
+  MemberSubscriptionSchema.partial()
+    .omit({ id: true })
+    .extend({
+      memberUid: z.string().optional()
+    })
+) {}

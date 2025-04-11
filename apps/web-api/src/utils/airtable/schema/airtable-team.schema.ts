@@ -1,7 +1,7 @@
-import z from 'zod';
+import { z } from 'zod';
 import { IAirtableTeam } from '@protocol-labs-network/airtable';
 
-export const AirtableTeamSchema: z.ZodType<IAirtableTeam> = z.lazy(() =>
+export const AirtableTeamSchema = z.lazy(() =>
   z.object({
     id: z.string(),
     fields: z.object({
@@ -13,13 +13,9 @@ export const AirtableTeamSchema: z.ZodType<IAirtableTeam> = z.lazy(() =>
       'Network members': z.string().array().optional(),
       // Logo: IAirtableTeamLogo[].optional();
       'Tags lookup': z.string().array().optional(),
-      'Last Audited': z
-        .preprocess((value: string) => new Date(value), z.date())
-        .optional(),
+      'Last Audited': z.any().transform(val => val ? new Date(val) : undefined),
       Notes: z.string().optional(),
-      'Last Modified': z
-        .preprocess((value: string) => new Date(value), z.date())
-        .optional(),
+      'Last Modified': z.any().transform(val => val ? new Date(val) : undefined),
       'Eligible for marketplace credits': z.boolean().optional(),
       'Grants program': z.boolean().optional(),
       Blog: z.string().optional(),
@@ -33,4 +29,4 @@ export const AirtableTeamSchema: z.ZodType<IAirtableTeam> = z.lazy(() =>
       'Preferred Method of Contact': z.string().optional(),
     }),
   })
-);
+) as z.ZodType<IAirtableTeam>;

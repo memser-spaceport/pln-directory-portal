@@ -109,7 +109,7 @@ export const InteractionFailureReasons: { [key: string]: string } = {
 
 /********* HUSKY CONSTANTS ********/
 
-export const IGNORED_URLS_FOR_CONCEALID = ['/v1/husky/chat/assistant', '/v1/husky/chat/feedback', '/v1/husky/chat/contextual', '/v1/husky/chat/analytical', '/v1/husky/chat/additional-info', '/husky/threads'];
+export const IGNORED_URLS_FOR_CONCEALID = ['/v1/husky/chat/assistant', '/v1/husky/chat/feedback', '/v1/husky/chat/contextual', '/v1/husky/chat/analytical', '/v1/husky/chat/additional-info', '/husky/threads', 'v1/husky/chatbot/intro'];
 
 export const HUSKY_SOURCES = {
   TWITTER: 'twitter',

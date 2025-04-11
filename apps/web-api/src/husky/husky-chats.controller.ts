@@ -20,4 +20,14 @@ export class HuskyChatsController {
   async huskyChatFeedback(@Body() body: HuskyFeedbackDto) {
     await this.huskyService.addHuskyFeedback({ ...body });
   }
+
+  @Post('v1/husky/chatbot/intro')
+  async huskyChatbotIntro(@Body() body: { id: string; messages: Array<any> }, @Req() req: any, @Res() res: Response) {
+    const aiStreamingResponse = await this.huskyAiService.createChatbotIntro(
+      body.id,
+      body.messages,
+    );
+    aiStreamingResponse.pipeDataStreamToResponse(res);
+    return;
+  }
 }

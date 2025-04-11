@@ -97,8 +97,13 @@ export const QueryParams = ({
     })
     .optional();
 
-export const RETRIEVAL_QUERY_FILTERS: { [prop: string]: true } = {
+export const RETRIEVAL_QUERY_FILTERS = {
   order: true,
   with: true,
+  pagination: true,
+  page: true,
+  limit: true,
   select: true,
-};
+  distinct: true,
+  orderBy: true
+} as const;

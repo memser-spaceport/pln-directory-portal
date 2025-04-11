@@ -1,18 +1,15 @@
 import { z } from 'zod';
 import { IAirtableMember } from '@protocol-labs-network/airtable';
 
-export const AirtableMemberSchema: z.ZodType<IAirtableMember> = z.lazy(() =>
+export const AirtableMemberSchema = z.lazy(() =>
   z.object({
     id: z.string(),
     fields: z.object({
       Name: z.string(),
       'Display Name': z.string().optional(),
-      'PLN Start Date': z
-        .preprocess((value: string) => new Date(value), z.date())
-        .optional(),
-      'PLN End Date': z
-        .preprocess((value: string) => new Date(value), z.date())
-        .optional(),
+      'PLN Start Date': z.any().transform(val => val ? new Date(val) : undefined),
+      'PLN End Date': z.any().transform(val => val ? new Date(val) : undefined),
+      'Last Audited': z.any().transform(val => val ? new Date(val) : undefined),
       // 'Profile picture'?: IAirtableMemberPicture[];
       Skills: z.string().array().optional(),
       'Github Handle': z.string().optional(),
@@ -25,9 +22,7 @@ export const AirtableMemberSchema: z.ZodType<IAirtableMember> = z.lazy(() =>
       Twitter: z.string().optional(),
       'Discord handle': z.string().optional(),
       Notes: z.string().optional(),
-      'Date contacted': z
-        .preprocess((value: string) => new Date(value), z.date())
-        .optional(),
+      'Date contacted': z.any().transform(val => val ? new Date(val) : undefined),
       'State / Province': z.string().optional(),
       Country: z.string().optional(),
       City: z.string().optional(),
@@ -48,4 +43,4 @@ export const AirtableMemberSchema: z.ZodType<IAirtableMember> = z.lazy(() =>
       Region: z.string().optional(),
     }),
   })
-);
+) as z.ZodType<IAirtableMember>;
