@@ -1,1 +1,1 @@
-web: bin/start-pgbouncer node dist/apps/web-api/main.js
+web: bin/heroku-buildpack-pgbouncer/pgbouncer_wrapper node dist/apps/web-api/main.js
