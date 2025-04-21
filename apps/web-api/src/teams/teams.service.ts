@@ -23,6 +23,8 @@ import { copyObj, buildMultiRelationMapping, buildRelationMapping } from '../uti
 import { CacheService } from '../utils/cache/cache.service';
 import { AskService } from '../asks/asks.service';
 import { isEmpty } from 'lodash';
+import { HuskyRevalidationService } from '../husky/husky-revalidation.service';
+import { CREATE, UPDATE } from '../utils/constants';
 
 @Injectable()
 export class TeamsService {
@@ -37,7 +39,8 @@ export class TeamsService {
     private forestadminService: ForestAdminService,
     private notificationService: NotificationService,
     private cacheService: CacheService,
-    private askService: AskService
+    private askService: AskService,
+    private huskyRevalidationService: HuskyRevalidationService
   ) { }
 
   /**
@@ -175,9 +178,11 @@ export class TeamsService {
    */
   async createTeam(team: Prisma.TeamUncheckedCreateInput, tx: Prisma.TransactionClient): Promise<Team> {
     try {
-      return await tx.team.create({
+      const createdTeam = await tx.team.create({
         data: team,
       });
+      await this.postCreateActions(createdTeam.uid, CREATE);
+      return createdTeam;
     } catch (err) {
       return this.handleErrors(err);
     }
@@ -197,10 +202,12 @@ export class TeamsService {
     tx: Prisma.TransactionClient
   ): Promise<Team> {
     try {
-      return await tx.team.update({
+      const updatedTeam = await tx.team.update({
         where: { uid },
         data: team,
       });
+      await this.postUpdateActions(updatedTeam.uid);
+      return updatedTeam;
     } catch (err) {
       return this.handleErrors(err, `${uid}`);
     }
@@ -260,7 +267,7 @@ export class TeamsService {
       await this.logParticipantRequest(requestorEmail, updatedTeam, existingTeam.uid, tx);
     });
     this.notificationService.notifyForTeamEditApproval(updatedTeam.name, teamUid, requestorEmail);
-    await this.postUpdateActions();
+    await this.postUpdateActions(updatedTeam.uid);
     return result;
   }
 
@@ -451,8 +458,9 @@ export class TeamsService {
    * Executes post-update actions such as resetting the cache and triggering Airtable sync.
    * This ensures that the system is up-to-date with the latest changes.
    */
-  private async postUpdateActions(): Promise<void> {
+  private async postUpdateActions(uid: string): Promise<void> {
     await this.cacheService.reset({ service: 'teams' });
+    await this.huskyRevalidationService.triggerHuskyRevalidation('teams', uid, UPDATE);
     await this.forestadminService.triggerAirtableSync();
   }
 
@@ -1070,4 +1078,13 @@ export class TeamsService {
       this.handleErrors(error);
     }
   }
+
+  /**
+   * Executes post-create actions such as triggering n8n workflow.
+   * This ensures that the system is up-to-date with the latest changes.
+   */
+  private async postCreateActions(uid: string, action: string): Promise<void> {
+    await this.huskyRevalidationService.triggerHuskyRevalidation('teams', uid, action);
+    }
+  
 }
