@@ -6,7 +6,8 @@ import { Prisma } from '@prisma/client';
 import { MembersService } from '../members/members.service';
 import { CacheService } from '../utils/cache/cache.service';
 import { AskService } from '../asks/asks.service';
-
+import { HuskyRevalidationService } from '../husky/husky-revalidation.service';
+import { CREATE, UPDATE } from '../utils/constants';
 @Injectable()
 export class ProjectsService {
   constructor(
@@ -14,7 +15,8 @@ export class ProjectsService {
     private memberService: MembersService,
     private logger: LogService,
     private cacheService: CacheService,
-    private askService: AskService
+    private askService: AskService,
+    private huskyRevalidationService: HuskyRevalidationService
   ) { }
 
   async createProject(project: Prisma.ProjectUncheckedCreateInput, userEmail: string) {
@@ -37,7 +39,7 @@ export class ProjectsService {
           }
         }
       });
-      await this.cacheService.reset({ service: 'projects'});
+      await this.postCreateActions(result.uid);
       return result;
     } catch (err) {
       this.handleErrors(err);
@@ -84,7 +86,7 @@ export class ProjectsService {
             }
           }
         });
-        await this.cacheService.reset({ service: 'projects'});
+        await this.postUpdateActions(result.uid);
         return result;
       });
     } catch (err) {
@@ -181,7 +183,7 @@ export class ProjectsService {
         where: { uid },
         data: { isDeleted: true }
       });
-      await this.cacheService.reset({ service: 'projects'});
+      await this.postUpdateActions(result.uid);
       return result;
     } catch (err) {
       this.handleErrors(err, `${uid}`);
@@ -547,5 +549,23 @@ export class ProjectsService {
       console.error(err);
       throw err;
     }
+  }
+
+  /**
+   * Executes post-create actions such as resetting the cache and triggering Airtable sync.
+   * This ensures that the system is up-to-date with the latest changes.
+   */
+  private async postCreateActions(uid: string): Promise<void> {
+    //await this.cacheService.reset({ service: 'projects' });
+    await this.huskyRevalidationService.triggerHuskyRevalidation('projects', uid, CREATE);
+  }
+
+  /**
+   * Executes post-update actions such as resetting the cache and triggering Airtable sync.
+   * This ensures that the system is up-to-date with the latest changes.
+   */
+  private async postUpdateActions(uid: string): Promise<void> {
+    await this.cacheService.reset({ service: 'projects' });
+    await this.huskyRevalidationService.triggerHuskyRevalidation('projects', uid, UPDATE);
   }
 }
