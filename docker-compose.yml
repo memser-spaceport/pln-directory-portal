@@ -27,10 +27,7 @@ services:
     image: redis:7.0.5
     restart: always
     ports:
-      - '6389:6379'
-    environment:
-      REDIS_HOST: ${REDIS_HOST}
-      REDIS_PORT: ${REDIS_PORT}
+      - '6359:6379'
     volumes:
       - redis_cache_data:/data
   
@@ -56,6 +53,15 @@ services:
       MONGO_INITDB_DATABASE: ${MONGO_DB_NAME}
     volumes:
       - mongodb_data:/data/db
+  
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant_container
+    restart: always
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant-storage:/qdrant/storage
 
 volumes:
   db_data:
@@ -66,4 +72,6 @@ volumes:
   redis_queue_data:
     driver: local
   mongodb_data:
+    driver: local
+  qdrant-storage:
     driver: local
