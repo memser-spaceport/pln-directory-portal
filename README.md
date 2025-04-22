@@ -94,7 +94,7 @@ Then run:
 $ docker-compose up -d
 ```
 
-Once this is done, you will have your Postgres and Redis running through Docker and they will be up and running based on the following configurations:
+Once this is done, you will have your Postgres(for both PL Network and OSO) and Redis running through Docker and they will be up and running based on the following configurations:
 
 - Sample values through which Docker will run Postgres and Redis:
   ```sh
@@ -103,6 +103,13 @@ Once this is done, you will have your Postgres and Redis running through Docker 
   DB_PASSWORD=postgres
   DB_NAME=plnetwork_dev
   DATABASE_URL=postgresql://postgres:postgres@localhost:19432/plnetwork_dev
+
+  OSO_DB_HOST_PORT=19433
+  OSO_DB_USER=postgres
+  OSO_DB_PASSWORD=postgres
+  OSO_DB_NAME=oso_dev
+  OSO_DATABASE_URL=postgresql://postgres:postgres@localhost:19433/oso_dev
+
 
   REDIS_HOST=localhost
   REDIS_PORT=6379
