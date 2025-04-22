@@ -75,7 +75,7 @@ If you do not want to log in CloudWatch or do not have the necessary AWS keys, y
 | AWS SES | External | To send email notifications | Yes, but you can skip in local by disabling email in .env |
 | PL Auth service | Internal | To manage user auth requests and issue tokens, works in OAuth 2.0 standard | Yes, for local we have provided you with sandbox url |
 | [Google API](https://developers.google.com/maps/documentation/places/web-service/get-api-key) | External | For location-based services | Yes |
-| [Forestadmin](https://www.forestadmin.com/) | External | To manage data directly from/to database. The admin panel for the database | No |
+| [Forestadmin](https://www.forestadmin.com/) | External | To manage data directly from/to database. The admin panel for the database | Yes |
 | Github API Key | External | To get information about projects from Github repo | Yes |
 
 ## Setting up Husky AI
@@ -122,11 +122,26 @@ To run **Husky AI** locally, you should configure the following environment vari
 | `QDRANT_PROJECTS_COLLECTION` | Set to any collection name, e.g. `projects` | Qdrant collection name | Stores vectorized data for directory projects |
 | `QDRANT_IRL_EVENTS_COLLECTION` | Set to any collection name, e.g. `irl_events` | Qdrant collection name | Stores vectorized data for IRL events |
 
+---
+
+### Forest Admin Configuration
+*Forest Admin is used to syncing data with Airtable and managing data securely. If you are using Forest Admin, you need to set the following environment variables. In the next release, this dependency will be removed, and Forest Admin will no longer be needed for local deployment.
+*
+
+| Name | How to Get/Set | Purpose/Description |
+|------|----------------|---------------------|
+| `FOREST_ENV_SECRET` | Obtain from your Forest Admin project settings under **Environment Secret**. | Secret used to verify environment identity for Forest Admin. |
+| `FOREST_AUTH_SECRET` | Obtain from your Forest Admin project settings under **Authentication Secret**. | Secret used to secure authentication between your application and Forest Admin. |
+
+---
+
 ## Installation
 
 ```sh
 $ yarn install
 ```
+
+
 
 ### Setup Docker for Postgres and Redis
 
@@ -138,9 +153,10 @@ Then run:
 $ docker-compose up -d
 ```
 
-Once this is done, you will have your Postgres and Redis running through Docker and they will be up and running based on the following configurations:
+Once this is done, you will have your Postgres(for both PL Network and OSO) and Redis running through Docker and they will be up and running based on the following configurations:
 
-- Sample values through which Docker will run Postgres and Redis:
+#### Sample Values - PL Network database and Redis
+*This database manages most of the core functionalities of the PL Network application.*
   ```sh
   DB_HOST_PORT=19432
   DB_USER=postgres
@@ -150,6 +166,19 @@ Once this is done, you will have your Postgres and Redis running through Docker 
 
   REDIS_HOST=localhost
   REDIS_PORT=6379
+  ```
+#### Sample Values - OSO Database
+*Open Source Observer (OSO) provides data-driven insights into open source ecosystems. It analyzes projects, contributors, and communities using public datasets. The platform offers visualizations and analytics to support open source research.*
+*In real time, we periodically update this database with data from the OSO website. The retrieved project statistics are displayed on the project detail page.*
+
+*For **local development**, we set up the OSO Postgres database using the **Docker Compose** file. Make sure it is configured correctly when running locally.*
+
+  ```sh
+  OSO_DB_HOST_PORT=19433
+  OSO_DB_USER=postgres
+  OSO_DB_PASSWORD=postgres
+  OSO_DB_NAME=oso_dev
+  OSO_DATABASE_URL=postgresql://postgres:postgres@localhost:19433/oso_dev
   ```
 
 ## Add Local Environment Variables
@@ -187,11 +216,20 @@ Once this is done, you will have your Postgres and Redis running through Docker 
   IS_EMAIL_ENABLED=false
   ```
 
+
+
 ## Generate Prisma Schemas and Update the Database
 
 ```sh
 $ npx prisma generate --schema=./apps/web-api/prisma/schema.prisma
 $ npx prisma db push --schema=./apps/web-api/prisma/schema.prisma
+```
+
+## Generate Prisma Schemas and Update the OSO Database
+
+```sh
+$ npx prisma generate --schema=./apps/web-api/prisma/oso-schema.prisma
+$ npx prisma db push --schema=./apps/web-api/prisma/oso-schema.prisma
 ```
 
 ## Populate a Database with Mock Data
