@@ -20,10 +20,11 @@ import { NotificationService } from '../utils/notification/notification.service'
 import { EmailOtpService } from '../otp/email-otp.service';
 import { AuthService } from '../auth/auth.service';
 import { LogService } from '../shared/log.service';
-import { DEFAULT_MEMBER_ROLES } from '../utils/constants';
+import { CREATE, DEFAULT_MEMBER_ROLES, UPDATE } from '../utils/constants';
 import { hashFileName } from '../utils/hashing';
 import { copyObj, buildMultiRelationMapping } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
+import { HuskyRevalidationService } from '../husky/husky-revalidation.service';
 
 @Injectable()
 export class MembersService {
@@ -39,7 +40,8 @@ export class MembersService {
     private participantsRequestService: ParticipantsRequestService,
     @Inject(forwardRef(() => NotificationService))
     private notificationService: NotificationService,
-    private cacheService: CacheService
+    private cacheService: CacheService,
+    private huskyRevalidationService: HuskyRevalidationService
   ) { }
 
   /**
@@ -668,7 +670,7 @@ export class MembersService {
     const member = await this.prepareMemberFromParticipantRequest(null, memberData, null, tx);
     await this.mapLocationToMember(memberData, null, member, tx);
     const createdMember = await this.createMember(member, tx);
-    await this.postCreateActions();
+    await this.postCreateActions(createdMember.uid, CREATE);
     return createdMember;
   }
 
@@ -702,7 +704,7 @@ export class MembersService {
       }
       this.logger.info(`Member update request - completed, requestId -> ${result.uid}, requestor -> ${requestorEmail}`)
     });
-    await this.postUpdateActions();
+    await this.postUpdateActions(memberUid, UPDATE);
     return result;
   }
 
@@ -1220,8 +1222,9 @@ export class MembersService {
    * Executes post-create actions such as resetting the cache and triggering Airtable sync.
    * This ensures that the system is up-to-date with the latest changes.
    */
-  private async postCreateActions(): Promise<void> {
+  private async postCreateActions(uid: string, action: string): Promise<void> {
     await this.cacheService.reset({ service: 'members' });
+    await this.huskyRevalidationService.triggerHuskyRevalidation('members', uid, action);
     await this.forestadminService.triggerAirtableSync();
   }
 
@@ -1229,8 +1232,9 @@ export class MembersService {
    * Executes post-update actions such as resetting the cache and triggering Airtable sync.
    * This ensures that the system is up-to-date with the latest changes.
    */
-  private async postUpdateActions(): Promise<void> {
+  private async postUpdateActions(uid: string, action: string): Promise<void> {
     await this.cacheService.reset({ service: 'members' });
+    await this.huskyRevalidationService.triggerHuskyRevalidation('members', uid, action);
     await this.forestadminService.triggerAirtableSync();
   }
 

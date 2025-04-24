@@ -18,6 +18,7 @@ export const ALLOWED_CORS_ORIGINS = {
     /dev-auth-app.plnetwork.io/,
     /dev-analytics.plnetwork.io/,
     /staging-admin.plnetwork.io/,
+    /protocol-ai-git-fix-home-page-polaris-01.vercel.app/
   ],
   [APP_ENV.STAGING]: [
     /.-protocol-labs-spaceport.vercel.app/,
@@ -28,7 +29,7 @@ export const ALLOWED_CORS_ORIGINS = {
     /dev-analytics.plnetwork.io/,
     /staging-admin.plnetwork.io/,
   ],
-  [APP_ENV.PRODUCTION]: ['https://www.plnetwork.io', /app.forestadmin.com/, /admin.plnetwork.io/, /plnetwork.io/],
+  [APP_ENV.PRODUCTION]: ['https://www.plnetwork.io', /app.forestadmin.com/, /admin.plnetwork.io/, /plnetwork.io/,/protocol.ai/],
 };
 
 export const IS_DEV_ENVIRONMENT = process.env.ENVIRONMENT == APP_ENV.DEV;
@@ -177,6 +178,7 @@ export const NOTIFICATION_CHANNEL: { [key: string]: string } = {
 
 export const CREATE = "CREATE";
 export const UPDATE = "UPDATE";
+export const DELETE = "DELETE";
 
 export const  EventInvitationToMember ="EventInvitationToMember";
 export const  EVENT_GUEST_PRESENCE_REQUEST_TEMPLATE_NAME = "EventGuestPresenceRequest";

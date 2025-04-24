@@ -513,19 +513,5 @@ export class HuskyAiService {
       ...(thread?.guestUserId && { guestUserId: thread?.guestUserId }),
     }
   }
-
-  async getChatById(uid: string) {
-    const threads = await this.huskyPersistentDbService.findByKeyValue(process.env.MONGO_CONVERSATION_COLLECTION || '', 'chatThreadId', uid);
-    const allThreads: any = [];
-    threads.map((thread: any) => {
-      if (thread?.type === "context") {
-        const filteredSql = threads.filter((sqlThread: any) => sqlThread.type === "sql" && sqlThread.chatUid === thread.chatUid);
-        allThreads.push({
-          ...thread,
-          sqlData: filteredSql[0]?.data
-        })
-      }
-    })
-    return allThreads;
-  }
+  
 }

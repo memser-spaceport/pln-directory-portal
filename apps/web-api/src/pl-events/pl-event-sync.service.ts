@@ -151,6 +151,28 @@ export class PLEventSyncService {
    */
   private async mapEventData(event, locationUid) {
     const logo = await this.createLogo(this.prisma, event.event_logo);
+    const resources: Array<{ 
+      name: string; 
+      description: string; 
+      link: string;
+    }> = [];
+    
+    if (event?.registration_link) {
+      resources.push({
+        name: "Registration", 
+        description: "Registration URL",
+        link: event.registration_link
+      });
+    }
+
+    if (event?.website_link) {
+      resources.push({
+        name: "Website", 
+        description: "Website URL",
+        link: event.website_link
+      });
+    }
+
     return {
       externalId: event.event_id,
       name: event.event_name,
@@ -164,6 +186,7 @@ export class PLEventSyncService {
       slugURL: event.event_id,
       locationUid,
       logoUid: logo?.uid,
+      resources
     };
   }
 
