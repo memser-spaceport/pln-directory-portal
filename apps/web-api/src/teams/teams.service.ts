@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import * as path from 'path';
 import { z } from 'zod';
-import { Prisma, Team, Member, ParticipantsRequest } from '@prisma/client';
+import { Prisma, Team, Member, ParticipantsRequest, AskStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schema';
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
@@ -977,6 +977,7 @@ export class TeamsService {
               where: { uid: data.uid },
               data: {
                 ...data,
+                closedAt: data.status === AskStatus.CLOSED ? new Date() : null,
               },
             });
           }
