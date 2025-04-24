@@ -52,18 +52,26 @@ model Team {
   asks                         Ask[]
 }
 
+enum AskStatus {
+  OPEN
+  CLOSED
+}
+
 model Ask {
-  id          Int      @id @default(autoincrement())
-  uid         String   @unique @default(cuid())
-  title       String
-  description String
-  tags        String[]
-  team        Team?    @relation(fields: [teamUid], references: [uid])
-  teamUid     String?
-  project     Project? @relation(fields: [projectUid], references: [uid])
-  projectUid  String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           Int       @id @default(autoincrement())
+  uid          String    @unique @default(cuid())
+  title        String
+  description  String
+  tags         String[]
+  team         Team?     @relation(fields: [teamUid], references: [uid])
+  teamUid      String?
+  project      Project?  @relation(fields: [projectUid], references: [uid])
+  projectUid   String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  status       AskStatus @default(OPEN)
+  closedAt     DateTime?
+  closedReason String?
 }
 
 model Member {
