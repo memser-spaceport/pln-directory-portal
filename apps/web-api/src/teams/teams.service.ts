@@ -138,12 +138,24 @@ export class TeamsService {
           asks: {
             select: {
               uid: true,
-              title:true,
-              tags:true,
-              description:true,
-              teamUid:true
-            }
-          }
+              title: true,
+              tags: true,
+              description: true,
+              teamUid: true,
+              status: true,
+              closedAt: true,
+              closedReason: true,
+              closedComment: true,
+              closedByUid: true,
+              closedBy: {
+                select: {
+                  uid: true,
+                  name: true,
+                  image: true,
+                },
+              },
+            },
+          },
         },
       });
       team.teamFocusAreas = this.removeDuplicateFocusAreas(team.teamFocusAreas);
