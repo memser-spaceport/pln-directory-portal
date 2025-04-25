@@ -279,7 +279,7 @@ export class TeamsService {
       await this.logParticipantRequest(requestorEmail, updatedTeam, existingTeam.uid, tx);
     });
     this.notificationService.notifyForTeamEditApproval(updatedTeam.name, teamUid, requestorEmail);
-    await this.postUpdateActions(updatedTeam.uid);
+    await this.postUpdateActions(result.uid);
     return result;
   }
 
