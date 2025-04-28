@@ -1542,7 +1542,10 @@ export class MembersService {
       }
     } else if (error instanceof Prisma.PrismaClientValidationError) {
       throw new BadRequestException('Database field validation error on Member', error.message);
+    } else {
+      throw error;
     }
+    // TODO: Remove this return statement if future versions allow all error-returning functions to be inferred correctly.
     return error;
   }
 
