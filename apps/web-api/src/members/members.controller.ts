@@ -38,7 +38,7 @@ export class MemberController {
   /**
    * Retrieves a list of members based on query parameters.
    * Builds a Prisma query from the queryable fields and adds filters for names, roles, and recent members.
-   * 
+   *
    * @param request - HTTP request object containing query parameters
    * @returns Array of members with related data
    */
@@ -52,13 +52,14 @@ export class MemberController {
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(queryParams);
-    const { name__icontains, isHost, isSpeaker } = queryParams;
+    const { name__icontains, isHost, isSpeaker, isSponsor } = queryParams;
     if (name__icontains) {
       delete builtQuery.where?.name;
     }
-    if (isHost || isSpeaker) {  //Remove isHost and isSpeaker from the default query since it is to be added in eventGuest.
+    if (isHost || isSpeaker || isSponsor) {  //Remove isHost and isSpeaker from the default query since it is to be added in eventGuest.
       delete builtQuery.where?.isHost;
       delete builtQuery.where?.isSpeaker;
+      delete builtQuery.where?.isSponsor;
     }
     builtQuery.where = {
       AND: [
@@ -83,7 +84,7 @@ export class MemberController {
   /**
    * Retrieves member roles based on query parameters with their counts.
    * Builds a Prisma query and applies filters to return roles with the count of associated members.
-   * 
+   *
    * @param request - HTTP request object containing query parameters
    * @returns Array of roles with member counts
    */
@@ -95,13 +96,14 @@ export class MemberController {
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(queryParams);
-    const { name__icontains, isHost, isSpeaker } = queryParams;
+    const { name__icontains, isHost, isSpeaker, isSponsor } = queryParams;
     if (name__icontains) {
       delete builtQuery.where?.name;
     }
-    if (isHost || isSpeaker) {  //Remove isHost and isSpeaker from the default query since it is to be added in eventGuest.
+    if (isHost || isSpeaker || isSponsor) {  //Remove isHost and isSpeaker from the default query since it is to be added in eventGuest.
       delete builtQuery.where?.isHost;
       delete builtQuery.where?.isSpeaker;
+      delete builtQuery.where?.isSponsor;
     }
     builtQuery.where = {
       AND: [
@@ -116,7 +118,7 @@ export class MemberController {
 
   /**
    * Retrieves member filters.
-   * 
+   *
    * @param request - HTTP request object containing query parameters
    * @returns return list of member filters.
    */
@@ -128,13 +130,14 @@ export class MemberController {
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(queryParams);
-    const { name__icontains, isHost, isSpeaker } = queryParams;
+    const { name__icontains, isHost, isSpeaker, isSponsor } = queryParams;
     if (name__icontains) {
       delete builtQuery.where?.name;
     }
-    if (isHost || isSpeaker) { //Remove isHost and isSpeaker from the default query since it is to be added in eventGuest.
+    if (isHost || isSpeaker || isSponsor) { //Remove isHost and isSpeaker from the default query since it is to be added in eventGuest.
       delete builtQuery.where?.isHost;
       delete builtQuery.where?.isSpeaker;
+      delete builtQuery.where?.isSponsor;
     }
     builtQuery.where = {
       AND: [
@@ -151,7 +154,7 @@ export class MemberController {
   /**
    * Retrieves details of a specific member by UID.
    * Builds a query for member details including relations and profile data.
-   * 
+   *
    * @param request - HTTP request object containing query parameters
    * @param uid - UID of the member to fetch
    * @returns Member details with related data
@@ -173,7 +176,7 @@ export class MemberController {
   /**
    * Updates member details based on the provided participant request data.
    * Uses a validation pipe to ensure that the request is valid before processing.
-   * 
+   *
    * @param id - ID of the member to update
    * @param body - Request body containing member data to update
    * @param req - HTTP request object containing user email
@@ -200,7 +203,7 @@ export class MemberController {
 
   /**
    * Updates a member's preference settings.
-   * 
+   *
    * @param id - UID of the member whose preferences will be updated
    * @param body - Request body containing preference data
    * @param req - HTTP request object
@@ -232,7 +235,7 @@ export class MemberController {
 
   /**
    * Retrieves a member's preference settings by UID.
-   * 
+   *
    * @param uid - UID of the member whose preferences will be fetched
    * @returns Member's preferences
    */
@@ -245,7 +248,7 @@ export class MemberController {
 
   /**
    * Sends an OTP for email change to the new email provided by the member.
-   * 
+   *
    * @param sendOtpRequest - Request DTO containing the new email
    * @param req - HTTP request object containing user email
    * @returns Response indicating success of OTP sending
@@ -271,7 +274,7 @@ export class MemberController {
 
   /**
    * Updates a member's email address to a new one.
-   * 
+   *
    * @param changeEmailRequest - Request DTO containing the new email address
    * @param req - HTTP request object containing user email
    * @returns Updated member data with new email
@@ -289,7 +292,7 @@ export class MemberController {
 
   /**
    * Retrieves GitHub projects associated with the member identified by UID.
-   * 
+   *
    * @param uid - UID of the member whose GitHub projects will be fetched
    * @returns Array of GitHub projects associated with the member
    */

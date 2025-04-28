@@ -67,7 +67,7 @@ export class PLEventGuestsService {
         this.memberService.checkIfAdminUser(member) && !plEvents.length &&
           (await this.sendEventInvitationIfAdminAddsMember(eventMember, location));
       }
-      await this.updateGuestTopicsAndReason(data, locationUid, member, eventType, tx);  
+      await this.updateGuestTopicsAndReason(data, locationUid, member, eventType, tx);
       this.cacheService.reset({ service: 'PLEventGuest' });
       return result;
     } catch (err) {
@@ -79,7 +79,7 @@ export class PLEventGuestsService {
   /**
    * This method checks if the member has events at the specified location. If no events are found,
    * an invitation email is sent to the member with the event location details.
-   * 
+   *
    * @param eventMember The member object being checked and invited, including their name and email.
    * @param location The location object containing details such as the location name.
    * @returns A Promise that resolves when the email is successfully sent or does nothing if the member already has events at the location.
@@ -245,7 +245,7 @@ export class PLEventGuestsService {
 
   /**
   * Fetches all PLEventGuests for a given location, filtered by the upcoming events at that location.
-  * 
+  *
   * @param {string} locationUid - The UID of the location to get event guests for.
   * @param {Prisma.PLEventGuestFindManyArgs} query - Optional query arguments, including orderBy.
   * @returns {Promise<PLEventGuest[]>} - A promise that resolves to an array of PLEventGuest records, including member and team details.
@@ -268,6 +268,7 @@ export class PLEventGuestsService {
           memberUid: true,
           isHost: true,
           isSpeaker: true,
+          isSponsor: true,
           isFeatured: true,
           topics: true,
           event: {
@@ -328,7 +329,8 @@ export class PLEventGuestsService {
       const additionalInfo = {
         ...input.additionalInfo,
         hostSubEvents: event.hostSubEvents || [],
-        speakerSubEvents: event.speakerSubEvents || []
+        speakerSubEvents: event.speakerSubEvents || [],
+        sponsorSubEvents: event.sponsorSubEvents || []
       };
       return {
         telegramId: input.telegramId || null,
@@ -340,7 +342,8 @@ export class PLEventGuestsService {
         additionalInfo: additionalInfo,
         topics: input.topics || [],
         isHost: event.isHost || false,
-        isSpeaker: event.isSpeaker || false
+        isSpeaker: event.isSpeaker || false,
+        isSponsor: event.isSponsor || false
       };
     });
   };
@@ -412,12 +415,12 @@ export class PLEventGuestsService {
 
   /**
    * Filters out invite-only events based on user attendance, login state, and admin status.
-   * 
+   *
    * This function takes an array of events and a user ID. If the user is logged out, it removes
    * all invite-only events. If the user is logged in and is an admin, it returns all events without
-   * filtering. If the user is logged in but not an admin, it only keeps invite-only events that 
+   * filtering. If the user is logged in but not an admin, it only keeps invite-only events that
    * the user is attending.
-   * 
+   *
    * @param {PLEvent[]} events - Array of events to be filtered.
    * @param {string | null} userId - The UID of the logged-in user, or null if the user is logged out.
    * @returns {Promise<PLEvent[]>} Filtered array of events based on the user’s attendance, login state, and admin status.
@@ -435,7 +438,7 @@ export class PLEventGuestsService {
     if (this.memberService.checkIfAdminUser(member)) {
       return filteredEventsUid?.length ? events.filter(event => filteredEventsUid.includes(event.uid)) : events;
     }
-    // Scenario 2: If the user is logged in and not an admin, get invite-only events they are attending 
+    // Scenario 2: If the user is logged in and not an admin, get invite-only events they are attending
     const userAttendedEvents = await this.prisma.pLEvent.findMany({
       where: {
         type: "INVITE_ONLY",
@@ -464,11 +467,12 @@ export class PLEventGuestsService {
   /**
    * Fetches event attendees with dynamic filtering, searching, sorting, and pagination.
    * Retrieves event, member, and team information for each attendee.
-   * 
+   *
    * @param {Object}  queryParams - Parameters for filtering, searching, sorting, and pagination.
    * @param {Array}   queryParams.eventUids - List of event UIDs to filter attendees.
    * @param {boolean} queryParams.isHost - Filter by whether the attendee is a host.
    * @param {boolean} queryParams.isSpeaker - Filter by whether the attendee is a speaker.
+   * @param {boolean} queryParams.isSponsor - Filter by whether the attendee is a sponsor.
    * @param {string}  queryParams.sortBy - Field by which to sort results (member, team).
    * @param {string}  queryParams.sortDirection - Direction of sorting (asc, desc).
    * @param {string}  queryParams.search - Search term to filter results by member name, team name, or project name.
@@ -478,7 +482,7 @@ export class PLEventGuestsService {
    * @returns {Promise<Array>} A list of attendees with their associated member, team, and event information.
    */
   async fetchAttendees(queryParams) {
-    const { eventUids, isHost, isSpeaker, topics, sortBy, sortDirection = 'asc', search, limit = 10, page = 1, loggedInMemberUid, includeLocations } = queryParams;
+    const { eventUids, isHost, isSpeaker, isSponsor, topics, sortBy, sortDirection = 'asc', search, limit = 10, page = 1, loggedInMemberUid, includeLocations } = queryParams;
     // Build dynamic query conditions for filtering by eventUids, isHost, and isSpeaker
     let { conditions, values } = this.buildConditions(eventUids, topics);
     // Apply sorting based on the sortBy parameter (default is sorting by memberName)
@@ -509,22 +513,29 @@ export class PLEventGuestsService {
     const eventPosition = search ? values.length + 4 : values.length + 3;
 
     // Construct the raw SQL query for fetching attendees with joined tables and aggregated JSON data
-    const query: any = ` 
-      SELECT 
+    const query: any = `
+      SELECT
         *,
         COUNT(*) OVER() AS count FROM (
-        SELECT 
+        SELECT
           pg."memberUid",
           CASE   --check the guestType of the guest in the events in specified locations
             WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition})) --eventUid's index in values array
-               AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition})) 
+               AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition}))
+               AND NOT BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventPosition}))
             THEN 'isHostOnly'
             WHEN BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition}))
-               AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition})) 
+               AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition}))
+               AND NOT BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventPosition}))
             THEN 'isSpeakerOnly'
-            WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition})) 
-               AND BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition})) 
-            THEN 'hostAndSpeaker'
+            WHEN BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventPosition}))
+               AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition}))
+               AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition}))
+            THEN 'isSponsorOnly'
+            WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition}))
+               AND BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition}))
+               AND BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventPosition}))
+            THEN 'hostAndSpeakerAndSponsor'
             ELSE 'none'
           END AS guest_type,
           json_object_agg(
@@ -535,6 +546,7 @@ export class PLEventGuestsService {
               'topics', pg."topics",
               'isHost', pg."isHost",
               'isSpeaker', pg."isSpeaker",
+              'isSponsor', pg."isSponsor",
               'createdAt', pg."createdAt",
               'telegramId', pg."telegramId",
               'officeHours', pg."officeHours"
@@ -550,6 +562,7 @@ export class PLEventGuestsService {
               'endDate', e."endDate",
               'isHost', pg."isHost",      -- Event-specific host details
               'isSpeaker', pg."isSpeaker", -- Event-specific speaker details
+              'isSponsor', pg."isSponsor", -- Event-specific sponsor details
               'additionalInfo', pg."additionalInfo"
                ${selectLocation}
             )
@@ -576,7 +589,7 @@ export class PLEventGuestsService {
               )
             ) FILTER (WHERE tmr_team.uid IS NOT NULL),  -- Exclude NULL teams from the aggregation
             '[]'::jsonb     -- Default to an empty JSON array if no valid team member roles exist
-          ) AS teamMemberRoles, 
+          ) AS teamMemberRoles,
           json_object_agg(
             'team',
             json_build_object(
@@ -601,7 +614,7 @@ export class PLEventGuestsService {
         LEFT JOIN "Team" tm ON tm.uid = pg."teamUid"
         LEFT JOIN "Image" tml ON tml.uid = tm."logoUid"
         ${this.applySearch(values, search)}
-        GROUP BY 
+        GROUP BY
           pg."memberUid",
           pg."teamUid",
           pg."topics",
@@ -610,9 +623,9 @@ export class PLEventGuestsService {
           tm.name
         ${conditions} -- Add the dynamically generated conditions for filtering
         ${orderBy} -- Apply sorting logic
-      ) 
+      )
       AS subquery
-      ${this.buildHostAndSpeakerCondition(isHost, isSpeaker)}
+      ${this.buildHostAndSpeakerCondition(isHost, isSpeaker, isSponsor)}
       LIMIT $${values.length + 1}
       OFFSET $${values.length + 2} -- Apply pagination limit and offset
     `;
@@ -625,7 +638,7 @@ export class PLEventGuestsService {
   }
 
   /**
-   * 
+   *
    * @param includeLocation query param to specify whether to include location or not
    * @returns join query for event location is specified
    */
@@ -640,7 +653,7 @@ export class PLEventGuestsService {
    * Formats the raw attendee query results to a structured object format.
    * This function maps through each result item to structure it with necessary
    * details like member information, guest information, event count, and team data.
-   * 
+   *
    * @param {Array} result - Raw array of attendee data returned from the query.
    * @returns {Array} Formatted array of attendees with organized properties.
    */
@@ -653,7 +666,7 @@ export class PLEventGuestsService {
         count: Number(BigInt(attendee.count || '0n')),
 
         memberUid: attendee.memberUid,
-        // Spread guest information if available, including attributes like isHost and isSpeaker
+        // Spread guest information if available, including attributes like isHost, isSpeaker and isSponsor
         ...guestInfo,
         events: attendee.events,
         member: {
@@ -669,8 +682,8 @@ export class PLEventGuestsService {
    * Builds dynamic SQL conditions for filtering event guests based on provided criteria.
    *
    * This function creates a SQL conditions string and an array of values for binding in the query.
-   * Conditions are added for filtering by eventUids, isHost, isSpeaker, and topics.
-   * 
+   * Conditions are added for filtering by eventUids, isHost, isSpeaker, isSponsor and topics.
+   *
    * @param {Array} eventUids - List of event UIDs for filtering.
    * @param {Array} topics - List of topics to filter by using the overlap operator.
    * @returns {Object} An object containing the SQL conditions string and associated values for query binding.
@@ -698,12 +711,13 @@ export class PLEventGuestsService {
    *
    * @param {string} isHost - Indicates if the guest is a host (expected values: "true" or "false").
    * @param {string} isSpeaker - Indicates if the guest is a speaker (expected values: "true" or "false").
+   * @param {string} isSponsor - Indicates if the guest is a sponsor (expected values: "true" or "false").
    * @returns {string} - A SQL condition string to filter guests based on their type.
    */
-  buildHostAndSpeakerCondition(isHost, isSpeaker) {
+  buildHostAndSpeakerCondition(isHost, isSpeaker, isSponsor) {
     // Check if the guest is both a host and a speaker
-    if (isHost === "true" && isSpeaker === "true") {
-      return ` WHERE guest_type = 'hostAndSpeaker' `; // Return condition for both host and speaker
+    if (isHost === "true" && isSpeaker === "true" && isSponsor === "true") {
+      return ` WHERE guest_type = 'hostAndSpeakerAndSponsor' `; // Return condition for both host, speaker and sponsor
     }
     // Check if the guest is only a host
     else if (isHost === "true") {
@@ -713,12 +727,16 @@ export class PLEventGuestsService {
     else if (isSpeaker === "true") {
       return ` WHERE guest_type = 'isSpeakerOnly' `; // Return condition for speaker only
     }
+    // Check if the guest is only a speaker
+    else if (isSponsor === "true") {
+      return ` WHERE guest_type = 'isSponsorOnly' `; // Return condition for sponsor only
+    }
     return '';
   }
 
   /**
    * Applies search filters to the SQL query for filtering by member, team, or project names.
-   * 
+   *
    * @param {string} conditions - The current SQL conditions string.
    * @param {Array} values - The current values for query binding.
    * @param {string} search - The search term to filter by member name, team name, or project names.
@@ -729,9 +747,9 @@ export class PLEventGuestsService {
     if (search) {
       values.push(`%${search}%`);
       return ` WHERE
-        m."name" ILIKE $${values.length} OR 
-        tm."name" ILIKE $${values.length} OR 
-        pc_project."name" ILIKE $${values.length} OR 
+        m."name" ILIKE $${values.length} OR
+        tm."name" ILIKE $${values.length} OR
+        pc_project."name" ILIKE $${values.length} OR
         cp."name" ILIKE $${values.length} `;
       // Append search term to the query values with wildcard matching
     }
@@ -740,8 +758,8 @@ export class PLEventGuestsService {
 
   /**
    * Applies sorting logic to the SQL query based on the provided sortBy parameter.
-   * 
-   * @param {string} sortBy - The field by which to sort the results. 
+   *
+   * @param {string} sortBy - The field by which to sort the results.
    *                          Can be 'memberName', 'teamName', or 'eventName'.
    * @returns {string} SQL orderBy clause to apply the sorting.
    */
@@ -756,9 +774,9 @@ export class PLEventGuestsService {
         const loggedInMemberOrder = uid
           ? `CASE WHEN pg."memberUid" = '${uid}' THEN 0 ELSE 1 END,` : '';
         return `
-          ORDER BY 
+          ORDER BY
             ${loggedInMemberOrder}
-            CASE 
+            CASE
               WHEN pg."reason" IS NOT NULL AND array_length(pg."topics", 1) > 0 THEN 1
               WHEN array_length(pg."topics", 1) > 0 THEN 2
               WHEN pg."reason" IS NOT NULL THEN 3
@@ -805,7 +823,7 @@ export class PLEventGuestsService {
 
   /**
    * Calculates pagination limits and offsets for SQL queries.
-   * 
+   *
    * @param {number} limit - The number of records per page.
    * @param {number} page - The current page number.
    * @returns {Object} An object containing limit and offset for the SQL query.
@@ -819,15 +837,15 @@ export class PLEventGuestsService {
   /**
    * Retrieves event guest information for a specific member at a specific location.
    *
-   * This function retrieves upcoming events at the specified location, and then fetches 
-   * the corresponding guest records for a particular member across these events. 
-   * It includes detailed information about the event, member, team, and guest's role 
-   * within the event. Additionally, it applies restrictions on visibility of member 
+   * This function retrieves upcoming events at the specified location, and then fetches
+   * the corresponding guest records for a particular member across these events.
+   * It includes detailed information about the event, member, team, and guest's role
+   * within the event. Additionally, it applies restrictions on visibility of member
    * preferences based on the specified member UID.
-   * 
+   *
    * @param {string} memberUid - The UID of the member whose event guest information is being retrieved.
    * @param {string} locationUid - The UID of the location for which events are retrieved.
-   * @returns {Promise<PLEventGuest>} An array of event guest records for the specified member 
+   * @returns {Promise<PLEventGuest>} An array of event guest records for the specified member
    *                           at the specified location.
    */
   async getPLEventGuestByUidAndLocation(
@@ -861,6 +879,7 @@ export class PLEventGuestsService {
           additionalInfo: true,
           isHost: true,
           isSpeaker: true,
+          isSponsor: true,
           event: {
             select: {
               slugURL: true,
@@ -922,7 +941,7 @@ export class PLEventGuestsService {
     }
   }
 
-  /** 
+  /**
    * This method constructs a dynamic query to search for the given text by either
    * member name or team name based on query parameters.
    * @param query An object containing `searchBy` (either 'member' or 'team') and `searchText` (the name to search for)
@@ -954,8 +973,8 @@ export class PLEventGuestsService {
   };
 
   /**
-   * Retrieves the details of a host or speaker for a specific event.
-   * @param memberUid - The unique identifier of the member (host or speaker).
+   * Retrieves the details of a host or speaker or sponsor for a specific event.
+   * @param memberUid - The unique identifier of the member (host or speaker or sponsor).
    * @param eventUid - The unique identifier of the event.
    * @returns A Promise that resolves to the event guest details, including:
    * - Member information (e.g., name).
@@ -1002,6 +1021,7 @@ export class PLEventGuestsService {
       eventUids: [],
       isHost: undefined,
       isSpeaker: undefined,
+      isSponsor: undefined,
       topics: [],
       sortBy: 'memberName',
       sortDirection: 'asc',
@@ -1026,15 +1046,15 @@ export class PLEventGuestsService {
 
   /**
    * Updates the topics and reason for a member across specific event UIDs.
-   * 
+   *
    * @param data - The update schema containing new topics and reason.
    * @param locationUid - The unique identifier of the location.
    * @param member - The member whose topics and reason need to be updated.
    * @param type - The event type, either "upcoming" or "past" (defaults to "upcoming").
    * @param tx - (Optional) Prisma transaction client to execute within a transaction context.
-   * 
+   *
    * @returns A Promise that resolves to the result of the update operation.
-   * 
+   *
    * @throws Throws an error if fetching location details or updating records fails.
    */
   async updateGuestTopicsAndReason(
@@ -1121,7 +1141,7 @@ export class PLEventGuestsService {
   enrichEvents(events) {
     return events.map((event) => ({
       ...event,
-      rowspan: (event.hostSubEvents?.length || 0) + (event.speakerSubEvents?.length || 0),
+      rowspan: (event.hostSubEvents?.length || 0) + (event.speakerSubEvents?.length || 0) + (event.sponsorSubEvents?.length || 0),
     }));
   }
 
@@ -1152,11 +1172,11 @@ export class PLEventGuestsService {
 
       const adminEmailIdsEnv = process.env.SES_ADMIN_EMAIL_IDS;
       const adminEmailIds = adminEmailIdsEnv?.split('|') ?? [];
-      
+
       const result = await this.awsService.sendEmailWithTemplate(
         path.join(__dirname, '/shared/markMyPresence.hbs'),
         {
-          ...emailData    
+          ...emailData
         },
         '',
         'Request to Log Attendance for Past In-Person Events',
@@ -1165,7 +1185,7 @@ export class PLEventGuestsService {
         []
       );
       this.logger.info(`New mark my presence request for ${userEmail} notified to support team ref: ${result?.MessageId}`);
-      
+
       //const response = await this.awsService.sendEmail(EVENT_GUEST_PRESENCE_REQUEST_TEMPLATE_NAME, true, [], emailData);
       return {
         message: 'Email sent successfully'
