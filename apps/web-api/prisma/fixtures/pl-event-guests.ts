@@ -17,7 +17,7 @@ const eventGuestFactory = Factory.define<Omit<PLEventGuest, 'id'>>(
   ({ onCreate }) => {
     onCreate(async (eventGuest) => {
       // Fetching UIDs for relational fields
-      const memberUids = await ( 
+      const memberUids = await (
         await getUidsFrom('member')
       ).map((result) => result.uid);
       eventGuest.memberUid = sample(memberUids) || '';
@@ -50,6 +50,7 @@ const eventGuestFactory = Factory.define<Omit<PLEventGuest, 'id'>>(
       priority: faker.datatype.number({ min: 1, max: 100 }),
       isHost: faker.datatype.boolean(),
       isSpeaker: faker.datatype.boolean(),
+      isSponsor: faker.datatype.boolean(),
       isFeatured: faker.datatype.boolean(),
     };
   }

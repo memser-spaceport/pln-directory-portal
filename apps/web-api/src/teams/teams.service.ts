@@ -285,7 +285,7 @@ export class TeamsService {
 
   /**
    * Updates multiple team member roles in the database.
-   * 
+   *
    * @param teamAndRoles - Array of objects containing `memberUid` and `teamUid` as identifiers, along with update data.
    * @param tx - Prisma transaction client for atomic execution.
    */
@@ -301,7 +301,7 @@ export class TeamsService {
   /**
    * Deletes multiple team member roles in a single query using `deleteMany`.
    * Ensures deletion only occurs when both `memberUid` and `teamUid` match.
-   * 
+   *
    * @param teamAndRoles - Array of objects containing `memberUid` and `teamUid` pairs to delete.
    * @param tx - Prisma transaction client for atomic execution.
    */
@@ -315,7 +315,7 @@ export class TeamsService {
 
   /**
    * Inserts multiple new team member roles in a single batch operation using `createMany`.
-   * 
+   *
    * @param teamAndRoles - Array of new team member role objects to be added.
    * @param tx - Prisma transaction client for atomic execution.
    */
@@ -1051,20 +1051,22 @@ export class TeamsService {
             some: {
               OR: [
                 { isHost: true },
-                { isSpeaker: true }
+                { isSpeaker: true },
+                { isSponsor: true }
               ]
             }
           }
         },
         select: {
-          uid: true, 
+          uid: true,
           name: true,
           logo: true,
           eventGuests: {
             where: {
               OR: [
                 { isHost: true },
-                { isSpeaker: true }
+                { isSpeaker: true },
+                { isSponsor: true }
               ]
             },
             distinct: ['memberUid'], // Ensures unique members per team
@@ -1072,6 +1074,7 @@ export class TeamsService {
               uid: true,
               isHost: true,
               isSpeaker: true,
+              isSponsor: true,
               member: {
                 select: {
                   uid: true,
@@ -1102,5 +1105,5 @@ export class TeamsService {
   private async postCreateActions(uid: string, action: string): Promise<void> {
     await this.huskyRevalidationService.triggerHuskyRevalidation('teams', uid, action);
     }
-  
+
 }
