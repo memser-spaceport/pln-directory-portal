@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createZodDto } from '@abitia/zod-dto';
 import { QueryParams } from './query-params';
-import { ResponseMemberSchema } from './member'; 
+import { ResponseMemberSchema } from './member';
 import { ResponseTeamSchema  } from "./team";
 
 export const CreatePLEventGuestSchema = z.object({
@@ -16,6 +16,7 @@ export const CreatePLEventGuestSchema = z.object({
     uid: z.string(),
     isHost: z.boolean().optional(),
     isSpeaker: z.boolean().optional(),
+    isSponsor: z.boolean().optional(),
     hostSubEvents: z.array(
       z.object({
         name: z.string(),
@@ -26,7 +27,14 @@ export const CreatePLEventGuestSchema = z.object({
       z.object({
         name: z.string(),
         link: z.string().url(),
-    })).optional()
+    })
+    ).optional(),
+    sponsorSubEvents: z.array(
+      z.object({
+        name: z.string(),
+        link: z.string().url(),
+      })
+    ).optional()
   }))
 });
 
@@ -45,6 +53,7 @@ export const PLEventGuestSchema = z.object({
   isFeatured: z.boolean().nullish(),
   isHost: z.boolean().nullish(),
   isSpeaker: z.boolean().nullish(),
+  isSponsor: z.boolean().nullish(),
   priority: z.number().int().nullish()
 });
 
@@ -66,6 +75,7 @@ export const PLEventGuestQuerySchema = z.object({
   isFeatured: z.boolean().nullish(),
   isHost: z.boolean().nullish(),
   isSpeaker: z.boolean().nullish(),
+  isSponsor: z.boolean().nullish(),
   searchBy: z.string()
 });
 

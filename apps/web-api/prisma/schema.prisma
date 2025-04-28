@@ -456,6 +456,7 @@ model PLEventGuest {
   priority       Int?
   isHost         Boolean  @default(false)
   isSpeaker      Boolean  @default(false)
+  isSponsor      Boolean  @default(false)
   isFeatured     Boolean  @default(false)
 }
 

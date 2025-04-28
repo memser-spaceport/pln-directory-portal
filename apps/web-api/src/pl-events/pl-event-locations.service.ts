@@ -140,7 +140,8 @@ export class PLEventLocationsService {
                     }
                   },
                   isHost: true,
-                  isSpeaker: true
+                  isSpeaker: true,
+                  isSponsor: true,
                 }
               }
             },
@@ -189,6 +190,7 @@ export class PLEventLocationsService {
     team: {uid: string; name: string} | null;
     isHost: boolean;
     isSpeaker: boolean;
+    isSponsor: boolean;
   }[]) {
     const groupedGuests = {};
     eventGuests?.forEach((guest) => {
@@ -198,7 +200,8 @@ export class PLEventLocationsService {
           member: guest.member,
           isHost: guest.isHost,
           isSpeaker: guest.isSpeaker,
-          team: guest.team, 
+          isSponsor: guest.isSponsor,
+          team: guest.team,
         };
     });
     return Object.values(groupedGuests);
@@ -258,7 +261,7 @@ export class PLEventLocationsService {
 
   /**
    * Finds a location by its unique identifier.
-   * 
+   *
    * @param {string} uid - The unique identifier of the location to be retrieved.
    * @returns plEvent location The location object if found, otherwise `null`.
    * @throws {Error} - If an error occurs during the query, it is passed to the `handleErrors` method.
@@ -318,7 +321,7 @@ export class PLEventLocationsService {
 
   /**
    * This method is executed on a cron schedule every two days once
-   * It queries the database for location data associated with events, hosts, speakers, and participant counts.
+   * It queries the database for location data associated with events, hosts, speakers, sponsors, and participant counts.
    * After retrieving the data, it notifies subscribers if certain threshold is met
    */
   @Cron(process.env.IRL_NOTIFICATION_CRON || '0 0 * * *')
@@ -327,25 +330,25 @@ export class PLEventLocationsService {
       this.logger.info('Notification initiated by cron');
       const query: any = `
       WITH LatestNotificationDate AS (
-        SELECT 
-          n."entityUid", 
+        SELECT
+          n."entityUid",
           MAX(n."createdAt") AS latest_createdAt
         FROM "Notification" n
-        WHERE (n."status"='SENT'AND "entityType"='EVENT_LOCATION'   
+        WHERE (n."status"='SENT'AND "entityType"='EVENT_LOCATION'
         AND n."entityAction"='IRL_UPDATE' )  -- Get the latest 'createdAt' for each 'entityUid' where status is 'SENT'
         GROUP BY n."entityUid"              -- Group by entityUid to get the latest created date for each entity
       )
       SELECT
         el."uid",
         el."location",
-        CASE                                -- cases to seggregate data into hosts and speakers 
+        CASE                                -- cases to seggregate data into hosts and speakers
           WHEN COUNT(events.uid) > 0 THEN   -- Aggregate the events if exists
             jsonb_agg(                      -- Aggregate distinct events as JSON objects
               DISTINCT jsonb_build_object(
               'uid', events.uid,
               'name', events.name
               )
-            ) 
+            )
           ELSE NULL
         END AS events,
 
@@ -359,9 +362,9 @@ export class PLEventLocationsService {
           ELSE NULL
         END
         ) FILTER (                -- Filter hosts by created/updated at or after latest notification date, or today
-        WHERE pg."isHost" = TRUE 
-          AND (                              
-             (pg."updatedAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid")) 
+        WHERE pg."isHost" = TRUE
+          AND (
+             (pg."updatedAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid"))
           )) AS hosts,
 
       jsonb_agg(
@@ -374,11 +377,27 @@ export class PLEventLocationsService {
           ELSE NULL
         END
       ) FILTER (                    -- Filter speakers by created/updated at or after latest notification date, or today
-          WHERE pg."isSpeaker" = TRUE 
+          WHERE pg."isSpeaker" = TRUE
             AND (
               (pg."updatedAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid"))
         )
-      ) AS speakers
+      ) AS speakers,
+
+      jsonb_agg(
+        DISTINCT CASE
+          WHEN pg."isSponsor" THEN      -- Aggregate guests if the participant is a sponsor
+            jsonb_build_object(
+              'uid', pg."memberUid",
+              'name', m."name"
+            )
+          ELSE NULL
+        END
+      ) FILTER (                    -- Filter sponsors by created/updated at or after latest notification date, or today
+          WHERE pg."isSponsor" = TRUE
+            AND (
+              (pg."updatedAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid"))
+        )
+      ) AS sponsors
 
     FROM
       "PLEventLocation" el
@@ -392,7 +411,7 @@ export class PLEventLocationsService {
           e."name"
         FROM "PLEvent" e
         WHERE                --fetch the events added after latest notification date,or today
-          (e."createdAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid")) 
+          (e."createdAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid"))
           )AS events ON events."locationUid" = el."uid"
     GROUP BY
       el."uid",
@@ -407,11 +426,11 @@ export class PLEventLocationsService {
 
   /**
    * Notifies subscribers based on the fetched location.
-   * 
+   *
    * @param {Array} data - The location data containing the data about latest updates.
-   * 
+   *
    * This method loops through each location and checks for latest updates
-   * if exceeds a threshold (IRL_THRESHOLD) it constructs and sends an email 
+   * if exceeds a threshold (IRL_THRESHOLD) it constructs and sends an email
    * notification to the subscribers for that location.
    */
   private async notifySubscribers(data) {
@@ -422,6 +441,7 @@ export class PLEventLocationsService {
           let participantsCount = 0;
           let hostCount = 0;
           let speakerCount = 0;
+          let sponsorCount = 0;
           let eventCount = 0;
           if (location?.events?.length) {
             eventCount = location?.events.length;
@@ -432,11 +452,14 @@ export class PLEventLocationsService {
           if (location?.speakers?.length) {
             speakerCount = location?.speakers.length;
           }
+          if (location?.sponsors?.length) {
+            sponsorCount = location?.sponsors.length;
+          }
 
-          participantsCount = hostCount + speakerCount + eventCount;
+          participantsCount = hostCount + speakerCount + sponsorCount + eventCount;
           if (participantsCount >= (Number(process.env.IRL_NOTIFICATION_THRESHOLD) || 10)) {
             const notification = await this.notificationService.getNotificationPayload(location.uid, "IRL_UPDATE");
-            const payload = await this.buildConsolidatedEmailPayload(location, notification, eventCount, hostCount, speakerCount);
+            const payload = await this.buildConsolidatedEmailPayload(location, notification, eventCount, hostCount, speakerCount, sponsorCount);
             await this.notificationService.sendNotification(payload)
           } else {
             this.logger.info(`Threshold not reached for sending notification in ${location.location}`)
@@ -450,12 +473,12 @@ export class PLEventLocationsService {
 
   /**
    * Builds the consolidated email payload for the notification.
-   * 
+   *
    * @param locationData Data containing records of latest updates in a specific location.
    * @param notification The notification payload to be sent.
    * @returns The updated notification payload with additional information for email.
    */
-  private async buildConsolidatedEmailPayload(locationData, notification, eventCount, hostCount, speakerCount) {
+  private async buildConsolidatedEmailPayload(locationData, notification, eventCount, hostCount, speakerCount, sponsorCount) {
     const requestor = await this.memberService.findMemberByRole();
     notification.additionalInfo = {
       location: locationData.location,
@@ -463,6 +486,7 @@ export class PLEventLocationsService {
       irlPageLink: `${process.env.IRL_BASEURL}?location=${locationData.location}`,
       speakers: await this.buildGuestPayload(locationData.speakers, process.env.IRL_GUEST_BASEURL) || [],
       hosts: await this.buildGuestPayload(locationData.hosts, process.env.IRL_GUEST_BASEURL) || [],
+      sponsors: await this.buildGuestPayload(locationData.sponsors, process.env.IRL_GUEST_BASEURL) || [],
       events: await this.buildEventsPayload(locationData.events, process.env.IRL_BASEURL, locationData.location) || [],
       sourceUid: requestor?.uid,
       sourceName: requestor?.name,
@@ -470,6 +494,7 @@ export class PLEventLocationsService {
       irlBaseUrl: process.env.IRL_BASEURL,
       hostCount: hostCount,
       speakerCount: speakerCount,
+      sponsorCount: sponsorCount,
       eventCount: eventCount,
     }
     this.logger.info(`Successfully built email payload for ${locationData.location}`)
@@ -478,7 +503,7 @@ export class PLEventLocationsService {
 
   /**
    * Builds the events payload for the email based on the events data.
-   * 
+   *
    * @param events The list of events associated with the location.
    * @param baseUrl The base URL for events.
    * @param location The location associated with the events.
@@ -501,8 +526,8 @@ export class PLEventLocationsService {
 
   /**
    * Builds the guests payload for the email based on the guest data.
-   * 
-   * @param guests The list of guests added as host/speaker.
+   *
+   * @param guests The list of guests added as host/speaker/sponsor.
    * @param baseUrl The base URL for member.
    * @returns modified guests list with URLs.
    */
