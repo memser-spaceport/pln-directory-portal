@@ -177,6 +177,7 @@ enum ImageSize {
 
 enum DiscoveryQuestionType {
   CHAT
+  FOLLOW_UP
 }
 
 model ParticipantsRequest {
