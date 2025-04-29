@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import * as path from 'path';
 import { z } from 'zod';
-import { Prisma, Team, Member, ParticipantsRequest } from '@prisma/client';
+import { Prisma, Team, Member, ParticipantsRequest, AskStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schema';
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
@@ -138,12 +138,24 @@ export class TeamsService {
           asks: {
             select: {
               uid: true,
-              title:true,
-              tags:true,
-              description:true,
-              teamUid:true
-            }
-          }
+              title: true,
+              tags: true,
+              description: true,
+              teamUid: true,
+              status: true,
+              closedAt: true,
+              closedReason: true,
+              closedComment: true,
+              closedByUid: true,
+              closedBy: {
+                select: {
+                  uid: true,
+                  name: true,
+                  image: true,
+                },
+              },
+            },
+          },
         },
       });
       team.teamFocusAreas = this.removeDuplicateFocusAreas(team.teamFocusAreas);
@@ -267,7 +279,7 @@ export class TeamsService {
       await this.logParticipantRequest(requestorEmail, updatedTeam, existingTeam.uid, tx);
     });
     this.notificationService.notifyForTeamEditApproval(updatedTeam.name, teamUid, requestorEmail);
-    await this.postUpdateActions(updatedTeam.uid);
+    await this.postUpdateActions(result.uid);
     return result;
   }
 
@@ -758,7 +770,10 @@ export class TeamsService {
       }
     } else if (error instanceof Prisma.PrismaClientValidationError) {
       throw new BadRequestException('Database field validation error on Team', error.message);
+    } else {
+      throw error;
     }
+    // TODO: Remove this return statement if future versions allow all error-returning functions to be inferred correctly.
     return error;
   }
 
@@ -977,6 +992,7 @@ export class TeamsService {
               where: { uid: data.uid },
               data: {
                 ...data,
+                closedAt: data.status === AskStatus.CLOSED ? new Date() : null,
               },
             });
           }
