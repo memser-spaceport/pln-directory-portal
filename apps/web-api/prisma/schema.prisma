@@ -52,18 +52,29 @@ model Team {
   asks                         Ask[]
 }
 
+enum AskStatus {
+  OPEN
+  CLOSED
+}
+
 model Ask {
-  id          Int      @id @default(autoincrement())
-  uid         String   @unique @default(cuid())
-  title       String
-  description String
-  tags        String[]
-  team        Team?    @relation(fields: [teamUid], references: [uid])
-  teamUid     String?
-  project     Project? @relation(fields: [projectUid], references: [uid])
-  projectUid  String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            Int       @id @default(autoincrement())
+  uid           String    @unique @default(cuid())
+  title         String
+  description   String
+  tags          String[]
+  team          Team?     @relation(fields: [teamUid], references: [uid])
+  teamUid       String?
+  project       Project?  @relation(fields: [projectUid], references: [uid])
+  projectUid    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  status        AskStatus @default(OPEN)
+  closedAt      DateTime?
+  closedReason  String?
+  closedComment String?
+  closedBy      Member?   @relation(fields: [closedByUid], references: [uid])
+  closedByUid   String?
 }
 
 model Member {
@@ -116,6 +127,7 @@ model Member {
   createdQuestions             DiscoveryQuestion[]           @relation("MemberCreatedDiscoveryQuestions")
   modifiedQuestions            DiscoveryQuestion[]           @relation("MemberModifiedDiscoveryQuestions")
   subscriptions                MemberSubscription[]
+  closedAsks                   Ask[]
 }
 
 model MemberRole {
@@ -165,6 +177,7 @@ enum ImageSize {
 
 enum DiscoveryQuestionType {
   CHAT
+  FOLLOW_UP
 }
 
 model ParticipantsRequest {
