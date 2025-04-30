@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MemberController } from './members.controller';
 import { MembersService } from './members.service';
 import { ParticipantsRequestModule } from '../participants-request/participants-request.module';
@@ -12,8 +12,8 @@ import { HuskyModule } from '../husky/husky.module';
     SharedModule,
     AuthModule,
     OtpModule,
-    ParticipantsRequestModule,
-    HuskyModule
+    forwardRef(() => ParticipantsRequestModule),
+    forwardRef(() => HuskyModule)
   ],
   providers: [
     MembersService

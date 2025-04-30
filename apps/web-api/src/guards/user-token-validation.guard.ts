@@ -6,10 +6,14 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import axios from 'axios';
+import { ActiveMemberEmailGuard } from './active-member-email.guard';
+import { MembersService } from '../members/members.service';
 
 @Injectable()
-export class UserTokenValidation implements CanActivate {
-  constructor() {}
+export class UserTokenValidation extends ActiveMemberEmailGuard {
+  constructor(protected membersService: MembersService) {
+    super(membersService);
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     try {
@@ -22,6 +26,7 @@ export class UserTokenValidation implements CanActivate {
         `${process.env.AUTH_API_URL}/auth/introspect`,
         { token: token }
       );
+      await super.canActivate(context); //perform the base active member email guard logic
       if (
         validationResult?.data?.active &&
         validationResult?.data?.email
@@ -38,10 +43,5 @@ export class UserTokenValidation implements CanActivate {
       throw new InternalServerErrorException();
     }
     return true;
-  }
-
-  private extractTokenFromHeader(request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
   }
 }
