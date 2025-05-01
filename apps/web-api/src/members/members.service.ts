@@ -1225,7 +1225,7 @@ export class MembersService {
    */
   private async postCreateActions(uid: string, action: string): Promise<void> {
     await this.cacheService.reset({ service: 'members' });
-    await this.huskyRevalidationService.triggerHuskyRevalidation('members', uid, action);
+    this.huskyRevalidationService.triggerHuskyRevalidation('members', uid, action);
     await this.forestadminService.triggerAirtableSync();
   }
 
@@ -1235,7 +1235,7 @@ export class MembersService {
    */
   private async postUpdateActions(uid: string, action: string): Promise<void> {
     await this.cacheService.reset({ service: 'members' });
-    await this.huskyRevalidationService.triggerHuskyRevalidation('members', uid, action);
+    this.huskyRevalidationService.triggerHuskyRevalidation('members', uid, action);
     await this.forestadminService.triggerAirtableSync();
   }
 
