@@ -232,6 +232,23 @@ $ npx prisma generate --schema=./apps/web-api/prisma/oso-schema.prisma
 $ npx prisma db push --schema=./apps/web-api/prisma/oso-schema.prisma
 ```
 
+## DB Migration (local environment only)
+If you need to create a new migration, you can run the following commands:
+
+1. Recreate your database schema, so all the migrations are applied to your database, you'll need to do this only once
+```sh
+npx prisma reset
+```
+
+2. Add changes to the "schema.prisma" file
+
+3. Create a new migration based on the schema changes
+```sh
+npx prisma migrate dev --name "my_new_migration"
+```
+
+If you need to roll back the migration, you need to delete the folder with your last migration manually, remove changes from "schema.prisma" and run "npx prisma reset" again
+
 ## Populate a Database with Mock Data
 
 ⚠ Keep in mind that running the following command completely wipes the database before inserting any mock data.
