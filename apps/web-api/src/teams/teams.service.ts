@@ -472,7 +472,7 @@ export class TeamsService {
    */
   private async postUpdateActions(uid: string): Promise<void> {
     await this.cacheService.reset({ service: 'teams' });
-    await this.huskyRevalidationService.triggerHuskyRevalidation('teams', uid, UPDATE);
+    this.huskyRevalidationService.triggerHuskyRevalidation('teams', uid, UPDATE);
     await this.forestadminService.triggerAirtableSync();
   }
 
@@ -1103,7 +1103,7 @@ export class TeamsService {
    * This ensures that the system is up-to-date with the latest changes.
    */
   private async postCreateActions(uid: string, action: string): Promise<void> {
-    await this.huskyRevalidationService.triggerHuskyRevalidation('teams', uid, action);
+    this.huskyRevalidationService.triggerHuskyRevalidation('teams', uid, action);
     }
 
 }
