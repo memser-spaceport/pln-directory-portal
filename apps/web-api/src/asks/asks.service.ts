@@ -1,6 +1,7 @@
 import { ForbiddenException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { Ask, AskStatus, Prisma } from '@prisma/client';
+import { Ask, AskStatus, Member, Prisma, Team } from '@prisma/client';
 import DOMPurify from 'isomorphic-dompurify';
+import path from 'path';
 import { CreateAskDto, ResponseAskDto, ResponseAskWithRelationsDto } from 'libs/contracts/src/schema/ask';
 import { PrismaService } from '../shared/prisma.service';
 import { CacheService } from '../utils/cache/cache.service';
@@ -8,6 +9,11 @@ import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { LogService } from '../shared/log.service';
 import { TeamsService } from '../teams/teams.service';
+import { MembersService } from '../members/members.service';
+import { AwsService } from '../utils/aws/aws.service';
+import { ASK_CLOSED_SUBJECT } from '../utils/constants';
+import { ASK_CREATED_SUBJECT } from '../utils/constants';
+import { formatDateTime } from '../utils/formatters';
 
 @Injectable()
 export class AskService {
@@ -17,8 +23,11 @@ export class AskService {
     private readonly forestadminService: ForestAdminService,
     @Inject(forwardRef(() => TeamsService))
     private readonly teamsService: TeamsService,
+    @Inject(forwardRef(() => MembersService))
+    private membersService: MembersService,
     @Inject(forwardRef(() => ParticipantsRequestService))
     private readonly participantsRequestService: ParticipantsRequestService,
+    private awsService: AwsService,
     private readonly logger: LogService
   ) {}
 
@@ -57,7 +66,7 @@ export class AskService {
 
   // Create a new ask for a team
   async createForTeam(teamUid: string, requesterEmailId: string, askData: CreateAskDto): Promise<ResponseAskDto> {
-    await this.teamsService.isTeamMemberOrAdmin(requesterEmailId, teamUid);
+    const requester = await this.teamsService.isTeamMemberOrAdmin(requesterEmailId, teamUid);
 
     const team = await this.teamsService.findTeamByUid(teamUid);
 
@@ -85,6 +94,11 @@ export class AskService {
         });
 
         await this.logIntoParticipantRequest(tx, createdAsk, teamAsks, team.name, requesterEmailId);
+        await this.notifyForAskStatusChange({
+          ask: createdAsk,
+          requester,
+          team,
+        });
       });
 
       await this.cacheService.reset({ service: 'teams' });
@@ -120,8 +134,9 @@ export class AskService {
         throw new NotFoundException(`Ask with uid ${uid} not found`);
       }
 
+      let requester;
       if (ask.teamUid) {
-        await this.teamsService.isTeamMemberOrAdmin(requesterEmailId, ask.teamUid);
+        requester = await this.teamsService.isTeamMemberOrAdmin(requesterEmailId, ask.teamUid);
       }
 
       if (ask.status === AskStatus.CLOSED) {
@@ -160,6 +175,12 @@ export class AskService {
           });
 
           await this.logIntoParticipantRequest(tx, updatedAsk, teamAsks, team.name, requesterEmailId);
+          await this.notifyForAskStatusChange({
+            ask: updatedAsk,
+            requester,
+            closedByUid: askData.closedByUid,
+            team,
+          });
         });
 
         await this.cacheService.reset({ service: 'teams' });
@@ -246,5 +267,50 @@ export class AskService {
       },
       tx
     );
+  }
+
+  async notifyForAskStatusChange({
+    ask,
+    requester,
+    closedByUid,
+    team,
+  }: {
+    ask: Ask;
+    team: Team;
+    requester?: Member;
+    closedByUid?: string;
+  }) {
+    const adminEmailIdsEnv = process.env.SES_ADMIN_EMAIL_IDS;
+    const adminEmailIds = adminEmailIdsEnv?.split('|') ?? [];
+    const teamLink = `${process.env.WEB_UI_BASE_URL}/teams/${team.uid}`;
+    const closedBy = closedByUid ? await this.membersService.findOne(closedByUid) : null;
+    const closedByLink = closedBy ? `${process.env.WEB_UI_BASE_URL}/members/${closedBy.uid}` : null;
+    const requesterLink = requester ? `${process.env.WEB_UI_BASE_URL}/members/${requester.uid}` : null;
+
+    const result = await this.awsService.sendEmailWithTemplate(
+      path.join(__dirname, '/shared/askStatusChange.hbs'),
+      {
+        status: ask.status,
+        title: ask.title,
+        description: ask.description,
+        tags: ask.tags?.join(', '),
+        teamName: team.name,
+        teamLink,
+        requester,
+        requesterLink,
+        createdAt: formatDateTime(ask.createdAt),
+        closedBy,
+        closedByLink,
+        closedReason: ask.closedReason,
+        closedComment: ask.closedComment,
+        closedAt: ask.closedAt ? formatDateTime(ask.closedAt) : null,
+      },
+      '',
+      ask.status === AskStatus.OPEN ? ASK_CREATED_SUBJECT : ASK_CLOSED_SUBJECT,
+      process.env.SES_SOURCE_EMAIL || '',
+      adminEmailIds,
+      []
+    );
+    this.logger.info(`Ask status change notified to support team ref: ${result?.MessageId}`);
   }
 }
