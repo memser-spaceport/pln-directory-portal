@@ -12,7 +12,8 @@
     "resolveJsonModule": true,
     "isolatedModules": false,
     "module": "commonjs",
-    "incremental": true
+    "incremental": true,
+    "emitDecoratorMetadata": true
   },
   "include": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
   "exclude": ["node_modules", "setup-env.ts"]

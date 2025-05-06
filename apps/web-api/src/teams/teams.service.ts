@@ -777,6 +777,7 @@ export class TeamsService {
     return error;
   }
 
+
   async insertManyFromAirtable(airtableTeams: z.infer<typeof AirtableTeamSchema>[]) {
     const fundingStages = await this.prisma.fundingStage.findMany();
     const industryTags = await this.prisma.industryTag.findMany();
@@ -805,20 +806,28 @@ export class TeamsService {
 
       const oneToManyRelations = {
         fundingStageUid:
-          fundingStages.find((fundingStage) => fundingStage.title === team.fields?.['Funding Stage'])?.uid || null,
+          fundingStages.find(
+            (fundingStage) =>
+              fundingStage.title === team.fields?.['Funding Stage']
+          )?.uid || null,
       };
 
       const manyToManyRelations = {
         industryTags: {
           connect: industryTags
-            .filter((tag) => !!team.fields?.['Tags lookup'] && team.fields?.['Tags lookup'].includes(tag.title))
+            .filter(
+              (tag) =>
+                !!team.fields?.['Tags lookup'] &&
+                team.fields?.['Tags lookup'].includes(tag.title)
+            )
             .map((tag) => ({ id: tag.id })),
         },
         membershipSources: {
           connect: membershipSources
             .filter(
               (program) =>
-                !!team.fields?.['Accelerator Programs'] && team.fields?.['Accelerator Programs'].includes(program.title)
+                !!team.fields?.['Accelerator Programs'] &&
+                team.fields?.['Accelerator Programs'].includes(program.title)
             )
             .map((tag) => ({ id: tag.id })),
         },
@@ -838,9 +847,13 @@ export class TeamsService {
       if (team.fields.Logo) {
         const logo = team.fields.Logo[0];
 
-        const hashedLogo = logo.filename ? hashFileName(`${path.parse(logo.filename).name}-${logo.id}`) : '';
+        const hashedLogo = logo.filename
+          ? hashFileName(`${path.parse(logo.filename).name}-${logo.id}`)
+          : '';
         image =
-          images.find((image) => path.parse(image.filename).name === hashedLogo) ||
+          images.find(
+            (image) => path.parse(image.filename).name === hashedLogo
+          ) ||
           (await this.fileMigrationService.migrateFile({
             id: logo.id ? logo.id : '',
             url: logo.url ? logo.url : '',

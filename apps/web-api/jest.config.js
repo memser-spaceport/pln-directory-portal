@@ -7,6 +7,8 @@ module.exports = {
     },
   },
   testEnvironment: 'node',
+  collectCoverage: true,
+  coverageReporters: ['text', 'lcov', 'html', 'json'],
   // Temporary fix for CI/CD issue: https://d.pr/i/x1Qfk7
   testTimeout: 30000,
   transform: {
@@ -16,6 +18,6 @@ module.exports = {
   coverageDirectory: '../../coverage/apps/api',
   setupFilesAfterEnv: ['./mocks.ts'],
   transformIgnorePatterns: [
-    'node_modules/(?!(web3.storage|ipfs-car|@web3-storage|carbites)/)',
+    'node_modules/(?!(web3.storage|ipfs-car|@web3-storage|carbites|axios)/)',
   ],
 };

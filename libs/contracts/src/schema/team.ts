@@ -7,7 +7,8 @@ import { ResponseMembershipSourceSchema } from './membership-source';
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
 import { ResponseTechnologySchema } from './technology';
-import { ResponseAskSchema, ResponseAskSchemaWithRelationsSchema } from './ask';
+import { ResponseProjectSchema } from './project';
+import { ResponseTeamFocusAreaSchema } from './team-focus-areas';
 
 export const TeamSchema = z.object({
   id: z.number().int(),
@@ -30,6 +31,8 @@ export const TeamSchema = z.object({
   fundingStageUid: z.string().nullish(),
   linkedinHandler: z.string().nullish(),
   officeHours: z.string().nullish(),
+  moreDetails: z.string().nullish(),
+  telegramHandler: z.string().nullish(),
 });
 
 export const CreateTeamSchema = TeamSchema.pick({
@@ -48,13 +51,16 @@ export const CreateTeamSchema = TeamSchema.pick({
 export const ResponseTeamSchema = TeamSchema.omit({ id: true }).strict();
 
 export const ResponseTeamWithRelationsSchema = ResponseTeamSchema.extend({
-  logo: ResponseImageWithRelationsSchema.optional(),
+  logo: ResponseImageWithRelationsSchema.nullable().optional(),
   membershipSources: ResponseMembershipSourceSchema.array().optional(),
   industryTags: ResponseIndustryTagSchema.array().optional(),
   fundingStage: ResponseFundingStageSchema.optional(),
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
   technologies: ResponseTechnologySchema.array().optional(),
-  asks: ResponseAskSchemaWithRelationsSchema.array().optional()
+  lastModifiedBy: z.string().nullish(),
+  maintainingProjects: ResponseProjectSchema.array().optional(),
+  contributingProjects: ResponseProjectSchema.array().optional(),
+  teamFocusAreas: ResponseTeamFocusAreaSchema.array().optional(),
 });
 
 export const TeamQueryableFields = ResponseTeamSchema.keyof();
@@ -74,9 +80,7 @@ export const TeamQueryParams = QueryParams({
   relationalFields: TeamRelationalFields,
 });
 
-export const TeamDetailQueryParams = TeamQueryParams.unwrap()
-  .pick(RETRIEVAL_QUERY_FILTERS)
-  .optional();
+export const TeamDetailQueryParams = TeamQueryParams.unwrap().pick(RETRIEVAL_QUERY_FILTERS).optional();
 
 export class TeamDto extends createZodDto(TeamSchema) {}
 
