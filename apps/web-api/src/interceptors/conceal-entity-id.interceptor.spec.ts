@@ -1,4 +1,3 @@
-import { createMock } from '@golevelup/ts-jest';
 import { ExecutionContext } from '@nestjs/common';
 import { ConcealEntityIDInterceptor } from './conceal-entity-id.interceptor';
 
@@ -8,9 +7,21 @@ jest.mock('rxjs/operators', () => ({
   map: jest.fn((data) => data),
 }));
 
+const mockRequest = {
+  method: 'GET',
+  url: '/example',
+  headers: {},
+};
+
 describe('ConcealEntityIDInterceptor', () => {
   let concealEntityIDInterceptor: ConcealEntityIDInterceptor;
-  const contextMock = createMock<ExecutionContext>();
+
+  const contextMock = {
+    switchToHttp: () => ({
+      getRequest: () => mockRequest,
+    }),
+  } as ExecutionContext;
+
   const getNextMock = jest.fn(function (data) {
     return {
       handle: jest.fn().mockReturnThis(),
@@ -26,10 +37,7 @@ describe('ConcealEntityIDInterceptor', () => {
     describe('and the response is just a string', () => {
       it('should not conceal ids', () => {
         const responseData = 'String with id: 123';
-        const finalResponse = concealEntityIDInterceptor.intercept(
-          contextMock,
-          getNextMock(responseData)
-        );
+        const finalResponse = concealEntityIDInterceptor.intercept(contextMock, getNextMock(responseData));
         expect(finalResponse).toBe(responseData);
       });
     });
@@ -37,10 +45,7 @@ describe('ConcealEntityIDInterceptor', () => {
     describe('and the response is just a number', () => {
       it('should not conceal ids', () => {
         const responseData = 123;
-        const finalResponse = concealEntityIDInterceptor.intercept(
-          contextMock,
-          getNextMock(responseData)
-        );
+        const finalResponse = concealEntityIDInterceptor.intercept(contextMock, getNextMock(responseData));
         expect(finalResponse).toBe(responseData);
       });
     });
@@ -54,10 +59,7 @@ describe('ConcealEntityIDInterceptor', () => {
               uid: '123',
             },
           };
-          const finalResponse = concealEntityIDInterceptor.intercept(
-            contextMock,
-            getNextMock(responseData)
-          );
+          const finalResponse = concealEntityIDInterceptor.intercept(contextMock, getNextMock(responseData));
           expect(finalResponse).toStrictEqual(responseData);
         });
       });
@@ -69,10 +71,7 @@ describe('ConcealEntityIDInterceptor', () => {
               id: '123',
             },
           };
-          const finalResponse = concealEntityIDInterceptor.intercept(
-            contextMock,
-            getNextMock(responseData)
-          );
+          const finalResponse = concealEntityIDInterceptor.intercept(contextMock, getNextMock(responseData));
           expect(finalResponse).toStrictEqual({
             nested: {},
           });
@@ -97,10 +96,7 @@ describe('ConcealEntityIDInterceptor', () => {
               },
             },
           ];
-          const finalResponse = concealEntityIDInterceptor.intercept(
-            contextMock,
-            getNextMock(responseData)
-          );
+          const finalResponse = concealEntityIDInterceptor.intercept(contextMock, getNextMock(responseData));
           expect(finalResponse).toStrictEqual(responseData);
         });
       });
@@ -120,10 +116,7 @@ describe('ConcealEntityIDInterceptor', () => {
               },
             },
           ];
-          const finalResponse = concealEntityIDInterceptor.intercept(
-            contextMock,
-            getNextMock(responseData)
-          );
+          const finalResponse = concealEntityIDInterceptor.intercept(contextMock, getNextMock(responseData));
           expect(finalResponse).toStrictEqual([
             {
               nested: {},

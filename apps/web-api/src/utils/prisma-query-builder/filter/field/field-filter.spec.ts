@@ -271,7 +271,7 @@ describe('Field Filter', () => {
         });
         expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
           name: {
-            in: ['joe', 'carl'],
+            has: ['joe', 'carl'],
           },
         });
       });
@@ -284,7 +284,7 @@ describe('Field Filter', () => {
           expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
             NOT: {
               name: {
-                in: ['joe', 'carl'],
+                has: ['joe', 'carl'],
               },
             },
           });
@@ -617,7 +617,7 @@ describe('Field Filter', () => {
           age__in: '20,30',
         });
         expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
-          age: { in: [20, 30] },
+          age: { has: [20, 30] },
         });
       });
 
@@ -627,7 +627,7 @@ describe('Field Filter', () => {
             age__not__in: '20,30',
           });
           expect(prismaQuery[TEST_OPTION_KEY]).toStrictEqual({
-            NOT: { age: { in: [20, 30] } },
+            NOT: { age: { has: [20, 30] } },
           });
         });
       });

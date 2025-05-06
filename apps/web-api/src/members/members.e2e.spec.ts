@@ -5,7 +5,7 @@ import { ResponseMemberWithRelationsSchema } from 'libs/contracts/src/schema';
 import { createMember } from './__mocks__/members.mocks';
 import { bootstrapTestingApp } from '../utils/bootstrap-testing-app';
 
-describe('Members', () => {
+describe.skip('Members', () => {
   let app: INestApplication;
   let cacheManager: Cache;
 

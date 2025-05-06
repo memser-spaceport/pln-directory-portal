@@ -1,4 +1,4 @@
-import z from 'zod';
+import z, { ZodDate, ZodEffects } from 'zod';
 import { IAirtableTeam } from '@protocol-labs-network/airtable';
 
 export const AirtableTeamSchema: z.ZodType<IAirtableTeam> = z.lazy(() =>
@@ -13,13 +13,13 @@ export const AirtableTeamSchema: z.ZodType<IAirtableTeam> = z.lazy(() =>
       'Network members': z.string().array().optional(),
       // Logo: IAirtableTeamLogo[].optional();
       'Tags lookup': z.string().array().optional(),
-      'Last Audited': z
-        .preprocess((value: string) => new Date(value), z.date())
-        .optional(),
+      'Last Audited': (
+        z.preprocess((value: string) => new Date(value), z.date()) as unknown as ZodEffects<ZodDate, Date, undefined>
+      ).optional(),
       Notes: z.string().optional(),
-      'Last Modified': z
-        .preprocess((value: string) => new Date(value), z.date())
-        .optional(),
+      'Last Modified': (
+        z.preprocess((value: string) => new Date(value), z.date()) as unknown as ZodEffects<ZodDate, Date, undefined>
+      ).optional(),
       'Eligible for marketplace credits': z.boolean().optional(),
       'Grants program': z.boolean().optional(),
       Blog: z.string().optional(),

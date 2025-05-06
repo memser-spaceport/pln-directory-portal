@@ -12,7 +12,7 @@ export const ApiOkResponseFromZod = (ZodSchema: any) => {
       schema: zodToJsonSchema(ZodSchema, {
         target: 'openApi3',
         $refStrategy: 'none',
-      }),
+      }).definitions,
       description: 'By default, all relational fields will be omitted.',
     })
   );

@@ -1,7 +1,7 @@
 import { faker } from '@faker-js/faker';
 import { FundingStage, Team } from '@prisma/client';
 import { Factory } from 'fishery';
-import { prisma } from '../../../prisma/__mocks__/index';
+import { prisma } from '../../../prisma/__mocks__';
 import { TestFactorySeederParams } from '../../utils/factory-interfaces';
 
 async function createFundingStage() {

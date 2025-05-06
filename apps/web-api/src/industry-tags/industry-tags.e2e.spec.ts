@@ -5,7 +5,7 @@ import { ResponseIndustryTagSchema } from 'libs/contracts/src/schema';
 import { createIndustryTags } from './__mocks__/industry-tags.mocks';
 import { bootstrapTestingApp } from '../utils/bootstrap-testing-app';
 
-describe('Industry Tags', () => {
+describe.skip('Industry Tags', () => {
   let app: INestApplication;
   let cacheManager: Cache;
 

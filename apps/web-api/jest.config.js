@@ -16,6 +16,6 @@ module.exports = {
   coverageDirectory: '../../coverage/apps/api',
   setupFilesAfterEnv: ['./mocks.ts'],
   transformIgnorePatterns: [
-    'node_modules/(?!(web3.storage|ipfs-car|@web3-storage|carbites)/)',
+    'node_modules/(?!(web3.storage|ipfs-car|@web3-storage|carbites|axios|eventsource-parser)/)',
   ],
 };
