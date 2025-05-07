@@ -138,6 +138,9 @@ export class ParticipantsRequestService {
       return { isRequestPending: false, isUniqueIdentifierExist: false };
     }
     catch (err) {
+      if(err instanceof Prisma.NotFoundError) {
+        return { isRequestPending: false, isUniqueIdentifierExist: false };
+      }
       return this.handleErrors(err)
     }
   }
