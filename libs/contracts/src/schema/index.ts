@@ -28,3 +28,4 @@ export * from './admin';
 export * from './participants-request';
 export * from './member-subscription';
 export * from './ask';
+export * from './member-experience';
