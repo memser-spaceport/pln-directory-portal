@@ -1,5 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
-import { z } from 'nestjs-zod/z';
+import { z } from 'zod';
 
 const SendOtpRequestSchema = z.object({
     email: z.string(),

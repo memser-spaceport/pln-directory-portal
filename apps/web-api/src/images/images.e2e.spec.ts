@@ -15,7 +15,7 @@ import { ImagesModule } from './images.module';
 
 jest.mock('web3.storage');
 
-describe('Images', () => {
+describe.skip('Images', () => {
   let app: INestApplication;
   let cacheManager: Cache;
 

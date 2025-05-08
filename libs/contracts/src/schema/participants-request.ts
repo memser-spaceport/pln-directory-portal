@@ -1,5 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
-import { z } from 'nestjs-zod/z';
+import { z } from 'zod';
 import { ProjectContributionSchema } from './project-contribution';
 
 export const statusEnum = z.enum(['PENDING', 'APPROVED', 'REJECTED']);

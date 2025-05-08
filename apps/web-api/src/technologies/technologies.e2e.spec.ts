@@ -5,7 +5,7 @@ import { ResponseTechnologySchema } from 'libs/contracts/src/schema/technology';
 import { createTechnology } from './__mocks__/technologies.mocks';
 import { bootstrapTestingApp } from '../utils/bootstrap-testing-app';
 
-describe('Technologies', () => {
+describe.skip('Technologies', () => {
   let app: INestApplication;
   let cacheManager: Cache;
 

@@ -1,7 +1,9 @@
 import { createZodDto } from 'nestjs-zod';
-import { z } from 'nestjs-zod/z';
+import { z } from 'zod';
 
-export class LoginRequestDto extends createZodDto(z.object({
-    username: z.string(),
-    password: z.string()
-})) {};
+const CredentialsSchema = z.object({
+  username: z.string(),
+  password: z.string(),
+})
+
+export class LoginRequestDto extends createZodDto(CredentialsSchema) {}

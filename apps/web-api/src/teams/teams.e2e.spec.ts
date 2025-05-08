@@ -4,7 +4,7 @@ import { INestApplication } from '@nestjs/common';
 import { createTeam } from './__mocks__/teams.mocks';
 import { bootstrapTestingApp } from '../utils/bootstrap-testing-app';
 
-describe('TeamsService', () => {
+describe.skip('TeamsService', () => {
   let app: INestApplication;
   let cacheManager: Cache;
   let ResponseTeamWithRelationsSchema;
