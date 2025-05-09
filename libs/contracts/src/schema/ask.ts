@@ -7,19 +7,19 @@ import { ResponseProjectSchema } from './project';
 export const AskStatusEnum = z.enum(['OPEN', 'CLOSED']);
 
 export const CreateAskSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().min(1, 'Description is required'),
+  title: z.string().min(7, 'Title must be minimum 7 characters'),
+  description: z.string().min(10, 'Description must be minimum 10 characters'),
   tags: z.array(z.string()).optional().default([]),
 });
 
 export const UpdateAskSchema = z.object({
-  title: z.string().min(1, 'Title is required').optional(),
-  description: z.string().min(1, 'Description is required').optional(),
+  title: z.string().min(7, 'Title must be minimum 7 characters').optional(),
+  description: z.string().min(10, 'Description must be minimum 10 characters').optional(),
   tags: z.array(z.string()).optional(),
 });
 
 export const CloseAskSchema = z.object({
-  closedReason: z.string().min(1, 'Closed reason is required'),
+  closedReason: z.string().min(7, 'Closed reason must be minimum 7 character'),
   closedComment: z.string().optional(),
   closedByUid: z.string().optional(),
 });
