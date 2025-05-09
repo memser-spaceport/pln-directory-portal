@@ -382,7 +382,7 @@ export class TeamsService {
     }
     team['logo'] = teamData.logoUid
       ? { connect: { uid: teamData.logoUid } }
-      : type === 'update'
+      : type === 'Update'
         ? { disconnect: true }
         : undefined;
     return team;

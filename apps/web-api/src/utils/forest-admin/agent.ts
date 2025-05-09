@@ -42,169 +42,9 @@ async function executeImageUpload(context) {
   return image;
 }
 
-const agent = createAgent({
-  authSecret: process.env.FOREST_AUTH_SECRET || '',
-  envSecret: process.env.FOREST_ENV_SECRET || '',
-  isProduction: process.env.ENVIRONMENT === 'production',
-}).addDataSource(createSqlDataSource(process.env.DATABASE_URL || ''));
-
-agent.customizeCollection('Member', (collection) => {
-  // TODO: Check if we can do all of this on the member creation
-  collection.addAction('Upload image', {
-    scope: 'Single',
-    form: [
-      {
-        label: 'Image',
-        type: 'File',
-      },
-    ],
-    execute: async (context, resultBuilder) => {
-      const image = await executeImageUpload(context);
-      const memberId = await context.getRecordId();
-      context.collection.update(
-        {
-          conditionTree: {
-            field: 'id',
-            operator: 'Equal',
-            value: memberId,
-          },
-        },
-        { imageUid: image.uid }
-      );
-    },
-  });
-
-  configureCUDSyncs(collection, 'member-to-pln-airtable');
-});
-
-agent.customizeCollection('Team', (collection) => {
-  collection.addAction('Upload image', {
-    scope: 'Single',
-    form: [
-      {
-        label: 'Image',
-        type: 'File',
-      },
-    ],
-    execute: async (context, resultBuilder) => {
-      const image = await executeImageUpload(context);
-      const teamId = await context.getRecordId();
-      context.collection.update(
-        {
-          conditionTree: {
-            field: 'id',
-            operator: 'Equal',
-            value: teamId,
-          },
-        },
-        { logoUid: image.uid }
-      );
-    },
-  });
-
-  configureCUDSyncs(collection, 'team-to-pln-airtable');
-});
-
-agent.customizeCollection('IndustryTag', (collection) => {
-  configureCUDSyncs(collection, 'industry-tag-to-pln-airtable');
-});
-
-agent.customizeCollection('TeamMemberRole', (collection) => {
-  configureCUDSyncs(collection, 'member-to-pln-airtable');
-});
-
-agent.customizeCollection('_MemberToSkill', (collection) => {
-  configureCUDSyncs(collection, 'member-to-pln-airtable');
-});
-
-agent.customizeCollection('_IndustryTagToTeam', (collection) => {
-  configureCUDSyncs(collection, 'team-to-pln-airtable');
-});
-
-agent.customizeCollection('_MembershipSourceToTeam', (collection) => {
-  configureCUDSyncs(collection, 'team-to-pln-airtable');
-});
-
-agent.customizeCollection('_TeamToTechnology', (collection) => {
-  configureCUDSyncs(collection, 'team-to-pln-airtable');
-});
-
-agent.customizeCollection('Location', (collection) => {
-  collection.addField('formattedLocation', {
-    columnType: 'String',
-    dependencies: ['city', 'country', 'region', 'continent', 'metroArea'],
-    getValues: (records) =>
-      records.map(
-        (r) =>
-          `${r.city ? r.city + ' - ' : ''}${
-            r.metroArea ? r.metroArea + ' - ' : ''
-          }${r.region ? r.region + ' : ' : ''}${r.country} (${r.continent})`
-      ),
-  });
-
-  collection.addHook('Before', 'Create', async (context) => {
-    const { city, country, continent, region, metroArea } = context.data[0];
-    await generateGoogleApiData(
-      city,
-      country,
-      continent,
-      region,
-      metroArea,
-      context
-    );
-  });
-
-  collection.addHook('Before', 'Update', async (context) => {
-    let { city, country, continent, region, metroArea } = context.patch;
-
-    if (!city || !country) {
-      const location = await prismaService.location.findUnique({
-        where: {
-          id: context.patch['id'],
-        },
-      });
-
-      if (!location) {
-        context.throwForbiddenError('Location not found');
-        return;
-      }
-
-      city = city === null ? '' : city || location.city;
-      metroArea = metroArea === null ? '' : metroArea || location.metroArea;
-      country = country || location.country;
-      continent = continent || location.continent;
-      region = region === null ? '' : region || location.region;
-    }
-
-    await generateGoogleApiData(
-      city,
-      country,
-      continent,
-      region,
-      metroArea,
-      context
-    );
-  });
-});
-
-agent.use(resetCacheAfterCreateOrUpdateOrDelete);
-
-async function generateGoogleApiData(
-  city,
-  country,
-  continent,
-  region,
-  metroArea,
-  context
-) {
+async function generateGoogleApiData(city, country, continent, region, metroArea, context) {
   const locationTransferService = new LocationTransferService(prismaService);
-  const { location } = await locationTransferService.fetchLocation(
-    city,
-    country,
-    continent,
-    region,
-    metroArea
-  );
+  const { location } = await locationTransferService.fetchLocation(city, country, continent, region, metroArea);
 
   if (!location) {
     context.throwForbiddenError('Provided location not valid');
@@ -225,9 +65,7 @@ async function generateGoogleApiData(
   // Check if location already exists when creating a new location or when updating a location
   if (
     (existingLocation && context.data) ||
-    (existingLocation &&
-      context.patch &&
-      existingLocation.id !== context.patch['id'])
+    (existingLocation && context.patch && existingLocation.id !== context.patch['id'])
   ) {
     context.throwForbiddenError('Provided location already exists');
     return;
@@ -273,6 +111,141 @@ async function triggerSync(slug) {
   }
 }
 
-agent.use(generateUid);
+export function createForestAdminAgent() {
+  const agent = createAgent({
+    authSecret: process.env.FOREST_AUTH_SECRET || '',
+    envSecret: process.env.FOREST_ENV_SECRET || '',
+    isProduction: process.env.ENVIRONMENT === 'production',
+  }).addDataSource(createSqlDataSource(process.env.DATABASE_URL || ''));
 
-export default agent;
+  agent.customizeCollection('Member', (collection) => {
+    // TODO: Check if we can do all of this on the member creation
+    collection.addAction('Upload image', {
+      scope: 'Single',
+      form: [
+        {
+          label: 'Image',
+          type: 'File',
+        },
+      ],
+      execute: async (context, resultBuilder) => {
+        const image = await executeImageUpload(context);
+        const memberId = await context.getRecordId();
+        context.collection.update(
+          {
+            conditionTree: {
+              field: 'id',
+              operator: 'Equal',
+              value: memberId,
+            },
+          },
+          { imageUid: image.uid }
+        );
+      },
+    });
+
+    configureCUDSyncs(collection, 'member-to-pln-airtable');
+  });
+
+  agent.customizeCollection('Team', (collection) => {
+    collection.addAction('Upload image', {
+      scope: 'Single',
+      form: [
+        {
+          label: 'Image',
+          type: 'File',
+        },
+      ],
+      execute: async (context, resultBuilder) => {
+        const image = await executeImageUpload(context);
+        const teamId = await context.getRecordId();
+        context.collection.update(
+          {
+            conditionTree: {
+              field: 'id',
+              operator: 'Equal',
+              value: teamId,
+            },
+          },
+          { logoUid: image.uid }
+        );
+      },
+    });
+
+    configureCUDSyncs(collection, 'team-to-pln-airtable');
+  });
+
+  agent.customizeCollection('IndustryTag', (collection) => {
+    configureCUDSyncs(collection, 'industry-tag-to-pln-airtable');
+  });
+
+  agent.customizeCollection('TeamMemberRole', (collection) => {
+    configureCUDSyncs(collection, 'member-to-pln-airtable');
+  });
+
+  agent.customizeCollection('_MemberToSkill', (collection) => {
+    configureCUDSyncs(collection, 'member-to-pln-airtable');
+  });
+
+  agent.customizeCollection('_IndustryTagToTeam', (collection) => {
+    configureCUDSyncs(collection, 'team-to-pln-airtable');
+  });
+
+  agent.customizeCollection('_MembershipSourceToTeam', (collection) => {
+    configureCUDSyncs(collection, 'team-to-pln-airtable');
+  });
+
+  agent.customizeCollection('_TeamToTechnology', (collection) => {
+    configureCUDSyncs(collection, 'team-to-pln-airtable');
+  });
+
+  agent.customizeCollection('Location', (collection) => {
+    collection.addField('formattedLocation', {
+      columnType: 'String',
+      dependencies: ['city', 'country', 'region', 'continent', 'metroArea'],
+      getValues: (records) =>
+        records.map(
+          (r) =>
+            `${r.city ? r.city + ' - ' : ''}${r.metroArea ? r.metroArea + ' - ' : ''}${
+              r.region ? r.region + ' : ' : ''
+            }${r.country} (${r.continent})`
+        ),
+    });
+
+    collection.addHook('Before', 'Create', async (context) => {
+      const { city, country, continent, region, metroArea } = context.data[0];
+      await generateGoogleApiData(city, country, continent, region, metroArea, context);
+    });
+
+    collection.addHook('Before', 'Update', async (context) => {
+      let { city, country, continent, region, metroArea } = context.patch;
+
+      if (!city || !country) {
+        const location = await prismaService.location.findUnique({
+          where: {
+            id: context.patch['id'],
+          },
+        });
+
+        if (!location) {
+          context.throwForbiddenError('Location not found');
+          return;
+        }
+
+        city = city === null ? '' : city || location.city;
+        metroArea = metroArea === null ? '' : metroArea || location.metroArea;
+        country = country || location.country;
+        continent = continent || location.continent;
+        region = region === null ? '' : region || location.region;
+      }
+
+      await generateGoogleApiData(city, country, continent, region, metroArea, context);
+    });
+  });
+
+  agent.use(resetCacheAfterCreateOrUpdateOrDelete);
+
+  agent.use(generateUid);
+
+  return agent;
+}
