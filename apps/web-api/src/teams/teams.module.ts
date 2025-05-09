@@ -5,13 +5,18 @@ import { SharedModule } from '../shared/shared.module';
 import { ParticipantsRequestModule } from '../participants-request/participants-request.module';
 import { MembersModule } from '../members/members.module';
 import { AskModule } from '../asks/asks.module';
-import { AskService } from '../asks/asks.service';
 import { HuskyModule } from '../husky/husky.module';
 
 @Module({
-  imports: [forwardRef(() => ParticipantsRequestModule), forwardRef(() => MembersModule), SharedModule, AskModule, HuskyModule],
+  imports: [
+    forwardRef(() => ParticipantsRequestModule),
+    forwardRef(() => MembersModule),
+    SharedModule,
+    forwardRef(() => AskModule),
+    HuskyModule,
+  ],
   controllers: [TeamsController],
-  providers: [TeamsService, AskService],
+  providers: [TeamsService],
   exports: [TeamsService],
 })
 export class TeamsModule {}

@@ -45,6 +45,7 @@ export const apiTeam = contract.router({
     },
     summary: 'Modify a team',
   },
+  // TODO: Remove this endpoint after frontend integration with new ask api
   patchTeam: {
     method: 'PATCH',
     path: `${getAPIVersionAsPath('1')}/teams/:uid/ask`,
