@@ -1,7 +1,7 @@
 import { ForbiddenException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Ask, AskStatus, Prisma } from '@prisma/client';
 import DOMPurify from 'isomorphic-dompurify';
-import { CreateAskDto, ResponseAskDto, ResponseAskWithRelationsDto } from 'libs/contracts/src/schema/ask';
+import { CreateAskDto, ResponseAskDto } from 'libs/contracts/src/schema/ask';
 import { PrismaService } from '../shared/prisma.service';
 import { CacheService } from '../utils/cache/cache.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
@@ -33,22 +33,18 @@ export class AskService {
     return Object.entries(tagCounts).map(([tag, count]) => ({ tag, count }));
   }
 
-  async findOne(uid: string): Promise<ResponseAskWithRelationsDto> {
+  async findOne(uid: string, include?: Prisma.AskInclude): Promise<Ask> {
     try {
       const result = await this.prisma.ask.findUnique({
         where: { uid },
-        include: {
-          team: true,
-          project: true,
-          closedBy: true,
-        },
+        include,
       });
 
       if (!result) {
         throw new NotFoundException(`Ask with uid ${uid} not found`);
       }
 
-      return result as unknown as ResponseAskWithRelationsDto;
+      return result;
     } catch (error) {
       this.logger.error(`Error fetching ask with uid ${uid}`, error);
       throw error;
@@ -112,14 +108,7 @@ export class AskService {
     }
   ): Promise<ResponseAskDto> {
     try {
-      const ask = await this.prisma.ask.findUnique({
-        where: { uid },
-      });
-
-      if (!ask) {
-        throw new NotFoundException(`Ask with uid ${uid} not found`);
-      }
-
+      const ask = await this.findOne(uid);
       if (ask.teamUid) {
         await this.teamsService.isTeamMemberOrAdmin(requesterEmailId, ask.teamUid);
       }
@@ -181,13 +170,7 @@ export class AskService {
 
   async delete(uid: string, requesterEmailId: string): Promise<void> {
     try {
-      const ask = await this.prisma.ask.findUnique({
-        where: { uid },
-      });
-
-      if (!ask) {
-        throw new NotFoundException(`Ask with uid ${uid} not found`);
-      }
+      const ask = await this.findOne(uid);
 
       // If this is a team ask, we need to handle team-specific logic
       if (ask.teamUid) {
