@@ -39,7 +39,11 @@ export class AsksController {
   @Api(server.route.getAsk)
   @ApiParam({ name: 'uid', type: 'string' })
   findOne(@Param('uid') uid: string): Promise<ResponseAskWithRelationsDto> {
-    return this.askService.findOne(uid);
+    return this.askService.findOne(uid, {
+      team: true,
+      project: true,
+      closedBy: true,
+    });
   }
 
   /**
