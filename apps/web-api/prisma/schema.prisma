@@ -129,6 +129,7 @@ model Member {
   subscriptions                MemberSubscription[]
   closedAsks                   Ask[]
   experiences                  MemberExperience[]
+  linkedInDetails              MemberlinkedInDetails?
 }
 
 model MemberRole {
@@ -664,4 +665,14 @@ model MemberExperience {
   updatedAt           DateTime  @updatedAt
   memberUid           String
   member              Member    @relation(fields: [memberUid], references: [uid])
+}
+
+model MemberlinkedInDetails {
+ id                  Int       @id @default(autoincrement())
+ uid                 String    @unique @default(uuid())
+ data                Json?
+ memberUid           String    @unique
+ member              Member    @relation(fields: [memberUid], references: [uid])
+ createdAt           DateTime  @default(now())
+ updatedAt           DateTime  @updatedAt
 }

@@ -6,7 +6,7 @@ import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseSkillSchema } from './skill';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
 import { ProjectContributionSchema, ResponseProjectContributionSchema } from './project-contribution';
-import { ResponseExperienceSchema } from './experience';
+import { ResponseMemberExperienceSchema } from './member-experience';
 
 export const GitHubRepositorySchema = z.object({
   name: z.string(),
@@ -71,7 +71,7 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   skills: ResponseSkillSchema.array().optional(),
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
   projectContributions: ResponseProjectContributionSchema.array().optional(),
-  experiences: ResponseExperienceSchema.array().optional()
+  experiences: ResponseMemberExperienceSchema.array().optional()
 });
 
 

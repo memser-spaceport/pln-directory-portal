@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { createZodDto } from '@abitia/zod-dto';
 import { ResponseMemberSchema } from './member';
+import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 
 export const MemberExperienceSchema = z.object({
   id: z.number().int(),
@@ -49,9 +50,21 @@ export const ResponseMemberExperienceWithRelationsSchema = ResponseMemberExperie
     member: ResponseMemberSchema
   });
   
-  export const MemberExperienceRelationalFields = ResponseMemberExperienceWithRelationsSchema.pick({
-    member: true
-  }).strip();
+export const MemberExperienceRelationalFields = ResponseMemberExperienceWithRelationsSchema.pick({
+  member: true
+}).strip();
   
+export const MemberExperienceQueryableFields = ResponseMemberExperienceSchema.keyof();
+
+export const MemberExperienceQueryParams = QueryParams({
+  queryableFields: MemberExperienceQueryableFields,
+  relationalFields: MemberExperienceRelationalFields
+});
+
+export const MemberExperienceDetailQueryParams = MemberExperienceQueryParams.unwrap()
+  .pick(RETRIEVAL_QUERY_FILTERS)
+  .optional();
+
 export class CreateMemberExperienceDto extends createZodDto(CreateMemberExperienceSchema) {}
 export class UpdateMemberExperienceDto extends createZodDto(UpdateMemberExperienceSchema) {}
+  
