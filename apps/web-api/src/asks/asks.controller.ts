@@ -54,7 +54,7 @@ export class AsksController {
    * @param {any} req - The request object.
    *
    * @return {Promise<ResponseAskDto>} A promise that resolves to the newly created ask response.
-   */velop
+   */
   @Api(server.route.createTeamAsk)
   @ApiBodyFromZod(CreateAskSchema)
   @UseGuards(UserTokenValidation)
