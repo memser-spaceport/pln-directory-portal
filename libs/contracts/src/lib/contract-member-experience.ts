@@ -42,5 +42,13 @@ export const apiMemberExperiences = contract.router({
       200: contract.response<unknown>()
     },
     summary: 'delete a member experience'
+  },
+  getMemberExperienceByMemberUid: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/member-experiences/get-all-by-member-uid/:memberUid`,
+    responses: {
+      200: ResponseMemberExperienceWithRelationsSchema
+    },
+    summary: 'get all member experiences by member uid'
   }
 });
