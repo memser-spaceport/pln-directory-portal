@@ -38,7 +38,7 @@ export const apiAsks = contract.router({
     summary: 'Update an ask',
   },
   closeAsk: {
-    method: 'POST',
+    method: 'PATCH',
     path: `${getAPIVersionAsPath('1')}/asks/:uid/close`,
     body: CloseAskSchema,
     responses: {
