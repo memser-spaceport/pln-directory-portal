@@ -2,7 +2,8 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
-  ConflictException
+  forwardRef,
+  Inject
 } from '@nestjs/common';
 import { Prisma, MemberExperience } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
@@ -11,12 +12,17 @@ import {
   CreateMemberExperienceDto, 
   UpdateMemberExperienceDto 
 } from '../../../../libs/contracts/src/schema/member-experience';
+import { ParticipantsRequestService } from '../participants-request/participants-request.service';
+import { CacheService } from '../utils/cache/cache.service';
 
 @Injectable()
 export class MemberExperiencesService {
   constructor(
     private prisma: PrismaService,
-    private logger: LogService
+    private logger: LogService,
+    @Inject(forwardRef(() => ParticipantsRequestService))
+    private participantsRequestService: ParticipantsRequestService,
+    private cacheService: CacheService
   ) { }
 
   /**
@@ -28,7 +34,7 @@ export class MemberExperiencesService {
   async create(experienceDto: CreateMemberExperienceDto) {
     try {
       const { memberUid, ...data } = experienceDto;
-      return await this.prisma.memberExperience.create({
+      const experience = await this.prisma.memberExperience.create({
         data: {
           ...data,
           member: {
@@ -36,6 +42,8 @@ export class MemberExperiencesService {
           }
         }
       });
+      await this.cacheService.reset({ service: 'members' });
+      return experience;
     } catch (error) {
       this.logger.error('Error creating member experience', error);
       this.handleErrors(error);
@@ -76,8 +84,9 @@ export class MemberExperiencesService {
    * @param dto - The data transfer object with fields to update
    * @returns The updated member experience record
    */
-  async update(uid: string, updateMemberExperiencedto: UpdateMemberExperienceDto) {
+  async update(uid: string, updateMemberExperiencedto: UpdateMemberExperienceDto, requesterEmailId: string) {
     try {
+      const existingExperience = await this.findOne(uid);
       const { memberUid, ...experienceData } = updateMemberExperiencedto;
       
       const updateData: Prisma.MemberExperienceUpdateInput = {
@@ -85,10 +94,30 @@ export class MemberExperiencesService {
         userUpdatedAt: new Date()
       };
       
-      return await this.prisma.memberExperience.update({
-        where: { uid },
-        data: updateData
+      const experience = await this.prisma.$transaction(async (tx) => {
+        const updatedExperience = await tx.memberExperience.update({
+          where: { uid },
+          data: updateData
+        });
+
+        //logging into participant request
+        await this.participantsRequestService.add(
+          {
+            status: 'AUTOAPPROVED',
+            requesterEmailId,
+            referenceUid: uid,
+            uniqueIdentifier: updatedExperience.title,
+            participantType: 'MEMBER',
+            newData: updatedExperience as any,
+            oldData: existingExperience as any,
+          },
+          tx
+        );
+
+        return updatedExperience;
       });
+      await this.cacheService.reset({ service: 'members' });
+      return experience;
     } catch (error) {
       this.handleErrors(error, uid);
     }
@@ -102,11 +131,37 @@ export class MemberExperiencesService {
    */ 
   async remove(uid: string) {
     try {
-      return await this.prisma.memberExperience.delete({
+      const experience = await this.prisma.memberExperience.delete({
         where: { uid }
       });
+      await this.cacheService.reset({ service: 'members' });
+      return experience;
     } catch (error) {
       this.handleErrors(error, uid);
+    }
+  }
+
+  /**
+   * Retrieves all member experiences for a specific member.
+   * 
+   * @param uid - The UID of the member to retrieve experiences for
+   * @returns An array of member experiences
+   */
+  async getAllMemberExperience(uid: string) {
+    try {
+      const experiences = await this.prisma.memberExperience.findMany({
+        include: {
+          member: true
+        },
+        where: {
+          member: {
+            uid: uid
+          }
+        }
+      });
+      return experiences;
+    } catch (error) {
+      this.handleErrors(error);
     }
   }
 
