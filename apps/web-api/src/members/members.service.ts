@@ -268,6 +268,7 @@ export class MembersService {
               },
             },
           },
+          experiences: true,
           eventGuests: {
             orderBy: {
               event: {

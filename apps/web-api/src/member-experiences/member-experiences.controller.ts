@@ -18,6 +18,7 @@ import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { apiMemberExperiences } from '../../../../libs/contracts/src/lib/contract-member-experience';
+import { CacheService } from '../utils/cache/cache.service';
 
 const server = initNestServer(apiMemberExperiences);
 type RouteShape = typeof server.routeShapes;
@@ -25,7 +26,9 @@ type RouteShape = typeof server.routeShapes;
 @Controller()
 @NoCache()
 export class MemberExperiencesController {
-  constructor(private readonly memberExperiencesService: MemberExperiencesService) {}
+  constructor(private readonly memberExperiencesService: MemberExperiencesService,
+    private cacheService: CacheService,
+  ) {}
 
   @Api(server.route.createMemberExperience)
   @UsePipes(ZodValidationPipe)
@@ -33,7 +36,9 @@ export class MemberExperiencesController {
   async create(
     @Body() body: CreateMemberExperienceDto
   ){
-    return await this.memberExperiencesService.create(body as any);
+    const experience = await this.memberExperiencesService.create(body as any);
+    await this.cacheService.reset({ service: 'members' });
+    return experience;
   }
 
   @Api(server.route.getMemberExperience)
@@ -61,7 +66,9 @@ export class MemberExperiencesController {
     if (!experience) {
       throw new NotFoundException(`Member experience not found with uid: ${uid}.`);
     }
-    return this.memberExperiencesService.update(uid, body as any);
+    const updatedExperience = await this.memberExperiencesService.update(uid, body as any);
+    await this.cacheService.reset({ service: 'members' });
+    return updatedExperience;
   }
 
   @Api(server.route.deleteMemberExperience)
@@ -75,6 +82,8 @@ export class MemberExperiencesController {
     if (!experience) {
       throw new NotFoundException(`Member experience not found with uid: ${uid}.`);
     }
-    return this.memberExperiencesService.remove(uid);
+    const removedExperience = await this.memberExperiencesService.remove(uid);
+    await this.cacheService.reset({ service: 'members' });
+    return removedExperience;
   }
 } 
