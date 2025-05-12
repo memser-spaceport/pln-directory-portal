@@ -22,6 +22,12 @@ export class AskService {
     private readonly logger: LogService
   ) {}
 
+  /**
+   * Formats the ask tags into a structured format with counts.
+   *
+   * @param {Array<{tags: string[]}>} askTags - Array of objects containing tags arrays
+   * @returns {Array<{tag: string, count: number}>} Array of objects with tag name and count
+   */
   formatAskFilterResponse(askTags: { tags: string[] }[]): { tag: string; count: number }[] {
     // Flatten the tags and calculate counts
     const tagCounts = askTags
@@ -33,6 +39,13 @@ export class AskService {
     return Object.entries(tagCounts).map(([tag, count]) => ({ tag, count }));
   }
 
+  /**
+   * Finds a single ask by its unique identifier.
+   *
+   * @param {string} uid - The unique identifier of the ask to find.
+   * @param {Prisma.AskInclude} [include] - Optional Prisma include options.
+   * @returns {Promise<Ask & { team?: Team }>} A Promise that resolves to the found ask with its associated team.
+   */
   async findOne(uid: string, include?: Prisma.AskInclude): Promise<Ask & { team?: Team }> {
     try {
       const result = await this.prisma.ask.findUnique({
@@ -51,7 +64,14 @@ export class AskService {
     }
   }
 
-  // Create a new ask for a team
+  /**
+   * Creates a new ask for a specific team.
+   *
+   * @param {string} teamUid - The unique identifier of the team.
+   * @param {string} requesterEmailId - The email ID of the requester.
+   * @param {CreateAskDto} askData - The data for creating the ask.
+   * @returns {Promise<ResponseAskDto>} A Promise that resolves to the created ask.
+   */
   async createForTeam(teamUid: string, requesterEmailId: string, askData: CreateAskDto): Promise<ResponseAskDto> {
     await this.teamsService.isTeamMemberOrAdmin(requesterEmailId, teamUid);
 
@@ -90,6 +110,14 @@ export class AskService {
     }
   }
 
+  /**
+   * Updates an existing ask.
+   *
+   * @param {string} uid - The unique identifier of the ask to update.
+   * @param {string} requesterEmailId - The email ID of the requester.
+   * @param {Object} askData - The data for updating the ask.
+   * @returns {Promise<ResponseAskDto>} A Promise that resolves to the updated ask.
+   */
   async update(
     uid: string,
     requesterEmailId: string,
@@ -164,6 +192,13 @@ export class AskService {
     }
   }
 
+  /**
+   * Deletes an ask by its unique identifier.
+   *
+   * @param {string} uid - The unique identifier of the ask to delete.
+   * @param {string} requesterEmailId - The email ID of the requester.
+   * @returns {Promise<void>} A Promise that resolves when the ask is deleted.
+   */
   async delete(uid: string, requesterEmailId: string): Promise<void> {
     try {
       const ask = await this.findOne(uid, {
@@ -201,6 +236,15 @@ export class AskService {
     }
   }
 
+  /**
+   * Logs the ask into the participant request service.
+   *
+   * @param {Prisma.TransactionClient} tx - The transaction client.
+   * @param {Ask} ask - The ask to log.
+   * @param {Ask[]} teamAsks - The team asks to log.
+   * @param {string} teamName - The name of the team.
+   * @param {string} requesterEmailId - The email ID of the requester.
+   */
   async logIntoParticipantRequest(
     tx: Prisma.TransactionClient,
     ask: Ask,
