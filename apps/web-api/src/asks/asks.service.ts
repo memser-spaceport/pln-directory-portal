@@ -2,7 +2,7 @@ import { ForbiddenException, forwardRef, Inject, Injectable, NotFoundException }
 import { Ask, AskStatus, Member, Prisma, Team } from '@prisma/client';
 import DOMPurify from 'isomorphic-dompurify';
 import path from 'path';
-import { CreateAskDto, ResponseAskDto, ResponseAskWithRelationsDto } from 'libs/contracts/src/schema/ask';
+import { CreateAskDto, ResponseAskDto } from 'libs/contracts/src/schema/ask';
 import { PrismaService } from '../shared/prisma.service';
 import { CacheService } from '../utils/cache/cache.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
@@ -30,7 +30,12 @@ export class AskService {
     private awsService: AwsService,
     private readonly logger: LogService
   ) {}
-
+  /**
+   * Formats the ask tags into a structured format with counts.
+   *
+   * @param {Array<{tags: string[]}>} askTags - Array of objects containing tags arrays
+   * @returns {Array<{tag: string, count: number}>} Array of objects with tag name and count
+   */
   formatAskFilterResponse(askTags: { tags: string[] }[]): { tag: string; count: number }[] {
     // Flatten the tags and calculate counts
     const tagCounts = askTags
@@ -42,32 +47,41 @@ export class AskService {
     return Object.entries(tagCounts).map(([tag, count]) => ({ tag, count }));
   }
 
-  async findOne(uid: string): Promise<ResponseAskWithRelationsDto> {
+  /**
+   * Finds a single ask by its unique identifier.
+   *
+   * @param {string} uid - The unique identifier of the ask to find.
+   * @param {Prisma.AskInclude} [include] - Optional Prisma include options.
+   * @returns {Promise<Ask & { team?: Team }>} A Promise that resolves to the found ask with its associated team.
+   */
+  async findOne(uid: string, include?: Prisma.AskInclude): Promise<Ask & { team?: Team }> {
     try {
       const result = await this.prisma.ask.findUnique({
         where: { uid },
-        include: {
-          team: true,
-          project: true,
-          closedBy: true,
-        },
+        include,
       });
 
       if (!result) {
         throw new NotFoundException(`Ask with uid ${uid} not found`);
       }
 
-      return result as unknown as ResponseAskWithRelationsDto;
+      return result;
     } catch (error) {
       this.logger.error(`Error fetching ask with uid ${uid}`, error);
       throw error;
     }
   }
 
-  // Create a new ask for a team
+  /**
+   * Creates a new ask for a specific team.
+   *
+   * @param {string} teamUid - The unique identifier of the team.
+   * @param {string} requesterEmailId - The email ID of the requester.
+   * @param {CreateAskDto} askData - The data for creating the ask.
+   * @returns {Promise<ResponseAskDto>} A Promise that resolves to the created ask.
+   */
   async createForTeam(teamUid: string, requesterEmailId: string, askData: CreateAskDto): Promise<ResponseAskDto> {
     const requester = await this.teamsService.isTeamMemberOrAdmin(requesterEmailId, teamUid);
-
     const team = await this.teamsService.findTeamByUid(teamUid);
 
     if (!team) {
@@ -79,7 +93,6 @@ export class AskService {
       const teamAsks = await this.prisma.ask.findMany({
         where: { teamUid },
       });
-
       let createdAsk;
 
       await this.prisma.$transaction(async (tx) => {
@@ -112,6 +125,14 @@ export class AskService {
     }
   }
 
+  /**
+   * Updates an existing ask.
+   *
+   * @param {string} uid - The unique identifier of the ask to update.
+   * @param {string} requesterEmailId - The email ID of the requester.
+   * @param {Object} askData - The data for updating the ask.
+   * @returns {Promise<ResponseAskDto>} A Promise that resolves to the updated ask.
+   */
   async update(
     uid: string,
     requesterEmailId: string,
@@ -126,17 +147,14 @@ export class AskService {
     }
   ): Promise<ResponseAskDto> {
     try {
-      const ask = await this.prisma.ask.findUnique({
-        where: { uid },
+      const ask = await this.findOne(uid, {
+        team: true,
       });
-
-      if (!ask) {
-        throw new NotFoundException(`Ask with uid ${uid} not found`);
-      }
+      const team = ask.team;
 
       let requester;
-      if (ask.teamUid) {
-        requester = await this.teamsService.isTeamMemberOrAdmin(requesterEmailId, ask.teamUid);
+      if (team) {
+        requester = await this.teamsService.isTeamMemberOrAdmin(requesterEmailId, team.uid);
       }
 
       if (ask.status === AskStatus.CLOSED) {
@@ -161,11 +179,10 @@ export class AskService {
       let updatedAsk;
 
       // If this is a team ask, we need to handle team-specific logic
-      if (ask.teamUid && requesterEmailId) {
-        const team = await this.teamsService.findTeamByUid(ask.teamUid);
+      if (team && requesterEmailId) {
         // Get existing asks related to teamuid for logging
         const teamAsks = await this.prisma.ask.findMany({
-          where: { teamUid: ask.teamUid },
+          where: { teamUid: team.uid },
         });
 
         await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -184,7 +201,6 @@ export class AskService {
         });
 
         await this.cacheService.reset({ service: 'teams' });
-
         await this.forestadminService.triggerAirtableSync();
       } else {
         updatedAsk = await this.prisma.ask.update({
@@ -200,6 +216,13 @@ export class AskService {
     }
   }
 
+  /**
+   * Deletes an ask by its unique identifier.
+   *
+   * @param {string} uid - The unique identifier of the ask to delete.
+   * @param {string} requesterEmailId - The email ID of the requester.
+   * @returns {Promise<void>} A Promise that resolves when the ask is deleted.
+   */
   async delete(uid: string, requesterEmailId: string): Promise<void> {
     try {
       const ask = await this.prisma.ask.findUnique({
@@ -225,12 +248,10 @@ export class AskService {
           await tx.ask.delete({
             where: { uid },
           });
-
           await this.logIntoParticipantRequest(tx, ask, teamAsks, team.name, requesterEmailId);
         });
 
         await this.cacheService.reset({ service: 'teams' });
-
         await this.forestadminService.triggerAirtableSync();
       } else {
         // For simpler deletions
@@ -244,6 +265,15 @@ export class AskService {
     }
   }
 
+  /**
+   * Logs the ask into the participant request service.
+   *
+   * @param {Prisma.TransactionClient} tx - The transaction client.
+   * @param {Ask} ask - The ask to log.
+   * @param {Ask[]} teamAsks - The team asks to log.
+   * @param {string} teamName - The name of the team.
+   * @param {string} requesterEmailId - The email ID of the requester.
+   */
   async logIntoParticipantRequest(
     tx: Prisma.TransactionClient,
     ask: Ask,
@@ -254,7 +284,6 @@ export class AskService {
     const teamAsksAfter = await tx.ask.findMany({
       where: { teamUid: ask.teamUid },
     });
-
     await this.participantsRequestService.add(
       {
         status: 'AUTOAPPROVED',

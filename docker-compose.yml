@@ -11,12 +11,12 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
-  
+
   #OSO Postgres database
   oso_postgres:
     image: postgres:13.8
     ports:
-      - '${OSO_DB_HOST_PORT}:5433'
+      - '${OSO_DB_HOST_PORT}:5432'
     restart: always
     environment:
       POSTGRES_DB: ${OSO_DB_NAME}
@@ -43,7 +43,7 @@ services:
       - '6359:6379'
     volumes:
       - redis_cache_data:/data
-  
+
   redis-queue:
     image: redis:7.0.5
     restart: always
@@ -63,7 +63,7 @@ services:
       MONGO_INITDB_DATABASE: ${MONGO_DB_NAME}
     volumes:
       - mongodb_data:/data/db
-  
+
   qdrant:
     image: qdrant/qdrant:latest
     container_name: qdrant_container

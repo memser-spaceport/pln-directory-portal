@@ -3,23 +3,24 @@ import { createZodDto } from '@abitia/zod-dto';
 import { QueryParams } from './query-params';
 import { ResponseTeamSchema } from './team';
 import { ResponseProjectSchema } from './project';
+import { ResponseMemberSchema } from './member';
 
 export const AskStatusEnum = z.enum(['OPEN', 'CLOSED']);
 
 export const CreateAskSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().min(1, 'Description is required'),
+  title: z.string().min(7, 'Title must be minimum 7 characters'),
+  description: z.string().min(10, 'Description must be minimum 10 characters'),
   tags: z.array(z.string()).optional().default([]),
 });
 
 export const UpdateAskSchema = z.object({
-  title: z.string().min(1, 'Title is required').optional(),
-  description: z.string().min(1, 'Description is required').optional(),
+  title: z.string().min(7, 'Title must be minimum 7 characters').optional(),
+  description: z.string().min(10, 'Description must be minimum 10 characters').optional(),
   tags: z.array(z.string()).optional(),
 });
 
 export const CloseAskSchema = z.object({
-  closedReason: z.string().min(1, 'Closed reason is required'),
+  closedReason: z.string().min(5, 'Closed reason must be minimum 5 characters'),
   closedComment: z.string().optional(),
   closedByUid: z.string().optional(),
 });
@@ -46,6 +47,7 @@ export const ResponseAskSchema = AskSchema.omit({ id: true }).strict();
 export const ResponseAskSchemaWithRelationsSchema = ResponseAskSchema.extend({
   team: z.lazy(() => ResponseTeamSchema).optional(),
   project: z.lazy(() => ResponseProjectSchema).optional(),
+  closedBy: z.lazy(() => ResponseMemberSchema).optional(),
 });
 
 export const AskRelationalFields = ResponseAskSchemaWithRelationsSchema.pick({

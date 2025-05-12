@@ -556,8 +556,8 @@ export class ProjectsService {
    * This ensures that the system is up-to-date with the latest changes.
    */
   private async postCreateActions(uid: string): Promise<void> {
-    //await this.cacheService.reset({ service: 'projects' });
-    await this.huskyRevalidationService.triggerHuskyRevalidation('projects', uid, CREATE);
+    await this.cacheService.reset({ service: 'projects' });
+    this.huskyRevalidationService.triggerHuskyRevalidation('projects', uid, CREATE);
   }
 
   /**
@@ -566,6 +566,6 @@ export class ProjectsService {
    */
   private async postUpdateActions(uid: string): Promise<void> {
     await this.cacheService.reset({ service: 'projects' });
-    await this.huskyRevalidationService.triggerHuskyRevalidation('projects', uid, UPDATE);
+    this.huskyRevalidationService.triggerHuskyRevalidation('projects', uid, UPDATE);
   }
 }
