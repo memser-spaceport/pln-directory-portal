@@ -24,10 +24,10 @@ export class AskService {
     @Inject(forwardRef(() => TeamsService))
     private readonly teamsService: TeamsService,
     @Inject(forwardRef(() => MembersService))
-    private membersService: MembersService,
+    private readonly membersService: MembersService,
     @Inject(forwardRef(() => ParticipantsRequestService))
     private readonly participantsRequestService: ParticipantsRequestService,
-    private awsService: AwsService,
+    private readonly awsService: AwsService,
     private readonly logger: LogService
   ) {}
   /**
