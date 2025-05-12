@@ -83,7 +83,6 @@ export class AskService {
   async createForTeam(teamUid: string, requesterEmailId: string, askData: CreateAskDto): Promise<ResponseAskDto> {
     const requester = await this.teamsService.isTeamMemberOrAdmin(requesterEmailId, teamUid);
     const team = await this.teamsService.findTeamByUid(teamUid);
-
     if (!team) {
       throw new NotFoundException('Team not found');
     }
@@ -105,7 +104,6 @@ export class AskService {
             status: AskStatus.OPEN,
           },
         });
-
         await this.logIntoParticipantRequest(tx, createdAsk, teamAsks, team.name, requesterEmailId);
         await this.notifyForAskStatusChange({
           ask: createdAsk,
@@ -115,7 +113,6 @@ export class AskService {
       });
 
       await this.cacheService.reset({ service: 'teams' });
-
       await this.forestadminService.triggerAirtableSync();
 
       return createdAsk;
@@ -225,23 +222,18 @@ export class AskService {
    */
   async delete(uid: string, requesterEmailId: string): Promise<void> {
     try {
-      const ask = await this.prisma.ask.findUnique({
-        where: { uid },
+      const ask = await this.findOne(uid, {
+        team: true,
       });
-
-      if (!ask) {
-        throw new NotFoundException(`Ask with uid ${uid} not found`);
-      }
+      const team = ask.team;
 
       // If this is a team ask, we need to handle team-specific logic
-      if (ask.teamUid) {
-        await this.teamsService.isTeamMemberOrAdmin(requesterEmailId, ask.teamUid);
-
-        const team = await this.teamsService.findTeamByUid(ask.teamUid);
+      if (team) {
+        await this.teamsService.isTeamMemberOrAdmin(requesterEmailId, team.uid);
 
         // Get existing asks related to teamuid for logging
         const teamAsks = await this.prisma.ask.findMany({
-          where: { teamUid: ask.teamUid },
+          where: { teamUid: team.uid },
         });
 
         await this.prisma.$transaction(async (tx) => {
