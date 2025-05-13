@@ -5,7 +5,6 @@ import { SharedModule } from '../shared/shared.module';
 import { ParticipantsRequestModule } from '../participants-request/participants-request.module';
 import { TeamsModule } from '../teams/teams.module';
 import { MembersModule } from '../members/members.module';
-import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 
 @Module({
   imports: [
