@@ -33,8 +33,7 @@ export class MemberExperiencesController {
   async create(
     @Body() body: CreateMemberExperienceDto
   ){
-    const experience = await this.memberExperiencesService.create(body as any);
-    return experience;
+    return await this.memberExperiencesService.create(body as any);
   }
 
   @Api(server.route.getMemberExperience)
@@ -43,18 +42,14 @@ export class MemberExperiencesController {
   async findOne(
     @ApiDecorator() { params: { uid } }: RouteShape['getMemberExperience']
   ) {
-    const experience = await this.memberExperiencesService.findOne(uid);
-    if (!experience) {
-      throw new NotFoundException(`Member experience not found with uid: ${uid}.`);
-    }
-    return experience;
+    return await this.memberExperiencesService.findOne(uid);
   }
 
   @Api(server.route.getMemberExperienceByMemberUid)
   @ApiParam({ name: 'memberUid', type: 'string' })
   @ApiOkResponseFromZod(ResponseMemberExperienceWithRelationsSchema)
-  async getMemberExperienceByMemberUid(@ApiDecorator() { params: { memberUid } }: RouteShape['getMemberExperienceByMemberUid']) {
-    return await this.memberExperiencesService.getAllMemberExperience(memberUid);
+  async getMemberExperienceByMemberUid(@ApiDecorator() { params: { uid } }: RouteShape['getMemberExperienceByMemberUid']) {
+    return await this.memberExperiencesService.getAllMemberExperience(uid);
   }
 
   @Api(server.route.updateMemberExperience)
@@ -66,10 +61,6 @@ export class MemberExperiencesController {
     @ApiDecorator() { params: { uid }, body }: RouteShape['updateMemberExperience'],
     @Req() req
   ) {
-    const experience = await this.memberExperiencesService.findOne(uid);
-    if (!experience) {
-      throw new NotFoundException(`Member experience not found with uid: ${uid}.`);
-    }
     return await this.memberExperiencesService.update(uid, body as any,req.userEmail);
   }
 
@@ -80,11 +71,6 @@ export class MemberExperiencesController {
   async remove(
     @ApiDecorator() { params: { uid } }: RouteShape['deleteMemberExperience']
   ) {
-    const experience = await this.memberExperiencesService.findOne(uid);
-    if (!experience) {
-      throw new NotFoundException(`Member experience not found with uid: ${uid}.`);
-    }
-    const removedExperience = await this.memberExperiencesService.remove(uid);
-    return removedExperience;
+    return await this.memberExperiencesService.remove(uid);
   }
 } 

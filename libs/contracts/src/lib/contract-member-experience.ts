@@ -45,7 +45,7 @@ export const apiMemberExperiences = contract.router({
   },
   getMemberExperienceByMemberUid: {
     method: 'GET',
-    path: `${getAPIVersionAsPath('1')}/member-experiences/get-all-by-member-uid/:memberUid`,
+    path: `${getAPIVersionAsPath('1')}/members/:uid/experiences`,
     responses: {
       200: ResponseMemberExperienceWithRelationsSchema
     },
