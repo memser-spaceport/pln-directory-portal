@@ -9,16 +9,8 @@ export const MemberExperienceSchema = z.object({
   title: z.string(),
   company: z.string(),
   location: z.string().nullable(),
-  startDate: z.object({
-    day: z.number().optional(),
-    month: z.number(),
-    year: z.number()
-  }),
-  endDate: z.object({
-    day: z.number().optional(),
-    month: z.number(),
-    year: z.number()
-  }),
+  startDate: z.date(),
+  endDate: z.date(),
   isCurrent: z.boolean().default(false),
   experience: z.any().optional(),
   isFlaggedByUser: z.boolean().default(false),
