@@ -10,7 +10,7 @@ export const MemberExperienceSchema = z.object({
   company: z.string(),
   location: z.string().nullable(),
   startDate: z.date(),
-  endDate: z.date(),
+  endDate: z.date().nullable(),
   isCurrent: z.boolean().default(false),
   experience: z.any().optional(),
   isFlaggedByUser: z.boolean().default(false),

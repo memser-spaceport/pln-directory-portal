@@ -142,7 +142,8 @@ export class MemberExperiencesService {
   }
 
   /**
-   * Retrieves all member experiences for a specific member.
+   * Retrieves all member experiences for a specific member,
+   * sorted with current positions first, then by end date (most recent first).
    * 
    * @param uid - The UID of the member to retrieve experiences for
    * @returns An array of member experiences
@@ -157,7 +158,12 @@ export class MemberExperiencesService {
           member: {
             uid: uid
           }
-        }
+        },
+        orderBy: [
+          { isCurrent: 'desc' },
+          { endDate: 'desc' },
+          { startDate: 'desc' }
+        ]
       });
       return experiences;
     } catch (error) {

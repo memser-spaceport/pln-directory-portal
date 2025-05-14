@@ -5,6 +5,7 @@ import {
   UsePipes, 
   NotFoundException,
   Req,
+  BadRequestException
 } from '@nestjs/common';
 import { ApiParam } from '@nestjs/swagger';
 import { MemberExperiencesService } from './member-experiences.service';
@@ -12,7 +13,8 @@ import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { 
   CreateMemberExperienceDto, 
   ResponseMemberExperienceSchema,
-  ResponseMemberExperienceWithRelationsSchema
+  ResponseMemberExperienceWithRelationsSchema,
+  UpdateMemberExperienceDto
 } from '../../../../libs/contracts/src/schema/member-experience';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { ZodValidationPipe } from 'nestjs-zod';
@@ -33,7 +35,8 @@ export class MemberExperiencesController {
   async create(
     @Body() body: CreateMemberExperienceDto
   ){
-    return await this.memberExperiencesService.create(body as any);
+    this.validateExperienceDates(body);
+    return await this.memberExperiencesService.create(body);
   }
 
   @Api(server.route.getMemberExperience)
@@ -61,7 +64,8 @@ export class MemberExperiencesController {
     @ApiDecorator() { params: { uid }, body }: RouteShape['updateMemberExperience'],
     @Req() req
   ) {
-    return await this.memberExperiencesService.update(uid, body as any,req.userEmail);
+    this.validateExperienceDates(body as UpdateMemberExperienceDto);
+    return await this.memberExperiencesService.update(uid, body as UpdateMemberExperienceDto, req.userEmail);
   }
 
   @Api(server.route.deleteMemberExperience)
@@ -72,5 +76,11 @@ export class MemberExperiencesController {
     @ApiDecorator() { params: { uid } }: RouteShape['deleteMemberExperience']
   ) {
     return await this.memberExperiencesService.remove(uid);
+  }
+
+  private validateExperienceDates(body: CreateMemberExperienceDto | UpdateMemberExperienceDto) {
+    if (body.isCurrent === false && body.endDate === null) {
+      throw new BadRequestException('End date is required');
+    }
   }
 } 
