@@ -1,5 +1,5 @@
 import { Controller, Req } from '@nestjs/common';
-import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
+import { ApiNotFoundResponse, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
 import { apiMembershipSource } from 'libs/contracts/src/lib/contract-membership-source';
@@ -19,6 +19,7 @@ import { MembershipSourcesService } from './membership-sources.service';
 const server = initNestServer(apiMembershipSource);
 type RouteShape = typeof server.routeShapes;
 
+@ApiTags('Membership Sources')
 @Controller()
 export class MembershipSourcesController {
   constructor(

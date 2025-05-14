@@ -1,5 +1,5 @@
 import { Controller, Req } from '@nestjs/common';
-import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
+import { ApiNotFoundResponse, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
 import { apiIndustryTags } from 'libs/contracts/src/lib/contract-industry-tags';
@@ -19,6 +19,7 @@ import { IndustryTagsService } from './industry-tags.service';
 const server = initNestServer(apiIndustryTags);
 type RouteShape = typeof server.routeShapes;
 
+@ApiTags('Industry Tags')
 @Controller()
 export class IndustryTagsController {
   constructor(private readonly industryTagsService: IndustryTagsService) {}

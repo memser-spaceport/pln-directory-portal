@@ -32,5 +32,7 @@ export const LocationDetailQueryParams = LocationQueryParams.unwrap()
   .pick(RETRIEVAL_QUERY_FILTERS)
   .optional();
 
+export const ValidateLocationSchema = LocationSchema.pick({ city: true, region: true, country: true });
+
 export type TLocationResponse = z.infer<typeof LocationResponseSchema>;
-export class ValidateLocationDto extends createZodDto(LocationSchema.pick({ city: true, region: true, country: true })) {}
+export class ValidateLocationDto extends createZodDto(ValidateLocationSchema) {}

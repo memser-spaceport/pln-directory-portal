@@ -1,5 +1,5 @@
 import { Controller, Req } from '@nestjs/common';
-import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
+import { ApiNotFoundResponse, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
 import { apiSkills } from 'libs/contracts/src/lib/contract-skills';
@@ -19,6 +19,7 @@ import { SkillsService } from './skills.service';
 const server = initNestServer(apiSkills);
 type RouteShape = typeof server.routeShapes;
 
+@ApiTags('Skills')
 @Controller()
 export class SkillsController {
   constructor(private readonly skillsService: SkillsService) {}

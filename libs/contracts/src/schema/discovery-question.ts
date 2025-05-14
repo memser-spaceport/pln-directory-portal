@@ -47,6 +47,10 @@ export const CreateDiscoveryQuestionSchema = DiscoveryQuestionSchema.pick({
   type: true
 });
 
+export const UpdateDiscoveryQuestionCountSchema = z.object({
+  attribute: z.enum(['shareCount', 'viewCount'])
+});
+
 export const ResponseDiscoveryQuestionSchema = DiscoveryQuestionSchema.omit({ id: true }).strict();
 
 export const ResponseDiscoveryQuestionSchemaWithRelations = ResponseDiscoveryQuestionSchema.extend({
@@ -75,3 +79,4 @@ export const DiscoveryQuestionDetailQueryParams = DiscoveryQuestionQueryParams.u
 
 export class CreateDiscoveryQuestionSchemaDto extends createZodDto(CreateDiscoveryQuestionSchema) {}
 export class UpdateDiscoveryQuestionSchemaDto extends createZodDto(CreateDiscoveryQuestionSchema) {}
+export class UpdateDiscoveryQuestionCountSchemaDto extends createZodDto(UpdateDiscoveryQuestionCountSchema) {}

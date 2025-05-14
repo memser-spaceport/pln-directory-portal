@@ -1,6 +1,6 @@
 /* eslint-disable prettier/prettier */
 import { Controller, Req, UseGuards, Body, Param, UsePipes } from '@nestjs/common';
-import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiNotFoundResponse, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
 import { apiTeam } from 'libs/contracts/src/lib/contract-team';
@@ -22,6 +22,8 @@ import { ParticipantsReqValidationPipe } from '../pipes/participant-request-vali
 
 const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
+
+@ApiTags('Teams')
 @Controller()
 export class TeamsController {
   constructor(private readonly teamsService: TeamsService) { }
@@ -125,6 +127,7 @@ export class TeamsController {
   @Api(server.route.modifyTeam)
   @UseGuards(UserTokenValidation)
   @UsePipes(new ParticipantsReqValidationPipe())
+  @ApiBearerAuth()
   async updateOne(@Param('uid') teamUid, @Body() body, @Req() req) {
     await this.teamsService.validateRequestor(req.userEmail, teamUid);
     return await this.teamsService.updateTeamFromParticipantsRequest(teamUid, body, req.userEmail);

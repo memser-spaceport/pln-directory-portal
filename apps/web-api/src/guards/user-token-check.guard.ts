@@ -12,7 +12,7 @@ import axios from 'axios';
 export class UserTokenCheckGuard implements CanActivate {
     constructor() { }
 
-    async canActivate(context: ExecutionContext): Promise<boolean> {
+    async canActivate(context: ExecutionContext): Promise<boolean> { 
         const request = context.switchToHttp().getRequest();
         const token = this.extractTokenFromHeader(request);
 

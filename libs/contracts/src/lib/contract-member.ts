@@ -106,5 +106,5 @@ export const apiMembers = contract.router({
       200: contract.response<unknown>(),
     },
     summary: 'Get member Projects',
-  }
+  },
 });

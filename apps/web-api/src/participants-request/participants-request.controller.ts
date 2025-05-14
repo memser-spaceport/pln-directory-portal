@@ -1,9 +1,11 @@
 import { Body, Controller, Get, Post, Query, UsePipes } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { ParticipantsRequestService } from './participants-request.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
 import { FindUniqueIdentiferDto } from 'libs/contracts/src/schema/participants-request';
 
+@ApiTags('Participants Request')
 @Controller('v1/participants-request')
 @NoCache()
 export class ParticipantsRequestController {

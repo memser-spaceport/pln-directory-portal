@@ -1,14 +1,25 @@
 import { Controller, Post, Body, UsePipes, InternalServerErrorException } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { FaqService } from './faq.service';
-import { CustomQuestionSchemaDto, CustomQuestionResponseDto } from 'libs/contracts/src/schema';
-import { ZodValidationPipe } from 'nestjs-zod';
+import {
+  CustomQuestionSchema,
+  CustomQuestionSchemaDto,
+  CustomQuestionResponseDto,
+  CustomQuestionResponseSchema,
+} from 'libs/contracts/src/schema';
+import { ZodValidationPipe } from '@abitia/zod-dto';
 import { RequestIp } from '../decorators/request.decorator';
+import { ApiBodyFromZod } from '../decorators/api-body-from-zod';
+import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 
+@ApiTags('FAQ')
 @Controller('/faq')
 export class FaqController {
   constructor(private readonly faqService: FaqService) {}
 
   @Post('/')
+  @ApiBodyFromZod(CustomQuestionSchema)
+  @ApiOkResponseFromZod(CustomQuestionResponseSchema)
   @UsePipes(ZodValidationPipe)
   async create(
     @Body() body: CustomQuestionSchemaDto,

@@ -1,10 +1,11 @@
 import { Body, Controller, NotFoundException, Req, UseGuards, UsePipes, Param, ForbiddenException } from '@nestjs/common';
 import { Api, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { apiMemberInteractions } from '../../../../libs/contracts/src/lib/contract-member-interaction';
 import { MembersService } from '../members/members.service';
-import { ZodValidationPipe } from 'nestjs-zod';
+import { ZodValidationPipe } from '@abitia/zod-dto';
 import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
@@ -14,15 +15,18 @@ import {
    MemberFollowUpQueryParams,
    ResponseMemberFollowUpWithRelationsSchema,
    MemberFollowUpStatus,
-   MemberFollowUpType
+   MemberFollowUpType,
+   CreateMemberInteractionSchema,
+   CreateMemberFeedbackSchema
 } from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { OfficeHoursService } from './office-hours.service';
+import { ApiBodyFromZod } from '../decorators/api-body-from-zod';
 import { MemberFollowUpsService } from '../member-follow-ups/member-follow-ups.service';
-
 const server = initNestServer(apiMemberInteractions);
 
+@ApiTags('Office Hours')
 @Controller()
 @NoCache()
 export class OfficeHoursController {
@@ -35,6 +39,8 @@ export class OfficeHoursController {
   @Api(server.route.createMemberInteraction)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
+  @ApiBodyFromZod(CreateMemberInteractionSchema)
+  @ApiBearerAuth()
   async createMemberInteraction(
     @Body() body: CreateMemberInteractionSchemaDto,
     @Req() request: Request
@@ -73,10 +79,11 @@ export class OfficeHoursController {
   }
 
   @Api(server.route.getMemberInteractionFollowUps)
-  @ApiQueryFromZod(MemberFollowUpQueryParams)
-  @ApiOkResponseFromZod(ResponseMemberFollowUpWithRelationsSchema.array())
   @UseGuards(UserTokenValidation)
   @NoCache()
+  @ApiOkResponseFromZod(ResponseMemberFollowUpWithRelationsSchema.array())
+  @ApiQueryFromZod(MemberFollowUpQueryParams)
+  @ApiBearerAuth()
   async findAll(
     @Req() request: Request
   ) {
@@ -104,6 +111,8 @@ export class OfficeHoursController {
   @Api(server.route.createMemberInteractionFeedback)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
+  @ApiBodyFromZod(CreateMemberFeedbackSchema)
+  @ApiBearerAuth()
   async createMemberInteractionFeedback(
     @Param('uid') interactionFollowUpUid: string,
     @Body() body: CreateMemberFeedbackSchemaDto,
@@ -129,6 +138,7 @@ export class OfficeHoursController {
   @Api(server.route.closeMemberInteractionFollowUp)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
+  @ApiBearerAuth()
   async closeMemberInteractionFollowUp(
     @Param('interactionUid') interactionUid: string,
     @Param('followUpUid') followUpUid: string,

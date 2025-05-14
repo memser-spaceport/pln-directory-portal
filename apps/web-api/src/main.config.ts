@@ -44,6 +44,7 @@ export function mainConfig(app: INestApplication) {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'none'"],
+          connectSrc: ["'self'"],
         },
       },
       hidePoweredBy: true,

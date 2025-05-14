@@ -60,7 +60,11 @@ export const ResponseProjectWithRelationsSchema = ResponseProjectSchema.extend({
   asks: z.lazy(()=>ResponseAskSchemaWithRelationsSchema).array().optional().nullable()
 });
 export const ResponseProjectSuccessSchema = z.object({ success: z.boolean()});
+
+export const CreateProjectSchema = ProjectSchema.omit({ id: true, score: true });
+export const UpdateProjectSchema = ProjectSchema.partial().omit({ id:true, score: true });
+
 // omit score and id to avoid update from request
-export class UpdateProjectDto extends createZodDto(ProjectSchema.partial().omit({ id:true, score: true })) {}
-export class CreateProjectDto extends createZodDto(ProjectSchema.omit({ id:true, score: true })) {}
+export class CreateProjectDto extends createZodDto(CreateProjectSchema) {}
+export class UpdateProjectDto extends createZodDto(UpdateProjectSchema) {}
 
