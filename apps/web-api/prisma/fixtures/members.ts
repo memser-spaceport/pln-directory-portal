@@ -72,7 +72,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
         showTwitter:true,
         showSubscription:true
       },
-      linkedInDetails: null
+      linkedInDetails: {},
     };
   }
 );
