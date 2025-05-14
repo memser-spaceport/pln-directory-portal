@@ -133,6 +133,7 @@ export class TeamsController {
     return await this.teamsService.updateTeamFromParticipantsRequest(teamUid, body, req.userEmail);
   }
 
+  // TODO: Remove this endpoint after frontend integration with new ask api
   @Api(server.route.patchTeam)
   @UseGuards(UserTokenValidation)
   async addAsk(@Param('uid') teamUid, @Body() body, @Req() req) {

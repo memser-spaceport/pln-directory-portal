@@ -71,7 +71,8 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
         showGithubProjects:false,
         showTwitter:true,
         showSubscription:true
-      }
+      },
+      linkedInDetails: null
     };
   }
 );
