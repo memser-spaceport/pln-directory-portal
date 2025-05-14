@@ -655,7 +655,7 @@ model MemberExperience {
   company             String
   location            String?
   startDate           DateTime
-  endDate             DateTime
+  endDate             DateTime?
   isCurrent           Boolean   @default(false)
   isFlaggedByUser     Boolean   @default(false)
   isModifiedByUser    Boolean   @default(false)
