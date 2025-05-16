@@ -654,6 +654,7 @@ model MemberExperience {
   title               String
   company             String
   location            String?
+  description         String?
   startDate           DateTime
   endDate             DateTime?
   isCurrent           Boolean   @default(false)

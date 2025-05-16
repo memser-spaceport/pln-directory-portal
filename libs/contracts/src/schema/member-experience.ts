@@ -9,6 +9,7 @@ export const MemberExperienceSchema = z.object({
   title: z.string(),
   company: z.string(),
   location: z.string().nullable(),
+  description: z.string().nullish(),
   startDate: z.date(),
   endDate: z.date().nullable(),
   isCurrent: z.boolean().default(false),
@@ -39,8 +40,8 @@ export const UpdateMemberExperienceSchema = CreateMemberExperienceSchema.partial
 export const ResponseMemberExperienceSchema = MemberExperienceSchema.omit({ id: true }).strict();
 
 export const ResponseMemberExperienceWithRelationsSchema = ResponseMemberExperienceSchema.extend({
-    member: ResponseMemberSchema
-  });
+  member: ResponseMemberSchema
+});
   
 export const MemberExperienceRelationalFields = ResponseMemberExperienceWithRelationsSchema.pick({
   member: true
