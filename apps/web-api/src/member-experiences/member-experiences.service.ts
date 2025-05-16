@@ -91,7 +91,8 @@ export class MemberExperiencesService {
       
       const updateData: Prisma.MemberExperienceUpdateInput = {
         ...experienceData,
-        userUpdatedAt: new Date()
+        userUpdatedAt: new Date(),
+        isModifiedByUser: true,
       };
       
       const experience = await this.prisma.$transaction(async (tx) => {
