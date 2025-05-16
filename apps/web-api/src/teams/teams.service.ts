@@ -958,11 +958,13 @@ export class TeamsService {
    */
   buildParticipationTypeFilter(queryParams) {
     const isHost = queryParams.isHost === 'true';
-    if (isHost) {
+    const isSponsor = queryParams.isSponsor === 'true';
+    if (isHost || isSponsor) {
       return {
         eventGuests: {
           some: {
             isHost: isHost,
+            isSponsor: isSponsor,
           },
         },
       };
