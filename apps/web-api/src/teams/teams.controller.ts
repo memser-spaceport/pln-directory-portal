@@ -60,9 +60,10 @@ export class TeamsController {
     );
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
-    const { focusAreas, isHost } : any = request.query;
-    if(isHost) {  //Remove isHost from the default query since it is to be added in eventGuest.
+    const { focusAreas, isHost, isSponsor} : any = request.query;
+    if(isHost || isSponsor) {  //Remove isHost from the default query since it is to be added in eventGuest.
       delete builtQuery.where?.isHost;
+      delete builtQuery.where?.isSponsor;
     }
     builtQuery.where = {
       AND: [
@@ -81,7 +82,7 @@ export class TeamsController {
         },
       });
     }
-    
+
     //when "default" is passed as a parameter to orderBy, teams with asks will appear at the beginning of the list.
     const orderByQuery: any = request.query.orderBy
     if(orderByQuery && orderByQuery.includes('default')){
@@ -130,6 +131,7 @@ export class TeamsController {
     return await this.teamsService.updateTeamFromParticipantsRequest(teamUid, body, req.userEmail);
   }
 
+  // TODO: Remove this endpoint after frontend integration with new ask api
   @Api(server.route.patchTeam)
   @UseGuards(UserTokenValidation)
   async addAsk(@Param('uid') teamUid, @Body() body, @Req() req) {

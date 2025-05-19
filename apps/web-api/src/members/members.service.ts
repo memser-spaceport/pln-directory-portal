@@ -66,10 +66,10 @@ export class MembersService {
 
   /**
    * Retrieves a list of members based on the provided query options.
-   * 
+   *
    * This method interacts with the Prisma ORM to execute a `findMany` query on the `member` table,
    * using the query options specified in the `Prisma.MemberFindManyArgs` object.
-   * 
+   *
    * @param queryOptions - An object containing the query options to filter, sort, and paginate
    *                       the members. These options are based on Prisma's `MemberFindManyArgs`.
    * @returns A promise that resolves to an array of member records matching the query criteria.
@@ -106,11 +106,11 @@ export class MembersService {
   private async getRoleCountForDefaultAndUserSelectedRoles(defaultAndUserSelectedRoles, memberRef) {
     try {
       return await this.prisma.$queryRaw`
-      SELECT CAST(count(DISTINCT "memberUid") as INTEGER) AS count, role 
+      SELECT CAST(count(DISTINCT "memberUid") as INTEGER) AS count, role
       FROM (
-        SELECT unnest("roleTags") AS role, "memberUid" 
+        SELECT unnest("roleTags") AS role, "memberUid"
         FROM "TeamMemberRole"
-      ) AS roles WHERE role IN (SELECT unnest(string_to_array(${defaultAndUserSelectedRoles?.toString()}, ','))) AND 
+      ) AS roles WHERE role IN (SELECT unnest(string_to_array(${defaultAndUserSelectedRoles?.toString()}, ','))) AND
       "memberUid" IN (
         SELECT unnest(string_to_array(${memberRef?.toString()}, ','))
       ) GROUP BY role;
@@ -135,15 +135,15 @@ export class MembersService {
   private async getRoleCountForExcludedAndNonSelectedRoles(defaultAndUserSelectedRoles, memberRef, searchTerm) {
     try {
       return await this.prisma.$queryRaw`
-        SELECT CAST(count(DISTINCT "memberUid") as INTEGER) AS count, role 
+        SELECT CAST(count(DISTINCT "memberUid") as INTEGER) AS count, role
         FROM (
-          SELECT unnest("roleTags") AS role, "memberUid" 
+          SELECT unnest("roleTags") AS role, "memberUid"
           FROM "TeamMemberRole"
-        ) AS roles WHERE role NOT IN (SELECT unnest(string_to_array(${defaultAndUserSelectedRoles?.toString()}, ','))) 
+        ) AS roles WHERE role NOT IN (SELECT unnest(string_to_array(${defaultAndUserSelectedRoles?.toString()}, ',')))
         AND "memberUid" IN (
           SELECT unnest(string_to_array(${memberRef?.toString()}, ','))
-        ) 
-        AND role ILIKE '%' || ${searchTerm} || '%' 
+        )
+        AND role ILIKE '%' || ${searchTerm} || '%'
         GROUP BY role;
     `;
     } catch (error) {
@@ -157,8 +157,8 @@ export class MembersService {
 
   /**
    * Retrieves the roles associated with members
-   * @param queryOptions 
-   * @returns 
+   * @param queryOptions
+   * @returns
    */
   async getRolesWithCount(queryOptions: Prisma.MemberFindManyArgs, queryParams: any) {
     try {
@@ -203,7 +203,7 @@ export class MembersService {
 
   /**
    * Updates the Member data in the database within a transaction.
-   * 
+   *
    * @param uid - Unique identifier of the member being updated
    * @param member - The new data to be applied to the member
    * @param tx - The transaction client to ensure atomicity
@@ -229,7 +229,7 @@ export class MembersService {
   /**
    * Retrieves a member record by its UID, with additional relational data.
    * If the member is not found, an exception is thrown.
-   * 
+   *
    * @param uid - The unique identifier (UID) of the member to retrieve.
    * @param queryOptions - Additional query options to customize the search (excluding the 'where' clause).
    * @param tx - An optional Prisma TransactionClient for executing within a transaction.
@@ -268,6 +268,7 @@ export class MembersService {
               },
             },
           },
+          experiences: true,
           eventGuests: {
             orderBy: {
               event: {
@@ -278,6 +279,7 @@ export class MembersService {
               uid: true,
               isHost: true,
               isSpeaker: true,
+              isSponsor: true,
               event: {
                 select: {
                   uid: true,
@@ -305,7 +307,7 @@ export class MembersService {
 
   /**
    * Retrieves a member record by its external ID, with additional relational data.
-   * 
+   *
    * @param externalId - The external ID of the member to find.
    * @returns A promise that resolves to the member object, including associated image, roles, team roles,
    *          and project contributions. If no member is found, it returns `null`.
@@ -351,7 +353,7 @@ export class MembersService {
 
   /**
    * Finds a member by their email address.
-   * 
+   *
    * @param email - The member's email address.
    * @returns The member object if found.
    */
@@ -371,9 +373,9 @@ export class MembersService {
   /**
    * Retrieves a member by email, including additional data such as roles, teams, and project contributions.
    * Also determines if the member is a Directory Admin.
-   * 
+   *
    * @param userEmail - The email address of the member to retrieve.
-   * @returns A promise that resolves to an object containing the member's details, their roles, 
+   * @returns A promise that resolves to an object containing the member's details, their roles,
    *          and whether they are a Directory Admin. It also returns the teams the member leads.
    *          If the member is not found, it returns `null`.
    */
@@ -411,7 +413,7 @@ export class MembersService {
   /**
    * Sends an OTP (One-Time Password) to the provided email address for verification purposes.
    * This method utilizes the `emailOtpService` to generate and send the OTP.
-   * 
+   *
    * @param newEmailId - The email address to which the OTP should be sent.
    * @returns A promise that resolves when the OTP is successfully sent to the provided email address.
    */
@@ -427,13 +429,13 @@ export class MembersService {
    * - Updates the member's email in the authentication service to ensure consistency across services.
    * - Resets the cache to reflect the updated member information.
    * - Logs the successful email update.
-   * 
+   *
    * @param newEmail - The new email address to update.
    * @param oldEmail - The current email address that will be replaced.
    * @param memberInfo - An object containing the member's information, including their unique ID and external ID.
-   * @returns A promise that resolves with updated authentication tokens (refresh token, ID token, access token) 
+   * @returns A promise that resolves with updated authentication tokens (refresh token, ID token, access token)
    * and the updated member information in the form of `userInfo`.
-   * 
+   *
    * @throws If any operation within the transaction fails, the entire transaction is rolled back.
    */
   async updateMemberEmail(newEmail: string, oldEmail: string, memberInfo) {
@@ -482,7 +484,7 @@ export class MembersService {
   /**
    * Checks if a member exists with the provided email address.
    * The email address is normalized to lowercase and trimmed before querying.
-   * 
+   *
    * @param emailId - The email address to check for an existing member.
    * @returns A boolean value indicating whether the member exists (`true`) or not (`false`).
    */
@@ -495,7 +497,7 @@ export class MembersService {
    * Converts the member entity to a user information object.
    * This method maps necessary member details such as login state, name, email, roles,
    * profile image URL, and teams they lead.
-   * 
+   *
    * @param memberInfo - The member object from the database.
    * @returns A structured user information object containing fields like
    *          isFirstTimeLogin, name, email, profileImageUrl, uid, roles, and leadingTeams.
@@ -516,7 +518,7 @@ export class MembersService {
   /**
    * Updates the external ID for the member identified by the provided email address.
    * This method normalizes the email address before updating the external ID in the database.
-   * 
+   *
    * @param emailId - The email address of the member whose external ID should be updated.
    * @param externalId - The new external ID to be assigned to the member.
    * @returns The updated member object after the external ID is updated.
@@ -535,7 +537,7 @@ export class MembersService {
 
   /**
    * Retrieves a member's GitHub handler based on their UID.
-   * 
+   *
    * @param uid - The UID of the member.
    * @returns The GitHub handler of the member or null if not found.
    */
@@ -553,7 +555,7 @@ export class MembersService {
 
   /**
    * Sends a request to the GitHub GraphQL API to fetch pinned repositories.
-   * 
+   *
    * @param githubHandler - The GitHub username of the member.
    * @returns An array of pinned repositories or an empty array if none are found.
    */
@@ -595,7 +597,7 @@ export class MembersService {
 
   /**
    * Sends a request to the GitHub REST API to fetch recent repositories.
-   * 
+   *
    * @param githubHandler - The GitHub username of the member.
    * @returns An array of recent repositories or an empty array if none are found.
    */
@@ -619,7 +621,7 @@ export class MembersService {
 
   /**
    * Combines pinned and recent repositories, ensuring no duplicates.
-   * 
+   *
    * @param pinnedRepos - Array of pinned repositories.
    * @param recentRepos - Array of recent repositories.
    * @returns An array of up to 50 combined repositories with pinned ones first.
@@ -632,7 +634,7 @@ export class MembersService {
 
   /**
    * Fetches a member's GitHub repositories (pinned and recent).
-   * 
+   *
    * @param uid - The UID of the member for whom the GitHub projects are to be fetched.
    * @returns An array of repositories (both pinned and recent), or an error response if something goes wrong.
    */
@@ -710,7 +712,7 @@ export class MembersService {
 
   /**
    * Checks if the email has changed during update and verifies if the new email is already in use.
-   * 
+   *
    * @param transactionType - The Prisma transaction client, used for querying the database.
    * @param dataToProcess - The input data containing the new email.
    * @param existingData - The existing member data, used for comparing the current email.
@@ -735,7 +737,7 @@ export class MembersService {
 
   /**
    * prepare member data for creation or update
-   * 
+   *
    * @param memberUid - The unique identifier for the member (used for updates)
    * @param memberData - Raw member data to be formatted
    * @param tx - Transaction client for atomic operations
@@ -782,7 +784,7 @@ export class MembersService {
    * Process and map location data for both create and update operations.
    * It fetches and upserts location details based on the provided city, country, and region,
    * and connects or disconnects the location accordingly.
-   * 
+   *
    * @param memberData - The input data containing location fields (city, country, region).
    * @param existingData - The existing member data, used for comparing locations during updates.
    * @param member - The data object that will be saved with the mapped location.
@@ -823,7 +825,7 @@ export class MembersService {
 
   /**
    * Main function to process team member role updates by creating, updating, or deleting roles.
-   * 
+   *
    * @param memberData - New data for processing team member roles.
    * @param existingMember - Existing member data used to identify roles for update or deletion.
    * @param referenceUid - The member's reference UID.
@@ -877,7 +879,7 @@ export class MembersService {
 
   /**
    * Function to handle the creation of new team member roles.
-   * 
+   *
    * @param tx - The Prisma transaction client.
    * @param rolesToCreate - Array of team roles to create.
    * @param referenceUid - The member's reference UID.
@@ -907,7 +909,7 @@ export class MembersService {
 
   /**
    * Function to handle deletion of team member roles.
-   * 
+   *
    * @param tx - The Prisma transaction client.
    * @param rolesToDelete - Array of team UIDs to delete.
    * @param referenceUid - The member's reference UID.
@@ -930,7 +932,7 @@ export class MembersService {
 
   /**
    * Function to handle the update of existing team member roles.
-   * 
+   *
    * @param tx - The Prisma transaction client.
    * @param rolesToUpdate - Array of team roles to update.
    * @param referenceUid - The member's reference UID.
@@ -979,7 +981,7 @@ export class MembersService {
   /**
    * function to handle creation, updating, and deletion of project contributions
    * with fewer database calls by using batch operations.
-   * 
+   *
    * @param memberData - The input data containing the new project contributions.
    * @param existingMember - The existing member data, used to identify contributions to update or delete.
    * @param memberUid - The reference UID for associating the new contributions with the member.
@@ -1137,7 +1139,7 @@ export class MembersService {
 
   /**
    * Logs the participant request in the participants request table for audit and tracking purposes.
-   * 
+   *
    * @param tx - The transaction client to ensure atomicity
    * @param requestorEmail - Email of the requestor who is updating the team
    * @param newMemberData - The new data being applied to the team
@@ -1207,7 +1209,7 @@ export class MembersService {
 
   /**
    * Updates the member's preferences and resets the cache.
-   * 
+   *
    * @param id - The UID of the member.
    * @param preferences - The new preferences data to be updated.
    * @returns The updated member object.
@@ -1224,7 +1226,7 @@ export class MembersService {
    */
   private async postCreateActions(uid: string, action: string): Promise<void> {
     await this.cacheService.reset({ service: 'members' });
-    await this.huskyRevalidationService.triggerHuskyRevalidation('members', uid, action);
+    this.huskyRevalidationService.triggerHuskyRevalidation('members', uid, action);
     await this.forestadminService.triggerAirtableSync();
   }
 
@@ -1234,13 +1236,13 @@ export class MembersService {
    */
   private async postUpdateActions(uid: string, action: string): Promise<void> {
     await this.cacheService.reset({ service: 'members' });
-    await this.huskyRevalidationService.triggerHuskyRevalidation('members', uid, action);
+    this.huskyRevalidationService.triggerHuskyRevalidation('members', uid, action);
     await this.forestadminService.triggerAirtableSync();
   }
 
   /**
    * Retrieves member preferences along with social media handlers.
-   * 
+   *
    * @param uid - The UID of the member.
    * @returns An object containing the member's preferences and handler statuses.
    */
@@ -1263,7 +1265,7 @@ export class MembersService {
 
   /**
    * Helper function to build the preference response object.
-   * 
+   *
    * @param member - The member data.
    * @returns The processed preferences and handlers.
    */
@@ -1286,7 +1288,7 @@ export class MembersService {
 
   /**
    * Checks if the given member is a team lead for the provided team UID.
-   * 
+   *
    * @param member - The member object.
    * @param teamUid - The UID of the team.
    * @returns True if the member is leading the team, false otherwise.
@@ -1298,7 +1300,7 @@ export class MembersService {
 
   /**
    * Checks if the given member is a part of the provided teams.
-   * 
+   *
    * @param member - The member object.
    * @param teams - An array of team UIDs.
    * @returns True if the member belongs to any of the provided teams, false otherwise.
@@ -1309,7 +1311,7 @@ export class MembersService {
 
   /**
    * Checks if the member is an admin.
-   * 
+   *
    * @param member - The member object.
    * @returns True if the member is a directory admin, false otherwise.
    */
@@ -1321,7 +1323,7 @@ export class MembersService {
    * This method constructs a dynamic filter query for retrieving recent members
    * created within a specified number of days, based on the 'recent' query parameter
    * and an environment variable to configure the timeline.
-   * 
+   *
    * @param queryParams - HTTP request query parameters object
    * @returns Constructed query with a 'createdAt' filter if 'recent' is set to 'true',
    *          or an empty object if 'recent' is not provided or set to 'false'.
@@ -1409,7 +1411,7 @@ export class MembersService {
 
   /**
    * Fetches filter tags for members for facilitating easy searching.
-   * @param queryParams HTTP request query params object 
+   * @param queryParams HTTP request query params object
    * @returns Set of skills, locations that contain at least one member.
    */
   async getMemberFilters(queryParams) {
@@ -1458,7 +1460,7 @@ export class MembersService {
 
   /**
    * Updates the member's field if the value has changed.
-   * 
+   *
    * @param member - The member object to check for updates.
    * @param field - The field in the member object that may be updated.
    * @param newValue - The new value to update the field with.
@@ -1480,7 +1482,7 @@ export class MembersService {
 
   /**
    * Updates the member's telegram handler if it has changed.
-   * 
+   *
    * @param member - The member object to check for updates.
    * @param telegram - The new telegram handler value.
    * @param tx - Optional transaction client.
@@ -1496,7 +1498,7 @@ export class MembersService {
 
   /**
    * Updates the member's office hours if it has changed.
-   * 
+   *
    * @param member - The member object to check for updates.
    * @param officeHours - The new office hours value.
    * @param tx - Optional transaction client.
@@ -1513,9 +1515,9 @@ export class MembersService {
   /**
    * Handles database-related errors specifically for the Member entity.
    * Logs the error and throws an appropriate HTTP exception based on the error type.
-   * 
+   *
    * @param {any} error - The error object thrown by Prisma or other services.
-   * @param {string} [message] - An optional message to provide additional context, 
+   * @param {string} [message] - An optional message to provide additional context,
    *                             such as the member UID when an entity is not found.
    * @throws {ConflictException} - If there's a unique key constraint violation.
    * @throws {BadRequestException} - If there's a foreign key constraint violation or validation error.
@@ -1657,7 +1659,7 @@ export class MembersService {
   }
 
   /**
-   * This method construct the dynamic query to search the member by 
+   * This method construct the dynamic query to search the member by
    * their participation type i.e isHost only, isSpeaker only, or both host and speaker
    * @param queryParams HTTP request query params object
    * @returns Constructed query based on given participation type
@@ -1665,12 +1667,14 @@ export class MembersService {
   buildParticipationTypeFilter(queryParams) {
     const isHost = queryParams.isHost === 'true';
     const isSpeaker = queryParams.isSpeaker === 'true';
-    if (isHost || isSpeaker) {
+    const isSponsor = queryParams.isSponsor === 'true';
+    if (isHost || isSpeaker || isSponsor) {
       return {
         eventGuests: {
           some: {
             isHost: isHost,
             isSpeaker: isSpeaker,
+            isSponsor: isSponsor,
           }
         }
       }

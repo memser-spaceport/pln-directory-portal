@@ -25,7 +25,8 @@ export class HuskyRevalidationService {
           return await axios.delete(url);
       }
     } catch (error) {
-      throw new Error(`Failed to trigger workflow: ${error.message}`);
+      this.logService.error(`Failed to trigger husky revalidate workflow: ${error.message}`);
+      return;
     }
   }
 } 

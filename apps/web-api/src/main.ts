@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/node';
 import { AppModule } from './app.module';
 import { mainConfig } from './main.config';
 import { APP_ENV } from './utils/constants';
-import agent from './utils/forest-admin/agent';
+import { createForestAdminAgent } from './utils/forest-admin/agent';
 import { SetupService } from './setup.service';
 
 export async function bootstrap() {
@@ -29,12 +29,15 @@ export async function bootstrap() {
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
     environment: process.env.ENVIRONMENT,
-    enabled:
-      process.env.ENVIRONMENT === APP_ENV.PRODUCTION ||
-      process.env.ENVIRONMENT === APP_ENV.STAGING,
+    enabled: process.env.ENVIRONMENT === APP_ENV.PRODUCTION || process.env.ENVIRONMENT === APP_ENV.STAGING,
   });
 
-  await agent.mountOnNestJs(app).start();
+  // Create forest admin agent if the secret is set
+  if (!!process.env.FOREST_AUTH_SECRET) {
+    const agent = createForestAdminAgent();
+    await agent.mountOnNestJs(app).start();
+  }
+
   await app.listen(process.env.PORT || 3000);
 }
 

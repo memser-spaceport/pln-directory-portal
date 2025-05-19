@@ -6,6 +6,7 @@ import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseSkillSchema } from './skill';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
 import { ProjectContributionSchema, ResponseProjectContributionSchema } from './project-contribution';
+import { ResponseMemberExperienceSchema } from './member-experience';
 
 export const GitHubRepositorySchema = z.object({
   name: z.string(),
@@ -69,7 +70,8 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   location: LocationResponseSchema.optional(),
   skills: ResponseSkillSchema.array().optional(),
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
-  projectContributions: ResponseProjectContributionSchema.array().optional()
+  projectContributions: ResponseProjectContributionSchema.array().optional(),
+  experiences: ResponseMemberExperienceSchema.array().optional()
 });
 
 
@@ -94,7 +96,8 @@ export const CreateMemberSchema = MemberSchema.pick({
   isSubscribedToNewsletter: true,
   teamOrProjectURL: true,
   preferences: true,
-  projectContributions: true
+  projectContributions: true,
+  experiences: true
 });
 
 export const MemberRelationalFields = ResponseMemberWithRelationsSchema.pick({
@@ -102,7 +105,8 @@ export const MemberRelationalFields = ResponseMemberWithRelationsSchema.pick({
   location: true,
   skills: true,
   teamMemberRoles: true,
-  projectContributions: true
+  projectContributions: true,
+  experiences: true
 }).strip();
 
 export const MemberQueryableFields = ResponseMemberSchema.keyof();

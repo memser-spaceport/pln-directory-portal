@@ -21,8 +21,8 @@ export class PLEventsService {
 
   /**
    * This method creates a new event associated with a specific location.
-   * 
-   * @param event The event creation payload containing the required event details, such as name, type, description, 
+   *
+   * @param event The event creation payload containing the required event details, such as name, type, description,
    *             startDate, endDate, resources, and locationUid.
    * @returns The newly created event object with details such as name, type, start and end dates, and location.
    */
@@ -59,7 +59,7 @@ export class PLEventsService {
   };
 
   /**
-   * This method retrieves a specific event by its slug URL, with different details based on whether the user is logged in. 
+   * This method retrieves a specific event by its slug URL, with different details based on whether the user is logged in.
    * And also provides filtered result based on the provided query param.
    * @param slug The slug URL of the event
    * @param query where clause query for applying filter.
@@ -86,6 +86,7 @@ export class PLEventsService {
               additionalInfo: true,
               isHost: true,
               isSpeaker: true,
+              isSponsor: true,
               createdAt: true,
               telegramId: isUserLoggedIn ? true : false,
               officeHours: isUserLoggedIn ? true : false,
@@ -220,7 +221,7 @@ export class PLEventsService {
   };
 
 
-  /** 
+  /**
    * This method construct the dynamic query to search the given text in either
    * by member name , project name or by team name from query params
    * This method builts a query to enable search by team name or member name.

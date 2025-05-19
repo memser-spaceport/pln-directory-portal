@@ -285,7 +285,7 @@ export class TeamsService {
 
   /**
    * Updates multiple team member roles in the database.
-   * 
+   *
    * @param teamAndRoles - Array of objects containing `memberUid` and `teamUid` as identifiers, along with update data.
    * @param tx - Prisma transaction client for atomic execution.
    */
@@ -301,7 +301,7 @@ export class TeamsService {
   /**
    * Deletes multiple team member roles in a single query using `deleteMany`.
    * Ensures deletion only occurs when both `memberUid` and `teamUid` match.
-   * 
+   *
    * @param teamAndRoles - Array of objects containing `memberUid` and `teamUid` pairs to delete.
    * @param tx - Prisma transaction client for atomic execution.
    */
@@ -315,7 +315,7 @@ export class TeamsService {
 
   /**
    * Inserts multiple new team member roles in a single batch operation using `createMany`.
-   * 
+   *
    * @param teamAndRoles - Array of new team member role objects to be added.
    * @param tx - Prisma transaction client for atomic execution.
    */
@@ -382,7 +382,7 @@ export class TeamsService {
     }
     team['logo'] = teamData.logoUid
       ? { connect: { uid: teamData.logoUid } }
-      : type === 'update'
+      : type === 'Update'
         ? { disconnect: true }
         : undefined;
     return team;
@@ -472,7 +472,7 @@ export class TeamsService {
    */
   private async postUpdateActions(uid: string): Promise<void> {
     await this.cacheService.reset({ service: 'teams' });
-    await this.huskyRevalidationService.triggerHuskyRevalidation('teams', uid, UPDATE);
+    this.huskyRevalidationService.triggerHuskyRevalidation('teams', uid, UPDATE);
     await this.forestadminService.triggerAirtableSync();
   }
 
@@ -958,11 +958,13 @@ export class TeamsService {
    */
   buildParticipationTypeFilter(queryParams) {
     const isHost = queryParams.isHost === 'true';
-    if (isHost) {
+    const isSponsor = queryParams.isSponsor === 'true';
+    if (isHost || isSponsor) {
       return {
         eventGuests: {
           some: {
             isHost: isHost,
+            isSponsor: isSponsor,
           },
         },
       };
@@ -970,6 +972,7 @@ export class TeamsService {
     return {};
   }
 
+  // TODO: Remove this endpoint after frontend integration with new ask api
   async addEditTeamAsk(teamUid, teamName, requesterEmailId, data) {
     let addEditResponse;
 
@@ -1051,20 +1054,22 @@ export class TeamsService {
             some: {
               OR: [
                 { isHost: true },
-                { isSpeaker: true }
+                { isSpeaker: true },
+                { isSponsor: true }
               ]
             }
           }
         },
         select: {
-          uid: true, 
+          uid: true,
           name: true,
           logo: true,
           eventGuests: {
             where: {
               OR: [
                 { isHost: true },
-                { isSpeaker: true }
+                { isSpeaker: true },
+                { isSponsor: true }
               ]
             },
             distinct: ['memberUid'], // Ensures unique members per team
@@ -1072,6 +1077,7 @@ export class TeamsService {
               uid: true,
               isHost: true,
               isSpeaker: true,
+              isSponsor: true,
               member: {
                 select: {
                   uid: true,
@@ -1100,7 +1106,7 @@ export class TeamsService {
    * This ensures that the system is up-to-date with the latest changes.
    */
   private async postCreateActions(uid: string, action: string): Promise<void> {
-    await this.huskyRevalidationService.triggerHuskyRevalidation('teams', uid, action);
+    this.huskyRevalidationService.triggerHuskyRevalidation('teams', uid, action);
     }
-  
+
 }

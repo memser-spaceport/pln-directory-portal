@@ -18,20 +18,30 @@ export const teamMemberRoles = async () => {
   const teamUids = await getUidsFrom(Prisma.ModelName.Team);
   const memberUids = await getUidsFrom(Prisma.ModelName.Member);
 
-  teamUids.forEach((teamUid) =>
+  const assignedMainTeams = new Set();
+  teamUids.forEach((teamUid) => {
+    const selectedMembers = sampleSize(memberUids, random(0, 6));
+
     teamMemberRoles.push(
-      ...sampleSize(memberUids, random(0, 6)).map(({ uid }) => ({
-        teamUid: teamUid.uid,
-        memberUid: uid,
-        role: faker.name.jobTitle(),
-        mainTeam: faker.datatype.boolean(),
-        teamLead: faker.datatype.boolean(),
-        startDate: faker.date.past(),
-        endDate: faker.date.recent(),
-        roleTags: [faker.name.jobType(), faker.name.jobType()],
-      }))
-    )
-  );
+      ...selectedMembers.map(({ uid }) => {
+        const isMainTeam = !assignedMainTeams.has(uid);
+        if (isMainTeam) {
+          assignedMainTeams.add(uid);
+        }
+
+        return {
+          teamUid: teamUid.uid,
+          memberUid: uid,
+          role: faker.name.jobTitle(),
+          mainTeam: isMainTeam,
+          teamLead: faker.datatype.boolean(),
+          startDate: faker.date.past(),
+          endDate: faker.date.recent(),
+          roleTags: [faker.name.jobType(), faker.name.jobType()],
+        };
+      })
+    );
+  });
 
   return teamMemberRoles;
 };

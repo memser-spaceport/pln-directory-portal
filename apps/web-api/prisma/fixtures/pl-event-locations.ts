@@ -3,7 +3,7 @@ import { PLEventLocation } from '@prisma/client';
 import { faker } from '@faker-js/faker';
 
 const eventLocationFactory = Factory.define<Omit<PLEventLocation, 'id'>>(({ onCreate }) => {
-  onCreate(async (location) => { 
+  onCreate(async (location) => {
     return location;
   });
   return {

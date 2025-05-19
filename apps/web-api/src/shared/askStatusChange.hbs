@@ -1,0 +1,57 @@
+<html>
+  <body>
+    <div style='border: 1px solid #ccc; padding: 20px; margin: 20px;'>
+      {{#if (eq status 'OPEN')}}
+        <h2>Ask Created</h2>
+        <p>The ask
+          <strong>{{title}}</strong>
+          has been created
+          {{#if requester}}by <a href='{{requesterLink}}'>{{requester.name}}</a>{{/if}}.</p>
+      {{/if}}
+
+      {{#if (eq status 'CLOSED')}}
+        <h2>Ask Closed</h2>
+        <p>The ask
+          <strong>{{title}}</strong>
+          has been closed
+          {{#if closedBy}}by <a href='{{closedByLink}}'>{{closedBy.name}}</a>{{/if}}.</p>
+      {{/if}}
+
+      <hr />
+      <h3>Ask Details</h3>
+      <p><strong>Title:</strong> {{title}}</p>
+      <p><strong>Description:</strong> {{{description}}}</p>
+      <p><strong>Tags:</strong>
+        {{#if tags}}
+          {{tags}}
+        {{else}}
+          N/A
+        {{/if}}
+      </p>
+      <p><strong>Team:</strong> <a href='{{teamLink}}'>{{teamName}}</a></p>
+      <p><strong>Created At:</strong> {{createdAt}}</p>
+
+      {{#if (eq status 'CLOSED')}}
+        <hr />
+        <h3>Close Details</h3>
+        <p><strong>Reason:</strong>
+          {{#if closedReason}}
+            {{closedReason}}
+          {{else}}
+            N/A
+          {{/if}}
+        </p>
+        <p><strong>Comment:</strong>
+          {{#if closedComment}}
+            {{closedComment}}
+          {{else}}
+            N/A
+          {{/if}}
+        </p>
+        <p><strong>Closed At:</strong> {{closedAt}}</p>
+        <p><strong>Closed By:</strong>
+          {{#if closedBy}} <a href='{{closedByLink}}'>{{closedBy.name}}</a> {{else}} N/A {{/if}}</p>
+      {{/if}}
+    </div>
+  </body>
+</html>
