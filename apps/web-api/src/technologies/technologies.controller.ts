@@ -1,5 +1,5 @@
 import { Controller, Req } from '@nestjs/common';
-import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
+import { ApiNotFoundResponse, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
 import { apiTechnologies } from 'libs/contracts/src/lib/contract-technology';
@@ -19,6 +19,7 @@ import { TechnologiesService } from './technologies.service';
 const server = initNestServer(apiTechnologies);
 type RouteShape = typeof server.routeShapes;
 
+@ApiTags('Technologies')
 @Controller()
 export class TechnologiesController {
   constructor(private readonly technologiesService: TechnologiesService) {}

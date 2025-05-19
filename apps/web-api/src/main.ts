@@ -20,9 +20,11 @@ export async function bootstrap() {
     .setTitle('Protocol Labs Directory API')
     .setDescription('The Protocol Labs Directory API documentation')
     .setVersion('1.0')
-    .addTag('PL')
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' })
     .build();
-  const document = SwaggerModule.createDocument(app, config);
+  const document = SwaggerModule.createDocument(app, config, {
+    deepScanRoutes: true,
+  });
   SwaggerModule.setup('api/docs', app, document);
 
   // Sentry - Error Reporting

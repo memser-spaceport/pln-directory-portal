@@ -1,5 +1,6 @@
 import { Controller, UseGuards, Body, BadRequestException, NotFoundException } from '@nestjs/common';
-import { Api, initNestServer, ApiDecorator } from '@ts-rest/nest';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Api, initNestServer } from '@ts-rest/nest';
 import { apiInternals } from 'libs/contracts/src/lib/contract-internals';
 import { InternalUpdateMemberDto, ResponseMemberSchema } from 'libs/contracts/src/schema';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
@@ -7,10 +8,11 @@ import { InternalAuthGuard } from '../guards/auth.guard';
 import { MembersService } from '../members/members.service';
 
 const server = initNestServer(apiInternals);
-type RouteShape = typeof server.routeShapes;
 
-@Controller("")
+@ApiTags('Internals')
+@Controller()
 @UseGuards(InternalAuthGuard)
+@ApiBearerAuth()
 export class MembersController {
   constructor(
     private readonly membersService: MembersService

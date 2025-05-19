@@ -1,14 +1,17 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CacheService } from '../utils/cache/cache.service';
 import { InternalAuthGuard } from '../guards/auth.guard';
 import { LogService } from '../shared/log.service';
 
+@ApiTags('Internals')
 @Controller('cache')
 export class CacheController {
   constructor(private cacheService: CacheService, private logService: LogService) { }
 
   @Get('/reset')
   @UseGuards(InternalAuthGuard)
+  @ApiBearerAuth()
   async resetCache() {
     try {
       await this.cacheService.flushCache();

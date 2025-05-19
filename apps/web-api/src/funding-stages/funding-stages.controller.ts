@@ -1,5 +1,5 @@
 import { Controller, Req } from '@nestjs/common';
-import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
+import { ApiNotFoundResponse, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
 import { apiFundingStages } from 'libs/contracts/src/lib/contract-funding-stages';
@@ -19,6 +19,7 @@ import { FundingStagesService } from './funding-stages.service';
 const server = initNestServer(apiFundingStages);
 type RouteShape = typeof server.routeShapes;
 
+@ApiTags('Funding Stages')
 @Controller()
 export class FundingStagesController {
   constructor(private readonly fundingStagesService: FundingStagesService) {}

@@ -1,5 +1,5 @@
 import { Controller, Req, Body, Param, NotFoundException, ForbiddenException, UsePipes, UseGuards, UnauthorizedException, BadRequestException } from '@nestjs/common';
-import { ApiParam } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Api, initNestServer, ApiDecorator } from '@ts-rest/nest';
 import { Request } from 'express';
 import { apiEvents } from 'libs/contracts/src/lib/contract-pl-events';
@@ -12,7 +12,10 @@ import {
   UpdatePLEventGuestSchemaDto,
   DeletePLEventGuestsSchemaDto,
   PLEventGuestQuerySchema,
-  CreatePLEventSchemaDto
+  CreatePLEventSchemaDto,
+  PLCreateEventSchema,
+  CreatePLEventGuestSchema,
+  DeletePLEventGuestsSchema
 } from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
@@ -20,7 +23,7 @@ import { PLEventsService } from './pl-events.service';
 import { PLEventSyncService } from './pl-event-sync.service';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
-import { ZodValidationPipe } from 'nestjs-zod';
+import { ZodValidationPipe } from '@abitia/zod-dto';
 import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { NoCache } from '../decorators/no-cache.decorator';
@@ -31,10 +34,11 @@ import { isEmpty } from 'lodash';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { InternalAuthGuard } from '../guards/auth.guard';
 import { TeamsService } from '../teams/teams.service';
-
+import { ApiBodyFromZod } from '../decorators/api-body-from-zod';
 const server = initNestServer(apiEvents);
 type RouteShape = typeof server.routeShapes;
 
+@ApiTags('PLEvents')
 @Controller()
 export class PLEventsController {
   constructor(
@@ -56,6 +60,8 @@ export class PLEventsController {
    */
   @Api(server.route.createPLEventByLocation)
   @UseGuards(AdminAuthGuard)
+  @ApiBodyFromZod(PLCreateEventSchema)
+  @ApiBearerAuth()
   async createPLEventByLocation(
     @Param('uid') locationUid: string,
     @Body() body: CreatePLEventSchemaDto,
@@ -68,6 +74,7 @@ export class PLEventsController {
   @Api(server.route.getPLEventGuestsByLocation)
   @UseGuards(UserAuthValidateGuard)
   @NoCache()
+  @ApiBearerAuth()
   async findPLEventGuestsByLocation(
     @Req() request: Request,
     @Param('uid') locationUid: string
@@ -81,6 +88,7 @@ export class PLEventsController {
   @ApiOkResponseFromZod(ResponsePLEventSchemaWithRelationsSchema)
   @UseGuards(UserAuthValidateGuard)
   @NoCache()
+  @ApiBearerAuth()
   async findOne(
     @ApiDecorator() { params: { slug } }: RouteShape['getPLEventBySlug'],
     @Req() request: Request
@@ -107,6 +115,8 @@ export class PLEventsController {
   @Api(server.route.createPLEventGuestByLocation)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
+  @ApiBodyFromZod(CreatePLEventGuestSchema)
+  @ApiBearerAuth()
   async createPLEventGuestByLocation(
     @Param("uid") locationUid,
     @Body() body: CreatePLEventGuestSchemaDto,
@@ -134,6 +144,8 @@ export class PLEventsController {
   @Api(server.route.modifyPLEventGuestByLocation)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
+  @ApiBodyFromZod(CreatePLEventGuestSchema)
+  @ApiBearerAuth()
   async modifyPLEventGuestByLocation(
     @Param("uid") locationUid,
     @Param("guestUid") guestUid,
@@ -160,6 +172,8 @@ export class PLEventsController {
   @Api(server.route.deletePLEventGuestsByLocation)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
+  @ApiBodyFromZod(DeletePLEventGuestsSchema)
+  @ApiBearerAuth()
   async deletePLEventGuestsByLocation(
     @Param("uid") locationUid,
     @Body() body: DeletePLEventGuestsSchemaDto,
@@ -180,6 +194,7 @@ export class PLEventsController {
   @ApiOkResponseFromZod(ResponsePLEventSchemaWithRelationsSchema.array())
   @UseGuards(UserTokenValidation)
   @NoCache()
+  @ApiBearerAuth()
   async getPLEventsByLoggedInMember(
     @Param("uid") locationUid,
     @Req() request
@@ -192,6 +207,7 @@ export class PLEventsController {
   @ApiQueryFromZod(PLEventLocationQueryParams)
   @ApiOkResponseFromZod(ResponsePLEventLocationWithRelationsSchema.array())
   @NoCache()
+  @ApiBearerAuth()
   findLocations(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(
       ResponsePLEventLocationWithRelationsSchema
@@ -203,6 +219,7 @@ export class PLEventsController {
 
   @Api(server.route.getPLEventTopicsByLocation)
   @UseGuards(UserAuthValidateGuard)
+  @ApiBearerAuth()
   findPLEventTopicsByLocation(
     @Req() request: Request,
     @Param('uid') locationUid: string) {
@@ -212,6 +229,7 @@ export class PLEventsController {
 
   @Api(server.route.getPLEventGuestByUidAndLocation)
   @UseGuards(UserTokenValidation)
+  @ApiBearerAuth()
   async getPLEventGuestByUidAndLocation(
     @Req() request,
     @Param('uid') locationUid: string,
@@ -225,6 +243,7 @@ export class PLEventsController {
 
   @Api(server.route.syncPLEventsByLocation)
   @UseGuards(InternalAuthGuard)
+  @ApiBearerAuth()
   async syncPLEventsByLocation(
     @Param('uid') locationUid: string,
     @Body() body
@@ -248,6 +267,7 @@ export class PLEventsController {
   @Api(server.route.getPLEventGuestTopics)
   @UseGuards(UserTokenValidation)
   @NoCache()
+  @ApiBearerAuth()
   async getPLEventGuestTopics(
     @Param('uid') locationUid: string,
     @Param('guestUid') guestUid: string,
@@ -271,6 +291,7 @@ export class PLEventsController {
   @Api(server.route.getAllAggregatedData)
   @UseGuards(UserAuthValidateGuard)
   @NoCache()
+  @ApiBearerAuth()
   async getAllAggregatedData(
     @Req() request: Request 
   ) {
@@ -280,6 +301,7 @@ export class PLEventsController {
 
   @Api(server.route.sendEventGuestPresenceRequest)
   @UseGuards(UserTokenValidation)
+  @ApiBearerAuth()
   async sendEventGuestPresenceRequest(
     @Param('uid') locationUid: string,
     @Body() body,

@@ -1,64 +1,66 @@
-import { createZodDto } from 'nestjs-zod';
-import { z } from 'nestjs-zod/z';
+import { createZodDto } from '@abitia/zod-dto';
+import { z } from 'zod';
 
-const SendOtpRequestSchema = z.object({
-    email: z.string(),
-})
+export const SendOtpRequestSchema = z.object({
+  email: z.string(),
+});
 
-const ResendOtpRequestSchema = z.object({
-    otpToken: z.string(),
-})
+export const ResendOtpRequestSchema = z.object({
+  otpToken: z.string(),
+});
 
-const VerifyOtpRequestSchema = z.object({
-    otp: z.string(),
-    otpToken: z.string(),
-    idToken: z.string()
-})
+export const VerifyOtpRequestSchema = z.object({
+  otp: z.string(),
+  otpToken: z.string(),
+  idToken: z.string(),
+});
 
-const GRANT_TYPES = ["refresh_token", "authorization_code", "token_exchange"] as const;
-const AuthRequestSchema = z.object({
-    state: z.string()
-})
-const TokenRequestSchema = z.object({
+const GRANT_TYPES = ['refresh_token', 'authorization_code', 'token_exchange'] as const;
+export const AuthRequestSchema = z.object({
+  state: z.string(),
+});
+export const TokenRequestSchema = z
+  .object({
     grantType: z.enum(GRANT_TYPES),
     code: z.string().optional(),
     refreshToken: z.string().optional(),
     exchangeRequestToken: z.string().optional(),
-    exchangeRequestId: z.string().optional()
-}).superRefine((data, ctx) => {
+    exchangeRequestId: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
     if (data.grantType === 'refresh_token' && !data.refreshToken) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: 'Refresh token required for this grant type',
-            fatal: true,
-        });
-        return z.never;
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Refresh token required for this grant type',
+        fatal: true,
+      });
+      return z.never;
     }
     if (data.grantType === 'authorization_code' && !data.code) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: 'Code required for this grant type',
-            fatal: true,
-        });
-        return z.never;
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Code required for this grant type',
+        fatal: true,
+      });
+      return z.never;
     }
     if (data.grantType === 'token_exchange' && (!data.exchangeRequestToken || !data.exchangeRequestId)) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: 'Request token and id required for this grant type',
-            fatal: true,
-        });
-        return z.never;
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Request token and id required for this grant type',
+        fatal: true,
+      });
+      return z.never;
     }
+  });
+
+export const DeleteUserAccountSchema = z.object({
+  token: z.string(),
 });
 
-const DeleteUserAccountSchema = z.object({
-  token: z.string(),
-})
-
 export class AuthRequestDto extends createZodDto(AuthRequestSchema) {}
-export class SendOtpRequestDto extends createZodDto(SendOtpRequestSchema) { }
-export class ResendOtpRequestDto extends createZodDto(ResendOtpRequestSchema) { }
-export class VerifyOtpRequestDto extends createZodDto(VerifyOtpRequestSchema) { }
-export class TokenRequestDto extends createZodDto(TokenRequestSchema) { }
+export class SendOtpRequestDto extends createZodDto(SendOtpRequestSchema) {}
+export class ResendOtpRequestDto extends createZodDto(ResendOtpRequestSchema) {}
+export class VerifyOtpRequestDto extends createZodDto(VerifyOtpRequestSchema) {}
+export class TokenRequestDto extends createZodDto(TokenRequestSchema) {}
 export class DeleteUserAccountDto extends createZodDto(DeleteUserAccountSchema) {}

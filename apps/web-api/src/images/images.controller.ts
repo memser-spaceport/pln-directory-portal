@@ -6,7 +6,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBody, ApiConsumes, ApiParam } from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import * as fs from 'fs';
@@ -19,7 +19,6 @@ import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { hashFileName } from '../utils/hashing';
 import { ImagesService } from './images.service';
 import { IPFS } from '../../src/utils/constants';
-
 const server = initNestServer(apiImages);
 type RouteShape = typeof server.routeShapes;
 
@@ -27,6 +26,7 @@ type RouteShape = typeof server.routeShapes;
  * This controller is only used for testing purposes.
  * It is not used in the production app.
  */
+@ApiTags('Images')
 @Controller()
 export class ImagesController {
   constructor(

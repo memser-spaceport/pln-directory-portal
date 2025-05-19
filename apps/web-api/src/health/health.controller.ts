@@ -4,10 +4,12 @@ import {
   HealthCheckService,
   HttpHealthIndicator,
 } from '@nestjs/terminus';
+import { ApiTags } from '@nestjs/swagger';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { HerokuHealthIndicator } from './heroku.health';
 import { PrismaHealthIndicator } from './prisma.health';
 
+@ApiTags('App')
 @Injectable()
 @Controller('health')
 export class HealthController {

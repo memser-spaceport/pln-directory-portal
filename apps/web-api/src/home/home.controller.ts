@@ -1,6 +1,7 @@
 import { Controller, Req, Body, Param, UsePipes, UseGuards, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { Api, initNestServer } from '@ts-rest/nest';
-import { ZodValidationPipe } from 'nestjs-zod';
+import { ZodValidationPipe } from '@abitia/zod-dto';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
@@ -13,19 +14,23 @@ import {
   CreateDiscoveryQuestionSchemaDto,
   UpdateDiscoveryQuestionSchemaDto,
   TeamQueryParams,
-  MemberQueryParams
+  MemberQueryParams,
+  CreateDiscoveryQuestionSchema,
+  UpdateDiscoveryQuestionCountSchemaDto,
+  UpdateDiscoveryQuestionCountSchema,
 } from 'libs/contracts/src/schema';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
-import { MembersService } from '../members/members.service';
+import { MembersService } from '../members/members.service'; 
 import { NoCache } from '../decorators/no-cache.decorator';
 import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { HuskyService } from '../husky/husky.service';
 import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
+import { ApiBodyFromZod } from '../decorators/api-body-from-zod';
 
 const server = initNestServer(apiHome);
-type RouteShape = typeof server.routeShapes;
 
+@ApiTags('Home')
 @Controller()
 export class HomeController {
   constructor(
@@ -69,6 +74,8 @@ export class HomeController {
   @Api(server.route.createDiscoveryQuestion)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
+  @ApiBearerAuth()
+  @ApiBodyFromZod(CreateDiscoveryQuestionSchema)
   async addDiscoveryQuestion(
     @Body() discoveryQuestion: CreateDiscoveryQuestionSchemaDto,
     @Req() request
@@ -85,6 +92,8 @@ export class HomeController {
   @Api(server.route.updateDiscoveryQuestion)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
+  @ApiBearerAuth()
+  @ApiBodyFromZod(CreateDiscoveryQuestionSchema)
   async modifyDiscoveryQuestion(
     @Param('slug') slug: string,
     @Body() discoveryQuestion: UpdateDiscoveryQuestionSchemaDto,
@@ -100,9 +109,11 @@ export class HomeController {
   }
 
   @Api(server.route.updateDiscoveryQuestionShareCountOrViewCount)
+  @ApiBearerAuth()
+  @ApiBodyFromZod(UpdateDiscoveryQuestionCountSchema)
   async modifyDiscoveryQuestionShareCountOrViewCount(
     @Param('slug') slug: string,
-    @Body() body
+    @Body() body: UpdateDiscoveryQuestionCountSchemaDto
   ) {
     const attribute = body.attribute;
     switch (attribute) {

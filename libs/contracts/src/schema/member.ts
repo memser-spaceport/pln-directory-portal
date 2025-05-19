@@ -17,14 +17,14 @@ export const GitHubRepositorySchema = z.object({
 });
 
 export const PreferenceSchema = z.object({
-  showEmail:z.boolean(),
-  showGithubHandle:z.boolean(),
-  showTelegram:z.boolean(),
-  showLinkedin:z.boolean(),
-  showDiscord:z.boolean(),
-  showGithubProjects:z.boolean(),
-  showTwitter:z.boolean(),
-  showSubscription:z.boolean()
+  showEmail: z.boolean(),
+  showGithubHandle: z.boolean(),
+  showTelegram: z.boolean(),
+  showLinkedin: z.boolean(),
+  showDiscord: z.boolean(),
+  showGithubProjects: z.boolean(),
+  showTwitter: z.boolean(),
+  showSubscription: z.boolean(),
 });
 
 export const MemberSchema = z.object({
@@ -55,13 +55,11 @@ export const MemberSchema = z.object({
   repositories: GitHubRepositorySchema.array().optional(),
   preferences: PreferenceSchema.optional(),
   projectContributions: z.array(ProjectContributionSchema).optional(),
-  isVerified:z.boolean().nullish(),
+  isVerified: z.boolean().nullish(),
   isUserConsent: z.boolean().nullish(),
   isSubscribedToNewsletter: z.boolean().nullish(),
-  teamOrProjectURL: z.string().nullish()
+  teamOrProjectURL: z.string().nullish(),
 });
-
-
 
 export const ResponseMemberSchema = MemberSchema.omit({ id: true, telegramUid: true }).strict();
 
@@ -73,7 +71,6 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   projectContributions: ResponseProjectContributionSchema.array().optional(),
   experiences: ResponseMemberExperienceSchema.array().optional()
 });
-
 
 export const CreateMemberSchema = MemberSchema.pick({
   name: true,
@@ -116,28 +113,26 @@ export const MemberQueryParams = QueryParams({
   relationalFields: MemberRelationalFields,
 });
 
-export const MemberDetailQueryParams = MemberQueryParams.unwrap()
-  .pick(RETRIEVAL_QUERY_FILTERS)
-  .optional();
+export const MemberDetailQueryParams = MemberQueryParams.unwrap().pick(RETRIEVAL_QUERY_FILTERS).optional();
 
-export class MemberDto extends createZodDto(MemberSchema.omit({telegramUid: true})) {}
-export class InternalUpdateMemberDto extends createZodDto(MemberSchema.pick({telegramUid: true, telegramHandler: true})) {}
+export class MemberDto extends createZodDto(MemberSchema.omit({ telegramUid: true })) {}
+export class InternalUpdateMemberDto extends createZodDto(
+  MemberSchema.pick({ telegramUid: true, telegramHandler: true })
+) {}
 
 export class CreateMemberSchemaDto extends createZodDto(CreateMemberSchema) {}
 
-export class ResponseMemberSchemaDto extends createZodDto(
-  ResponseMemberSchema
-) {}
+export class ResponseMemberSchemaDto extends createZodDto(ResponseMemberSchema) {}
 
 export type TMemberResponse = z.infer<typeof ResponseMemberWithRelationsSchema>;
 
-const ChangeEmailRequestSchema = z.object({
+export const ChangeEmailRequestSchema = z.object({
   newEmail: z.string().email(),
-})
+});
 
-const SendEmailOtpRequestSchema = z.object({
+export const SendEmailOtpRequestSchema = z.object({
   newEmail: z.string().email(),
-})
+});
 
 export class SendEmailOtpRequestDto extends createZodDto(SendEmailOtpRequestSchema) {}
 export class ChangeEmailRequestDto extends createZodDto(ChangeEmailRequestSchema) {}

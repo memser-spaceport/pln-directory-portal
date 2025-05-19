@@ -1,12 +1,12 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
 
-const JoinRequestSchema = z.object({
+export const JoinRequestSchema = z.object({
   email: z.string().email(),
-  introduction: z.string()
+  introduction: z.string() 
 });
 
-const JoinRequestResponseSchema = z.object({
+export const JoinRequestResponseSchema = z.object({
   success: z.boolean()
 });
 

@@ -10,21 +10,30 @@ import {
   UsePipes,
   BadRequestException,
   NotFoundException,
-  Post
+  Post,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
-import { ProcessBulkParticipantRequest, ProcessParticipantReqDto } from 'libs/contracts/src/schema';
+import {
+  ProcessBulkParticipantRequest,
+  ProcessBulkRequest,
+  ProcessParticipantReqDto,
+  ProcessParticipantRequest,
+  UpdateParticipantRequest,
+} from 'libs/contracts/src/schema';
 import { ApprovalStatus, ParticipantsRequest, ParticipantType } from '@prisma/client';
+import { ApiBodyFromZod } from '../decorators/api-body-from-zod';
+import { ZodValidationPipe } from '@abitia/zod-dto';
 
+@ApiTags('Admin')
 @Controller('v1/admin/participants-request')
 @UseGuards(AdminAuthGuard)
+@ApiBearerAuth()
 export class AdminParticipantsRequestController {
-  constructor(
-    private readonly participantsRequestService: ParticipantsRequestService
-  ) { }
+  constructor(private readonly participantsRequestService: ParticipantsRequestService) {}
 
   /**
    * Process (approve/reject) multiple pending participants requests.
@@ -32,9 +41,8 @@ export class AdminParticipantsRequestController {
    * @returns The result of processing the participants request
    */
   @Post('/')
-  async processBulkRequest(
-    @Body() body: ProcessBulkParticipantRequest[]
-  ): Promise<any> {
+  @ApiBodyFromZod(ProcessBulkRequest)
+  async processBulkRequest(@Body() body: ProcessBulkParticipantRequest[]): Promise<any> {
     const participationRequests = body;
     return await this.participantsRequestService.processBulkRequest(participationRequests);
   }
@@ -44,7 +52,7 @@ export class AdminParticipantsRequestController {
    * @param query - Filter parameters for participants requests
    * @returns A list of participants requests
    */
-  @Get("/")
+  @Get('/')
   @NoCache()
   async findAll(@Query() query) {
     return this.participantsRequestService.getAll(query);
@@ -55,7 +63,7 @@ export class AdminParticipantsRequestController {
    * @param uid - The unique identifier of the participants request
    * @returns The participants request entry matching the UID
    */
-  @Get("/:uid")
+  @Get('/:uid')
   @NoCache()
   async findOne(@Param('uid') uid: string) {
     return await this.participantsRequestService.findOneByUid(uid);
@@ -69,10 +77,8 @@ export class AdminParticipantsRequestController {
    */
   @Put('/:uid')
   @UsePipes(new ParticipantsReqValidationPipe())
-  async updateRequest(
-    @Body() body: any,
-    @Param('uid') uid: string
-  ) {
+  @ApiBodyFromZod(UpdateParticipantRequest)
+  async updateRequest(@Body() body: any, @Param('uid') uid: string) {
     return await this.participantsRequestService.updateByUid(uid, body);
   }
 
@@ -83,10 +89,9 @@ export class AdminParticipantsRequestController {
    * @returns The result of processing the participants request
    */
   @Patch('/:uid')
-  async processRequest(
-    @Param('uid') uid: string,
-    @Body() body: ProcessParticipantReqDto
-  ): Promise<any> {
+  @ApiBodyFromZod(ProcessParticipantRequest)
+  @UsePipes(ZodValidationPipe)
+  async processRequest(@Param('uid') uid: string, @Body() body: ProcessParticipantReqDto): Promise<any> {
     const participantRequest: ParticipantsRequest | null = await this.participantsRequestService.findOneByUid(uid);
     if (!participantRequest) {
       throw new NotFoundException('Request not found');
@@ -101,7 +106,11 @@ export class AdminParticipantsRequestController {
         'Requester email is required for team participation requests. Please provide a valid email address.'
       );
     }
-    return await this.participantsRequestService.processRequestByUid(uid, participantRequest, body.status, body.isVerified);
+    return await this.participantsRequestService.processRequestByUid(
+      uid,
+      participantRequest,
+      body.status,
+      body.isVerified
+    );
   }
-
 }

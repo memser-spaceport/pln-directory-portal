@@ -46,5 +46,7 @@ export const MemberSubscriptionDetailQueryParams = MemberSubscriptionQueryParams
   .pick(RETRIEVAL_QUERY_FILTERS)
   .optional();
 
+export const UpdateMemberSubscriptionSchema = MemberSubscriptionSchema.partial().omit({ id:true, score: true });
+
 export class CreateMemberSubscriptionDto extends createZodDto(CreateMemberSubscriptionSchema) {}
-export class UpdateMemberSubscriptionDto extends createZodDto(MemberSubscriptionSchema.partial().omit({ id:true, score: true })) {}
+export class UpdateMemberSubscriptionDto extends createZodDto(UpdateMemberSubscriptionSchema) {}

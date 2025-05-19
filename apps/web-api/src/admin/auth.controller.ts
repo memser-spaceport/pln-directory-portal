@@ -1,8 +1,11 @@
 import { Body, Controller, Post, UsePipes } from '@nestjs/common';
-import { LoginRequestDto } from 'libs/contracts/src/schema';
-import { ZodValidationPipe } from 'nestjs-zod';
+import { ApiTags } from '@nestjs/swagger';
+import { LoginRequestDto, LoginRequestSchema } from 'libs/contracts/src/schema';
+import { ZodValidationPipe } from '@abitia/zod-dto';
 import { AdminService } from './admin.service';
+import { ApiBodyFromZod } from '../decorators/api-body-from-zod';
 
+@ApiTags('Admin')
 @Controller('v1/admin/auth')
 export class AdminAuthController {
   constructor(private readonly adminService: AdminService) {}
@@ -14,6 +17,7 @@ export class AdminAuthController {
    * @returns Access token if login is successful
    */
   @Post('login')
+  @ApiBodyFromZod(LoginRequestSchema)
   @UsePipes(ZodValidationPipe)
   async login(@Body() loginRequestDto: LoginRequestDto): Promise<{ accessToken: string }> {
     const { username, password } = loginRequestDto;

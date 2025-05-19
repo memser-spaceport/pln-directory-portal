@@ -1,8 +1,10 @@
-import { Controller, Get, Redirect, Req, Res, UseInterceptors} from '@nestjs/common';
+import { Controller, Get, Redirect, Req, Res, UseInterceptors } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { NoCache } from './decorators/no-cache.decorator';
 import { SentryInterceptor } from './interceptors/sentry.interceptor';
 import { generateOAuth2State } from '../src/utils/helper/helper';
 
+@ApiTags('App')
 @UseInterceptors(SentryInterceptor)
 @Controller()
 export class AppController {

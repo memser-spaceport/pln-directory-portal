@@ -1,22 +1,24 @@
-import { Req, Controller, Body, Patch, Param, UsePipes, NotFoundException, InternalServerErrorException, UseGuards } from '@nestjs/common';
-import { ApiParam } from '@nestjs/swagger';
+import { Req, Controller, Body, Param, UsePipes, NotFoundException, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { ProjectsService } from './projects.service';
 import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { apiProjects } from '../../../../libs/contracts/src/lib/contract-project';
-import { CreateProjectDto, UpdateProjectDto } from 'libs/contracts/src/schema/project';
+import { CreateProjectDto, CreateProjectSchema, UpdateProjectDto, UpdateProjectSchema } from 'libs/contracts/src/schema/project';
 import { NoCache } from '../decorators/no-cache.decorator';
 import {
   ResponseProjectWithRelationsSchema
 } from 'libs/contracts/src/schema';
-import { ZodValidationPipe } from 'nestjs-zod';
+import { ZodValidationPipe } from '@abitia/zod-dto';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
+import { ApiBodyFromZod } from '../decorators/api-body-from-zod';
 
 const server = initNestServer(apiProjects);
 type RouteShape = typeof server.routeShapes;
 
+@ApiTags('Projects')
 @Controller()
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) { }
@@ -52,6 +54,8 @@ export class ProjectsController {
   @Api(server.route.createProject)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
+  @ApiBodyFromZod(CreateProjectSchema)
+  @ApiBearerAuth()
   async create(
     @Body() body: CreateProjectDto,
     @Req() request
@@ -62,6 +66,8 @@ export class ProjectsController {
   @Api(server.route.modifyProject)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
+  @ApiBodyFromZod(UpdateProjectSchema)
+  @ApiBearerAuth()
   update(@Param('uid') uid: string,
     @Body() body: UpdateProjectDto,
     @Req() request
@@ -110,6 +116,7 @@ export class ProjectsController {
   @Api(server.route.removeProject)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
+  @ApiBearerAuth()
   remove(@Param('uid') uid: string,
     @Req() request
   ) {
@@ -118,6 +125,7 @@ export class ProjectsController {
 
   @Api(server.route.patchAskProject)
   @UseGuards(UserTokenValidation)
+  @ApiBearerAuth()
   async addEditAsk(@Param('uid') projectUid, @Body() body, @Req() req) {
     return await this.projectsService.addEditProjectAsk(projectUid,req.userEmail,body);
   }
