@@ -34,6 +34,18 @@ export const HuskyFeedbackSchema = z.object({
   email: z.string().email().optional(),
 });
 
+export const HuskyResponseContextSchema = z.object({
+  followUpQuestions: z.array(z.string()),
+  sources: z.array(z.string()),
+  actions: z.array(
+    z.object({
+      name: z.string(),
+      directoryLink: z.string(),
+      type: z.string(),
+    })
+  ),
+});
+
 export const HuskyResponseSchema = z.object({
   content: z.string(),
   followUpQuestions: z.array(z.string()),
