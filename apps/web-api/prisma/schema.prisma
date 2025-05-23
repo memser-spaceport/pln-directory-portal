@@ -155,6 +155,8 @@ enum ApprovalStatus {
 
 enum PLEventType {
   INVITE_ONLY
+  VIRTUAL
+  IN_PERSON
 }
 
 enum MemberFollowUpStatus {
@@ -393,8 +395,8 @@ model PLEventLocation {
   uid            String    @unique @default(cuid())
   location       String
   timezone       String
-  latitude       String?
-  longitude      String?
+  latitude       String   @unique 
+  longitude      String   @unique 
   flag           String?
   icon           String?
   resources      Json[]
