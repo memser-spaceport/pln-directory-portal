@@ -292,5 +292,4 @@ export class PLEventsController {
     return await this.eventGuestService.sendEventGuestPresenceRequest(loggedInMember?.email, body);
   }
 
-
 }

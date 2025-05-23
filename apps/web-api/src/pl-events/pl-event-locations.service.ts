@@ -597,5 +597,31 @@ export class PLEventLocationsService {
       this.handleErrors(error);
     }
   }
-}
 
+  /**
+   * Creates a new event location.
+   *
+   * @param location The location data to be created.
+   * @returns The created location object.
+   * @throws {Error} - If an error occurs during the creation process, it will be passed to the `handleErrors` method.
+   */
+  async createPLEventLocation(location: Prisma.PLEventLocationUncheckedCreateInput) {
+    try {
+      const createdLocation = await this.prisma.pLEventLocation.create({
+        data: location
+      });
+      this.logger.info(`New location created: ${createdLocation.location}`);
+      return createdLocation;
+    } catch (error) {
+      // Check for unique constraint violation on latitude and longitude
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        // Find the existing location by latitude and longitude
+        this.logger.info(`Location already exists with latitude: ${location.latitude} and longitude: ${location.longitude}`);
+        return null;
+      }
+      this.handleErrors(error);
+    }
+  }
+
+
+}
