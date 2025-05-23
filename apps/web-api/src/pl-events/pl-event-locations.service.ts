@@ -597,5 +597,22 @@ export class PLEventLocationsService {
       this.handleErrors(error);
     }
   }
+
+  /**
+   * Creates a new event location.
+   *
+   * @param location The location data to be created.
+   * @returns The created location object.
+   * @throws {Error} - If an error occurs during the creation process, it will be passed to the `handleErrors` method.
+   */
+  async createPLEventLocation(location: Prisma.PLEventLocationUncheckedCreateInput) {
+    try {
+      return this.prisma.pLEventLocation.create({
+        data: location
+      })
+    } catch (error) {
+      this.handleErrors(error);
+    }
+  }
 }
 

@@ -148,5 +148,14 @@ export const apiEvents = contract.router({
     responses: {
       200: ResponsePLEventLocationWithRelationsSchema.array(),
     },
-  }
+  },
+  createPLEvent: {
+    method: 'POST',
+    body: contract.body<unknown>(),
+    path: `${getAPIVersionAsPath('1')}/irl/event/submit`,
+    responses: {
+      200: ResponsePLEventSchemaWithRelationsSchema,
+    },
+    summary: 'Create new pl event',
+  },
 });

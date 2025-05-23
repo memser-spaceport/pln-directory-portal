@@ -292,5 +292,14 @@ export class PLEventsController {
     return await this.eventGuestService.sendEventGuestPresenceRequest(loggedInMember?.email, body);
   }
 
+  @Api(server.route.createPLEvent)
+  @UseGuards(UserTokenValidation)
+  async createPLEvent(
+    @Body() body,
+    @Req() request
+  ) {
+   return await this.eventService.submitPLEvent(body, request['userEmail']);
+  }
+
 
 }

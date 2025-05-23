@@ -6,6 +6,7 @@ import { PLEventGuestsService } from './pl-event-guests.service';
 import { NotificationService } from '../notifications/notifications.service';
 import { MembersService } from '../members/members.service';
 import { PLEventLocationsService } from './pl-event-locations.service';
+import axios from 'axios';
 
 @Injectable()
 export class PLEventsService {
@@ -307,5 +308,69 @@ export class PLEventsService {
     }
     return notification;
   }
+
+  /**
+   * Submits a new event to the event service.
+   * 
+   * @param event - The event data to be submitted.
+   * @param requestorEmail - The email address of the requestor.
+   * @returns The response from the event service.
+   */
+  async submitPLEvent(event, requestorEmail: string) {
+    try {
+      const baseUrl = process.env.EVENT_SERVICE_BASE_URL;
+      if (!baseUrl) {
+        throw new BadRequestException('Event service base url is not set in ENV');
+      }
+      // Fetch all existing location names in lowercase
+      await this.createEventLocation(event);
+      const clientSecret = process.env.EVENT_SERVICE_SECRET;
+      const internalAuthToken = process.env.EVENT_SERVICE_INTERNAL_AUTH_TOKEN;
+      if(!clientSecret || !internalAuthToken) {
+        throw new BadRequestException('Event service secret or internal auth token is not set in ENV variables');
+      }
+      const response = await axios.post(
+        `${baseUrl}/events/submit`, 
+        {event: event, requestorEmail: requestorEmail},
+        {
+          headers: {
+            'x-client-secret': clientSecret,
+            'x-internal-auth-token': internalAuthToken
+          }
+        }
+      );
+      this.logger.info(`Event submitted successfully: ${response?.data?.event_name}`);
+      return response;
+    } catch (error) {
+      this.logger.error(`Error occurred while submitting event`);
+      this.handleErrors(error);
+    }
+  }
+
+
+  /**
+   * Creates a new event location if it doesn't already exist.
+   * 
+   * @param event - The event data containing the location information.
+   * @returns The created location object if it was created, or null if it already exists.
+   */
+  async createEventLocation(event) {
+    try {
+      const existingIrlLocations = await this.locationService.getPLEventLocations({});
+      const locationNames = existingIrlLocations.map(loc => loc.location.toLowerCase());
+      const eventLocationName = event?.addressInfo?.city != '' ? event?.addressInfo?.city : event?.addressInfo?.country;
+      if (!locationNames.includes(eventLocationName.toLowerCase())) {
+        const newLocation = await this.locationService.createPLEventLocation({ location: eventLocationName.toLowerCase(), timezone: event?.timezone });
+        this.logger.info(`New location created successfully: ${newLocation?.location}`);
+        return newLocation;
+      }
+      this.logger.info(`Location already exists: ${eventLocationName}`);
+      return ;
+    } catch (error) {
+      this.logger.error(`Error Occured while checking and creating event location: ${error}`);
+      this.handleErrors(error);
+    }
+  }
+
 }
 
