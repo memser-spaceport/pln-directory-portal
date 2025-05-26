@@ -62,7 +62,7 @@ export class HuskyAiService {
             - question: ${question}
             - currentDate: ${currentDate}
           `,
-          maxSteps: 2,
+          maxSteps: 5,
           temperature: 0.001,
           onStepFinish: async (step) => {
             if (step.toolResults?.length > 0) {
