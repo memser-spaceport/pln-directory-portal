@@ -139,8 +139,10 @@ export class AsksTool {
 
     return asks
       .map((ask) => {
-        const teamInfo = ask.team ? `Team: ${ask.team.name}` : 'No team';
-        const projectInfo = ask.project ? `Project: ${ask.project.name}` : 'No project';
+        const teamInfo = ask.team ? `Team: ${ask.team.name}\nTeam Link: /teams/${ask.team.uid}` : 'No team';
+        const projectInfo = ask.project
+          ? `Project: ${ask.project.name}\nProject Link: /projects/${ask.project.uid}`
+          : 'No project';
         const closedInfo =
           ask.status === 'CLOSED'
             ? `Closed At: ${ask.closedAt}
