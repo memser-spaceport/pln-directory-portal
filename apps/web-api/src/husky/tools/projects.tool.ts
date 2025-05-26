@@ -138,6 +138,7 @@ export class ProjectsTool {
         const asks = project.asks.map((ask) => ask.title).join(', ');
 
         return `Project ID: ${project.uid}
+                Link: /projects/${project.uid}
                 Name: ${project.name}
                 Tagline: ${project.tagline}
                 Description: ${project.description}

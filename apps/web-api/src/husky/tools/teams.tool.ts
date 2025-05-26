@@ -119,6 +119,7 @@ export class TeamsTool {
           .join(', ');
 
         return `Team ID: ${team.uid}
+                Link: /teams/${team.uid}
                 Name: ${team.name}
                 Short Description: ${team.shortDescription || 'Not provided'}
                 Long Description: ${team.longDescription || 'Not provided'}

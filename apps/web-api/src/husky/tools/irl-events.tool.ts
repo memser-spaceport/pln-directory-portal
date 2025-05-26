@@ -163,6 +163,7 @@ export class IrlEventsTool {
           : '';
 
         return `Event ID: ${event.uid}
+                Link: /events/irl?location=${event.location?.location}
                 Name: ${event.name}
                 Type: ${event.type}
                 Description: ${event.description}
