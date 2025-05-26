@@ -6,9 +6,21 @@ import { TeamsTool } from './teams.tool';
 import { ProjectsTool } from './projects.tool';
 import { FocusAreasTool } from './focus-areas.tool';
 import { AsksTool } from './asks.tool';
+import { NonDirectoryDocsTool } from './non-directory-docs.tool';
+import { QdrantVectorDbService } from '../db/qdrant-vector-db.service';
 
 @Module({
-  providers: [HuskyAiToolsService, IrlEventsTool, MembersTool, TeamsTool, ProjectsTool, FocusAreasTool, AsksTool],
+  providers: [
+    HuskyAiToolsService,
+    IrlEventsTool,
+    MembersTool,
+    TeamsTool,
+    ProjectsTool,
+    FocusAreasTool,
+    AsksTool,
+    NonDirectoryDocsTool,
+    QdrantVectorDbService,
+  ],
   exports: [HuskyAiToolsService],
 })
 export class HuskyAiToolsModule {}

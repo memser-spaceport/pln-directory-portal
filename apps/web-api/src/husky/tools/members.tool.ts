@@ -11,7 +11,8 @@ export class MembersTool {
 
   getTool(): CoreTool {
     return tool({
-      description: 'Search for members with detailed information including teams, projects, asks, and interactions',
+      description:
+        'Search for members with detailed information including teams, projects, asks, experiences, and interactions',
       parameters: z.object({
         search: z.string().describe('Search term to look for in member name, email, bio, or other details').optional(),
         isVerified: z.boolean().describe('Filter by verified status').optional(),
@@ -128,10 +129,16 @@ export class MembersTool {
         ].join(', ');
 
         const experiences = member.experiences
-          .map((exp) => `${exp.title} at ${exp.company} (${exp.startDate} - ${exp.endDate || 'Present'})`)
+          .map(
+            (exp) =>
+              `${exp.title} at ${exp.company}${exp.location ? ` in ${exp.location}` : ''} (${exp.startDate} - ${
+                exp.endDate || 'Present'
+              })${exp.description ? ` - ${exp.description}` : ''}`
+          )
           .join('\n');
 
         return `Member ID: ${member.uid}
+                Link: /members/${member.uid}
                 Name: ${member.name}
                 Email: ${member.email || 'Not provided'}
                 Bio: ${member.bio || 'Not provided'}

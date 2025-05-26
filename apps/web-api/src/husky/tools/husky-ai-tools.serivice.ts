@@ -8,6 +8,7 @@ import { TeamsTool } from './teams.tool';
 import { ProjectsTool } from './projects.tool';
 import { FocusAreasTool } from './focus-areas.tool';
 import { AsksTool } from './asks.tool';
+import { NonDirectoryDocsTool } from './non-directory-docs.tool';
 
 @Injectable()
 export class HuskyAiToolsService implements OnModuleInit {
@@ -19,7 +20,8 @@ export class HuskyAiToolsService implements OnModuleInit {
     private teamsTool: TeamsTool,
     private projectsTool: ProjectsTool,
     private focusAreasTool: FocusAreasTool,
-    private asksTool: AsksTool
+    private asksTool: AsksTool,
+    private nonDirectoryDocsTool: NonDirectoryDocsTool
   ) {}
 
   async onModuleInit() {
@@ -34,6 +36,7 @@ export class HuskyAiToolsService implements OnModuleInit {
       getProjects: this.projectsTool.getTool(),
       getFocusAreas: this.focusAreasTool.getTool(),
       getAsks: this.asksTool.getTool(),
+      getNonDirectoryDocs: this.nonDirectoryDocsTool.getTool(),
     };
   }
 }
