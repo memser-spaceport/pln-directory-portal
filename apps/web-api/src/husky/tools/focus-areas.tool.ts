@@ -96,13 +96,17 @@ export class FocusAreasTool {
           : 'No children';
 
         const teamAreas = [
-          ...area.teamFocusAreas.map((tfa) => `${tfa.team.name} (Direct)`),
-          ...area.teamAncestorFocusAreas.map((tfa) => `${tfa.team.name} (Ancestor)`),
+          ...area.teamFocusAreas.map((tfa) => `${tfa.team.name} (Direct) TeamLink: /teams/${tfa.team.uid}`),
+          ...area.teamAncestorFocusAreas.map((tfa) => `${tfa.team.name} (Ancestor) TeamLink: /teams/${tfa.team.uid}`),
         ].join(', ');
 
         const projectAreas = [
-          ...area.projectFocusAreas.map((pfa) => `${pfa.project.name} (Direct)`),
-          ...area.projectAncestorFocusAreas.map((pfa) => `${pfa.project.name} (Ancestor)`),
+          ...area.projectFocusAreas.map(
+            (pfa) => `${pfa.project.name} (Direct) ProjectLink: /projects/${pfa.project.uid}`
+          ),
+          ...area.projectAncestorFocusAreas.map(
+            (pfa) => `${pfa.project.name} (Ancestor) ProjectLink: /projects/${pfa.project.uid}`
+          ),
         ].join(', ');
 
         const hierarchyInfo = [
