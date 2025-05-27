@@ -395,8 +395,8 @@ model PLEventLocation {
   uid            String    @unique @default(cuid())
   location       String
   timezone       String
-  latitude       String   @unique 
-  longitude      String   @unique 
+  latitude       String   
+  longitude      String   
   flag           String?
   icon           String?
   resources      Json[]
@@ -407,6 +407,7 @@ model PLEventLocation {
   updatedAt      DateTime  @updatedAt
   isFeatured     Boolean?  @default(false)
   isAggregated   Boolean   @default(false)
+  @@unique([latitude, longitude])
 }
 
 model PLEvent {
