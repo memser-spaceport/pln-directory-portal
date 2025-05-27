@@ -26,7 +26,7 @@ export class EventsToolingService {
         throw new BadRequestException('Event service secret or internal auth token is not set in ENV variables');
       }
       const response = await axios.post(
-        `${baseUrl}/events/submit`,
+        `${baseUrl}/internals/events/submit`,
         { event: event, requestorEmail: requestorEmail },
         {
           headers: {
