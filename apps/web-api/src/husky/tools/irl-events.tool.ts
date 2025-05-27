@@ -156,14 +156,16 @@ export class IrlEventsTool {
                 if (guest.isHost) roles.push('Host');
                 if (guest.isSpeaker) roles.push('Speaker');
                 if (guest.isSponsor) roles.push('Sponsor');
-                return `${guestName}${roles.length ? ` (${roles.join(', ')})` : ''}`;
+                return `${guestName}${roles.length ? ` (${roles.join(', ')})` : ''} [MemberLink](/members/${
+                  guest.member?.uid
+                })`;
               })
               .filter(Boolean)
               .join(', ')}`
           : '';
 
         return `Event ID: ${event.uid}
-                Link: /events/irl?location=${event.location?.location}
+                [EventLink](/events/irl?location=${event.location?.location})
                 Name: ${event.name}
                 Type: ${event.type}
                 Description: ${event.description}
