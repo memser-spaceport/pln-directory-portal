@@ -4,6 +4,7 @@ import { embed, tool, CoreTool } from 'ai';
 import { LogService } from '../../shared/log.service';
 import { z } from 'zod';
 import { QdrantVectorDbService } from '../db/qdrant-vector-db.service';
+import { HUSKY_ACTION_TYPES } from '../../utils/constants';
 
 @Injectable()
 export class NonDirectoryDocsTool {
@@ -35,15 +36,49 @@ export class NonDirectoryDocsTool {
     const limit = 25;
 
     // Get results from both collections
-    const [allDocsResults, teamsWebsearchResults] = await Promise.all([
-      this.huskyVectorDbService.searchEmbeddings(process.env.QDRANT_ALL_DOCS_COLLECTION || '', embedding, limit, true),
-      this.huskyVectorDbService.searchEmbeddings(
-        process.env.QDRANT_TEAMS_WEBSEARCH_COLLECTION || '',
-        embedding,
-        limit,
-        true
-      ),
-    ]);
+    const [allDocsResults, teamsWebsearchResults, memberDocs, teamDocs, projectDocs, focusAreaDocs, irlEventDocs] =
+      await Promise.all([
+        this.huskyVectorDbService.searchEmbeddings(
+          process.env.QDRANT_ALL_DOCS_COLLECTION || '',
+          embedding,
+          limit,
+          true
+        ),
+        this.huskyVectorDbService.searchEmbeddings(
+          process.env.QDRANT_TEAMS_WEBSEARCH_COLLECTION || '',
+          embedding,
+          limit,
+          true
+        ),
+        this.fetchAndFormatActionDocs(
+          HUSKY_ACTION_TYPES.MEMBER,
+          process.env.QDRANT_MEMBERS_COLLECTION || '',
+          embedding,
+          limit
+        ),
+        this.fetchAndFormatActionDocs(
+          HUSKY_ACTION_TYPES.TEAM,
+          process.env.QDRANT_TEAMS_COLLECTION || '',
+          embedding,
+          limit
+        ),
+        this.fetchAndFormatActionDocs(
+          HUSKY_ACTION_TYPES.PROJECT,
+          process.env.QDRANT_PROJECTS_COLLECTION || '',
+          embedding,
+          limit
+        ),
+        this.fetchAndFormatActionDocs(
+          HUSKY_ACTION_TYPES.FOCUS_AREA,
+          process.env.QDRANT_FOCUS_AREAS_COLLECTION || '',
+          embedding
+        ),
+        this.fetchAndFormatActionDocs(
+          HUSKY_ACTION_TYPES.IRL_EVENT,
+          process.env.QDRANT_IRL_EVENTS_COLLECTION || '',
+          embedding
+        ),
+      ]);
 
     const formattedTeamsWebsearchResults = teamsWebsearchResults.map((doc) => {
       return {
@@ -61,7 +96,7 @@ export class NonDirectoryDocsTool {
       };
     });
 
-    return [...allDocsResults, ...formattedTeamsWebsearchResults]
+    const allDocs = [...allDocsResults, ...formattedTeamsWebsearchResults]
       .map((doc: any) => {
         return {
           id: doc?.id,
@@ -73,7 +108,37 @@ export class NonDirectoryDocsTool {
       .filter((v) => v.score > 0.45 && v?.text?.length > 5)
       .sort((a, b) => b.score - a.score)
       .slice(0, 15)
-      .map((result) => `${result?.text}${result?.source ? ` (Source:${result?.source})` : ''}`)
-      .join('\n');
+      .map((result) => `${result?.text}${result?.source ? ` (Source:${result?.source})` : ''}`);
+
+    const actionDocs = [...memberDocs, ...teamDocs, ...projectDocs, ...focusAreaDocs, ...irlEventDocs]
+      .map((doc: any) => {
+        return {
+          id: doc?.id,
+          text: doc?.info,
+          score: doc?.score,
+          source: doc?.directoryLink,
+        };
+      })
+      .filter((v) => v.score > 0.37 && v?.text?.length > 5)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 15)
+      .map((result) => `${result?.text}${result?.source ? ` (Source:${result?.source})` : ''}`);
+
+    return [...allDocs, ...actionDocs].join('\n');
+  }
+
+  private async fetchAndFormatActionDocs(type: string, collectionName: string, embedding: any, limit = 5) {
+    const actionDocs = await this.huskyVectorDbService.searchEmbeddings(collectionName, embedding, limit, true);
+    return actionDocs.map((doc) => {
+      const metadata: any = doc?.payload?.metadata;
+      return {
+        name: metadata?.name ?? '',
+        directoryLink: metadata?.source ?? '',
+        id: doc?.id,
+        info: doc?.payload?.content ?? '',
+        type: type,
+        score: doc.score,
+      };
+    });
   }
 }
