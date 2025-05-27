@@ -99,11 +99,13 @@ export class TeamsTool {
           .filter(Boolean)
           .join('\n');
 
-        const members = team.teamMemberRoles.map((role) => `${role.member.name} (${role.role})`).join(', ');
+        const members = team.teamMemberRoles
+          .map((role) => `${role.member.name} (${role.role}) [MemberLink](/members/${role.member.uid})`)
+          .join(', ');
 
         const projects = [
-          ...team.maintainingProjects.map((p) => `${p.name} (Maintaining)`),
-          ...team.contributingProjects.map((p) => `${p.name} (Contributing)`),
+          ...team.maintainingProjects.map((p) => `${p.name} (Maintaining) [ProjectLink](/projects/${p.uid})`),
+          ...team.contributingProjects.map((p) => `${p.name} (Contributing) [ProjectLink](/projects/${p.uid})`),
         ].join(', ');
 
         const asks = team.asks.map((ask) => ask.title).join(', ');
@@ -119,7 +121,7 @@ export class TeamsTool {
           .join(', ');
 
         return `Team ID: ${team.uid}
-                Link: /teams/${team.uid}
+                [TeamLink](/teams/${team.uid})
                 Name: ${team.name}
                 Short Description: ${team.shortDescription || 'Not provided'}
                 Long Description: ${team.longDescription || 'Not provided'}
