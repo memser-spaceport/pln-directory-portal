@@ -75,7 +75,7 @@ export class HuskyAiService {
         const chunks: string[] = [];
         for await (const chunk of textStream) {
           chunks.push(chunk);
-          controller.enqueue(encoder.encode(chunk.replace(/\n/g, '\\n')));
+          controller.enqueue(encoder.encode(chunk.replace(/\n/g, '\\n').replace(/"/g, '\\"')));
         }
 
         // Close the content field
