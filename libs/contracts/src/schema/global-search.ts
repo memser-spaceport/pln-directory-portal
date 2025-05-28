@@ -12,8 +12,8 @@ const MatchSchema = z.object({
 
 const SearchResultItemSchema = z.object({
   uid: z.string(),
-  index: z.string(),
   name: z.string(),
+  index: z.string(),
   matches: z.array(MatchSchema),
 });
 
