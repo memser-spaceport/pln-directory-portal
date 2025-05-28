@@ -63,7 +63,7 @@ export class HuskyAiService {
             - currentDate: ${currentDate}
           `,
           maxSteps: 5,
-          temperature: 0.001,
+          temperature: 0.1,
           onStepFinish: async (step) => {
             if (step.toolResults?.length > 0) {
               toolResults += step.toolResults.map((tool: { result: string }) => tool.result).join('\n\n');
@@ -95,7 +95,7 @@ export class HuskyAiService {
             - content: ${content}
             - context: ${toolResults}
           `,
-          temperature: 0.001,
+          temperature: 0.1,
           onFinish: async (response) => {
             this.updateChatSummary(threadId, { user: question, system: content })
               .then((res) => {
