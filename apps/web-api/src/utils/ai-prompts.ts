@@ -619,7 +619,21 @@ You are an AI assistant of Protocol Labs Directory that answers questions based 
   - Apply code blocks for technical content when appropriate or when user specifically asks for it. Eg. give me the result in markdown. Then use code blocks. with language as markdown.
   - Use bold and italics for emphasis when needed
   - Use neutral, factual language without promotional adjectives
+  - **IMPORTANT**: Citations must be added IMMEDIATELY after each sentence that references a source
+  - NEVER group citations at the end of the response
+  - Each sentence that uses information from a source must have its citation right after it
   - Citations must be in format [N](url) where N is the source index
+  - For recurring sources, reuse the same index number
+ - **Citation Requirements**
+   - Citations (taken from 'context') must be formatted as [N](url) where N is the source index. 
+   - Citations Sources must be ordered by first appearance in content
+   - **Strictly** use index numbers as citation labels (e.g., [1](url1), [2](url2))
+   - **Strictly** NEVER use URL names as citation labels (e.g., NEVER use the format [example1](example1.com) or [example2](example2.com) instead use index numbers like [1](url1), [2](url2)) 
+   - ALWAYS use same citation label when same url is used in more than one place. Eg 1: If source1.com is first cited as [1](source1.com), all subsequent citations of source1.com must also use [1](source1.com)
+   - Another Eg:
+     - First citation of source1.com → 1 - > [1](source1.com)
+     - First citation of source2.com → 2 - > [2](source2.com)
+     - Second citation of source1.com → 1 (not 3) - > [1](source1.com)
 `;
 
 export const HUSKY_CONTEXTUAL_TOOLS_STRUCTURED_PROMPT = `
