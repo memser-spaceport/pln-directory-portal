@@ -3,9 +3,9 @@ import { QdrantVectorDbService } from './db/qdrant-vector-db.service';
 import { RedisCacheDbService } from './db/redis-cache-db.service';
 import { MongoPersistantDbService } from './db/mongo-persistant-db.service';
 import { LogService } from '../shared/log.service';
-import { embed, generateObject, generateText, streamObject } from 'ai';
+import { embed, generateObject, generateText, streamObject, streamText } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { HuskyResponseSchema, HuskyChatInterface, HuskyRephraseQuestionSchema } from 'libs/contracts/src/schema/husky-chat';
+import { HuskyResponseSchema, HuskyChatInterface, HuskyRephraseQuestionSchema, HuskyResponseContextSchema } from 'libs/contracts/src/schema/husky-chat';
 import {
   HUSKY_ACTION_TYPES,
   HUSKY_MAX_CONTEXT_LENGTH,
@@ -20,10 +20,13 @@ import {
   HUSKY_NO_INFO_PROMPT,
   PROMPT_FOR_GENERATE_TITLE,
   HUSKY_CONTEXTUAL_SUMMARY_PROMPT,
+  HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT,
+  HUSKY_CONTEXTUAL_TOOLS_STRUCTURED_PROMPT,
 } from '../utils/ai-prompts'
 import Handlebars from 'handlebars';
 import { PrismaService } from '../shared/prisma.service';
 import { v4 as uuidv4 } from 'uuid';
+import { HuskyAiToolsService } from './tools/husky-ai-tools.serivice';
 
 @Injectable()
 export class HuskyAiService {
@@ -32,8 +35,100 @@ export class HuskyAiService {
     private huskyVectorDbService: QdrantVectorDbService,
     private huskyCacheDbService: RedisCacheDbService,
     private huskyPersistentDbService: MongoPersistantDbService,
-    private prisma: PrismaService
+    private prisma: PrismaService,
+    private huskyAiToolsService: HuskyAiToolsService
   ) { }
+
+  async createContextualToolsResponse(chatInfo: HuskyChatInterface) {
+    const { question, threadId, chatId } = chatInfo;
+    const currentDate = new Date().toISOString().split('T')[0];
+
+    const chatSummaryFromDb = await this.huskyCacheDbService.get(`${threadId}:summary`);
+
+    // Create a new stream that will combine both text and structured data
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start: async (controller) => {
+        // Send the opening of the JSON object with content
+        controller.enqueue(encoder.encode('{ "content": "'));
+
+        let toolResults = '';
+        const { textStream } = streamText({
+          model: openai(process.env.OPENAI_LLM_MODEL || ''),
+          system: HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT,
+          tools: this.huskyAiToolsService.getTools(),
+          prompt: `
+          ${chatSummaryFromDb ? ` - chatHistory: ${chatSummaryFromDb}` : ''}
+            - question: ${question}
+            - currentDate: ${currentDate}
+          `,
+          maxSteps: 5,
+          temperature: 0.001,
+          onStepFinish: async (step) => {
+            if (step.toolResults?.length > 0) {
+              toolResults += step.toolResults.map((tool: { result: string }) => tool.result).join('\n\n');
+            }
+          },
+        });
+
+        // Handle text stream chunks
+        const chunks: string[] = [];
+        for await (const chunk of textStream) {
+          chunks.push(chunk);
+          controller.enqueue(encoder.encode(chunk.replace(/\n/g, '\\n').replace(/"/g, '\\"')));
+        }
+
+        // Close the content field
+        controller.enqueue(encoder.encode('", '));
+
+        const content = chunks.join('');
+
+        // Get and stream the structured data
+        const objectStream = streamObject({
+          model: openai(process.env.OPENAI_LLM_MODEL || ''),
+          schema: HuskyResponseContextSchema,
+          system: HUSKY_CONTEXTUAL_TOOLS_STRUCTURED_PROMPT,
+          prompt: `
+          ${chatSummaryFromDb ? ` - chatHistory: ${chatSummaryFromDb}` : ''}
+            - question: ${question}
+            - currentDate: ${currentDate}
+            - content: ${content}
+            - context: ${toolResults}
+          `,
+          temperature: 0.001,
+          onFinish: async (response) => {
+            this.updateChatSummary(threadId, { user: question, system: content })
+              .then((res) => {
+                return this.updateChatSummaryInMongo(threadId, res);
+              })
+              .then(() => {});
+            this.persistContextualHistory(
+              threadId,
+              chatId,
+              question,
+              content || '',
+              response?.object?.sources || [],
+              response?.object?.followUpQuestions || [],
+              response?.object?.actions || []
+            ).then(() => {});
+          },
+        });
+
+        const contextChunks: string[] = [];
+        for await (let chunk of objectStream.textStream) {
+          if (contextChunks.length === 0 && chunk.startsWith('{')) {
+            chunk = chunk.substring(1);
+          }
+          contextChunks.push(chunk);
+          controller.enqueue(encoder.encode(chunk));
+        }
+
+        controller.close();
+      },
+    });
+
+    return stream;
+  }
 
   async createContextualResponse(chatInfo: HuskyChatInterface) {
     const { question, chatSummary, threadId, chatId } = chatInfo;
