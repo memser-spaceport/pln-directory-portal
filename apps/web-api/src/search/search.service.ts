@@ -91,7 +91,7 @@ export class SearchService {
         matches: item.matches,
       }));
 
-    return result;
+    return SearchResultSchema.parse(result);
   }
 
   async autocompleteSearch(text: string, size = 5): Promise<SearchResult> {
