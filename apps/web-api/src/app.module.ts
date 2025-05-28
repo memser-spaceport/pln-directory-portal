@@ -47,7 +47,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { AskModule } from './asks/asks.module';
 import { MemberExperiencesModule } from './member-experiences/member-experiences.module';
 import { SearchModule } from './search/search.module';
-import { OpenSearchModule } from './opensearch.module';
+import { OpenSearchModule } from './opensearch/opensearch.module';
 
 @Module({
   controllers: [AppController],

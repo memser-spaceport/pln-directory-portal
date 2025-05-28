@@ -1,6 +1,6 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { Client } from '@opensearch-project/opensearch';
+import { Injectable } from '@nestjs/common';
 import { SearchResult, SearchResultSchema } from 'libs/contracts/src/schema/global-search';
+import { OpenSearchService } from '../opensearch/opensearch.service';
 
 type IndexFieldMap = {
   [key: string]: [string, string[]];
@@ -10,7 +10,7 @@ const MAX_SEARCH_RESULTS_PER_INDEX = 10;
 
 @Injectable()
 export class SearchService {
-  constructor(@Inject('OPENSEARCH_CLIENT') private readonly client: Client) {}
+  constructor(private readonly openSearchService: OpenSearchService) {}
 
   async fetchAllIndices(text: string): Promise<SearchResult> {
     const indices: IndexFieldMap = {
@@ -25,40 +25,81 @@ export class SearchService {
       projects: [],
       teams: [],
       members: [],
+      top: [],
     };
 
+    const allHits: Array<{
+      index: keyof SearchResult;
+      uid: string;
+      name: string;
+      matches: Array<{ field: string; content: string }>;
+      score: number;
+    }> = [];
+
     for (const key of Object.keys(result) as Array<keyof SearchResult>) {
+      if (key == 'top') {
+        continue;
+      }
+
       const [index, fields] = indices[key];
 
-      const res = await this.client.search({
-        index,
-        size: MAX_SEARCH_RESULTS_PER_INDEX,
-        body: {
-          query: {
-            multi_match: {
-              query: text,
-              fields,
-              type: 'best_fields',
-            },
+      const res = await this.openSearchService.searchWithLimit(index, MAX_SEARCH_RESULTS_PER_INDEX, {
+        query: {
+          multi_match: {
+            query: text,
+            fields,
+            type: 'best_fields',
           },
-          highlight: {
-            fields: fields.reduce<Record<string, Record<string, never>>>((acc, f) => {
-              acc[f] = {};
-              return acc;
-            }, {}),
-          },
+        },
+        highlight: {
+          fields: fields.reduce<Record<string, Record<string, never>>>((acc, f) => {
+            acc[f] = {};
+            return acc;
+          }, {}),
         },
       });
 
-      result[key] = res.body.hits.hits.map((hit) => ({
-        uid: hit._id,
-        name: hit._source?.name ?? '',
-        matches: Object.entries(hit.highlight || {}).map(([field, value]) => ({
+      const formattedHits = res.body.hits.hits.map((hit) => {
+        const matches = Object.entries(hit.highlight || {}).map(([field, value]) => ({
           field,
           content: value.join(' '),
-        })),
-      }));
+        }));
+
+        const item = {
+          uid: hit._id,
+          name: hit._source?.name ?? '',
+          index: key,
+          matches,
+        };
+
+        // Add to grouped results
+        result[key].push(item);
+
+        const rawScore = hit._score;
+        const score = typeof rawScore === 'number' ? rawScore : 0;
+
+        // Track for "top" scoring results
+        allHits.push({
+          uid: hit._id,
+          name: item.name,
+          index: key,
+          matches,
+          score,
+        });
+
+        return item;
+      });
     }
+
+    result.top = allHits
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10)
+      .map(({ index, uid, name, matches }) => ({
+        index,
+        uid,
+        name,
+        matches,
+      }));
 
     return result;
   }
@@ -72,6 +113,7 @@ export class SearchService {
       teams: [],
       projects: [],
       members: [],
+      top: [],
     };
 
     const indexToResultKey: Record<IndexType, keyof SearchResult> = {
@@ -101,11 +143,11 @@ export class SearchService {
         };
       });
 
-      const response = await this.client.search({ index, body });
+      const response = await this.openSearchService.searchWithLimit(index, MAX_SEARCH_RESULTS_PER_INDEX, body);
 
       const groupedById: Record<
         string,
-        { uid: string; name: string; matches: { field: string; content: string }[] }
+        { uid: string; name: string; index: string; matches: { field: string; content: string }[] }
       > = {};
 
       for (const key in response.body.suggest) {
@@ -124,6 +166,7 @@ export class SearchService {
             groupedById[uid] = {
               uid: uid,
               name,
+              index: key,
               matches: [],
             };
           }

@@ -12,6 +12,7 @@ const MatchSchema = z.object({
 
 const SearchResultItemSchema = z.object({
   uid: z.string(),
+  index: z.string(),
   name: z.string(),
   matches: z.array(MatchSchema),
 });
@@ -21,6 +22,7 @@ export const SearchResultSchema = z.object({
   projects: z.array(SearchResultItemSchema),
   teams: z.array(SearchResultItemSchema),
   members: z.array(SearchResultItemSchema),
+  top: z.array(SearchResultItemSchema),
 });
 
 export type SearchResult = z.infer<typeof SearchResultSchema>;
