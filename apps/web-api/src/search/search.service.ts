@@ -166,7 +166,7 @@ export class SearchService {
             groupedById[uid] = {
               uid: uid,
               name,
-              index: key,
+              index: indexToResultKey[opt._index],
               matches: [],
             };
           }
