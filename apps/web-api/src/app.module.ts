@@ -50,10 +50,12 @@ import { EventsModule } from './events/events.module';
 import { SearchModule } from './search/search.module';
 import { OpenSearchModule } from './opensearch/opensearch.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   controllers: [AppController],
   imports: [
+    AnalyticsModule,
     ThrottlerModule.forRoot({
       ttl: 1,
       limit: 10,
@@ -114,7 +116,6 @@ import { RecommendationsModule } from './recommendations/recommendations.module'
     MemberSubscriptionsModule,
     NotificationsModule,
     AskModule,
-    MemberExperiencesModule,
     EventsModule,
     MemberExperiencesModule,
     SearchModule,

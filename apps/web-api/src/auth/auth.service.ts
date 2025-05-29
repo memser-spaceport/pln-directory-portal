@@ -15,6 +15,8 @@ import { MembersService } from '../members/members.service';
 import { EmailOtpService } from '../otp/email-otp.service';
 import { ModuleRef } from '@nestjs/core';
 import { LogService } from '../shared/log.service';
+import { AnalyticsService } from '../analytics/analytics.service';
+import { ANALYTICS_EVENTS } from '../utils/constants';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -23,7 +25,8 @@ export class AuthService implements OnModuleInit {
     private moduleRef: ModuleRef,
     private emailOtpService: EmailOtpService,
     private logger: LogService,
-    @Inject(CACHE_MANAGER) private cacheService: Cache
+    @Inject(CACHE_MANAGER) private cacheService: Cache,
+    private analyticsService: AnalyticsService
   ) {}
 
   onModuleInit() {
@@ -156,7 +159,17 @@ export class AuthService implements OnModuleInit {
         accessToken: newTokens.access_token,
       };
     }
-
+    // Track login event
+    await this.analyticsService.trackEvent({
+      name: foundUser.externalId ? 
+        ANALYTICS_EVENTS.AUTH.USER_LOGIN : ANALYTICS_EVENTS.AUTH.USER_FIRST_LOGIN,
+      distinctId: foundUser.uid,
+      properties: {
+        uid: foundUser.uid,
+        email: foundUser.email,
+        name: foundUser.name
+      }
+    });
     // Get external Id
     const { externalId } = this.decodeAuthIdToken(newTokens.id_token);
 
