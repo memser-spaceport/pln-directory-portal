@@ -32,6 +32,12 @@ export const ROUTE_CONSTANTS = {
   TEAM_VIEW: APP_CONSTANTS.SLASH + 'team-view',
   MEMBER_VIEW: APP_CONSTANTS.SLASH + 'member-view',
   INTERNAL_SERVER_ERROR: APP_CONSTANTS.SLASH + 'internal-server-error',
+  MASTER_DATA: APP_CONSTANTS.SLASH + 'master-data',
+  INDUSTRY_TAGS: APP_CONSTANTS.SLASH + 'master-data/industry-tags',
+  SKILLS: APP_CONSTANTS.SLASH + 'master-data/skills',
+  MEMBERSHIP_SOURCES: APP_CONSTANTS.SLASH + 'master-data/membership-sources',
+  TECHNOLOGIES: APP_CONSTANTS.SLASH + 'master-data/technologies',
+  FOCUS_AREAS: APP_CONSTANTS.SLASH + 'master-data/focus-areas',
 };
 
 export const API_ROUTE = {
@@ -44,6 +50,7 @@ export const API_ROUTE = {
   INDUSTRIES: APP_CONSTANTS.V1 + 'industry-tags',
   TECHNOLOGIES: APP_CONSTANTS.V1 + 'technologies',
   MEMBERS: APP_CONSTANTS.V1 + 'members',
+  MASTER_DATA: APP_CONSTANTS.V1 + 'admin/master-data',
 };
 
 export const TOKEN = 'plnetwork@1';
