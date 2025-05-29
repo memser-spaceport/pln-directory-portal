@@ -20,11 +20,12 @@ import { NotificationService } from '../utils/notification/notification.service'
 import { EmailOtpService } from '../otp/email-otp.service';
 import { AuthService } from '../auth/auth.service';
 import { LogService } from '../shared/log.service';
-import { CREATE, DEFAULT_MEMBER_ROLES, UPDATE } from '../utils/constants';
+import { ANALYTICS_EVENTS, CREATE, DEFAULT_MEMBER_ROLES, UPDATE } from '../utils/constants';
 import { hashFileName } from '../utils/hashing';
 import { copyObj, buildMultiRelationMapping } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { HuskyRevalidationService } from '../husky/husky-revalidation.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 
 @Injectable()
 export class MembersService {
@@ -41,7 +42,8 @@ export class MembersService {
     @Inject(forwardRef(() => NotificationService))
     private notificationService: NotificationService,
     private cacheService: CacheService,
-    private huskyRevalidationService: HuskyRevalidationService
+    private huskyRevalidationService: HuskyRevalidationService,
+    private analyticsService: AnalyticsService
   ) { }
 
   /**
@@ -672,7 +674,7 @@ export class MembersService {
     const member = await this.prepareMemberFromParticipantRequest(null, memberData, null, tx);
     await this.mapLocationToMember(memberData, null, member, tx);
     const createdMember = await this.createMember(member, tx);
-    await this.postCreateActions(createdMember.uid, CREATE);
+    await this.postCreateActions(createdMember, CREATE, memberParticipantRequest.requesterEmailId);
     return createdMember;
   }
 
@@ -706,7 +708,7 @@ export class MembersService {
       }
       this.logger.info(`Member update request - completed, requestId -> ${result.uid}, requestor -> ${requestorEmail}`)
     });
-    await this.postUpdateActions(memberUid, UPDATE);
+    await this.postUpdateActions(result, UPDATE, requestorEmail);
     return result;
   }
 
@@ -1222,22 +1224,50 @@ export class MembersService {
 
   /**
    * Executes post-create actions such as resetting the cache and triggering Airtable sync.
+   * Also tracks the member creation event with analytics.
    * This ensures that the system is up-to-date with the latest changes.
    */
-  private async postCreateActions(uid: string, action: string): Promise<void> {
+  private async postCreateActions(
+    member: Member, 
+    action: string, 
+    requestorEmail: string
+  ): Promise<void> {
     await this.cacheService.reset({ service: 'members' });
-    this.huskyRevalidationService.triggerHuskyRevalidation('members', uid, action);
+    this.huskyRevalidationService.triggerHuskyRevalidation('members', member.uid, action);
     await this.forestadminService.triggerAirtableSync();
+    await this.analyticsService.trackEvent({
+      name: ANALYTICS_EVENTS.MEMBER.MEMBER_CREATE,
+      distinctId: requestorEmail,
+      properties: {
+        uid: member.uid,
+        name: member.name,
+        email: member.email
+      }
+    });
   }
 
   /**
    * Executes post-update actions such as resetting the cache and triggering Airtable sync.
+   * Also tracks the member updation event with analytics.
    * This ensures that the system is up-to-date with the latest changes.
    */
-  private async postUpdateActions(uid: string, action: string): Promise<void> {
+  private async postUpdateActions( 
+    member: Member, 
+    action: string,
+    requestorEmail: string
+  ): Promise<void> {
     await this.cacheService.reset({ service: 'members' });
-    this.huskyRevalidationService.triggerHuskyRevalidation('members', uid, action);
+    this.huskyRevalidationService.triggerHuskyRevalidation('members', member.uid, action);
     await this.forestadminService.triggerAirtableSync();
+    await this.analyticsService.trackEvent({
+      name: ANALYTICS_EVENTS.MEMBER.MEMBER_UPDATE,
+      distinctId: requestorEmail,
+      properties: {
+        uid: member.uid,
+        name: member.name,
+        email: member.email
+      }
+    });
   }
 
   /**

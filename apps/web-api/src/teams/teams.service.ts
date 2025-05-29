@@ -24,7 +24,8 @@ import { CacheService } from '../utils/cache/cache.service';
 import { AskService } from '../asks/asks.service';
 import { isEmpty } from 'lodash';
 import { HuskyRevalidationService } from '../husky/husky-revalidation.service';
-import { CREATE, UPDATE } from '../utils/constants';
+import { ANALYTICS_EVENTS, CREATE, UPDATE } from '../utils/constants';
+import { AnalyticsService } from '../analytics/analytics.service';
 
 @Injectable()
 export class TeamsService {
@@ -40,7 +41,8 @@ export class TeamsService {
     private notificationService: NotificationService,
     private cacheService: CacheService,
     private askService: AskService,
-    private huskyRevalidationService: HuskyRevalidationService
+    private huskyRevalidationService: HuskyRevalidationService,
+    private analyticsService: AnalyticsService
   ) { }
 
   /**
@@ -186,14 +188,18 @@ export class TeamsService {
    *
    * @param team - The data for the new team to be created
    * @param tx - The transaction client to ensure atomicity
+   * @param requestorEmail - Email of the person creating the team
    * @returns The created team record
    */
-  async createTeam(team: Prisma.TeamUncheckedCreateInput, tx: Prisma.TransactionClient): Promise<Team> {
+  async createTeam(
+   team: Prisma.TeamUncheckedCreateInput,
+   tx: Prisma.TransactionClient, 
+   requestorEmail: string): Promise<Team> {
     try {
       const createdTeam = await tx.team.create({
         data: team,
       });
-      await this.postCreateActions(createdTeam.uid, CREATE);
+      await this.postCreateActions(createdTeam, CREATE, requestorEmail);
       return createdTeam;
     } catch (err) {
       return this.handleErrors(err);
@@ -211,14 +217,15 @@ export class TeamsService {
   async updateTeamByUid(
     uid: string,
     team: Prisma.TeamUncheckedUpdateInput,
-    tx: Prisma.TransactionClient
+    tx: Prisma.TransactionClient,
+    requestorEmail: string
   ): Promise<Team> {
     try {
       const updatedTeam = await tx.team.update({
         where: { uid },
         data: team,
       });
-      await this.postUpdateActions(updatedTeam.uid);
+      await this.postUpdateActions(updatedTeam, requestorEmail);
       return updatedTeam;
     } catch (err) {
       return this.handleErrors(err, `${uid}`);
@@ -245,7 +252,7 @@ export class TeamsService {
     let result;
     await this.prisma.$transaction(async (tx) => {
       const team = await this.formatTeam(teamUid, updatedTeam, tx, 'Update');
-      result = await this.updateTeamByUid(teamUid, team, tx);
+      result = await this.updateTeamByUid(teamUid, team, tx, requestorEmail);
       const toAdd: any[] = [];
       const toDelete: any[] = [];
       if (updatedTeam?.teamMemberRoles?.length > 0) {
@@ -279,7 +286,7 @@ export class TeamsService {
       await this.logParticipantRequest(requestorEmail, updatedTeam, existingTeam.uid, tx);
     });
     this.notificationService.notifyForTeamEditApproval(updatedTeam.name, teamUid, requestorEmail);
-    await this.postUpdateActions(result.uid);
+    await this.postUpdateActions(result, requestorEmail);
     return result;
   }
 
@@ -338,7 +345,7 @@ export class TeamsService {
   ): Promise<Team> {
     const newTeam: any = teamParticipantRequest.newData;
     const formattedTeam = await this.formatTeam(null, newTeam, tx);
-    const createdTeam = await this.createTeam(formattedTeam, tx);
+    const createdTeam = await this.createTeam(formattedTeam, tx, teamParticipantRequest.requesterEmailId);
     return createdTeam;
   }
 
@@ -468,12 +475,22 @@ export class TeamsService {
 
   /**
    * Executes post-update actions such as resetting the cache and triggering Airtable sync.
+   * Also tracks the team update event with analytics.
    * This ensures that the system is up-to-date with the latest changes.
    */
-  private async postUpdateActions(uid: string): Promise<void> {
+  private async postUpdateActions(team: Team, requestorEmail: string): Promise<void> {
     await this.cacheService.reset({ service: 'teams' });
-    this.huskyRevalidationService.triggerHuskyRevalidation('teams', uid, UPDATE);
+    this.huskyRevalidationService.triggerHuskyRevalidation('teams', team.uid, UPDATE);
     await this.forestadminService.triggerAirtableSync();
+    await this.analyticsService.trackEvent({
+      name: ANALYTICS_EVENTS.TEAM.TEAM_UPDATE,
+      distinctId: requestorEmail,
+      properties: {
+        uid: team.uid,
+        name: team.name
+      }
+    });
+    
   }
 
   /**
@@ -1103,10 +1120,23 @@ export class TeamsService {
 
   /**
    * Executes post-create actions such as triggering n8n workflow.
+   * Also tracks the team creation event with analytics.
    * This ensures that the system is up-to-date with the latest changes.
    */
-  private async postCreateActions(uid: string, action: string): Promise<void> {
-    this.huskyRevalidationService.triggerHuskyRevalidation('teams', uid, action);
-    }
+  private async postCreateActions(
+    team: Team, 
+    action: string, 
+    requestorEmail: string
+  ): Promise<void> {
+    this.huskyRevalidationService.triggerHuskyRevalidation('teams', team.uid, action);
+    await this.analyticsService.trackEvent({
+      name: ANALYTICS_EVENTS.TEAM.TEAM_CREATE,
+      distinctId: requestorEmail,
+      properties: {
+        uid: team.uid,
+        name: team.name
+      }
+    });
+  }
 
 }
