@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MemberController } from './members.controller';
 import { MembersService } from './members.service';
+import { MembersHooksService } from './members.hooks.service';
 import { ParticipantsRequestModule } from '../participants-request/participants-request.module';
 import { OtpModule } from '../otp/otp.module';
 import { SharedModule } from '../shared/shared.module';
@@ -16,9 +17,10 @@ import { HuskyModule } from '../husky/husky.module';
     HuskyModule
   ],
   providers: [
-    MembersService
+    MembersService,
+    MembersHooksService
   ],
   controllers: [MemberController],
-  exports: [MembersService]
+  exports: [MembersService, MembersHooksService]
 })
 export class MembersModule {}
