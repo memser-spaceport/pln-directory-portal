@@ -1,3 +1,4 @@
+import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 
@@ -23,3 +24,19 @@ export const TechnologyQueryParams = QueryParams({
 export const TechnologyDetailQueryParams = TechnologyQueryParams.unwrap()
   .pick(RETRIEVAL_QUERY_FILTERS)
   .optional();
+
+export const CreateTechnologySchema = TechnologySchema.pick({
+  title: true,
+});
+
+export const UpdateTechnologySchema = TechnologySchema.pick({
+  title: true,
+}).partial();
+
+export class TechnologyDto extends createZodDto(TechnologySchema) {}
+
+export class CreateTechnologyDto extends createZodDto(CreateTechnologySchema) {}
+
+export class UpdateTechnologyDto extends createZodDto(UpdateTechnologySchema) {}
+
+export class ResponseTechnologyDto extends createZodDto(ResponseTechnologySchema) {}

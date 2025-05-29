@@ -28,9 +28,16 @@ export const CreateSkillSchema = SkillSchema.pick({
   description: true,
 });
 
+export const UpdateSkillSchema = SkillSchema.pick({
+  title: true,
+  description: true,
+}).partial();
+
 export class SkillDto extends createZodDto(SkillSchema) {}
 
 export class CreateSkillDto extends createZodDto(CreateSkillSchema) {}
+
+export class UpdateSkillDto extends createZodDto(UpdateSkillSchema) {}
 
 export class ResponseSkillDto extends createZodDto(ResponseSkillSchema) {}
 

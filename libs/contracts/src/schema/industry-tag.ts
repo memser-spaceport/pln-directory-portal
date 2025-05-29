@@ -26,6 +26,12 @@ export const CreateIndustryTagSchema = IndustryTagSchema.pick({
   industryCategoryUid: true,
 });
 
+export const UpdateIndustryTagSchema = IndustryTagSchema.pick({
+  title: true,
+  definition: true,
+  industryCategoryUid: true,
+}).partial();
+
 export const IndustryTagRelationalFields = ResponseIndustryTagSchema.pick({
   industryCategory: true,
 }).strip();
@@ -47,6 +53,10 @@ export class IndustryTagDto extends createZodDto(IndustryTagSchema) {}
 
 export class CreateIndustryTagDto extends createZodDto(
   CreateIndustryTagSchema
+) {}
+
+export class UpdateIndustryTagDto extends createZodDto(
+  UpdateIndustryTagSchema
 ) {}
 
 export class ResponseIndustryTagDto extends createZodDto(

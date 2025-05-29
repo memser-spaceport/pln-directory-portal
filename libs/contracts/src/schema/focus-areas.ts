@@ -47,12 +47,22 @@ export const FocusAreaDetailQueryParams = FocusAreaQueryParams.unwrap()
   .optional();
 
 export const CreateFocusAreaSchema = FocusAreaSchema.pick({
-  title: true
+  title: true,
+  description: true,
+  parentUid: true
 });
+
+export const UpdateFocusAreaSchema = FocusAreaSchema.pick({
+  title: true,
+  description: true,
+  parentUid: true
+}).partial();
 
 export class FocusAreaDto extends createZodDto(FocusAreaSchema) {}
 
 export class CreateFocusAreaDto extends createZodDto(CreateFocusAreaSchema) {}
+
+export class UpdateFocusAreaDto extends createZodDto(UpdateFocusAreaSchema) {}
 
 export class ResponseFocusAreaDto extends createZodDto(ResponseFocusAreaSchema) {}
 
