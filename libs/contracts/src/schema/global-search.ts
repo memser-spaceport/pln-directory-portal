@@ -13,6 +13,7 @@ const MatchSchema = z.object({
 const SearchResultItemSchema = z.object({
   uid: z.string(),
   name: z.string(),
+  image: z.string(),
   index: z.string(),
   matches: z.array(MatchSchema),
 });

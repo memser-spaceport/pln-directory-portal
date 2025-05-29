@@ -27,6 +27,7 @@ export class SearchService {
     const allHits: Array<{
       uid: string;
       name: string;
+      image: string;
       index: string;
       matches: Array<{ field: string; content: string }>;
       score: number;
@@ -62,6 +63,7 @@ export class SearchService {
         const item = {
           uid: hit._id,
           name: hit._source?.name ?? '',
+          image: hit._source?.image ?? '',
           index: key,
           matches,
         };
@@ -74,6 +76,7 @@ export class SearchService {
         allHits.push({
           uid: hit._id,
           name: item.name,
+          image: item.image,
           index: key,
           matches,
           score,
@@ -87,6 +90,7 @@ export class SearchService {
       .map((item) => ({
         uid: item.uid,
         name: item.name,
+        image: item.image,
         index: item.index,
         matches: item.matches,
       }));
@@ -140,11 +144,13 @@ export class SearchService {
           const uid = opt._id;
           const field = key.replace('suggest_', '').replace('_suggest', '');
           const name = opt._source?.name ?? opt.text ?? 'unknown';
+          const image = opt._source?.image ?? '';
 
           if (!foundItem[uid]) {
             foundItem[uid] = {
               uid: uid,
               name,
+              image,
               index: index_key,
               matches: [],
             };
