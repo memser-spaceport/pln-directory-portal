@@ -47,10 +47,12 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { AskModule } from './asks/asks.module';
 import { MemberExperiencesModule } from './member-experiences/member-experiences.module';
 import { EventsModule } from './events/events.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   controllers: [AppController],
   imports: [
+    AnalyticsModule,
     ThrottlerModule.forRoot({
       ttl: 1,
       limit: 10,

@@ -184,3 +184,21 @@ export const DELETE = "DELETE";
 
 export const  EventInvitationToMember ="EventInvitationToMember";
 export const  EVENT_GUEST_PRESENCE_REQUEST_TEMPLATE_NAME = "EventGuestPresenceRequest";
+
+// Analytics Events
+export const ANALYTICS_EVENTS = {
+  AUTH: {
+    USER_FIRST_LOGIN: 'auth_user_first_login',
+    USER_LOGIN: 'auth_user_login'
+  },
+  MEMBER: {
+    MEMBER_CREATE: 'member_create',
+    MEMBER_UPDATE: 'member_update'
+  },
+  TEAM: {
+    TEAM_CREATE: 'team_create',
+    TEAM_UPDATE: 'team_update'
+  }
+};
+
+export const ANALYTICS_SOURCE = 'directory-portal';

@@ -6,6 +6,193 @@ It is set up in monorepo (soon will be revamped to single microservice pattern) 
 
 The actual frontend for directory has been moved [here](https://github.com/memser-spaceport/pln-directory-portal-v2).
 
+---
+
+# Analytics Service
+
+A simple and flexible wrapper service for tracking application events with multiple providers. The service provides a clean interface to track custom events while abstracting away the specific analytics provider implementation.
+
+## Architecture
+
+The service follows a provider pattern with these components:
+
+- **Core Interface** (`analytics.interface.ts`): Defines the `IAnalyticsProvider` interface and `IAnalyticsEvent` type
+- **Providers**: Implementations for different analytics services
+  - `PostHogProvider`: Wraps the PostHog service
+  - `ConsoleProvider`: Logs events to console (for development)
+- **Main Service** (`AnalyticsService`): Wrapper that automatically selects and manages providers
+- **Module** (`AnalyticsModule`): NestJS module for dependency injection
+
+## Environment Configuration
+
+### Option 1: Explicit Provider Selection
+```bash
+# Set the provider explicitly
+ANALYTICS_PROVIDER=posthog  # or 'console'
+```
+
+### Option 2: Auto-detection
+```bash
+# Service will auto-detect PostHog if these are set:
+POSTHOG_API_KEY=your_api_key
+POSTHOG_HOST=your_posthog_host
+```
+
+Without explicit configuration, the service defaults to the console provider.
+
+## Usage
+
+### Inject the Service
+```typescript
+import { AnalyticsService } from './utils/analytics/analytics.service';
+
+@Injectable()
+export class YourService {
+  constructor(
+    private readonly analyticsService: AnalyticsService
+  ) {}
+}
+```
+
+### Track Events
+```typescript
+// Track a custom event
+await this.analyticsService.trackEvent({
+  name: 'user_login',
+  userId: 'user@example.com',
+  properties: {
+    loginMethod: 'oauth',
+    timestamp: new Date().toISOString()
+  }
+});
+
+// Track member creation
+await this.analyticsService.trackEvent({
+  name: 'member_created',
+  userId: memberData.email,
+  properties: {
+    memberId: memberData.id,
+    teamCount: memberData.teams?.length || 0,
+    skills: memberData.skills
+  }
+});
+
+// Track team events
+await this.analyticsService.trackEvent({
+  name: 'team_joined',
+  userId: userEmail,
+  properties: {
+    teamId: team.id,
+    teamName: team.name,
+    memberCount: team.memberCount
+  }
+});
+```
+
+## Integration Examples
+
+### In AuthService
+```typescript
+@Injectable()
+export class AuthService {
+  constructor(
+    private readonly analyticsService: AnalyticsService
+  ) {}
+
+  async handleLogin(userEmail: string, method: string) {
+    // ... login logic ...
+    
+    await this.analyticsService.trackEvent({
+      name: 'user_login',
+      userId: userEmail,
+      properties: {
+        loginMethod: method,
+        timestamp: new Date().toISOString()
+      }
+    });
+  }
+}
+```
+
+### In MembersService
+```typescript
+@Injectable()
+export class MembersService {
+  constructor(
+    private readonly analyticsService: AnalyticsService
+  ) {}
+
+  async createMember(memberData: any) {
+    const member = await this.membersRepository.create(memberData);
+    
+    await this.analyticsService.trackEvent({
+      name: 'member_created',
+      userId: member.email,
+      properties: {
+        memberId: member.id,
+        skillsCount: member.skills?.length || 0,
+        location: member.location
+      }
+    });
+    
+    return member;
+  }
+}
+```
+
+## Adding New Providers
+
+1. Create a new provider class implementing `IAnalyticsProvider`:
+```typescript
+@Injectable()
+export class MyCustomProvider implements IAnalyticsProvider {
+  async trackEvent(event: IAnalyticsEvent): Promise<void> {
+    // Your implementation
+  }
+
+  async shutdown(): Promise<void> {
+    // Cleanup logic
+  }
+}
+```
+
+2. Update the `AnalyticsService` to include your provider in the selection logic.
+
+## Error Handling
+
+The service handles errors gracefully:
+- Failed events are logged but don't break application flow
+- Invalid configurations fall back to console provider
+- All tracking operations are asynchronous and non-blocking
+
+## Development vs Production
+
+- **Development**: Defaults to console provider for easy debugging
+- **Production**: Automatically selects PostHog if configured, otherwise uses console
+
+## Debugging
+
+Check which provider is active:
+```typescript
+const activeProvider = this.analyticsService.getActiveProvider();
+console.log(`Using provider: ${activeProvider}`);
+```
+
+## Provider Comparison
+
+| Provider | Use Case | Setup Required |
+|----------|----------|----------------|
+| PostHog | Production analytics | POSTHOG_API_KEY, POSTHOG_HOST |
+| Console | Development/debugging | None |
+
+## Performance
+
+- All tracking is asynchronous and non-blocking
+- Failed events don't affect application performance
+- Providers handle their own connection management and cleanup
+
+---
+
 ## Folder Structure
 
 The folder structure of this project is organized as follows:
