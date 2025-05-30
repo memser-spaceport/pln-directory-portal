@@ -114,7 +114,7 @@ import { OpenSearchModule } from './opensearch/opensearch.module';
     NotificationsModule,
     AskModule,
     MemberExperiencesModule,
-    EventsModule
+    EventsModule,
     MemberExperiencesModule,
     SearchModule,
     OpenSearchModule,
