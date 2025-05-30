@@ -62,7 +62,7 @@ export class HuskyAiService {
             - question: ${question}
             - currentDate: ${currentDate}
           `,
-          maxSteps: 2,
+          maxSteps: 5,
           temperature: 0.001,
           onStepFinish: async (step) => {
             if (step.toolResults?.length > 0) {
@@ -75,7 +75,7 @@ export class HuskyAiService {
         const chunks: string[] = [];
         for await (const chunk of textStream) {
           chunks.push(chunk);
-          controller.enqueue(encoder.encode(chunk.replace(/\n/g, '\\n')));
+          controller.enqueue(encoder.encode(chunk.replace(/\n/g, '\\n').replace(/"/g, '\\"')));
         }
 
         // Close the content field

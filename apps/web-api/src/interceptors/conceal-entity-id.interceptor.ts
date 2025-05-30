@@ -18,9 +18,25 @@ export class ConcealEntityIDInterceptor implements NestInterceptor {
       map((data) => {
         // Match all ocurrences of id props:
         const matchIdPropsRegex = /(,?)(\s*)("|'?)\bid("|'?):(\s*)("|'?)\d*("|'?)(\s*)(,?|}?)/gm;
-        // Replace ocurrences with a an empty string:
-        const dataWithoutIds = JSON.stringify(data).replace(matchIdPropsRegex, '');
-        return typeof data == 'object' ? JSON.parse(dataWithoutIds) : data;
+        if (typeof data === 'undefined' || data === null) {
+          return data;
+        }
+        let jsonString;
+        try {
+          jsonString = JSON.stringify(data);
+        } catch (e) {
+          return data;
+        }
+        if (!jsonString || typeof jsonString !== 'string') {
+          return data;
+        }
+        const dataWithoutIds = jsonString.replace(matchIdPropsRegex, '');
+        try {
+          return typeof data === 'object' ? JSON.parse(dataWithoutIds) : data;
+        } catch (e) {
+          // fallback: return original data if parsing fails
+          return data;
+        }
       })
     );
   }

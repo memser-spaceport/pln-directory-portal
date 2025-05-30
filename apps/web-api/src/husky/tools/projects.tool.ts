@@ -108,8 +108,10 @@ export class ProjectsTool {
     return projects
       .map((project) => {
         const teamInfo = [
-          project.maintainingTeam ? `${project.maintainingTeam.name} (Maintaining)` : null,
-          ...project.contributingTeams.map((team) => `${team.name} (Contributing)`),
+          project.maintainingTeam
+            ? `${project.maintainingTeam.name} (Maintaining) [TeamLink](/teams/${project.maintainingTeam.uid})`
+            : null,
+          ...project.contributingTeams.map((team) => `${team.name} (Contributing) [TeamLink](/teams/${team.uid})`),
         ]
           .filter(Boolean)
           .join(', ');
@@ -127,7 +129,7 @@ export class ProjectsTool {
                   contribution.endDate ? new Date(contribution.endDate).toLocaleDateString() : 'Present'
                 })`
               : '';
-            return `${memberName} - ${role} ${dates}`;
+            return `${memberName} [MemberLink](/members/${contribution.member?.uid}) - ${role} ${dates}`;
           })
           .join('\n');
 
@@ -138,7 +140,7 @@ export class ProjectsTool {
         const asks = project.asks.map((ask) => ask.title).join(', ');
 
         return `Project ID: ${project.uid}
-                Link: /projects/${project.uid}
+                [ProjectLink](/projects/${project.uid})
                 Name: ${project.name}
                 Tagline: ${project.tagline}
                 Description: ${project.description}

@@ -110,10 +110,12 @@ export class MembersTool {
           .filter(Boolean)
           .join('\n');
 
-        const teams = member.teamMemberRoles.map((role) => `${role.team.name} (${role.role})`).join(', ');
+        const teams = member.teamMemberRoles
+          .map((role) => `${role.team.name} (${role.role}) [TeamLink](/teams/${role.team.uid})`)
+          .join(', ');
 
         const projects = [
-          ...member.createdProjects.map((p) => `${p.name} (Creator)`),
+          ...member.createdProjects.map((p) => `${p.name} (Creator) [ProjectLink](/projects/${p.uid})`),
           ...member.projectContributions.map((c) => (c.project ? `${c.project.name} (${c.role})` : '')).filter(Boolean),
         ].join(', ');
 
@@ -138,7 +140,7 @@ export class MembersTool {
           .join('\n');
 
         return `Member ID: ${member.uid}
-                Link: /members/${member.uid}
+                [MemberLink](/members/${member.uid})
                 Name: ${member.name}
                 Email: ${member.email || 'Not provided'}
                 Bio: ${member.bio || 'Not provided'}

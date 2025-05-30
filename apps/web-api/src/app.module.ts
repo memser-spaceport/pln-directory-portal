@@ -46,6 +46,7 @@ import { MemberSubscriptionsModule } from './member-subscriptions/member-subscri
 import { NotificationsModule } from './notifications/notifications.module';
 import { AskModule } from './asks/asks.module';
 import { MemberExperiencesModule } from './member-experiences/member-experiences.module';
+import { EventsModule } from './events/events.module';
 import { SearchModule } from './search/search.module';
 import { OpenSearchModule } from './opensearch/opensearch.module';
 
@@ -112,6 +113,8 @@ import { OpenSearchModule } from './opensearch/opensearch.module';
     MemberSubscriptionsModule,
     NotificationsModule,
     AskModule,
+    MemberExperiencesModule,
+    EventsModule
     MemberExperiencesModule,
     SearchModule,
     OpenSearchModule,
