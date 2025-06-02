@@ -40,4 +40,13 @@ export class OpenSearchService {
   async searchWithLimit(index: string, size: number, body: any) {
     return this.client.search({ index, size, body });
   }
+
+  async getDocsByIds(index: string, ids: string[]) {
+    const mgetResponse = await this.client.mget({
+      index,
+      body: { ids },
+    });
+
+    return mgetResponse.body.docs;
+  }
 }
