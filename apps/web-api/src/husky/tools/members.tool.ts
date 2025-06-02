@@ -9,7 +9,7 @@ import { z } from 'zod';
 export class MembersTool {
   constructor(private logger: LogService, private prisma: PrismaService) {}
 
-  getTool(): CoreTool {
+  getTool(isLoggedIn: boolean): CoreTool {
     return tool({
       description:
         'Search for members with detailed information including teams, projects, asks, experiences, and interactions',
@@ -24,18 +24,21 @@ export class MembersTool {
           .describe('Sort members by name, creation date, or PLN start date')
           .optional(),
       }),
-      execute: (args) => this.execute(args),
+      execute: (args) => this.execute(args, isLoggedIn),
     });
   }
 
-  private async execute(args: {
-    search?: string;
-    isVerified?: boolean;
-    isFeatured?: boolean;
-    openToWork?: boolean;
-    plnFriend?: boolean;
-    orderBy?: 'name' | 'date' | 'plnStartDate';
-  }) {
+  private async execute(
+    args: {
+      search?: string;
+      isVerified?: boolean;
+      isFeatured?: boolean;
+      openToWork?: boolean;
+      plnFriend?: boolean;
+      orderBy?: 'name' | 'date' | 'plnStartDate';
+    },
+    isLoggedIn: boolean
+  ) {
     this.logger.info(`Getting members for args: ${JSON.stringify(args)}`);
 
     const where: Prisma.MemberWhereInput = {};
@@ -142,10 +145,9 @@ export class MembersTool {
         return `Member ID: ${member.uid}
                 [MemberLink](/members/${member.uid})
                 Name: ${member.name}
-                Email: ${member.email || 'Not provided'}
-                Bio: ${member.bio || 'Not provided'}
+                ${isLoggedIn ? `Bio: ${member.bio || 'Not provided'}` : ''}
                 Location: ${
-                  member.location
+                  isLoggedIn && member.location
                     ? `${member.location.city || ''}${member.location.city && member.location.country ? ', ' : ''}${
                         member.location.country || ''
                       }${(member.location.city || member.location.country) && member.location.region ? ', ' : ''}${
@@ -158,14 +160,12 @@ export class MembersTool {
                 Featured: ${member.isFeatured ? 'Yes' : 'No'}
                 Open to Work: ${member.openToWork ? 'Yes' : 'No'}
                 Skills: ${member.skills.map((s) => s.title).join(', ')}
-                Social Links:
-                ${socialLinks}
                 Teams: ${teams || 'None'}
-                Projects: ${projects || 'None'}
-                Asks: ${asks || 'None'}
-                Interactions: ${interactions || 'None'}
-                Experiences:
-                ${experiences || 'None'}`;
+                ${isLoggedIn ? `Social Links: ${socialLinks}` : ''}
+                ${isLoggedIn ? `Projects: ${projects || 'None'}` : ''}
+                ${isLoggedIn ? `Asks: ${asks || 'None'}` : ''}
+                ${isLoggedIn ? `Interactions: ${interactions || 'None'}` : ''}
+                ${isLoggedIn ? `Experiences: ${experiences || 'None'}` : ''}`;
       })
       .join('\n\n');
   }
