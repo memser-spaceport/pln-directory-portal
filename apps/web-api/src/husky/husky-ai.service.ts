@@ -39,7 +39,7 @@ export class HuskyAiService {
     private huskyAiToolsService: HuskyAiToolsService
   ) { }
 
-  async createContextualToolsResponse(chatInfo: HuskyChatInterface) {
+  async createContextualToolsResponse(chatInfo: HuskyChatInterface, isLoggedIn: boolean) {
     const { question, threadId, chatId } = chatInfo;
     const currentDate = new Date().toISOString().split('T')[0];
 
@@ -56,7 +56,7 @@ export class HuskyAiService {
         const { textStream } = streamText({
           model: openai(process.env.OPENAI_LLM_MODEL || ''),
           system: HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT,
-          tools: this.huskyAiToolsService.getTools(),
+          tools: this.huskyAiToolsService.getTools(isLoggedIn),
           prompt: `
           ${chatSummaryFromDb ? ` - chatHistory: ${chatSummaryFromDb}` : ''}
             - question: ${question}
