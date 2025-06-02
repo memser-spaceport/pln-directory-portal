@@ -49,6 +49,7 @@ import { MemberExperiencesModule } from './member-experiences/member-experiences
 import { EventsModule } from './events/events.module';
 import { SearchModule } from './search/search.module';
 import { OpenSearchModule } from './opensearch/opensearch.module';
+import { RecommendationsModule } from './recommendations/recommendations.module';
 
 @Module({
   controllers: [AppController],
@@ -118,6 +119,7 @@ import { OpenSearchModule } from './opensearch/opensearch.module';
     MemberExperiencesModule,
     SearchModule,
     OpenSearchModule,
+    RecommendationsModule,
   ],
   providers: [
     {
