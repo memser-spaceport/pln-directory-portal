@@ -155,9 +155,6 @@ export class MembersTool {
                       }`
                     : 'Not provided'
                 }
-                PLN Friend: ${member.plnFriend ? 'Yes' : 'No'}
-                Verified: ${member.isVerified ? 'Yes' : 'No'}
-                Featured: ${member.isFeatured ? 'Yes' : 'No'}
                 Open to Work: ${member.openToWork ? 'Yes' : 'No'}
                 Skills: ${member.skills.map((s) => s.title).join(', ')}
                 Teams: ${teams || 'None'}
