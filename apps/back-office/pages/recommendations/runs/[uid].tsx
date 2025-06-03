@@ -147,11 +147,45 @@ export default function RecommendationRunViewPage() {
   };
 
   if (!uid) {
-    return <div>No recommendation run ID provided</div>;
+    return (
+      <BaseLayout
+        title={`Recommendation Run`}
+        actionButton={{
+          label: 'Back to List',
+          onClick: () => router.push('/recommendations/runs'),
+        }}
+      >
+        <div className="m-6 bg-white p-6 text-center">No recommendation run ID provided</div>
+      </BaseLayout>
+    );
   }
 
-  if (isLoading || !run) {
-    return <div>Loading...</div>;
+  if (isLoading && !run) {
+    return (
+      <BaseLayout
+        title={`Recommendation Run`}
+        actionButton={{
+          label: 'Back to List',
+          onClick: () => router.push('/recommendations/runs'),
+        }}
+      >
+        <div className="m-6 bg-white p-6 text-center">Loading...</div>
+      </BaseLayout>
+    );
+  }
+
+  if (!run) {
+    return (
+      <BaseLayout
+        title={`Recommendation Run`}
+        actionButton={{
+          label: 'Back to List',
+          onClick: () => router.push('/recommendations/runs'),
+        }}
+      >
+        <div className="m-6 bg-white p-6 text-center">No recommendation run found</div>
+      </BaseLayout>
+    );
   }
 
   const approvedCount = Object.values(localRecommendations).filter((status) => status === 'APPROVED').length;
