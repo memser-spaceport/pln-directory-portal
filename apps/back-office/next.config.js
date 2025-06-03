@@ -10,6 +10,7 @@ const nextConfig = {
     WEB_API_BASE_URL: process.env.WEB_API_BASE_URL,
     ADMIN_LOGIN_USERNAME: process.env.ADMIN_LOGIN_USERNAME,
     ADMIN_LOGIN_PASSWORD: process.env.ADMIN_LOGIN_PASSWORD,
+    WEB_UI_BASE_URL: process.env.WEB_UI_BASE_URL,
   },
   nx: {
     // Set this to true if you would like to to use SVGR
