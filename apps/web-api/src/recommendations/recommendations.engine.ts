@@ -1,4 +1,12 @@
-import { Member, TeamMemberRole, MemberInteraction, PLEventGuest, Team, TeamFocusArea } from '@prisma/client';
+import {
+  Member,
+  TeamMemberRole,
+  MemberInteraction,
+  PLEventGuest,
+  Team,
+  TeamFocusArea,
+  MemberExperience,
+} from '@prisma/client';
 
 // Score constants
 const SCORES = {
@@ -13,6 +21,7 @@ const SCORES = {
   MATCHING_FOCUS_AREA: 5,
   MATCHING_FUNDING_STAGE: 5,
   MATCHING_ROLE: 5,
+  MATCHING_TECHNOLOGY: 5,
   HAS_OFFICE_HOURS: 1,
   NO_OFFICE_HOURS: 0,
   JOIN_DATE: {
@@ -26,8 +35,9 @@ const SCORES = {
 
 export interface RecommendationConfig {
   // Filtering options
-  skipTeamIds?: string[];
+  skipTeamNames?: string[];
   skipMemberIds?: string[];
+  skipMemberNames?: string[];
 
   // Scoring factors to include/exclude
   includeFocusAreas?: boolean;
@@ -40,46 +50,61 @@ export interface MemberWithRelations extends Member {
   teamMemberRoles: (TeamMemberRole & {
     team: Team & {
       teamFocusAreas: (TeamFocusArea & {
-        focusArea: { name: string };
+        focusArea: { title: string };
       })[];
       fundingStage?: { uid: string };
+      technologies: { title: string }[];
     };
   })[];
   interactions: MemberInteraction[];
   targetInteractions: MemberInteraction[];
   eventGuests: PLEventGuest[];
+  experiences: MemberExperience[];
 }
 
 export interface RecommendationScore {
   member: MemberWithRelations;
   score: number;
-  factors: {
-    sameTeam: number;
-    previouslyRecommended: number;
-    bookedOH: number;
-    sameEvent: number;
-    teamFocusArea: number;
-    teamFundingStage: number;
-    roleMatch: number;
-    hasOfficeHours: number;
-    joinDateScore: number;
-  };
+  factors: RecommendationFactors;
+}
+
+export interface RecommendationFactors {
+  sameTeam: number;
+  previouslyRecommended: number;
+  bookedOH: number;
+  sameEvent: number;
+  teamFocusArea: number;
+  teamFundingStage: number;
+  roleMatch: number;
+  teamTechnology: number;
+  hasOfficeHours: number;
+  joinDateScore: number;
 }
 
 export class RecommendationsEngine {
   public getRecommendations(
     targetMember: MemberWithRelations,
     allMembers: MemberWithRelations[],
-    config: RecommendationConfig,
-    limit = 5
+    config: RecommendationConfig
   ): RecommendationScore[] {
+    // Filter out target member and members that are in the skip list
     let filteredMembers = allMembers.filter(
-      (m) => m.uid !== targetMember.uid && !config.skipMemberIds?.includes(m.uid)
+      (m) =>
+        m.uid !== targetMember.uid &&
+        !config.skipMemberIds?.includes(m.uid) &&
+        !config.skipMemberNames?.includes(m.name)
     );
 
-    if (config.skipTeamIds?.length) {
+    // Filter out members that are in the team skip list
+    if (config.skipTeamNames?.length) {
       filteredMembers = filteredMembers.filter(
-        (member) => !member.teamMemberRoles.some((role) => config.skipTeamIds!.includes(role.teamUid))
+        (member) =>
+          !member.experiences.some((experience) =>
+            config.skipTeamNames!.some((skipName) => experience.company.toLowerCase().includes(skipName.toLowerCase()))
+          ) &&
+          !member.teamMemberRoles.some((role) =>
+            config.skipTeamNames!.some((skipName) => role.team?.name?.toLowerCase().includes(skipName.toLowerCase()))
+          )
       );
     }
 
@@ -95,10 +120,7 @@ export class RecommendationsEngine {
       this.calculateRecommendationScore(member, targetMember, config)
     );
 
-    return scoredMembers
-      .filter((member) => member.score >= SCORES.MIN_SCORE)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit);
+    return scoredMembers.filter((member) => member.score >= SCORES.MIN_SCORE).sort((a, b) => b.score - a.score);
   }
 
   public calculateRecommendationScore(
@@ -141,6 +163,8 @@ export class RecommendationsEngine {
         ? this.calculateRoleMatchScore(member.teamMemberRoles, targetMember.teamMemberRoles)
         : 0,
 
+      teamTechnology: this.hasTeamTechnologyMatch(member, targetMember) ? SCORES.MATCHING_TECHNOLOGY : 0,
+
       hasOfficeHours: member.officeHours ? SCORES.HAS_OFFICE_HOURS : SCORES.NO_OFFICE_HOURS,
 
       joinDateScore: this.calculateJoinDateScore(member.plnStartDate),
@@ -154,6 +178,7 @@ export class RecommendationsEngine {
       (factors.teamFocusArea +
         factors.teamFundingStage +
         factors.roleMatch +
+        factors.teamTechnology +
         factors.hasOfficeHours +
         factors.joinDateScore);
 
@@ -167,11 +192,11 @@ export class RecommendationsEngine {
   private hasTeamFocusAreaMatch(member: MemberWithRelations, targetMember: MemberWithRelations): boolean {
     const targetFocusAreas = targetMember.teamMemberRoles
       .flatMap((role) => role.team.teamFocusAreas)
-      .map((focusArea) => focusArea.focusArea.name);
+      .map((focusArea) => focusArea.focusArea.title);
 
     const memberFocusAreas = member.teamMemberRoles
       .flatMap((role) => role.team.teamFocusAreas)
-      .map((focusArea) => focusArea.focusArea.name);
+      .map((focusArea) => focusArea.focusArea.title);
 
     return targetFocusAreas.some((targetArea) => memberFocusAreas.includes(targetArea));
   }
@@ -225,5 +250,17 @@ export class RecommendationsEngine {
     const targetEventIds = targetMember.eventGuests.map((guest) => guest.eventUid);
 
     return memberEventIds.some((eventId) => targetEventIds.includes(eventId));
+  }
+
+  private hasTeamTechnologyMatch(member: MemberWithRelations, targetMember: MemberWithRelations): boolean {
+    const targetTechnologies = targetMember.teamMemberRoles
+      .flatMap((role) => role.team.technologies)
+      .map((tech) => tech.title);
+
+    const memberTechnologies = member.teamMemberRoles
+      .flatMap((role) => role.team.technologies)
+      .map((tech) => tech.title);
+
+    return targetTechnologies.some((targetTech) => memberTechnologies.includes(targetTech));
   }
 }

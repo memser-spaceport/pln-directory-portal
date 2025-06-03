@@ -7,12 +7,12 @@ import { AdminParticipantsRequestController } from './participants-request.contr
 import { AdminAuthController } from './auth.controller';
 import { MemberController } from './member.controller';
 import { MembersModule } from '../members/members.module';
+import { RecommendationsController } from './recommendations.controller';
+import { RecommendationsModule } from '../recommendations/recommendations.module';
+
 @Module({
-  imports: [CacheModule.register(), ParticipantsRequestModule, SharedModule, MembersModule],
-  controllers: [AdminParticipantsRequestController, AdminAuthController, MemberController],
-  providers: [
-    AdminService,
-    JwtService
-  ],
+  imports: [CacheModule.register(), ParticipantsRequestModule, SharedModule, MembersModule, RecommendationsModule],
+  controllers: [AdminParticipantsRequestController, AdminAuthController, MemberController, RecommendationsController],
+  providers: [AdminService, JwtService],
 })
-export class AdminModule { }
+export class AdminModule {}
