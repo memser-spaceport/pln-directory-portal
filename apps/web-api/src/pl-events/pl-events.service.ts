@@ -6,6 +6,7 @@ import { PLEventGuestsService } from './pl-event-guests.service';
 import { NotificationService } from '../notifications/notifications.service';
 import { MembersService } from '../members/members.service';
 import { PLEventLocationsService } from './pl-event-locations.service';
+import axios from 'axios';
 
 @Injectable()
 export class PLEventsService {
@@ -307,5 +308,6 @@ export class PLEventsService {
     }
     return notification;
   }
+
 }
 

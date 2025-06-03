@@ -14,9 +14,9 @@ import {
 
 
 import {
-  CONTEXTUAL_SYSTEM_PROMPT, 
-  HUSKY_CHAT_SUMMARY_SYSTEM_PROMPT, 
-  REPHRASE_QUESTION_SYSTEM_PROMPT, 
+  CONTEXTUAL_SYSTEM_PROMPT,
+  HUSKY_CHAT_SUMMARY_SYSTEM_PROMPT,
+  REPHRASE_QUESTION_SYSTEM_PROMPT,
   HUSKY_NO_INFO_PROMPT,
   PROMPT_FOR_GENERATE_TITLE,
   HUSKY_CONTEXTUAL_SUMMARY_PROMPT,
@@ -39,7 +39,7 @@ export class HuskyAiService {
     private huskyAiToolsService: HuskyAiToolsService
   ) { }
 
-  async createContextualToolsResponse(chatInfo: HuskyChatInterface) {
+  async createContextualToolsResponse(chatInfo: HuskyChatInterface, isLoggedIn: boolean) {
     const { question, threadId, chatId } = chatInfo;
     const currentDate = new Date().toISOString().split('T')[0];
 
@@ -56,7 +56,7 @@ export class HuskyAiService {
         const { textStream } = streamText({
           model: openai(process.env.OPENAI_LLM_MODEL || ''),
           system: HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT,
-          tools: this.huskyAiToolsService.getTools(),
+          tools: this.huskyAiToolsService.getTools(isLoggedIn),
           prompt: `
           ${chatSummaryFromDb ? ` - chatHistory: ${chatSummaryFromDb}` : ''}
             - question: ${question}
@@ -321,7 +321,7 @@ export class HuskyAiService {
     } as { [key: string]: any };
 
     await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || '', newThread);
-    
+
     if (summary) {
        await Promise.all([
         this.huskyPersistentDbService.create(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', {
@@ -370,7 +370,7 @@ export class HuskyAiService {
           chatHistory: ${chatHistory}
           question: ${question}
         `,
-      }); 
+      });
       return object;
     }
     return {
@@ -608,5 +608,5 @@ export class HuskyAiService {
       ...(thread?.guestUserId && { guestUserId: thread?.guestUserId }),
     }
   }
-  
+
 }

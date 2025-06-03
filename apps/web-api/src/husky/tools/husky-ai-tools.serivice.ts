@@ -28,10 +28,10 @@ export class HuskyAiToolsService implements OnModuleInit {
     await this.irlEventsTool.initialize();
   }
 
-  public getTools(): Record<string, CoreTool> {
+  public getTools(isLoggedIn: boolean): Record<string, CoreTool> {
     return {
       getIrlEvents: this.irlEventsTool.getTool(),
-      getMembers: this.membersTool.getTool(),
+      getMembers: this.membersTool.getTool(isLoggedIn),
       getTeams: this.teamsTool.getTool(),
       getProjects: this.projectsTool.getTool(),
       getFocusAreas: this.focusAreasTool.getTool(),
