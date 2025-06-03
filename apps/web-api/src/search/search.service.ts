@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { SearchResult, SearchResultSchema } from 'libs/contracts/src/schema/global-search';
 import { OpenSearchService } from '../opensearch/opensearch.service';
+import { truncate } from '../utils/formatters';
 
 const MAX_SEARCH_RESULTS_PER_INDEX = 10;
+const AUTOMCOMPLETE_MAX_LENGTH = 50;
 
 @Injectable()
 export class SearchService {
@@ -132,6 +134,7 @@ export class SearchService {
       const response = await this.openSearchService.searchWithLimit(index, MAX_SEARCH_RESULTS_PER_INDEX, body);
 
       const foundItem = {};
+      const idsToFetch = new Set<string>();
 
       for (const key in response.body.suggest) {
         const suggestions = response.body.suggest[key];
@@ -143,24 +146,45 @@ export class SearchService {
         firstEntry.options.forEach((opt) => {
           const uid = opt._id;
           const field = key.replace('suggest_', '').replace('_suggest', '');
-          const name = opt._source?.name ?? opt.text ?? 'unknown';
-          const image = opt._source?.image ?? '';
+          const content = opt.text;
+
+          idsToFetch.add(uid);
 
           if (!foundItem[uid]) {
             foundItem[uid] = {
-              uid: uid,
-              name,
-              image,
+              uid,
               index: index_key,
               matches: [],
             };
           }
 
-          foundItem[uid].matches.push({
-            field,
-            content: opt.text,
-          });
+          foundItem[uid].matches.push({ field, content });
         });
+      }
+
+      const ids = Array.from(idsToFetch);
+      if (ids.length > 0) {
+        const allDocs = await this.openSearchService.getDocsByIds(index, ids);
+
+        for (const doc of allDocs as any[]) {
+          if (doc._source && foundItem[doc._id]) {
+            const item = foundItem[doc._id];
+            const source = doc._source;
+
+            item.name = source.name ?? 'unknown';
+            item.image = source.image ?? '';
+
+            item.matches.forEach((match) => {
+              const fullFieldValue = source[match.field];
+
+              if (typeof fullFieldValue === 'string') {
+                match.content = truncate(fullFieldValue, AUTOMCOMPLETE_MAX_LENGTH);
+              } else if (Array.isArray(fullFieldValue)) {
+                match.content = truncate(fullFieldValue.join(', '), AUTOMCOMPLETE_MAX_LENGTH);
+              }
+            });
+          }
+        }
       }
 
       results[index_key] = Object.values(foundItem);
