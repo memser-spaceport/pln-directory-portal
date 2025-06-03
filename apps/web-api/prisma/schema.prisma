@@ -130,6 +130,8 @@ model Member {
   closedAsks                   Ask[]
   experiences                  MemberExperience[]
   linkedInDetails              Json?
+  recommendationRunsAsTarget   RecommendationRun[]
+  recommendationsAsRecommended Recommendation[]
 }
 
 model MemberRole {
@@ -395,8 +397,8 @@ model PLEventLocation {
   uid            String    @unique @default(cuid())
   location       String
   timezone       String
-  latitude       String   
-  longitude      String   
+  latitude       String
+  longitude      String
   flag           String?
   icon           String?
   resources      Json[]
@@ -407,6 +409,7 @@ model PLEventLocation {
   updatedAt      DateTime  @updatedAt
   isFeatured     Boolean?  @default(false)
   isAggregated   Boolean   @default(false)
+
   @@unique([latitude, longitude])
 }
 
@@ -652,20 +655,51 @@ enum SubscriptionEntityType {
 }
 
 model MemberExperience {
-  id                  Int       @id @default(autoincrement())
-  uid                 String    @unique @default(uuid())
-  title               String
-  company             String
-  location            String?
-  description         String?
-  startDate           DateTime
-  endDate             DateTime?
-  isCurrent           Boolean   @default(false)
-  isFlaggedByUser     Boolean   @default(false)
-  isModifiedByUser    Boolean   @default(false)
-  userUpdatedAt       DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  memberUid           String
-  member              Member    @relation(fields: [memberUid], references: [uid])
+  id               Int       @id @default(autoincrement())
+  uid              String    @unique @default(uuid())
+  title            String
+  company          String
+  location         String?
+  description      String?
+  startDate        DateTime
+  endDate          DateTime?
+  isCurrent        Boolean   @default(false)
+  isFlaggedByUser  Boolean   @default(false)
+  isModifiedByUser Boolean   @default(false)
+  userUpdatedAt    DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  memberUid        String
+  member           Member    @relation(fields: [memberUid], references: [uid])
+}
+
+enum RecommendationRunStatus {
+  OPEN
+  CLOSED
+  SENT
+}
+
+model RecommendationRun {
+  id              Int                     @id @default(autoincrement())
+  uid             String                  @unique @default(cuid())
+  targetMember    Member                  @relation(fields: [targetMemberUid], references: [uid])
+  targetMemberUid String
+  status          RecommendationRunStatus @default(OPEN)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  recommendations Recommendation[]
+}
+
+model Recommendation {
+  id                   Int               @id @default(autoincrement())
+  uid                  String            @unique @default(cuid())
+  recommendationRun    RecommendationRun @relation(fields: [recommendationRunUid], references: [uid])
+  recommendationRunUid String
+  recommendedMember    Member            @relation(fields: [recommendedMemberUid], references: [uid])
+  recommendedMemberUid String
+  score                Float
+  factors              Json // Stores the factors that influenced this recommendation
+  status               ApprovalStatus    @default(PENDING)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 }
