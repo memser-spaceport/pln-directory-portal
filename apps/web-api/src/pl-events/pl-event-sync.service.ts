@@ -62,10 +62,11 @@ export class PLEventSyncService {
    */
   private async fetchEventsFromService(params) {
     try {
-      const { clientSecret, conference, selectedEventUids } = params;
+      const { clientSecret, conference, selectedEventUids, locationName } = params;
       const queryParams = new URLSearchParams({
         status: 'APPROVED',
-        conference: conference
+        location: locationName,
+        conference: ""
       });
   
       if (selectedEventUids && selectedEventUids.length > 0) {

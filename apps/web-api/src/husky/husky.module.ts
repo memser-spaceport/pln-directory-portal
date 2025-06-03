@@ -8,10 +8,11 @@ import { HuskyAiService } from './husky-ai.service';
 import { HuskyThreadsController } from './husky-threads.controller';
 import { PrismaService } from '../shared/prisma.service';
 import { HuskyRevalidationService } from './husky-revalidation.service';
+import { HuskyAiToolsModule } from './tools/husky-ai-tools.module';
 @Module({
   controllers: [HuskyChatsController, HuskyThreadsController],
   providers: [HuskyService, HuskyAiService, RedisCacheDbService, QdrantVectorDbService, MongoPersistantDbService, PrismaService, HuskyRevalidationService],
-  imports: [],
+  imports: [HuskyAiToolsModule],
   exports: [HuskyService, HuskyAiService, RedisCacheDbService, QdrantVectorDbService, MongoPersistantDbService, HuskyRevalidationService],
 })
 export class HuskyModule {}
