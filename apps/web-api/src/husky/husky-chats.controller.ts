@@ -34,7 +34,7 @@ export class HuskyChatsController {
     aiStreamingResponse.pipeTextStreamToResponse(res);
     return;
   }
-  
+
   @Post('v1/husky/chat/feedback')
   async huskyChatFeedback(@Body() body: HuskyFeedbackDto) {
     await this.huskyService.addHuskyFeedback({ ...body });
