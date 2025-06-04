@@ -38,6 +38,7 @@ export interface RecommendationConfig {
   skipTeamNames?: string[];
   skipMemberIds?: string[];
   skipMemberNames?: string[];
+  skipIndustryTags?: string[];
 
   // Scoring factors to include/exclude
   includeFocusAreas?: boolean;
@@ -54,6 +55,7 @@ export interface MemberWithRelations extends Member {
       })[];
       fundingStage?: { uid: string };
       technologies: { title: string }[];
+      industryTags: { title: string }[];
     };
   })[];
   interactions: MemberInteraction[];
@@ -104,6 +106,18 @@ export class RecommendationsEngine {
           ) &&
           !member.teamMemberRoles.some((role) =>
             config.skipTeamNames!.some((skipName) => role.team?.name?.toLowerCase().includes(skipName.toLowerCase()))
+          )
+      );
+    }
+
+    // Filter out members that are in teams with matching industry tags
+    if (config.skipIndustryTags?.length) {
+      filteredMembers = filteredMembers.filter(
+        (member) =>
+          !member.teamMemberRoles.some((role) =>
+            role.team?.industryTags?.some((tag) =>
+              config.skipIndustryTags!.some((skipTag) => tag.title.toLowerCase().includes(skipTag.toLowerCase()))
+            )
           )
       );
     }
@@ -210,13 +224,23 @@ export class RecommendationsEngine {
   private calculateRoleMatchScore(memberRoles: TeamMemberRole[], targetRoles: TeamMemberRole[]): number {
     if (!memberRoles.length || !targetRoles.length) return SCORES.NO_OFFICE_HOURS;
 
-    // Get all unique roles from both members
+    // Get all unique roles and role tags from both members
     const memberRoleSet = new Set(memberRoles.map((role) => role.role?.toLowerCase()).filter(Boolean));
     const targetRoleSet = new Set(targetRoles.map((role) => role.role?.toLowerCase()).filter(Boolean));
+
+    const memberRoleTags = new Set(memberRoles.flatMap((role) => role.roleTags?.map((tag) => tag.toLowerCase()) || []));
+    const targetRoleTags = new Set(targetRoles.flatMap((role) => role.roleTags?.map((tag) => tag.toLowerCase()) || []));
 
     // Check if there's any role match
     for (const role of memberRoleSet) {
       if (targetRoleSet.has(role)) {
+        return SCORES.MATCHING_ROLE;
+      }
+    }
+
+    // Check if there's any role tag match
+    for (const tag of memberRoleTags) {
+      if (targetRoleTags.has(tag)) {
         return SCORES.MATCHING_ROLE;
       }
     }

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { RecommendationsService } from '../recommendations/recommendations.service';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
@@ -49,12 +49,6 @@ export class RecommendationsController {
     @Body() updateDto: UpdateRecommendationRunStatusRequest
   ) {
     return this.recommendationsService.updateRecommendationRunStatus(uid, updateDto);
-  }
-
-  @Delete('runs/:uid')
-  @NoCache()
-  async deleteRecommendationRun(@Param('uid') uid: string) {
-    return this.recommendationsService.deleteRecommendationRun(uid);
   }
 
   @Post('runs/:uid/send')
