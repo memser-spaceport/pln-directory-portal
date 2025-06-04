@@ -121,8 +121,8 @@ function generateSuggestInput(text) {
 
 function purifyHtml(html) {
   const withoutTags = sanitizeHtml(html, {
-    ALLOWED_TAGS: [],
-    ALLOWED_ATTR: []
+    allowedTags: [],
+    allowedAttributes: []
   });
   return withoutTags.replaceAll('&nbsp;', ' ');
 }
