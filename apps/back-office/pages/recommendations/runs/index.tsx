@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { parseCookies } from 'nookies';
 import { Member, MemberSearch } from '../../../components/members/membersearch';
 import api from '../../../utils/api';
 import { BaseLayout } from '../../../layout/base-layout';
-import { parseCookies } from 'nookies';
+import { WEB_UI_BASE_URL } from '../../../utils/constants';
 
 interface RecommendationRun {
   uid: string;
@@ -117,7 +118,7 @@ export default function RecommendationRunListPage() {
                 <div>
                   <div className="text-lg font-medium">
                     <a
-                      href={`${process.env.WEB_UI_BASE_URL}/members/${selectedMember.uid}`}
+                      href={`${WEB_UI_BASE_URL}/members/${selectedMember.uid}`}
                       className="text-blue-600 hover:underline"
                       target="_blank"
                       rel="noreferrer"
@@ -176,7 +177,7 @@ export default function RecommendationRunListPage() {
                   <tr key={run.uid} className="border-b">
                     <td className="py-3">
                       <a
-                        href={`${process.env.WEB_UI_BASE_URL}/members/${run.targetMember.uid}`}
+                        href={`${WEB_UI_BASE_URL}/members/${run.targetMember.uid}`}
                         className="text-blue-600 hover:underline"
                         target="_blank"
                         rel="noreferrer"
