@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ApprovalStatus, Member, Prisma, RecommendationRunStatus } from '@prisma/client';
+import sanitizeHtml from 'sanitize-html';
 import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
 import { RecommendationsEngine, MemberWithRelations, RecommendationFactors } from './recommendations.engine';
@@ -286,11 +287,15 @@ export class RecommendationsService {
       const member = rec.recommendedMember;
       const primaryRole = member.teamMemberRoles[0];
       const team = primaryRole?.team;
+      const sanitizedBio = sanitizeHtml(member.bio || '', {
+        ALLOWED_TAGS: [],
+        ALLOWED_ATTR: [],
+      });
 
       return {
         name: member.name,
         image: member.image?.url || '',
-        bio: member.bio || '',
+        bio: sanitizedBio.length > 500 ? sanitizedBio.substring(0, 500) + '...' : sanitizedBio,
         team_name: team?.name || '',
         team_logo: team?.logo?.url || '',
         position: primaryRole?.role || '',
