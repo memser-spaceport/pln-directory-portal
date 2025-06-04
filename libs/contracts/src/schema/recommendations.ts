@@ -45,6 +45,8 @@ export const UpdateRecommendationRunStatusRequestSchema = z.object({
 
 export const SendRecommendationsRequestSchema = z.object({
   approvedRecommendationUids: z.array(z.string()),
+  email: z.string().email().optional(),
+  emailSubject: z.string(),
 });
 
 export type Recommendation = z.infer<typeof RecommendationSchema>;

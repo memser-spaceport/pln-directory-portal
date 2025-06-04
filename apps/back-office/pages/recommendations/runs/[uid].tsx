@@ -4,6 +4,8 @@ import { toast } from 'react-toastify';
 import { parseCookies } from 'nookies';
 import api from '../../../utils/api';
 import { BaseLayout } from '../../../layout/base-layout';
+import { WEB_UI_BASE_URL } from '../../../utils/constants';
+import { EmailConfirmationModal } from '../../../components/email-confirmation-modal';
 
 interface Recommendation {
   uid: string;
@@ -32,6 +34,7 @@ interface RecommendationRun {
   targetMember: {
     name: string;
     uid: string;
+    email: string;
   };
   status: string;
   createdAt: string;
@@ -46,6 +49,7 @@ export default function RecommendationRunViewPage() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [localRecommendations, setLocalRecommendations] = useState<Record<string, string>>({});
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
   useEffect(() => {
     if (uid) {
@@ -118,7 +122,7 @@ export default function RecommendationRunViewPage() {
     }
   };
 
-  const handleSendEmail = async () => {
+  const handleSendEmail = async (subject: string, email: string) => {
     try {
       setIsSendingEmail(true);
       const { plnadmin } = parseCookies();
@@ -134,13 +138,16 @@ export default function RecommendationRunViewPage() {
         `/v1/admin/recommendations/runs/${uid}/send`,
         {
           approvedRecommendationUids: approvedUids,
+          emailSubject: subject,
+          email,
         },
         config
       );
       await fetchRun();
-      toast.warning('Email sending is not implemented yet');
+      toast.success('Email sent successfully');
     } catch (error) {
       console.error('Failed to send email:', error);
+      toast.error('Failed to send email');
     } finally {
       setIsSendingEmail(false);
     }
@@ -208,7 +215,7 @@ export default function RecommendationRunViewPage() {
             <p className="text-gray-600">
               For{' '}
               <a
-                href={`${process.env.WEB_UI_BASE_URL}/members/${run.targetMember.uid}`}
+                href={`${WEB_UI_BASE_URL}/members/${run.targetMember.uid}`}
                 className="text-blue-600 hover:underline"
                 target="_blank"
                 rel="noreferrer"
@@ -267,13 +274,13 @@ export default function RecommendationRunViewPage() {
               )}
             </div>
             <div>
-              {approvedCount > 0 && run.status === 'OPEN' && (
+              {approvedCount > 0 && (
                 <button
                   className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:bg-gray-400"
-                  onClick={handleSendEmail}
+                  onClick={() => setIsEmailModalOpen(true)}
                   disabled={isSendingEmail}
                 >
-                  {isSendingEmail ? 'Sending...' : 'Send Email'}
+                  {isSendingEmail ? 'Sending...' : run.status === 'OPEN' ? 'Send Email' : 'Resend Email'}
                 </button>
               )}
             </div>
@@ -297,7 +304,7 @@ export default function RecommendationRunViewPage() {
                     <div>
                       <h3 className="font-medium">
                         <a
-                          href={`${process.env.WEB_UI_BASE_URL}/members/${recommendation.recommendedMember.uid}`}
+                          href={`${WEB_UI_BASE_URL}/members/${recommendation.recommendedMember.uid}`}
                           target="_blank"
                           rel="noreferrer"
                           className="text-blue-600 hover:underline"
@@ -329,23 +336,29 @@ export default function RecommendationRunViewPage() {
 
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <div className="font-medium">Factors</div>
-                      <ul className="mt-2 space-y-1">
-                        <li>Same Team: {!recommendation.factors.sameTeam ? 'Yes' : 'No'}</li>
-                        <li>Previously Recommended: {!recommendation.factors.previouslyRecommended ? 'Yes' : 'No'}</li>
-                        <li>Booked Office Hours: {!recommendation.factors.bookedOH ? 'Yes' : 'No'}</li>
-                        <li>Same Event: {!recommendation.factors.sameEvent ? 'Yes' : 'No'}</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <div className="font-medium">Matches</div>
-                      <ul className="mt-2 space-y-1">
-                        <li>Role Match: {recommendation.factors.roleMatch ? 'Yes' : 'No'}</li>
-                        <li>Team Focus Area: {recommendation.factors.teamFocusArea ? 'Yes' : 'No'}</li>
-                        <li>Team Funding Stage: {recommendation.factors.teamFundingStage ? 'Yes' : 'No'}</li>
-                        <li>Team Technology : {recommendation.factors.teamTechnology ? 'Yes' : 'No'}</li>
-                        <li>Has Office Hours: {recommendation.factors.hasOfficeHours ? 'Yes' : 'No'}</li>
-                      </ul>
+                      <div className="flex gap-4">
+                        <div>
+                          <div className="font-medium">Factors</div>
+                          <ul className="mt-2 space-y-1">
+                            <li>Same Team: {!recommendation.factors.sameTeam ? 'Yes' : 'No'}</li>
+                            <li>
+                              Previously Recommended: {!recommendation.factors.previouslyRecommended ? 'Yes' : 'No'}
+                            </li>
+                            <li>Booked Office Hours: {!recommendation.factors.bookedOH ? 'Yes' : 'No'}</li>
+                            <li>Same Event: {!recommendation.factors.sameEvent ? 'Yes' : 'No'}</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <div className="font-medium">Matches</div>
+                          <ul className="mt-2 space-y-1">
+                            <li>Role Match: {recommendation.factors.roleMatch ? 'Yes' : 'No'}</li>
+                            <li>Team Focus Area: {recommendation.factors.teamFocusArea ? 'Yes' : 'No'}</li>
+                            <li>Team Funding Stage: {recommendation.factors.teamFundingStage ? 'Yes' : 'No'}</li>
+                            <li>Team Technology : {recommendation.factors.teamTechnology ? 'Yes' : 'No'}</li>
+                            <li>Has Office Hours: {recommendation.factors.hasOfficeHours ? 'Yes' : 'No'}</li>
+                          </ul>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -353,6 +366,21 @@ export default function RecommendationRunViewPage() {
             })}
         </div>
       </div>
+
+      <EmailConfirmationModal
+        isOpen={isEmailModalOpen}
+        onClose={(confirmed, subject, email) => {
+          setIsEmailModalOpen(false);
+          if (confirmed && subject && email) {
+            handleSendEmail(subject, email);
+          }
+        }}
+        approvedMembers={run.recommendations
+          .filter((rec) => localRecommendations[rec.uid] === 'APPROVED')
+          .map((rec) => rec.recommendedMember)}
+        defaultSubject="Your Recommended Connections from PL Network Directory"
+        targetMemberEmail={run.targetMember.email}
+      />
     </BaseLayout>
   );
 }

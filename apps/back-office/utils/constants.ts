@@ -68,3 +68,5 @@ export const FILTER_API_ROUTES = {
 export const ABOUT_PLN_LINK = "https://protocol.ai/blog/transcription-pl-vision-driving-a-breakthroughs-in-computing-to-push-humanity-forward/"
 
 export default APP_CONSTANTS;
+
+export const WEB_UI_BASE_URL = process.env.WEB_UI_BASE_URL || 'https://directory.plnetwork.io';

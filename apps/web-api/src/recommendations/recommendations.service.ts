@@ -1,18 +1,22 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { ApprovalStatus, Prisma, RecommendationRunStatus, Team, TeamFocusArea } from '@prisma/client';
+import { ApprovalStatus, Member, Prisma, RecommendationRunStatus } from '@prisma/client';
+import sanitizeHtml from 'sanitize-html';
 import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
 import { RecommendationsEngine, MemberWithRelations, RecommendationFactors } from './recommendations.engine';
+import { AwsService } from '../utils/aws/aws.service';
+import * as path from 'path';
 import {
   CreateRecommendationRunRequest,
   GenerateMoreRecommendationsRequest,
   UpdateRecommendationRunStatusRequest,
   SendRecommendationsRequest,
 } from 'libs/contracts/src/schema/recommendations';
+import { getRandomId } from '../utils/helper/helper';
 
 @Injectable()
 export class RecommendationsService {
-  constructor(private prisma: PrismaService, private logger: LogService) {}
+  constructor(private prisma: PrismaService, private logger: LogService, private awsService: AwsService) {}
 
   async createRecommendationRun(createDto: CreateRecommendationRunRequest) {
     const targetMember = await this.prisma.member.findUnique({
@@ -59,10 +63,6 @@ export class RecommendationsService {
 
     if (!recommendationRun) {
       throw new NotFoundException('Recommendation run not found');
-    }
-
-    if (recommendationRun.status !== RecommendationRunStatus.OPEN) {
-      throw new BadRequestException('Can only generate more recommendations for OPEN runs');
     }
 
     await this.prisma.recommendation.updateMany({
@@ -184,26 +184,11 @@ export class RecommendationsService {
     });
   }
 
-  async deleteRecommendationRun(uid: string) {
-    const run = await this.prisma.recommendationRun.findUnique({
-      where: { uid },
-    });
-
-    if (!run) {
-      throw new NotFoundException('Recommendation run not found');
-    }
-
-    await this.prisma.recommendationRun.delete({
-      where: { uid },
-    });
-
-    return { success: true };
-  }
-
   async sendRecommendations(uid: string, sendDto: SendRecommendationsRequest) {
     const run = await this.prisma.recommendationRun.findUnique({
       where: { uid },
       include: {
+        targetMember: true,
         recommendations: true,
       },
     });
@@ -212,12 +197,8 @@ export class RecommendationsService {
       throw new NotFoundException('Recommendation run not found');
     }
 
-    if (run.status !== RecommendationRunStatus.OPEN) {
-      throw new BadRequestException('Can only send recommendations for OPEN runs');
-    }
-
     // Update the status of approved recommendations
-    if (sendDto.approvedRecommendationUids) {
+    if (sendDto.approvedRecommendationUids?.length > 0) {
       await this.prisma.recommendation.updateMany({
         where: {
           recommendationRunUid: uid,
@@ -227,18 +208,124 @@ export class RecommendationsService {
       });
     }
 
-    // Update the run status to SENT
-    return this.prisma.recommendationRun.update({
-      where: { uid },
-      data: { status: RecommendationRunStatus.SENT },
+    const approvedRecommendations = await this.prisma.recommendation.findMany({
+      where: {
+        recommendationRunUid: uid,
+        status: ApprovalStatus.APPROVED,
+      },
       include: {
-        recommendations: {
+        recommendedMember: {
           include: {
-            recommendedMember: true,
+            image: true,
+            teamMemberRoles: {
+              include: {
+                team: {
+                  include: {
+                    logo: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
     });
+
+    const emailData = await this.prepareEmailTemplateData(run.targetMember, approvedRecommendations);
+
+    const toEmail = sendDto.email || run.targetMember.email;
+    if (!toEmail) {
+      throw new BadRequestException('No email address available to send recommendations');
+    }
+
+    await this.sendRecommendationEmail(emailData, toEmail, sendDto.emailSubject);
+
+    return this.prisma.recommendationRun.update({
+      where: { uid },
+      data: { status: RecommendationRunStatus.SENT },
+    });
+  }
+
+  private async prepareEmailTemplateData(
+    targetMember: Member,
+    approvedRecommendations: Array<
+      Prisma.RecommendationGetPayload<{
+        include: {
+          recommendedMember: {
+            include: {
+              image: true;
+              teamMemberRoles: {
+                include: {
+                  team: {
+                    include: {
+                      logo: true;
+                    };
+                  };
+                };
+              };
+            };
+          };
+        };
+      }>
+    >
+  ): Promise<{
+    name: string;
+    user_email_frequency_preference: string;
+    description: string;
+    recommendations: Array<{
+      name: string;
+      image: string;
+      bio: string | null;
+      team_name: string;
+      team_logo: string;
+      position: string;
+      link: string;
+      reason: string;
+    }>;
+  }> {
+    const recommendations = approvedRecommendations.map((rec) => {
+      const member = rec.recommendedMember;
+      const primaryRole = member.teamMemberRoles[0];
+      const team = primaryRole?.team;
+      const sanitizedBio = sanitizeHtml(member.bio || '', {
+        ALLOWED_TAGS: [],
+        ALLOWED_ATTR: [],
+      });
+
+      return {
+        name: member.name,
+        image: member.image?.url || '',
+        bio: sanitizedBio.length > 500 ? sanitizedBio.substring(0, 500) + '...' : sanitizedBio,
+        team_name: team?.name || '',
+        team_logo: team?.logo?.url || '',
+        position: primaryRole?.role || '',
+        link: `${process.env.WEB_UI_BASE_URL}/members/${
+          member.uid
+        }?utm_source=recommendations&utm_medium=email&utm_code=${getRandomId()}&target_uid=${targetMember.uid}`,
+        reason: this.generateRecommendationReason(rec.factors),
+      };
+    });
+
+    return {
+      name: targetMember.name,
+      user_email_frequency_preference: '',
+      description: 'Here are your recommended connections from the PL Network Directory.',
+      recommendations: recommendations,
+    };
+  }
+
+  private async sendRecommendationEmail(emailData: any, toEmail: string, subject: string): Promise<void> {
+    const result = await this.awsService.sendEmailWithTemplate(
+      path.join(__dirname, '/shared/recommendedMembers.hbs'),
+      emailData,
+      '',
+      subject,
+      process.env.SES_SOURCE_EMAIL || '',
+      [toEmail],
+      []
+    );
+
+    this.logger.info(`Recommendations email sent to ${toEmail} ref: ${result?.MessageId}`);
   }
 
   private async generateRecommendations(
@@ -261,6 +348,7 @@ export class RecommendationsService {
     const recommendations = engine.getRecommendations(targetMemberWithRelations, allMembers, {
       skipMemberIds: existingRecommendationUids,
       skipTeamNames: ['Protocol Labs', 'Polaris Labs'],
+      skipIndustryTags: ['Discontinued'],
       includeFocusAreas: true,
       includeRoles: true,
       includeFundingStages: true,
@@ -299,6 +387,7 @@ export class RecommendationsService {
         },
         fundingStage: true,
         technologies: true,
+        industryTags: true,
       },
     });
 
@@ -331,5 +420,33 @@ export class RecommendationsService {
         team: allTeams.find((team) => team.uid === role.teamUid),
       })),
     })) as MemberWithRelations[];
+  }
+
+  private generateRecommendationReason(factors): string {
+    const reasons: string[] = [];
+
+    if (factors.teamFocusArea) {
+      reasons.push('focused on similar areas');
+    }
+    if (factors.teamFundingStage) {
+      reasons.push('at similar funding stages');
+    }
+    if (factors.roleMatch) {
+      reasons.push('in complementary roles');
+    }
+    if (factors.teamTechnology) {
+      reasons.push('working with similar technologies');
+    }
+
+    if (reasons.length === 0) {
+      return 'Based on your profile and activity in the network';
+    }
+
+    if (reasons.length === 1) {
+      return `You are both ${reasons[0]}`;
+    }
+
+    const lastReason = reasons.pop();
+    return `You are both ${reasons.join(', ')} and ${lastReason}`;
   }
 }
