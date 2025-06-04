@@ -5,6 +5,7 @@ import { LogService } from '../shared/log.service';
 import { RecommendationsEngine, MemberWithRelations, RecommendationFactors } from './recommendations.engine';
 import { AwsService } from '../utils/aws/aws.service';
 import * as path from 'path';
+
 import {
   CreateRecommendationRunRequest,
   GenerateMoreRecommendationsRequest,
