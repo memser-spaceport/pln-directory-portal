@@ -15,7 +15,8 @@
           "apps/web-api/src/shared/contactUs.hbs",
           "apps/web-api/src/shared/joinNow.hbs",
           "apps/web-api/src/shared/markMyPresence.hbs",
-          "apps/web-api/src/shared/askStatusChange.hbs"
+          "apps/web-api/src/shared/askStatusChange.hbs",
+          "apps/web-api/src/shared/recommendedMembers.hbs"
         ]
       },
       "configurations": {
