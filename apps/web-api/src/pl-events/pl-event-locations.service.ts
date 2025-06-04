@@ -613,12 +613,14 @@ export class PLEventLocationsService {
    */
   async createPLEventLocation(location: Prisma.PLEventLocationUncheckedCreateInput) {
     try {
+      this.logger.info(`location data : , ${location}`);
       const createdLocation = await this.prisma.pLEventLocation.create({
         data: location
       });
       this.logger.info(`New location created: ${createdLocation.location}`);
       return createdLocation;
     } catch (error) {
+      this.logger.error(`location error : , ${error}`);
       // Check for unique constraint violation on latitude and longitude
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         // Find the existing location by latitude and longitude
