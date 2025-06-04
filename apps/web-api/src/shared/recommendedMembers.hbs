@@ -1,0 +1,129 @@
+<html lang='en'>
+  <head>
+    <meta charset='UTF-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1' />
+    <title>Selection of recommended members from the PL network</title>
+  </head>
+  <body style='margin: 0; padding: 0; font-family: Inter, sans-serif;'>
+    <table width='100%' cellpadding='0' cellspacing='0' border='0' align='center' style='background-color: #ffffff;'>
+      <tr>
+        <td align='center'>
+
+          <!-- Container Table -->
+          <table width='640' cellpadding='0' cellspacing='0' border='0' style='margin: auto;'>
+
+            <!-- Header -->
+            <tr>
+              <td align='center' style='padding: 8px 24px;'>
+                <img
+                  src='https://pl-directory-images-prod.s3.us-west-1.amazonaws.com/email/protocol-labs-logo.png'
+                  width='246'
+                  height='56'
+                  alt='Protocol Labs'
+                />
+              </td>
+            </tr>
+
+            <!-- Title -->
+            <tr>
+              <td align='center' style='padding: 24px;'>
+                <h1 style='margin: 0; font-size: 28px; font-weight: 600;'>Hi {{name}},</h1>
+                <p style='color: #667085; font-size: 15px; line-height: 24px; margin: 0;'>
+                  Here's your
+                  {{user_email_frequency_preference}}
+                  selection of recommended members from the PL network.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Recommendations -->
+            {{#each recommendations}}
+              <tr>
+                <td style='padding: 0 24px 24px 24px;'>
+                  <table
+                    width='100%'
+                    cellpadding='0'
+                    cellspacing='0'
+                    border='0'
+                    style='border: 1px solid rgba(102,112,133,0.12); border-radius: 8px; padding: 16px;'
+                  >
+                    <tr>
+                      <!-- Avatar -->
+                      <td width='112' valign='top'>
+                        <img src='{{this.image}}' width='112' height='112' style='border-radius: 6px;' alt='' />
+                      </td>
+
+                      <!-- Details -->
+                      <td valign='top' style='padding-left: 24px;'>
+                        <table width='100%' cellpadding='0' cellspacing='0' border='0'>
+                          <tr>
+                            <td style='font-size: 20px; font-weight: 600; color: #101828;'>{{this.name}}</td>
+                            <td align='right'>
+                              <a
+                                href='{{this.link}}'
+                                style='font-size: 20px; font-weight: 600; color: #156FF7; text-decoration: underline;'
+                              >Connect</a>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td
+                              colspan='2'
+                              style='padding-top: 8px; color: #667085; font-size: 14px; line-height: 20px;'
+                            >
+                              {{this.bio}}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style='padding-top: 12px;'>
+                              <table cellpadding='0' cellspacing='0' border='0'>
+                                <tr>
+                                  <td><img
+                                      src='{{this.team_logo}}'
+                                      width='28'
+                                      height='28'
+                                      style='border-radius: 8px;'
+                                      alt=''
+                                    /></td>
+                                  <td
+                                    style='padding-left: 8px; font-size: 14px; font-weight: 600; color: #101828;'
+                                  >{{this.team_name}}</td>
+                                </tr>
+                              </table>
+                            </td>
+                            <td
+                              align='right'
+                              style='padding-top: 12px; font-size: 14px; font-weight: 600; color: #667085;'
+                            >{{this.position}}</td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style='padding-top: 12px;'></td>
+                    </tr>
+                    <tr>
+                      <td
+                        colspan='2'
+                        style='border-left: 5px solid #156FF7; background: #F3F8FE; padding: 8px 24px; color: #156FF7; font-size: 14px; font-style: italic;'
+                      >
+                        {{this.reason}}
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            {{/each}}
+
+            <!-- Footer -->
+            <tr>
+              <td align='center' style='padding: 24px;'>
+                <p style='color: #667085; font-size: 16px; font-weight: 600; margin-top: 16px;'>Protocol Lab's LabOS</p>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
