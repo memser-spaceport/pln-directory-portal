@@ -288,8 +288,8 @@ export class RecommendationsService {
       const primaryRole = member.teamMemberRoles[0];
       const team = primaryRole?.team;
       const sanitizedBio = sanitizeHtml(member.bio || '', {
-        ALLOWED_TAGS: [],
-        ALLOWED_ATTR: [],
+        allowedTags: [],
+        allowedAttributes: [],
       });
 
       return {
