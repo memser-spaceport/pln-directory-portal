@@ -46,9 +46,10 @@ export class AwsService {
     subject: string,
     fromAddress: string,
     toAddresses: string[],
-    ccAddresses: string[]
+    ccAddresses: string[],
+    isEmailEnabled = this.isEmailServiceEnabled()
   ) {
-    if (!this.isEmailServiceEnabled()) 
+    if (!isEmailEnabled) 
       return null;
     const emailTemplate = fs.readFileSync(
       templateName,
