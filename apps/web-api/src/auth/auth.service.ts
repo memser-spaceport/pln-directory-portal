@@ -76,6 +76,8 @@ export class AuthService implements OnModuleInit {
     let foundUser = await this.membersService.findMemberByExternalId(externalId);
     if (foundUser) {
       if(foundUser.email === email) {
+        // Track login event
+        await this.trackLoginEvent(foundUser);
         return {
           userInfo: this.memberToUserInfo(foundUser),
           refreshToken: refresh_token,
@@ -101,6 +103,8 @@ export class AuthService implements OnModuleInit {
       } else {
         await this.membersService.updateExternalIdByEmail(email, externalId);
         this.logger.info(`Updated externalId - ${externalId} for emailId - ${email}`);
+        // Track login event
+        await this.trackLoginEvent(foundUser);
         return {
           userInfo: this.memberToUserInfo(foundUser),
           refreshToken: refresh_token,
@@ -152,6 +156,8 @@ export class AuthService implements OnModuleInit {
 
     // If user already has externalId then send new token directly
     if (foundUser.externalId) {
+      // Track login event
+      await this.trackLoginEvent(foundUser);
       return {
         userInfo,
         refreshToken: newTokens.refresh_token,
@@ -159,22 +165,13 @@ export class AuthService implements OnModuleInit {
         accessToken: newTokens.access_token,
       };
     }
-    // Track login event
-    await this.analyticsService.trackEvent({
-      name: foundUser.externalId ? 
-        ANALYTICS_EVENTS.AUTH.USER_LOGIN : ANALYTICS_EVENTS.AUTH.USER_FIRST_LOGIN,
-      distinctId: foundUser.uid,
-      properties: {
-        uid: foundUser.uid,
-        email: foundUser.email,
-        name: foundUser.name
-      }
-    });
     // Get external Id
     const { externalId } = this.decodeAuthIdToken(newTokens.id_token);
 
     // Update External Id and return new tokens
     await this.membersService.updateExternalIdByEmail(foundUser.email, externalId);
+    // Track login event
+    await this.trackLoginEvent(foundUser);
     return {
       refreshToken: newTokens.refresh_token,
       idToken: newTokens.id_token,
@@ -232,6 +229,22 @@ export class AuthService implements OnModuleInit {
   };
 
   /*********************** PRIVATE METHODS ****************************/
+
+  /**
+   * Track login event
+   * @param foundUser 
+   */
+  private async trackLoginEvent(foundUser) {
+    return await this.analyticsService.trackEvent({
+      name: foundUser.externalId ? ANALYTICS_EVENTS.AUTH.USER_LOGIN : ANALYTICS_EVENTS.AUTH.USER_FIRST_LOGIN,
+      distinctId: foundUser.uid,
+      properties: {
+        uid: foundUser.uid,
+        email: foundUser.email,
+        name: foundUser.name
+      }
+    });
+  }
 
   private async getClientToken() {
     const response = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
