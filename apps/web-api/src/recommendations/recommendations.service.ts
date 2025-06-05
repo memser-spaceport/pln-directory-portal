@@ -271,11 +271,10 @@ export class RecommendationsService {
   ): Promise<{
     name: string;
     user_email_frequency_preference: string;
-    description: string;
     recommendations: Array<{
       name: string;
       image: string;
-      bio: string | null;
+      team_description: string | null;
       team_name: string;
       team_logo: string;
       position: string;
@@ -287,15 +286,18 @@ export class RecommendationsService {
       const member = rec.recommendedMember;
       const primaryRole = member.teamMemberRoles[0];
       const team = primaryRole?.team;
-      const sanitizedBio = sanitizeHtml(member.bio || '', {
-        ALLOWED_TAGS: [],
-        ALLOWED_ATTR: [],
+      const sanitizedTeamDescription = sanitizeHtml(team?.shortDescription || '', {
+        allowedTags: [],
+        allowedAttributes: [],
       });
 
       return {
         name: member.name,
         image: member.image?.url || '',
-        bio: sanitizedBio.length > 500 ? sanitizedBio.substring(0, 500) + '...' : sanitizedBio,
+        team_description:
+          sanitizedTeamDescription.length > 500
+            ? sanitizedTeamDescription.substring(0, 500) + '...'
+            : sanitizedTeamDescription,
         team_name: team?.name || '',
         team_logo: team?.logo?.url || '',
         position: primaryRole?.role || '',
@@ -309,7 +311,6 @@ export class RecommendationsService {
     return {
       name: targetMember.name,
       user_email_frequency_preference: '',
-      description: 'Here are your recommended connections from the PL Network Directory.',
       recommendations: recommendations,
     };
   }
@@ -322,7 +323,8 @@ export class RecommendationsService {
       subject,
       process.env.SES_SOURCE_EMAIL || '',
       [toEmail],
-      []
+      [],
+      true
     );
 
     this.logger.info(`Recommendations email sent to ${toEmail} ref: ${result?.MessageId}`);

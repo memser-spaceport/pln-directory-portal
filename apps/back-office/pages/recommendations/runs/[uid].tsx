@@ -378,7 +378,7 @@ export default function RecommendationRunViewPage() {
         approvedMembers={run.recommendations
           .filter((rec) => localRecommendations[rec.uid] === 'APPROVED')
           .map((rec) => rec.recommendedMember)}
-        defaultSubject="Your Recommended Connections from PL Network Directory"
+        defaultSubject="Your Recommended Connections from PL Network"
         targetMemberEmail={run.targetMember.email}
       />
     </BaseLayout>
