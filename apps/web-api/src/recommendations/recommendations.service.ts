@@ -316,7 +316,9 @@ export class RecommendationsService {
         position: primaryRole?.role || '',
         link: `${process.env.WEB_UI_BASE_URL}/members/${
           member.uid
-        }?utm_source=recommendations&utm_medium=email&utm_code=${getRandomId()}&target_uid=${targetMember.uid}`,
+        }?utm_source=recommendations&utm_medium=email&utm_code=${getRandomId()}&target_uid=${
+          targetMember.uid
+        }&target_email=${encodeURIComponent(targetMember.email || '')}`,
         reason: this.generateRecommendationReason(rec.factors),
       };
     });
