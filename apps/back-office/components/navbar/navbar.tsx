@@ -21,27 +21,27 @@ export function Navbar() {
           <div className="m-auto h-full w-[80px] bg-[#1D4ED8]">
             <Link href={ROUTE_CONSTANTS.PENDING_LIST}>
               <a className="on-focus relative left-[15px] top-[20px]">
-                <ProtocolLabsLogo
-                  title="Protocol Labs Directory Beta Black Logo"
-                  width="45"
-                  height="40"
-                />
+                <ProtocolLabsLogo title="Protocol Labs Directory Beta Black Logo" width="45" height="40" />
               </a>
             </Link>
           </div>
-          <span className="text-base font-semibold">
-            {isOpenRequest ? `Pending Requests` : `Closed Requests`}
-          </span>
+          <span className="text-base font-semibold">{isOpenRequest ? `Pending Requests` : `Closed Requests`}</span>
         </div>
         <div>{showMenu && <Menu />}</div>
         <div className="flex space-x-4 text-sm text-gray-700">
-          <Link
-            href={
-              isOpenRequest
-                ? ROUTE_CONSTANTS.CLOSED_LIST
-                : ROUTE_CONSTANTS.PENDING_LIST
-            }
-          >
+          <Link href={ROUTE_CONSTANTS.RECOMMENDATIONS_RUNS}>
+            <a
+              target="_self"
+              className="on-focus shadow-request-button
+              hover:shadow-on-hover flex h-10 items-center justify-center rounded-lg border border-blue-700
+              bg-white py-2 px-4 text-sm font-medium
+              text-blue-700 hover:border-slate-200 hover:ring-2 hover:ring-blue-300 focus:outline-none
+              focus:ring-2 focus:ring-blue-300 active:border-blue-700 active:ring-2 active:ring-blue-300"
+            >
+              {APP_CONSTANTS.VIEW_RECOMMENDATIONS_LABEL}
+            </a>
+          </Link>
+          <Link href={isOpenRequest ? ROUTE_CONSTANTS.CLOSED_LIST : ROUTE_CONSTANTS.PENDING_LIST}>
             <a
               target="_self"
               className={`on-focus shadow-request-button
@@ -49,23 +49,13 @@ export function Navbar() {
             py-2 px-4 text-sm font-medium hover:border-slate-200
             hover:ring-2 hover:ring-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300
             active:border-blue-700 active:ring-2 active:ring-blue-300 ${
-              isOpenRequest
-                ? 'bg-white text-blue-700 '
-                : 'bg-[#1D4ED8] text-white'
+              isOpenRequest ? 'bg-white text-blue-700 ' : 'bg-[#1D4ED8] text-white'
             }`}
             >
-              {isOpenRequest
-                ? APP_CONSTANTS.VIEW_CLOSED_REQUEST_LABEL
-                : APP_CONSTANTS.EXIT_CLOSED_REQUEST_LABEL}
+              {isOpenRequest ? APP_CONSTANTS.VIEW_CLOSED_REQUEST_LABEL : APP_CONSTANTS.EXIT_CLOSED_REQUEST_LABEL}
             </a>
           </Link>
-          <LogOut
-            onClick={onLogout}
-            className="w-[30px] cursor-pointer"
-            title="LogOut"
-            width="45"
-            height="40"
-          />
+          <LogOut onClick={onLogout} className="w-[30px] cursor-pointer" title="LogOut" width="45" height="40" />
         </div>
       </nav>
     </div>
