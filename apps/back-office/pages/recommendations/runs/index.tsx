@@ -3,8 +3,9 @@ import { useRouter } from 'next/router';
 import { parseCookies } from 'nookies';
 import { Member, MemberSearch } from '../../../components/members/membersearch';
 import api from '../../../utils/api';
-import { BaseLayout } from '../../../layout/base-layout';
-import { WEB_UI_BASE_URL } from '../../../utils/constants';
+import { ROUTE_CONSTANTS, WEB_UI_BASE_URL } from '../../../utils/constants';
+import { RecommendationsLayout } from '../../../layout/recommendations-layout';
+import { fetchRecommendationRuns } from '../../../utils/services/recommendations';
 
 interface RecommendationRun {
   uid: string;
@@ -34,14 +35,8 @@ export default function RecommendationRunListPage() {
   const fetchRuns = async () => {
     try {
       setIsLoading(true);
-      const { plnadmin } = parseCookies();
-      const config = {
-        headers: {
-          authorization: `Bearer ${plnadmin}`,
-        },
-      };
-      const response = await api.get('/v1/admin/recommendations/runs', config);
-      setRuns(response.data);
+      const response = await fetchRecommendationRuns();
+      setRuns(response);
     } catch (error) {
       console.error('Failed to fetch runs:', error);
     } finally {
@@ -66,7 +61,7 @@ export default function RecommendationRunListPage() {
         config
       );
       await fetchRuns();
-      router.push(`/recommendations/runs/${response.data.uid}`);
+      router.push(`${ROUTE_CONSTANTS.RECOMMENDATIONS_RUNS}/${response.data.uid}`);
     } catch (error) {
       console.error('Failed to create run:', error);
     } finally {
@@ -89,7 +84,7 @@ export default function RecommendationRunListPage() {
 
   if (isCreating) {
     return (
-      <BaseLayout
+      <RecommendationsLayout
         title="Create Recommendation Run"
         actionButton={{
           label: 'Cancel',
@@ -145,13 +140,13 @@ export default function RecommendationRunListPage() {
             {isCreatingRun ? 'Creating...' : 'Generate Recommendations'}
           </button>
         </div>
-      </BaseLayout>
+      </RecommendationsLayout>
     );
   }
 
   return (
-    <BaseLayout
-      title="Recommendation Runs"
+    <RecommendationsLayout
+      activeTab="runs"
       actionButton={{
         label: 'New Recommendation Run',
         onClick: () => setIsCreating(true),
@@ -207,7 +202,7 @@ export default function RecommendationRunListPage() {
                     <td className="py-3">
                       <button
                         className="rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-300"
-                        onClick={() => router.push(`/recommendations/runs/${run.uid}`)}
+                        onClick={() => router.push(`${ROUTE_CONSTANTS.RECOMMENDATIONS_RUNS}/${run.uid}`)}
                       >
                         View
                       </button>
@@ -219,6 +214,6 @@ export default function RecommendationRunListPage() {
           </div>
         )}
       </div>
-    </BaseLayout>
+    </RecommendationsLayout>
   );
 }

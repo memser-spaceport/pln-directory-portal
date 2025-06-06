@@ -21,7 +21,7 @@ const SCORES = {
   MATCHING_FOCUS_AREA: 5,
   MATCHING_FUNDING_STAGE: 5,
   MATCHING_ROLE: 5,
-  MATCHING_TECHNOLOGY: 5,
+  MATCHING_TECHNOLOGY: 1,
   HAS_OFFICE_HOURS: 1,
   NO_OFFICE_HOURS: 0,
   JOIN_DATE: {
@@ -81,6 +81,10 @@ export interface RecommendationFactors {
   teamTechnology: number;
   hasOfficeHours: number;
   joinDateScore: number;
+  matchedFocusAreas: string[];
+  matchedTechnologies: string[];
+  matchedFundingStages: string[];
+  matchedRoles: string[];
 }
 
 export class RecommendationsEngine {
@@ -142,6 +146,12 @@ export class RecommendationsEngine {
     targetMember: MemberWithRelations,
     config: RecommendationConfig
   ): RecommendationScore {
+    // Collect matched items
+    const matchedFocusAreas = this.getMatchedFocusAreas(member, targetMember);
+    const matchedTechnologies = this.getMatchedTechnologies(member, targetMember);
+    const matchedFundingStages = this.getMatchedFundingStages(member, targetMember);
+    const matchedRoles = this.getMatchedRoles(member, targetMember);
+
     const factors = {
       sameTeam: member.teamMemberRoles.some((role) =>
         targetMember.teamMemberRoles.some((targetRole) => role.teamUid === targetRole.teamUid)
@@ -161,14 +171,10 @@ export class RecommendationsEngine {
 
       sameEvent: this.hasSameEvent(member, targetMember) ? SCORES.SAME_EVENT : SCORES.DIFFERENT_EVENT,
 
-      teamFocusArea: config.includeFocusAreas
-        ? this.hasTeamFocusAreaMatch(member, targetMember)
-          ? SCORES.MATCHING_FOCUS_AREA
-          : 0
-        : 0,
+      teamFocusArea: config.includeFocusAreas ? (matchedFocusAreas.length > 0 ? SCORES.MATCHING_FOCUS_AREA : 0) : 0,
 
       teamFundingStage: config.includeFundingStages
-        ? this.hasTeamFundingStageMatch(member, targetMember)
+        ? matchedFundingStages.length > 0
           ? SCORES.MATCHING_FUNDING_STAGE
           : 0
         : 0,
@@ -177,11 +183,16 @@ export class RecommendationsEngine {
         ? this.calculateRoleMatchScore(member.teamMemberRoles, targetMember.teamMemberRoles)
         : 0,
 
-      teamTechnology: this.hasTeamTechnologyMatch(member, targetMember) ? SCORES.MATCHING_TECHNOLOGY : 0,
+      teamTechnology: matchedTechnologies.length > 0 ? SCORES.MATCHING_TECHNOLOGY : 0,
 
       hasOfficeHours: member.officeHours ? SCORES.HAS_OFFICE_HOURS : SCORES.NO_OFFICE_HOURS,
 
       joinDateScore: this.calculateJoinDateScore(member.plnStartDate),
+
+      matchedFocusAreas,
+      matchedTechnologies,
+      matchedFundingStages,
+      matchedRoles,
     };
 
     const score =
@@ -203,49 +214,15 @@ export class RecommendationsEngine {
     };
   }
 
-  private hasTeamFocusAreaMatch(member: MemberWithRelations, targetMember: MemberWithRelations): boolean {
-    const targetFocusAreas = targetMember.teamMemberRoles
-      .flatMap((role) => role.team.teamFocusAreas)
-      .map((focusArea) => focusArea.focusArea.title);
-
-    const memberFocusAreas = member.teamMemberRoles
-      .flatMap((role) => role.team.teamFocusAreas)
-      .map((focusArea) => focusArea.focusArea.title);
-
-    return targetFocusAreas.some((targetArea) => memberFocusAreas.includes(targetArea));
-  }
-
-  private hasTeamFundingStageMatch(member: MemberWithRelations, targetMember: MemberWithRelations): boolean {
-    const targetFundingStages = targetMember.teamMemberRoles.map((role) => role.team.fundingStage?.uid).filter(Boolean);
-
-    return member.teamMemberRoles.some((role) => targetFundingStages.includes(role.team.fundingStage?.uid));
-  }
-
   private calculateRoleMatchScore(memberRoles: TeamMemberRole[], targetRoles: TeamMemberRole[]): number {
     if (!memberRoles.length || !targetRoles.length) return SCORES.NO_OFFICE_HOURS;
 
-    // Get all unique roles and role tags from both members
-    const memberRoleSet = new Set(memberRoles.map((role) => role.role?.toLowerCase()).filter(Boolean));
-    const targetRoleSet = new Set(targetRoles.map((role) => role.role?.toLowerCase()).filter(Boolean));
+    const matchedRoles = this.getMatchedRoles(
+      { teamMemberRoles: memberRoles } as MemberWithRelations,
+      { teamMemberRoles: targetRoles } as MemberWithRelations
+    );
 
-    const memberRoleTags = new Set(memberRoles.flatMap((role) => role.roleTags?.map((tag) => tag.toLowerCase()) || []));
-    const targetRoleTags = new Set(targetRoles.flatMap((role) => role.roleTags?.map((tag) => tag.toLowerCase()) || []));
-
-    // Check if there's any role match
-    for (const role of memberRoleSet) {
-      if (targetRoleSet.has(role)) {
-        return SCORES.MATCHING_ROLE;
-      }
-    }
-
-    // Check if there's any role tag match
-    for (const tag of memberRoleTags) {
-      if (targetRoleTags.has(tag)) {
-        return SCORES.MATCHING_ROLE;
-      }
-    }
-
-    return SCORES.NO_OFFICE_HOURS;
+    return matchedRoles.length > 0 ? SCORES.MATCHING_ROLE : SCORES.NO_OFFICE_HOURS;
   }
 
   private calculateJoinDateScore(joinDate: Date | null): number {
@@ -276,7 +253,19 @@ export class RecommendationsEngine {
     return memberEventIds.some((eventId) => targetEventIds.includes(eventId));
   }
 
-  private hasTeamTechnologyMatch(member: MemberWithRelations, targetMember: MemberWithRelations): boolean {
+  private getMatchedFocusAreas(member: MemberWithRelations, targetMember: MemberWithRelations): string[] {
+    const targetFocusAreas = targetMember.teamMemberRoles
+      .flatMap((role) => role.team.teamFocusAreas)
+      .map((focusArea) => focusArea.focusArea.title);
+
+    const memberFocusAreas = member.teamMemberRoles
+      .flatMap((role) => role.team.teamFocusAreas)
+      .map((focusArea) => focusArea.focusArea.title);
+
+    return targetFocusAreas.filter((area) => memberFocusAreas.includes(area));
+  }
+
+  private getMatchedTechnologies(member: MemberWithRelations, targetMember: MemberWithRelations): string[] {
     const targetTechnologies = targetMember.teamMemberRoles
       .flatMap((role) => role.team.technologies)
       .map((tech) => tech.title);
@@ -285,6 +274,37 @@ export class RecommendationsEngine {
       .flatMap((role) => role.team.technologies)
       .map((tech) => tech.title);
 
-    return targetTechnologies.some((targetTech) => memberTechnologies.includes(targetTech));
+    return targetTechnologies.filter((tech) => memberTechnologies.includes(tech));
+  }
+
+  private getMatchedFundingStages(member: MemberWithRelations, targetMember: MemberWithRelations): string[] {
+    const targetFundingStages = targetMember.teamMemberRoles
+      .map((role) => role.team.fundingStage?.uid)
+      .filter(Boolean) as string[];
+
+    const memberFundingStages = member.teamMemberRoles
+      .map((role) => role.team.fundingStage?.uid)
+      .filter(Boolean) as string[];
+
+    return targetFundingStages.filter((stage) => memberFundingStages.includes(stage));
+  }
+
+  private getMatchedRoles(member: MemberWithRelations, targetMember: MemberWithRelations): string[] {
+    const memberRoles = member.teamMemberRoles.map((role) => role.role?.toLowerCase()).filter(Boolean) as string[];
+    const targetRoles = targetMember.teamMemberRoles
+      .map((role) => role.role?.toLowerCase())
+      .filter(Boolean) as string[];
+
+    const memberRoleTags = member.teamMemberRoles.flatMap(
+      (role) => role.roleTags?.map((tag) => tag.toLowerCase()) || []
+    );
+    const targetRoleTags = targetMember.teamMemberRoles.flatMap(
+      (role) => role.roleTags?.map((tag) => tag.toLowerCase()) || []
+    );
+
+    const matchedRoles = memberRoles.filter((role) => targetRoles.includes(role));
+    const matchedTags = memberRoleTags.filter((tag) => targetRoleTags.includes(tag));
+
+    return [...new Set([...matchedRoles, ...matchedTags])];
   }
 }

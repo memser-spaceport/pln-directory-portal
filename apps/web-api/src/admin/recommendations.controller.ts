@@ -32,8 +32,12 @@ export class RecommendationsController {
 
   @Get('runs')
   @NoCache()
-  async getRecommendationRuns(@Query('targetMemberUid') targetMemberUid?: string, @Query('status') status?: string) {
-    return this.recommendationsService.getRecommendationRuns(targetMemberUid, status);
+  async getRecommendationRuns(
+    @Query('targetMemberUid') targetMemberUid?: string,
+    @Query('status') status?: string,
+    @Query('unique') unique?: boolean
+  ) {
+    return this.recommendationsService.getRecommendationRuns(targetMemberUid, status, unique);
   }
 
   @Get('runs/:uid')
@@ -55,5 +59,11 @@ export class RecommendationsController {
   @NoCache()
   async sendRecommendations(@Param('uid') uid: string, @Body() sendDto: SendRecommendationsRequest) {
     return this.recommendationsService.sendRecommendations(uid, sendDto);
+  }
+
+  @Get('notifications')
+  @NoCache()
+  async getRecommendationNotifications(@Query('targetMemberUid') targetMemberUid?: string) {
+    return this.recommendationsService.getRecommendationNotifications(targetMemberUid);
   }
 }

@@ -3,43 +3,10 @@ import { useRouter } from 'next/router';
 import { toast } from 'react-toastify';
 import { parseCookies } from 'nookies';
 import api from '../../../utils/api';
-import { BaseLayout } from '../../../layout/base-layout';
-import { WEB_UI_BASE_URL } from '../../../utils/constants';
+import { RecommendationsLayout } from '../../../layout/recommendations-layout';
+import { ROUTE_CONSTANTS, WEB_UI_BASE_URL } from '../../../utils/constants';
 import { EmailConfirmationModal } from '../../../components/email-confirmation-modal';
-
-interface Recommendation {
-  uid: string;
-  recommendedMember: {
-    name: string;
-    uid: string;
-  };
-  score: number;
-  status: string;
-  factors: {
-    sameTeam: boolean;
-    previouslyRecommended: boolean;
-    bookedOH: boolean;
-    sameEvent: boolean;
-    teamFocusArea: boolean;
-    teamFundingStage: boolean;
-    roleMatch: boolean;
-    teamTechnology: boolean;
-    hasOfficeHours: boolean;
-    joinDateScore: number;
-  };
-}
-
-interface RecommendationRun {
-  uid: string;
-  targetMember: {
-    name: string;
-    uid: string;
-    email: string;
-  };
-  status: string;
-  createdAt: string;
-  recommendations: Recommendation[];
-}
+import { RecommendationRun, Recommendation, fetchRecommendationRun } from '../../../utils/services/recommendations';
 
 export default function RecommendationRunViewPage() {
   const router = useRouter();
@@ -60,17 +27,11 @@ export default function RecommendationRunViewPage() {
   const fetchRun = async () => {
     try {
       setIsLoading(true);
-      const { plnadmin } = parseCookies();
-      const config = {
-        headers: {
-          authorization: `Bearer ${plnadmin}`,
-        },
-      };
-      const response = await api.get(`/v1/admin/recommendations/runs/${uid}`, config);
-      setRun(response.data);
+      const response = await fetchRecommendationRun(uid as string);
+      setRun(response);
       // Initialize local recommendations state
       const initialLocalState: Record<string, string> = {};
-      response.data.recommendations.forEach((rec: Recommendation) => {
+      response.recommendations.forEach((rec: Recommendation) => {
         initialLocalState[rec.uid] = rec.status;
       });
       setLocalRecommendations(initialLocalState);
@@ -155,43 +116,43 @@ export default function RecommendationRunViewPage() {
 
   if (!uid) {
     return (
-      <BaseLayout
+      <RecommendationsLayout
         title={`Recommendation Run`}
         actionButton={{
           label: 'Back to List',
-          onClick: () => router.push('/recommendations/runs'),
+          onClick: () => router.push(ROUTE_CONSTANTS.RECOMMENDATIONS_RUNS),
         }}
       >
         <div className="m-6 bg-white p-6 text-center">No recommendation run ID provided</div>
-      </BaseLayout>
+      </RecommendationsLayout>
     );
   }
 
   if (isLoading && !run) {
     return (
-      <BaseLayout
+      <RecommendationsLayout
         title={`Recommendation Run`}
         actionButton={{
           label: 'Back to List',
-          onClick: () => router.push('/recommendations/runs'),
+          onClick: () => router.push(ROUTE_CONSTANTS.RECOMMENDATIONS_RUNS),
         }}
       >
         <div className="m-6 bg-white p-6 text-center">Loading...</div>
-      </BaseLayout>
+      </RecommendationsLayout>
     );
   }
 
   if (!run) {
     return (
-      <BaseLayout
+      <RecommendationsLayout
         title={`Recommendation Run`}
         actionButton={{
           label: 'Back to List',
-          onClick: () => router.push('/recommendations/runs'),
+          onClick: () => router.push(ROUTE_CONSTANTS.RECOMMENDATIONS_RUNS),
         }}
       >
         <div className="m-6 bg-white p-6 text-center">No recommendation run found</div>
-      </BaseLayout>
+      </RecommendationsLayout>
     );
   }
 
@@ -201,11 +162,11 @@ export default function RecommendationRunViewPage() {
   const activeCount = approvedCount + pendingCount;
 
   return (
-    <BaseLayout
+    <RecommendationsLayout
       title={`Recommendation Run - ${run.targetMember.name}`}
       actionButton={{
         label: 'Back to List',
-        onClick: () => router.push('/recommendations/runs'),
+        onClick: () => router.push(ROUTE_CONSTANTS.RECOMMENDATIONS_RUNS),
       }}
     >
       <div className="m-6 bg-white p-6">
@@ -381,6 +342,6 @@ export default function RecommendationRunViewPage() {
         defaultSubject="Your Recommended Connections from PL Network"
         targetMemberEmail={run.targetMember.email}
       />
-    </BaseLayout>
+    </RecommendationsLayout>
   );
 }
