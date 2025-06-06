@@ -262,7 +262,7 @@ export class RecommendationsEngine {
       .flatMap((role) => role.team.teamFocusAreas)
       .map((focusArea) => focusArea.focusArea.title);
 
-    return targetFocusAreas.filter((area) => memberFocusAreas.includes(area));
+    return [...new Set(targetFocusAreas.filter((area) => memberFocusAreas.includes(area)))];
   }
 
   private getMatchedTechnologies(member: MemberWithRelations, targetMember: MemberWithRelations): string[] {
@@ -274,7 +274,7 @@ export class RecommendationsEngine {
       .flatMap((role) => role.team.technologies)
       .map((tech) => tech.title);
 
-    return targetTechnologies.filter((tech) => memberTechnologies.includes(tech));
+    return [...new Set(targetTechnologies.filter((tech) => memberTechnologies.includes(tech)))];
   }
 
   private getMatchedFundingStages(member: MemberWithRelations, targetMember: MemberWithRelations): string[] {
@@ -286,7 +286,7 @@ export class RecommendationsEngine {
       .map((role) => role.team.fundingStage?.uid)
       .filter(Boolean) as string[];
 
-    return targetFundingStages.filter((stage) => memberFundingStages.includes(stage));
+    return [...new Set(targetFundingStages.filter((stage) => memberFundingStages.includes(stage)))];
   }
 
   private getMatchedRoles(member: MemberWithRelations, targetMember: MemberWithRelations): string[] {
