@@ -132,6 +132,7 @@ model Member {
   linkedInDetails              Json?
   recommendationRunsAsTarget   RecommendationRun[]
   recommendationsAsRecommended Recommendation[]
+  recommendationNotifications  RecommendationNotification[]
 }
 
 model MemberRole {
@@ -680,26 +681,43 @@ enum RecommendationRunStatus {
 }
 
 model RecommendationRun {
-  id              Int                     @id @default(autoincrement())
-  uid             String                  @unique @default(cuid())
-  targetMember    Member                  @relation(fields: [targetMemberUid], references: [uid])
-  targetMemberUid String
-  status          RecommendationRunStatus @default(OPEN)
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
-  recommendations Recommendation[]
+  id                 Int                          @id @default(autoincrement())
+  uid                String                       @unique @default(cuid())
+  targetMember       Member                       @relation(fields: [targetMemberUid], references: [uid])
+  targetMemberUid    String
+  status             RecommendationRunStatus      @default(OPEN)
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+  recommendations    Recommendation[]
+  emailNotifications RecommendationNotification[]
 }
 
 model Recommendation {
+  id                   Int                          @id @default(autoincrement())
+  uid                  String                       @unique @default(cuid())
+  recommendationRun    RecommendationRun            @relation(fields: [recommendationRunUid], references: [uid])
+  recommendationRunUid String
+  recommendedMember    Member                       @relation(fields: [recommendedMemberUid], references: [uid])
+  recommendedMemberUid String
+  score                Float
+  factors              Json // Stores the factors that influenced this recommendation
+  status               ApprovalStatus               @default(PENDING)
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+  emailNotifications   RecommendationNotification[] @relation("NotificationRecommendations")
+}
+
+model RecommendationNotification {
   id                   Int               @id @default(autoincrement())
   uid                  String            @unique @default(cuid())
   recommendationRun    RecommendationRun @relation(fields: [recommendationRunUid], references: [uid])
   recommendationRunUid String
-  recommendedMember    Member            @relation(fields: [recommendedMemberUid], references: [uid])
-  recommendedMemberUid String
-  score                Float
-  factors              Json // Stores the factors that influenced this recommendation
-  status               ApprovalStatus    @default(PENDING)
+  targetMember         Member            @relation(fields: [targetMemberUid], references: [uid])
+  targetMemberUid      String
+  email                String
+  subject              String
+  recommendations      Recommendation[]  @relation("NotificationRecommendations")
+  sentAt               DateTime          @default(now())
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 }

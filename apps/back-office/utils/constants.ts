@@ -1,8 +1,8 @@
 const APP_CONSTANTS = {
-  AUTO_APPROVED_LABEL:'AUTOAPPROVED',
+  AUTO_APPROVED_LABEL: 'AUTOAPPROVED',
   APPROVED_LABEL: 'Approved',
   PENDING_LABEL: 'PENDING',
-  PENDING_FLAG: "Pending",
+  PENDING_FLAG: 'Pending',
   UNVERIFIED_LABEL: 'UNVERIFIED',
   UNVERIFIED_FLAG: 'Unverified',
   VERIFIED_FLAG: 'Verified',
@@ -15,6 +15,7 @@ const APP_CONSTANTS = {
   NO_DATA_AVAILABLE_LABEL: 'No data available',
   VIEW_CLOSED_REQUEST_LABEL: 'View closed requests',
   EXIT_CLOSED_REQUEST_LABEL: 'Exit closed requests',
+  VIEW_RECOMMENDATIONS_LABEL: 'View recommendations',
   BACK_OFFICE_LABEL: 'Back Office',
   SLASH: '/',
   LOADING_CONTENT: 'Loading...',
@@ -24,14 +25,14 @@ const APP_CONSTANTS = {
 export const TABLE_SORT_ICONS = {
   DEFAULT: '/assets/icons/group.svg',
   ASCENDING: '/assets/icons/sort-asc-blue.svg',
-  DESCENDING: '/assets/icons/sort-desc-blue.svg'
-}
+  DESCENDING: '/assets/icons/sort-desc-blue.svg',
+};
 
 export const TABLE_SORT_VALUES = {
   DEFAULT: 'DEFAULT',
   ASCENDING: 'ASCENDING',
-  DESCENDING:'DESCENDING',
-}
+  DESCENDING: 'DESCENDING',
+};
 
 export const ENROLLMENT_TYPE = {
   MEMBER: 'MEMBER',
@@ -43,6 +44,8 @@ export const ROUTE_CONSTANTS = {
   CLOSED_LIST: APP_CONSTANTS.SLASH + 'closed-list',
   TEAM_VIEW: APP_CONSTANTS.SLASH + 'team-view',
   MEMBER_VIEW: APP_CONSTANTS.SLASH + 'member-view',
+  RECOMMENDATIONS_RUNS: APP_CONSTANTS.SLASH + 'recommendations/runs',
+  RECOMMENDATIONS_HISTORY: APP_CONSTANTS.SLASH + 'recommendations/history',
   INTERNAL_SERVER_ERROR: APP_CONSTANTS.SLASH + 'internal-server-error',
 };
 
@@ -57,6 +60,7 @@ export const API_ROUTE = {
   TECHNOLOGIES: APP_CONSTANTS.V1 + 'technologies',
   MEMBERS: APP_CONSTANTS.V1 + 'members',
   ADMIN_APPROVAL: APP_CONSTANTS.V1 + 'admin/members',
+  ADMIN_RECOMMENDATIONS: APP_CONSTANTS.V1 + 'admin/recommendations',
 };
 
 export const TOKEN = 'plnetwork@1';
@@ -65,7 +69,8 @@ export const FILTER_API_ROUTES = {
   FOCUS_AREA: '/v1/focus-areas',
 };
 
-export const ABOUT_PLN_LINK = "https://protocol.ai/blog/transcription-pl-vision-driving-a-breakthroughs-in-computing-to-push-humanity-forward/"
+export const ABOUT_PLN_LINK =
+  'https://protocol.ai/blog/transcription-pl-vision-driving-a-breakthroughs-in-computing-to-push-humanity-forward/';
 
 export default APP_CONSTANTS;
 

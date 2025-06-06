@@ -121,12 +121,13 @@ export class RecommendationsService {
     });
   }
 
-  async getRecommendationRuns(targetMemberUid?: string, status?: string) {
+  async getRecommendationRuns(targetMemberUid?: string, status?: string, unique?: boolean) {
     return this.prisma.recommendationRun.findMany({
       where: {
         ...(targetMemberUid && { targetMemberUid }),
         ...(status && { status: status as RecommendationRunStatus }),
       },
+      distinct: unique ? 'targetMemberUid' : undefined,
       include: {
         targetMember: true,
         recommendations: {
@@ -239,6 +240,18 @@ export class RecommendationsService {
     }
 
     await this.sendRecommendationEmail(emailData, toEmail, sendDto.emailSubject);
+
+    await this.prisma.recommendationNotification.create({
+      data: {
+        recommendationRunUid: uid,
+        targetMemberUid: run.targetMemberUid,
+        email: toEmail,
+        subject: sendDto.emailSubject,
+        recommendations: {
+          connect: approvedRecommendations.map((rec) => ({ uid: rec.uid })),
+        },
+      },
+    });
 
     return this.prisma.recommendationRun.update({
       where: { uid },
@@ -427,28 +440,54 @@ export class RecommendationsService {
   private generateRecommendationReason(factors): string {
     const reasons: string[] = [];
 
+    // Build focus area reason with examples
     if (factors.teamFocusArea) {
-      reasons.push('focused on similar areas');
+      const focusAreaReason = factors.matchedFocusAreas?.length
+        ? `focused on similar problem areas such as: ${factors.matchedFocusAreas.join(', ')}`
+        : 'focused on similar problem areas';
+      reasons.push(focusAreaReason);
     }
+
+    // Build funding stage reason
     if (factors.teamFundingStage) {
       reasons.push('at similar funding stages');
     }
-    if (factors.roleMatch) {
-      reasons.push('in complementary roles');
-    }
+
+    // Build technology reason with examples
     if (factors.teamTechnology) {
-      reasons.push('working with similar technologies');
+      const techReason = factors.matchedTechnologies?.length
+        ? `working with similar technologies like: ${factors.matchedTechnologies.join(', ')}`
+        : 'working with similar technologies';
+      reasons.push(techReason);
     }
 
     if (reasons.length === 0) {
       return 'Based on your profile and activity in the network';
     }
 
-    if (reasons.length === 1) {
-      return `You are both ${reasons[0]}`;
-    }
-
+    // Join all reasons with appropriate conjunctions
     const lastReason = reasons.pop();
-    return `You are both ${reasons.join(', ')} and ${lastReason}`;
+    return reasons.length > 0 ? `You are both ${reasons.join(', ')} and ${lastReason}` : `You are both ${lastReason}`;
+  }
+
+  async getRecommendationNotifications(targetMemberUid?: string) {
+    return this.prisma.recommendationNotification.findMany({
+      where: {
+        ...(targetMemberUid && { targetMemberUid }),
+      },
+      include: {
+        targetMember: true,
+        recommendations: {
+          include: {
+            recommendedMember: true,
+          },
+        },
+        recommendationRun: true,
+      },
+      orderBy: {
+        sentAt: 'desc',
+      },
+      take: 100,
+    });
   }
 }
