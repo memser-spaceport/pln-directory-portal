@@ -133,6 +133,7 @@ model Member {
   recommendationRunsAsTarget   RecommendationRun[]
   recommendationsAsRecommended Recommendation[]
   recommendationNotifications  RecommendationNotification[]
+  notificationSetting          NotificationSetting?
 }
 
 model MemberRole {
@@ -720,4 +721,17 @@ model RecommendationNotification {
   sentAt               DateTime          @default(now())
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
+}
+
+model NotificationSetting {
+  id                     Int               @id @default(autoincrement())
+  memberUid              String            @unique
+  member                 Member            @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  recommendationsEnabled Boolean           @default(false)
+  subscribed             Boolean           @default(false)
+  showInvitationDialog   Boolean           @default(true)
+  emailFrequency         Int               @default(14)
+  byFocusArea            Boolean           @default(true)
+  byRole                 Boolean           @default(true)
+  byFundingStage         Boolean           @default(true)
 }

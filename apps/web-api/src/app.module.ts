@@ -51,6 +51,7 @@ import { SearchModule } from './search/search.module';
 import { OpenSearchModule } from './opensearch/opensearch.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { NotificationSettingsModule } from './notification-settings/notification-settings.module';
 
 @Module({
   controllers: [AppController],
@@ -121,6 +122,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     SearchModule,
     OpenSearchModule,
     RecommendationsModule,
+    NotificationSettingsModule,
   ],
   providers: [
     {
