@@ -206,6 +206,7 @@ export class PLEventsService {
         select: {
           uid: true,
           name: true,
+          websiteURL: true,
           startDate: true,
           endDate: true,
           logo: {
@@ -233,6 +234,7 @@ export class PLEventsService {
           return {
             uid: event.uid,
             name: event.name,
+            websiteUrl: event.websiteURL ?? null,
             logo: event.logo?.url ?? null,
             location: event.location?.location ?? null,
             flag: event.location?.flag ?? null,
