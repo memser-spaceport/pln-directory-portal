@@ -31,7 +31,7 @@ const SCORES = {
     LESS_THAN_6_MONTHS: 1,
     MORE_THAN_6_MONTHS: 0,
   },
-  MIN_SCORE: 1,
+  MIN_SCORE: 15,
 };
 
 export interface RecommendationConfig {
