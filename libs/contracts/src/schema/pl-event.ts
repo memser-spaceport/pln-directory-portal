@@ -21,8 +21,8 @@ export const PLEventSchema = z.object({
   websiteURL: z.string().url().optional(),
   slugURL: z.string(),
   resources: z.array(
-    z.object({ 
-      name: z.string(), 
+    z.object({
+      name: z.string(),
       link: z.string().url(),
       description: z.string().optional()
     })
@@ -69,6 +69,16 @@ export const ResponsePLEventSchemaWithRelationsSchema = ResponsePLEventSchema.ex
   location: ResponsePLEventLocationSchema.optional()
 });
 
+export const ResponseUpcomingEventSchema = z.object({
+  uid: z.string(),
+  name: z.string(),
+  logo: z.string().nullable(),
+  location: z.string().nullable(),
+  flag: z.string().nullable(),
+  startDate: z.string(),
+  endDate: z.string(),
+});
+
 export const PLEventRelationalFields = ResponsePLEventSchemaWithRelationsSchema.pick({
   logo: true,
   banner: true,
@@ -88,3 +98,5 @@ export const PLEventDetailQueryParams = PLEventQueryParams.unwrap()
   .optional();
 
 export class CreatePLEventSchemaDto extends createZodDto(PLCreateEventSchema) {}
+
+export class ResponseUpcomingEvents extends createZodDto(ResponseUpcomingEventSchema) {}

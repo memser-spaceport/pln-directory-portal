@@ -21,6 +21,7 @@ export interface Recommendation {
   recommendedMember: {
     name: string;
     uid: string;
+    createdAt: string;
   };
   score: number;
   status: string;
@@ -35,6 +36,12 @@ export interface Recommendation {
     teamTechnology: boolean;
     hasOfficeHours: boolean;
     joinDateScore: number;
+    teamIndustryTag: boolean;
+    matchedFocusAreas: string[];
+    matchedFundingStages: string[];
+    matchedRoles: string[];
+    matchedTechnologies: string[];
+    matchedIndustryTags: string[];
   };
 }
 
