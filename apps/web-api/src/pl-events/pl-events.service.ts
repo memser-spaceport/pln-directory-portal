@@ -1,12 +1,20 @@
-import { Injectable, BadRequestException, ConflictException, NotFoundException, forwardRef, Inject } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException
+} from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
-import { Prisma, PLEvent, Member } from '@prisma/client';
+import { Member, PLEvent, Prisma } from '@prisma/client';
 import { PLEventGuestsService } from './pl-event-guests.service';
 import { NotificationService } from '../notifications/notifications.service';
 import { MembersService } from '../members/members.service';
 import { PLEventLocationsService } from './pl-event-locations.service';
-import axios from 'axios';
+import moment from 'moment-timezone';
+import { ResponseUpcomingEvents } from '@protocol-labs-network/contracts';
 
 @Injectable()
 export class PLEventsService {
@@ -175,6 +183,64 @@ export class PLEventsService {
           }
         }
       })
+    } catch (err) {
+      return this.handleErrors(err);
+    }
+  }
+
+  async getUpcomingPLEvents(): Promise<ResponseUpcomingEvents[]> {
+    try {
+      const events = await this.prisma.pLEvent.findMany({
+        where: {
+          startDate: {
+            gte: new Date(),
+          },
+          location: {
+            is: {
+              timezone: {
+                not: '',
+              },
+            },
+          },
+        },
+        select: {
+          uid: true,
+          name: true,
+          startDate: true,
+          endDate: true,
+          logo: {
+            select: {
+              url: true,
+            },
+          },
+          location: {
+            select: {
+              location: true,
+              flag: true,
+              timezone: true,
+            },
+          },
+        },
+        orderBy: { startDate: 'desc' },
+      });
+
+      return events
+        .map((event) => {
+          const timezone = event.location?.timezone || 'UTC';
+          const localStartDate = moment.utc(event.startDate).tz(timezone).toISOString();
+          const localEndDate = moment.utc(event.endDate).tz(timezone).toISOString();
+
+          return {
+            uid: event.uid,
+            name: event.name,
+            logo: event.logo?.url ?? null,
+            location: event.location?.location ?? null,
+            flag: event.location?.flag ?? null,
+            startDate: localStartDate,
+            endDate: localEndDate,
+          };
+        })
+        .filter((event) => moment.utc(event.startDate).isAfter(moment.utc()));
     } catch (err) {
       return this.handleErrors(err);
     }
