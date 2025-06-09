@@ -79,8 +79,6 @@ export const ResponseUpcomingEventSchema = z.object({
   endDate: z.string(),
 });
 
-export const UpcomingEventsResponseSchema = z.array(ResponseUpcomingEventSchema);
-
 export const PLEventRelationalFields = ResponsePLEventSchemaWithRelationsSchema.pick({
   logo: true,
   banner: true,
