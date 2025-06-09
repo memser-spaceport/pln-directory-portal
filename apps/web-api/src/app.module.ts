@@ -52,6 +52,7 @@ import { OpenSearchModule } from './opensearch/opensearch.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { NotificationSettingsModule } from './notification-settings/notification-settings.module';
+import { ProfileModule } from './profile/profile.module';
 
 @Module({
   controllers: [AppController],
@@ -123,6 +124,7 @@ import { NotificationSettingsModule } from './notification-settings/notification
     OpenSearchModule,
     RecommendationsModule,
     NotificationSettingsModule,
+    ProfileModule,
   ],
   providers: [
     {
