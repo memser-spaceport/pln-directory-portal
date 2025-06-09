@@ -12,7 +12,7 @@ import {
   UpdatePLEventGuestSchemaDto,
   DeletePLEventGuestsSchemaDto,
   PLEventGuestQuerySchema,
-  CreatePLEventSchemaDto
+  CreatePLEventSchemaDto, ResponseUpcomingEvents
 } from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
@@ -48,9 +48,9 @@ export class PLEventsController {
 
   /**
    * This method creates a new event associated with a specific location.
-   * 
+   *
    * @param locationUid The unique identifier (UID) of the location where the event will be created.
-   * @param body The event creation payload containing the required event details, such as name, type, description, 
+   * @param body The event creation payload containing the required event details, such as name, type, description,
    *             startDate, endDate, resources, and locationUid.
    * @returns The newly created event object with details such as name, type, start and end dates, and location.
    */
@@ -118,7 +118,7 @@ export class PLEventsController {
     const result = await this.memberService.isMemberPartOfTeams(member, [body.teamUid]) ||
       await this.memberService.checkIfAdminUser(member);
     if (!result && !isEmpty(body.teamUid)) {
-      throw new ForbiddenException(`Member with email ${userEmail} is not part of 
+      throw new ForbiddenException(`Member with email ${userEmail} is not part of
         team with uid ${body.teamUid} or isn't admin.`);
     }
     const location = await this.eventLocationService.getPLEventLocationByUid(locationUid);
@@ -272,7 +272,7 @@ export class PLEventsController {
   @UseGuards(UserAuthValidateGuard)
   @NoCache()
   async getAllAggregatedData(
-    @Req() request: Request 
+    @Req() request: Request
   ) {
     const loggedInMember = request['userEmail'] ? await this.memberService.findMemberByEmail(request['userEmail']) : null;
     return await this.eventGuestService.getAllAggregatedData(loggedInMember);
@@ -292,4 +292,10 @@ export class PLEventsController {
     return await this.eventGuestService.sendEventGuestPresenceRequest(loggedInMember?.email, body);
   }
 
+  @Api(server.route.getAllUpcomingEvents)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async getAllUpcomingEvents(): Promise<ResponseUpcomingEvents[]> {
+    return await this.eventService.getUpcomingPLEvents();
+  }
 }

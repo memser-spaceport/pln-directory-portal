@@ -47,6 +47,7 @@ export class AwsService {
     fromAddress: string,
     toAddresses: string[],
     ccAddresses: string[],
+    replyTo?: string,
     isEmailEnabled = this.isEmailServiceEnabled()
   ) {
     if (!isEmailEnabled) 
@@ -68,7 +69,8 @@ export class AwsService {
       cc: ccAddresses,
       subject: subject,
       html: renderedHtml,
-      text: textTemplate
+      text: textTemplate,
+      replyTo: replyTo
     };
     const mail = new MailComposer(mailOptions);
     // Compose the email with attachment

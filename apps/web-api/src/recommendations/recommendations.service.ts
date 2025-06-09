@@ -12,11 +12,15 @@ import {
   UpdateRecommendationRunStatusRequest,
   SendRecommendationsRequest,
 } from 'libs/contracts/src/schema/recommendations';
-import { getRandomId } from '../utils/helper/helper';
+import { getRandomId, isEmails } from '../utils/helper/helper';
 
 @Injectable()
 export class RecommendationsService {
-  constructor(private prisma: PrismaService, private logger: LogService, private awsService: AwsService) {}
+  private supportEmail: string | undefined;
+
+  constructor(private prisma: PrismaService, private logger: LogService, private awsService: AwsService) {
+    this.supportEmail = this.getSupportEmail();
+  }
 
   async createRecommendationRun(createDto: CreateRecommendationRunRequest) {
     const targetMember = await this.prisma.member.findUnique({
@@ -339,6 +343,7 @@ export class RecommendationsService {
       process.env.SES_SOURCE_EMAIL || '',
       [toEmail],
       [],
+      this.supportEmail,
       true
     );
 
@@ -491,5 +496,12 @@ export class RecommendationsService {
       },
       take: 100,
     });
+  }
+
+  private getSupportEmail(): string | undefined {
+    const supportEmails = process.env.SUPPORT_EMAILS?.split(',') ?? [];
+    if (isEmails(supportEmails)) {
+      return supportEmails[0];
+    }
   }
 }
