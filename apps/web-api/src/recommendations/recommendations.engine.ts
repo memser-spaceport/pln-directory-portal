@@ -22,6 +22,7 @@ const SCORES = {
   MATCHING_FUNDING_STAGE: 5,
   MATCHING_ROLE: 5,
   MATCHING_TECHNOLOGY: 1,
+  MATCHING_INDUSTRY_TAG: 5,
   HAS_OFFICE_HOURS: 1,
   NO_OFFICE_HOURS: 0,
   JOIN_DATE: {
@@ -30,7 +31,7 @@ const SCORES = {
     LESS_THAN_6_MONTHS: 1,
     MORE_THAN_6_MONTHS: 0,
   },
-  MIN_SCORE: 15,
+  MIN_SCORE: 1,
 };
 
 export interface RecommendationConfig {
@@ -53,7 +54,7 @@ export interface MemberWithRelations extends Member {
       teamFocusAreas: (TeamFocusArea & {
         focusArea: { title: string };
       })[];
-      fundingStage?: { uid: string };
+      fundingStage?: { title: string };
       technologies: { title: string }[];
       industryTags: { title: string }[];
     };
@@ -79,12 +80,14 @@ export interface RecommendationFactors {
   teamFundingStage: number;
   roleMatch: number;
   teamTechnology: number;
+  teamIndustryTag: number;
   hasOfficeHours: number;
   joinDateScore: number;
   matchedFocusAreas: string[];
   matchedTechnologies: string[];
   matchedFundingStages: string[];
   matchedRoles: string[];
+  matchedIndustryTags: string[];
 }
 
 export class RecommendationsEngine {
@@ -151,6 +154,7 @@ export class RecommendationsEngine {
     const matchedTechnologies = this.getMatchedTechnologies(member, targetMember);
     const matchedFundingStages = this.getMatchedFundingStages(member, targetMember);
     const matchedRoles = this.getMatchedRoles(member, targetMember);
+    const matchedIndustryTags = this.getMatchedIndustryTags(member, targetMember);
 
     const factors = {
       sameTeam: member.teamMemberRoles.some((role) =>
@@ -185,6 +189,8 @@ export class RecommendationsEngine {
 
       teamTechnology: matchedTechnologies.length > 0 ? SCORES.MATCHING_TECHNOLOGY : 0,
 
+      teamIndustryTag: matchedIndustryTags.length > 0 ? SCORES.MATCHING_INDUSTRY_TAG : 0,
+
       hasOfficeHours: member.officeHours ? SCORES.HAS_OFFICE_HOURS : SCORES.NO_OFFICE_HOURS,
 
       joinDateScore: this.calculateJoinDateScore(member.plnStartDate),
@@ -193,6 +199,7 @@ export class RecommendationsEngine {
       matchedTechnologies,
       matchedFundingStages,
       matchedRoles,
+      matchedIndustryTags,
     };
 
     const score =
@@ -204,6 +211,7 @@ export class RecommendationsEngine {
         factors.teamFundingStage +
         factors.roleMatch +
         factors.teamTechnology +
+        factors.teamIndustryTag +
         factors.hasOfficeHours +
         factors.joinDateScore);
 
@@ -279,11 +287,11 @@ export class RecommendationsEngine {
 
   private getMatchedFundingStages(member: MemberWithRelations, targetMember: MemberWithRelations): string[] {
     const targetFundingStages = targetMember.teamMemberRoles
-      .map((role) => role.team.fundingStage?.uid)
+      .map((role) => role.team.fundingStage?.title)
       .filter(Boolean) as string[];
 
     const memberFundingStages = member.teamMemberRoles
-      .map((role) => role.team.fundingStage?.uid)
+      .map((role) => role.team.fundingStage?.title)
       .filter(Boolean) as string[];
 
     return [...new Set(targetFundingStages.filter((stage) => memberFundingStages.includes(stage)))];
@@ -306,5 +314,17 @@ export class RecommendationsEngine {
     const matchedTags = memberRoleTags.filter((tag) => targetRoleTags.includes(tag));
 
     return [...new Set([...matchedRoles, ...matchedTags])];
+  }
+
+  private getMatchedIndustryTags(member: MemberWithRelations, targetMember: MemberWithRelations): string[] {
+    const targetIndustryTags = targetMember.teamMemberRoles
+      .flatMap((role) => role.team.industryTags)
+      .map((tag) => tag.title.toLowerCase());
+
+    const memberIndustryTags = member.teamMemberRoles
+      .flatMap((role) => role.team.industryTags)
+      .map((tag) => tag.title.toLowerCase());
+
+    return [...new Set(targetIndustryTags.filter((tag) => memberIndustryTags.includes(tag)))];
   }
 }

@@ -114,6 +114,14 @@ export default function RecommendationRunViewPage() {
     }
   };
 
+  const renderMatch = (label: string, score: boolean, value?: string[]) => {
+    return (
+      <li>
+        {label}: {score ? `Yes${value ? ` (${value.join(', ')})` : ''}` : 'No'}
+      </li>
+    );
+  };
+
   if (!uid) {
     return (
       <RecommendationsLayout
@@ -273,6 +281,14 @@ export default function RecommendationRunViewPage() {
                           {recommendation.recommendedMember.name}
                         </a>
                       </h3>
+                      <p className="text-sm text-gray-600">
+                        Join Date:{' '}
+                        {new Date(recommendation.recommendedMember.createdAt).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </p>
                       <p className="text-sm text-gray-600">Score: {recommendation.score}</p>
                     </div>
                     <div className="flex gap-2">
@@ -312,11 +328,34 @@ export default function RecommendationRunViewPage() {
                         <div>
                           <div className="font-medium">Matches</div>
                           <ul className="mt-2 space-y-1">
-                            <li>Role Match: {recommendation.factors.roleMatch ? 'Yes' : 'No'}</li>
-                            <li>Team Focus Area: {recommendation.factors.teamFocusArea ? 'Yes' : 'No'}</li>
-                            <li>Team Funding Stage: {recommendation.factors.teamFundingStage ? 'Yes' : 'No'}</li>
-                            <li>Team Technology : {recommendation.factors.teamTechnology ? 'Yes' : 'No'}</li>
-                            <li>Has Office Hours: {recommendation.factors.hasOfficeHours ? 'Yes' : 'No'}</li>
+                            {renderMatch(
+                              'Role Match',
+                              recommendation.factors.roleMatch,
+                              recommendation.factors.matchedRoles
+                            )}
+                            <li>
+                              {renderMatch(
+                                'Team Focus Area',
+                                recommendation.factors.teamFocusArea,
+                                recommendation.factors.matchedFocusAreas
+                              )}
+                            </li>
+                            <li>
+                              {renderMatch(
+                                'Team Technology',
+                                recommendation.factors.teamTechnology,
+                                recommendation.factors.matchedTechnologies
+                              )}
+                            </li>
+                            <li>
+                              {renderMatch(
+                                'Team Industry Tag',
+                                recommendation.factors.teamIndustryTag,
+                                recommendation.factors.matchedIndustryTags
+                              )}
+                            </li>
+                            <li>{renderMatch('Team Funding Stage', recommendation.factors.teamFundingStage)}</li>
+                            {renderMatch('Has Office Hours', recommendation.factors.hasOfficeHours)}
                           </ul>
                         </div>
                       </div>
