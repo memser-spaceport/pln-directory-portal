@@ -72,6 +72,7 @@ export const ResponsePLEventSchemaWithRelationsSchema = ResponsePLEventSchema.ex
 export const ResponseUpcomingEventSchema = z.object({
   uid: z.string(),
   name: z.string(),
+  websiteUrl: z.string().nullable(),
   logo: z.string().nullable(),
   location: z.string().nullable(),
   flag: z.string().nullable(),
