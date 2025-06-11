@@ -203,7 +203,7 @@ export const ANALYTICS_EVENTS = {
   }
 };
 
-export const ANALYTICS_SOURCE = 'directory-portal';
+export const ANALYTICS_SOURCE = 'directory-backend';
 
 export const ANALYTICS_PROVIDER = {
   POSTHOG: 'posthog',
