@@ -244,7 +244,10 @@ export class ParticipantsRequestService {
         createdItem.uid,
         dataToProcess.requesterEmailId
       );
-      await this.notificationService.notifyForOnboarding(createdItem.name, createdItem.email);
+
+      if (isVerified) {
+        await this.notificationService.notifyForOnboarding(createdItem.name, createdItem.email);
+      }
     } else {
       await this.notificationService.notifyForTeamCreationApproval(
         createdItem.name,
