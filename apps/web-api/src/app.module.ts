@@ -120,11 +120,11 @@ import { ProfileModule } from './profile/profile.module';
     AskModule,
     EventsModule,
     MemberExperiencesModule,
-    SearchModule,
-    OpenSearchModule,
-    RecommendationsModule,
-    NotificationSettingsModule,
-    ProfileModule,
+    // SearchModule,
+    // OpenSearchModule,
+    // RecommendationsModule,
+    // NotificationSettingsModule,
+    // ProfileModule,
   ],
   providers: [
     {
