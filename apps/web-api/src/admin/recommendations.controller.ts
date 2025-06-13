@@ -66,4 +66,10 @@ export class RecommendationsController {
   async getRecommendationNotifications(@Query('targetMemberUid') targetMemberUid?: string) {
     return this.recommendationsService.getRecommendationNotifications(targetMemberUid);
   }
+
+  @Get('members-enabled')
+  @NoCache()
+  async getMembersWithEnabledRecommendations() {
+    return this.recommendationsService.getMembersWithEnabledRecommendations();
+  }
 }
