@@ -7,6 +7,7 @@ import { OtpModule } from '../otp/otp.module';
 import { SharedModule } from '../shared/shared.module';
 import { AuthModule } from '../auth/auth.module';
 import { HuskyModule } from '../husky/husky.module';
+import { NotificationSettingsModule } from '../notification-settings/notification-settings.module';
 
 @Module({
   imports: [
@@ -14,7 +15,8 @@ import { HuskyModule } from '../husky/husky.module';
     AuthModule,
     OtpModule,
     ParticipantsRequestModule,
-    HuskyModule
+    HuskyModule,
+    NotificationSettingsModule,
   ],
   providers: [
     MembersService,
