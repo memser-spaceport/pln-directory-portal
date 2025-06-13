@@ -27,7 +27,7 @@ interface Member {
   }>;
 }
 
-export default function MembersWithNotificationsPage() {
+export default function MembersWithRecommendationsPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingRun, setIsCreatingRun] = useState<string | null>(null);
