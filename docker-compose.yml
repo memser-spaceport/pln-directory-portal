@@ -1,5 +1,22 @@
-version: '3.7'
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '${PORT}:3000'
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - oso_postgres
+      - redis
+      - redis-cache
+      - redis-queue
+      - mongodb
+    networks:
+      - pl-directory-backend
+
   postgres:
     image: postgres:13.8
     ports:
@@ -11,6 +28,8 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
+    networks:
+      - pl-directory-backend
 
   #OSO Postgres database
   oso_postgres:
@@ -24,6 +43,8 @@ services:
       POSTGRES_PASSWORD: ${OSO_DB_PASSWORD}
     volumes:
       - oso_db_data:/var/lib/postgresql/data
+    networks:
+      - pl-directory-backend
 
   redis:
     image: redis:7.0.5
@@ -35,6 +56,8 @@ services:
       REDIS_PORT: ${REDIS_PORT}
     volumes:
       - redis:/data
+    networks:
+      - pl-directory-backend
 
   redis-cache:
     image: redis:7.0.5
@@ -43,6 +66,8 @@ services:
       - '6359:6379'
     volumes:
       - redis_cache_data:/data
+    networks:
+      - pl-directory-backend
 
   redis-queue:
     image: redis:7.0.5
@@ -51,6 +76,8 @@ services:
       - '6399:6379'
     volumes:
       - redis_queue_data:/data
+    networks:
+      - pl-directory-backend
 
   mongodb:
     image: mongo:5.0
@@ -63,6 +90,8 @@ services:
       MONGO_INITDB_DATABASE: ${MONGO_DB_NAME}
     volumes:
       - mongodb_data:/data/db
+    networks:
+      - pl-directory-backend
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -72,6 +101,8 @@ services:
       - "6333:6333"
     volumes:
       - qdrant-storage:/qdrant/storage
+    networks:
+      - pl-directory-backend
 
 volumes:
   db_data:
@@ -86,3 +117,7 @@ volumes:
     driver: local
   qdrant-storage:
     driver: local
+
+networks:
+  pl-directory-backend:
+    driver: bridge
