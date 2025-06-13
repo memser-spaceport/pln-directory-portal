@@ -670,3 +670,87 @@ Return a valid JSON object with the following structure:
 - Action name should only be the name of the Member, Team, Project, or Event
 - Do not use call-to-action names for action names
 `;
+
+export const HUSKY_AUTO_BIO_SYSTEM_PROMPT = `
+Task: Write a concise, professional bio in HTML format based on the member's database profile and web search results.
+
+Instructions:
+1. Use web_search_preview tool to gather additional information about the member from:
+   - Professional social media (LinkedIn, Twitter, GitHub)
+   - News articles and press releases
+   - Professional websites and blogs
+   - Industry publications
+   - Conference talks or presentations
+
+   When using web_search_preview tool, provide specific search queries in the args parameter:
+   - Search for the member's name and current role
+   - Search for their professional achievements and contributions
+   - Search for their speaking engagements or publications
+   - Search for their company affiliations and projects
+
+2. Create a concise bio (2-6 sentences) that:
+   - Uses third-person perspective with appropriate gender pronouns (He/She)
+   - Focuses on current role and key expertise
+   - Maintains professional tone
+   - Avoids any source links or citations
+   - Integrates verified web information naturally
+   - Prioritizes LinkedIn details as the most authoritative source of professional information
+   - Ensures no LinkedIn experience is omitted, especially recent and relevant roles
+
+3. Structure:
+   - Start with current position and core expertise from LinkedIn
+   - Highlight key skills and significant project contributions
+   - Include relevant professional experience from LinkedIn
+   - End with current focus/objectives
+
+4. Content Priorities:
+   - LinkedIn experience and roles (highest priority)
+   - Current role and responsibilities
+   - Core skills and expertise
+   - Notable project contributions
+   - Professional interests and focus areas
+   - Avoid event participation unless it reveals professional interests
+
+5. HTML Formatting:
+   - Use <p> tags for each sentence
+   - Use <strong> for emphasis on key roles and skills
+   - Use <em> for highlighting current focus areas
+   - Maintain clean, semantic HTML structure
+
+Example: 
+<p><strong>John Smith</strong> is a Senior Software Engineer specializing in cloud architecture and distributed systems.</p>
+<p>With expertise in <strong>AWS</strong> and <strong>microservices</strong>, he leads the development of scalable infrastructure solutions.</p>
+<p>Currently focused on <em>implementing AI-driven automation in cloud deployments</em>.</p>
+
+Respond with the HTML-formatted bio only, no additional text or formatting.
+`;
+
+export const HUSKY_SKILLS_GENERATION_SYSTEM_PROMPT = `
+Task: Generate a list of relevant skills for a member based on their database profile and web search results.
+
+Instructions:
+1. Use web_search_preview tool to gather additional information about the member from:
+   - Professional social media (LinkedIn, Twitter, GitHub)
+   - News articles and press releases
+   - Professional websites and blogs
+   - Industry publications
+   - Conference talks or presentations
+
+2. Analyze the member's profile and web search results to identify relevant skills.
+
+3. Return ONLY an array of skill titles that:
+   - Match exactly with the provided list of available skills
+   - Are relevant to the member's experience and expertise
+   - Are supported by their profile data or web search results
+   - Are not already in their current skills list
+
+4. If no new relevant skills are found, return an empty array.
+
+5. Do not include any explanations or additional text, just the array of skill titles.
+
+Example Response:
+["AI", "Engineering", "Product"]
+
+Available Skills:
+{{availableSkills}}
+`;
