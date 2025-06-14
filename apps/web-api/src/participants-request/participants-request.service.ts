@@ -1,11 +1,11 @@
 /* eslint-disable prettier/prettier */
-import { 
-  BadRequestException, 
-  ConflictException, 
+import {
+  BadRequestException,
+  ConflictException,
   NotFoundException,
   Injectable,
   forwardRef,
-  Inject 
+  Inject
 } from '@nestjs/common';
 import { ApprovalStatus, ParticipantType } from '@prisma/client';
 import { Prisma, ParticipantsRequest, PrismaClient } from '@prisma/client';
@@ -18,6 +18,7 @@ import { NotificationService } from '../utils/notification/notification.service'
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { CacheService } from '../utils/cache/cache.service';
+import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 
 @Injectable()
 export class ParticipantsRequestService {
@@ -32,12 +33,13 @@ export class ParticipantsRequestService {
     private membersService: MembersService,
     @Inject(forwardRef(() => TeamsService))
     private teamsService: TeamsService,
+    private notificationSettingsService: NotificationSettingsService,
   ) { }
 
   /**
    * Find all participant requests based on the query.
    * Filters are dynamically applied based on the presence of query parameters.
-   * 
+   *
    * @param userQuery - The query object containing filtering options like participantType, status, etc.
    * @returns A promise that resolves with the filtered participant requests
    */
@@ -68,7 +70,7 @@ export class ParticipantsRequestService {
 
   /**
    * Add a new entry to the participants request table.
-   * 
+   *
    * @param tx - The transactional Prisma client
    * @param newEntry - The data for the new participants request entry
    * @returns A promise that resolves with the newly created entry
@@ -88,7 +90,7 @@ export class ParticipantsRequestService {
 
   /**
    * Find a single entry from the participants request table that matches the provided UID.
-   * 
+   *
    * @param uid - The UID of the participants request entry to be fetched
    * @returns A promise that resolves with the matching entry or null if not found
    */
@@ -197,14 +199,14 @@ export class ParticipantsRequestService {
 
   /**
    * Approves a participant request by UID, creating either a new member or a team based on the request type.
-   * 
+   *
    * 1. Validates and processes the new data in the participant request (either MEMBER or TEAM).
    * 2. Uses a transaction to:
    *    - Create a new member or team based on the `participantType`.
    *    - Update the participant request status to `APPROVED`.
    * 3. Sends a notification based on the type of participant (member or team) after creation.
    * 4. Resets the cache and triggers an Airtable synchronization.
-   * 
+   *
    * @param uidToApprove - The unique identifier of the participant request to approve.
    * @param participantsRequest - The participant request data containing details of the request.
    * @returns The updated participant request with the status set to `APPROVED`.
@@ -246,6 +248,7 @@ export class ParticipantsRequestService {
       );
 
       if (isVerified) {
+        await this.notificationSettingsService.enableRecommendationsFor([createdItem.uid]);
         await this.notificationService.notifyForOnboarding(createdItem.name, createdItem.email);
       }
     } else {
@@ -323,7 +326,7 @@ export class ParticipantsRequestService {
 
   /**
    * Extract unique identifier based on participant type.
-   * @param requestData 
+   * @param requestData
    * @returns string
    */
   getUniqueIdentifier(requestData): string {
@@ -334,8 +337,8 @@ export class ParticipantsRequestService {
 
   /**
    * Validate if the unique identifier already exists.
-   * @param participantType 
-   * @param uniqueIdentifier 
+   * @param participantType
+   * @param uniqueIdentifier
    * @throws BadRequestException if identifier already exists
    */
   async validateUniqueIdentifier(
@@ -354,7 +357,7 @@ export class ParticipantsRequestService {
 
   /**
    * Validate location for members or email for teams.
-   * @param requestData 
+   * @param requestData
    * @throws BadRequestException if validation fails
    */
   async validateParticipantRequest(requestData: any): Promise<void> {
@@ -370,7 +373,7 @@ export class ParticipantsRequestService {
 
   /**
    * Send notification based on the participant type.
-   * @param result 
+   * @param result
    */
   private notifyForCreate(result: any): void {
     if (result.participantType === ParticipantType.MEMBER.toString()) {
@@ -383,9 +386,9 @@ export class ParticipantsRequestService {
   /**
    * Handles database-related errors specifically for the Participant entity.
    * Logs the error and throws an appropriate HTTP exception based on the error type.
-   * 
+   *
    * @param {any} error - The error object thrown by Prisma or other services.
-   * @param {string} [message] - An optional message to provide additional context, 
+   * @param {string} [message] - An optional message to provide additional context,
    *                             such as the participant UID when an entity is not found.
    * @throws {ConflictException} - If there's a unique key constraint violation.
    * @throws {BadRequestException} - If there's a foreign key constraint violation or validation error.
