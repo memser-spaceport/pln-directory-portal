@@ -85,17 +85,23 @@ export class NotificationService {
    * @param memberEmailId The email address of the member being approved
    * @returns Sends an approval email to the member and posts a notification to Slack.
    */
-  async notifyForMemberCreationApproval(memberName: string, uid: string, memberEmailId: string) {
+  async notifyForMemberCreationApproval(memberName: string, uid: string, memberEmailId: string, isVerified: boolean) {
       const memberUrl = `${process.env.WEB_UI_BASE_URL}/members/${uid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`;
       const slackConfig = { requestLabel: 'New Labber Added', url: memberUrl, name: memberName };
       await this.awsService.sendEmail(
         'MemberCreated', true, [], 
         { memberName, memberUid: uid, adminSiteUrl: memberUrl }
       );
-      await this.awsService.sendEmail(
-        'NewMemberSuccess', false, [memberEmailId], 
-        { memberName, memberProfileLink: memberUrl }
-      );
+
+      if (isVerified) {
+        await this.notifyForOnboarding(memberName, memberEmailId);
+      } else {
+        await this.awsService.sendEmail(
+          'NewMemberSuccess', false, [memberEmailId], 
+          { memberName, memberProfileLink: memberUrl }
+        );
+      }
+
       await this.slackService.notifyToChannel(slackConfig);
   }
 

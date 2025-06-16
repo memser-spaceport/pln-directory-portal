@@ -244,12 +244,12 @@ export class ParticipantsRequestService {
       await this.notificationService.notifyForMemberCreationApproval(
         createdItem.name,
         createdItem.uid,
-        dataToProcess.requesterEmailId
+        dataToProcess.requesterEmailId,
+        isVerified
       );
 
       if (isVerified) {
         await this.notificationSettingsService.enableRecommendationsFor([createdItem.uid]);
-        await this.notificationService.notifyForOnboarding(createdItem.name, createdItem.email);
       }
     } else {
       await this.notificationService.notifyForTeamCreationApproval(
