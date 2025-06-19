@@ -11,7 +11,8 @@ export class HuskyGenerationController {
   @NoCache()
   @UseGuards(UserAccessTokenValidateGuard)
   async generateMemberBio(@Req() req) {
-    return await this.huskyAutoBioService.generateMemberBio(req?.userEmail);
+    const { bio } = await this.huskyAutoBioService.generateMemberBio(req?.userEmail);
+    return { bio: bio === '' ? 'Not enough data to generate bio. Please add more information to your profile.' : bio };
   }
 
   @Get('skills')
