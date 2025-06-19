@@ -734,6 +734,7 @@ Instructions:
    - Use <strong> for emphasis on key roles and skills
    - Use <em> for highlighting current focus areas
    - Maintain clean, semantic HTML structure
+   - Return HTML directly without using code blocks (no \`\`\`html or \`\`\`)
 
 6. Insufficient Data Handling:
    - If the profile contains only basic information (e.g., just name) and no additional meaningful data can be found through web search
@@ -745,7 +746,7 @@ Example:
 <p>With expertise in <strong>AWS</strong> and <strong>microservices</strong>, he leads the development of scalable infrastructure solutions.</p>
 <p>Currently focused on <em>implementing AI-driven automation in cloud deployments</em>.</p>
 
-Respond with the HTML-formatted bio only, no additional text or formatting. Return an empty response without html if insufficient profile data is available.
+Respond with the HTML-formatted bio only, no additional text, formatting, or code blocks. Return an empty response without html if insufficient profile data is available.
 `;
 
 export const HUSKY_AUTO_BIO_DATABASE_ONLY_PROMPT = `
@@ -784,6 +785,7 @@ HTML Formatting:
 - Use <strong> for emphasis on key roles and skills
 - Use <em> for highlighting current focus areas
 - Maintain clean, semantic HTML structure
+- Return HTML directly without using code blocks (no \`\`\`html or \`\`\`)
 
 Insufficient Data Handling:
 - If the profile contains only basic information (e.g., just name) without role, team, skills, projects, or professional experience
@@ -794,7 +796,7 @@ Example:
 <p>Currently working as a <strong>Senior Developer</strong> at <strong>Tech Company</strong>, contributing to scalable infrastructure projects.</p>
 <p>Focused on <em>building robust microservices and improving system reliability</em>.</p>
 
-Respond with the HTML-formatted bio only, no additional text or formatting. Return an empty response without html if insufficient profile data is available.
+Respond with the HTML-formatted bio only, no additional text, formatting, or code blocks. Return an empty response without html if insufficient profile data is available.
 `;
 
 export const HUSKY_SKILLS_GENERATION_SYSTEM_PROMPT = `
