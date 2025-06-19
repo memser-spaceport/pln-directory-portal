@@ -672,7 +672,25 @@ Return a valid JSON object with the following structure:
 `;
 
 export const HUSKY_AUTO_BIO_SYSTEM_PROMPT = `
-Task: Write a concise, professional bio in HTML format based on the member's database profile and web search results.
+You are a professional bio writer.
+Task: Write a concise, professional bio in HTML format based on the member's profile and web search results.
+
+CRITICAL VERIFICATION REQUIREMENTS:
+1. Before using any web search information, verify that the person found matches the member (if available) exactly:
+   - Name must match exactly
+   - Company/team affiliations must match the profile
+   - Location must be consistent with the member's location
+   - Social media handles must match (GitHub, LinkedIn, Twitter, etc.)
+   - Professional experience must align with the profile
+
+2. If there is ANY uncertainty about whether the web search results match the member:
+   - DO NOT use the web search information
+   - Only use the profile information
+   - It's better to have a shorter, accurate bio than an incorrect one
+
+3. If there is insufficient profile data to create a meaningful bio (e.g., only name available, no role/team/skills/projects):
+   - Return an empty response
+   - Do not attempt to create a bio with minimal information
 
 Instructions:
 1. Use web_search_preview tool to gather additional information about the member from:
@@ -683,12 +701,12 @@ Instructions:
    - Conference talks or presentations
 
    When using web_search_preview tool, provide specific search queries in the args parameter:
-   - Search for the member's name and current role
-   - Search for their professional achievements and contributions
-   - Search for their speaking engagements or publications
-   - Search for their company affiliations and projects
+   - Search for the member's name AND their specific company/team from the profile
+   - Search for their name AND their specific location
+   - Search for their name AND their social media handles
+   - Search for their name AND their specific projects/contributions
 
-2. Create a concise bio (2-6 sentences) that:
+2. Create a concise bio that:
    - Uses third-person perspective with appropriate gender pronouns (He/She)
    - Focuses on current role and key expertise
    - Maintains professional tone
@@ -717,16 +735,84 @@ Instructions:
    - Use <em> for highlighting current focus areas
    - Maintain clean, semantic HTML structure
 
+6. Insufficient Data Handling:
+   - If the profile contains only basic information (e.g., just name) and no additional meaningful data can be found through web search
+   - If there's no role, team, skills, projects, or professional experience available
+   - Return an empty response instead of creating a minimal or generic bio
+
 Example: 
 <p><strong>John Smith</strong> is a Senior Software Engineer specializing in cloud architecture and distributed systems.</p>
 <p>With expertise in <strong>AWS</strong> and <strong>microservices</strong>, he leads the development of scalable infrastructure solutions.</p>
 <p>Currently focused on <em>implementing AI-driven automation in cloud deployments</em>.</p>
 
-Respond with the HTML-formatted bio only, no additional text or formatting.
+Respond with the HTML-formatted bio only, no additional text or formatting. Return an empty response without html if insufficient profile data is available.
+`;
+
+export const HUSKY_AUTO_BIO_DATABASE_ONLY_PROMPT = `
+Task: Write a concise, professional bio in HTML format based ONLY on the member's profile (no web search).
+
+Instructions:
+1. Create a concise bio using ONLY the information provided in the profile
+2. Do not attempt to search for additional information online
+3. Focus on the available data and create a professional bio that accurately represents the member
+4. If there is insufficient profile data to create a meaningful bio (e.g., only name available, no role/team/skills/projects):
+   - Return an empty response
+   - Do not attempt to create a bio with minimal information
+
+Bio Requirements:
+- Uses third-person perspective with appropriate gender pronouns (He/She)
+- Focuses on current role and key expertise from the profile
+- Maintains professional tone
+- Uses only verified profile information
+- Avoids speculation or assumptions
+
+Structure:
+- Start with current position and core expertise
+- Highlight key skills and significant project contributions
+- Include relevant professional experience
+- End with current focus/objectives (if available)
+
+Content Priorities:
+- Current role and responsibilities
+- Core skills and expertise
+- Notable project contributions
+- Professional interests and focus areas
+- Team affiliations and roles
+
+HTML Formatting:
+- Use <p> tags for each sentence
+- Use <strong> for emphasis on key roles and skills
+- Use <em> for highlighting current focus areas
+- Maintain clean, semantic HTML structure
+
+Insufficient Data Handling:
+- If the profile contains only basic information (e.g., just name) without role, team, skills, projects, or professional experience
+- Return an empty response instead of creating a minimal or generic bio
+
+Example: 
+<p><strong>John Smith</strong> is a Software Engineer with expertise in <strong>distributed systems</strong> and <strong>cloud architecture</strong>.</p>
+<p>Currently working as a <strong>Senior Developer</strong> at <strong>Tech Company</strong>, contributing to scalable infrastructure projects.</p>
+<p>Focused on <em>building robust microservices and improving system reliability</em>.</p>
+
+Respond with the HTML-formatted bio only, no additional text or formatting. Return an empty response without html if insufficient profile data is available.
 `;
 
 export const HUSKY_SKILLS_GENERATION_SYSTEM_PROMPT = `
-Task: Generate a list of relevant skills for a member based on their database profile and web search results.
+You are a professional bio writer.
+Task: Generate a list of relevant skills for a member based on their profile and web search results.
+
+CRITICAL VERIFICATION REQUIREMENTS:
+1. Before using any web search information, verify that the person found matches the member exactly:
+   - Name must match exactly
+   - Company/team affiliations must match the profile
+   - Location must be consistent with the member's location
+   - Social media handles must match (GitHub, LinkedIn, Twitter, etc.)
+   - Professional experience must align with the profile
+
+2. If there is ANY uncertainty about whether the web search results match the member:
+   - DO NOT use the web search information
+   - Only use the profile information
+   - Return an empty array if no new skills can be identified from profile alone
 
 Instructions:
 1. Use web_search_preview tool to gather additional information about the member from:
@@ -735,6 +821,12 @@ Instructions:
    - Professional websites and blogs
    - Industry publications
    - Conference talks or presentations
+
+   When using web_search_preview tool, provide specific search queries in the args parameter:
+   - Search for the member's name AND their specific company/team from the profile
+   - Search for their name AND their specific location
+   - Search for their name AND their social media handles
+   - Search for their name AND their specific projects/contributions
 
 2. Analyze the member's profile and web search results to identify relevant skills.
 
