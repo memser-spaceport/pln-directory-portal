@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/Logo.svg';
 import { ReactComponent as LogOut } from '/public/assets/images/log-out.svg';
-import { PlayIcon, ClockIcon } from '@heroicons/react/solid';
+import { PlayIcon, ClockIcon, UserGroupIcon } from '@heroicons/react/solid';
 import { ROUTE_CONSTANTS } from '../utils/constants';
 import { removeToken } from '../utils/auth';
 import { useRouter } from 'next/router';
@@ -45,6 +45,16 @@ export function RecommendationsLayout({
           </div>
           {!!activeTab && (
             <ul className="flex space-x-4 text-sm text-gray-700">
+              <Link href={ROUTE_CONSTANTS.RECOMMENDATIONS_MEMBERS}>
+                <a
+                  className={`on-focus group flex items-center rounded-lg px-3 py-2.5 text-sm focus:text-slate-900 ${
+                    activeTab === 'members' ? 'text-[#1D4ED8]' : 'text-[#475569]'
+                  }`}
+                >
+                  <UserGroupIcon className="mr-2 h-5 w-5" />
+                  Opted-in
+                </a>
+              </Link>
               <Link href={ROUTE_CONSTANTS.RECOMMENDATIONS_RUNS}>
                 <a
                   className={`on-focus group flex items-center rounded-lg px-3 py-2.5 text-sm focus:text-slate-900 ${

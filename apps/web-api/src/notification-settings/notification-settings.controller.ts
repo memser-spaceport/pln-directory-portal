@@ -1,5 +1,17 @@
 import { ApiTags } from '@nestjs/swagger';
-import { Body, Controller, ForbiddenException, Get, Param, Patch, Put, Req, UseGuards, UsePipes } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException, forwardRef,
+  Get,
+  Inject,
+  Param,
+  Patch,
+  Put,
+  Req,
+  UseGuards,
+  UsePipes
+} from '@nestjs/common';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { NotificationSettingsService } from './notification-settings.service';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
@@ -17,6 +29,7 @@ import { ZodValidationPipe } from '@abitia/zod-dto';
 export class NotificationSettingsController {
   constructor(
     private notificationSettingsService: NotificationSettingsService,
+    @Inject(forwardRef(() => MembersService))
     private memberService: MembersService
   ) {}
 

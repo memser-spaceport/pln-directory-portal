@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import * as path from 'path';
 import { AwsService } from '../aws/aws.service';
 import { SlackService } from '../slack/slack.service';
-import { getRandomId } from '../helper/helper';
+import { getRandomId, isEmails } from '../helper/helper';
+import { ONBOARDING_SUBJECT } from '../constants';
 
 @Injectable()
 export class NotificationService {
@@ -83,17 +85,23 @@ export class NotificationService {
    * @param memberEmailId The email address of the member being approved
    * @returns Sends an approval email to the member and posts a notification to Slack.
    */
-  async notifyForMemberCreationApproval(memberName: string, uid: string, memberEmailId: string) {
+  async notifyForMemberCreationApproval(memberName: string, uid: string, memberEmailId: string, isVerified: boolean) {
       const memberUrl = `${process.env.WEB_UI_BASE_URL}/members/${uid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`;
       const slackConfig = { requestLabel: 'New Labber Added', url: memberUrl, name: memberName };
       await this.awsService.sendEmail(
         'MemberCreated', true, [], 
         { memberName, memberUid: uid, adminSiteUrl: memberUrl }
       );
-      await this.awsService.sendEmail(
-        'NewMemberSuccess', false, [memberEmailId], 
-        { memberName, memberProfileLink: memberUrl }
-      );
+
+      if (isVerified) {
+        await this.notifyForOnboarding(memberName, memberEmailId);
+      } else {
+        await this.awsService.sendEmail(
+          'NewMemberSuccess', false, [memberEmailId], 
+          { memberName, memberProfileLink: memberUrl }
+        );
+      }
+
       await this.slackService.notifyToChannel(slackConfig);
   }
 
@@ -174,5 +182,37 @@ export class NotificationService {
         { teamName, memberProfileLink: teamUrl }
     );
     await this.slackService.notifyToChannel(slackConfig);
+  }
+
+  /**
+   * This method sends notifications for onboarding.
+   * @param memberName The name of the member being onboarded
+   * @param memberEmailId The email address of the member being onboarded
+   * @returns Sends an email to the member with the onboarding link.
+   */
+  async notifyForOnboarding(memberName: string, memberEmailId: string) {
+    const memberUrl = `${process.env.WEB_UI_BASE_URL}/?loginFlow=onboarding&prefillEmail=${encodeURIComponent(memberEmailId)}`;
+    await this.awsService.sendEmailWithTemplate(
+      path.join(__dirname, '/shared/onboarding.hbs'),
+      {
+        name: memberName,
+        onboarding_link: memberUrl,
+        from: 'La Christa Eccles',
+      },
+      '',
+      ONBOARDING_SUBJECT,
+      process.env.SES_SOURCE_EMAIL || '',
+      [memberEmailId],
+      [],
+      this.getSupportEmail(),
+      true
+    );
+  }
+
+  private getSupportEmail(): string | undefined {
+    const supportEmails = process.env.SUPPORT_EMAILS?.split(',') ?? [];
+    if (isEmails(supportEmails)) {
+      return supportEmails[0];
+    }
   }
 }

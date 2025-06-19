@@ -46,6 +46,7 @@ export const ROUTE_CONSTANTS = {
   MEMBER_VIEW: APP_CONSTANTS.SLASH + 'member-view',
   RECOMMENDATIONS_RUNS: APP_CONSTANTS.SLASH + 'recommendations/runs',
   RECOMMENDATIONS_HISTORY: APP_CONSTANTS.SLASH + 'recommendations/history',
+  RECOMMENDATIONS_MEMBERS: APP_CONSTANTS.SLASH + 'recommendations/members',
   INTERNAL_SERVER_ERROR: APP_CONSTANTS.SLASH + 'internal-server-error',
 };
 

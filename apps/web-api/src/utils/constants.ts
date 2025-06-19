@@ -61,6 +61,8 @@ export const DIRECTORYADMIN = 'DIRECTORYADMIN';
 
 export const JOIN_NOW_SUBJECT = 'A request to be a part of network';
 
+export const ONBOARDING_SUBJECT = 'Complete your profile on Protocol Lab’s LabOS';
+
 export const ASK_QUESTION = 'Ask a Question';
 export const FEEDBACK = 'Give Feedback';
 export const SHARE_IDEA = 'Share an Idea';
@@ -201,7 +203,7 @@ export const ANALYTICS_EVENTS = {
   }
 };
 
-export const ANALYTICS_SOURCE = 'directory-portal';
+export const ANALYTICS_SOURCE = 'directory-backend';
 
 export const ANALYTICS_PROVIDER = {
   POSTHOG: 'posthog',

@@ -9,10 +9,12 @@ import { HuskyThreadsController } from './husky-threads.controller';
 import { PrismaService } from '../shared/prisma.service';
 import { HuskyRevalidationService } from './husky-revalidation.service';
 import { HuskyAiToolsModule } from './tools/husky-ai-tools.module';
+import { HuskyGenerationService } from './husky-generation.service';
+import { HuskyGenerationController } from './husky-generation.controller';
 @Module({
-  controllers: [HuskyChatsController, HuskyThreadsController],
-  providers: [HuskyService, HuskyAiService, RedisCacheDbService, QdrantVectorDbService, MongoPersistantDbService, PrismaService, HuskyRevalidationService],
+  controllers: [HuskyChatsController, HuskyThreadsController, HuskyGenerationController],
+  providers: [HuskyService, HuskyAiService, RedisCacheDbService, QdrantVectorDbService, MongoPersistantDbService, PrismaService, HuskyRevalidationService, HuskyGenerationService],
   imports: [HuskyAiToolsModule],
-  exports: [HuskyService, HuskyAiService, RedisCacheDbService, QdrantVectorDbService, MongoPersistantDbService, HuskyRevalidationService],
+  exports: [HuskyService, HuskyAiService, RedisCacheDbService, QdrantVectorDbService, MongoPersistantDbService, HuskyRevalidationService, HuskyGenerationService,],
 })
 export class HuskyModule {}

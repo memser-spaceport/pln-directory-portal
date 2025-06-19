@@ -10,6 +10,11 @@ export const NotificationSettingsResponseSchema = z.object({
   byFocusArea: z.boolean(),
   byRole: z.boolean(),
   byFundingStage: z.boolean(),
+  byIndustryTag: z.boolean(),
+  focusAreaList: z.array(z.string()),
+  roleList: z.array(z.string()),
+  fundingStageList: z.array(z.string()),
+  industryTagList: z.array(z.string()),
 });
 
 export const UpdateNotificationSettingsSchema = z.object({
@@ -19,6 +24,11 @@ export const UpdateNotificationSettingsSchema = z.object({
   byFocusArea: z.boolean().optional(),
   byRole: z.boolean().optional(),
   byFundingStage: z.boolean().optional(),
+  byIndustryTag: z.boolean().optional(),
+  focusAreaList: z.array(z.string()).optional(),
+  roleList: z.array(z.string()).optional(),
+  fundingStageList: z.array(z.string()).optional(),
+  industryTagList: z.array(z.string()).optional(),
 });
 
 export const UpdateParticipationSchema = z.object({
