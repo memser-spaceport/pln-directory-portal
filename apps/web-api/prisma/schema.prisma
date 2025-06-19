@@ -734,4 +734,9 @@ model NotificationSetting {
   byFocusArea            Boolean           @default(true)
   byRole                 Boolean           @default(true)
   byFundingStage         Boolean           @default(true)
+  byIndustryTag          Boolean           @default(true)
+  focusAreaList          String[]          @default([])
+  roleList               String[]          @default([])
+  fundingStageList       String[]          @default([])
+  industryTagList        String[]          @default([])
 }
