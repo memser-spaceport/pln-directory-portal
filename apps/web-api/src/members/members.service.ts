@@ -25,6 +25,7 @@ import { hashFileName } from '../utils/hashing';
 import { copyObj, buildMultiRelationMapping } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { MembersHooksService } from './members.hooks.service';
+import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 
 @Injectable()
 export class MembersService {
@@ -41,6 +42,8 @@ export class MembersService {
     private notificationService: NotificationService,
     private cacheService: CacheService,
     private membersHooksService: MembersHooksService,
+    @Inject(forwardRef(() => NotificationSettingsService))
+    private notificationSettingsService: NotificationSettingsService
   ) { }
 
   /**
@@ -1179,6 +1182,10 @@ export class MembersService {
       if (result.count !== memberIds.length) {
         throw new NotFoundException('One or more member IDs are invalid.');
       }
+
+      // enables recommendation feature for new users
+      await this.notificationSettingsService.enableRecommendationsFor(memberIds);
+
       const members = await tx.member.findMany({
         where: { uid: { in: memberIds } }
       })

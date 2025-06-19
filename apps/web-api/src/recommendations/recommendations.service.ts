@@ -498,6 +498,41 @@ export class RecommendationsService {
     });
   }
 
+  async getMembersWithEnabledRecommendations() {
+    return this.prisma.member.findMany({
+      where: {
+        notificationSetting: {
+          recommendationsEnabled: true,
+        },
+      },
+      include: {
+        notificationSetting: true,
+        image: true,
+        teamMemberRoles: {
+          include: {
+            team: {
+              include: {
+                logo: true,
+              },
+            },
+          },
+        },
+        recommendationRunsAsTarget: {
+          include: {
+            recommendations: {
+              include: {
+                recommendedMember: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
+      },
+    });
+  }
+
   private getSupportEmail(): string | undefined {
     const supportEmails = process.env.SUPPORT_EMAILS?.split(',') ?? [];
     if (isEmails(supportEmails)) {

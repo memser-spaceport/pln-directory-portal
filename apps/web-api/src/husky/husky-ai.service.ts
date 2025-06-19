@@ -3,7 +3,7 @@ import { QdrantVectorDbService } from './db/qdrant-vector-db.service';
 import { RedisCacheDbService } from './db/redis-cache-db.service';
 import { MongoPersistantDbService } from './db/mongo-persistant-db.service';
 import { LogService } from '../shared/log.service';
-import { embed, generateObject, generateText, streamObject, streamText } from 'ai';
+import { embed, generateObject, generateText, LanguageModel, streamObject, streamText } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { HuskyResponseSchema, HuskyChatInterface, HuskyRephraseQuestionSchema, HuskyResponseContextSchema } from 'libs/contracts/src/schema/husky-chat';
 import {
@@ -54,7 +54,7 @@ export class HuskyAiService {
 
         let toolResults = '';
         const { textStream } = streamText({
-          model: openai(process.env.OPENAI_LLM_MODEL || ''),
+          model: openai(process.env.OPENAI_LLM_MODEL || '') as LanguageModel,
           system: HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT,
           tools: this.huskyAiToolsService.getTools(isLoggedIn),
           prompt: `
@@ -85,7 +85,7 @@ export class HuskyAiService {
 
         // Get and stream the structured data
         const objectStream = streamObject({
-          model: openai(process.env.OPENAI_LLM_MODEL || ''),
+          model: openai(process.env.OPENAI_LLM_MODEL || '') as LanguageModel,
           schema: HuskyResponseContextSchema,
           system: HUSKY_CONTEXTUAL_TOOLS_STRUCTURED_PROMPT,
           prompt: `
@@ -160,7 +160,7 @@ export class HuskyAiService {
     // Handle the case when there is no context
     if (context === '') {
       return streamObject({
-        model: openai(process.env.OPENAI_LLM_MODEL || ''),
+        model: openai(process.env.OPENAI_LLM_MODEL || '') as LanguageModel,
         schema: HuskyResponseSchema,
         temperature: 0.001,
         prompt: HUSKY_NO_INFO_PROMPT,
@@ -181,7 +181,7 @@ export class HuskyAiService {
     // If Context is valid, then create prompt and stream the response
     const chatSummaryFromDb = await this.huskyCacheDbService.get(`${threadId}:summary`);
     return streamObject({
-      model: openai(process.env.OPENAI_LLM_MODEL || ''),
+      model: openai(process.env.OPENAI_LLM_MODEL || '') as LanguageModel,
       schema: HuskyResponseSchema,
       system: CONTEXTUAL_SYSTEM_PROMPT,
       prompt: `
@@ -363,7 +363,7 @@ export class HuskyAiService {
     const chatHistory = await this.huskyCacheDbService.get(`${threadId}:summary`);
     if (chatHistory) {
       const { object } = await generateObject({
-        model: openai(process.env.OPENAI_LLM_MODEL || ''),
+        model: openai(process.env.OPENAI_LLM_MODEL || '') as LanguageModel,
         schema: HuskyRephraseQuestionSchema,
         system: REPHRASE_QUESTION_SYSTEM_PROMPT,
         prompt: `
@@ -395,7 +395,7 @@ export class HuskyAiService {
       : Handlebars.compile(HUSKY_CHAT_SUMMARY_SYSTEM_PROMPT)({ previousChatHistory: '', question: rawChatHistory.user, response: rawChatHistory.system, maxLength });
 
     const { text } = await generateText({
-      model: openai(process.env.OPENAI_LLM_MODEL || ''),
+      model: openai(process.env.OPENAI_LLM_MODEL || '') as LanguageModel,
       prompt: aiPrompt,
     });
     await this.huskyCacheDbService.set(`${chatId}:summary`, text);
@@ -554,7 +554,7 @@ export class HuskyAiService {
       question: question,
     });
     const { text } = await generateText({
-      model: openai(process.env.OPENAI_LLM_MODEL || ''),
+      model: openai(process.env.OPENAI_LLM_MODEL || '') as LanguageModel,
       prompt: prompt,
     });
     const createdTitle = text || '';

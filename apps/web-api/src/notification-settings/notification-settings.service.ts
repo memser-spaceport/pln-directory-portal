@@ -70,4 +70,25 @@ export class NotificationSettingsService {
       },
     });
   }
+
+  async enableRecommendationsFor(memberUids: string[]) {
+    try {
+      await this.prisma.$transaction(
+        memberUids.map((uid) =>
+          this.prisma.notificationSetting.upsert({
+            where: { memberUid: uid },
+            update: {
+              recommendationsEnabled: true,
+            },
+            create: {
+              memberUid: uid,
+              recommendationsEnabled: true,
+            },
+          })
+        )
+      );
+    } catch (err) {
+      this.logger.error(`The recommendations weren't enabled for ${memberUids.join(', ')}`, err);
+    }
+  }
 }
