@@ -190,7 +190,7 @@ export class TeamsService {
    */
   async createTeam(
    team: Prisma.TeamUncheckedCreateInput,
-   tx: Prisma.TransactionClient, 
+   tx: Prisma.TransactionClient,
    requestorEmail: string): Promise<Team> {
     try {
       const createdTeam = await tx.team.create({
@@ -247,11 +247,13 @@ export class TeamsService {
     const updatedTeam: any = teamParticipantRequest.newData;
     const existingTeam = await this.findTeamByUid(teamUid);
     let result;
+    this.logger.info(`Going to update information about the '${teamUid}' team`);
     await this.prisma.$transaction(async (tx) => {
       const team = await this.formatTeam(teamUid, updatedTeam, tx, 'Update');
       result = await this.updateTeamByUid(teamUid, team, tx, requestorEmail);
       const toAdd: any[] = [];
-      const toDelete: any[] = [];
+      const toDelete: { teamUid: string; memberUid: string }[] = [];
+      this.logger.info(`Team data roles to update: ${JSON.stringify(updatedTeam.teamMemberRoles)}`);
       if (updatedTeam?.teamMemberRoles?.length > 0) {
         for (const teamMemberRole of updatedTeam.teamMemberRoles) {
           const updatedRole = { ...teamMemberRole };
@@ -278,11 +280,12 @@ export class TeamsService {
         await this.addNewTeamMemberRoleEntry(toAdd, tx);
       }
       if (!isEmpty(toDelete)) {
+        this.logger.info(`Going to delete members ${toDelete.map((r) => r.memberUid).join(', ')} from the ${teamUid}`);
         await this.deleteTeamMemberRoleEntry(toDelete, tx);
       }
       await this.logParticipantRequest(requestorEmail, updatedTeam, existingTeam.uid, tx);
     });
-    this.notificationService.notifyForTeamEditApproval(updatedTeam.name, teamUid, requestorEmail);
+    await this.notificationService.notifyForTeamEditApproval(updatedTeam.name, teamUid, requestorEmail);
     return result;
   }
 
@@ -308,10 +311,16 @@ export class TeamsService {
    * @param teamAndRoles - Array of objects containing `memberUid` and `teamUid` pairs to delete.
    * @param tx - Prisma transaction client for atomic execution.
    */
-  private async deleteTeamMemberRoleEntry(teamAndRoles: any[], tx: Prisma.TransactionClient) {
+  private async deleteTeamMemberRoleEntry(
+    teamAndRoles: { teamUid: string; memberUid: string }[],
+    tx: Prisma.TransactionClient
+  ) {
     await tx.teamMemberRole.deleteMany({
       where: {
-        OR: teamAndRoles
+        OR: teamAndRoles.map((role) => ({
+          teamUid: role.teamUid,
+          memberUid: role.memberUid,
+        })),
       },
     });
   }
