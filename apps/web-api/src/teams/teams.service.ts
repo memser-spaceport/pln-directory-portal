@@ -247,7 +247,7 @@ export class TeamsService {
     const updatedTeam: any = teamParticipantRequest.newData;
     const existingTeam = await this.findTeamByUid(teamUid);
     let result;
-    this.logger.info(`Going to update information about the '${existingTeam.uid}' team`);
+    this.logger.info(`Going to update information about the '${teamUid}' team`);
     await this.prisma.$transaction(async (tx) => {
       const team = await this.formatTeam(teamUid, updatedTeam, tx, 'Update');
       result = await this.updateTeamByUid(teamUid, team, tx, requestorEmail);
@@ -280,7 +280,7 @@ export class TeamsService {
         await this.addNewTeamMemberRoleEntry(toAdd, tx);
       }
       if (!isEmpty(toDelete)) {
-        this.logger.info(`Going to delete members ${toDelete.map((r) => r.memberUid).join(', ')} from the ${team.uid}`);
+        this.logger.info(`Going to delete members ${toDelete.map((r) => r.memberUid).join(', ')} from the ${teamUid}`);
         await this.deleteTeamMemberRoleEntry(toDelete, tx);
       }
       await this.logParticipantRequest(requestorEmail, updatedTeam, existingTeam.uid, tx);
