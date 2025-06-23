@@ -724,19 +724,23 @@ model RecommendationNotification {
 }
 
 model NotificationSetting {
-  id                     Int               @id @default(autoincrement())
-  memberUid              String            @unique
-  member                 Member            @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
-  recommendationsEnabled Boolean           @default(false)
-  subscribed             Boolean           @default(false)
-  showInvitationDialog   Boolean           @default(true)
-  emailFrequency         Int               @default(14)
-  byFocusArea            Boolean           @default(true)
-  byRole                 Boolean           @default(true)
-  byFundingStage         Boolean           @default(true)
-  byIndustryTag          Boolean           @default(true)
-  focusAreaList          String[]          @default([])
-  roleList               String[]          @default([])
-  fundingStageList       String[]          @default([])
-  industryTagList        String[]          @default([])
+  id                     Int      @id @default(autoincrement())
+  memberUid              String   @unique
+  member                 Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  recommendationsEnabled Boolean  @default(false)
+  subscribed             Boolean  @default(false)
+  showInvitationDialog   Boolean  @default(true)
+  emailFrequency         Int      @default(14)
+  byFocusArea            Boolean  @default(true)
+  byRole                 Boolean  @default(true)
+  byFundingStage         Boolean  @default(true)
+  byIndustryTag          Boolean  @default(true)
+  byTechnology           Boolean  @default(true)
+  byKeyword              Boolean  @default(true)
+  focusAreaList          String[] @default([])
+  roleList               String[] @default([])
+  fundingStageList       String[] @default([])
+  industryTagList        String[] @default([])
+  technologyList         String[] @default([])
+  keywordList            String[] @default([])
 }

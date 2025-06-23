@@ -25,10 +25,14 @@ export const UpdateNotificationSettingsSchema = z.object({
   byRole: z.boolean().optional(),
   byFundingStage: z.boolean().optional(),
   byIndustryTag: z.boolean().optional(),
+  byTechnology: z.boolean().optional(),
+  byKeyword: z.boolean().optional(),
   focusAreaList: z.array(z.string()).optional(),
   roleList: z.array(z.string()).optional(),
   fundingStageList: z.array(z.string()).optional(),
   industryTagList: z.array(z.string()).optional(),
+  technologyList: z.array(z.string()).optional(),
+  keywordList: z.array(z.string()).optional(),
 });
 
 export const UpdateParticipationSchema = z.object({
