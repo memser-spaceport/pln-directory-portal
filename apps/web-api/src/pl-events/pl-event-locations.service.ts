@@ -608,12 +608,33 @@ export class PLEventLocationsService {
    * Creates a new event location.
    *
    * @param location The location data to be created.
-   * @returns The created location object.
+   * @returns The created location object or existing location if found within deviation.
    * @throws {Error} - If an error occurs during the creation process, it will be passed to the `handleErrors` method.
    */
   async createPLEventLocation(location: Prisma.PLEventLocationUncheckedCreateInput) {
     try {
       this.logger.info(`location data : , ${location}`);
+      
+      // First, check if a location with the same city name exists
+      const existingLocation = await this.prisma.pLEventLocation.findFirst({
+        where: {
+          location: location.location
+        }
+      });
+
+      if (existingLocation) {
+        // Calculate the deviation between existing and new coordinates
+        const latitudeDeviation = Math.abs(parseFloat(existingLocation.latitude) - parseFloat(location.latitude));
+        const longitudeDeviation = Math.abs(parseFloat(existingLocation.longitude) - parseFloat(location.longitude));
+
+        // Check if deviation is within provided degrees
+        if (latitudeDeviation <= Number(process.env.ALLOWED_LATITUDE_DEVIATION || 2) && longitudeDeviation <= Number(process.env.ALLOWED_LONGITUDE_DEVIATION || 2)) {
+          this.logger.info(`Location already exists with similar coordinates. City: ${location.location}, Existing: (${existingLocation.latitude}, ${existingLocation.longitude})`);
+          return existingLocation;
+        }
+      }
+
+      // If no existing location found or deviation is greater than 2 degrees, create new location
       const createdLocation = await this.prisma.pLEventLocation.create({
         data: location
       });
