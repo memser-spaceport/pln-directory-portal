@@ -40,7 +40,7 @@ export class EventsService {
   async createEventLocation(event) {
     try {
       const eventLocationName = event?.address_info?.city || event?.address_info?.country;
-      await this.locationService.createPLEventLocation({ location: eventLocationName.toLowerCase(), timezone: event?.timezone, latitude: event?.address_info?.latitude, longitude: event?.address_info?.longitude });
+      await this.locationService.createPLEventLocation({ location: eventLocationName.toLowerCase(), timezone: event?.timezone, latitude: Number(event?.address_info?.latitude).toFixed(2), longitude: Number(event?.address_info?.longitude).toFixed(2), country: event?.address_info?.country });
     } catch (error) {
       throw error;
     }
