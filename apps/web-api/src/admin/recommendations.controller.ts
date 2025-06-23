@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { RecommendationsService } from '../recommendations/recommendations.service';
+import { RecommendationsJob } from '../recommendations/recommendations.job';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import {
   CreateRecommendationRunRequest,
@@ -13,7 +14,10 @@ import {
 @UseGuards(AdminAuthGuard)
 @NoCache()
 export class RecommendationsController {
-  constructor(private readonly recommendationsService: RecommendationsService) {}
+  constructor(
+    private readonly recommendationsService: RecommendationsService,
+    private readonly recommendationsJob: RecommendationsJob
+  ) {}
 
   @Post('runs')
   @NoCache()
@@ -71,5 +75,12 @@ export class RecommendationsController {
   @NoCache()
   async getMembersWithEnabledRecommendations() {
     return this.recommendationsService.getMembersWithEnabledRecommendations();
+  }
+
+  @Post('trigger-job')
+  @NoCache()
+  async triggerJob() {
+    await this.recommendationsJob.triggerRecommendations();
+    return { message: 'Recommendations job triggered successfully' };
   }
 }
