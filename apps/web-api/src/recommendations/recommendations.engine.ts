@@ -24,7 +24,7 @@ const SCORES = {
   MATCHING_ROLE: 5,
   MATCHING_TECHNOLOGY: 1,
   MATCHING_INDUSTRY_TAG: 5,
-  MATCHING_KEYWORD: 5,
+  MATCHING_KEYWORD: 10,
   HAS_OFFICE_HOURS: 1,
   NO_OFFICE_HOURS: 0,
   JOIN_DATE: {
@@ -248,7 +248,11 @@ export class RecommendationsEngine {
           : 0,
 
       teamKeyword:
-        config.includeKeywords && settings.byKeyword ? (matchedKeywords.length > 0 ? SCORES.MATCHING_KEYWORD : 0) : 0,
+        config.includeKeywords && settings.byKeyword
+          ? matchedKeywords.length > 0
+            ? SCORES.MATCHING_KEYWORD * matchedKeywords.length
+            : 0
+          : 0,
 
       hasOfficeHours: member.officeHours ? SCORES.HAS_OFFICE_HOURS : SCORES.NO_OFFICE_HOURS,
 
@@ -462,13 +466,14 @@ export class RecommendationsEngine {
       });
     });
 
-    // Search in team descriptions and asks
+    // Search in team descriptions, asks, and industry tags
     member.teamMemberRoles.forEach((role) => {
       const team = role.team;
       const teamText = [
         team.shortDescription,
         team.longDescription,
         ...team.asks.map((ask) => `${ask.title} ${ask.description}`),
+        ...team.industryTags.map((tag) => tag.title),
       ]
         .filter(Boolean)
         .join(' ')
