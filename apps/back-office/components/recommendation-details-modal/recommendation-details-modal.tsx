@@ -103,10 +103,8 @@ export function RecommendationDetailsModal({ isOpen, onClose, notification }: Re
                             Matches:{' '}
                             {[
                               recommendation.factors.roleMatch && 'Role Match',
-                              recommendation.factors.teamFocusArea && 'Team Focus Area',
                               recommendation.factors.teamFundingStage && 'Team Funding Stage',
                               recommendation.factors.teamTechnology && 'Team Technology',
-                              recommendation.factors.teamIndustryTag && 'Team Industry Tag',
                             ]
                               .filter(Boolean)
                               .join(', ')}

@@ -259,7 +259,11 @@ export class RecommendationsService {
       throw new BadRequestException('No email address available to send recommendations');
     }
 
-    await this.sendRecommendationEmail(emailData, toEmail, sendDto.emailSubject);
+    if (sendDto.isExample) {
+      await this.sendExampleRecommendationEmail(emailData, toEmail, sendDto.emailSubject);
+    } else {
+      await this.sendRecommendationEmail(emailData, toEmail, sendDto.emailSubject);
+    }
 
     await this.prisma.recommendationNotification.create({
       data: {
@@ -267,6 +271,7 @@ export class RecommendationsService {
         targetMemberUid: run.targetMemberUid,
         email: toEmail,
         subject: sendDto.emailSubject,
+        isExample: sendDto.isExample,
         recommendations: {
           connect: approvedRecommendations.map((rec) => ({ uid: rec.uid })),
         },
@@ -434,6 +439,22 @@ export class RecommendationsService {
     this.logger.info(`Recommendations email sent to ${toEmail} ref: ${result?.MessageId}`);
   }
 
+  private async sendExampleRecommendationEmail(emailData: any, toEmail: string, subject: string): Promise<void> {
+    const result = await this.awsService.sendEmailWithTemplate(
+      path.join(__dirname, '/shared/recommendedMembersExample.hbs'),
+      emailData,
+      '',
+      subject,
+      process.env.SES_SOURCE_EMAIL || '',
+      [toEmail],
+      [],
+      this.supportEmail,
+      true
+    );
+
+    this.logger.info(`Example recommendations email sent to ${toEmail} ref: ${result?.MessageId}`);
+  }
+
   private async generateRecommendations(
     targetMemberUid: string,
     count: number,
@@ -591,7 +612,6 @@ export class RecommendationsService {
     return this.prisma.member.findMany({
       where: {
         notificationSetting: {
-          recommendationsEnabled: true,
           subscribed: true,
         },
       },
