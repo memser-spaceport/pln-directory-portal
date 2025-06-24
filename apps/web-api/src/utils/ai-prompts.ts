@@ -868,9 +868,9 @@ Guidelines:
 - Make it sound like a natural introduction a colleague might make
 
 Examples:
-- "You're both working on AI infrastructure projects and at similar funding stages."
-- "You share expertise in blockchain technologies and are focused on similar problem areas."
-- "You're both building in the Web3 space and working with complementary technologies."
+- You're both working on AI infrastructure projects and at similar funding stages.
+- You share expertise in blockchain technologies and are focused on similar problem areas.
+- You're both building in the Web3 space and working with complementary technologies.
 
 Available matching factors:
 - Technologies

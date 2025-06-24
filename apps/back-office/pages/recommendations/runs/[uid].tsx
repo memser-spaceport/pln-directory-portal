@@ -335,27 +335,12 @@ export default function RecommendationRunViewPage() {
                             )}
                             <li>
                               {renderMatch(
-                                'Team Focus Area',
-                                recommendation.factors.teamFocusArea,
-                                recommendation.factors.matchedFocusAreas
-                              )}
-                            </li>
-                            <li>
-                              {renderMatch(
                                 'Team Technology',
                                 recommendation.factors.teamTechnology,
                                 recommendation.factors.matchedTechnologies
                               )}
                             </li>
-                            <li>
-                              {renderMatch(
-                                'Team Industry Tag',
-                                recommendation.factors.teamIndustryTag,
-                                recommendation.factors.matchedIndustryTags
-                              )}
-                            </li>
                             <li>{renderMatch('Team Funding Stage', recommendation.factors.teamFundingStage)}</li>
-                            {renderMatch('Has Office Hours', recommendation.factors.hasOfficeHours)}
                           </ul>
                         </div>
                       </div>

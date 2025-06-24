@@ -43,6 +43,34 @@ export class RecommendationsJob {
 
       for (const member of membersWithRecommendationsEnabled) {
         try {
+          if (!member.notificationSetting?.exampleSent) {
+            // Send example recommendations for members who haven't received them yet
+            const createDto: CreateRecommendationRunRequest = {
+              targetMemberUid: member.uid,
+            };
+
+            const recommendationRun = await this.recommendationsService.createRecommendationRun(createDto, allMembers);
+
+            if (recommendationRun.recommendations.length > 0) {
+              await this.recommendationsService.sendRecommendations(recommendationRun.uid, {
+                approvedRecommendationUids: recommendationRun.recommendations.map((r) => r.uid),
+                email: member.email ?? undefined,
+                emailSubject: '[Action required] Your Recommended Connections from PL Network',
+                isExample: true,
+              });
+
+              // Mark example as sent
+              await this.prisma.notificationSetting.update({
+                where: { memberUid: member.uid },
+                data: { exampleSent: true },
+              });
+            }
+
+            this.logger.info(`Successfully sent example recommendations for member ${member.uid} (${member.name})`);
+            successCount++;
+            continue;
+          }
+
           const recentRun = await this.prisma.recommendationNotification.findFirst({
             where: {
               targetMemberUid: member.uid,

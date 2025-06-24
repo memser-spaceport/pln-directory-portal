@@ -717,6 +717,7 @@ model RecommendationNotification {
   targetMemberUid      String
   email                String
   subject              String
+  isExample            Boolean           @default(false)
   recommendations      Recommendation[]  @relation("NotificationRecommendations")
   sentAt               DateTime          @default(now())
   createdAt            DateTime          @default(now())
@@ -729,6 +730,7 @@ model NotificationSetting {
   member                 Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
   recommendationsEnabled Boolean  @default(false)
   subscribed             Boolean  @default(false)
+  exampleSent            Boolean  @default(false)
   showInvitationDialog   Boolean  @default(true)
   emailFrequency         Int      @default(14)
   byFocusArea            Boolean  @default(true)

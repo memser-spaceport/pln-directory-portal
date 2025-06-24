@@ -120,10 +120,10 @@ export class RecommendationsEngine {
       filteredMembers = filteredMembers.filter(
         (member) =>
           !member.experiences.some((experience) =>
-            config.skipTeamNames!.some((skipName) => experience.company.toLowerCase().includes(skipName.toLowerCase()))
+            config.skipTeamNames?.some((skipName) => experience.company.toLowerCase().includes(skipName.toLowerCase()))
           ) &&
           !member.teamMemberRoles.some((role) =>
-            config.skipTeamNames!.some((skipName) => role.team?.name?.toLowerCase().includes(skipName.toLowerCase()))
+            config.skipTeamNames?.some((skipName) => role.team?.name?.toLowerCase().includes(skipName.toLowerCase()))
           )
       );
     }
@@ -134,7 +134,7 @@ export class RecommendationsEngine {
         (member) =>
           !member.teamMemberRoles.some((role) =>
             role.team?.industryTags?.some((tag) =>
-              config.skipIndustryTags!.some((skipTag) => tag.title.toLowerCase().includes(skipTag.toLowerCase()))
+              config.skipIndustryTags?.some((skipTag) => tag.title.toLowerCase().includes(skipTag.toLowerCase()))
             )
           )
       );
@@ -161,8 +161,20 @@ export class RecommendationsEngine {
     config: RecommendationConfig,
     notificationSetting?: NotificationSetting
   ): RecommendationScore {
-    // Use notification settings with defaults if not provided
-    const settings = {
+    const settings = this.getNotificationSettings(notificationSetting);
+    const matchedItems = this.getMatchedItems(member, targetMember, settings);
+    const factors = this.calculateFactors(member, targetMember, config, settings, matchedItems);
+    const score = this.calculateTotalScore(factors);
+
+    return {
+      member,
+      score,
+      factors,
+    };
+  }
+
+  private getNotificationSettings(notificationSetting?: NotificationSetting) {
+    return {
       byFocusArea: notificationSetting?.byFocusArea ?? true,
       byRole: notificationSetting?.byRole ?? true,
       byFundingStage: notificationSetting?.byFundingStage ?? true,
@@ -176,97 +188,62 @@ export class RecommendationsEngine {
       technologyList: notificationSetting?.technologyList ?? [],
       keywordList: notificationSetting?.keywordList ?? [],
     };
+  }
 
-    // Collect matched items based on notification settings
-    const matchedFocusAreas = settings.byFocusArea
-      ? this.getMatchedFocusAreas(member, targetMember, settings.focusAreaList)
-      : [];
-    const matchedTechnologies = settings.byTechnology
-      ? this.getMatchedTechnologies(member, targetMember, settings.technologyList)
-      : [];
-    const matchedFundingStages = settings.byFundingStage
-      ? this.getMatchedFundingStages(member, targetMember, settings.fundingStageList)
-      : [];
-    const matchedRoles = settings.byRole ? this.getMatchedRoles(member, targetMember, settings.roleList) : [];
-    const matchedIndustryTags = settings.byIndustryTag
-      ? this.getMatchedIndustryTags(member, targetMember, settings.industryTagList)
-      : [];
-    const matchedKeywords = settings.byKeyword
-      ? this.getMatchedKeywords(member, targetMember, settings.keywordList)
-      : [];
-
-    const factors = {
-      sameTeam: member.teamMemberRoles.some((role) =>
-        targetMember.teamMemberRoles.some((targetRole) => role.teamUid === targetRole.teamUid)
-      )
-        ? SCORES.SAME_TEAM
-        : SCORES.DIFFERENT_TEAM,
-
-      previouslyRecommended: this.hasBookedOH(member, targetMember)
-        ? SCORES.PREVIOUSLY_RECOMMENDED
-        : SCORES.NOT_PREVIOUSLY_RECOMMENDED,
-
-      bookedOH: member.interactions.some(
-        (interaction) => interaction.targetMemberUid === targetMember.uid && interaction.type === 'OFFICE_HOURS'
-      )
-        ? SCORES.BOOKED_OH
-        : SCORES.NOT_BOOKED_OH,
-
-      sameEvent: this.hasSameEvent(member, targetMember) ? SCORES.SAME_EVENT : SCORES.DIFFERENT_EVENT,
-
-      teamFocusArea:
-        config.includeFocusAreas && settings.byFocusArea
-          ? matchedFocusAreas.length > 0
-            ? SCORES.MATCHING_FOCUS_AREA
-            : 0
-          : 0,
-
-      teamFundingStage:
-        config.includeFundingStages && settings.byFundingStage
-          ? matchedFundingStages.length > 0
-            ? SCORES.MATCHING_FUNDING_STAGE
-            : 0
-          : 0,
-
-      roleMatch:
-        config.includeRoles && settings.byRole
-          ? this.calculateRoleMatchScore(member.teamMemberRoles, targetMember.teamMemberRoles, settings.roleList)
-          : 0,
-
-      teamTechnology:
-        config.includeTechnologies && settings.byTechnology
-          ? matchedTechnologies.length > 0
-            ? SCORES.MATCHING_TECHNOLOGY
-            : 0
-          : 0,
-
-      teamIndustryTag:
-        config.includeIndustryTags && settings.byIndustryTag
-          ? matchedIndustryTags.length > 0
-            ? SCORES.MATCHING_INDUSTRY_TAG
-            : 0
-          : 0,
-
-      teamKeyword:
-        config.includeKeywords && settings.byKeyword
-          ? matchedKeywords.length > 0
-            ? SCORES.MATCHING_KEYWORD * matchedKeywords.length
-            : 0
-          : 0,
-
-      hasOfficeHours: member.officeHours ? SCORES.HAS_OFFICE_HOURS : SCORES.NO_OFFICE_HOURS,
-
-      joinDateScore: this.calculateJoinDateScore(member.plnStartDate),
-
-      matchedFocusAreas,
-      matchedTechnologies,
-      matchedFundingStages,
-      matchedRoles,
-      matchedIndustryTags,
-      matchedKeywords,
+  private getMatchedItems(
+    member: MemberWithRelations,
+    targetMember: MemberWithRelations,
+    settings: ReturnType<typeof this.getNotificationSettings>
+  ) {
+    return {
+      matchedFocusAreas: settings.byFocusArea
+        ? this.getMatchedFocusAreas(member, targetMember, settings.focusAreaList)
+        : [],
+      matchedTechnologies: settings.byTechnology
+        ? this.getMatchedTechnologies(member, targetMember, settings.technologyList)
+        : [],
+      matchedFundingStages: settings.byFundingStage
+        ? this.getMatchedFundingStages(member, targetMember, settings.fundingStageList)
+        : [],
+      matchedRoles: settings.byRole ? this.getMatchedRoles(member, targetMember, settings.roleList) : [],
+      matchedIndustryTags: settings.byIndustryTag
+        ? this.getMatchedIndustryTags(member, targetMember, settings.industryTagList)
+        : [],
+      matchedKeywords: settings.byKeyword ? this.getMatchedKeywords(member, targetMember, settings.keywordList) : [],
     };
+  }
 
-    const score =
+  private calculateFactors(
+    member: MemberWithRelations,
+    targetMember: MemberWithRelations,
+    config: RecommendationConfig,
+    settings: ReturnType<typeof this.getNotificationSettings>,
+    matchedItems: ReturnType<typeof this.getMatchedItems>
+  ): RecommendationFactors {
+    return {
+      sameTeam: this.calculateSameTeamScore(member, targetMember),
+      previouslyRecommended: this.calculatePreviouslyRecommendedScore(member, targetMember),
+      bookedOH: this.calculateBookedOHScore(member, targetMember),
+      sameEvent: this.calculateSameEventScore(member, targetMember),
+      teamFocusArea: this.calculateTeamFocusAreaScore(config, settings, matchedItems),
+      teamFundingStage: this.calculateTeamFundingStageScore(config, settings, matchedItems),
+      roleMatch: this.calculateRoleMatchScore(member.teamMemberRoles, targetMember.teamMemberRoles, settings.roleList),
+      teamTechnology: this.calculateTeamTechnologyScore(config, settings, matchedItems),
+      teamIndustryTag: this.calculateTeamIndustryTagScore(config, settings, matchedItems),
+      teamKeyword: this.calculateTeamKeywordScore(config, settings, matchedItems),
+      hasOfficeHours: this.calculateHasOfficeHoursScore(member),
+      joinDateScore: this.calculateJoinDateScore(member.plnStartDate),
+      matchedFocusAreas: matchedItems.matchedFocusAreas,
+      matchedTechnologies: matchedItems.matchedTechnologies,
+      matchedFundingStages: matchedItems.matchedFundingStages,
+      matchedRoles: matchedItems.matchedRoles,
+      matchedIndustryTags: matchedItems.matchedIndustryTags,
+      matchedKeywords: matchedItems.matchedKeywords,
+    };
+  }
+
+  private calculateTotalScore(factors: RecommendationFactors): number {
+    return (
       factors.sameTeam *
       factors.previouslyRecommended *
       factors.bookedOH *
@@ -278,13 +255,91 @@ export class RecommendationsEngine {
         factors.teamIndustryTag +
         factors.teamKeyword +
         factors.hasOfficeHours +
-        factors.joinDateScore);
+        factors.joinDateScore)
+    );
+  }
 
-    return {
-      member,
-      score,
-      factors,
-    };
+  private calculateSameTeamScore(member: MemberWithRelations, targetMember: MemberWithRelations): number {
+    const hasSameTeam = member.teamMemberRoles.some((role) =>
+      targetMember.teamMemberRoles.some((targetRole) => role.teamUid === targetRole.teamUid)
+    );
+    return hasSameTeam ? SCORES.SAME_TEAM : SCORES.DIFFERENT_TEAM;
+  }
+
+  private calculatePreviouslyRecommendedScore(member: MemberWithRelations, targetMember: MemberWithRelations): number {
+    const hasBookedOH = this.hasBookedOH(member, targetMember);
+    return hasBookedOH ? SCORES.PREVIOUSLY_RECOMMENDED : SCORES.NOT_PREVIOUSLY_RECOMMENDED;
+  }
+
+  private calculateBookedOHScore(member: MemberWithRelations, targetMember: MemberWithRelations): number {
+    const hasBookedOH = member.interactions.some(
+      (interaction) => interaction.targetMemberUid === targetMember.uid && interaction.type === 'OFFICE_HOURS'
+    );
+    return hasBookedOH ? SCORES.BOOKED_OH : SCORES.NOT_BOOKED_OH;
+  }
+
+  private calculateSameEventScore(member: MemberWithRelations, targetMember: MemberWithRelations): number {
+    const hasSameEvent = this.hasSameEvent(member, targetMember);
+    return hasSameEvent ? SCORES.SAME_EVENT : SCORES.DIFFERENT_EVENT;
+  }
+
+  private calculateTeamFocusAreaScore(
+    config: RecommendationConfig,
+    settings: ReturnType<typeof this.getNotificationSettings>,
+    matchedItems: ReturnType<typeof this.getMatchedItems>
+  ): number {
+    if (!config.includeFocusAreas || !settings.byFocusArea) {
+      return 0;
+    }
+    return matchedItems.matchedFocusAreas.length > 0 ? SCORES.MATCHING_FOCUS_AREA : 0;
+  }
+
+  private calculateTeamFundingStageScore(
+    config: RecommendationConfig,
+    settings: ReturnType<typeof this.getNotificationSettings>,
+    matchedItems: ReturnType<typeof this.getMatchedItems>
+  ): number {
+    if (!config.includeFundingStages || !settings.byFundingStage) {
+      return 0;
+    }
+    return matchedItems.matchedFundingStages.length > 0 ? SCORES.MATCHING_FUNDING_STAGE : 0;
+  }
+
+  private calculateTeamTechnologyScore(
+    config: RecommendationConfig,
+    settings: ReturnType<typeof this.getNotificationSettings>,
+    matchedItems: ReturnType<typeof this.getMatchedItems>
+  ): number {
+    if (!config.includeTechnologies || !settings.byTechnology) {
+      return 0;
+    }
+    return matchedItems.matchedTechnologies.length > 0 ? SCORES.MATCHING_TECHNOLOGY : 0;
+  }
+
+  private calculateTeamIndustryTagScore(
+    config: RecommendationConfig,
+    settings: ReturnType<typeof this.getNotificationSettings>,
+    matchedItems: ReturnType<typeof this.getMatchedItems>
+  ): number {
+    if (!config.includeIndustryTags || !settings.byIndustryTag) {
+      return 0;
+    }
+    return matchedItems.matchedIndustryTags.length > 0 ? SCORES.MATCHING_INDUSTRY_TAG : 0;
+  }
+
+  private calculateTeamKeywordScore(
+    config: RecommendationConfig,
+    settings: ReturnType<typeof this.getNotificationSettings>,
+    matchedItems: ReturnType<typeof this.getMatchedItems>
+  ): number {
+    if (!config.includeKeywords || !settings.byKeyword) {
+      return 0;
+    }
+    return matchedItems.matchedKeywords.length > 0 ? SCORES.MATCHING_KEYWORD * matchedItems.matchedKeywords.length : 0;
+  }
+
+  private calculateHasOfficeHoursScore(member: MemberWithRelations): number {
+    return member.officeHours ? SCORES.HAS_OFFICE_HOURS : SCORES.NO_OFFICE_HOURS;
   }
 
   private calculateRoleMatchScore(

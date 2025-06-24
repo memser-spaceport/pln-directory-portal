@@ -17,6 +17,7 @@
           "apps/web-api/src/shared/markMyPresence.hbs",
           "apps/web-api/src/shared/askStatusChange.hbs",
           "apps/web-api/src/shared/recommendedMembers.hbs",
+          "apps/web-api/src/shared/recommendedMembersExample.hbs",
           "apps/web-api/src/shared/onboarding.hbs"
         ]
       },
