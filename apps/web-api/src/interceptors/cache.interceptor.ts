@@ -32,8 +32,14 @@ export class MyCacheInterceptor extends CacheInterceptor {
    * @param context Execution context containing the request
    * @returns Cache key string with auth/guest prefix
    */
-  trackBy(context: ExecutionContext): string {
+  trackBy(context: ExecutionContext): string | undefined {
     const request = context.switchToHttp().getRequest<Request>();
+    const baseKey = super.trackBy(context);
+
+    // Get the base cache key from parent implementation
+    if (!baseKey) {
+      return baseKey; // If no base key, return undefined
+    }
     
     // Check for any authentication indicators set by the various guards
     const isAuthenticated = !!(
@@ -42,10 +48,7 @@ export class MyCacheInterceptor extends CacheInterceptor {
       request['userUid'] || 
       request['userAccessToken'] 
     );
-    
-    // Get the base cache key from parent implementation
-    const baseKey = super.trackBy(context);
-    
+
     // Prefix the key with the environment to prevent cache collisions between deployment stages.
     // Further prefix with auth status to create separate cache spaces for authenticated
     // and guest users, preventing sensitive data from being shared.
