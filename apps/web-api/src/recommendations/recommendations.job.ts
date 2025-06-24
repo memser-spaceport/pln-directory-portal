@@ -16,10 +16,10 @@ export class RecommendationsJob {
   ) {}
 
   /**
-   * Daily job that runs every day at 9:00 AM
+   * Bi-monthly job that runs on the 1st and 15th of every month at 9:00 AM UTC
    * Creates recommendation runs for all members with recommendations enabled
    */
-  @Cron('0 9 * * *', {
+  @Cron('0 9 1,15 * *', {
     name: 'bi-monthly-recommendations',
     timeZone: 'UTC',
   })

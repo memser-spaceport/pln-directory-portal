@@ -5,6 +5,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
 import { RecommendationsEngine, MemberWithRelations, RecommendationFactors } from './recommendations.engine';
 import { AwsService } from '../utils/aws/aws.service';
+import { HuskyGenerationService } from '../husky/husky-generation.service';
 import * as path from 'path';
 import {
   CreateRecommendationRunRequest,
@@ -19,7 +20,12 @@ export class RecommendationsService {
   private readonly recommendationsPerRun = 1;
   private supportEmail: string | undefined;
 
-  constructor(private prisma: PrismaService, private logger: LogService, private awsService: AwsService) {
+  constructor(
+    private prisma: PrismaService,
+    private logger: LogService,
+    private awsService: AwsService,
+    private huskyGenerationService: HuskyGenerationService
+  ) {
     this.supportEmail = this.getSupportEmail();
   }
 
@@ -309,33 +315,101 @@ export class RecommendationsService {
       reason: string;
     }>;
   }> {
-    const recommendations = approvedRecommendations.map((rec) => {
-      const member = rec.recommendedMember;
-      const primaryRole = member.teamMemberRoles[0];
-      const team = primaryRole?.team;
-      const sanitizedTeamDescription = sanitizeHtml(team?.shortDescription || '', {
-        allowedTags: [],
-        allowedAttributes: [],
-      });
+    const recommendations = await Promise.all(
+      approvedRecommendations.map(async (rec) => {
+        const member = rec.recommendedMember;
+        const primaryRole = member.teamMemberRoles[0];
+        const team = primaryRole?.team;
+        const sanitizedTeamDescription = sanitizeHtml(team?.shortDescription || '', {
+          allowedTags: [],
+          allowedAttributes: [],
+        });
 
-      return {
-        name: member.name,
-        image: member.image?.url || '',
-        team_description:
-          sanitizedTeamDescription.length > 500
-            ? sanitizedTeamDescription.substring(0, 500) + '...'
-            : sanitizedTeamDescription,
-        team_name: team?.name || '',
-        team_logo: team?.logo?.url || '',
-        position: primaryRole?.role || '',
-        link: `${process.env.WEB_UI_BASE_URL}/members/${
-          member.uid
-        }?utm_source=recommendations&utm_medium=email&utm_code=${getRandomId()}&target_uid=${
-          targetMember.uid
-        }&target_email=${encodeURIComponent(targetMember.email || '')}`,
-        reason: this.generateRecommendationReason(rec.factors),
-      };
-    });
+        // Get target member with full relations for LLM generation
+        const targetMemberWithRelations = await this.prisma.member.findUnique({
+          where: { uid: targetMember.uid },
+          include: {
+            teamMemberRoles: {
+              include: {
+                team: {
+                  include: {
+                    teamFocusAreas: {
+                      include: {
+                        focusArea: true,
+                      },
+                    },
+                    fundingStage: true,
+                    technologies: true,
+                    industryTags: true,
+                    asks: true,
+                  },
+                },
+              },
+            },
+            interactions: true,
+            targetInteractions: true,
+            eventGuests: true,
+            experiences: true,
+          },
+        });
+
+        // Get recommended member with full relations for LLM generation
+        const recommendedMemberWithRelations = await this.prisma.member.findUnique({
+          where: { uid: member.uid },
+          include: {
+            teamMemberRoles: {
+              include: {
+                team: {
+                  include: {
+                    teamFocusAreas: {
+                      include: {
+                        focusArea: true,
+                      },
+                    },
+                    fundingStage: true,
+                    technologies: true,
+                    industryTags: true,
+                    asks: true,
+                  },
+                },
+              },
+            },
+            interactions: true,
+            targetInteractions: true,
+            eventGuests: true,
+            experiences: true,
+          },
+        });
+
+        // Generate LLM-based recommendation reason
+        let reason = 'Based on your profile and activity in the network';
+        if (targetMemberWithRelations && recommendedMemberWithRelations) {
+          reason = await this.huskyGenerationService.generateRecommendationReason(
+            targetMemberWithRelations as MemberWithRelations,
+            recommendedMemberWithRelations as MemberWithRelations,
+            rec.factors as unknown as RecommendationFactors
+          );
+        }
+
+        return {
+          name: member.name,
+          image: member.image?.url || '',
+          team_description:
+            sanitizedTeamDescription.length > 500
+              ? sanitizedTeamDescription.substring(0, 500) + '...'
+              : sanitizedTeamDescription,
+          team_name: team?.name || '',
+          team_logo: team?.logo?.url || '',
+          position: primaryRole?.role || '',
+          link: `${process.env.WEB_UI_BASE_URL}/members/${
+            member.uid
+          }?utm_source=recommendations&utm_medium=email&utm_code=${getRandomId()}&target_uid=${
+            targetMember.uid
+          }&target_email=${encodeURIComponent(targetMember.email || '')}`,
+          reason: reason,
+        };
+      })
+    );
 
     return {
       name: targetMember.name,
@@ -413,10 +487,10 @@ export class RecommendationsService {
         skipMemberIds: [...existingRecommendationUids, ...alreadyRecommendedMemberUids],
         skipTeamNames: ['Protocol Labs', 'Polaris Labs'],
         skipIndustryTags: ['Discontinued'],
-        includeFocusAreas: true,
+        includeFocusAreas: false,
         includeRoles: true,
         includeFundingStages: true,
-        includeIndustryTags: true,
+        includeIndustryTags: false,
         includeTechnologies: true,
         includeKeywords: true,
       },
@@ -492,39 +566,6 @@ export class RecommendationsService {
     })) as MemberWithRelations[];
   }
 
-  private generateRecommendationReason(factors): string {
-    const reasons: string[] = [];
-
-    // Build focus area reason with examples
-    if (factors.teamFocusArea) {
-      const focusAreaReason = factors.matchedFocusAreas?.length
-        ? `focused on similar problem areas such as: ${factors.matchedFocusAreas.join(', ')}`
-        : 'focused on similar problem areas';
-      reasons.push(focusAreaReason);
-    }
-
-    // Build funding stage reason
-    if (factors.teamFundingStage) {
-      reasons.push('at similar funding stages');
-    }
-
-    // Build technology reason with examples
-    if (factors.teamTechnology) {
-      const techReason = factors.matchedTechnologies?.length
-        ? `working with similar technologies like: ${factors.matchedTechnologies.join(', ')}`
-        : 'working with similar technologies';
-      reasons.push(techReason);
-    }
-
-    if (reasons.length === 0) {
-      return 'Based on your profile and activity in the network';
-    }
-
-    // Join all reasons with appropriate conjunctions
-    const lastReason = reasons.pop();
-    return reasons.length > 0 ? `You are both ${reasons.join(', ')} and ${lastReason}` : `You are both ${lastReason}`;
-  }
-
   async getRecommendationNotifications(targetMemberUid?: string) {
     return this.prisma.recommendationNotification.findMany({
       where: {
@@ -551,6 +592,7 @@ export class RecommendationsService {
       where: {
         notificationSetting: {
           recommendationsEnabled: true,
+          subscribed: true,
         },
       },
       include: {
