@@ -2,7 +2,7 @@
   <head>
     <meta charset='UTF-8' />
     <meta name='viewport' content='width=device-width, initial-scale=1' />
-    <title>Example recommendations from the PL network</title>
+    <title>Recommendations on PL network</title>
   </head>
   <body style='margin: 0; padding: 0; font-family: Inter, sans-serif;'>
     <table width='100%' cellpadding='0' cellspacing='0' border='0' align='center' style='background-color: #ffffff;'>
@@ -16,7 +16,7 @@
             <tr>
               <td align='center' style='padding: 8px 24px;'>
                 <img
-                  src='https://pl-directory-images-prod.s3.us-west-1.amazonaws.com/email/protocol-labs-logo.png'
+                  src='https://pl-directory-images-dev.s3.us-west-1.amazonaws.com/protocol-labs-logo.png'
                   width='246'
                   height='56'
                   alt='Protocol Labs'
@@ -27,12 +27,43 @@
             <!-- Title -->
             <tr>
               <td align='center' style='padding: 24px;'>
-                <h1 style='margin: 0; font-size: 28px; font-weight: 600;'>Hi {{name}},</h1>
-                <p style='color: #667085; font-size: 15px; line-height: 24px; margin: 0;'>
-                  This is an example of the recommendations you could receive from the PL network.
+                <h1 style='margin: 0; font-size: 24px; font-weight: 400; text-align: center;'>Hi, {{name}}</h1>
+                <br />
+                <p style='color: #667085; font-size: 15px; line-height: 24px; margin: 0; text-align: center;'>
+                  We are introducing Recommendations - a new way for you to discover people in the network relevant for
+                  peer knowledge sharing, collaboration, business development and more.
                 </p>
-                <p style='color: #667085; font-size: 15px; line-height: 24px; margin: 8px 0 0 0;'>
-                  To start receiving personalized recommendations, set up your preferences below.
+              </td>
+            </tr>
+
+            <!-- CTA -->
+            <tr>
+              <td align='center' style='padding: 24px;'>
+                <a
+                  href='{{this.link}}'
+                  style='display: inline-block; background-color: #156FF7; color: #ffffff; padding: 12px 32px; border-radius: 8px; font-size: 16px; text-decoration: none;'
+                >Complete your profile on LabOS now</a>
+              </td>
+            </tr>
+
+            <tr>
+              <td align='center' style='padding: 24px;'>
+                <p style='color: #667085; font-size: 15px; line-height: 24px; margin: 0; text-align: center;'>
+                  Set up your recommendations now to receive them regularly to your mailbox.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td align='center' style='padding: 0;'>
+                <hr />
+              </td>
+            </tr>
+
+            <tr>
+              <td align='center' style='padding: 24px;'>
+                <p style='color: #667085; font-size: 15px; line-height: 24px; margin: 0; text-align: center;'>
+                  Here is a sample of what Recommendations sent to you will look like:
                 </p>
               </td>
             </tr>
@@ -62,8 +93,16 @@
                             <td align='right'>
                               <a
                                 href='{{this.link}}'
-                                style='font-size: 20px; font-weight: 600; color: #156FF7; text-decoration: underline;'
-                              >Set up your recommendations</a>
+                                style='font-size: 20px; font-weight: 400; color: #156FF7; text-decoration: none; opacity: 0.5;'
+                              >Example only</a>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td
+                              colspan='2'
+                              style='padding-top: 8px; color: #667085; font-size: 14px; line-height: 20px;'
+                            >
+                              {{this.team_description}}
                             </td>
                           </tr>
                           <tr>
@@ -88,19 +127,8 @@
                               style='padding-top: 12px; font-size: 14px; font-weight: 600; color: #667085;'
                             >{{this.position}}</td>
                           </tr>
-                          <tr>
-                            <td
-                              colspan='2'
-                              style='padding-top: 8px; color: #667085; font-size: 14px; line-height: 20px;'
-                            >
-                              {{this.team_description}}
-                            </td>
-                          </tr>
                         </table>
                       </td>
-                    </tr>
-                    <tr>
-                      <td style='padding-top: 12px;'></td>
                     </tr>
                     <tr>
                       <td
@@ -115,10 +143,16 @@
               </tr>
             {{/each}}
 
-            <!-- Footer -->
             <tr>
               <td align='center' style='padding: 24px;'>
-                <p style='color: #667085; font-size: 16px; font-weight: 600; margin-top: 16px;'>Protocol Labs - LabOS</p>
+                <p style='color: #8F98B1; margin: 0;'>Protocol Labs - LabOS</p>
+              </td>
+            </tr>
+
+            <tr>
+              <td align='center' style='padding: 0 24px;'>
+                <p style='color: #667085; font-size: 10px;'>You received this email because you're part of the Protocol
+                  Labs Directory. You can manage your preferences in your account settings.</p>
               </td>
             </tr>
 

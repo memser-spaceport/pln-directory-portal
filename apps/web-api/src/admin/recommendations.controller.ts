@@ -83,4 +83,11 @@ export class RecommendationsController {
     await this.recommendationsJob.triggerRecommendations();
     return { message: 'Recommendations job triggered successfully' };
   }
+
+  @Post('trigger-example-emails')
+  @NoCache()
+  async triggerExampleEmails() {
+    await this.recommendationsJob.triggerExampleEmails();
+    return { message: 'Example emails job triggered successfully' };
+  }
 }

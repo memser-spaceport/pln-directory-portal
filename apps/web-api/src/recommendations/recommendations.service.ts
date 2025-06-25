@@ -305,10 +305,12 @@ export class RecommendationsService {
           };
         };
       }>
-    >
+    >,
+    isExample: boolean
   ): Promise<{
     name: string;
     user_email_frequency_preference: string;
+    link: string;
     recommendations: Array<{
       name: string;
       image: string;
@@ -320,6 +322,7 @@ export class RecommendationsService {
       reason: string;
     }>;
   }> {
+    const utmSource = isExample ? 'recommendations_example' : 'recommendations';
     const recommendations = await Promise.all(
       approvedRecommendations.map(async (rec) => {
         const member = rec.recommendedMember;
@@ -408,7 +411,7 @@ export class RecommendationsService {
           position: primaryRole?.role || '',
           link: `${process.env.WEB_UI_BASE_URL}/members/${
             member.uid
-          }?utm_source=recommendations&utm_medium=email&utm_code=${getRandomId()}&target_uid=${
+          }?utm_source=${utmSource}&utm_medium=email&utm_code=${getRandomId()}&target_uid=${
             targetMember.uid
           }&target_email=${encodeURIComponent(targetMember.email || '')}`,
           reason: reason,
@@ -418,7 +421,12 @@ export class RecommendationsService {
 
     return {
       name: targetMember.name,
-      user_email_frequency_preference: '',
+      link: `${
+        process.env.WEB_UI_BASE_URL
+      }/settings/recommendations?utm_source=${utmSource}&utm_medium=email&utm_code=${getRandomId()}&target_uid=${
+        targetMember.uid
+      }&target_email=${encodeURIComponent(targetMember.email || '')}`,
+      user_email_frequency_preference: 'twice per month',
       recommendations: recommendations,
     };
   }
