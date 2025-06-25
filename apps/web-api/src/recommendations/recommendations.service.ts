@@ -29,7 +29,11 @@ export class RecommendationsService {
     this.supportEmail = this.getSupportEmail();
   }
 
-  async createRecommendationRun(createDto: CreateRecommendationRunRequest, allMembers?: MemberWithRelations[]) {
+  async createRecommendationRun(
+    createDto: CreateRecommendationRunRequest,
+    allMembers?: MemberWithRelations[],
+    isExample = false
+  ) {
     const targetMember = await this.prisma.member.findUnique({
       where: { uid: createDto.targetMemberUid },
     });
@@ -42,7 +46,8 @@ export class RecommendationsService {
       targetMember.uid,
       this.recommendationsPerRun,
       [],
-      allMembers
+      allMembers,
+      isExample
     );
 
     return this.prisma.recommendationRun.create({
@@ -473,7 +478,8 @@ export class RecommendationsService {
     targetMemberUid: string,
     count: number,
     existingRecommendationUids: string[] = [],
-    allMembers?: MemberWithRelations[]
+    allMembers?: MemberWithRelations[],
+    isExample = false
   ): Promise<{ memberUid: string; score: number; factors: RecommendationFactors }[]> {
     const engine = new RecommendationsEngine();
 
@@ -528,6 +534,7 @@ export class RecommendationsService {
         includeIndustryTags: false,
         includeTechnologies: true,
         includeKeywords: true,
+        minScore: isExample ? 0 : 15,
       },
       notificationSetting ?? undefined
     );

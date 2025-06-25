@@ -18,14 +18,14 @@ export class RecommendationsJob {
   /**
    * Checks if a member has any notification settings configured
    */
-  private hasNotificationSettings(member: any): boolean {
+  private hasNotificationSettings(member): boolean {
     return !!(
-      member.notificationSetting?.byFocusArea ||
-      member.notificationSetting?.byFundingStage ||
-      member.notificationSetting?.byRole ||
-      member.notificationSetting?.byTechnology ||
-      member.notificationSetting?.byIndustryTag ||
-      member.notificationSetting?.byKeyword
+      member.notificationSetting?.focusAreaList?.length > 0 ||
+      member.notificationSetting?.fundingStageList?.length > 0 ||
+      member.notificationSetting?.roleList?.length > 0 ||
+      member.notificationSetting?.technologyList?.length > 0 ||
+      member.notificationSetting?.industryTagList?.length > 0 ||
+      member.notificationSetting?.keywordList?.length > 0
     );
   }
 
@@ -76,7 +76,11 @@ export class RecommendationsJob {
             targetMemberUid: member.uid,
           };
 
-          const recommendationRun = await this.recommendationsService.createRecommendationRun(createDto, allMembers);
+          const recommendationRun = await this.recommendationsService.createRecommendationRun(
+            createDto,
+            allMembers,
+            true
+          );
 
           if (recommendationRun.recommendations.length > 0) {
             await this.recommendationsService.sendRecommendations(recommendationRun.uid, {

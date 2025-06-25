@@ -33,7 +33,6 @@ const SCORES = {
     LESS_THAN_6_MONTHS: 1,
     MORE_THAN_6_MONTHS: 0,
   },
-  MIN_SCORE: 15,
 };
 
 export interface RecommendationConfig {
@@ -51,6 +50,8 @@ export interface RecommendationConfig {
   includeTechnologies?: boolean;
   includeKeywords?: boolean;
   includeSameEvent?: boolean;
+
+  minScore?: number;
 }
 
 export interface MemberWithRelations extends Member {
@@ -152,7 +153,7 @@ export class RecommendationsEngine {
       this.calculateRecommendationScore(member, targetMember, config, notificationSetting)
     );
 
-    return scoredMembers.filter((member) => member.score >= SCORES.MIN_SCORE).sort((a, b) => b.score - a.score);
+    return scoredMembers.filter((member) => member.score >= (config.minScore ?? 15)).sort((a, b) => b.score - a.score);
   }
 
   public calculateRecommendationScore(
