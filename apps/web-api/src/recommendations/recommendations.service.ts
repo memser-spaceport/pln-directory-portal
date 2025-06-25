@@ -311,6 +311,7 @@ export class RecommendationsService {
     name: string;
     user_email_frequency_preference: string;
     link: string;
+    feedback_link: string;
     recommendations: Array<{
       name: string;
       image: string;
@@ -427,6 +428,11 @@ export class RecommendationsService {
         targetMember.uid
       }&target_email=${encodeURIComponent(targetMember.email || '')}`,
       user_email_frequency_preference: 'twice per month',
+      feedback_link: `${
+        process.env.WEB_UI_BASE_URL
+      }/feedback?utm_source=${utmSource}&utm_medium=email&utm_code=${getRandomId()}&target_uid=${
+        targetMember.uid
+      }&target_email=${encodeURIComponent(targetMember.email || '')}`,
       recommendations: recommendations,
     };
   }
