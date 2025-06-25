@@ -164,6 +164,7 @@ export class RecommendationsJob {
           const recentRun = await this.prisma.recommendationNotification.findFirst({
             where: {
               targetMemberUid: member.uid,
+              isExample: false,
               sentAt: {
                 gte: new Date(Date.now() - this.recommendationIntervalMs),
               },
