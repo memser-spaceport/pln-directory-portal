@@ -108,12 +108,13 @@ export class RecommendationsEngine {
     config: RecommendationConfig,
     notificationSetting?: NotificationSetting
   ): RecommendationScore[] {
-    // Filter out target member and members that are in the skip list
+    // Filter out target member, members that are in the skip list and members without teams
     let filteredMembers = allMembers.filter(
       (m) =>
         m.uid !== targetMember.uid &&
         !config.skipMemberIds?.includes(m.uid) &&
-        !config.skipMemberNames?.includes(m.name)
+        !config.skipMemberNames?.includes(m.name) &&
+        m.teamMemberRoles.length > 0
     );
 
     // Filter out members that are in the team skip list
