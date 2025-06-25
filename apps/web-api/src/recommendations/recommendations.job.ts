@@ -112,7 +112,7 @@ export class RecommendationsJob {
 
       // Log to the application log service for monitoring
       this.logger.info(
-        `Daily example emails job completed: ${successCount} successful, ${skippedCount} skipped, ${errorCount} errors`,
+        `Daily example emails job completed: ${successCount} successful, ${errorCount} errors`,
         'daily-example-emails'
       );
     } catch (error) {

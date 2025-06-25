@@ -252,7 +252,7 @@ export class RecommendationsService {
       return run;
     }
 
-    const emailData = await this.prepareEmailTemplateData(run.targetMember, approvedRecommendations);
+    const emailData = await this.prepareEmailTemplateData(run.targetMember, approvedRecommendations, sendDto.isExample);
 
     const toEmail = sendDto.email || run.targetMember.email;
     if (!toEmail) {
@@ -306,7 +306,7 @@ export class RecommendationsService {
         };
       }>
     >,
-    isExample: boolean
+    isExample = false
   ): Promise<{
     name: string;
     user_email_frequency_preference: string;
