@@ -111,26 +111,52 @@
               </tr>
             {{/each}}
 
+            <tr>
+              <td align='center' style='padding: 12px;'>
+                <p style='margin: 0; color: #667085; font-size: 14px; text-align: center; font-weight: 600;'>
+                  Was the recommendation helpful?
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td align='center' style='padding: 12px;'>
+                <a href='{{this.feedback_link}}&selection=bad' style='text-decoration: none; margin: 0 24px;'>
+                  <img
+                    src='https://pl-directory-images-prod.s3.us-west-1.amazonaws.com/vote-down.png'
+                    alt='vote down'
+                    style='width: 40px; height: 40px;'
+                  />
+                </a>
+                <a href='{{this.feedback_link}}&selection=good' style='text-decoration: none; margin: 0 24px;'>
+                  <img
+                    src='https://pl-directory-images-prod.s3.us-west-1.amazonaws.com/vote-up.png'
+                    alt='vote down'
+                    style='width: 40px; height: 40px;'
+                  />
+                </a>
+              </td>
+            </tr>
+
             <!-- CTA -->
             <tr>
-              <td align='center' style='padding: 24px;'>
+              <td align='center' style='padding: 0 12px;'>
                 <a
                   href='{{this.link}}'
-                  style='display: inline-block; background-color: #156FF7; color: #ffffff; padding: 12px 32px; border-radius: 8px; font-size: 16px; text-decoration: none;'
+                  style='display: inline-block; background-color: #1B4DFF0A; color: #156FF7; padding: 12px 48px; border-radius: 10px; font-size: 16px; text-decoration: none;'
                 >Fine‑tune matches or opt-out</a>
+              </td>
+            </tr>
+
+            <tr>
+              <td align='center' style='padding: 24px 24px 0;'>
+                <hr style='border-top: none; border-width: 1px; border-color: #E2E8F0;' />
               </td>
             </tr>
 
             <tr>
               <td align='center' style='padding: 24px;'>
                 <p style='color: #8F98B1; margin: 0;'>Protocol Labs - LabOS</p>
-              </td>
-            </tr>
-
-            <tr>
-              <td align='center' style='padding: 0 24px;'>
-                <p style='color: #667085; font-size: 10px;'>You received this email because you're part of the Protocol
-                  Labs Directory.You can manage your preferences in your account settings.</p>
               </td>
             </tr>
 
