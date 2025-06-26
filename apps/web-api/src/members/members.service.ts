@@ -26,6 +26,7 @@ import { copyObj, buildMultiRelationMapping } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { MembersHooksService } from './members.hooks.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
+import { AccessLevel } from '../utils/access-levels';
 
 @Injectable()
 export class MembersService {
@@ -675,6 +676,18 @@ export class MembersService {
     await this.mapLocationToMember(memberData, null, member, tx);
     const createdMember = await this.createMember(member, tx);
     await this.membersHooksService.postCreateActions(createdMember, memberParticipantRequest.requesterEmailId);
+    return createdMember;
+  }
+
+  async createMemberFromSignUpData(memberData: any): Promise<Member> {
+    let createdMember: any;
+    await this.prisma.$transaction(async (tx) => {
+      const member = await this.prepareMemberFromParticipantRequest(null, memberData, null, tx);
+      member.accessLevel = AccessLevel.L0;
+      await this.mapLocationToMember(memberData, null, member, tx);
+      createdMember = await this.createMember(member, tx);
+      await this.membersHooksService.postCreateActions(createdMember, memberData.email);
+    });
     return createdMember;
   }
 
@@ -1642,6 +1655,19 @@ export class MembersService {
       }
     });
     return member;
+  }
+
+  async getAccessLevelByMemberEmail(email: string): Promise<string | null> {
+    try {
+      const member = await this.prisma.member.findUnique({
+        where: { email: email },
+        select: { accessLevel: true },
+      });
+
+      return member?.accessLevel ?? null;
+    } catch (error) {
+      return this.handleErrors(error);
+    }
   }
 
   /**

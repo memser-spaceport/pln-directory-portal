@@ -3,12 +3,14 @@ import { ParticipantsRequestService } from './participants-request.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
 import { FindUniqueIdentiferDto } from 'libs/contracts/src/schema/participants-request';
+import { MembersService } from '../members/members.service';
 
 @Controller('v1/participants-request')
 @NoCache()
 export class ParticipantsRequestController {
   constructor(
-    private readonly participantsRequestService: ParticipantsRequestService
+    private readonly participantsRequestService: ParticipantsRequestService,
+    private readonly memberService: MembersService,
   ) {}
 
   /**
@@ -23,7 +25,15 @@ export class ParticipantsRequestController {
     // Validate unique identifier existence
     await this.participantsRequestService.validateUniqueIdentifier(body.participantType, uniqueIdentifier);
     await this.participantsRequestService.validateParticipantRequest(body);
-    return await this.participantsRequestService.addRequest(body);
+    const participantRequest = await this.participantsRequestService.addRequest(body);
+
+    // adding a member with L0 access level into the Member table
+    // the addRequest method that adds data into the ParticipantsRequests table should be removed
+    // when we are sure new RBAC system with L0, L1, L2, L3, L4 access levels is working
+    // and there are no dependencies on ParticipantRequest table
+    await this.memberService.createMemberFromSignUpData(body.newData);
+
+    return participantRequest;
   }
 
   /**

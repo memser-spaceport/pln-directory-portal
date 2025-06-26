@@ -134,6 +134,7 @@ model Member {
   recommendationsAsRecommended Recommendation[]
   recommendationNotifications  RecommendationNotification[]
   notificationSetting          NotificationSetting?
+  accessLevel                  String?
 }
 
 model MemberRole {
