@@ -134,6 +134,7 @@ model Member {
   recommendationsAsRecommended Recommendation[]
   recommendationNotifications  RecommendationNotification[]
   notificationSetting          NotificationSetting?
+  linkedinProfile              LinkedInProfile?
 }
 
 model MemberRole {
@@ -746,4 +747,18 @@ model NotificationSetting {
   industryTagList        String[] @default([])
   technologyList         String[] @default([])
   keywordList            String[] @default([])
+}
+
+model LinkedInProfile {
+  id                Int       @id @default(autoincrement())
+  uid               String    @unique @default(cuid())
+  memberUid         String    @unique
+  member            Member    @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  linkedinProfileId String    @unique
+  linkedinHandler   String?
+  profileData       Json
+  isVerified        Boolean   @default(false)
+  verifiedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
