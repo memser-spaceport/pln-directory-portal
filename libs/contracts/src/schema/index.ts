@@ -4,6 +4,7 @@ export * from './image';
 export * from './industry-category';
 export * from './industry-tag';
 export * from './location';
+export * from './linkedin-verification';
 export * from './member';
 export * from './role';
 export * from './skill';
