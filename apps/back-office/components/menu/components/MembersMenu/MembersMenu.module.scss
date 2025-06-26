@@ -1,0 +1,95 @@
+.root {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  gap: 8px;
+  //background: red;
+
+  color: var(--action-foreground-neutral-normal, #455468);
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 24px; /* 150% */
+  letter-spacing: -0.3px;
+}
+
+.menu {
+  position: absolute;
+  z-index: 1;
+  background: red;
+  min-width: 272px;
+  top: calc(100% + 16px);
+  left: 0;
+  gap: 4px;
+
+  display: flex;
+  flex-direction: column;
+  padding: 8px 16px;
+  align-items: flex-start;
+  border-radius: var(--corner-radius-2xl, 16px);
+  background: var(--background-base-white, #FFF);
+  box-shadow: 0px 10px 20px -5px var(--transparent-dark-6, rgba(14, 15, 17, 0.06)), 0px 20px 65px -5px var(--transparent-dark-6, rgba(14, 15, 17, 0.06));
+}
+
+.menuItem {
+  display: flex;
+  padding: var(--spacing-2xs, 8px) var(--spacing-sm, 12px);
+  align-items: center;
+  gap: var(--spacing-2xs, 8px);
+  align-self: stretch;
+  border-radius: var(--corner-radius-3xl, 20px);
+  width: 100%;
+  transition: all 0.3s ease;
+
+  .caret {
+    width: 0;
+    transition: all 0.3s ease;
+  }
+
+  &:hover {
+    background: var(--transparent-dark-4, rgba(14, 15, 17, 0.04));
+
+    .caret {
+      width: 16px;
+    }
+
+    .menuItemCount {
+      border-radius: var(--corner-radius-Full-round, 9999px);
+      background: var(--background-error-soft-surface, rgba(255, 56, 56, 0.08));
+      color: #FF3838;
+    }
+  }
+}
+
+.menuItemLabel {
+  overflow: hidden;
+  color: var(--action-foreground-neutral-active, #3D4A5C);
+  text-overflow: ellipsis;
+
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 142.857% */
+  letter-spacing: -0.2px;
+}
+
+.menuItemCount {
+  margin-left: auto;
+  display: flex;
+  padding: var(--spacing-5xs, 2px) var(--spacing-3xs, 6px);
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-5xs, 2px);
+  border-radius: var(--corner-radius-Full-round, 9999px);
+  background: var(--transparent-dark-6, rgba(14, 15, 17, 0.06));
+  transition: all 0.3s ease;
+}

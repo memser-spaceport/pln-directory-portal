@@ -11,6 +11,7 @@ const APP_CONSTANTS = {
   REJECTED_FLAG: 'REJECTED',
   CLOSED_FLAG: 'CLOSED',
   MEMBER_LABEL: 'Members',
+  RECOMMENDATIONS_LABEL: 'Recommendations',
   TEAMS_LABEL: 'Teams',
   NO_DATA_AVAILABLE_LABEL: 'No data available',
   VIEW_CLOSED_REQUEST_LABEL: 'View closed requests',

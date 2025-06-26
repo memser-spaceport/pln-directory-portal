@@ -1,0 +1,47 @@
+.root {
+  display: flex;
+  flex-direction: column;
+
+  width: 100%;
+  max-width: 1343px;
+  margin: 0 auto;
+  min-height: calc(100dvh - 80px);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 0;
+}
+
+.title {
+  color: var(--foreground-neutral-primary, #0A0C11);
+  font-size: 32px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 42px; /* 131.25% */
+  letter-spacing: -0.75px;
+}
+
+.addNewBtn {
+  display: flex;
+  padding: 8px var(--global-size-size-125, 10px);
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-zero, 0px);
+
+  border-radius: var(--corner-radius-md, 8px);
+  border: 1px solid var(--transparent-dark-12, rgba(14, 15, 17, 0.12));
+  background: var(--action-background-brand-normal, #1B4DFF);
+
+  /* Button/primay/fill */
+  box-shadow: 0px 1px 3px 0px var(--transparent-light-32, rgba(255, 255, 255, 0.32)) inset, 0px 4px 6px 0px var(--transparent-light-6, rgba(255, 255, 255, 0.06)) inset, 0px 1px 5px 0px var(--transparent-brand-16, rgba(27, 77, 255, 0.16));
+
+  color: var(--action-foreground-base-inverted_white, #FFF);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 142.857% */
+  letter-spacing: -0.2px;
+}
