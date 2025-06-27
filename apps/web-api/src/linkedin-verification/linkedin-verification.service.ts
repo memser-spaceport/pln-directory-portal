@@ -174,7 +174,7 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         linkedinProfileId: linkedinProfile.linkedinProfileId,
         linkedinHandler: linkedinProfile.linkedinHandler || undefined,
         profileData: linkedinProfile.profileData as any,
-        redirectUrl: `${redirectUrl}${redirectUrl.includes('?') ? '&' : '?'}state=success`,
+        redirectUrl: `${redirectUrl}${redirectUrl.includes('?') ? '&' : '?'}status=success`,
       };
     } catch (error) {
       this.logger.error('LinkedIn verification failed', error, 'LinkedInVerification');
@@ -189,7 +189,7 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         message: errorMessage,
         redirectUrl: `${redirectUrl}${
           redirectUrl.includes('?') ? '&' : '?'
-        }state=error&error_message=${encodeURIComponent(errorMessage)}`,
+        }status=error&error_message=${encodeURIComponent(errorMessage)}`,
       };
     }
   }
