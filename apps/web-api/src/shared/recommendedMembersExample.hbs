@@ -8,10 +8,8 @@
     <table width='100%' cellpadding='0' cellspacing='0' border='0' align='center' style='background-color: #ffffff;'>
       <tr>
         <td align='center'>
-
           <!-- Container Table -->
           <table width='640' cellpadding='0' cellspacing='0' border='0' style='margin: auto;'>
-
             <!-- Header -->
             <tr>
               <td align='center' style='padding: 8px 24px;'>
@@ -23,19 +21,47 @@
                 />
               </td>
             </tr>
-
             <!-- Title -->
             <tr>
               <td align='center' style='padding: 24px;'>
                 <h1 style='margin: 0; font-size: 24px; font-weight: 400; text-align: center;'>Hi, {{name}}</h1>
                 <br />
                 <p style='color: #667085; font-size: 15px; line-height: 24px; margin: 0; text-align: center;'>
-                  Here's your recommendation from the PL network. You are currently receiving this email
-                  {{this.user_email_frequency_preference}}.
+                  We are introducing Recommendations - a new way for you to discover people in the network relevant for
+                  peer knowledge sharing, collaboration, business development and more.
                 </p>
               </td>
             </tr>
-
+            <!-- CTA -->
+            <tr>
+              <td align='center' style='padding: 0 24px 24px;'>
+                <a
+                  href='{{this.link}}'
+                  style='display: inline-block; background-color: #156FF7; color: #ffffff; padding: 12px 32px; border-radius: 8px; font-size: 16px; text-decoration: none;'
+                >Set up your Recommendations / Opt out</a>
+              </td>
+            </tr>
+            <tr>
+              <td align='center' style='padding: 0 24px 24px;'>
+                <p
+                  style='color: #667085; font-size: 15px; line-height: 24px; margin: 0; text-align: center; max-width: 378px;'
+                >
+                  Set up your recommendations now to receive them regularly to your mailbox.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td align='center' style='padding: 0;'>
+                <hr style='border: 1px solid rgba(102,112,133,0.12);' />
+              </td>
+            </tr>
+            <tr>
+              <td align='center' style='padding: 24px;'>
+                <p style='color: #667085; font-size: 15px; line-height: 24px; margin: 0; text-align: center;'>
+                  Here is a sample of what Recommendations sent to you will look like:
+                </p>
+              </td>
+            </tr>
             <!-- Recommendations -->
             {{#each recommendations}}
               <tr>
@@ -52,7 +78,6 @@
                       <td width='112' valign='top'>
                         <img src='{{this.image}}' width='112' height='112' style='border-radius: 6px;' alt='' />
                       </td>
-
                       <!-- Details -->
                       <td valign='top' style='padding-left: 24px;'>
                         <table width='100%' cellpadding='0' cellspacing='0' border='0'>
@@ -61,8 +86,8 @@
                             <td align='right'>
                               <a
                                 href='{{this.link}}'
-                                style='font-size: 16px; font-weight: 400; color: #156FF7; text-decoration: underline;'
-                              >Connect</a>
+                                style='font-size: 16px; font-weight: 400; color: #156FF7; text-decoration: none; opacity: 0.5;'
+                              >Example only</a>
                             </td>
                           </tr>
                           <tr>
@@ -110,56 +135,17 @@
                 </td>
               </tr>
             {{/each}}
-
-            <tr>
-              <td align='center' style='padding: 12px;'>
-                <p style='margin: 0; color: #667085; font-size: 14px; text-align: center; font-weight: 600;'>
-                  Was the recommendation helpful?
-                </p>
-              </td>
-            </tr>
-
-            <tr>
-              <td align='center' style='padding: 12px;'>
-                <a href='{{this.feedback_link}}&selection=bad' style='text-decoration: none; margin: 0 24px;'>
-                  <img
-                    src='https://pl-directory-images-prod.s3.us-west-1.amazonaws.com/vote-down.png'
-                    alt='vote down'
-                    style='width: 40px; height: 40px;'
-                  />
-                </a>
-                <a href='{{this.feedback_link}}&selection=good' style='text-decoration: none; margin: 0 24px;'>
-                  <img
-                    src='https://pl-directory-images-prod.s3.us-west-1.amazonaws.com/vote-up.png'
-                    alt='vote down'
-                    style='width: 40px; height: 40px;'
-                  />
-                </a>
-              </td>
-            </tr>
-
-            <!-- CTA -->
-            <tr>
-              <td align='center' style='padding: 0 12px;'>
-                <a
-                  href='{{this.link}}'
-                  style='display: inline-block; background-color: #1B4DFF0A; color: #156FF7; padding: 12px 0; border-radius: 10px; font-size: 16px; text-decoration: none; width: 100%; max-width: 592px;'
-                >Fine‑tune matches or opt-out</a>
-              </td>
-            </tr>
-
-            <tr>
-              <td align='center' style='padding: 24px 24px 0;'>
-                <hr style='border-top: none; border-width: 1px; border-color: #E2E8F0;' />
-              </td>
-            </tr>
-
             <tr>
               <td align='center' style='padding: 24px;'>
-                <p style='color: #667085; margin: 0;'>Protocol Labs - LabOS</p>
+                <p style='color: #101828; margin: 0; font-weight: 600;'>Protocol Labs - LabOS</p>
               </td>
             </tr>
-
+            <tr>
+              <td align='center' style='padding: 0 24px;'>
+                <p style='color: #667085; font-size: 10px;'>You received this email because you opted in for
+                  Recommendations when signing up on LabOS</p>
+              </td>
+            </tr>
           </table>
         </td>
       </tr>

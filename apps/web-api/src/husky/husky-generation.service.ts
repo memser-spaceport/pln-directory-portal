@@ -7,8 +7,10 @@ import {
   HUSKY_AUTO_BIO_SYSTEM_PROMPT,
   HUSKY_SKILLS_GENERATION_SYSTEM_PROMPT,
   HUSKY_AUTO_BIO_DATABASE_ONLY_PROMPT,
+  HUSKY_RECOMMENDATION_REASON_SYSTEM_PROMPT,
 } from '../utils/ai-prompts';
 import { PrismaService } from '../shared/prisma.service';
+import { MemberWithRelations, RecommendationFactors } from '../recommendations/recommendations.engine';
 
 @Injectable()
 export class HuskyGenerationService {
@@ -224,6 +226,51 @@ export class HuskyGenerationService {
     }
 
     return { skills };
+  }
+
+  async generateRecommendationReason(
+    targetMember: MemberWithRelations,
+    recommendedMember: MemberWithRelations,
+    factors: RecommendationFactors
+  ): Promise<string> {
+    this.logger.info(`Generating recommendation reason for ${targetMember.name} and ${recommendedMember.name}`);
+
+    const prompt = `
+      Target Member:
+      - Name: ${targetMember.name}
+      - Team Roles: ${targetMember.teamMemberRoles
+        .map((role) => `${role.role} at ${role.team.name}${role.teamLead ? ' (Team Lead)' : ''}`)
+        .join(', ')}
+      - Professional Experience: ${targetMember.experiences
+        .map((exp) => `${exp.title} at ${exp.company} (${exp.startDate} - ${exp.endDate || 'Present'})`)
+        .join(', ')}
+
+      Recommended Member:
+      - Name: ${recommendedMember.name}
+      - Team Roles: ${recommendedMember.teamMemberRoles
+        .map((role) => `${role.role} at ${role.team.name}${role.teamLead ? ' (Team Lead)' : ''}`)
+        .join(', ')}
+      - Professional Experience: ${recommendedMember.experiences
+        .map((exp) => `${exp.title} at ${exp.company} (${exp.startDate} - ${exp.endDate || 'Present'})`)
+        .join(', ')}
+
+      Matching Factors:
+      - Technologies: ${factors.matchedTechnologies?.join(', ') || 'None'}
+      - Funding Stages: ${factors.matchedFundingStages?.join(', ') || 'None'}
+      - Roles: ${factors.matchedRoles?.join(', ') || 'None'}
+      - Keywords: ${factors.matchedKeywords?.join(', ') || 'None'}
+    `;
+
+    const generateTextOptions: any = {
+      model: openai.responses(process.env.OPENAI_LLM_MODEL || '') as LanguageModel,
+      system: HUSKY_RECOMMENDATION_REASON_SYSTEM_PROMPT,
+      prompt,
+      temperature: 0.7,
+    };
+
+    const { text: reason } = await generateText(generateTextOptions);
+
+    return reason.trim();
   }
 
   private hasEnoughIdentifyingInfo(member: any): boolean {

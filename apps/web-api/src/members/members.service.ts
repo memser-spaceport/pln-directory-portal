@@ -252,6 +252,7 @@ export class MembersService {
           location: true,
           skills: true,
           memberRoles: true,
+          linkedinProfile: true,
           teamMemberRoles: {
             include: {
               team: {
