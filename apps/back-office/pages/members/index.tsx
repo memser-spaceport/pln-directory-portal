@@ -4,12 +4,19 @@ import s from './styles.module.scss';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { TableFilter } from '../../components/filters/TableFilter/TableFilter';
 import { useRouter } from 'next/router';
+import { flexRender, SortingState } from '@tanstack/react-table';
+import { useMembersTable } from '../../screens/members/hooks/useMembersTable';
+import { GetServerSideProps } from 'next';
+import { IRequest } from '../../utils/request.types';
+import { parseCookies } from 'nookies';
+import api from '../../utils/api';
+import APP_CONSTANTS, { API_ROUTE, ENROLLMENT_TYPE } from '../../utils/constants';
+import { useMembersList } from '../../hooks/members/useMembersList';
 
-const MembersPage = () => {
+const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
   const router = useRouter();
   const query = router.query;
   const { filter } = query;
-
   const [active, setActive] = useState<string>((filter as string) ?? 'level1');
   const items = useMemo(() => {
     return [
@@ -39,6 +46,12 @@ const MembersPage = () => {
       },
     ];
   }, []);
+  const [sorting, setSorting] = useState<SortingState>([]); //
+
+  const { data, isLoading } = useMembersList({ authToken });
+  const { table } = useMembersTable(data, sorting, setSorting);
+
+  console.log(table.getState().sorting);
 
   return (
     <ApprovalLayout>
@@ -53,6 +66,65 @@ const MembersPage = () => {
               </button>
             </TableFilter>
           </span>
+        </div>
+
+        <div className={s.body}>
+          <table className="min-w-full border-collapse">
+            <thead>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <tr key={headerGroup.id}>
+                  {headerGroup.headers.map((header) =>
+                    header.isPlaceholder ? null : (
+                      <th>
+                        <div
+                          className={header.column.getCanSort() ? 'cursor-pointer select-none' : ''}
+                          onClick={header.column.getToggleSortingHandler()}
+                          title={
+                            header.column.getCanSort()
+                              ? header.column.getNextSortingOrder() === 'asc'
+                                ? 'Sort ascending'
+                                : header.column.getNextSortingOrder() === 'desc'
+                                ? 'Sort descending'
+                                : 'Clear sort'
+                              : undefined
+                          }
+                        >
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          {{
+                            asc: ' 🔼',
+                            desc: ' 🔽',
+                          }[header.column.getIsSorted() as string] ?? null}
+                        </div>
+                      </th>
+                    )
+                  )}
+                </tr>
+              ))}
+            </thead>
+            <tbody>
+              {table.getRowModel().rows.map((row) => (
+                <React.Fragment key={row.id}>
+                  <tr key={row.id}>
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                    ))}
+                  </tr>
+
+                  {/* Expanded content */}
+                  {row.getIsExpanded() && (
+                    <tr>
+                      <td colSpan={row.getVisibleCells().length}>
+                        {/* Place custom content or nested table here */}
+                        <div className="bg-gray-50 p-4">
+                          <strong>Details:</strong> This is expanded content for {row.original.name}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </ApprovalLayout>
@@ -141,3 +213,32 @@ const AddIcon = () => (
     </defs>
   </svg>
 );
+
+export const getServerSideProps: GetServerSideProps<IRequest> = async (context) => {
+  const { plnadmin } = parseCookies(context);
+  try {
+    if (!plnadmin) {
+      const currentUrl = context.resolvedUrl;
+      const loginUrl = `/?backlink=${currentUrl}`;
+      return {
+        redirect: {
+          destination: loginUrl,
+          permanent: false,
+        },
+      };
+    }
+
+    return {
+      props: {
+        authToken: plnadmin,
+      },
+    };
+  } catch (error) {
+    return {
+      props: {
+        authToken: '',
+        isError: true,
+      },
+    };
+  }
+};
