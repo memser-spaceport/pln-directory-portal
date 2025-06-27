@@ -125,17 +125,6 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         throw new BadRequestException('Member not found');
       }
 
-      // Additional security: Check if this LinkedIn profile is already connected to another member
-      const existingLinkedInProfile = await this.prisma.linkedInProfile.findUnique({
-        where: {
-          linkedinProfileId: profileData.sub,
-        },
-      });
-
-      if (existingLinkedInProfile && existingLinkedInProfile.memberUid !== member.uid) {
-        throw new BadRequestException('This LinkedIn profile is already connected to another member account.');
-      }
-
       // Update or create LinkedIn profile
       const linkedinProfile = await this.prisma.linkedInProfile.upsert({
         where: {
