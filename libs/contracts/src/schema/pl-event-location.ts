@@ -6,6 +6,7 @@ export const PLEventLocationSchema = z.object({
   id: z.number().int(),
   uid: z.string(),
   location: z.string(),
+  country: z.string(),
   latitude: z.string().optional().nullable(),
   longitude: z.string().optional().nullable(),
   flag: z.string().optional().nullable(),
@@ -26,6 +27,7 @@ export const PLEventLocationSchema = z.object({
 
 export const PLCreateEventLocationSchema = PLEventLocationSchema.pick({
   location: true,
+  country: true,
   latitude: true,
   longitude: true,
   flag: true,

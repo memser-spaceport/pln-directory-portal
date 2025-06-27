@@ -16,10 +16,120 @@ export class RecommendationsJob {
   ) {}
 
   /**
-   * Daily job that runs every day at 9:00 AM
-   * Creates recommendation runs for all members with recommendations enabled
+   * Checks if a member has any notification settings configured
+   */
+  private hasNotificationSettings(member): boolean {
+    return !!(
+      member.notificationSetting?.focusAreaList?.length > 0 ||
+      member.notificationSetting?.fundingStageList?.length > 0 ||
+      member.notificationSetting?.roleList?.length > 0 ||
+      member.notificationSetting?.technologyList?.length > 0 ||
+      member.notificationSetting?.industryTagList?.length > 0 ||
+      member.notificationSetting?.keywordList?.length > 0
+    );
+  }
+
+  /**
+   * Daily job that runs at 9:00 AM UTC to send example emails
+   * Sends example emails to members who:
+   * - Are subscribed and have no settings configured
+   * - Haven't received an example email yet (exampleSent = false)
    */
   @Cron('0 9 * * *', {
+    name: 'daily-example-emails',
+    timeZone: 'UTC',
+  })
+  async sendExampleEmails() {
+    if (process.env.IS_RECOMMENDATIONS_ENABLED !== 'true') {
+      this.logger.info('Skipping example emails as recommendations are disabled');
+      return;
+    }
+
+    this.logger.info('Starting daily example emails job');
+
+    try {
+      const allMembers = await this.recommendationsService.loadRecommendationMembersInChunks(500);
+      const membersWithRecommendationsEnabled =
+        await this.recommendationsService.getMembersWithEnabledRecommendations();
+
+      this.logger.info(`Found ${membersWithRecommendationsEnabled.length} members eligible for example emails`);
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const member of membersWithRecommendationsEnabled) {
+        try {
+          const hasSomeSettings = this.hasNotificationSettings(member);
+
+          // Skip if member has settings configured
+          if (hasSomeSettings) {
+            continue;
+          }
+
+          // Skip if member already received an example email
+          if (member.notificationSetting?.exampleSent) {
+            continue;
+          }
+
+          // Send example email
+          const createDto: CreateRecommendationRunRequest = {
+            targetMemberUid: member.uid,
+          };
+
+          const recommendationRun = await this.recommendationsService.createRecommendationRun(
+            createDto,
+            allMembers,
+            true
+          );
+
+          if (recommendationRun.recommendations.length > 0) {
+            await this.recommendationsService.sendRecommendations(recommendationRun.uid, {
+              approvedRecommendationUids: recommendationRun.recommendations.map((r) => r.uid),
+              email: member.email ?? undefined,
+              emailSubject: '[Action required] Your Recommendations from PL Network',
+              isExample: true,
+            });
+
+            // Mark example as sent
+            await this.prisma.notificationSetting.update({
+              where: { memberUid: member.uid },
+              data: {
+                exampleSent: true,
+                subscribed: false,
+              },
+            });
+          }
+
+          this.logger.info(`Successfully sent example email for member ${member.uid} (${member.name})`);
+          successCount++;
+        } catch (error) {
+          this.logger.error(`Failed to send example email for member ${member.uid}: ${error.message}`);
+          errorCount++;
+        }
+      }
+
+      // Log summary
+      this.logger.info(`Daily example emails job completed:`);
+      this.logger.info(`- Total members processed: ${membersWithRecommendationsEnabled.length}`);
+      this.logger.info(`- Successful emails sent: ${successCount}`);
+      this.logger.info(`- Errors: ${errorCount}`);
+
+      // Log to the application log service for monitoring
+      this.logger.info(
+        `Daily example emails job completed: ${successCount} successful, ${errorCount} errors`,
+        'daily-example-emails'
+      );
+    } catch (error) {
+      this.logger.error(`Daily example emails job failed: ${error.message}`, error.stack, 'daily-example-emails');
+      throw error;
+    }
+  }
+
+  /**
+   * Bi-monthly job that runs on the 1st and 15th of every month at 9:00 AM UTC
+   * Creates recommendation runs for all members with recommendations enabled and settings configured
+   */
+  @Cron('0 9 1,15 * *', {
     name: 'bi-monthly-recommendations',
     timeZone: 'UTC',
   })
@@ -40,12 +150,25 @@ export class RecommendationsJob {
 
       let successCount = 0;
       let errorCount = 0;
+      let skippedCount = 0;
 
       for (const member of membersWithRecommendationsEnabled) {
         try {
+          const hasSomeSettings = this.hasNotificationSettings(member);
+
+          // Only send regular recommendations if member has settings configured
+          if (!hasSomeSettings) {
+            this.logger.info(
+              `Skipping member ${member.uid} - no settings configured, will be handled by example emails job`
+            );
+            skippedCount++;
+            continue;
+          }
+
           const recentRun = await this.prisma.recommendationNotification.findFirst({
             where: {
               targetMemberUid: member.uid,
+              isExample: false,
               sentAt: {
                 gte: new Date(Date.now() - this.recommendationIntervalMs),
               },
@@ -57,6 +180,7 @@ export class RecommendationsJob {
 
           if (recentRun) {
             this.logger.info(`Skipping member ${member.uid} - has recent recommendation run from ${recentRun.sentAt}`);
+            skippedCount++;
             continue;
           }
 
@@ -70,7 +194,7 @@ export class RecommendationsJob {
             await this.recommendationsService.sendRecommendations(recommendationRun.uid, {
               approvedRecommendationUids: recommendationRun.recommendations.map((r) => r.uid),
               email: member.email ?? undefined,
-              emailSubject: 'Your Recommended Connections from PL Network',
+              emailSubject: 'Your Recommendations from PL Network',
             });
           }
 
@@ -86,11 +210,12 @@ export class RecommendationsJob {
       this.logger.info(`Bi-monthly recommendations job completed:`);
       this.logger.info(`- Total members processed: ${membersWithRecommendationsEnabled.length}`);
       this.logger.info(`- Successful runs created: ${successCount}`);
+      this.logger.info(`- Skipped: ${skippedCount}`);
       this.logger.info(`- Errors: ${errorCount}`);
 
       // Log to the application log service for monitoring
       this.logger.info(
-        `Bi-monthly recommendations job completed: ${successCount} successful, ${errorCount} errors`,
+        `Bi-monthly recommendations job completed: ${successCount} successful, ${skippedCount} skipped, ${errorCount} errors`,
         'bi-monthly-recommendations'
       );
     } catch (error) {
@@ -104,10 +229,18 @@ export class RecommendationsJob {
   }
 
   /**
-   * Manual trigger method for testing or on-demand execution
+   * Manual trigger method for testing or on-demand execution of regular recommendations
    */
   async triggerRecommendations() {
     this.logger.info('Manually triggering bi-monthly recommendations generation');
     await this.generateRecommendations();
+  }
+
+  /**
+   * Manual trigger method for testing or on-demand execution of example emails
+   */
+  async triggerExampleEmails() {
+    this.logger.info('Manually triggering daily example emails generation');
+    await this.sendExampleEmails();
   }
 }

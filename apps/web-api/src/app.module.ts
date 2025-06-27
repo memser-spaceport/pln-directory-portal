@@ -1,10 +1,5 @@
 import { BullModule } from '@nestjs/bull';
-import {
-  CacheModule,
-  MiddlewareConsumer,
-  Module,
-  RequestMethod,
-} from '@nestjs/common';
+import { CacheModule, MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -17,6 +12,7 @@ import { IndustryTagsModule } from './industry-tags/industry-tags.module';
 import { MyCacheInterceptor } from './interceptors/cache.interceptor';
 import { ConcealEntityIDInterceptor } from './interceptors/conceal-entity-id.interceptor';
 import { LocationsModule } from './locations/locations.module';
+import { LinkedInVerificationModule } from './linkedin-verification/linkedin-verification.module';
 import { MembersModule } from './members/members.module';
 import { MembershipSourcesModule } from './membership-sources/membership-sources.module';
 import { ContentTypeMiddleware } from './middlewares/content-type.middleware';
@@ -70,9 +66,9 @@ import { ProfileModule } from './profile/profile.module';
       max: 100, // maximum number of items in cache
       tls: process.env.REDIS_WITH_TLS
         ? {
-          rejectUnauthorized: false,
-          requestCert: true,
-        }
+            rejectUnauthorized: false,
+            requestCert: true,
+          }
         : null,
     }),
     BullModule.forRoot({
@@ -84,8 +80,8 @@ import { ProfileModule } from './profile/profile.module';
         },
       },
       settings: {
-        lockDuration: 20000
-      }
+        lockDuration: 20000,
+      },
     }),
     ScheduleModule.forRoot(),
     MembersModule,
@@ -93,6 +89,7 @@ import { ProfileModule } from './profile/profile.module';
     TeamsModule,
     IndustryTagsModule,
     ImagesModule,
+    LinkedInVerificationModule,
     MembershipSourcesModule,
     FundingStagesModule,
     SkillsModule,
@@ -141,12 +138,12 @@ import { ProfileModule } from './profile/profile.module';
     },
     {
       provide: APP_INTERCEPTOR,
-      useClass: EmptyStringToNullInterceptor
+      useClass: EmptyStringToNullInterceptor,
     },
     {
       provide: APP_FILTER,
-      useClass: LogException
-    }
+      useClass: LogException,
+    },
   ],
 })
 export class AppModule {

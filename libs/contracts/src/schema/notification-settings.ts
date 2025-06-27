@@ -5,6 +5,7 @@ export const NotificationSettingsResponseSchema = z.object({
   memberUid: z.string(),
   recommendationsEnabled: z.boolean(),
   subscribed: z.boolean(),
+  exampleSent: z.boolean(),
   showInvitationDialog: z.boolean(),
   emailFrequency: z.number(),
   byFocusArea: z.boolean(),

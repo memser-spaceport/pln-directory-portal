@@ -134,6 +134,7 @@ model Member {
   recommendationsAsRecommended Recommendation[]
   recommendationNotifications  RecommendationNotification[]
   notificationSetting          NotificationSetting?
+  linkedinProfile              LinkedInProfile?
 }
 
 model MemberRole {
@@ -398,6 +399,7 @@ model PLEventLocation {
   id             Int       @id @default(autoincrement())
   uid            String    @unique @default(cuid())
   location       String
+  country        String?
   timezone       String
   latitude       String
   longitude      String
@@ -717,6 +719,7 @@ model RecommendationNotification {
   targetMemberUid      String
   email                String
   subject              String
+  isExample            Boolean           @default(false)
   recommendations      Recommendation[]  @relation("NotificationRecommendations")
   sentAt               DateTime          @default(now())
   createdAt            DateTime          @default(now())
@@ -729,6 +732,7 @@ model NotificationSetting {
   member                 Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
   recommendationsEnabled Boolean  @default(false)
   subscribed             Boolean  @default(false)
+  exampleSent            Boolean  @default(false)
   showInvitationDialog   Boolean  @default(true)
   emailFrequency         Int      @default(14)
   byFocusArea            Boolean  @default(true)
@@ -743,4 +747,18 @@ model NotificationSetting {
   industryTagList        String[] @default([])
   technologyList         String[] @default([])
   keywordList            String[] @default([])
+}
+
+model LinkedInProfile {
+  id                Int       @id @default(autoincrement())
+  uid               String    @unique @default(cuid())
+  memberUid         String    @unique
+  member            Member    @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  linkedinProfileId String    @unique
+  linkedinHandler   String?
+  profileData       Json
+  isVerified        Boolean   @default(false)
+  verifiedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
