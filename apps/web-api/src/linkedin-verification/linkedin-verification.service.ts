@@ -66,6 +66,16 @@ export class LinkedInVerificationService implements OnModuleDestroy {
   }
 
   async handleLinkedInCallback(request: LinkedInCallbackRequestDto): Promise<LinkedInVerificationResponseDto> {
+    // Retrieve auth data from Redis cache
+    const authDataString = await this.redis.get(`linkedin_auth:${request.state}`);
+
+    if (!authDataString) {
+      throw new BadRequestException('Invalid or expired state parameter');
+    }
+
+    const authData = JSON.parse(authDataString) as { memberUid: string; redirectUrl: string; timestamp: number };
+    const { memberUid, redirectUrl = `${process.env.WEB_UI_BASE_URL}/profile` } = authData;
+
     try {
       if (!request.code) {
         throw new BadRequestException('Authorization code is required');
@@ -74,16 +84,6 @@ export class LinkedInVerificationService implements OnModuleDestroy {
       if (!request.state) {
         throw new BadRequestException('State parameter is required');
       }
-
-      // Retrieve auth data from Redis cache
-      const authDataString = await this.redis.get(`linkedin_auth:${request.state}`);
-
-      if (!authDataString) {
-        throw new BadRequestException('Invalid or expired state parameter');
-      }
-
-      const authData = JSON.parse(authDataString) as { memberUid: string; redirectUrl: string; timestamp: number };
-      const { memberUid, redirectUrl } = authData;
 
       // Clean up the cache entry
       await this.redis.del(`linkedin_auth:${request.state}`);
@@ -125,6 +125,17 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         throw new BadRequestException('Member not found');
       }
 
+      // Additional security: Check if this LinkedIn profile is already connected to another member
+      const existingLinkedInProfile = await this.prisma.linkedInProfile.findUnique({
+        where: {
+          linkedinProfileId: profileData.sub,
+        },
+      });
+
+      if (existingLinkedInProfile && existingLinkedInProfile.memberUid !== member.uid) {
+        throw new BadRequestException('This LinkedIn profile is already connected to another member account.');
+      }
+
       // Update or create LinkedIn profile
       const linkedinProfile = await this.prisma.linkedInProfile.upsert({
         where: {
@@ -163,16 +174,23 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         linkedinProfileId: linkedinProfile.linkedinProfileId,
         linkedinHandler: linkedinProfile.linkedinHandler || undefined,
         profileData: linkedinProfile.profileData as any,
-        redirectUrl,
+        redirectUrl: `${redirectUrl}${redirectUrl.includes('?') ? '&' : '?'}state=success`,
       };
     } catch (error) {
       this.logger.error('LinkedIn verification failed', error, 'LinkedInVerification');
+      let errorMessage = 'LinkedIn verification failed. Please try again.';
 
       if (error instanceof BadRequestException || error instanceof NotFoundException) {
-        throw error;
+        errorMessage = error.message || errorMessage;
       }
 
-      throw new BadRequestException('LinkedIn verification failed. Please try again.');
+      return {
+        success: false,
+        message: errorMessage,
+        redirectUrl: `${redirectUrl}${
+          redirectUrl.includes('?') ? '&' : '?'
+        }state=error&error_message=${encodeURIComponent(errorMessage)}`,
+      };
     }
   }
 

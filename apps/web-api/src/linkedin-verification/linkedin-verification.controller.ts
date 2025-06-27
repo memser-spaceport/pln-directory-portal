@@ -27,8 +27,7 @@ export class LinkedInVerificationController {
   @Get('callback')
   async linkedinCallback(@Query() query: LinkedInCallbackRequestDto, @Res() res: Response) {
     const result = await this.linkedinVerificationService.handleLinkedInCallback(query);
-    const redirectUrl = result.redirectUrl || `${process.env.WEB_UI_BASE_URL}/profile`;
-    res.redirect(redirectUrl);
+    res.redirect(result.redirectUrl);
   }
 
   @Get('status/:memberUid')
