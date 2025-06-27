@@ -5,6 +5,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
 import { RecommendationsEngine, MemberWithRelations, RecommendationFactors } from './recommendations.engine';
 import { AwsService } from '../utils/aws/aws.service';
+import { HuskyGenerationService } from '../husky/husky-generation.service';
 import * as path from 'path';
 import {
   CreateRecommendationRunRequest,
@@ -16,13 +17,23 @@ import { getRandomId, isEmails } from '../utils/helper/helper';
 
 @Injectable()
 export class RecommendationsService {
+  private readonly recommendationsPerRun = 1;
   private supportEmail: string | undefined;
 
-  constructor(private prisma: PrismaService, private logger: LogService, private awsService: AwsService) {
+  constructor(
+    private prisma: PrismaService,
+    private logger: LogService,
+    private awsService: AwsService,
+    private huskyGenerationService: HuskyGenerationService
+  ) {
     this.supportEmail = this.getSupportEmail();
   }
 
-  async createRecommendationRun(createDto: CreateRecommendationRunRequest) {
+  async createRecommendationRun(
+    createDto: CreateRecommendationRunRequest,
+    allMembers?: MemberWithRelations[],
+    isExample = false
+  ) {
     const targetMember = await this.prisma.member.findUnique({
       where: { uid: createDto.targetMemberUid },
     });
@@ -31,7 +42,13 @@ export class RecommendationsService {
       throw new NotFoundException('Target member not found');
     }
 
-    const recommendations = await this.generateRecommendations(targetMember.uid, 5);
+    const recommendations = await this.generateRecommendations(
+      targetMember.uid,
+      this.recommendationsPerRun,
+      [],
+      allMembers,
+      isExample
+    );
 
     return this.prisma.recommendationRun.create({
       data: {
@@ -91,7 +108,7 @@ export class RecommendationsService {
         status: { in: [ApprovalStatus.APPROVED, ApprovalStatus.PENDING] },
       },
     });
-    const count = 5 - activeRecommendations.length;
+    const count = this.recommendationsPerRun - activeRecommendations.length;
 
     if (count > 0) {
       const existingRecommendedMemberUids = recommendationRun.recommendations.map((rec) => rec.recommendedMemberUid);
@@ -236,14 +253,22 @@ export class RecommendationsService {
       },
     });
 
-    const emailData = await this.prepareEmailTemplateData(run.targetMember, approvedRecommendations);
+    if (approvedRecommendations.length === 0) {
+      return run;
+    }
+
+    const emailData = await this.prepareEmailTemplateData(run.targetMember, approvedRecommendations, sendDto.isExample);
 
     const toEmail = sendDto.email || run.targetMember.email;
     if (!toEmail) {
       throw new BadRequestException('No email address available to send recommendations');
     }
 
-    await this.sendRecommendationEmail(emailData, toEmail, sendDto.emailSubject);
+    if (sendDto.isExample) {
+      await this.sendExampleRecommendationEmail(emailData, toEmail, sendDto.emailSubject);
+    } else {
+      await this.sendRecommendationEmail(emailData, toEmail, sendDto.emailSubject);
+    }
 
     await this.prisma.recommendationNotification.create({
       data: {
@@ -251,6 +276,7 @@ export class RecommendationsService {
         targetMemberUid: run.targetMemberUid,
         email: toEmail,
         subject: sendDto.emailSubject,
+        isExample: sendDto.isExample,
         recommendations: {
           connect: approvedRecommendations.map((rec) => ({ uid: rec.uid })),
         },
@@ -284,10 +310,13 @@ export class RecommendationsService {
           };
         };
       }>
-    >
+    >,
+    isExample = false
   ): Promise<{
     name: string;
     user_email_frequency_preference: string;
+    link: string;
+    feedback_link: string;
     recommendations: Array<{
       name: string;
       image: string;
@@ -299,37 +328,116 @@ export class RecommendationsService {
       reason: string;
     }>;
   }> {
-    const recommendations = approvedRecommendations.map((rec) => {
-      const member = rec.recommendedMember;
-      const primaryRole = member.teamMemberRoles[0];
-      const team = primaryRole?.team;
-      const sanitizedTeamDescription = sanitizeHtml(team?.shortDescription || '', {
-        allowedTags: [],
-        allowedAttributes: [],
-      });
+    const utmSource = isExample ? 'recommendations_example' : 'recommendations';
+    const recommendations = await Promise.all(
+      approvedRecommendations.map(async (rec) => {
+        const member = rec.recommendedMember;
+        const primaryRole = member.teamMemberRoles[0];
+        const team = primaryRole?.team;
+        const sanitizedTeamDescription = sanitizeHtml(team?.shortDescription || '', {
+          allowedTags: [],
+          allowedAttributes: [],
+        });
 
-      return {
-        name: member.name,
-        image: member.image?.url || '',
-        team_description:
-          sanitizedTeamDescription.length > 500
-            ? sanitizedTeamDescription.substring(0, 500) + '...'
-            : sanitizedTeamDescription,
-        team_name: team?.name || '',
-        team_logo: team?.logo?.url || '',
-        position: primaryRole?.role || '',
-        link: `${process.env.WEB_UI_BASE_URL}/members/${
-          member.uid
-        }?utm_source=recommendations&utm_medium=email&utm_code=${getRandomId()}&target_uid=${
-          targetMember.uid
-        }&target_email=${encodeURIComponent(targetMember.email || '')}`,
-        reason: this.generateRecommendationReason(rec.factors),
-      };
-    });
+        // Get target member with full relations for LLM generation
+        const targetMemberWithRelations = await this.prisma.member.findUnique({
+          where: { uid: targetMember.uid },
+          include: {
+            teamMemberRoles: {
+              include: {
+                team: {
+                  include: {
+                    teamFocusAreas: {
+                      include: {
+                        focusArea: true,
+                      },
+                    },
+                    fundingStage: true,
+                    technologies: true,
+                    industryTags: true,
+                    asks: true,
+                  },
+                },
+              },
+            },
+            interactions: true,
+            targetInteractions: true,
+            eventGuests: true,
+            experiences: true,
+          },
+        });
+
+        // Get recommended member with full relations for LLM generation
+        const recommendedMemberWithRelations = await this.prisma.member.findUnique({
+          where: { uid: member.uid },
+          include: {
+            teamMemberRoles: {
+              include: {
+                team: {
+                  include: {
+                    teamFocusAreas: {
+                      include: {
+                        focusArea: true,
+                      },
+                    },
+                    fundingStage: true,
+                    technologies: true,
+                    industryTags: true,
+                    asks: true,
+                  },
+                },
+              },
+            },
+            interactions: true,
+            targetInteractions: true,
+            eventGuests: true,
+            experiences: true,
+          },
+        });
+
+        // Generate LLM-based recommendation reason
+        let reason = 'Based on your profile and activity in the network';
+        if (targetMemberWithRelations && recommendedMemberWithRelations) {
+          reason = await this.huskyGenerationService.generateRecommendationReason(
+            targetMemberWithRelations as MemberWithRelations,
+            recommendedMemberWithRelations as MemberWithRelations,
+            rec.factors as unknown as RecommendationFactors
+          );
+        }
+
+        return {
+          name: member.name,
+          image: member.image?.url || '',
+          team_description:
+            sanitizedTeamDescription.length > 500
+              ? sanitizedTeamDescription.substring(0, 500) + '...'
+              : sanitizedTeamDescription,
+          team_name: team?.name || '',
+          team_logo: team?.logo?.url || '',
+          position: primaryRole?.role || '',
+          link: `${process.env.WEB_UI_BASE_URL}/members/${
+            member.uid
+          }?utm_source=${utmSource}&utm_medium=email&utm_code=${getRandomId()}&target_uid=${
+            targetMember.uid
+          }&target_email=${encodeURIComponent(targetMember.email || '')}`,
+          reason: reason,
+        };
+      })
+    );
 
     return {
       name: targetMember.name,
-      user_email_frequency_preference: '',
+      link: `${
+        process.env.WEB_UI_BASE_URL
+      }/settings/recommendations?utm_source=${utmSource}&utm_medium=email&utm_code=${getRandomId()}&target_uid=${
+        targetMember.uid
+      }&target_email=${encodeURIComponent(targetMember.email || '')}`,
+      user_email_frequency_preference: 'twice per month',
+      feedback_link: `${
+        process.env.WEB_UI_BASE_URL
+      }/feedback?utm_source=${utmSource}&utm_medium=email&utm_code=${getRandomId()}&target_uid=${
+        targetMember.uid
+      }&target_email=${encodeURIComponent(targetMember.email || '')}`,
       recommendations: recommendations,
     };
   }
@@ -350,31 +458,86 @@ export class RecommendationsService {
     this.logger.info(`Recommendations email sent to ${toEmail} ref: ${result?.MessageId}`);
   }
 
+  private async sendExampleRecommendationEmail(emailData: any, toEmail: string, subject: string): Promise<void> {
+    const result = await this.awsService.sendEmailWithTemplate(
+      path.join(__dirname, '/shared/recommendedMembersExample.hbs'),
+      emailData,
+      '',
+      subject,
+      process.env.SES_SOURCE_EMAIL || '',
+      [toEmail],
+      [],
+      this.supportEmail,
+      true
+    );
+
+    this.logger.info(`Example recommendations email sent to ${toEmail} ref: ${result?.MessageId}`);
+  }
+
   private async generateRecommendations(
     targetMemberUid: string,
     count: number,
-    existingRecommendationUids: string[] = []
+    existingRecommendationUids: string[] = [],
+    allMembers?: MemberWithRelations[],
+    isExample = false
   ): Promise<{ memberUid: string; score: number; factors: RecommendationFactors }[]> {
     const engine = new RecommendationsEngine();
-    const chunkSize = 500;
 
-    this.logger.info('Loading members in chunks...');
-    const allMembers = await this.loadMembersInChunks(chunkSize);
-    this.logger.info(`Loaded ${allMembers.length} members`);
+    if (!allMembers) {
+      const chunkSize = 500;
+
+      this.logger.info('Loading members in chunks...');
+      allMembers = await this.loadRecommendationMembersInChunks(chunkSize);
+      this.logger.info(`Loaded ${allMembers.length} members`);
+    }
 
     const targetMemberWithRelations = allMembers.find((member) => member.uid === targetMemberUid);
     if (!targetMemberWithRelations) {
       throw new NotFoundException('Target member not found with relations');
     }
 
-    const recommendations = engine.getRecommendations(targetMemberWithRelations, allMembers, {
-      skipMemberIds: existingRecommendationUids,
-      skipTeamNames: ['Protocol Labs', 'Polaris Labs'],
-      skipIndustryTags: ['Discontinued'],
-      includeFocusAreas: true,
-      includeRoles: true,
-      includeFundingStages: true,
-    });
+    // Find members that were already sent in recommendation notifications
+    const [existingNotificationMembers, notificationSetting] = await Promise.all([
+      this.prisma.recommendationNotification.findMany({
+        where: {
+          targetMemberUid: targetMemberUid,
+        },
+        include: {
+          recommendations: {
+            include: {
+              recommendedMember: true,
+            },
+          },
+        },
+      }),
+      this.prisma.notificationSetting.findUnique({
+        where: {
+          memberUid: targetMemberUid,
+        },
+      }),
+    ]);
+
+    const alreadyRecommendedMemberUids = existingNotificationMembers
+      .flatMap((notification) => notification.recommendations)
+      .map((recommendation) => recommendation.recommendedMemberUid);
+
+    const recommendations = engine.getRecommendations(
+      targetMemberWithRelations,
+      allMembers,
+      {
+        skipMemberIds: [...existingRecommendationUids, ...alreadyRecommendedMemberUids],
+        skipTeamNames: ['Protocol Labs', 'Polaris Labs'],
+        skipIndustryTags: ['Discontinued'],
+        includeFocusAreas: false,
+        includeRoles: true,
+        includeFundingStages: true,
+        includeIndustryTags: false,
+        includeTechnologies: true,
+        includeKeywords: true,
+        minScore: isExample ? 0 : 15,
+      },
+      notificationSetting ?? undefined
+    );
 
     const selectedRecommendations = recommendations
       .sort((a, b) => {
@@ -392,7 +555,7 @@ export class RecommendationsService {
     }));
   }
 
-  private async loadMembersInChunks(
+  public async loadRecommendationMembersInChunks(
     chunkSize: number,
     where?: Prisma.MemberWhereInput
   ): Promise<MemberWithRelations[]> {
@@ -410,6 +573,7 @@ export class RecommendationsService {
         fundingStage: true,
         technologies: true,
         industryTags: true,
+        asks: true,
       },
     });
 
@@ -444,39 +608,6 @@ export class RecommendationsService {
     })) as MemberWithRelations[];
   }
 
-  private generateRecommendationReason(factors): string {
-    const reasons: string[] = [];
-
-    // Build focus area reason with examples
-    if (factors.teamFocusArea) {
-      const focusAreaReason = factors.matchedFocusAreas?.length
-        ? `focused on similar problem areas such as: ${factors.matchedFocusAreas.join(', ')}`
-        : 'focused on similar problem areas';
-      reasons.push(focusAreaReason);
-    }
-
-    // Build funding stage reason
-    if (factors.teamFundingStage) {
-      reasons.push('at similar funding stages');
-    }
-
-    // Build technology reason with examples
-    if (factors.teamTechnology) {
-      const techReason = factors.matchedTechnologies?.length
-        ? `working with similar technologies like: ${factors.matchedTechnologies.join(', ')}`
-        : 'working with similar technologies';
-      reasons.push(techReason);
-    }
-
-    if (reasons.length === 0) {
-      return 'Based on your profile and activity in the network';
-    }
-
-    // Join all reasons with appropriate conjunctions
-    const lastReason = reasons.pop();
-    return reasons.length > 0 ? `You are both ${reasons.join(', ')} and ${lastReason}` : `You are both ${lastReason}`;
-  }
-
   async getRecommendationNotifications(targetMemberUid?: string) {
     return this.prisma.recommendationNotification.findMany({
       where: {
@@ -502,7 +633,7 @@ export class RecommendationsService {
     return this.prisma.member.findMany({
       where: {
         notificationSetting: {
-          recommendationsEnabled: true,
+          subscribed: true,
         },
       },
       include: {

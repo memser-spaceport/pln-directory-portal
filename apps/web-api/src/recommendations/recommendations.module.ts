@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { RecommendationsService } from './recommendations.service';
+import { RecommendationsJob } from './recommendations.job';
 import { SharedModule } from '../shared/shared.module';
+import { HuskyModule } from '../husky/husky.module';
 
 @Module({
-  imports: [SharedModule],
-  providers: [RecommendationsService],
-  exports: [RecommendationsService],
+  imports: [SharedModule, HuskyModule],
+  providers: [RecommendationsService, RecommendationsJob],
+  exports: [RecommendationsService, RecommendationsJob],
 })
 export class RecommendationsModule {}

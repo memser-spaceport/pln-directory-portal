@@ -5,6 +5,7 @@ export const NotificationSettingsResponseSchema = z.object({
   memberUid: z.string(),
   recommendationsEnabled: z.boolean(),
   subscribed: z.boolean(),
+  exampleSent: z.boolean(),
   showInvitationDialog: z.boolean(),
   emailFrequency: z.number(),
   byFocusArea: z.boolean(),
@@ -25,10 +26,14 @@ export const UpdateNotificationSettingsSchema = z.object({
   byRole: z.boolean().optional(),
   byFundingStage: z.boolean().optional(),
   byIndustryTag: z.boolean().optional(),
+  byTechnology: z.boolean().optional(),
+  byKeyword: z.boolean().optional(),
   focusAreaList: z.array(z.string()).optional(),
   roleList: z.array(z.string()).optional(),
   fundingStageList: z.array(z.string()).optional(),
   industryTagList: z.array(z.string()).optional(),
+  technologyList: z.array(z.string()).optional(),
+  keywordList: z.array(z.string()).optional(),
 });
 
 export const UpdateParticipationSchema = z.object({
