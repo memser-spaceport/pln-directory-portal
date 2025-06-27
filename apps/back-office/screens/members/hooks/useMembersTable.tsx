@@ -1,4 +1,4 @@
-import React, { Dispatch, SetStateAction, useMemo } from 'react';
+import React, { Dispatch, HTMLProps, SetStateAction, useMemo } from 'react';
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -6,50 +6,86 @@ import {
   SortingState,
   useReactTable,
 } from '@tanstack/react-table';
-
-type Member = {
-  email: string;
-  id: string;
-  imageUrl: string;
-  isSubscribedToNewsletter: boolean;
-  name: string;
-  projectContributions: [];
-  skills: 'PENDING';
-  teamAndRoles: [];
-  status: string;
-};
+import MemberCell from '../components/MemberCell/MemberCell';
+import { Member } from '../types/member';
 
 const columnHelper = createColumnHelper<Member>();
 
-export function useMembersTable(
-  members: Member[],
-  sorting: SortingState,
-  setSorting: Dispatch<SetStateAction<SortingState>>
-) {
+export function useMembersTable({
+  members,
+  sorting,
+  setSorting,
+  rowSelection,
+  setRowSelection,
+}: {
+  rowSelection: Record<string, boolean>;
+  setRowSelection: Dispatch<SetStateAction<Record<string, boolean>>>;
+  members: Member[];
+  sorting: SortingState;
+  setSorting: Dispatch<SetStateAction<SortingState>>;
+}) {
   const columns = useMemo(() => {
     return [
+      {
+        id: 'select',
+        header: ({ table }) => (
+          <IndeterminateCheckbox
+            {...{
+              checked: table.getIsAllRowsSelected(),
+              indeterminate: table.getIsSomeRowsSelected(),
+              onChange: table.getToggleAllRowsSelectedHandler(),
+            }}
+          />
+        ),
+        cell: ({ row }) => (
+          <div>
+            <IndeterminateCheckbox
+              {...{
+                checked: row.getIsSelected(),
+                disabled: !row.getCanSelect(),
+                indeterminate: row.getIsSomeSelected(),
+                onChange: row.getToggleSelectedHandler(),
+              }}
+            />
+          </div>
+        ),
+        size: 48,
+        enableResizing: false,
+      },
       columnHelper.accessor('name', {
         header: 'Member',
         sortingFn: 'alphanumeric',
-        cell: (info) => <div>Name: {info.getValue()}</div>,
+        cell: (info) => <MemberCell member={info.row.original} />,
+        size: 0,
       }),
       columnHelper.accessor('projectContributions', {
         header: 'Project/Team',
         sortingFn: 'alphanumeric',
         cell: (props) => <div>Projects here</div>,
+        size: 0,
+      }),
+      columnHelper.accessor('linkedinProfile', {
+        header: 'LinkedIn Verified',
+        cell: (props) => <div>Linkeding here</div>,
+        size: 0,
       }),
       columnHelper.accessor('isSubscribedToNewsletter', {
         header: 'News',
         cell: (props) => <div>{props.getValue() ? 'Y' : 'N'}</div>,
+        size: 120,
+        enableResizing: false,
       }),
       columnHelper.accessor('status', {
         header: 'Status',
         sortingFn: 'alphanumeric',
         cell: (props) => <div>status dropdown</div>,
+        size: 0,
       }),
       columnHelper.display({
         header: 'Info',
         cell: (props) => <div>Exp controls</div>,
+        size: 88,
+        enableResizing: false,
       }),
     ];
   }, []);
@@ -65,17 +101,40 @@ export function useMembersTable(
     getSortedRowModel: getSortedRowModel(),
     state: {
       sorting,
+      rowSelection,
     },
     onSortingChange: setSorting,
+    enableRowSelection: true,
+    onRowSelectionChange: setRowSelection,
+    getRowId: (row) => {
+      return row.id;
+    },
     initialState: {
       sorting: [
         {
           id: 'name',
-          desc: true, // sort by name in descending order by default
+          desc: true,
         },
       ],
     },
   });
 
   return { table };
+}
+
+function IndeterminateCheckbox({
+  indeterminate,
+  className = '',
+  ...rest
+}: { indeterminate?: boolean } & HTMLProps<HTMLInputElement>) {
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  const ref = React.useRef<HTMLInputElement>(null!);
+
+  React.useEffect(() => {
+    if (typeof indeterminate === 'boolean') {
+      ref.current.indeterminate = !rest.checked && indeterminate;
+    }
+  }, [ref, indeterminate, rest.checked]);
+
+  return <input type="checkbox" ref={ref} className={className + ' cursor-pointer'} {...rest} />;
 }

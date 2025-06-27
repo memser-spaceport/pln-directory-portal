@@ -45,3 +45,74 @@
   line-height: 20px; /* 142.857% */
   letter-spacing: -0.2px;
 }
+
+.table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+  font-family: sans-serif;
+}
+
+.tableHeader {
+  background: #f8f8f8;
+  font-weight: bold;
+  background: var(--background-neutral-soft-surface, #F9FAFB);
+}
+
+.tableRow {
+  display: flex;
+  border-bottom: 1px solid #eee;
+}
+
+.headerCell {
+  display: flex;
+  height: 52px;
+  padding: var(--spacing-4xs, 4px) var(--spacing-md, 16px);
+  align-items: center;
+  gap: var(--spacing-2xs, 8px);
+
+  color: var(--foreground-neutral-secondary, #455468);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 142.857% */
+  letter-spacing: -0.2px;
+
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.bodyCell {
+  background: var(--background-base-white, #FFF);
+  display: flex;
+  padding: var(--spacing-4xs, 12px) var(--spacing-md, 16px);
+  align-items: center;
+  gap: var(--spacing-2xs, 8px);
+  align-self: stretch;
+
+  color: var(--foreground-neutral-secondary, #455468);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 142.857% */
+  letter-spacing: -0.2px;
+
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+
+.fixed {
+  flex: 0 0 auto;
+}
+
+.flexible {
+  flex: 1;
+  min-width: 0; /* important for text overflow */
+}
