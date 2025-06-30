@@ -18,6 +18,7 @@ import {
   SortIcon,
 } from '../../screens/members/components/icons';
 import clsx from 'clsx';
+import { MultieditControls } from '../../screens/members/components/MultieditControls';
 
 const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
   const router = useRouter();
@@ -94,7 +95,7 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
                         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                         // @ts-ignore
                         justifyContent: header.column.columnDef.meta?.align === 'center' ? 'center' : 'flex-start',
-                      }} // ← here
+                      }}
                       onClick={header.column.getToggleSortingHandler()}
                       title={
                         header.column.getCanSort()
@@ -145,6 +146,7 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
               </React.Fragment>
             ))}
           </div>
+          <MultieditControls ids={Object.keys(rowSelection)} onReset={() => setRowSelection({})} />
         </div>
       </div>
     </ApprovalLayout>
