@@ -26,8 +26,12 @@ import { copyObj, buildMultiRelationMapping } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { MembersHooksService } from './members.hooks.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
-import { AccessLevel } from '../utils/access-levels';
-import { RequestMembersDto, UpdateAccessLevelDto } from '../../../../libs/contracts/src/schema/admin-member';
+import {
+  AccessLevel,
+  AccessLevelCounts,
+  RequestMembersDto,
+  UpdateAccessLevelDto
+} from '../../../../libs/contracts/src/schema/admin-member';
 
 @Injectable()
 export class MembersService {
@@ -1726,6 +1730,26 @@ export class MembersService {
         pages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async getAccessLevelCounts(): Promise<AccessLevelCounts> {
+    const counts = await this.prisma.member.groupBy({
+      by: ['accessLevel'],
+      _count: true,
+    });
+
+    // Initialize all levels with 0, then populate real values
+    const allLevels = Object.values(AccessLevel);
+    const result = allLevels.reduce((acc, level) => {
+      acc[level as AccessLevel] = 0;
+      return acc;
+    }, {} as Record<AccessLevel, number>);
+
+    for (const item of counts) {
+      result[item.accessLevel as AccessLevel] = item._count;
+    }
+
+    return result;
   }
 
   async getAccessLevelByMemberEmail(email: string): Promise<string | null> {

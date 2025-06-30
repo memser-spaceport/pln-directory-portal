@@ -74,6 +74,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
       },
       linkedInDetails: {},
       accessLevel: faker.helpers.arrayElement(['L0', 'L1', 'L2', 'L3', 'L4']),
+      accessLevelUpdatedAt: faker.date.past(),
     };
   }
 );

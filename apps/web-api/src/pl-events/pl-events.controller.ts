@@ -44,8 +44,8 @@ import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { InternalAuthGuard } from '../guards/auth.guard';
 import { TeamsService } from '../teams/teams.service';
 import { AccessLevelsGuard } from '../guards/access-levels.guard';
-import { AccessLevel } from '../utils/access-levels';
 import { AccessLevels } from '../decorators/access-levels.decorator';
+import { AccessLevel } from 'libs/contracts/src/schema/admin-member';
 
 const server = initNestServer(apiEvents);
 type RouteShape = typeof server.routeShapes;

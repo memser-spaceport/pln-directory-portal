@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards, UsePi
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { MembersService } from '../members/members.service';
 import { ZodValidationPipe } from '@abitia/zod-dto';
-import { RequestMembersDto, UpdateAccessLevelDto } from 'libs/contracts/src/schema/admin-member';
+import { AccessLevelCounts, RequestMembersDto, UpdateAccessLevelDto } from 'libs/contracts/src/schema/admin-member';
 import { NoCache } from '../decorators/no-cache.decorator';
 
 @Controller('v1/admin/members')
@@ -15,6 +15,11 @@ export class MemberController {
   @NoCache()
   async getMembers(@Query() query: RequestMembersDto) {
     return await this.membersService.findMemberByAccessLevels(query);
+  }
+
+  @Get('access-level-counts')
+  async getAccessLevelCounts(): Promise<AccessLevelCounts> {
+    return this.membersService.getAccessLevelCounts();
   }
 
   @Put('access-level')
