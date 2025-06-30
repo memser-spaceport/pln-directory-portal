@@ -4,16 +4,22 @@ import React, { useCallback, useRef, useState } from 'react';
 import { useOnClickOutside } from '../../../../hooks/useOnClickOutside';
 
 import s from './MembersMenu.module.scss';
+import { useAccessLevelCounts } from '../../../../hooks/members/useAccessLevelCounts';
+import { useCookie } from 'react-use';
 
 export const MembersMenu = () => {
   const menuRef = useRef(null);
   const [open, setOpen] = useState(false);
+
+  const [cookieValue] = useCookie('plnadmin');
 
   const handleClickOutside = useCallback(() => {
     setOpen(false);
   }, []);
 
   useOnClickOutside([menuRef], handleClickOutside);
+
+  const { data: counts } = useAccessLevelCounts({ authToken: cookieValue });
 
   return (
     <div className={s.root}>
@@ -23,37 +29,37 @@ export const MembersMenu = () => {
       {open && (
         <div className={s.menu} ref={menuRef}>
           <Link href="/members?filter=level1" passHref>
-            <a className={s.menuItem}>
+            <a className={s.menuItem} onClick={handleClickOutside}>
               <Level1Icon />
               <span className={s.menuItemLabel}>1 level</span>
-              <span className={s.menuItemCount}>2</span>
+              <span className={s.menuItemCount}>{counts?.L1}</span>
               <CaretIcon />
             </a>
           </Link>
 
           <Link href="/members?filter=level0" passHref>
-            <div className={s.menuItem}>
+            <div className={s.menuItem} onClick={handleClickOutside}>
               <Level0Icon />
               <span className={s.menuItemLabel}>0 Level</span>
-              <span className={s.menuItemCount}>2</span>
+              <span className={s.menuItemCount}>{counts?.L0}</span>
               <CaretIcon />
             </div>
           </Link>
 
           <Link href="/members?filter=level2" passHref>
-            <div className={s.menuItem}>
+            <div className={s.menuItem} onClick={handleClickOutside}>
               <Level2Icon />
               <span className={s.menuItemLabel}>2-4 Level</span>
-              <span className={s.menuItemCount}>2</span>
+              <span className={s.menuItemCount}>{(counts?.L2 ?? 0) + (counts?.L3 ?? 0) + (counts?.L4 ?? 0)}</span>
               <CaretIcon />
             </div>
           </Link>
 
           <Link href="/members?filter=rejected" passHref>
-            <div className={s.menuItem}>
+            <div className={s.menuItem} onClick={handleClickOutside}>
               <RejectedIcon />
               <span className={s.menuItemLabel}>Rejected</span>
-              <span className={s.menuItemCount}>2</span>
+              <span className={s.menuItemCount}>{counts?.Rejected}</span>
               <CaretIcon />
             </div>
           </Link>
