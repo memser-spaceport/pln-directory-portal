@@ -10,5 +10,7 @@ export type Member = {
   skills: 'PENDING';
   teamAndRoles: { teamTitle: string; teamUid: string }[];
   status: string;
+  accessLevel: string;
   linkedinProfile: Record<string, string>;
+  updatedAt: string;
 };

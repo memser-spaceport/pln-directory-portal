@@ -1,0 +1,111 @@
+.root {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  width: 100%;
+}
+
+.btn {
+  display: flex;
+  padding: var(--spacing-4xs, 4px) var(--spacing-2xs, 8px);
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-zero, 4px);
+
+  border-radius: var(--corner-radius-md, 8px);
+  border: 1px solid var(--transparent-dark-2, rgba(14, 15, 17, 0.02));
+  background: var(--action-background-neutral-light_normal, rgba(14, 15, 17, 0.04));
+
+  /* Button/regular/light */
+  box-shadow: 0px -2px 4px 0px var(--transparent-dark-2, rgba(14, 15, 17, 0.02)) inset;
+
+  color: var(--action-foreground-neutral-normal, #455468);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 16px; /* 133.333% */
+  letter-spacing: -0.2px;
+
+  &:hover {
+    background: var(--action-background-neutral-light_hover, rgba(14, 15, 17, 0.08));
+  }
+}
+
+.optionRoot {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  gap: var(--spacing-3xs, 6px);
+  align-self: stretch;
+  max-height: 40px;
+  flex: 1;
+  overflow: hidden;
+
+  &:hover {
+    background: var(--transparent-dark-4, rgba(14, 15, 17, 0.04));
+  }
+}
+
+.name {
+  color: var(--action-foreground-neutral-normal, #455468);
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 24px; /* 150% */
+  letter-spacing: -0.3px;
+}
+
+.desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  flex: 1 0 0;
+  overflow: hidden;
+  color: #8897AE;
+  text-overflow: ellipsis;
+
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 16px; /* 133.333% */
+  letter-spacing: -0.2px;
+}
+
+.orange {
+  color: #D97706;
+}
+
+.blue {
+  color: #1B4DFF;
+}
+
+.green {
+  color: #0A9952;
+}
+
+.red {
+  color: #D21A0E;
+}
+
+.control {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3xs, 6px);
+
+  border-radius: var(--corner-radius-md, 8px);
+  border: 1px solid var(--action-border-neutral-light_active, rgba(14, 15, 17, 0.16));
+  background: var(--background-base-white, #FFF);
+  width: 100%;
+  flex-wrap: nowrap;
+
+  .optionRoot {
+    padding-left: 8px;
+  }
+}
+
+.childrenWrapper {
+  display: flex;
+  align-items: center;
+  flex: 0.2;
+  flex-wrap: nowrap;
+}

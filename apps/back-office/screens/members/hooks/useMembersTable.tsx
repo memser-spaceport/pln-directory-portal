@@ -12,6 +12,7 @@ import ProjectsCell from '../components/ProjectsCell/ProjectsCell';
 import LinkedinCell from '../components/LinkedinCell/LinkedinCell';
 import NewsCell from '../components/NewsCell/NewsCell';
 import EditCell from '../components/EditCell/EditCell';
+import StatusCell from '../components/StatusCell/StatusCell';
 
 const columnHelper = createColumnHelper<Member>();
 
@@ -91,7 +92,7 @@ export function useMembersTable({
       columnHelper.accessor('status', {
         header: 'Status',
         sortingFn: 'alphanumeric',
-        cell: (props) => <div>status dropdown</div>,
+        cell: (props) => <StatusCell member={props.row.original} />,
         size: 0,
       }),
       columnHelper.display({
