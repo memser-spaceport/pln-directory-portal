@@ -18,6 +18,8 @@ export class MemberController {
   }
 
   @Get('access-level-counts')
+  @UseGuards(AdminAuthGuard)
+  @NoCache()
   async getAccessLevelCounts(): Promise<AccessLevelCounts> {
     return this.membersService.getAccessLevelCounts();
   }
