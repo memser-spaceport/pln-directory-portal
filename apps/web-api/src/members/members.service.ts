@@ -1748,6 +1748,7 @@ export class MembersService {
       },
       data: {
         accessLevel,
+        accessLevelUpdatedAt: new Date(),
       },
     });
 

@@ -136,6 +136,7 @@ model Member {
   notificationSetting          NotificationSetting?
   linkedinProfile              LinkedInProfile?
   accessLevel                  String?
+  accessLevelUpdatedAt         DateTime                      @default(now())
 }
 
 model MemberRole {
