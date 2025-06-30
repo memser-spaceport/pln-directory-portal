@@ -63,6 +63,7 @@ export const API_ROUTE = {
   MEMBERS: APP_CONSTANTS.V1 + 'members',
   ADMIN_APPROVAL: APP_CONSTANTS.V1 + 'admin/members',
   ADMIN_RECOMMENDATIONS: APP_CONSTANTS.V1 + 'admin/recommendations',
+  ADMIN_MEMBERS: `${APP_CONSTANTS.V1}admin/members`,
 };
 
 export const TOKEN = 'plnetwork@1';

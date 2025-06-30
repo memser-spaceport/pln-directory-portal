@@ -1,16 +1,13 @@
 export type Member = {
-  email: string;
-  id: string;
-  imageUrl: string;
-  isSubscribedToNewsletter: boolean;
-  name: string;
-  projectContributions: {
-    projectTitle: string;
-  }[];
-  skills: 'PENDING';
-  teamAndRoles: { teamTitle: string; teamUid: string }[];
-  status: string;
   accessLevel: string;
-  linkedinProfile: Record<string, string>;
-  updatedAt: string;
+  accessLevelUpdatedAt: string;
+  email: string;
+  image: { url: string };
+  isSubscribedToNewsletter: boolean;
+  linkedinProfile: { uid: string; linkedinHandler: string } | null;
+  name: string;
+  projectContributions: { uid: string; project: { uid: string; name: string } }[];
+  teamMemberRoles: { team: { uid: string; name: string } }[];
+  teamOrProjectURL: string;
+  uid: string;
 };

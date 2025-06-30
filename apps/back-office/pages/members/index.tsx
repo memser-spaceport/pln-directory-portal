@@ -24,7 +24,6 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
   const router = useRouter();
   const query = router.query;
   const { filter } = query;
-  const [active, setActive] = useState<string>((filter as string) ?? 'level1');
   const items = useMemo(() => {
     return [
       {
@@ -56,8 +55,15 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [rowSelection, setRowSelection] = React.useState({});
 
-  const { data } = useMembersList({ authToken });
-  const { table } = useMembersTable({ members: data, sorting, setSorting, rowSelection, setRowSelection });
+  const { data } = useMembersList({ authToken, accessLevel: getAccessLevel(filter as string) });
+  const { table } = useMembersTable({
+    members: data?.data,
+    sorting,
+    setSorting,
+    rowSelection,
+    setRowSelection,
+    authToken,
+  });
 
   return (
     <ApprovalLayout>
@@ -66,7 +72,17 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
           <span className={s.title}>Members</span>
 
           <span className={s.filters}>
-            <TableFilter items={items} active={active} onFilterClick={(id) => setActive(id)}>
+            <TableFilter
+              items={items}
+              active={filter as string}
+              onFilterClick={(id) =>
+                router.replace({
+                  query: {
+                    filter: id,
+                  },
+                })
+              }
+            >
               <button className={s.addNewBtn}>
                 <AddIcon /> Add new
               </button>
@@ -78,7 +94,7 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
           <div className={s.table}>
             {/* Header */}
             {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className={s.tableRow}>
+              <div key={headerGroup.id} className={s.tableRow}>
                 {headerGroup.headers.map((header, i) => {
                   return header.isPlaceholder ? null : (
                     <div
@@ -112,7 +128,7 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
                     </div>
                   );
                 })}
-              </tr>
+              </div>
             ))}
             {/* Body */}
             {table.getRowModel().rows.map((row) => (
@@ -146,7 +162,11 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
               </React.Fragment>
             ))}
           </div>
-          <MultieditControls ids={Object.keys(rowSelection)} onReset={() => setRowSelection({})} />
+          <MultieditControls
+            ids={Object.keys(rowSelection)}
+            onReset={() => setRowSelection({})}
+            authToken={authToken}
+          />
         </div>
       </div>
     </ApprovalLayout>
@@ -183,3 +203,17 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     };
   }
 };
+
+function getAccessLevel(filter: string | undefined) {
+  switch (filter) {
+    case 'level1':
+      return ['L1'];
+    case 'level2':
+      return ['L2', 'L3', 'L4'];
+    case 'level0':
+      return ['L0'];
+    case 'rejected':
+    default:
+      return ['Rejected'];
+  }
+}

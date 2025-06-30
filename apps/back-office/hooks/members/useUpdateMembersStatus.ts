@@ -1,15 +1,22 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import api from 'apps/back-office/utils/api';
+import api from '../../utils/api';
 import { MembersQueryKeys } from './constants/queryKeys';
+import { API_ROUTE } from '../../utils/constants';
 
-async function mutation(params) {
+interface MutationParams {
+  authToken: string;
+  memberUids: string[];
+  accessLevel: string;
+}
+
+async function mutation(params: MutationParams) {
   const config = {
     headers: {
       authorization: `Bearer ${params.authToken}`,
     },
   };
 
-  await api.post('/v1/members/update-status', params, config);
+  await api.put(`${API_ROUTE.ADMIN_MEMBERS}/access-level`, params, config);
 }
 
 export function useUpdateMembersStatus() {

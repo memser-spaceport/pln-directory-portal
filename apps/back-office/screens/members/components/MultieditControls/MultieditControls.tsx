@@ -9,6 +9,7 @@ import { useUpdateMembersStatus } from '../../../../hooks/members/useUpdateMembe
 interface Props {
   ids: string[];
   onReset: () => void;
+  authToken: string;
 }
 
 const options = [
@@ -68,16 +69,16 @@ const options = [
         <Level2Icon />
       </span>
     ),
-    name: 'Denied',
-    value: 'Denied',
+    name: 'Rejected',
+    value: 'Rejected',
     desc: '- Access Denied',
   },
 ];
 
-export const MultieditControls = ({ ids, onReset }: Props) => {
+export const MultieditControls = ({ ids, onReset, authToken }: Props) => {
   const [_value, setValue] = React.useState<any>([]);
 
-  const { mutate } = useUpdateMembersStatus();
+  const { mutateAsync } = useUpdateMembersStatus();
 
   return (
     <div
@@ -214,11 +215,14 @@ export const MultieditControls = ({ ids, onReset }: Props) => {
           type="button"
           className={s.primaryBtn}
           disabled={false}
-          onClick={() => {
-            mutate({
-              ids,
-              status: _value.value,
+          onClick={async () => {
+            await mutateAsync({
+              authToken,
+              memberUids: ids,
+              accessLevel: _value.value,
             });
+
+            onReset();
           }}
         >
           Save

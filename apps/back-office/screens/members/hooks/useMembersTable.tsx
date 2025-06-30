@@ -22,12 +22,14 @@ export function useMembersTable({
   setSorting,
   rowSelection,
   setRowSelection,
+  authToken,
 }: {
   rowSelection: Record<string, boolean>;
   setRowSelection: Dispatch<SetStateAction<Record<string, boolean>>>;
   members: Member[];
   sorting: SortingState;
   setSorting: Dispatch<SetStateAction<SortingState>>;
+  authToken: string;
 }) {
   const columns = useMemo(() => {
     return [
@@ -67,7 +69,7 @@ export function useMembersTable({
         header: 'Project/Team',
         sortingFn: 'alphanumeric',
         cell: (info) => <ProjectsCell member={info.row.original} />,
-        size: 0,
+        size: 200,
       }),
       columnHelper.accessor('linkedinProfile', {
         header: 'LinkedIn Verified',
@@ -89,10 +91,10 @@ export function useMembersTable({
           align: 'center',
         },
       }),
-      columnHelper.accessor('status', {
+      columnHelper.accessor('accessLevel', {
         header: 'Status',
         sortingFn: 'alphanumeric',
-        cell: (props) => <StatusCell member={props.row.original} />,
+        cell: (props) => <StatusCell member={props.row.original} authToken={authToken} />,
         size: 0,
       }),
       columnHelper.display({
@@ -124,7 +126,7 @@ export function useMembersTable({
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     getRowId: (row) => {
-      return row.id;
+      return row.uid;
     },
     initialState: {
       sorting: [

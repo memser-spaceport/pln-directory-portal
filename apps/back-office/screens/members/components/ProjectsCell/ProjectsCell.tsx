@@ -11,19 +11,17 @@ export const ProjectsCell = ({ member }: { member: Member }) => {
 
   const items = useMemo(() => {
     const result = [];
-    member.projectContributions
-      .filter((project) => project.projectTitle.length)
-      .forEach((project) => {
-        result.push({
-          icon: <ProjectsIcon />,
-          label: project.projectTitle ?? 'n/a',
-        });
+    member.projectContributions.forEach((project) => {
+      result.push({
+        icon: <ProjectsIcon />,
+        label: project.project.name ?? 'n/a',
       });
+    });
 
-    member.teamAndRoles?.forEach((item) => {
+    member.teamMemberRoles?.forEach((item) => {
       result.push({
         icon: <MembersIcon />,
-        label: item.teamTitle,
+        label: item.team.name,
       });
     });
 

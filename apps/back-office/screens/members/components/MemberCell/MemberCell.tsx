@@ -9,8 +9,8 @@ export const MemberCell = ({ member }: { member: Member }) => {
   return (
     <div className={s.root}>
       <div className={s.avatar}>
-        {member.imageUrl ? (
-          <img src={member.imageUrl} alt={member.name} />
+        {member.image ? (
+          <img src={member.image.url} alt={member.name} />
         ) : (
           <div className={s.placeholder}>{member.name.charAt(0)}</div>
         )}
@@ -20,7 +20,7 @@ export const MemberCell = ({ member }: { member: Member }) => {
         <div className={s.secondaryLabel}>{member.email}</div>
       </div>
       <div className={s.link}>
-        <a href={`${WEB_UI_BASE_URL}/members/${member.id}`} target="_blank" rel="noreferrer">
+        <a href={`${WEB_UI_BASE_URL}/members/${member.uid}`} target="_blank" rel="noreferrer">
           <ExternalLinkIcon />
         </a>
       </div>

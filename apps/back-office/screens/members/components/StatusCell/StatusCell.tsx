@@ -5,6 +5,7 @@ import { Member } from '../../types/member';
 import s from './StatusCell.module.scss';
 import { Level0Icon, Level1Icon, Level2Icon } from '../icons';
 import { useUpdateMembersStatus } from '../../../../hooks/members/useUpdateMembersStatus';
+import { format } from 'date-fns';
 
 const options = [
   {
@@ -63,13 +64,13 @@ const options = [
         <Level2Icon />
       </span>
     ),
-    name: 'Denied',
-    value: 'Denied',
+    name: 'Rejected',
+    value: 'Rejected',
     desc: '- Access Denied',
   },
 ];
 
-export const StatusCell = ({ member }: { member: Member }) => {
+export const StatusCell = ({ member, authToken }: { member: Member; authToken: string }) => {
   const _value = useMemo(() => {
     const val = options.find((option) => option.value === member.accessLevel);
 
@@ -77,11 +78,11 @@ export const StatusCell = ({ member }: { member: Member }) => {
       return [
         {
           ...val,
-          updatedAt: member.updatedAt,
+          updatedAt: member.accessLevelUpdatedAt,
         },
       ];
     }
-  }, [member.accessLevel, member.updatedAt]);
+  }, [member.accessLevel, member.accessLevelUpdatedAt]);
 
   const { mutate } = useUpdateMembersStatus();
 
@@ -93,8 +94,9 @@ export const StatusCell = ({ member }: { member: Member }) => {
         value={_value}
         onChange={(val) => {
           mutate({
-            ids: [member.id],
-            status: val.value,
+            authToken,
+            memberUids: [member.uid],
+            accessLevel: val.value,
           });
         }}
         styles={{
@@ -173,6 +175,7 @@ export const StatusCell = ({ member }: { member: Member }) => {
                     <div className={s.optionRoot}>
                       {selected.icon} <span className={s.name}>{selected.name}</span>{' '}
                       <span className={s.desc}>{selected.desc}</span>
+                      <span className={s.desc}>{format(selected.updatedAt, 'dd/MM/yyyy, HH:mm')}</span>
                     </div>
                     <div className={s.childrenWrapper}>{children}</div>
                   </>

@@ -4,7 +4,7 @@ import {
   NotFoundException,
   Inject,
   Injectable,
-  forwardRef
+  forwardRef,
 } from '@nestjs/common';
 import { z } from 'zod';
 import axios from 'axios';
@@ -46,7 +46,7 @@ export class MembersService {
     private membersHooksService: MembersHooksService,
     @Inject(forwardRef(() => NotificationSettingsService))
     private notificationSettingsService: NotificationSettingsService
-  ) { }
+  ) {}
 
   /**
    * Creates a new member in the database within a transaction.
@@ -78,13 +78,13 @@ export class MembersService {
    *                       the members. These options are based on Prisma's `MemberFindManyArgs`.
    * @returns A promise that resolves to an array of member records matching the query criteria.
    */
-  async findAll(queryOptions: Prisma.MemberFindManyArgs): Promise<{ count: Number, members: Member[] }> {
+  async findAll(queryOptions: Prisma.MemberFindManyArgs): Promise<{ count: Number; members: Member[] }> {
     try {
       const [members, membersCount] = await Promise.all([
         this.prisma.member.findMany(queryOptions),
         this.prisma.member.count({ where: queryOptions.where }),
       ]);
-      return { count: membersCount, members: members }
+      return { count: membersCount, members: members };
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -123,7 +123,7 @@ export class MembersService {
       this.logger.error('Error while retrieving member role count for default and user selected roles. Error: ', error);
       return {
         statusCode: 500,
-        message: 'Error while retrieving member role count for default and user selected roles'
+        message: 'Error while retrieving member role count for default and user selected roles',
       };
     }
   }
@@ -154,7 +154,7 @@ export class MembersService {
       this.logger.error('Error while retrieving member role count for excluded and non selected roles. Error: ', error);
       return {
         statusCode: 500,
-        message: 'Error while retrieving member role count for excluded and non selected roles'
+        message: 'Error while retrieving member role count for excluded and non selected roles',
       };
     }
   }
@@ -200,7 +200,7 @@ export class MembersService {
       this.logger.error('Error while retrieving member role filters with count. Error: ', error);
       return {
         statusCode: 500,
-        message: 'Error while retrieving member role filters with count'
+        message: 'Error while retrieving member role filters with count',
       };
     }
   }
@@ -216,7 +216,7 @@ export class MembersService {
   async updateMemberByUid(
     uid: string,
     member: Prisma.MemberUncheckedUpdateInput,
-    tx: Prisma.TransactionClient = this.prisma,
+    tx: Prisma.TransactionClient = this.prisma
   ): Promise<Member> {
     try {
       const result = await tx.member.update({
@@ -277,7 +277,7 @@ export class MembersService {
           eventGuests: {
             orderBy: {
               event: {
-                startDate: 'desc'
+                startDate: 'desc',
               },
             },
             select: {
@@ -297,9 +297,9 @@ export class MembersService {
                     select: {
                       location: true,
                       timezone: true,
-                    }
+                    },
                   },
-                }
+                },
               },
             },
           },
@@ -326,7 +326,7 @@ export class MembersService {
           memberRoles: true,
           teamMemberRoles: true,
           projectContributions: true,
-        }
+        },
       });
     } catch (error) {
       return this.handleErrors(error);
@@ -348,7 +348,7 @@ export class MembersService {
           skills: true,
           teamMemberRoles: true,
           memberRoles: true,
-          projectContributions: true
+          projectContributions: true,
         },
       });
     } catch (error) {
@@ -367,7 +367,7 @@ export class MembersService {
       return await this.prisma.member.findUniqueOrThrow({
         where: { email: email.toLowerCase().trim() },
         include: {
-          memberRoles: true
+          memberRoles: true,
         },
       });
     } catch (error) {
@@ -406,9 +406,7 @@ export class MembersService {
         ...foundMember,
         isDirectoryAdmin,
         roleNames,
-        leadingTeams: foundMember.teamMemberRoles
-          .filter((role) => role.teamLead)
-          .map((role) => role.teamUid),
+        leadingTeams: foundMember.teamMemberRoles.filter((role) => role.teamLead).map((role) => role.teamUid),
       };
     } catch (error) {
       return this.handleErrors(error);
@@ -448,17 +446,18 @@ export class MembersService {
       let newTokens;
       let newMemberInfo;
       await this.prisma.$transaction(async (tx) => {
-        await this.participantsRequestService.addRequest({
-          status: 'AUTOAPPROVED',
-          requesterEmailId: oldEmail,
-          referenceUid: memberInfo.uid,
-          uniqueIdentifier: oldEmail,
-          participantType: 'MEMBER',
-          newData: {
-            oldEmail: oldEmail,
-            email: newEmail
-          }
-        },
+        await this.participantsRequestService.addRequest(
+          {
+            status: 'AUTOAPPROVED',
+            requesterEmailId: oldEmail,
+            referenceUid: memberInfo.uid,
+            uniqueIdentifier: oldEmail,
+            participantType: 'MEMBER',
+            newData: {
+              oldEmail: oldEmail,
+              email: newEmail,
+            },
+          },
           false,
           tx
         );
@@ -469,17 +468,17 @@ export class MembersService {
             memberRoles: true,
             image: true,
             teamMemberRoles: true,
-          }
-        })
-        newTokens = await this.authService.updateEmailInAuth(newEmail, oldEmail, memberInfo.externalId)
+          },
+        });
+        newTokens = await this.authService.updateEmailInAuth(newEmail, oldEmail, memberInfo.externalId);
       });
-      this.logger.info(`Email has been successfully updated from ${oldEmail} to ${newEmail}`)
+      this.logger.info(`Email has been successfully updated from ${oldEmail} to ${newEmail}`);
       await this.cacheService.reset({ service: 'members' });
       return {
         refreshToken: newTokens.refresh_token,
         idToken: newTokens.id_token,
         accessToken: newTokens.access_token,
-        userInfo: this.memberToUserInfo(newMemberInfo)
+        userInfo: this.memberToUserInfo(newMemberInfo),
       };
     } catch (error) {
       return this.handleErrors(error);
@@ -515,8 +514,7 @@ export class MembersService {
       profileImageUrl: memberInfo.image?.url ?? null,
       uid: memberInfo.uid,
       roles: memberInfo.memberRoles?.map((r) => r.name) ?? [],
-      leadingTeams: memberInfo.teamMemberRoles?.filter((role) => role.teamLead)
-        .map(role => role.teamUid) ?? []
+      leadingTeams: memberInfo.teamMemberRoles?.filter((role) => role.teamLead).map((role) => role.teamUid) ?? [],
     };
   }
 
@@ -583,16 +581,12 @@ export class MembersService {
       }`,
     };
     try {
-      const response = await axios.post(
-        'https://api.github.com/graphql',
-        query,
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.GITHUB_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const response = await axios.post('https://api.github.com/graphql', query, {
+        headers: {
+          Authorization: `Bearer ${process.env.GITHUB_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
       return response?.data?.data?.user?.pinnedItems?.nodes || [];
     } catch (err) {
       this.logger.error('Error fetching pinned repositories from GitHub.', err);
@@ -608,16 +602,16 @@ export class MembersService {
    */
   private async fetchRecentRepositories(githubHandler: string) {
     try {
-      const response = await axios.get(
-        `https://api.github.com/users/${githubHandler}/repos?sort=pushed&per_page=50`
+      const response = await axios.get(`https://api.github.com/users/${githubHandler}/repos?sort=pushed&per_page=50`);
+      return (
+        response?.data.map((repo) => ({
+          name: repo.name,
+          description: repo.description,
+          url: repo.html_url,
+          createdAt: repo.created_at,
+          updatedAt: repo.updated_at,
+        })) || []
       );
-      return response?.data.map((repo) => ({
-        name: repo.name,
-        description: repo.description,
-        url: repo.html_url,
-        createdAt: repo.created_at,
-        updatedAt: repo.updated_at,
-      })) || [];
     } catch (err) {
       this.logger.error('Error fetching recent repositories from GitHub.', err);
       return [];
@@ -705,8 +699,16 @@ export class MembersService {
       const existingMember = await this.findMemberByUid(memberUid, tx);
       const isExternalIdAvailable = existingMember.externalId ? true : false;
       const isEmailChanged = await this.checkIfEmailChanged(memberData, existingMember, tx);
-      this.logger.info(`Member update request - Initiaing update for member uid - ${existingMember.uid}, requestId -> ${memberUid}`)
-      const member = await this.prepareMemberFromParticipantRequest(memberUid, memberData, existingMember, tx, 'Update');
+      this.logger.info(
+        `Member update request - Initiaing update for member uid - ${existingMember.uid}, requestId -> ${memberUid}`
+      );
+      const member = await this.prepareMemberFromParticipantRequest(
+        memberUid,
+        memberData,
+        existingMember,
+        tx,
+        'Update'
+      );
       await this.mapLocationToMember(memberData, existingMember, member, tx);
       result = await this.updateMemberByUid(
         memberUid,
@@ -719,9 +721,14 @@ export class MembersService {
       await this.updateMemberEmailChange(memberUid, isEmailChanged, isExternalIdAvailable, memberData, existingMember);
       await this.logParticipantRequest(requestorEmail, memberData, existingMember.uid, tx);
       if (isEmailChanged && isDirectoryAdmin) {
-        this.notificationService.notifyForMemberChangesByAdmin(memberData.name, memberUid, existingMember.email, memberData.email);
+        this.notificationService.notifyForMemberChangesByAdmin(
+          memberData.name,
+          memberUid,
+          existingMember.email,
+          memberData.email
+        );
       }
-      this.logger.info(`Member update request - completed, requestId -> ${result.uid}, requestor -> ${requestorEmail}`)
+      this.logger.info(`Member update request - completed, requestId -> ${result.uid}, requestor -> ${requestorEmail}`);
     });
     await this.membersHooksService.postUpdateActions(result, requestorEmail);
     return result;
@@ -735,11 +742,7 @@ export class MembersService {
    * @param existingData - The existing member data, used for comparing the current email.
    * @throws {BadRequestException} - Throws if the email has been changed and the new email is already in use.
    */
-  async checkIfEmailChanged(
-    memberData,
-    existingMember,
-    transactionType: Prisma.TransactionClient,
-  ): Promise<boolean> {
+  async checkIfEmailChanged(memberData, existingMember, transactionType: Prisma.TransactionClient): Promise<boolean> {
     const isEmailChanged = existingMember.email?.toLowerCase() !== memberData.email?.toLowerCase();
     if (isEmailChanged) {
       const foundUser = await transactionType.member.findUnique({
@@ -770,16 +773,34 @@ export class MembersService {
   ) {
     const member: any = {};
     const directFields = [
-      'name', 'email', 'githubHandler', 'discordHandler', 'bio',
-      'twitterHandler', 'linkedinHandler', 'telegramHandler',
-      'officeHours', 'moreDetails', 'plnStartDate', 'plnFriend', 'openToWork',
-      'isVerified', 'signUpSource', 'signUpMedium', 'signUpCampaign',
-      'isUserConsent', 'isSubscribedToNewsletter', 'teamOrProjectURL',
+      'name',
+      'email',
+      'githubHandler',
+      'discordHandler',
+      'bio',
+      'twitterHandler',
+      'linkedinHandler',
+      'telegramHandler',
+      'officeHours',
+      'moreDetails',
+      'plnStartDate',
+      'plnFriend',
+      'openToWork',
+      'isVerified',
+      'signUpSource',
+      'signUpMedium',
+      'signUpCampaign',
+      'isUserConsent',
+      'isSubscribedToNewsletter',
+      'teamOrProjectURL',
     ];
     copyObj(memberData, member, directFields);
     member.email = member.email.toLowerCase().trim();
-    member['image'] = memberData.imageUid ? { connect: { uid: memberData.imageUid } }
-      : type === 'Update' ? { disconnect: true } : undefined;
+    member['image'] = memberData.imageUid
+      ? { connect: { uid: memberData.imageUid } }
+      : type === 'Update'
+      ? { disconnect: true }
+      : undefined;
     member['skills'] = buildMultiRelationMapping('skills', memberData, type);
     if (type === 'Create') {
       if (Array.isArray(memberData.teamAndRoles)) {
@@ -813,7 +834,7 @@ export class MembersService {
     memberData: any,
     existingMember: any,
     member: any,
-    tx: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient
   ): Promise<void> {
     const { city, country, region } = memberData;
     if (city || country || region) {
@@ -849,22 +870,13 @@ export class MembersService {
    * @param tx - The Prisma transaction client.
    * @returns {Promise<void>}
    */
-  async updateTeamMemberRoles(
-    memberData,
-    existingMember,
-    memberUid,
-    tx: Prisma.TransactionClient,
-  ) {
+  async updateTeamMemberRoles(memberData, existingMember, memberUid, tx: Prisma.TransactionClient) {
     const oldTeamUids = existingMember.teamMemberRoles.map((t: any) => t.teamUid);
     const newTeamUids = memberData.teamAndRoles.map((t: any) => t.teamUid);
     // Determine which roles need to be deleted, updated, or created
-    const rolesToDelete = existingMember.teamMemberRoles.filter(
-      (t: any) => !newTeamUids.includes(t.teamUid)
-    );
+    const rolesToDelete = existingMember.teamMemberRoles.filter((t: any) => !newTeamUids.includes(t.teamUid));
     const rolesToUpdate = memberData.teamAndRoles.filter((t: any, index: number) => {
-      const foundIndex = existingMember.teamMemberRoles.findIndex(
-        (v: any) => v.teamUid === t.teamUid
-      );
+      const foundIndex = existingMember.teamMemberRoles.findIndex((v: any) => v.teamUid === t.teamUid);
       if (foundIndex > -1) {
         const foundValue = existingMember.teamMemberRoles[foundIndex];
         if (foundValue.role !== t.role) {
@@ -885,9 +897,7 @@ export class MembersService {
       }
       return false;
     });
-    const rolesToCreate = memberData.teamAndRoles.filter(
-      (t: any) => !oldTeamUids.includes(t.teamUid)
-    );
+    const rolesToCreate = memberData.teamAndRoles.filter((t: any) => !oldTeamUids.includes(t.teamUid));
     // Process deletions, updates, and creations
     await this.deleteTeamMemberRoles(tx, rolesToDelete, memberUid);
     await this.modifyTeamMemberRoles(tx, rolesToUpdate, memberUid);
@@ -902,11 +912,7 @@ export class MembersService {
    * @param referenceUid - The member's reference UID.
    * @returns {Promise<void>}
    */
-  async createTeamMemberRoles(
-    tx: Prisma.TransactionClient,
-    rolesToCreate: any[],
-    memberUid: string
-  ) {
+  async createTeamMemberRoles(tx: Prisma.TransactionClient, rolesToCreate: any[], memberUid: string) {
     if (rolesToCreate.length > 0) {
       const rolesToCreateData = rolesToCreate.map((t: any) => ({
         role: t.role,
@@ -923,7 +929,6 @@ export class MembersService {
     }
   }
 
-
   /**
    * Function to handle deletion of team member roles.
    *
@@ -932,11 +937,7 @@ export class MembersService {
    * @param referenceUid - The member's reference UID.
    * @returns {Promise<void>}
    */
-  async deleteTeamMemberRoles(
-    tx: Prisma.TransactionClient,
-    rolesToDelete,
-    memberUid: string
-  ) {
+  async deleteTeamMemberRoles(tx: Prisma.TransactionClient, rolesToDelete, memberUid: string) {
     if (rolesToDelete.length > 0) {
       await tx.teamMemberRole.deleteMany({
         where: {
@@ -955,11 +956,7 @@ export class MembersService {
    * @param referenceUid - The member's reference UID.
    * @returns {Promise<void>}
    */
-  async modifyTeamMemberRoles(
-    tx: Prisma.TransactionClient,
-    rolesToUpdate,
-    memberUid: string
-  ): Promise<void> {
+  async modifyTeamMemberRoles(tx: Prisma.TransactionClient, rolesToUpdate, memberUid: string): Promise<void> {
     if (rolesToUpdate.length > 0) {
       const updatePromises = rolesToUpdate.map((roleToUpdate: any) =>
         tx.teamMemberRole.update({
@@ -989,7 +986,7 @@ export class MembersService {
           mainTeam: false,
           teamLead: false,
           teamUid: t.teamUid,
-          roleTags: t.role?.split(',')?.map(item => item.trim()),
+          roleTags: t.role?.split(',')?.map((item) => item.trim()),
         })),
       },
     };
@@ -1009,14 +1006,13 @@ export class MembersService {
     memberData,
     existingMember,
     memberUid: string | null,
-    tx: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient
   ): Promise<void> {
-    const contributionsToCreate = memberData.projectContributions?.filter(
-      (contribution) => !contribution.uid
-    ) || [];
-    const contributionUidsInRequest = memberData.projectContributions
-      ?.filter((contribution) => contribution.uid)
-      .map((contribution) => contribution.uid) || [];
+    const contributionsToCreate = memberData.projectContributions?.filter((contribution) => !contribution.uid) || [];
+    const contributionUidsInRequest =
+      memberData.projectContributions
+        ?.filter((contribution) => contribution.uid)
+        .map((contribution) => contribution.uid) || [];
     const contributionIdsToDelete: string[] = [];
     const contributionIdsToUpdate: any = [];
     existingMember.projectContributions?.forEach((existingContribution: any) => {
@@ -1088,7 +1084,9 @@ export class MembersService {
         this.logger.info(`Member update request - Email changed, requestId -> ${uidToEdit}`);
       }
     } catch (error) {
-      this.logger.error(`Member update request - Failed to update email, requestId -> ${uidToEdit}, error -> ${error.message}`);
+      this.logger.error(
+        `Member update request - Failed to update email, requestId -> ${uidToEdit}, error -> ${error.message}`
+      );
       throw new Error(`Email update failed: ${error.message}`);
     }
   }
@@ -1110,9 +1108,13 @@ export class MembersService {
     } catch (error) {
       // Handle cases where the external account is not found (404) and other errors
       if (error?.response?.status === 404) {
-        this.logger.error(`External account not found for deletion, externalId -> ${externalId}, requestId -> ${uidToEdit}`);
+        this.logger.error(
+          `External account not found for deletion, externalId -> ${externalId}, requestId -> ${uidToEdit}`
+        );
       } else {
-        this.logger.error(`Failed to delete external account, externalId -> ${externalId}, requestId -> ${uidToEdit}, error -> ${error.message}`);
+        this.logger.error(
+          `Failed to delete external account, externalId -> ${externalId}, requestId -> ${uidToEdit}, error -> ${error.message}`
+        );
         throw error;
       }
     }
@@ -1166,16 +1168,17 @@ export class MembersService {
     requestorEmail: string,
     newMemberData,
     referenceUid: string,
-    tx: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient
   ): Promise<void> {
-    await this.participantsRequestService.add({
-      status: 'AUTOAPPROVED',
-      requesterEmailId: requestorEmail,
-      referenceUid,
-      uniqueIdentifier: newMemberData?.email || '',
-      participantType: 'MEMBER',
-      newData: { ...newMemberData },
-    },
+    await this.participantsRequestService.add(
+      {
+        status: 'AUTOAPPROVED',
+        requesterEmailId: requestorEmail,
+        referenceUid,
+        uniqueIdentifier: newMemberData?.email || '',
+        participantType: 'MEMBER',
+        newData: { ...newMemberData },
+      },
       tx
     );
   }
@@ -1191,8 +1194,8 @@ export class MembersService {
       const result = await tx.member.updateMany({
         where: { uid: { in: memberIds } },
         data: {
-          isVerified: true
-        }
+          isVerified: true,
+        },
       });
       if (result.count !== memberIds.length) {
         throw new NotFoundException('One or more member IDs are invalid.');
@@ -1202,25 +1205,28 @@ export class MembersService {
       await this.notificationSettingsService.enableRecommendationsFor(memberIds);
 
       const members = await tx.member.findMany({
-        where: { uid: { in: memberIds } }
-      })
-      await Promise.all(members.map(async (member) => {
-        await this.participantsRequestService.add({
-          status: 'AUTOAPPROVED',
-          requesterEmailId: userEmail,
-          referenceUid: member.uid,
-          uniqueIdentifier: member?.email || '',
-          participantType: 'MEMBER',
-          oldData: {
-            isVerified: false
-          },
-          newData: {
-            isVerified: true
-          },
-        },
-          tx
-        );
-      }));
+        where: { uid: { in: memberIds } },
+      });
+      await Promise.all(
+        members.map(async (member) => {
+          await this.participantsRequestService.add(
+            {
+              status: 'AUTOAPPROVED',
+              requesterEmailId: userEmail,
+              referenceUid: member.uid,
+              uniqueIdentifier: member?.email || '',
+              participantType: 'MEMBER',
+              oldData: {
+                isVerified: false,
+              },
+              newData: {
+                isVerified: true,
+              },
+            },
+            tx
+          );
+        })
+      );
 
       return result;
     });
@@ -1258,7 +1264,7 @@ export class MembersService {
         linkedinHandler: true,
         twitterHandler: true,
         preferences: true,
-        isSubscribedToNewsletter: true
+        isSubscribedToNewsletter: true,
       },
     });
     return this.buildPreferenceResponse(member);
@@ -1334,8 +1340,10 @@ export class MembersService {
     if (isRecent === 'true') {
       return {
         createdAt: {
-          gte: new Date(Date.now() - (parseInt(process.env.RECENT_RECORD_DURATION_IN_DAYS || '30') * 24 * 60 * 60 * 1000))
-        }
+          gte: new Date(
+            Date.now() - parseInt(process.env.RECENT_RECORD_DURATION_IN_DAYS || '30') * 24 * 60 * 60 * 1000
+          ),
+        },
       };
     }
     return {};
@@ -1354,9 +1362,9 @@ export class MembersService {
       return {
         teamMemberRoles: {
           some: {
-            roleTags: { hasSome: roles }
-          }
-        }
+            roleTags: { hasSome: roles },
+          },
+        },
       };
     }
     return {};
@@ -1376,8 +1384,8 @@ export class MembersService {
           {
             name: {
               contains: name__icontains,
-              mode: 'insensitive'
-            }
+              mode: 'insensitive',
+            },
           },
           {
             teamMemberRoles: {
@@ -1385,11 +1393,11 @@ export class MembersService {
                 team: {
                   name: {
                     contains: name__icontains,
-                    mode: 'insensitive'
-                  }
-                }
-              }
-            }
+                    mode: 'insensitive',
+                  },
+                },
+              },
+            },
           },
           {
             projectContributions: {
@@ -1397,15 +1405,15 @@ export class MembersService {
                 project: {
                   name: {
                     contains: name__icontains,
-                    mode: 'insensitive'
+                    mode: 'insensitive',
                   },
-                  isDeleted: false
-                }
-              }
-            }
-          }
-        ]
-      }
+                  isDeleted: false,
+                },
+              },
+            },
+          },
+        ],
+      };
     }
     return {};
   }
@@ -1437,7 +1445,7 @@ export class MembersService {
         continent: true,
         country: true,
         region: true,
-        metroArea: true
+        metroArea: true,
       },
     });
 
@@ -1453,11 +1461,9 @@ export class MembersService {
       cities: uniqueCities,
       countries: uniqueCountries,
       regions: uniqueRegions,
-      metroAreas: uniqueMetroAreas
+      metroAreas: uniqueMetroAreas,
     };
   }
-
-
 
   /**
    * Updates the member's field if the value has changed.
@@ -1489,11 +1495,7 @@ export class MembersService {
    * @param tx - Optional transaction client.
    * @returns Updated member object if a change was made, otherwise the original member object.
    */
-  async updateTelegramIfChanged(
-    member: Member,
-    telegram: string,
-    tx?: Prisma.TransactionClient
-  ): Promise<Member> {
+  async updateTelegramIfChanged(member: Member, telegram: string, tx?: Prisma.TransactionClient): Promise<Member> {
     return await this.updateFieldIfChanged(member, 'telegramHandler', telegram, tx);
   }
 
@@ -1529,15 +1531,9 @@ export class MembersService {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       switch (error?.code) {
         case 'P2002':
-          throw new ConflictException(
-            'Unique key constraint error on Member:',
-            error.message
-          );
+          throw new ConflictException('Unique key constraint error on Member:', error.message);
         case 'P2003':
-          throw new BadRequestException(
-            'Foreign key constraint error on Member',
-            error.message
-          );
+          throw new BadRequestException('Foreign key constraint error on Member', error.message);
         case 'P2025':
           throw new NotFoundException('Member not found with uid: ' + message);
         default:
@@ -1552,10 +1548,7 @@ export class MembersService {
     return error;
   }
 
-
-  async insertManyWithLocationsFromAirtable(
-    airtableMembers: z.infer<typeof AirtableMemberSchema>[]
-  ) {
+  async insertManyWithLocationsFromAirtable(airtableMembers: z.infer<typeof AirtableMemberSchema>[]) {
     const skills = await this.prisma.skill.findMany();
     const images = await this.prisma.image.findMany();
 
@@ -1569,14 +1562,10 @@ export class MembersService {
       if (member.fields['Profile picture']) {
         const ppf = member.fields['Profile picture'][0];
 
-        const hashedPpf = ppf.filename
-          ? hashFileName(`${path.parse(ppf.filename).name}-${ppf.id}`)
-          : '';
+        const hashedPpf = ppf.filename ? hashFileName(`${path.parse(ppf.filename).name}-${ppf.id}`) : '';
 
         image =
-          images.find(
-            (image) => path.parse(image.filename).name === hashedPpf
-          ) ||
+          images.find((image) => path.parse(image.filename).name === hashedPpf) ||
           (await this.fileMigrationService.migrateFile({
             id: ppf.id || '',
             url: ppf.url || '',
@@ -1607,18 +1596,12 @@ export class MembersService {
       const manyToManyRelations = {
         skills: {
           connect: skills
-            .filter(
-              (skill) =>
-                !!member.fields?.['Skills'] &&
-                member.fields?.['Skills'].includes(skill.title)
-            )
+            .filter((skill) => !!member.fields?.['Skills'] && member.fields?.['Skills'].includes(skill.title))
             .map((skill) => ({ id: skill.id })),
         },
       };
 
-      const { location } = await this.locationTransferService.transferLocation(
-        member
-      );
+      const { location } = await this.locationTransferService.transferLocation(member);
 
       await this.prisma.member.upsert({
         where: {
@@ -1651,10 +1634,10 @@ export class MembersService {
         },
       },
       select: {
-        uid:true,
+        uid: true,
         email: true,
-        name:true
-      }
+        name: true,
+      },
     });
     return member;
   }
@@ -1705,6 +1688,7 @@ export class MembersService {
             linkedinHandler: true,
           },
         },
+        accessLevelUpdatedAt: true,
       },
       skip: (page - 1) * limit,
       take: limit,
@@ -1772,9 +1756,9 @@ export class MembersService {
             isHost: isHost,
             isSpeaker: isSpeaker,
             isSponsor: isSponsor,
-          }
-        }
-      }
+          },
+        },
+      };
     }
     return {};
   }

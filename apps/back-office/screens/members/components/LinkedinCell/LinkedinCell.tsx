@@ -8,9 +8,14 @@ import { EmptyIcon, ExternalLinkIcon } from '../icons';
 export const LinkedinCell = ({ member }: { member: Member }) => {
   return (
     <div className={s.root}>
-      {member.linkedinProfile?.url ? (
-        <a className={s.badge} href={member.linkedinProfile.url} target="_blank" rel="noreferrer">
-          <span>{member.linkedinProfile.name}</span>
+      {member.linkedinProfile?.uid ? (
+        <a
+          className={s.badge}
+          href={`https://linkedin.com/in/${member.linkedinProfile.linkedinHandler}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <span>{member.linkedinProfile.linkedinHandler}</span>
           <span>
             <ExternalLinkIcon />
           </span>
