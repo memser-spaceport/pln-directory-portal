@@ -46,6 +46,10 @@ async function fetcher(params: QueryParams) {
       isSubscribedToNewsletter: data.newData.isSubscribedToNewsletter,
       teamOrProjectURL: data.newData.teamOrProjectURL,
       imageUrl: data.newData.imageUrl,
+      linkedinProfile: {
+        name: '@olegonzalezhewewelongnamehere',
+        url: 'https://www.linkedin.com/in/olegonzalez/',
+      },
     };
   });
 }
