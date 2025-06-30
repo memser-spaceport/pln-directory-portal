@@ -1,14 +1,32 @@
-import { Body, Controller, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards, UsePipes } from '@nestjs/common';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { MembersService } from '../members/members.service';
+import { ZodValidationPipe } from '@abitia/zod-dto';
+import { RequestMembersDto, UpdateAccessLevelDto } from 'libs/contracts/src/schema/admin-member';
+import { NoCache } from '../decorators/no-cache.decorator';
 
 @Controller('v1/admin/members')
 export class MemberController {
   constructor(private readonly membersService: MembersService) { }
 
+  @Get()
+  @UseGuards(AdminAuthGuard)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async getMembers(@Query() query: RequestMembersDto) {
+    return await this.membersService.findMemberByAccessLevels(query);
+  }
+
+  @Put('access-level')
+  @UseGuards(AdminAuthGuard)
+  @UsePipes(ZodValidationPipe)
+  async updateAccessLevel(@Body() body: UpdateAccessLevelDto) {
+    return this.membersService.updateAccessLevel(body);
+  }
+
   /**
    * Updates a member to a verfied user.
-   * 
+   *
    * @param body - array of memberIds to be updated.
    * @returns Array of updation status of the provided memberIds.
    */
@@ -22,7 +40,7 @@ export class MemberController {
 
   /**
    * Updates a member to a verfied user.
-   * 
+   *
    * @param body - participation request data with updated member details
    * @returns updated member object
    */

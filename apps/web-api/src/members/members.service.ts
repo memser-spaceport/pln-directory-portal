@@ -27,6 +27,7 @@ import { CacheService } from '../utils/cache/cache.service';
 import { MembersHooksService } from './members.hooks.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 import { AccessLevel } from '../utils/access-levels';
+import { RequestMembersDto, UpdateAccessLevelDto } from '../../../../libs/contracts/src/schema/admin-member';
 
 @Injectable()
 export class MembersService {
@@ -1658,6 +1659,65 @@ export class MembersService {
     return member;
   }
 
+  async findMemberByAccessLevels(params: RequestMembersDto) {
+    const { accessLevel, page, limit } = params;
+
+    const members = await this.prisma.member.findMany({
+      where: {
+        accessLevel: { in: accessLevel },
+      },
+      select: {
+        uid: true,
+        name: true,
+        image: {
+          select: {
+            url: true,
+          },
+        },
+        email: true,
+        isSubscribedToNewsletter: true,
+        accessLevel: true,
+        teamOrProjectURL: true,
+        projectContributions: {
+          select: {
+            uid: true,
+            project: {
+              select: {
+                uid: true,
+                name: true,
+              },
+            },
+          },
+        },
+        linkedinProfile: {
+          select: {
+            uid: true,
+            linkedinHandler: true,
+          },
+        },
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { name: 'asc' },
+    });
+
+    const total = await this.prisma.member.count({
+      where: {
+        accessLevel: { in: accessLevel },
+      },
+    });
+
+    return {
+      data: members,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
   async getAccessLevelByMemberEmail(email: string): Promise<string | null> {
     try {
       const member = await this.prisma.member.findUnique({
@@ -1669,6 +1729,19 @@ export class MembersService {
     } catch (error) {
       return this.handleErrors(error);
     }
+  }
+
+  async updateAccessLevel({ memberUids, accessLevel }: UpdateAccessLevelDto): Promise<{ updatedCount: number }> {
+    const result = await this.prisma.member.updateMany({
+      where: {
+        uid: { in: memberUids },
+      },
+      data: {
+        accessLevel,
+      },
+    });
+
+    return { updatedCount: result.count };
   }
 
   /**
