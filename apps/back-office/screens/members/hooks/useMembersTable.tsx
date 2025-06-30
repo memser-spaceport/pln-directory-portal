@@ -2,7 +2,9 @@ import React, { Dispatch, HTMLProps, SetStateAction, useMemo } from 'react';
 import {
   createColumnHelper,
   getCoreRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
+  PaginationState,
   SortingState,
   useReactTable,
 } from '@tanstack/react-table';
@@ -23,6 +25,8 @@ export function useMembersTable({
   rowSelection,
   setRowSelection,
   authToken,
+  pagination,
+  setPagination,
 }: {
   rowSelection: Record<string, boolean>;
   setRowSelection: Dispatch<SetStateAction<Record<string, boolean>>>;
@@ -30,6 +34,8 @@ export function useMembersTable({
   sorting: SortingState;
   setSorting: Dispatch<SetStateAction<SortingState>>;
   authToken: string;
+  pagination: PaginationState;
+  setPagination: Dispatch<SetStateAction<PaginationState>>;
 }) {
   const columns = useMemo(() => {
     return [
@@ -121,10 +127,13 @@ export function useMembersTable({
     state: {
       sorting,
       rowSelection,
+      pagination,
     },
     onSortingChange: setSorting,
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
+    getPaginationRowModel: getPaginationRowModel(),
+    onPaginationChange: setPagination,
     getRowId: (row) => {
       return row.uid;
     },
