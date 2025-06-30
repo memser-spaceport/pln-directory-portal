@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-table';
 import MemberCell from '../components/MemberCell/MemberCell';
 import { Member } from '../types/member';
+import ProjectsCell from '../components/ProjectsCell/ProjectsCell';
 
 const columnHelper = createColumnHelper<Member>();
 
@@ -61,13 +62,14 @@ export function useMembersTable({
       columnHelper.accessor('projectContributions', {
         header: 'Project/Team',
         sortingFn: 'alphanumeric',
-        cell: (props) => <div>Projects here</div>,
+        cell: (info) => <ProjectsCell member={info.row.original} />,
         size: 0,
       }),
       columnHelper.accessor('linkedinProfile', {
         header: 'LinkedIn Verified',
         cell: (props) => <div>Linkeding here</div>,
-        size: 0,
+        size: 160,
+        enableResizing: false,
       }),
       columnHelper.accessor('isSubscribedToNewsletter', {
         header: 'News',

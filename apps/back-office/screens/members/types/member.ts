@@ -4,9 +4,11 @@ export type Member = {
   imageUrl: string;
   isSubscribedToNewsletter: boolean;
   name: string;
-  projectContributions: [];
+  projectContributions: {
+    projectTitle: string;
+  }[];
   skills: 'PENDING';
-  teamAndRoles: [];
+  teamAndRoles: { teamTitle: string; teamUid: string }[];
   status: string;
   linkedinProfile: Record<string, string>;
 };

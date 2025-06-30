@@ -34,6 +34,7 @@ async function fetcher(params: QueryParams) {
     } else {
       projectContributions = [];
     }
+
     return {
       id: data.uid,
       name: data.newData.name,
