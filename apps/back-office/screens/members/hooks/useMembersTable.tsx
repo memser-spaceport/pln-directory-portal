@@ -74,13 +74,19 @@ export function useMembersTable({
         size: 160,
         enableResizing: false,
         enableSorting: false,
+        meta: {
+          align: 'center',
+        },
       }),
       columnHelper.accessor('isSubscribedToNewsletter', {
         header: 'News',
         cell: (info) => <NewsCell member={info.row.original} />,
-        size: 72,
+        size: 80,
         enableResizing: false,
         enableSorting: false,
+        meta: {
+          align: 'center',
+        },
       }),
       columnHelper.accessor('status', {
         header: 'Status',
@@ -93,6 +99,9 @@ export function useMembersTable({
         cell: (props) => <EditCell member={props.row.original} />,
         size: 88,
         enableResizing: false,
+        meta: {
+          align: 'center',
+        },
       }),
     ];
   }, []);
