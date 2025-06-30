@@ -14,10 +14,10 @@ async function fetcher(params: QueryParams) {
     },
   };
 
-  const [listData, unVerifiedMembers, projectData] = await Promise.all([
+  const [listData, allMembers, projectData] = await Promise.all([
     api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}?status=PENDING`, config),
     api.get(
-      `${API_ROUTE.MEMBERS}?isVerified=false&pagination=false&orderBy=-createdAt&select=uid,name,teamMemberRoles.team.name,teamMemberRoles.team.uid,projectContributions,email,image.url,isVerified,teamOrProjectURL,teamMemberRoles.mainTeam`,
+      `${API_ROUTE.MEMBERS}?pagination=false&orderBy=-createdAt&select=uid,name,teamMemberRoles.team.name,teamMemberRoles.team.uid,projectContributions,email,image.url,teamOrProjectURL,teamMemberRoles.mainTeam,linkedinProfile.uid,accessLevel`,
       config
     ),
     api.get(`${process.env.WEB_API_BASE_URL}${APP_CONSTANTS.V1}projects`),

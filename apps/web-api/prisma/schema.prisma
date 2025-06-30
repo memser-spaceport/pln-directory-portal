@@ -135,6 +135,7 @@ model Member {
   recommendationNotifications  RecommendationNotification[]
   notificationSetting          NotificationSetting?
   linkedinProfile              LinkedInProfile?
+  accessLevel                  String?
 }
 
 model MemberRole {

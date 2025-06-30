@@ -79,7 +79,6 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className={s.tableRow}>
                 {headerGroup.headers.map((header, i) => {
-                  console.log(header.column.columnDef.size);
                   return header.isPlaceholder ? null : (
                     <div
                       className={clsx(s.headerCell, {

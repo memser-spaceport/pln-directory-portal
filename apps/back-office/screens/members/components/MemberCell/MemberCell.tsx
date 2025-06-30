@@ -6,8 +6,6 @@ import { ExternalLinkIcon } from '../icons';
 import { WEB_UI_BASE_URL } from '../../../../utils/constants';
 
 export const MemberCell = ({ member }: { member: Member }) => {
-  console.log(member);
-
   return (
     <div className={s.root}>
       <div className={s.avatar}>
