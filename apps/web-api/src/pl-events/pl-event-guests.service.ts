@@ -1123,15 +1123,21 @@ export class PLEventGuestsService {
   /**
    * This method retrieves all aggregated event and location data.
    * @returns An object containing:
-   * - `events`: An array of aggregated event objects.
-   * - `locations`: An array of aggregated location objects.
+   * - `events`: An array of aggregated event objects sorted by aggregatedPriority.
+   * - `locations`: An array of aggregated location objects sorted by aggregatedPriority.
    * @throws an `InternalServerErrorException` if an error occurs during data retrieval.
    */
   async getAllAggregatedData(loggedInMember) {
     try {
       return {
-        events: await this.eventService.getPLEvents({ where: { isAggregated: true } }),
-        locations: await this.eventLocationsService.getFeaturedLocationsWithSubscribers({ where: { isAggregated: true } }, loggedInMember)
+        events: await this.eventService.getPLEvents({
+          where: { isAggregated: true },
+          orderBy: { aggregatedPriority: 'asc' },
+        }),
+        locations: await this.eventLocationsService.getFeaturedLocationsWithSubscribers(
+          { where: { isAggregated: true }, orderBy: { aggregatedPriority: 'asc' } },
+          loggedInMember
+        )
       };
     } catch (error) {
       throw new InternalServerErrorException(`Error occured while retrieving aggregated data: ${error.message}`);

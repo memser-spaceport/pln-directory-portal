@@ -61,6 +61,7 @@ const eventFactory = Factory.define<Omit<PLEvent, 'id'>>(
       externalId: faker.datatype.uuid(),
       syncedAt: faker.date.recent(),
       isAggregated: false,
+      aggregatedPriority: faker.datatype.number(),
       country: faker.address.country(),
     };
   }

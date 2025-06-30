@@ -413,6 +413,7 @@ model PLEventLocation {
   updatedAt      DateTime  @updatedAt
   isFeatured     Boolean?  @default(false)
   isAggregated   Boolean   @default(false)
+  aggregatedPriority Int?
 
   @@unique([latitude, longitude])
 }
@@ -447,6 +448,7 @@ model PLEvent {
   locationUid      String?
   location         PLEventLocation?    @relation(fields: [locationUid], references: [uid])
   eventGuests      PLEventGuest[]
+  aggregatedPriority Int?
 }
 
 model PLEventGuest {
