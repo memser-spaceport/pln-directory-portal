@@ -7,10 +7,10 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ACCESS_LEVELS_KEY } from '../decorators/access-levels.decorator';
-import { AccessLevel } from '../utils/access-levels';
 import { LogService } from '../shared/log.service';
 import { MembersService } from '../members/members.service';
 import axios from 'axios';
+import { AccessLevel } from 'libs/contracts/src/schema/admin-member';
 
 @Injectable()
 export class AccessLevelsGuard implements CanActivate {
