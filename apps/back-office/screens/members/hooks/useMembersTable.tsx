@@ -11,6 +11,7 @@ import { Member } from '../types/member';
 import ProjectsCell from '../components/ProjectsCell/ProjectsCell';
 import LinkedinCell from '../components/LinkedinCell/LinkedinCell';
 import NewsCell from '../components/NewsCell/NewsCell';
+import EditCell from '../components/EditCell/EditCell';
 
 const columnHelper = createColumnHelper<Member>();
 
@@ -72,6 +73,7 @@ export function useMembersTable({
         cell: (info) => <LinkedinCell member={info.row.original} />,
         size: 160,
         enableResizing: false,
+        enableSorting: false,
       }),
       columnHelper.accessor('isSubscribedToNewsletter', {
         header: 'News',
@@ -88,7 +90,7 @@ export function useMembersTable({
       }),
       columnHelper.display({
         header: 'Info',
-        cell: (props) => <div>Exp controls</div>,
+        cell: (props) => <EditCell member={props.row.original} />,
         size: 88,
         enableResizing: false,
       }),
