@@ -1678,6 +1678,16 @@ export class MembersService {
         isSubscribedToNewsletter: true,
         accessLevel: true,
         teamOrProjectURL: true,
+        teamMemberRoles: {
+          select: {
+            team: {
+              select: {
+                uid: true,
+                name: true,
+              },
+            },
+          },
+        },
         projectContributions: {
           select: {
             uid: true,
