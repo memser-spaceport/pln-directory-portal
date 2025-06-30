@@ -28,6 +28,9 @@ export function useUpdateMembersStatus() {
       queryClient.invalidateQueries({
         queryKey: [MembersQueryKeys.GET_MEMBERS_LIST],
       });
+      queryClient.invalidateQueries({
+        queryKey: [MembersQueryKeys.GET_MEMBERS_ACCESS_LEVEL_COUNTS],
+      });
     },
   });
 }

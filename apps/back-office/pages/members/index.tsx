@@ -19,39 +19,41 @@ import {
 } from '../../screens/members/components/icons';
 import clsx from 'clsx';
 import { MultieditControls } from '../../screens/members/components/MultieditControls';
+import { useAccessLevelCounts } from '../../hooks/members/useAccessLevelCounts';
 
 const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
   const router = useRouter();
   const query = router.query;
   const { filter } = query;
+  const { data: counts } = useAccessLevelCounts({ authToken });
   const items = useMemo(() => {
     return [
       {
         id: 'level1',
         icon: <Level1Icon />,
         label: 'L1',
-        count: 12,
+        count: counts?.L1 ?? 0,
       },
       {
         id: 'level2',
         icon: <Level2Icon />,
         label: 'L2-L4',
-        count: 122,
+        count: (counts?.L2 ?? 0) + (counts?.L3 ?? 0) + (counts?.L4 ?? 0),
       },
       {
         id: 'level0',
         icon: <Level0Icon />,
         label: 'L0',
-        count: 23,
+        count: counts?.L0 ?? 0,
       },
       {
         id: 'rejected',
         icon: <RejectedIcon />,
         label: 'Rejected',
-        count: 34,
+        count: counts?.Rejected ?? 0,
       },
     ];
-  }, []);
+  }, [counts]);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [rowSelection, setRowSelection] = React.useState({});
   const [pagination, setPagination] = React.useState<PaginationState>({
