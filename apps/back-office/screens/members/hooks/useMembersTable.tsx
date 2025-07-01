@@ -75,7 +75,7 @@ export function useMembersTable({
         header: 'Project/Team',
         sortingFn: 'alphanumeric',
         cell: (info) => <ProjectsCell member={info.row.original} />,
-        size: 200,
+        size: 250,
       }),
       columnHelper.accessor('linkedinProfile', {
         header: 'LinkedIn Verified',
@@ -113,7 +113,7 @@ export function useMembersTable({
         },
       }),
     ];
-  }, []);
+  }, [authToken]);
 
   const data = useMemo(() => {
     return members ?? [];
