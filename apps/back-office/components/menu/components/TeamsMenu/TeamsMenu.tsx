@@ -1,7 +1,9 @@
 import React, { useCallback, useRef, useState } from 'react';
 
-import s from './TeamsMenu.module.scss';
 import { useOnClickOutside } from '../../../../hooks/useOnClickOutside';
+import Link from 'next/link';
+
+import s from './TeamsMenu.module.scss';
 
 export const TeamsMenu = () => {
   const menuRef = useRef(null);
@@ -20,34 +22,36 @@ export const TeamsMenu = () => {
       </button>
       {open && (
         <div className={s.menu} ref={menuRef}>
-          <div className={s.menuItem}>
-            <PendingIcon />
-            <span className={s.menuItemLabel}>Pending</span>
-            <span className={s.menuItemCount}>2</span>
-            <CaretIcon />
-          </div>
+          <Link href="/pending-list" passHref>
+            <a className={s.menuItem}>
+              <PendingIcon />
+              <span className={s.menuItemLabel}>Pending</span>
+              <span className={s.menuItemCount}></span>
+              <CaretIcon />
+            </a>
+          </Link>
 
-          <div className={s.menuItem}>
-            <VerifiedIcon />
-            <span className={s.menuItemLabel}>Verified</span>
-            <span className={s.menuItemCount}>2</span>
-            <CaretIcon />
-          </div>
+          {/*<div className={s.menuItem}>*/}
+          {/*  <VerifiedIcon />*/}
+          {/*  <span className={s.menuItemLabel}>Verified</span>*/}
+          {/*  <span className={s.menuItemCount}>2</span>*/}
+          {/*  <CaretIcon />*/}
+          {/*</div>*/}
 
-          <div className={s.menuItem}>
-            <ApprovedIcon />
-            <span className={s.menuItemLabel}>Approved</span>
-            <span className={s.menuItemCount}>2</span>
-            <CaretIcon />
-          </div>
+          {/*<div className={s.menuItem}>*/}
+          {/*  <ApprovedIcon />*/}
+          {/*  <span className={s.menuItemLabel}>Approved</span>*/}
+          {/*  <span className={s.menuItemCount}>2</span>*/}
+          {/*  <CaretIcon />*/}
+          {/*</div>*/}
 
-          <div className={s.menuItem}>
-            <RejectedIcon />
-            <span className={s.menuItemLabel}>Rejecyed</span>
-            <span className={s.menuItemCount}>2</span>
-            <CaretIcon />
-          </div>
-          <button className={s.menuItem}>Add New Team</button>
+          {/*<div className={s.menuItem}>*/}
+          {/*  <RejectedIcon />*/}
+          {/*  <span className={s.menuItemLabel}>Rejecyed</span>*/}
+          {/*  <span className={s.menuItemCount}>2</span>*/}
+          {/*  <CaretIcon />*/}
+          {/*</div>*/}
+          {/*<button className={s.menuItem}>Add New Team</button>*/}
         </div>
       )}
     </div>

@@ -12,6 +12,7 @@
   border-radius: 999px;
   margin-right: 8px;
   white-space: nowrap;
+  min-width: 90px;
 
   display: inline-flex;
   padding: var(--spacing-4xs, 4px) var(--spacing-2xs, 8px);
@@ -27,11 +28,16 @@
   letter-spacing: -0.2px;
 
   gap: 2px;
+
+  svg {
+    min-width: 16px;
+  }
 }
 
 .extra {
   background: #f3f4f6;
   color: #6b7280;
+  min-width: unset;
 }
 
 .label {

@@ -10,7 +10,7 @@ import { MembersService } from '../members/members.service';
 export class ParticipantsRequestController {
   constructor(
     private readonly participantsRequestService: ParticipantsRequestService,
-    private readonly memberService: MembersService,
+    private readonly memberService: MembersService
   ) {}
 
   /**
@@ -18,22 +18,38 @@ export class ParticipantsRequestController {
    * @param body - The request data to be added to the participants request table.
    * @returns A promise with the participants request entry that was added.
    */
-  @Post("/")
+  @Post('/')
   @UsePipes(new ParticipantsReqValidationPipe())
   async addRequest(@Body() body) {
     const uniqueIdentifier = this.participantsRequestService.getUniqueIdentifier(body);
     // Validate unique identifier existence
     await this.participantsRequestService.validateUniqueIdentifier(body.participantType, uniqueIdentifier);
     await this.participantsRequestService.validateParticipantRequest(body);
-    const participantRequest = await this.participantsRequestService.addRequest(body);
+    return await this.participantsRequestService.addRequest(body);
+  }
+
+  /**
+   * Add a new entry to the Participants request table.
+   * @param body - The request data to be added to the participants request table.
+   * @returns A promise with the participants request entry that was added.
+   */
+  @Post('/member')
+  @UsePipes(new ParticipantsReqValidationPipe())
+  async addMemberRequest(@Body() body) {
+    const uniqueIdentifier = this.participantsRequestService.getUniqueIdentifier(body);
+    // Validate unique identifier existence
+    await this.participantsRequestService.validateUniqueIdentifier(body.participantType, uniqueIdentifier);
+    await this.participantsRequestService.validateParticipantRequest(body);
 
     // adding a member with L0 access level into the Member table
     // the addRequest method that adds data into the ParticipantsRequests table should be removed
     // when we are sure new RBAC system with L0, L1, L2, L3, L4 access levels is working
     // and there are no dependencies on ParticipantRequest table
-    await this.memberService.createMemberFromSignUpData(body.newData);
+    const member = await this.memberService.createMemberFromSignUpData(body.newData);
 
-    return participantRequest;
+    return {
+      uid: member.uid,
+    };
   }
 
   /**
@@ -41,10 +57,8 @@ export class ParticipantsRequestController {
    * @param queryParams - The query parameters containing the identifier and its type.
    * @returns A promise indicating whether the identifier already exists.
    */
-  @Get("/unique-identifier")
-  async findMatchingIdentifier(
-    @Query() queryParams: FindUniqueIdentiferDto
-  ) {
+  @Get('/unique-identifier')
+  async findMatchingIdentifier(@Query() queryParams: FindUniqueIdentiferDto) {
     return await this.participantsRequestService.checkIfIdentifierAlreadyExist(
       queryParams.type,
       queryParams.identifier

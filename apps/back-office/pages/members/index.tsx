@@ -20,6 +20,7 @@ import {
 import clsx from 'clsx';
 import { MultieditControls } from '../../screens/members/components/MultieditControls';
 import { useAccessLevelCounts } from '../../hooks/members/useAccessLevelCounts';
+import PaginationControls from '../../screens/members/components/PaginationControls/PaginationControls';
 
 const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
   const router = useRouter();
@@ -54,7 +55,12 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
       },
     ];
   }, [counts]);
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortingState>([
+    {
+      id: 'accessLevel',
+      desc: true,
+    },
+  ]);
   const [rowSelection, setRowSelection] = React.useState({});
   const [pagination, setPagination] = React.useState<PaginationState>({
     pageIndex: 0,
@@ -175,60 +181,7 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
             onReset={() => setRowSelection({})}
             authToken={authToken}
           />
-          <div className="flex items-center gap-2">
-            <button
-              className="rounded border p-1"
-              onClick={() => table.firstPage()}
-              disabled={!table.getCanPreviousPage()}
-            >
-              {'<<'}
-            </button>
-            <button
-              className="rounded border p-1"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-            >
-              {'<'}
-            </button>
-            <button className="rounded border p-1" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
-              {'>'}
-            </button>
-            <button className="rounded border p-1" onClick={() => table.lastPage()} disabled={!table.getCanNextPage()}>
-              {'>>'}
-            </button>
-            <span className="flex items-center gap-1">
-              <div>Page</div>
-              <strong>
-                {table.getState().pagination.pageIndex + 1} of {table.getPageCount().toLocaleString()}
-              </strong>
-            </span>
-            <span className="flex items-center gap-1">
-              | Go to page:
-              <input
-                type="number"
-                min="1"
-                max={table.getPageCount()}
-                defaultValue={table.getState().pagination.pageIndex + 1}
-                onChange={(e) => {
-                  const page = e.target.value ? Number(e.target.value) - 1 : 0;
-                  table.setPageIndex(page);
-                }}
-                className="w-16 rounded border p-1"
-              />
-            </span>
-            <select
-              value={table.getState().pagination.pageSize}
-              onChange={(e) => {
-                table.setPageSize(Number(e.target.value));
-              }}
-            >
-              {[10, 20, 30, 40, 50].map((pageSize) => (
-                <option key={pageSize} value={pageSize}>
-                  Show {pageSize}
-                </option>
-              ))}
-            </select>
-          </div>
+          <PaginationControls table={table} />
         </div>
       </div>
     </ApprovalLayout>

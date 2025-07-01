@@ -68,7 +68,7 @@
 .headerCell {
   display: flex;
   height: 52px;
-  padding: var(--spacing-4xs, 4px) var(--spacing-md, 16px);
+  padding: var(--spacing-4xs, 4px) var(--spacing-md, 8px);
   align-items: center;
   gap: var(--spacing-2xs, 8px);
 
@@ -83,12 +83,13 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   flex: 1;
+  user-select: none;
 }
 
 .bodyCell {
   background: var(--background-base-white, #FFF);
   display: flex;
-  padding: var(--spacing-4xs, 12px) var(--spacing-md, 16px);
+  padding: var(--spacing-4xs, 12px) var(--spacing-md, 8px);
   align-items: center;
   gap: var(--spacing-2xs, 8px);
   align-self: stretch;
