@@ -9,6 +9,8 @@ import {
   LinkedInVerificationResponseDto,
   LinkedInVerificationStatusDto,
 } from 'libs/contracts/src/schema/linkedin-verification';
+import { MembersService } from '../members/members.service';
+import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 
 @Injectable()
 export class LinkedInVerificationService implements OnModuleDestroy {
@@ -18,7 +20,11 @@ export class LinkedInVerificationService implements OnModuleDestroy {
   private readonly CACHE_TTL = 3600;
   private redis: Redis;
 
-  constructor(private readonly prisma: PrismaService, private readonly logger: LogService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly logger: LogService,
+    private readonly memberService: MembersService
+  ) {
     this.redis = new Redis(process.env.REDIS_CACHE_URL as string, {
       ...(process.env.REDIS_CACHE_TLS && {
         tls: {
@@ -166,6 +172,17 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         });
       }
 
+      let accessLevel = member.accessLevel;
+      if (member.accessLevel === AccessLevel.L0) {
+        const result = await this.memberService.updateAccessLevel({
+          memberUids: [member.uid],
+          accessLevel: AccessLevel.L1,
+        });
+        if (result.updatedCount > 0) {
+          accessLevel = AccessLevel.L1;
+        }
+      }
+
       this.logger.info(`LinkedIn verification completed for member ${member.uid}`, 'LinkedInVerification');
 
       return {
@@ -174,7 +191,8 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         linkedinProfileId: linkedinProfile.linkedinProfileId,
         linkedinHandler: linkedinProfile.linkedinHandler || undefined,
         profileData: linkedinProfile.profileData as any,
-        redirectUrl: `${redirectUrl}${redirectUrl.includes('?') ? '&' : '?'}status=success`,
+        redirectUrl: `${redirectUrl}${redirectUrl.includes('?') ? '&' : '?'}status=success&accesslevel=${accessLevel}`,
+        newAccessLevel: accessLevel,
       };
     } catch (error) {
       this.logger.error('LinkedIn verification failed', error, 'LinkedInVerification');
@@ -190,6 +208,7 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         redirectUrl: `${redirectUrl}${
           redirectUrl.includes('?') ? '&' : '?'
         }status=error&error_message=${encodeURIComponent(errorMessage)}`,
+        newAccessLevel: null,
       };
     }
   }
