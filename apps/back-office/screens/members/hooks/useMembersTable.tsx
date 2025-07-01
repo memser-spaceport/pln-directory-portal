@@ -15,6 +15,7 @@ import LinkedinCell from '../components/LinkedinCell/LinkedinCell';
 import NewsCell from '../components/NewsCell/NewsCell';
 import EditCell from '../components/EditCell/EditCell';
 import StatusCell from '../components/StatusCell/StatusCell';
+import { Row } from '@tanstack/table-core/src/types';
 
 const columnHelper = createColumnHelper<Member>();
 
@@ -73,9 +74,9 @@ export function useMembersTable({
       }),
       columnHelper.accessor('projectContributions', {
         header: 'Project/Team',
-        sortingFn: 'alphanumeric',
         cell: (info) => <ProjectsCell member={info.row.original} />,
         size: 250,
+        enableSorting: false,
       }),
       columnHelper.accessor('linkedinProfile', {
         header: 'LinkedIn Verified',
@@ -99,7 +100,17 @@ export function useMembersTable({
       }),
       columnHelper.accessor('accessLevel', {
         header: 'Status',
-        sortingFn: 'alphanumeric',
+        sortingFn: (rowA: Row<Member>, rowB: Row<Member>, columnId: string) => {
+          if (rowA.original.accessLevelUpdatedAt > rowB.original.accessLevelUpdatedAt) {
+            return 1;
+          }
+
+          if (rowA.original.accessLevelUpdatedAt < rowB.original.accessLevelUpdatedAt) {
+            return -1;
+          }
+
+          return 0;
+        },
         cell: (props) => <StatusCell member={props.row.original} authToken={authToken} />,
         size: 0,
       }),
@@ -137,14 +148,14 @@ export function useMembersTable({
     getRowId: (row) => {
       return row.uid;
     },
-    initialState: {
-      sorting: [
-        {
-          id: 'name',
-          desc: true,
-        },
-      ],
-    },
+    // initialState: {
+    //   sorting: [
+    //     {
+    //       id: 'accessLevel',
+    //       desc: true,
+    //     },
+    //   ],
+    // },
   });
 
   return { table };

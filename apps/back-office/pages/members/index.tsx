@@ -55,7 +55,12 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
       },
     ];
   }, [counts]);
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortingState>([
+    {
+      id: 'accessLevel',
+      desc: true,
+    },
+  ]);
   const [rowSelection, setRowSelection] = React.useState({});
   const [pagination, setPagination] = React.useState<PaginationState>({
     pageIndex: 0,
