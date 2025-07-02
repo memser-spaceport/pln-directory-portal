@@ -30,7 +30,7 @@ import {
   AccessLevelCounts,
   CreateMemberDto,
   RequestMembersDto,
-  UpdateAccessLevelDto
+  UpdateAccessLevelDto, UpdateMemberDto
 } from '../../../../libs/contracts/src/schema/admin-member';
 
 @Injectable()
@@ -1766,13 +1766,13 @@ export class MembersService {
   async createMemberByAdmin(memberData: CreateMemberDto): Promise<Member> {
     let createdMember: any;
     await this.prisma.$transaction(async (tx) => {
-      const location = await this.mapLocationToNewMember(memberData, tx);
+      const location = await this.mapLocationToNewMember(memberData.city, memberData.country, memberData.region, tx);
       const newMember = {
         name: memberData.name,
         email: memberData.email,
         accessLevel: AccessLevel.L4,
         bio: memberData.bio,
-        // plnStartDate: new Date(joinDate),
+        plnStartDate: new Date(memberData.joinDate),
         githubHandler: memberData.githubHandler,
         discordHandler: memberData.discordHandler,
         twitterHandler: memberData.twitterHandler,
@@ -1799,8 +1799,69 @@ export class MembersService {
     return createdMember;
   }
 
-  private async mapLocationToNewMember(memberData: any, tx: Prisma.TransactionClient): Promise<Location> {
-    const { city, country, region } = memberData;
+  async updateMemberByAdmin(uid: string, dto: UpdateMemberDto): Promise<string> {
+    const { country, region, city, skills, teamMemberRoles, joinDate, ...rest } = dto;
+
+    const data: any = {
+      ...rest,
+    };
+
+    let updatedMember;
+
+    await this.prisma.$transaction(async (tx) => {
+      // Handle joinDate
+      if (joinDate) {
+        data.plnStartDate = new Date(joinDate);
+      }
+
+      // Handle location
+      if (country || region || city) {
+        const location = await this.mapLocationToNewMember(city, country, region, tx);
+        data.locationUid = location.uid;
+      }
+
+      // Handle skills
+      if (skills) {
+        data.skills = {
+          set: [], // Clear existing skills
+          connect: skills.map((uid) => ({ uid })),
+        };
+      }
+
+      // Handle teamMemberRoles
+      if (teamMemberRoles) {
+        // Clear existing and create new
+        await tx.teamMemberRole.deleteMany({
+          where: {
+            memberUid: uid,
+          },
+        });
+
+        data.teamMemberRoles = {
+          create: teamMemberRoles.map(({ teamUid, role }) => ({
+            role,
+            team: {
+              connect: { uid: teamUid },
+            },
+          })),
+        };
+      }
+
+      updatedMember = tx.member.update({
+        where: { uid },
+        data,
+      });
+    });
+
+    return updatedMember.uid;
+  }
+
+  private async mapLocationToNewMember(
+    city: string | undefined,
+    country: string | undefined,
+    region: string | undefined,
+    tx: Prisma.TransactionClient
+  ): Promise<Location> {
     if (city || country || region) {
       const result = await this.locationTransferService.fetchLocation(city, country, null, region, null);
       // If the location has a valid placeId, proceed with upsert

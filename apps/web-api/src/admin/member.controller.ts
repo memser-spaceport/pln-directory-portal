@@ -6,7 +6,7 @@ import {
   AccessLevelCounts,
   CreateMemberDto,
   RequestMembersDto,
-  UpdateAccessLevelDto,
+  UpdateAccessLevelDto, UpdateMemberDto
 } from 'libs/contracts/src/schema/admin-member';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { Member } from '@prisma/client';
@@ -42,6 +42,13 @@ export class MemberController {
   @UsePipes(ZodValidationPipe)
   async addNewMember(@Body() body: CreateMemberDto): Promise<Member> {
     return this.membersService.createMemberByAdmin(body);
+  }
+
+  @Patch('/edit/:uid')
+  @UseGuards(AdminAuthGuard)
+  @UsePipes(ZodValidationPipe)
+  async editMember(@Param('uid') uid: string, @Body() body: UpdateMemberDto): Promise<string> {
+    return this.membersService.updateMemberByAdmin(uid, body);
   }
 
   /**
