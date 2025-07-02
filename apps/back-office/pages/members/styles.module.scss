@@ -24,12 +24,12 @@
   letter-spacing: -0.75px;
 }
 
-.addNewBtn {
+.addNewBtn.addNewBtn {
   display: flex;
   padding: 8px var(--global-size-size-125, 10px);
   justify-content: center;
   align-items: center;
-  gap: var(--spacing-zero, 0px);
+  gap: var(--spacing-zero, 4px);
 
   border-radius: var(--corner-radius-md, 8px);
   border: 1px solid var(--transparent-dark-12, rgba(14, 15, 17, 0.12));

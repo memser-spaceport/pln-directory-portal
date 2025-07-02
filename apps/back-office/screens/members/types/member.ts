@@ -11,3 +11,24 @@ export type Member = {
   teamOrProjectURL: string;
   uid: string;
 };
+
+export type TMemberForm = {
+  accessLevel: string;
+  image: File | null;
+  name: string;
+  email: string;
+  joinDate: Date | null;
+  bio: string;
+  country: string;
+  state: string;
+  city: string;
+  skills: { label: string; value: string }[];
+  project: { label: string; value: string } | null;
+  role: string;
+  linkedin: string;
+  discord: string;
+  twitter: string;
+  github: string;
+  telegram: string;
+  officeHours: string;
+};

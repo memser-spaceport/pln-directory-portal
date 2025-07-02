@@ -1,0 +1,65 @@
+@use '../../styles/mixins';
+@use '../../styles/media';
+
+.field {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.label {
+  color: #475569;
+  font-feature-settings: 'liga' off, 'clig' off;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 166.667% */
+}
+
+.input {
+  display: flex;
+  height: 50px;
+  padding: 10px 16px;
+  align-items: center;
+  gap: 8px;
+  align-self: stretch;
+  border-radius: 8px;
+  border: 1px solid rgba(203, 213, 225, 0.50);
+  background: #FFF;
+  outline: none;
+
+  &:focus {
+    border-radius: 8px;
+    border: 1px solid rgba(66, 125, 255, 0.50);
+    background: #FFF;
+    box-shadow: 0 0 0 4px rgba(21, 111, 247, 0.10);
+  }
+
+  &.error {
+    border-color: darkred;
+  }
+}
+
+.errorMsg {
+  font-size: 10px;
+  color: darkred;
+  font-feature-settings: 'liga' off, 'clig' off;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 200% */
+}
+
+.fieldDescription {
+  font-feature-settings: 'liga' off, 'clig' off;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 200% */
+  color: #878B94;
+
+  &[data-focused] {
+    color: #A0BEFF;
+  }
+}
