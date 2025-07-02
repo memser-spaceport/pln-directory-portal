@@ -122,10 +122,14 @@ export class RecommendationsEngine {
       filteredMembers = filteredMembers.filter(
         (member) =>
           !member.experiences.some((experience) =>
-            config.skipTeamNames?.some((skipName) => experience.company.toLowerCase().includes(skipName.toLowerCase()))
+            config.skipTeamNames?.some((skipName) =>
+              this.normalizeText(experience.company).includes(this.normalizeText(skipName))
+            )
           ) &&
           !member.teamMemberRoles.some((role) =>
-            config.skipTeamNames?.some((skipName) => role.team?.name?.toLowerCase().includes(skipName.toLowerCase()))
+            config.skipTeamNames?.some(
+              (skipName) => role.team?.name && this.normalizeText(role.team.name).includes(this.normalizeText(skipName))
+            )
           )
       );
     }
@@ -136,7 +140,9 @@ export class RecommendationsEngine {
         (member) =>
           !member.teamMemberRoles.some((role) =>
             role.team?.industryTags?.some((tag) =>
-              config.skipIndustryTags?.some((skipTag) => tag.title.toLowerCase().includes(skipTag.toLowerCase()))
+              config.skipIndustryTags?.some((skipTag) =>
+                this.normalizeText(tag.title).includes(this.normalizeText(skipTag))
+              )
             )
           )
       );
@@ -395,14 +401,14 @@ export class RecommendationsEngine {
   ): string[] {
     const targetFocusAreas =
       focusAreaList.length > 0
-        ? focusAreaList.map((area) => area.toLowerCase())
+        ? focusAreaList.map((area) => this.normalizeText(area))
         : targetMember.teamMemberRoles
             .flatMap((role) => role.team.teamFocusAreas)
-            .map((focusArea) => focusArea.focusArea.title.toLowerCase());
+            .map((focusArea) => this.normalizeText(focusArea.focusArea.title));
 
     const memberFocusAreas = member.teamMemberRoles
       .flatMap((role) => role.team.teamFocusAreas)
-      .map((focusArea) => focusArea.focusArea.title.toLowerCase());
+      .map((focusArea) => this.normalizeText(focusArea.focusArea.title));
 
     return [...new Set(targetFocusAreas.filter((area) => memberFocusAreas.includes(area)))];
   }
@@ -414,14 +420,14 @@ export class RecommendationsEngine {
   ): string[] {
     const targetTechnologies =
       technologyList.length > 0
-        ? technologyList.map((tech) => tech.toLowerCase())
+        ? technologyList.map((tech) => this.normalizeText(tech))
         : targetMember.teamMemberRoles
             .flatMap((role) => role.team.technologies)
-            .map((tech) => tech.title.toLowerCase());
+            .map((tech) => this.normalizeText(tech.title));
 
     const memberTechnologies = member.teamMemberRoles
       .flatMap((role) => role.team.technologies)
-      .map((tech) => tech.title.toLowerCase());
+      .map((tech) => this.normalizeText(tech.title));
 
     return [...new Set(targetTechnologies.filter((tech) => memberTechnologies.includes(tech)))];
   }
@@ -433,14 +439,16 @@ export class RecommendationsEngine {
   ): string[] {
     const targetFundingStages =
       fundingStageList.length > 0
-        ? fundingStageList.map((stage) => stage.toLowerCase())
+        ? fundingStageList.map((stage) => this.normalizeText(stage))
         : (targetMember.teamMemberRoles
-            .map((role) => role.team.fundingStage?.title.toLowerCase())
-            .filter(Boolean) as string[]);
+            .map((role) => role.team.fundingStage?.title)
+            .filter(Boolean)
+            .map((title) => this.normalizeText(title!)) as string[]);
 
     const memberFundingStages = member.teamMemberRoles
       .map((role) => role.team.fundingStage?.title)
-      .filter(Boolean) as string[];
+      .filter(Boolean)
+      .map((title) => this.normalizeText(title!)) as string[];
 
     return [...new Set(targetFundingStages.filter((stage) => memberFundingStages.includes(stage)))];
   }
@@ -452,16 +460,22 @@ export class RecommendationsEngine {
   ): string[] {
     const targetRoles =
       roleList.length > 0
-        ? roleList.map((role) => role.toLowerCase())
-        : (targetMember.teamMemberRoles.map((role) => role.role?.toLowerCase()).filter(Boolean) as string[]);
+        ? roleList.map((role) => this.normalizeText(role))
+        : (targetMember.teamMemberRoles
+            .map((role) => role.role)
+            .filter(Boolean)
+            .map((role) => this.normalizeText(role!)) as string[]);
 
-    const memberRoles = member.teamMemberRoles.map((role) => role.role?.toLowerCase()).filter(Boolean) as string[];
+    const memberRoles = member.teamMemberRoles
+      .map((role) => role.role)
+      .filter(Boolean)
+      .map((role) => this.normalizeText(role!)) as string[];
 
     const memberRoleTags = member.teamMemberRoles.flatMap(
-      (role) => role.roleTags?.map((tag) => tag.toLowerCase()) || []
+      (role) => role.roleTags?.map((tag) => this.normalizeText(tag)) || []
     );
     const targetRoleTags = targetMember.teamMemberRoles.flatMap(
-      (role) => role.roleTags?.map((tag) => tag.toLowerCase()) || []
+      (role) => role.roleTags?.map((tag) => this.normalizeText(tag)) || []
     );
 
     const matchedRoles = memberRoles.filter((role) => targetRoles.includes(role));
@@ -477,14 +491,14 @@ export class RecommendationsEngine {
   ): string[] {
     const targetIndustryTags =
       industryTagList.length > 0
-        ? industryTagList.map((tag) => tag.toLowerCase())
+        ? industryTagList.map((tag) => this.normalizeText(tag))
         : (targetMember.teamMemberRoles
             .flatMap((role) => role.team.industryTags)
-            .map((tag) => tag.title.toLowerCase()) as string[]);
+            .map((tag) => this.normalizeText(tag.title)) as string[]);
 
     const memberIndustryTags = member.teamMemberRoles
       .flatMap((role) => role.team.industryTags)
-      .map((tag) => tag.title.toLowerCase());
+      .map((tag) => this.normalizeText(tag.title));
 
     return [...new Set(targetIndustryTags.filter((tag) => memberIndustryTags.includes(tag)))];
   }
@@ -497,13 +511,13 @@ export class RecommendationsEngine {
     if (keywordList.length === 0) return [];
 
     const matchedKeywords: string[] = [];
-    const lowerCaseKeywords = keywordList.map((keyword) => keyword.toLowerCase());
+    const lowerCaseKeywords = keywordList.map((keyword) => this.normalizeText(keyword));
 
     // Search in member bio
     if (member.bio) {
-      const memberBioLower = member.bio.toLowerCase();
+      const memberBioNormalized = this.normalizeText(member.bio);
       lowerCaseKeywords.forEach((keyword) => {
-        if (memberBioLower.includes(keyword)) {
+        if (memberBioNormalized.includes(keyword)) {
           matchedKeywords.push(keyword);
         }
       });
@@ -513,11 +527,11 @@ export class RecommendationsEngine {
     member.experiences.forEach((experience) => {
       const experienceText = [experience.title, experience.company, experience.description, experience.location]
         .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
+        .join(' ');
+      const experienceNormalized = this.normalizeText(experienceText);
 
       lowerCaseKeywords.forEach((keyword) => {
-        if (experienceText.includes(keyword)) {
+        if (experienceNormalized.includes(keyword)) {
           matchedKeywords.push(keyword);
         }
       });
@@ -533,16 +547,26 @@ export class RecommendationsEngine {
         ...team.industryTags.map((tag) => tag.title),
       ]
         .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
+        .join(' ');
+      const teamTextNormalized = this.normalizeText(teamText);
 
       lowerCaseKeywords.forEach((keyword) => {
-        if (teamText.includes(keyword)) {
+        if (teamTextNormalized.includes(keyword)) {
           matchedKeywords.push(keyword);
         }
       });
     });
 
     return [...new Set(matchedKeywords)];
+  }
+
+  private normalizeText(text: string): string {
+    return text
+      .toLowerCase()
+      .trim()
+      .replace(/[,&|-]/g, ' ') // Replace separators with spaces
+      .replace(/\s+and\s+/g, ' ') // Replace "and" with space
+      .replace(/\s+/g, ' ') // Normalize multiple spaces to single space
+      .trim();
   }
 }
