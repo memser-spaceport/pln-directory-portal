@@ -1770,6 +1770,7 @@ export class MembersService {
       const newMember = {
         name: memberData.name,
         email: memberData.email,
+        imageUid: memberData.imageUid,
         accessLevel: AccessLevel.L4,
         bio: memberData.bio,
         plnStartDate: new Date(memberData.joinDate),
