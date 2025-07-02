@@ -1,10 +1,10 @@
 import React, { useCallback, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-import s from './AddMember.module.scss';
+import s from './EditMember.module.scss';
 import { MemberForm } from '../MemberForm/MemberForm';
 import clsx from 'clsx';
-import { PlusIcon } from '../icons';
+import { EditIcon } from '../icons';
 import { TMemberForm } from '../../types/member';
 import { saveRegistrationImage } from '../../../../utils/services/member';
 
@@ -18,7 +18,7 @@ interface Props {
   className?: string;
 }
 
-export const AddMember = ({ className }: Props) => {
+export const EditMember = ({ className }: Props) => {
   const [open, setOpen] = useState(false);
 
   const handleSignUpClick = () => {
@@ -42,7 +42,7 @@ export const AddMember = ({ className }: Props) => {
   return (
     <>
       <button className={clsx(s.root, className)} onClick={handleSignUpClick}>
-        <PlusIcon /> Add new
+        <EditIcon /> Edit
       </button>
       <AnimatePresence>
         {open && (
@@ -57,8 +57,8 @@ export const AddMember = ({ className }: Props) => {
           >
             <MemberForm
               onClose={handleClose}
-              desc="Invite new members into the PL ecosystem."
-              title="Add New Member"
+              title="Edit Member"
+              desc="Verify the information or change the member's information."
               onSubmit={onSubmit}
             />
           </motion.div>

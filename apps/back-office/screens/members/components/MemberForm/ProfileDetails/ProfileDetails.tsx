@@ -11,7 +11,7 @@ export const ProfileDetails = () => {
         <ProfileImageInput />
         <FormField name="name" label="Name*" placeholder="Name" />
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex w-full items-start gap-4">
         <FormField name="email" label="Email*" placeholder="Email" />
         <FormDateField name="joinDate" label="Join Date" />
       </div>

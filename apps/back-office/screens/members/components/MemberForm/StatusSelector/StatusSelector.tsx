@@ -73,7 +73,8 @@ export const StatusSelector = () => {
   const { accessLevel } = watch();
 
   return (
-    <div>
+    <div className={s.field}>
+      <div className={s.label}>Select Status*</div>
       <Select
         menuPlacement="bottom"
         options={options}

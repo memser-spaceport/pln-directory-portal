@@ -24,6 +24,7 @@ export type TMemberForm = {
   city: string;
   skills: { label: string; value: string }[];
   project: { label: string; value: string } | null;
+  teamsAndRoles: { team: { label: string; value: string }[]; role: string };
   role: string;
   linkedin: string;
   discord: string;

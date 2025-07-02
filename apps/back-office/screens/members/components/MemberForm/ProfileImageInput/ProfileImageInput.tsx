@@ -44,7 +44,8 @@ export const ProfileImageInput = () => {
   return (
     <div className={s.dropzone} {...getRootProps()}>
       <input {...getInputProps()} />
-      <img src={imagePreview} alt="Preview" className="absolute h-full w-full" />
+      {imagePreview && <img src={imagePreview} alt="Preview" className="absolute h-full w-full" />}
+
       <div className={s.dropzoneHint}>
         <EditIcon />
       </div>

@@ -192,3 +192,20 @@
   flex: 0.2;
   flex-wrap: nowrap;
 }
+
+.field {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.label {
+  color: #475569;
+  font-feature-settings: 'liga' off, 'clig' off;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 166.667% */
+}
