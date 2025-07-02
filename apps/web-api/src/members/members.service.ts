@@ -33,6 +33,7 @@ import {
   UpdateAccessLevelDto,
   UpdateMemberDto,
 } from '../../../../libs/contracts/src/schema/admin-member';
+import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 
 @Injectable()
 export class MembersService {
@@ -50,7 +51,8 @@ export class MembersService {
     private cacheService: CacheService,
     private membersHooksService: MembersHooksService,
     @Inject(forwardRef(() => NotificationSettingsService))
-    private notificationSettingsService: NotificationSettingsService
+    private notificationSettingsService: NotificationSettingsService,
+    private forestAdminService: ForestAdminService
   ) {}
 
   /**
@@ -1751,6 +1753,18 @@ export class MembersService {
   }
 
   async updateAccessLevel({ memberUids, accessLevel }: UpdateAccessLevelDto): Promise<{ updatedCount: number }> {
+    const notApprovedMembers = await this.prisma.member.findMany({
+      where: {
+        uid: { in: memberUids },
+        accessLevel: { in: ['L0', 'L1', 'Rejected'] },
+      },
+      select: {
+        uid: true,
+        name: true,
+        email: true,
+      },
+    });
+
     const result = await this.prisma.member.updateMany({
       where: {
         uid: { in: memberUids },
@@ -1760,6 +1774,20 @@ export class MembersService {
         accessLevelUpdatedAt: new Date(),
       },
     });
+
+    if (result.count > 0) {
+      for (const member of notApprovedMembers) {
+        if (!member.email) {
+          this.logger.error(
+            `Missing email for member with uid ${member.uid}. Can't send an approval notification email`
+          );
+        } else {
+          await this.notificationService.notifyForMemberCreationApproval(member.name, member.uid, member.email, true);
+        }
+      }
+      await this.notificationSettingsService.enableRecommendationsFor(notApprovedMembers.map(({ uid }) => uid));
+      await this.forestAdminService.triggerAirtableSync();
+    }
 
     return { updatedCount: result.count };
   }
@@ -1796,6 +1824,12 @@ export class MembersService {
         },
       };
       createdMember = await this.createMember(newMember, tx);
+      await this.notificationService.notifyForMemberCreationApproval(
+        createdMember.name,
+        createdMember.uid,
+        createdMember.email,
+        true
+      );
       await this.membersHooksService.postCreateActions(createdMember, memberData.email);
     });
     return createdMember;
