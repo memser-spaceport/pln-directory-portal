@@ -249,8 +249,7 @@ You are a helpful assistant that converts natural language questions into SQL qu
 ---
 
 
-`
-
+`;
 
 export const PROMPT_FOR_GENERATE_TITLE = `Create a title for the following question 
 Question: {{question}}
@@ -260,10 +259,6 @@ Dont add any prefix or suffix to the title.
 If the question has valid words, then title must be created and dont add any other symbols.
 if there is no question or answer, return empty.
 `;
-
-
-
-
 
 export const HUSKY_CONTEXTUAL_SUMMARY_PROMPT = `
  For the given question "{{question}}", using only the provided 'Context' and 'Chat History Summary' (if available), generate a JSON response following this exact structure:
@@ -302,7 +297,7 @@ STRICT REQUIREMENTS for the output json: Follow the below requirements strictly.
 Context: {{context}}
 Chat Conversation Summary: {{chatSummary}}
 
-`
+`;
 
 export const HUSKY_RELATED_INFO_PROMPT = `Given the context, question, response and actions docs, create the following object.
       
@@ -339,7 +334,7 @@ export const HUSKY_RELATED_INFO_PROMPT = `Given the context, question, response 
         - question: {{question}}
         - response: {{response}}
 
-      `
+      `;
 export const CONTEXTUAL_SYSTEM_PROMPT = `
 You are an AI assistant that answers questions based on the provided 'context' and 'chatHistory'. For the given 'question' and 'chatHistory', generate a JSON response using only the information in the 'context' and 'chatHistory' (if available).
 
@@ -427,8 +422,7 @@ Return a valid JSON object with the following structure:
 - Make sure the content is true and correct based on the context provided, question asked and chat summary.
 - **Strictly** make sure the citations are added in the content in the format [N](url) where N is the source index.
 
-`
-
+`;
 
 /*
 - Add a note like "I've shown the first 10 results". And request user to specifically prompt/ask questions or add context to narrow down to show more specific results."
@@ -445,7 +439,7 @@ Given the new question, response and previous chat summary, create a summary for
 Question: {{question}}
 Response: {{response}}
 Previous Chat Summary: {{previousChatSummary}}
-`
+`;
 
 export const REPHRASE_QUESTION_SYSTEM_PROMPT = `
 You are an AI assistant responsible for rephrasing user questions to ensure they contain enough context for accurate document retrieval from Qdrant and for answering with an LLM.
@@ -506,7 +500,7 @@ Output in JSON format:
   "qdrantQuery": "<A context-rich question optimized for document retrieval.>",
   "llmQuestion": "<The natural, conversational question for the LLM to answer.>"
 }
-`
+`;
 
 export const rephraseQuestionTemplate = `
 You are an AI language model optimizing a user's query for document retrieval in a RAG-based system. Your task is to analyze the given chat summary (if available) and the new user question, then refine the question while ensuring it retains necessary context and clarity.
@@ -522,7 +516,6 @@ Chat Summary (if available): {{chatHistory}}
 New User Question: {{question}}
 Output:
 <final rephrased question>`;
-
 
 export const HUSKY_CHAT_SUMMARY_SYSTEM_PROMPT = `
 You are an AI assistant managing a conversation history between a user and an assistant. Your task is to **maintain an updated chat history** in a **single string format**, ensuring clarity, order, and conciseness.  
@@ -554,7 +547,7 @@ You are an AI assistant managing a conversation history between a user and an as
 ### Output:  
 An **updated chat history** as a single string, maintaining coherence while keeping the total length **under 1000 words**.  
 
-`
+`;
 
 export const chatSummaryWithHistoryTemplate = `
 You are a conversation summarization assistant designed to maintain coherent chat history for a RAG system. Your goal is to create compact yet comprehensive summaries that preserve key context for future interactions.
@@ -853,6 +846,13 @@ export const HUSKY_RECOMMENDATION_REASON_SYSTEM_PROMPT = `
 You are a professional recommendation writer.
 Task: Generate a concise, natural explanation for why two members would be good connections based on their profiles and matching factors.
 
+CRITICAL REQUIREMENTS:
+- ALWAYS provide a meaningful recommendation reason
+- NEVER apologize or say you don't have enough information
+- NEVER say you cannot make a meaningful connection
+- If specific matching factors are limited, focus on general professional networking benefits
+- Always assume there is value in connecting professionals in the same network
+
 Instructions:
 1. Create a brief, conversational explanation (maximum 2 sentences)
 2. Focus on the most relevant matching factors between the members
@@ -866,11 +866,14 @@ Guidelines:
 - Focus on shared interests, similar work areas, or complementary expertise
 - Mention specific technologies, focus areas, or funding stages when relevant
 - Make it sound like a natural introduction a colleague might make
+- If specific matches are limited, focus on general professional benefits
 
 Examples:
 - You're both working on AI infrastructure projects and at similar funding stages.
 - You share expertise in blockchain technologies and are focused on similar problem areas.
 - You're both building in the Web3 space and working with complementary technologies.
+- You're both active members of the network and could benefit from sharing insights and experiences.
+- You're both working in the tech industry and could explore potential collaborations.
 
 Available matching factors:
 - Technologies
