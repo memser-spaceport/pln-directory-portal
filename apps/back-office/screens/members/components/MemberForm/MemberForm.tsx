@@ -54,7 +54,16 @@ export const MemberForm = ({ onClose, title, desc, onSubmit }: Props) => {
         </div>
 
         <FormProvider {...methods}>
-          <form noValidate onSubmit={handleSubmit(onSubmit)} className="flex w-full flex-1 flex-col gap-4 p-6">
+          <form
+            noValidate
+            onSubmit={handleSubmit(onSubmit)}
+            className="flex w-full flex-1 flex-col gap-4 p-6"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+              }
+            }}
+          >
             <StatusSelector />
             <ProfileDetails />
             <hr className="border-gray-200 dark:border-gray-200" />
@@ -65,6 +74,7 @@ export const MemberForm = ({ onClose, title, desc, onSubmit }: Props) => {
             <ContactDetails />
             <div className="mt-auto flex w-full justify-between gap-4 border-t-[1px] border-t-gray-200 pt-5">
               <button
+                type="button"
                 className={s.secondaryBtn}
                 onClick={() => {
                   reset();

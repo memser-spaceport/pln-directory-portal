@@ -45,7 +45,11 @@ export const AdditionalDetails = () => {
                 }
               />
               <FormField name={`teamsAndRoles.${index}.role`} placeholder="Role" label="Role" />
-              <button className="mt-5 flex h-full items-end rounded bg-red-100 p-2" onClick={() => remove(index)}>
+              <button
+                className="mt-5 flex h-full items-end rounded bg-red-100 p-2"
+                onClick={() => remove(index)}
+                type="button"
+              >
                 <TrashIcon />
               </button>
             </div>
@@ -55,8 +59,9 @@ export const AdditionalDetails = () => {
       <button
         className="flex items-center gap-1 text-sm text-[#1B4DFF]"
         onClick={() => {
-          append({ team: '', role: '' });
+          append({ team: null, role: '' });
         }}
+        type="button"
       >
         Add an existing team <PlusIcon />
       </button>

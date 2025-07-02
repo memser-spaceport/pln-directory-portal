@@ -98,7 +98,7 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
                 })
               }
             >
-              <AddMember className={s.addNewBtn} />
+              <AddMember className={s.addNewBtn} authToken={authToken} />
             </TableFilter>
           </span>
         </div>

@@ -28,35 +28,25 @@ export const RequestMembersSchema = z.object({
     .string()
     .transform((val) => val.split(',').map((v) => v.trim()))
     .refine((arr) => arr.length > 0, { message: 'accessLevel must contain at least one value' }),
-  page: z
-    .string()
-    .regex(/^\d+$/)
-    .transform(Number)
-    .optional()
-    .default('1'),
-  limit: z
-    .string()
-    .regex(/^\d+$/)
-    .transform(Number)
-    .optional()
-    .default('20'),
+  page: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  limit: z.string().regex(/^\d+$/).transform(Number).optional().default('20'),
 });
 
 export const CreateMemberSchema = z.object({
   name: z.string(),
   accessLevel: z.string(),
   email: z.string().email(),
-  imageUid: z.string(),
-  joinDate: z.string(),
-  bio: z.string(),
+  imageUid: z.string().nullable(),
+  joinDate: z.string().nullable(),
+  bio: z.string().nullable(),
 
-  country: z.string(),
-  region: z.string(),
-  city: z.string(),
+  country: z.string().nullable(),
+  region: z.string().nullable(),
+  city: z.string().nullable(),
 
   skills: z.array(z.string()),
 
-  teamOrProjectURL: z.string().url(),
+  teamOrProjectURL: z.string().url().nullable(),
 
   teamMemberRoles: z.array(
     z.object({
@@ -65,12 +55,12 @@ export const CreateMemberSchema = z.object({
     })
   ),
 
-  githubHandler: z.string().optional(),
-  discordHandler: z.string().optional(),
-  twitterHandler: z.string().optional(),
-  linkedinHandler: z.string().optional(),
-  telegramHandler: z.string().optional(),
-  officeHours: z.string().optional(),
+  githubHandler: z.string().nullable(),
+  discordHandler: z.string().nullable(),
+  twitterHandler: z.string().nullable(),
+  linkedinHandler: z.string().nullable(),
+  telegramHandler: z.string().nullable(),
+  officeHours: z.string().nullable(),
 });
 
 export const UpdateMemberSchema = z.object({
@@ -89,12 +79,14 @@ export const UpdateMemberSchema = z.object({
 
   teamOrProjectURL: z.string().url().optional(),
 
-  teamMemberRoles: z.array(
-    z.object({
-      teamUid: z.string(),
-      role: z.string(),
-    })
-  ).optional(),
+  teamMemberRoles: z
+    .array(
+      z.object({
+        teamUid: z.string(),
+        role: z.string(),
+      })
+    )
+    .optional(),
 
   githubHandler: z.string().optional(),
   discordHandler: z.string().optional(),
@@ -105,13 +97,8 @@ export const UpdateMemberSchema = z.object({
 });
 
 export const UpdateAccessLevelSchema = z.object({
-  memberUids: z
-    .string()
-    .array()
-    .nonempty({ message: 'memberUids cannot be empty' }),
-  accessLevel: z
-    .string()
-    .min(1, { message: 'accessLevel must not be empty' }),
+  memberUids: z.string().array().nonempty({ message: 'memberUids cannot be empty' }),
+  accessLevel: z.string().min(1, { message: 'accessLevel must not be empty' }),
 });
 
 export type AccessLevelCounts = Record<AccessLevel, number>;

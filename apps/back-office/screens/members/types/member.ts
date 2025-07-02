@@ -13,7 +13,7 @@ export type Member = {
 };
 
 export type TMemberForm = {
-  accessLevel: string;
+  accessLevel: { label: string; value: string } | null;
   image: File | null;
   name: string;
   email: string;

@@ -4,7 +4,7 @@ import {
   forwardRef,
   Inject,
   Injectable,
-  NotFoundException
+  NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
 import axios from 'axios';
@@ -30,7 +30,8 @@ import {
   AccessLevelCounts,
   CreateMemberDto,
   RequestMembersDto,
-  UpdateAccessLevelDto, UpdateMemberDto
+  UpdateAccessLevelDto,
+  UpdateMemberDto,
 } from '../../../../libs/contracts/src/schema/admin-member';
 
 @Injectable()
@@ -1773,7 +1774,7 @@ export class MembersService {
         imageUid: memberData.imageUid,
         accessLevel: memberData.accessLevel,
         bio: memberData.bio,
-        plnStartDate: new Date(memberData.joinDate),
+        plnStartDate: memberData.joinDate ? new Date(memberData.joinDate) : null,
         githubHandler: memberData.githubHandler,
         discordHandler: memberData.discordHandler,
         twitterHandler: memberData.twitterHandler,
@@ -1781,7 +1782,7 @@ export class MembersService {
         telegramHandler: memberData.telegramHandler,
         officeHours: memberData.officeHours,
         teamOrProjectURL: memberData.teamOrProjectURL,
-        locationUid: location.uid,
+        locationUid: location?.uid || null,
         skills: {
           connect: memberData.skills.map((uid) => ({ uid })),
         },
@@ -1818,7 +1819,7 @@ export class MembersService {
       // Handle location
       if (country || region || city) {
         const location = await this.mapLocationToNewMember(city, country, region, tx);
-        data.locationUid = location.uid;
+        data.locationUid = location?.uid ?? '';
       }
 
       // Handle skills
@@ -1858,11 +1859,11 @@ export class MembersService {
   }
 
   private async mapLocationToNewMember(
-    city: string | undefined,
-    country: string | undefined,
-    region: string | undefined,
+    city: string | undefined | null,
+    country: string | undefined | null,
+    region: string | undefined | null,
     tx: Prisma.TransactionClient
-  ): Promise<Location> {
+  ): Promise<Location | null> {
     if (city || country || region) {
       const result = await this.locationTransferService.fetchLocation(city, country, null, region, null);
       // If the location has a valid placeId, proceed with upsert
@@ -1876,7 +1877,7 @@ export class MembersService {
         throw new BadRequestException('Invalid Location info');
       }
     } else {
-      throw new BadRequestException('Invalid Location info');
+      return null; // throw new BadRequestException('Invalid Location info');
     }
   }
 

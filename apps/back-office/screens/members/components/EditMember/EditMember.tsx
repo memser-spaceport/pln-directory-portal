@@ -46,7 +46,13 @@ export const EditMember = ({ className, uid }: Props) => {
 
   return (
     <>
-      <button className={clsx(s.root, className)} onClick={handleSignUpClick}>
+      <button
+        className={clsx(s.root, className, {
+          [s.disabled]: true,
+        })}
+        onClick={handleSignUpClick}
+        disabled
+      >
         <EditIcon /> Edit
       </button>
       <AnimatePresence>

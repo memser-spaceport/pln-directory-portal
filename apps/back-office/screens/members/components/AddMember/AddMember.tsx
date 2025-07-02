@@ -17,9 +17,10 @@ const fade = {
 
 interface Props {
   className?: string;
+  authToken: string;
 }
 
-export const AddMember = ({ className }: Props) => {
+export const AddMember = ({ className, authToken }: Props) => {
   const [open, setOpen] = useState(false);
 
   const handleSignUpClick = () => {
@@ -45,13 +46,13 @@ export const AddMember = ({ className }: Props) => {
       const payload = {
         imageUid: image ?? '',
         name: formData.name,
-        accessLevel: formData.accessLevel,
+        accessLevel: formData.accessLevel?.value,
         email: formData.email,
         joinDate: formData.joinDate?.toISOString() ?? '',
         bio: formData.bio,
-        country: formData.country,
-        region: formData.state,
-        city: formData.city,
+        country: formData.country ?? '',
+        region: formData.state ?? '',
+        city: formData.city ?? '',
         skills: formData.skills.map((item) => item.value),
         teamOrProjectURL: formData.teamOrProjectURL,
         teamMemberRoles: formData.teamsAndRoles.map((item) => {
@@ -68,9 +69,9 @@ export const AddMember = ({ className }: Props) => {
         githubHandler: formData.github,
       };
 
-      await mutateAsync({ payload });
+      await mutateAsync({ payload, authToken });
     },
-    [mutateAsync]
+    [mutateAsync, authToken]
   );
 
   return (

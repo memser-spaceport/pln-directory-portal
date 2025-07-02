@@ -3,6 +3,7 @@ import api from '../../utils/api';
 import { MembersQueryKeys } from './constants/queryKeys';
 
 interface MutationParams {
+  authToken: string;
   payload: {
     imageUid: string;
     name: string;
@@ -28,8 +29,12 @@ interface MutationParams {
   };
 }
 
-async function mutation({ payload }: MutationParams) {
-  return await api.post(`/v1/admin/members/create`, payload);
+async function mutation({ payload, authToken }: MutationParams) {
+  return await api.post(`/v1/admin/members/create`, payload, {
+    headers: {
+      authorization: `Bearer ${authToken}`,
+    },
+  });
 }
 
 export function useAddMember() {
