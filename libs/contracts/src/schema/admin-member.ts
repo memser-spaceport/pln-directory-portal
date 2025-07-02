@@ -46,6 +46,7 @@ export const CreateMemberSchema = z.object({
   name: z.string(),
   accessLevel: z.string(),
   email: z.string().email(),
+  imageUid: z.string(),
   joinDate: z.string(),
   bio: z.string(),
 
@@ -75,6 +76,7 @@ export const CreateMemberSchema = z.object({
 export const UpdateMemberSchema = z.object({
   name: z.string().optional(),
   email: z.string().email().optional(),
+  imageUid: z.string().optional(),
   accessLevel: z.string().optional(),
   joinDate: z.string().optional(),
   bio: z.string().optional(),
