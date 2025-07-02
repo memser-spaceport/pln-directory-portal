@@ -1771,7 +1771,7 @@ export class MembersService {
         name: memberData.name,
         email: memberData.email,
         imageUid: memberData.imageUid,
-        accessLevel: AccessLevel.L4,
+        accessLevel: memberData.accessLevel,
         bio: memberData.bio,
         plnStartDate: new Date(memberData.joinDate),
         githubHandler: memberData.githubHandler,
