@@ -10,12 +10,10 @@ export const AdditionalDetails = () => {
   const { data } = useMemberFormOptions();
   const { control } = useFormContext<TMemberForm>();
 
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control,
     name: 'teamsAndRoles',
   });
-
-  console.log(fields);
 
   return (
     <div className="flex flex-col gap-4">
@@ -62,18 +60,6 @@ export const AdditionalDetails = () => {
       >
         Add an existing team <PlusIcon />
       </button>
-      <FormSelectField
-        name="project"
-        placeholder="Select project"
-        label="Project"
-        options={
-          data?.projects?.map((item: { projectUid: string; projectName: string }) => ({
-            value: item.projectUid,
-            label: item.projectName,
-          })) ?? []
-        }
-      />
-      <FormField name="role" label="Role" placeholder="Role" />
     </div>
   );
 };

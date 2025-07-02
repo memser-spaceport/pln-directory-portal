@@ -29,13 +29,12 @@
   border: 1px solid rgba(203, 213, 225, 0.50);
   background: #FFF;
   outline: none;
-  color
 
   &:focus {
     border-radius: 8px;
-    border: 1px solid rgba(66, 125, 255, 0.50);
+    border: 1px solid #5E718D;
     background: #FFF;
-    box-shadow: 0 0 0 4px rgba(21, 111, 247, 0.10);
+    box-shadow: 0 0 0 4px rgba(27, 56, 96, 0.12) !important;
   }
 
   &.error {

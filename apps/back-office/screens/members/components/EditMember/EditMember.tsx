@@ -1,12 +1,13 @@
 import React, { useCallback, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-import s from './EditMember.module.scss';
 import { MemberForm } from '../MemberForm/MemberForm';
 import clsx from 'clsx';
 import { EditIcon } from '../icons';
 import { TMemberForm } from '../../types/member';
 import { saveRegistrationImage } from '../../../../utils/services/member';
+
+import s from './EditMember.module.scss';
 
 const fade = {
   hidden: { opacity: 0 },
