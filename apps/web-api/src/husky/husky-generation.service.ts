@@ -268,9 +268,15 @@ export class HuskyGenerationService {
       temperature: 0.7,
     };
 
-    const { text: reason } = await generateText(generateTextOptions);
-
-    return reason.trim();
+    try {
+      const { text: reason } = await generateText(generateTextOptions);
+      return reason.trim();
+    } catch (error) {
+      this.logger.error(
+        `Error generating recommendation reason for ${targetMember.name} and ${recommendedMember.name}: ${error}`
+      );
+      return 'Based on your profile and activity in the network';
+    }
   }
 
   private hasEnoughIdentifyingInfo(member: any): boolean {

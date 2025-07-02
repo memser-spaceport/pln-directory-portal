@@ -95,7 +95,7 @@ export class RecommendationsJob {
               where: { memberUid: member.uid },
               data: {
                 exampleSent: true,
-                subscribed: false,
+                subscribed: true,
               },
             });
           }
