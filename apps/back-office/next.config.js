@@ -20,14 +20,13 @@ const nextConfig = {
   images: {
     // List remote domains that have access to Next.js Image Optimization API,
     // to protect the app from malicious users
-    domains: ['loremflickr.com', 'files.plnetwork.io', AWS_S3_DOMAIN, 'pl-events-service.s3.us-west-1.amazonaws.com'],
+    domains: ['loremflickr.com', 'files.plnetwork.io', AWS_S3_DOMAIN],
     // Enable `dangerouslyAllowSVG` and `contentSecurityPolicy` to serve
     // SVG images using the default Image Optimization API
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     // Configure the Time to Live (TTL) in seconds for caching optimized images
     minimumCacheTTL: 300,
-    remotePatterns: [new URL('https://pl-events-service.s3.us-west-1.amazonaws.com/**')],
   },
 };
 
