@@ -55,7 +55,6 @@ const MemberTable = (props: any) => {
   };
   const sortImg = TABLE_SORT_ICONS[sortOrder];
 
-
   useEffect(() => {
     setAllMembers(members);
   }, [members]);

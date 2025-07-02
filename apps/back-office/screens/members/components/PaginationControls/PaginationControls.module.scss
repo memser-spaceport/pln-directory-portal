@@ -1,0 +1,98 @@
+.root {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 24px;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 12px);
+}
+
+.btn {
+  display: flex;
+  padding: 12px var(--global-size-size-250, 20px);
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-zero, 8px);
+
+  border-radius: var(--corner-radius-lg, 10px);
+  border: 1px solid var(--action-border-neutral-light_normal, rgba(14, 15, 17, 0.16));
+  background: var(--action-background-base-white, #FFF);
+
+  /* Button/secondary/border */
+  box-shadow: 0px -2px 8px 0px var(--transparent-dark-2, rgba(14, 15, 17, 0.02)) inset, 0px 1px 2px 0px var(--transparent-dark-8, rgba(14, 15, 17, 0.08));
+
+  color: var(--action-foreground-neutral-normal, #455468);
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 24px; /* 150% */
+  letter-spacing: -0.3px;
+
+  &:hover {
+    background: var(--action-background-neutral-light_hover, rgba(14, 15, 17, 0.04));
+  }
+}
+
+.inputWrapper {
+  color: var(--foreground-neutral-tertiary, #8897AE);
+  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 142.857% */
+  letter-spacing: -0.2px;
+}
+
+.input {
+  display: flex;
+  width: 60px;
+  padding: 5px var(--spacing-2xs, 8px);
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-zero, 0px);
+
+  border-radius: var(--corner-radius-sm, 6px);
+  border: 1px solid var(--border-neutral-muted, rgba(27, 56, 96, 0.24));
+  background: var(--background-base-white, #FFF);
+}
+
+.pageBtn {
+  color: var(--action-foreground-neutral-normal, #455468);
+  text-align: center;
+
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 24px; /* 150% */
+  letter-spacing: -0.3px;
+
+  display: flex;
+  width: 32px;
+  height: 32px;
+  padding: var(--spacing-zero, 0px);
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-zero, 0px);
+
+  &.active {
+    display: flex;
+    width: 32px;
+    height: 32px;
+    padding: var(--spacing-zero, 0px);
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-zero, 0px);
+    border-radius: var(--corner-radius-Full-round, 9999px);
+    background: var(--action-background-neutral-active, #5E718D);
+
+    color: #fff;
+  }
+}

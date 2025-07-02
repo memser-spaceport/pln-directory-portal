@@ -11,6 +11,7 @@ const APP_CONSTANTS = {
   REJECTED_FLAG: 'REJECTED',
   CLOSED_FLAG: 'CLOSED',
   MEMBER_LABEL: 'Members',
+  RECOMMENDATIONS_LABEL: 'Recommendations',
   TEAMS_LABEL: 'Teams',
   NO_DATA_AVAILABLE_LABEL: 'No data available',
   VIEW_CLOSED_REQUEST_LABEL: 'View closed requests',
@@ -62,6 +63,7 @@ export const API_ROUTE = {
   MEMBERS: APP_CONSTANTS.V1 + 'members',
   ADMIN_APPROVAL: APP_CONSTANTS.V1 + 'admin/members',
   ADMIN_RECOMMENDATIONS: APP_CONSTANTS.V1 + 'admin/recommendations',
+  ADMIN_MEMBERS: `${APP_CONSTANTS.V1}admin/members`,
 };
 
 export const TOKEN = 'plnetwork@1';

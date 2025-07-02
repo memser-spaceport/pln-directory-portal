@@ -1,14 +1,59 @@
-import { Body, Controller, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards, UsePipes } from '@nestjs/common';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { MembersService } from '../members/members.service';
+import { ZodValidationPipe } from '@abitia/zod-dto';
+import {
+  AccessLevelCounts,
+  CreateMemberDto,
+  RequestMembersDto,
+  UpdateAccessLevelDto, UpdateMemberDto
+} from 'libs/contracts/src/schema/admin-member';
+import { NoCache } from '../decorators/no-cache.decorator';
+import { Member } from '@prisma/client';
 
 @Controller('v1/admin/members')
 export class MemberController {
   constructor(private readonly membersService: MembersService) { }
 
+  @Get()
+  @UseGuards(AdminAuthGuard)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async getMembers(@Query() query: RequestMembersDto) {
+    return await this.membersService.findMemberByAccessLevels(query);
+  }
+
+  @Get('access-level-counts')
+  @UseGuards(AdminAuthGuard)
+  @NoCache()
+  async getAccessLevelCounts(): Promise<AccessLevelCounts> {
+    return this.membersService.getAccessLevelCounts();
+  }
+
+  @Put('access-level')
+  @UseGuards(AdminAuthGuard)
+  @UsePipes(ZodValidationPipe)
+  async updateAccessLevel(@Body() body: UpdateAccessLevelDto) {
+    return this.membersService.updateAccessLevel(body);
+  }
+
+  @Post('/create')
+  @UseGuards(AdminAuthGuard)
+  @UsePipes(ZodValidationPipe)
+  async addNewMember(@Body() body: CreateMemberDto): Promise<Member> {
+    return this.membersService.createMemberByAdmin(body);
+  }
+
+  @Patch('/edit/:uid')
+  @UseGuards(AdminAuthGuard)
+  @UsePipes(ZodValidationPipe)
+  async editMember(@Param('uid') uid: string, @Body() body: UpdateMemberDto): Promise<string> {
+    return this.membersService.updateMemberByAdmin(uid, body);
+  }
+
   /**
    * Updates a member to a verfied user.
-   * 
+   *
    * @param body - array of memberIds to be updated.
    * @returns Array of updation status of the provided memberIds.
    */
@@ -22,7 +67,7 @@ export class MemberController {
 
   /**
    * Updates a member to a verfied user.
-   * 
+   *
    * @param body - participation request data with updated member details
    * @returns updated member object
    */

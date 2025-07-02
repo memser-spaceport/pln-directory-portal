@@ -50,15 +50,12 @@ export class AuthService implements OnModuleInit {
    */
   async deleteUserAccount(externalAuthToken: string, externalAuthId: string) {
     const clientToken = await this.getAuthClientToken();
-    await axios.delete(
-      `${process.env.AUTH_API_URL}/accounts/external/${externalAuthId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${clientToken}`,
-        },
-        data:  { token: externalAuthToken },
-      }
-    );
+    await axios.delete(`${process.env.AUTH_API_URL}/accounts/external/${externalAuthId}`, {
+      headers: {
+        Authorization: `Bearer ${clientToken}`,
+      },
+      data: { token: externalAuthToken },
+    });
     return true;
   }
 
@@ -75,7 +72,7 @@ export class AuthService implements OnModuleInit {
     // Find User by externalId
     let foundUser = await this.membersService.findMemberByExternalId(externalId);
     if (foundUser) {
-      if(foundUser.email === email) {
+      if (foundUser.email === email) {
         // Track login event
         await this.trackLoginEvent(foundUser);
         return {
@@ -86,8 +83,8 @@ export class AuthService implements OnModuleInit {
         };
       } else {
         return {
-          isEmailChanged: true
-        }
+          isEmailChanged: true,
+        };
       }
     }
 
@@ -96,10 +93,10 @@ export class AuthService implements OnModuleInit {
     // if user found by email doesn't has email id then its a new user. update external id for user
     foundUser = await this.membersService.findMemberByEmail(email);
     if (foundUser) {
-      if(foundUser.externalId) {
+      if (foundUser.externalId) {
         return {
-          isDeleteAccount: true
-        }
+          isDeleteAccount: true,
+        };
       } else {
         await this.membersService.updateExternalIdByEmail(email, externalId);
         this.logger.info(`Updated externalId - ${externalId} for emailId - ${email}`);
@@ -232,7 +229,7 @@ export class AuthService implements OnModuleInit {
 
   /**
    * Track login event
-   * @param foundUser 
+   * @param foundUser
    */
   private async trackLoginEvent(foundUser) {
     return await this.analyticsService.trackEvent({
@@ -241,8 +238,8 @@ export class AuthService implements OnModuleInit {
       properties: {
         uid: foundUser.uid,
         email: foundUser.email,
-        name: foundUser.name
-      }
+        name: foundUser.name,
+      },
     });
   }
 
@@ -316,6 +313,7 @@ export class AuthService implements OnModuleInit {
       uid: memberInfo.uid,
       roles: memberInfo.memberRoles?.map((r) => r.name),
       leadingTeams: memberInfo.teamMemberRoles?.filter((role) => role.teamLead).map((role) => role.teamUid),
+      accessLevel: memberInfo.accessLevel,
     };
   }
 

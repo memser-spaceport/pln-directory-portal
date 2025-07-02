@@ -1,0 +1,104 @@
+@use "../../../../styles/mixins.scss";
+@use "../../../../styles/media.scss";
+
+.root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  background-color: #fff;
+  margin-top: 0;
+  border-radius: 0;
+  padding-bottom: 0;
+}
+
+.modal {
+  @include mixins.hide-scrollbar;
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  bottom: 0;
+  max-height: 100dvh;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  background: #00000066;
+  overflow: auto;
+
+  @include media.tablet-landscape {
+    padding: 32px;
+  }
+}
+
+.closeButton {
+  position: absolute;
+  border: none;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  user-select: none;
+  outline: none;
+}
+
+.modalContent {
+  background: white;
+  border-radius: 12px;
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  height: fit-content;
+  min-height: 100dvh;
+  flex-direction: column;
+
+  color: var(--foreground-neutral-secondary, #455468);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 142.857% */
+  letter-spacing: -0.2px;
+}
+
+.secondaryBtn {
+  display: flex;
+  padding: 10px var(--global-size-size-200, 16px);
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-zero, 0px);
+
+  border-radius: var(--corner-radius-md, 8px);
+  border: 1px solid var(--action-border-neutral-light_normal, rgba(14, 15, 17, 0.16));
+  background: var(--action-background-base-white, #FFF);
+
+  /* Button/secondary/border */
+  box-shadow: 0px -2px 8px 0px var(--transparent-dark-2, rgba(14, 15, 17, 0.02)) inset, 0px 1px 2px 0px var(--transparent-dark-8, rgba(14, 15, 17, 0.08));
+
+  color: var(--action-foreground-neutral-normal, #455468);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 142.857% */
+  letter-spacing: -0.2px;
+}
+
+.primaryBtn {
+  display: flex;
+  padding: 10px var(--global-size-size-200, 16px);
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-zero, 0px);
+
+  border-radius: var(--corner-radius-md, 8px);
+  border: 1px solid var(--transparent-dark-12, rgba(14, 15, 17, 0.12));
+  background: var(--action-background-brand-normal, #1B4DFF);
+
+  /* Button/primay/fill */
+  box-shadow: 0px 1px 3px 0px var(--transparent-light-32, rgba(255, 255, 255, 0.32)) inset, 0px 4px 6px 0px var(--transparent-light-6, rgba(255, 255, 255, 0.06)) inset, 0px 1px 5px 0px var(--transparent-brand-16, rgba(27, 77, 255, 0.16));
+
+  color: var(--action-foreground-base-inverted_white, #FFF);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 142.857% */
+  letter-spacing: -0.2px;
+}
