@@ -21,7 +21,8 @@
     "deploy:staging": "gh workflow run staging.yml",
     "deploy:production": "gh workflow run production.yml",
     "start:prod": "node dist/apps/web-api/main",
-    "start:migrate:prod": "npx prisma migrate deploy --schema=./apps/web-api/prisma/schema.prisma && npm run start:prod"
+    "start:migrate:prod": "npx prisma migrate deploy --schema=./apps/web-api/prisma/schema.prisma && npm run start:prod",
+    "postinstall": "patch-package"
   },
   "private": true,
   "prisma": {
@@ -213,7 +214,9 @@
     "jest": "27.2.3",
     "next-sitemap": "^3.1.22",
     "nx": "13.9.7",
+    "patch-package": "^8.0.0",
     "postcss-import": "^15.1.0",
+    "postinstall-postinstall": "^2.1.0",
     "prettier": "^2.5.1",
     "prettier-plugin-tailwindcss": "^0.1.11",
     "prisma": "^4.4.0",
