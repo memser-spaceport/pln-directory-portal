@@ -664,10 +664,55 @@ export class RecommendationsService {
     });
   }
 
+  async getUniqueRoles(): Promise<string[]> {
+    const result = await this.prisma.$queryRaw<Array<{ role: string }>>`
+      SELECT DISTINCT role 
+      FROM "TeamMemberRole" 
+      WHERE role IS NOT NULL AND role != ''
+      ORDER BY role
+    `;
+
+    const roles = result.map((row) => row.role);
+    const normalizedMap = new Map<string, string>();
+
+    // Group roles by their normalized version, keeping the shortest original
+    for (const role of roles) {
+      const normalized = this.normalizeRole(role);
+      // Skip roles that don't have actual words (like "--")
+      if (normalized && normalized.replace(/[^a-zA-Z0-9]/g, '').length > 0) {
+        if (!normalizedMap.has(normalized) || role.length < normalizedMap.get(normalized)!.length) {
+          normalizedMap.set(normalized, role);
+        }
+      }
+    }
+
+    return Array.from(normalizedMap.values()).sort();
+  }
+
   private getSupportEmail(): string | undefined {
     const supportEmails = process.env.SUPPORT_EMAILS?.split(',') ?? [];
     if (isEmails(supportEmails)) {
       return supportEmails[0];
     }
+  }
+
+  private normalizeRole(role: string): string {
+    return (
+      role
+        .toLowerCase()
+        .trim()
+        // Replace multiple spaces with single space
+        .replace(/\s+/g, ' ')
+        // Replace common separators with comma
+        .replace(/[&,]/g, ',')
+        // Replace dashes with comma
+        .replace(/\s*-\s*/g, ',')
+        // Replace "and" with comma
+        .replace(/\s+and\s+/g, ',')
+        // Remove extra commas and spaces
+        .replace(/,\s*,/g, ',')
+        .replace(/^,|,$/g, '')
+        .trim()
+    );
   }
 }
