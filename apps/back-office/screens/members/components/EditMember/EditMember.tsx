@@ -8,6 +8,7 @@ import { TMemberForm } from '../../types/member';
 import { saveRegistrationImage } from '../../../../utils/services/member';
 
 import s from './EditMember.module.scss';
+import { useMember } from '../../../../hooks/members/useMember';
 
 const fade = {
   hidden: { opacity: 0 },
@@ -17,9 +18,10 @@ const fade = {
 
 interface Props {
   className?: string;
+  uid: string;
 }
 
-export const EditMember = ({ className }: Props) => {
+export const EditMember = ({ className, uid }: Props) => {
   const [open, setOpen] = useState(false);
 
   const handleSignUpClick = () => {
@@ -39,6 +41,8 @@ export const EditMember = ({ className }: Props) => {
       image = imgResponse?.image.uid;
     }
   }, []);
+
+  const { data, isLoading } = useMember(uid, open);
 
   return (
     <>

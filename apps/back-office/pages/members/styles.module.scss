@@ -84,6 +84,10 @@
   text-overflow: ellipsis;
   flex: 1;
   user-select: none;
+
+  &.first {
+    padding-left: 12px;
+  }
 }
 
 .bodyCell {
@@ -105,6 +109,10 @@
   //overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+
+  &.first {
+    padding-left: 12px;
+  }
 }
 
 

@@ -147,9 +147,10 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
             {table.getRowModel().rows.map((row) => (
               <React.Fragment key={row.id}>
                 <div key={row.id} className={s.tableRow}>
-                  {row.getVisibleCells().map((cell) => (
+                  {row.getVisibleCells().map((cell, i) => (
                     <div
                       className={clsx(s.bodyCell, {
+                        [s.first]: i === 0,
                         [s.fixed]: !!cell.column.columnDef.size,
                         [s.flexible]: !cell.column.columnDef.size,
                       })}
