@@ -42,6 +42,66 @@ export const RequestMembersSchema = z.object({
     .default('20'),
 });
 
+export const CreateMemberSchema = z.object({
+  name: z.string(),
+  accessLevel: z.string(),
+  email: z.string().email(),
+  joinDate: z.string(),
+  bio: z.string(),
+
+  country: z.string(),
+  region: z.string(),
+  city: z.string(),
+
+  skills: z.array(z.string()),
+
+  teamOrProjectURL: z.string().url(),
+
+  teamMemberRoles: z.array(
+    z.object({
+      teamUid: z.string(),
+      role: z.string(),
+    })
+  ),
+
+  githubHandler: z.string().optional(),
+  discordHandler: z.string().optional(),
+  twitterHandler: z.string().optional(),
+  linkedinHandler: z.string().optional(),
+  telegramHandler: z.string().optional(),
+  officeHours: z.string().optional(),
+});
+
+export const UpdateMemberSchema = z.object({
+  name: z.string().optional(),
+  email: z.string().email().optional(),
+  accessLevel: z.string().optional(),
+  joinDate: z.string().optional(),
+  bio: z.string().optional(),
+
+  country: z.string().optional(),
+  region: z.string().optional(),
+  city: z.string().optional(),
+
+  skills: z.array(z.string()).optional(),
+
+  teamOrProjectURL: z.string().url().optional(),
+
+  teamMemberRoles: z.array(
+    z.object({
+      teamUid: z.string(),
+      role: z.string(),
+    })
+  ).optional(),
+
+  githubHandler: z.string().optional(),
+  discordHandler: z.string().optional(),
+  twitterHandler: z.string().optional(),
+  linkedinHandler: z.string().optional(),
+  telegramHandler: z.string().optional(),
+  officeHours: z.string().optional(),
+});
+
 export const UpdateAccessLevelSchema = z.object({
   memberUids: z
     .string()
@@ -55,4 +115,6 @@ export const UpdateAccessLevelSchema = z.object({
 export type AccessLevelCounts = Record<AccessLevel, number>;
 
 export class RequestMembersDto extends createZodDto(RequestMembersSchema) {}
+export class CreateMemberDto extends createZodDto(CreateMemberSchema) {}
+export class UpdateMemberDto extends createZodDto(UpdateMemberSchema) {}
 export class UpdateAccessLevelDto extends createZodDto(UpdateAccessLevelSchema) {}

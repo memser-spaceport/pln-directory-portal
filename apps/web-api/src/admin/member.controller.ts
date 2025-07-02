@@ -2,8 +2,14 @@ import { Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards, UsePi
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { MembersService } from '../members/members.service';
 import { ZodValidationPipe } from '@abitia/zod-dto';
-import { AccessLevelCounts, RequestMembersDto, UpdateAccessLevelDto } from 'libs/contracts/src/schema/admin-member';
+import {
+  AccessLevelCounts,
+  CreateMemberDto,
+  RequestMembersDto,
+  UpdateAccessLevelDto, UpdateMemberDto
+} from 'libs/contracts/src/schema/admin-member';
 import { NoCache } from '../decorators/no-cache.decorator';
+import { Member } from '@prisma/client';
 
 @Controller('v1/admin/members')
 export class MemberController {
@@ -29,6 +35,20 @@ export class MemberController {
   @UsePipes(ZodValidationPipe)
   async updateAccessLevel(@Body() body: UpdateAccessLevelDto) {
     return this.membersService.updateAccessLevel(body);
+  }
+
+  @Post('/create')
+  @UseGuards(AdminAuthGuard)
+  @UsePipes(ZodValidationPipe)
+  async addNewMember(@Body() body: CreateMemberDto): Promise<Member> {
+    return this.membersService.createMemberByAdmin(body);
+  }
+
+  @Patch('/edit/:uid')
+  @UseGuards(AdminAuthGuard)
+  @UsePipes(ZodValidationPipe)
+  async editMember(@Param('uid') uid: string, @Body() body: UpdateMemberDto): Promise<string> {
+    return this.membersService.updateMemberByAdmin(uid, body);
   }
 
   /**
