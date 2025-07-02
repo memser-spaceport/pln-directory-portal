@@ -1,34 +1,34 @@
 import {
   BadRequestException,
   ConflictException,
-  NotFoundException,
+  forwardRef,
   Inject,
   Injectable,
-  forwardRef,
+  NotFoundException
 } from '@nestjs/common';
 import { z } from 'zod';
 import axios from 'axios';
 import * as path from 'path';
-import { Prisma, Member, ParticipantsRequest } from '@prisma/client';
+import { Location, Member, ParticipantsRequest, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
-import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { NotificationService } from '../utils/notification/notification.service';
 import { EmailOtpService } from '../otp/email-otp.service';
 import { AuthService } from '../auth/auth.service';
 import { LogService } from '../shared/log.service';
-import { CREATE, DEFAULT_MEMBER_ROLES, UPDATE } from '../utils/constants';
+import { DEFAULT_MEMBER_ROLES } from '../utils/constants';
 import { hashFileName } from '../utils/hashing';
-import { copyObj, buildMultiRelationMapping } from '../utils/helper/helper';
+import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { MembersHooksService } from './members.hooks.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 import {
   AccessLevel,
   AccessLevelCounts,
+  CreateMemberDto,
   RequestMembersDto,
   UpdateAccessLevelDto
 } from '../../../../libs/contracts/src/schema/admin-member';
@@ -1761,6 +1761,61 @@ export class MembersService {
     });
 
     return { updatedCount: result.count };
+  }
+
+  async createMemberByAdmin(memberData: CreateMemberDto): Promise<Member> {
+    let createdMember: any;
+    await this.prisma.$transaction(async (tx) => {
+      const location = await this.mapLocationToNewMember(memberData, tx);
+      const newMember = {
+        name: memberData.name,
+        email: memberData.email,
+        accessLevel: AccessLevel.L4,
+        bio: memberData.bio,
+        // plnStartDate: new Date(joinDate),
+        githubHandler: memberData.githubHandler,
+        discordHandler: memberData.discordHandler,
+        twitterHandler: memberData.twitterHandler,
+        linkedinHandler: memberData.linkedinHandler,
+        telegramHandler: memberData.telegramHandler,
+        officeHours: memberData.officeHours,
+        teamOrProjectURL: memberData.teamOrProjectURL,
+        locationUid: location.uid,
+        skills: {
+          connect: memberData.skills.map((uid) => ({ uid })),
+        },
+        teamMemberRoles: {
+          create: memberData.teamMemberRoles.map(({ teamUid, role }) => ({
+            role,
+            team: {
+              connect: { uid: teamUid },
+            },
+          })),
+        },
+      };
+      createdMember = await this.createMember(newMember, tx);
+      await this.membersHooksService.postCreateActions(createdMember, memberData.email);
+    });
+    return createdMember;
+  }
+
+  private async mapLocationToNewMember(memberData: any, tx: Prisma.TransactionClient): Promise<Location> {
+    const { city, country, region } = memberData;
+    if (city || country || region) {
+      const result = await this.locationTransferService.fetchLocation(city, country, null, region, null);
+      // If the location has a valid placeId, proceed with upsert
+      if (result?.location?.placeId) {
+        return tx.location.upsert({
+          where: { placeId: result.location.placeId },
+          update: result.location,
+          create: result.location,
+        });
+      } else {
+        throw new BadRequestException('Invalid Location info');
+      }
+    } else {
+      throw new BadRequestException('Invalid Location info');
+    }
   }
 
   /**
