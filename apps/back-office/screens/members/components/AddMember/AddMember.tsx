@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 import s from './AddMember.module.scss';
 import { MemberForm } from '../MemberForm/MemberForm';
+import clsx from 'clsx';
+import { PlusIcon } from '../icons';
 
 const fade = {
   hidden: { opacity: 0 },
@@ -10,7 +12,11 @@ const fade = {
   exit: { opacity: 0 },
 };
 
-export const AddMember = () => {
+interface Props {
+  className?: string;
+}
+
+export const AddMember = ({ className }: Props) => {
   const [open, setOpen] = useState(false);
 
   const handleSignUpClick = () => {
@@ -23,8 +29,8 @@ export const AddMember = () => {
 
   return (
     <>
-      <button className={s.root} onClick={handleSignUpClick}>
-        Add new
+      <button className={clsx(s.root, className)} onClick={handleSignUpClick}>
+        <PlusIcon /> Add new
       </button>
       <AnimatePresence>
         {open && (
@@ -34,8 +40,8 @@ export const AddMember = () => {
             animate="visible"
             exit="exit"
             variants={fade}
-            transition={{ duration: 0.5 }}
-            style={{ zIndex: 10, position: 'absolute' }}
+            transition={{ duration: 0.2 }}
+            style={{ zIndex: 100, position: 'absolute' }}
           >
             <MemberForm onClose={handleClose} />
           </motion.div>

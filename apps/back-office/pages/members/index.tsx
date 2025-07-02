@@ -21,6 +21,7 @@ import clsx from 'clsx';
 import { MultieditControls } from '../../screens/members/components/MultieditControls';
 import { useAccessLevelCounts } from '../../hooks/members/useAccessLevelCounts';
 import PaginationControls from '../../screens/members/components/PaginationControls/PaginationControls';
+import { AddMember } from '../../screens/members/components/AddMember/AddMember';
 
 const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
   const router = useRouter();
@@ -97,9 +98,7 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
                 })
               }
             >
-              <button className={s.addNewBtn}>
-                <AddIcon /> Add new
-              </button>
+              <AddMember className={s.addNewBtn} />
             </TableFilter>
           </span>
         </div>

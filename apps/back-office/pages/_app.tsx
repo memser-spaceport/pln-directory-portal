@@ -5,8 +5,8 @@ import '@fontsource/inter/700.css';
 import { AppProps } from 'next/app';
 import Head from 'next/head';
 import './styles.css';
+import '../styles/react-datepicker.min.css';
 import { NavbarContextProvider } from '../context/navbar-context';
-import withAuth from '../hoc/withauth';
 import Toaster from '../components/common/toaster';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
