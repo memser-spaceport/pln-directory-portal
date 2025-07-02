@@ -3,15 +3,14 @@ import api from '../../utils/api';
 import { MembersQueryKeys } from './constants/queryKeys';
 
 interface MutationParams {
-  uid: string;
   payload: any;
 }
 
-async function mutation({ uid, payload }: MutationParams) {
-  return await api.put(`/v1/member/${uid}`, payload);
+async function mutation({ payload }: MutationParams) {
+  return await api.post(`/v1/admin/members/create`, payload);
 }
 
-export function useUpdateMember() {
+export function useAddMember() {
   const queryClient = useQueryClient();
 
   return useMutation({
