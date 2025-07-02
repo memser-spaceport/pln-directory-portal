@@ -43,11 +43,11 @@ export const AddMember = ({ className }: Props) => {
       }
 
       const payload = {
-        image,
+        imageUid: image ?? '',
         name: formData.name,
         accessLevel: formData.accessLevel,
         email: formData.email,
-        joinDate: formData.joinDate,
+        joinDate: formData.joinDate?.toISOString() ?? '',
         bio: formData.bio,
         country: formData.country,
         region: formData.state,
@@ -68,7 +68,7 @@ export const AddMember = ({ className }: Props) => {
         githubHandler: formData.github,
       };
 
-      await mutateAsync(payload);
+      await mutateAsync({ payload });
     },
     [mutateAsync]
   );

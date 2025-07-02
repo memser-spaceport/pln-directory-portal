@@ -3,7 +3,29 @@ import api from '../../utils/api';
 import { MembersQueryKeys } from './constants/queryKeys';
 
 interface MutationParams {
-  payload: any;
+  payload: {
+    imageUid: string;
+    name: string;
+    accessLevel: string;
+    email: string;
+    joinDate: string;
+    bio: string;
+    country: string;
+    region: string;
+    city: string;
+    skills: string[];
+    teamOrProjectURL: string;
+    teamMemberRoles: {
+      teamUid: string;
+      role: string;
+    }[];
+    linkedinHandler: string;
+    discordHandler: string;
+    twitterHandler: string;
+    telegramHandler: string;
+    officeHours: string;
+    githubHandler: string;
+  };
 }
 
 async function mutation({ payload }: MutationParams) {
