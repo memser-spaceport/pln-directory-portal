@@ -4,6 +4,7 @@ import { Level0Icon, Level1Icon, Level2Icon } from '../../icons';
 import { useFormContext } from 'react-hook-form';
 import { TMemberForm } from '../../../types/member';
 import s from './StatusSelector.module.scss';
+import { clsx } from 'clsx';
 
 const options = [
   {
@@ -69,12 +70,16 @@ const options = [
 ];
 
 export const StatusSelector = () => {
-  const { watch, setValue } = useFormContext<TMemberForm>();
+  const {
+    watch,
+    setValue,
+    formState: { errors },
+  } = useFormContext<TMemberForm>();
   const { accessLevel } = watch();
 
   return (
     <div className={s.field}>
-      <div className={s.label}>Select Status*</div>
+      <div className={clsx(s.label, s.required)}>Select Status</div>
       <Select
         menuPlacement="bottom"
         options={options}
@@ -153,7 +158,13 @@ export const StatusSelector = () => {
             const selected = val.length > 0 ? val[0] : null;
 
             return (
-              <div {...innerProps} ref={innerRef} className={s.control}>
+              <div
+                {...innerProps}
+                ref={innerRef}
+                className={clsx(s.control, {
+                  [s.error]: errors?.accessLevel?.message,
+                })}
+              >
                 {selected ? (
                   <>
                     <div className={s.optionRoot}>
@@ -183,6 +194,7 @@ export const StatusSelector = () => {
           },
         }}
       />
+      <div className={s.errorMsg}>{(errors?.accessLevel?.message as string) ?? ''}</div>
     </div>
   );
 };

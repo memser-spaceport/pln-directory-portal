@@ -9,6 +9,8 @@ import { ProfileDetails } from './ProfileDetails/ProfileDetails';
 import { ProfileLocationInput } from './ProfileLocationInput';
 import { AdditionalDetails } from './AdditionalDetails/AdditionalDetails';
 import { ContactDetails } from './ContactDetails/ContactDetails';
+import { yupResolver } from '@hookform/resolvers/yup';
+import { memberFormSchema } from './helpers';
 
 interface Props {
   onClose: () => void;
@@ -30,8 +32,6 @@ export const MemberForm = ({ onClose, title, desc, onSubmit }: Props) => {
       state: '',
       city: '',
       skills: [],
-      project: null,
-      role: '',
       discord: '',
       github: '',
       linkedin: '',
@@ -39,8 +39,13 @@ export const MemberForm = ({ onClose, title, desc, onSubmit }: Props) => {
       telegram: '',
       twitter: '',
     },
+    resolver: yupResolver(memberFormSchema),
   });
-  const { handleSubmit, reset } = methods;
+  const {
+    handleSubmit,
+    reset,
+    formState: { isSubmitting },
+  } = methods;
 
   return (
     <div className={s.modal}>
@@ -83,7 +88,9 @@ export const MemberForm = ({ onClose, title, desc, onSubmit }: Props) => {
               >
                 Cancel
               </button>
-              <button className={s.primaryBtn}>Confirm</button>
+              <button className={s.primaryBtn} disabled={isSubmitting}>
+                {isSubmitting ? 'Processing...' : 'Confirm'}
+              </button>
             </div>
           </form>
         </FormProvider>

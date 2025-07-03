@@ -13,7 +13,7 @@ export type Member = {
 };
 
 export type TMemberForm = {
-  accessLevel: { label: string; value: string } | null;
+  accessLevel: { label?: string; value?: string } | null;
   image: File | null;
   name: string;
   email: string;
@@ -22,11 +22,9 @@ export type TMemberForm = {
   country: string;
   state: string;
   city: string;
-  skills: { label: string; value: string }[];
+  skills: { label?: string; value?: string }[];
   teamOrProjectURL: string;
-  project: { label: string; value: string } | null;
-  teamsAndRoles: { team: { label: string; value: string }; role: string }[];
-  role: string;
+  teamsAndRoles: { team?: { label?: string; value?: string }; role?: string }[];
   linkedin: string;
   discord: string;
   twitter: string;
