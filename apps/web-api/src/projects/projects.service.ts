@@ -109,10 +109,19 @@ export class ProjectsService {
         this.prisma.project.findMany({
           ...queryOptions,
           where: whereWithFilter,
-          include: {
-            ...queryOptions.include,
-            creator: true,
-          },
+          ...(queryOptions.select
+            ? {
+                select: {
+                  ...queryOptions.select,
+                  creator: { select: { accessLevel: true } },
+                },
+              }
+            : ({
+                include: {
+                  ...(queryOptions.include || {}),
+                  creator: true,
+                },
+              } as any)),
         }),
         this.prisma.project.count({ where: whereWithFilter }),
       ]);
