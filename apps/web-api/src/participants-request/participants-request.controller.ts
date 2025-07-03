@@ -1,9 +1,13 @@
-import { Body, Controller, Get, Post, Query, UsePipes } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards, UsePipes } from '@nestjs/common';
 import { ParticipantsRequestService } from './participants-request.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
 import { FindUniqueIdentiferDto } from 'libs/contracts/src/schema/participants-request';
 import { MembersService } from '../members/members.service';
+import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
+import { AccessLevelsGuard } from '../guards/access-levels.guard';
+import { AccessLevels } from '../decorators/access-levels.decorator';
+import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 
 @Controller('v1/participants-request')
 @NoCache()
@@ -20,6 +24,8 @@ export class ParticipantsRequestController {
    */
   @Post('/')
   @UsePipes(new ParticipantsReqValidationPipe())
+  @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   async addRequest(@Body() body) {
     const uniqueIdentifier = this.participantsRequestService.getUniqueIdentifier(body);
     // Validate unique identifier existence
