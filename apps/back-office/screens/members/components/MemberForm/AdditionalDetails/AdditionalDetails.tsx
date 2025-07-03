@@ -32,7 +32,7 @@ export const AdditionalDetails = () => {
       {fields?.length > 0 && (
         <div className="flex flex-col gap-4">
           {fields.map((field, index) => (
-            <div className="flex items-center gap-2" key={index}>
+            <div className="flex items-start gap-2" key={index}>
               <FormSelectField
                 name={`teamsAndRoles.${index}.team`}
                 placeholder="Select team"
@@ -46,7 +46,7 @@ export const AdditionalDetails = () => {
               />
               <FormField name={`teamsAndRoles.${index}.role`} placeholder="Role" label="Role" />
               <button
-                className="mt-5 flex h-full items-end rounded bg-red-100 p-2"
+                className="mt-6 flex h-full items-end rounded bg-red-100 p-2"
                 onClick={() => remove(index)}
                 type="button"
               >

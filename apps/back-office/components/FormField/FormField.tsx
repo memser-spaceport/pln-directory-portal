@@ -3,15 +3,17 @@ import { clsx } from 'clsx';
 import { useFormContext } from 'react-hook-form';
 
 import s from './FormField.module.scss';
+import { get } from 'lodash';
 
 interface Props {
   name: string;
   placeholder: string;
   label: string;
   description?: string;
+  isRequired?: boolean;
 }
 
-export const FormField = ({ name, placeholder, label, description }: Props) => {
+export const FormField = ({ name, placeholder, label, description, isRequired }: Props) => {
   const {
     register,
     formState: { errors },
@@ -19,18 +21,24 @@ export const FormField = ({ name, placeholder, label, description }: Props) => {
 
   return (
     <div className={s.field}>
-      <div className={s.label}>{label}</div>
+      <div
+        className={clsx(s.label, {
+          [s.required]: isRequired,
+        })}
+      >
+        {label}
+      </div>
       <input
         {...register(name)}
         placeholder={placeholder}
         className={clsx(s.input, {
-          [s.error]: !!errors[name],
+          [s.error]: !!get(errors, name, null),
         })}
       />
-      {!errors[name] && description ? (
+      {!get(errors, name, null) && description ? (
         <div className={s.fieldDescription}>{description}</div>
       ) : (
-        <div className={s.errorMsg}>{(errors?.[name]?.message as string) ?? ''}</div>
+        <div className={s.errorMsg}>{(get(errors, name, null)?.message as string) ?? ''}</div>
       )}
     </div>
   );

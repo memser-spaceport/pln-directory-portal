@@ -6,6 +6,7 @@ import { useOnClickOutside } from '../../../../hooks/useOnClickOutside';
 import s from './MembersMenu.module.scss';
 import { useAccessLevelCounts } from '../../../../hooks/members/useAccessLevelCounts';
 import { useCookie } from 'react-use';
+import { AddMember } from '../../../../screens/members/components/AddMember/AddMember';
 
 export const MembersMenu = () => {
   const menuRef = useRef(null);
@@ -64,7 +65,7 @@ export const MembersMenu = () => {
             </div>
           </Link>
 
-          <button className={s.menuItem}>Add New Member</button>
+          <AddMember authToken={cookieValue} className={s.addMemberBtn} onClick={handleClickOutside} />
         </div>
       )}
     </div>

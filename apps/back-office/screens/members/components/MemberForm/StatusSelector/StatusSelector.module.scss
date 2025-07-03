@@ -181,6 +181,10 @@
   max-height: 40px;
   flex-wrap: nowrap;
 
+  &.error {
+    border-color: darkred;
+  }
+
   .optionRoot {
     padding-left: 8px;
   }
@@ -208,4 +212,19 @@
   font-style: normal;
   font-weight: 500;
   line-height: 20px; /* 166.667% */
+
+  &.required:after {
+    content: '*';
+    color: red;
+    margin-left: 0.25rem;
+  }
+}
+
+.errorMsg {
+  font-size: 10px;
+  color: darkred;
+  font-feature-settings: 'liga' off, 'clig' off;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 200% */
 }

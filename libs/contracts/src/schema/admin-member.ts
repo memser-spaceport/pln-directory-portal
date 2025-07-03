@@ -66,18 +66,18 @@ export const CreateMemberSchema = z.object({
 export const UpdateMemberSchema = z.object({
   name: z.string().optional(),
   email: z.string().email().optional(),
-  imageUid: z.string().optional(),
+  imageUid: z.string().optional().nullable(),
   accessLevel: z.string().optional(),
-  joinDate: z.string().optional(),
-  bio: z.string().optional(),
+  joinDate: z.string().optional().nullable(),
+  bio: z.string().optional().nullable(),
 
-  country: z.string().optional(),
-  region: z.string().optional(),
-  city: z.string().optional(),
+  country: z.string().optional().nullable(),
+  region: z.string().optional().nullable(),
+  city: z.string().optional().nullable(),
 
   skills: z.array(z.string()).optional(),
 
-  teamOrProjectURL: z.string().url().optional(),
+  teamOrProjectURL: z.string().url().optional().nullable(),
 
   teamMemberRoles: z
     .array(
@@ -88,12 +88,12 @@ export const UpdateMemberSchema = z.object({
     )
     .optional(),
 
-  githubHandler: z.string().optional(),
-  discordHandler: z.string().optional(),
-  twitterHandler: z.string().optional(),
-  linkedinHandler: z.string().optional(),
-  telegramHandler: z.string().optional(),
-  officeHours: z.string().optional(),
+  githubHandler: z.string().optional().nullable(),
+  discordHandler: z.string().optional().nullable(),
+  twitterHandler: z.string().optional().nullable(),
+  linkedinHandler: z.string().optional().nullable(),
+  telegramHandler: z.string().optional().nullable(),
+  officeHours: z.string().optional().nullable(),
 });
 
 export const UpdateAccessLevelSchema = z.object({

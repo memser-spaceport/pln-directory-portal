@@ -53,9 +53,11 @@ async function fetcher() {
   return getMemberInfoFormValues();
 }
 
-export function useMemberFormOptions() {
+export function useMemberFormOptions(enabled = true) {
   return useQuery({
     queryKey: [MembersQueryKeys.GET_SKILLS_OPTIONS],
     queryFn: fetcher,
+    enabled,
+    staleTime: 30000,
   });
 }

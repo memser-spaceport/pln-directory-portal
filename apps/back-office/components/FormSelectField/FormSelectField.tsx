@@ -3,6 +3,7 @@ import { useFormContext } from 'react-hook-form';
 
 import s from './FormSelectField.module.scss';
 import Select from 'react-select';
+import { get } from 'lodash';
 
 interface Props {
   name: string;
@@ -22,7 +23,7 @@ export const FormSelectField = ({ name, placeholder, label, description, options
     watch,
   } = useFormContext();
   const values = watch();
-  const val = values[name];
+  const val = get(values, name, null);
 
   return (
     <div className={s.field}>
@@ -48,13 +49,13 @@ export const FormSelectField = ({ name, placeholder, label, description, options
             gap: '8px',
             alignSelf: 'stretch',
             borderRadius: '8px',
-            border: '1px solid rgba(203, 213, 225, 0.50)',
+            borderWidth: '1px',
             background: '#fff',
             outline: 'none',
             fontSize: '14px',
             minWidth: '140px',
             width: '100%',
-            borderColor: 'rgba(203, 213, 225, 0.50) !important',
+            borderColor: get(errors, name, null) ? 'darkred' : 'rgba(203, 213, 225, 0.50) !important',
             position: 'relative',
             boxShadow: 'none !important',
             '&:hover': {
@@ -129,10 +130,10 @@ export const FormSelectField = ({ name, placeholder, label, description, options
           }),
         }}
       />
-      {!errors[name] && description ? (
+      {!get(errors, name, null) && description ? (
         <div className={s.fieldDescription}>{description}</div>
       ) : (
-        <div className={s.errorMsg}>{(errors?.[name]?.message as string) ?? ''}</div>
+        <div className={s.errorMsg}>{(get(errors, name, null)?.message as string) ?? ''}</div>
       )}
     </div>
   );

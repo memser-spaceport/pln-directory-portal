@@ -8,6 +8,7 @@ import { PlusIcon } from '../icons';
 import { TMemberForm } from '../../types/member';
 import { saveRegistrationImage } from '../../../../utils/services/member';
 import { useAddMember } from '../../../../hooks/members/useAddMember';
+import { toast } from 'react-toastify';
 
 const fade = {
   hidden: { opacity: 0 },
@@ -18,9 +19,10 @@ const fade = {
 interface Props {
   className?: string;
   authToken: string;
+  onClick?: () => void;
 }
 
-export const AddMember = ({ className, authToken }: Props) => {
+export const AddMember = ({ className, authToken, onClick }: Props) => {
   const [open, setOpen] = useState(false);
 
   const handleSignUpClick = () => {
@@ -29,7 +31,8 @@ export const AddMember = ({ className, authToken }: Props) => {
 
   const handleClose = useCallback(() => {
     setOpen(false);
-  }, []);
+    onClick?.();
+  }, [onClick]);
 
   const { mutateAsync } = useAddMember();
 
@@ -69,7 +72,14 @@ export const AddMember = ({ className, authToken }: Props) => {
         githubHandler: formData.github,
       };
 
-      await mutateAsync({ payload, authToken });
+      const res = await mutateAsync({ payload, authToken });
+
+      if (res?.data) {
+        setOpen(false);
+        toast.success('New member added successfully!');
+      } else {
+        toast.error('Failed to add new member. Please try again.');
+      }
     },
     [mutateAsync, authToken]
   );
@@ -102,33 +112,3 @@ export const AddMember = ({ className, authToken }: Props) => {
     </>
   );
 };
-
-function formatPayload(formData: TMemberForm) {
-  return {
-    name: formData.name,
-    email: formData.email,
-    plnStartDate: formData.joinDate,
-    city: formData.city,
-    region: formData.state,
-    country: formData.country,
-    teamOrProjectURL: formData.project,
-    linkedinHandler: formData.linkedin,
-    discordHandler: formData.discord,
-    twitterHandler: formData.twitter,
-    githubHandler: formData.github,
-    telegramHandler: formData.telegram,
-    officeHours: formData.officeHours,
-    // moreDetails: memberInfo.moreDetails,
-    // openToWork: memberInfo.openToWork,
-    // plnFriend: memberInfo.plnFriend,
-    // teamAndRoles: memberInfo.teamMemberRoles,
-    // projectContributions: memberInfo.projectContributions?.map((contribution: any) => ({
-    //   ...omit(contribution, 'projectName'),
-    // })),
-    skills: formData.skills?.map((skill: Record<string, string>) => ({
-      title: skill.name,
-      uid: skill.id,
-    })),
-    bio: formData.bio,
-  };
-}

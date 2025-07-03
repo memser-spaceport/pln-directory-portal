@@ -20,31 +20,11 @@
 
 .badge {
   display: flex;
-  padding: var(--spacing-5xs, 2px) var(--spacing-2xs, 8px);
+  padding: var(--spacing-5xs, 2px);
   justify-content: center;
   align-items: center;
   gap: var(--spacing-5xs, 2px);
-  flex: 1 0 0;
-
   border-radius: var(--corner-radius-Full-round, 9999px);
-  border: 1px solid var(--border-brand-subtle, #AEBFFF);
-  background: var(--transparent-brand-2, rgba(27, 77, 255, 0.02));
-  transition: all 0.3s ease;
-
-  span {
-    overflow: hidden;
-    color: var(--foreground-brand-secondary_inverted, #4174FF);
-    text-overflow: ellipsis;
-    word-break: break-word;
-    max-width: 92px;
-    font-size: 14px;
-    font-style: normal;
-    font-weight: 500;
-    line-height: 20px; /* 142.857% */
-    letter-spacing: -0.2px;
-  }
-
-  &:hover {
-    background: var(--transparent-brand-4, rgba(27, 77, 255, 0.08));
-  }
+  border: 1px solid var(--border-success-subtle, rgba(4, 135, 70, 0.32));
+  background: var(--background-base-white, #FFF);
 }

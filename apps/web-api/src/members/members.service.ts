@@ -1883,7 +1883,7 @@ export class MembersService {
         };
       }
 
-      updatedMember = tx.member.update({
+      updatedMember = await tx.member.update({
         where: { uid },
         data,
       });

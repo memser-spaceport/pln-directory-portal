@@ -101,7 +101,7 @@ export const getMemberInfo = async (memberUid: string) => {
     skills: skills,
   };
 
-  return { data: formatted };
+  return formatted;
 };
 
 async function fetcher(uid: string | undefined) {

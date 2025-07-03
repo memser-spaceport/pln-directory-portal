@@ -16,6 +16,12 @@
   font-style: normal;
   font-weight: 500;
   line-height: 20px; /* 166.667% */
+
+  &.required:after {
+    content: '*';
+    color: red;
+    margin-left: 0.25rem;
+  }
 }
 
 .input {

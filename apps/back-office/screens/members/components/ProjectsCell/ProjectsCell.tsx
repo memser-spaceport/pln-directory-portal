@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Member } from '../../types/member';
-import { MembersIcon, ProjectsIcon } from '../icons';
+import { EmptyIcon, MembersIcon, ProjectsIcon } from '../icons';
 
 import s from './ProjectsCell.module.scss';
 
@@ -70,6 +70,11 @@ export const ProjectsCell = ({ member }: { member: Member }) => {
 
   return (
     <div className={s.root} ref={containerRef}>
+      {!items.length && (
+        <div className={s.empty}>
+          <EmptyIcon />
+        </div>
+      )}
       {items.map((item, idx) => {
         if (idx < visibleCount) {
           return (

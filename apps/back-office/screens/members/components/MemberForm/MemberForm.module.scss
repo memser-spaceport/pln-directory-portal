@@ -101,4 +101,9 @@
   font-weight: 500;
   line-height: 20px; /* 142.857% */
   letter-spacing: -0.2px;
+
+  &:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
 }

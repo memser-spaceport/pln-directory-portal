@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 import s from './MemberForm.module.scss';
 import { CloseIcon } from '../icons';
@@ -9,15 +9,18 @@ import { ProfileDetails } from './ProfileDetails/ProfileDetails';
 import { ProfileLocationInput } from './ProfileLocationInput';
 import { AdditionalDetails } from './AdditionalDetails/AdditionalDetails';
 import { ContactDetails } from './ContactDetails/ContactDetails';
+import { yupResolver } from '@hookform/resolvers/yup';
+import { memberFormSchema } from './helpers';
 
 interface Props {
   onClose: () => void;
   title: string;
   desc: string;
   onSubmit: (data: TMemberForm) => Promise<void>;
+  initialData?: TMemberForm;
 }
 
-export const MemberForm = ({ onClose, title, desc, onSubmit }: Props) => {
+export const MemberForm = ({ onClose, title, desc, onSubmit, initialData }: Props) => {
   const methods = useForm<TMemberForm>({
     defaultValues: {
       accessLevel: null,
@@ -30,8 +33,6 @@ export const MemberForm = ({ onClose, title, desc, onSubmit }: Props) => {
       state: '',
       city: '',
       skills: [],
-      project: null,
-      role: '',
       discord: '',
       github: '',
       linkedin: '',
@@ -39,8 +40,19 @@ export const MemberForm = ({ onClose, title, desc, onSubmit }: Props) => {
       telegram: '',
       twitter: '',
     },
+    resolver: yupResolver(memberFormSchema),
   });
-  const { handleSubmit, reset } = methods;
+  const {
+    handleSubmit,
+    reset,
+    formState: { isSubmitting },
+  } = methods;
+
+  useEffect(() => {
+    if (initialData) {
+      reset(initialData);
+    }
+  }, [initialData, reset]);
 
   return (
     <div className={s.modal}>
@@ -83,7 +95,9 @@ export const MemberForm = ({ onClose, title, desc, onSubmit }: Props) => {
               >
                 Cancel
               </button>
-              <button className={s.primaryBtn}>Confirm</button>
+              <button className={s.primaryBtn} disabled={isSubmitting}>
+                {isSubmitting ? 'Processing...' : 'Confirm'}
+              </button>
             </div>
           </form>
         </FormProvider>
