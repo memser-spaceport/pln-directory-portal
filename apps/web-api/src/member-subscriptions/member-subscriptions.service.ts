@@ -80,7 +80,7 @@ export class MemberSubscriptionService {
         where: {
           ...query.where,
           member: {
-            accessLevel: { notIn: ['L0', 'L1'] },
+            accessLevel: { notIn: ['L0', 'L1', 'Rejected'] },
           },
         },
       });

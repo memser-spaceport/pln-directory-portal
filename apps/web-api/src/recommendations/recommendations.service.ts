@@ -582,7 +582,7 @@ export class RecommendationsService {
         where: {
           ...where,
           accessLevel: {
-            notIn: ['L0', 'L1'],
+            notIn: ['L0', 'L1', 'Rejected'],
           },
         },
         skip,
@@ -638,7 +638,7 @@ export class RecommendationsService {
     return this.prisma.member.findMany({
       where: {
         accessLevel: {
-          notIn: ['L0', 'L1'],
+          notIn: ['L0', 'L1', 'Rejected'],
         },
         notificationSetting: {
           subscribed: true,

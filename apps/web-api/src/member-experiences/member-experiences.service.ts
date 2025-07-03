@@ -159,7 +159,7 @@ export class MemberExperiencesService {
           member: {
             uid: uid,
             accessLevel: {
-              notIn: ['L0', 'L1'],
+              notIn: ['L0', 'L1', 'Rejected'],
             },
           },
         },

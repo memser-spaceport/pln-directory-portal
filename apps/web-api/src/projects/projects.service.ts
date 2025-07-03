@@ -100,7 +100,7 @@ export class ProjectsService {
         ...queryOptions.where,
         creator: {
           accessLevel: {
-            notIn: ['L0', 'L1'],
+            notIn: ['L0', 'L1', 'Rejected'],
           },
         },
       };

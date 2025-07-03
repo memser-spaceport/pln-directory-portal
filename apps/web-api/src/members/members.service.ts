@@ -88,7 +88,7 @@ export class MembersService {
       const where = {
         ...queryOptions.where,
         accessLevel: {
-          notIn: ['L0', 'L1'],
+          notIn: ['L0', 'L1', 'Rejected'],
         },
       };
 
@@ -128,7 +128,7 @@ export class MembersService {
       };
 
       const accessLevelFilter: Prisma.MemberWhereInput = {
-        accessLevel: { notIn: ['L0', 'L1'] },
+        accessLevel: { notIn: ['L0', 'L1', 'Rejected'] },
       };
 
       queryOptions.where = {

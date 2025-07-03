@@ -64,7 +64,7 @@ export class MembersTool {
       where: {
         ...where,
         accessLevel: {
-          notIn: ['L0', 'L1'],
+          notIn: ['L0', 'L1', 'Rejected'],
         },
       },
       include: {
