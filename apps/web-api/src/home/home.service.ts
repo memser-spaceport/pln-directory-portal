@@ -18,7 +18,7 @@ export class HomeService {
     private plEventLocationService: PLEventLocationsService
   ) { }
 
-  async fetchAllFeaturedData(loggedInMember: string) {
+  async fetchAllFeaturedData(loggedInMember) {
     try {
       return {
         members: await this.memberService.findAllFiltered({
@@ -35,7 +35,7 @@ export class HomeService {
               },
             },
           },
-        }, loggedInMember),
+        }, loggedInMember.email),
         teams: await this.teamsService.findAll({
           where: { isFeatured: true },
           include: { logo: true }
