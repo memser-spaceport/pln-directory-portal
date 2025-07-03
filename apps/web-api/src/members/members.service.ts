@@ -1824,6 +1824,11 @@ export class MembersService {
             },
           })),
         },
+        notificationSetting: {
+          create: {
+            recommendationsEnabled: true,
+          },
+        },
       };
       createdMember = await this.createMember(newMember, tx);
       await this.notificationService.notifyForMemberCreationApproval(
