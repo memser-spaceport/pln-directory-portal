@@ -46,7 +46,7 @@ export const AdditionalDetails = () => {
               />
               <FormField name={`teamsAndRoles.${index}.role`} placeholder="Role" label="Role" />
               <button
-                className="mt-5 flex h-full items-end rounded bg-red-100 p-2"
+                className="mt-6 flex h-full items-end rounded bg-red-100 p-2"
                 onClick={() => remove(index)}
                 type="button"
               >

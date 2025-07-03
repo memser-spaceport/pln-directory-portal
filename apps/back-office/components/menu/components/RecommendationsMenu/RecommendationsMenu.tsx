@@ -48,8 +48,6 @@ export const RecommendationsMenu = () => {
               <CaretIcon />
             </a>
           </Link>
-
-          <button className={s.menuItem}>New Recommendation Run</button>
         </div>
       )}
     </div>

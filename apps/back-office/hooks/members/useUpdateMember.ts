@@ -4,11 +4,38 @@ import { MembersQueryKeys } from './constants/queryKeys';
 
 interface MutationParams {
   uid: string;
-  payload: any;
+  authToken: string;
+  payload: {
+    imageUid: string;
+    name: string;
+    accessLevel: string;
+    email: string;
+    joinDate: string;
+    bio: string;
+    country: string;
+    region: string;
+    city: string;
+    skills: string[];
+    teamOrProjectURL: string;
+    teamMemberRoles: {
+      teamUid: string;
+      role: string;
+    }[];
+    linkedinHandler: string;
+    discordHandler: string;
+    twitterHandler: string;
+    telegramHandler: string;
+    officeHours: string;
+    githubHandler: string;
+  };
 }
 
-async function mutation({ uid, payload }: MutationParams) {
-  return await api.put(`/v1/member/${uid}`, payload);
+async function mutation({ uid, payload, authToken }: MutationParams) {
+  return await api.patch(`/v1/admin/members/edit/${uid}`, payload, {
+    headers: {
+      authorization: `Bearer ${authToken}`,
+    },
+  });
 }
 
 export function useUpdateMember() {

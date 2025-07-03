@@ -19,9 +19,10 @@ const fade = {
 interface Props {
   className?: string;
   authToken: string;
+  onClick?: () => void;
 }
 
-export const AddMember = ({ className, authToken }: Props) => {
+export const AddMember = ({ className, authToken, onClick }: Props) => {
   const [open, setOpen] = useState(false);
 
   const handleSignUpClick = () => {
@@ -30,7 +31,8 @@ export const AddMember = ({ className, authToken }: Props) => {
 
   const handleClose = useCallback(() => {
     setOpen(false);
-  }, []);
+    onClick?.();
+  }, [onClick]);
 
   const { mutateAsync } = useAddMember();
 

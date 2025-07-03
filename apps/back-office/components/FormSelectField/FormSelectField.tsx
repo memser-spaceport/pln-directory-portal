@@ -23,7 +23,7 @@ export const FormSelectField = ({ name, placeholder, label, description, options
     watch,
   } = useFormContext();
   const values = watch();
-  const val = values[name];
+  const val = get(values, name, null);
 
   return (
     <div className={s.field}>

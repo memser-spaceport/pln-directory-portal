@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 import s from './MemberForm.module.scss';
 import { CloseIcon } from '../icons';
@@ -17,9 +17,10 @@ interface Props {
   title: string;
   desc: string;
   onSubmit: (data: TMemberForm) => Promise<void>;
+  initialData?: TMemberForm;
 }
 
-export const MemberForm = ({ onClose, title, desc, onSubmit }: Props) => {
+export const MemberForm = ({ onClose, title, desc, onSubmit, initialData }: Props) => {
   const methods = useForm<TMemberForm>({
     defaultValues: {
       accessLevel: null,
@@ -46,6 +47,12 @@ export const MemberForm = ({ onClose, title, desc, onSubmit }: Props) => {
     reset,
     formState: { isSubmitting },
   } = methods;
+
+  useEffect(() => {
+    if (initialData) {
+      reset(initialData);
+    }
+  }, [initialData, reset]);
 
   return (
     <div className={s.modal}>

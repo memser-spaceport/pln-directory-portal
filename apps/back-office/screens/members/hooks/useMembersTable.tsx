@@ -116,7 +116,7 @@ export function useMembersTable({
       }),
       columnHelper.display({
         header: 'Info',
-        cell: (props) => <EditCell member={props.row.original} />,
+        cell: (props) => <EditCell member={props.row.original} authToken={authToken} />,
         size: 88,
         enableResizing: false,
         meta: {

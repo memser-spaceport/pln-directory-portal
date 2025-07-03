@@ -6,7 +6,7 @@ import { TMemberForm } from '../../../types/member';
 import s from './StatusSelector.module.scss';
 import { clsx } from 'clsx';
 
-const options = [
+export const options = [
   {
     icon: (
       <span className={s.orange}>

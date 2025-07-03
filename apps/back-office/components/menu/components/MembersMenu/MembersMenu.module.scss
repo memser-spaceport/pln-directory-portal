@@ -93,3 +93,27 @@
   background: var(--transparent-dark-6, rgba(14, 15, 17, 0.06));
   transition: all 0.3s ease;
 }
+
+.addMemberBtn {
+  display: flex;
+  padding: 10px var(--global-size-size-200, 16px);
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-zero, 0px);
+  align-self: stretch;
+
+  border-radius: var(--corner-radius-md, 8px);
+  border: 1px solid var(--transparent-brand-2, rgba(27, 77, 255, 0.02));
+  background: var(--action-background-brand-light_normal, rgba(27, 77, 255, 0.04));
+
+  /* Button/primay/light */
+  box-shadow: 0px -1px 4px 0px var(--transparent-brand-8, rgba(27, 77, 255, 0.08)) inset;
+
+  color: var(--action-foreground-brand-inverted_normal, #1B4DFF);
+
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 142.857% */
+  letter-spacing: -0.2px;
+}
