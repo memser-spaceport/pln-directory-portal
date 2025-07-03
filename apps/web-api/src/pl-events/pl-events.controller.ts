@@ -82,7 +82,6 @@ export class PLEventsController {
 
   @Api(server.route.getPLEventGuestsByLocation)
   @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   @NoCache()
   async findPLEventGuestsByLocation(
     @Req() request: Request,
@@ -96,7 +95,6 @@ export class PLEventsController {
   @ApiParam({ name: 'slug', type: 'string' })
   @ApiOkResponseFromZod(ResponsePLEventSchemaWithRelationsSchema)
   @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   @NoCache()
   async findOne(
     @ApiDecorator() { params: { slug } }: RouteShape['getPLEventBySlug'],
@@ -199,7 +197,6 @@ export class PLEventsController {
   @ApiQueryFromZod(PLEventQueryParams)
   @ApiOkResponseFromZod(ResponsePLEventSchemaWithRelationsSchema.array())
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   @NoCache()
   async getPLEventsByLoggedInMember(
     @Param("uid") locationUid,
@@ -233,7 +230,6 @@ export class PLEventsController {
 
   @Api(server.route.getPLEventGuestByUidAndLocation)
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   async getPLEventGuestByUidAndLocation(
     @Req() request,
     @Param('uid') locationUid: string,
@@ -269,7 +265,6 @@ export class PLEventsController {
 
   @Api(server.route.getPLEventGuestTopics)
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   @NoCache()
   async getPLEventGuestTopics(
     @Param('uid') locationUid: string,
@@ -293,7 +288,6 @@ export class PLEventsController {
 
   @Api(server.route.getAllAggregatedData)
   @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   @NoCache()
   async getAllAggregatedData(
     @Req() request: Request
