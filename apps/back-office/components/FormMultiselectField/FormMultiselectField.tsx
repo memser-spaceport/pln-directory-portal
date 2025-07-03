@@ -31,7 +31,6 @@ export const FormMultiselectField = ({ name, placeholder, label, description, op
         menuPlacement="auto"
         isMulti
         options={options}
-        filterOption={() => true}
         isClearable={false}
         placeholder={placeholder}
         value={val}

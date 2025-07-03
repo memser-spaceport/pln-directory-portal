@@ -31,7 +31,6 @@ export const FormSelectField = ({ name, placeholder, label, description, options
       <Select
         menuPlacement="auto"
         options={options}
-        filterOption={() => true}
         isClearable={false}
         placeholder={placeholder}
         value={val}
