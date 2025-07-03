@@ -85,15 +85,72 @@ export class MembersService {
    */
   async findAll(queryOptions: Prisma.MemberFindManyArgs): Promise<{ count: Number; members: Member[] }> {
     try {
+      const where = {
+        ...queryOptions.where,
+        accessLevel: {
+          notIn: ['L0', 'L1'],
+        },
+      };
+
       const [members, membersCount] = await Promise.all([
-        this.prisma.member.findMany(queryOptions),
-        this.prisma.member.count({ where: queryOptions.where }),
+        this.prisma.member.findMany({ ...queryOptions, where }),
+        this.prisma.member.count({ where }),
       ]);
-      return { count: membersCount, members: members };
+
+      return { count: membersCount, members };
     } catch (error) {
       return this.handleErrors(error);
     }
   }
+
+  /**
+   * Retrieves a list of members, filtering out those with access levels 'L0' and 'L1',
+   * except for the currently logged-in member identified by their email.
+   *
+   * This method allows combining the custom access-level filter with any additional filters
+   * passed via `queryOptions.where`. It ensures that the logged-in member is always included,
+   * even if they have an excluded access level.
+   *
+   * @param queryOptions - Prisma query options to filter, sort, and paginate members (e.g., isFeatured, team filters).
+   * @param loginEmail - The email of the currently logged-in member to ensure they are always included in the result.
+   * @returns A promise resolving to an object with the count and the filtered list of member records.
+   *
+   * @example
+   * await findAllFiltered({ where: { isFeatured: true } }, 'user@example.com');
+   */
+  async findAllFiltered(
+    queryOptions: Prisma.MemberFindManyArgs,
+    loginEmail: string
+  ): Promise<{ count: number; members: Member[] }> {
+    try {
+      const emailFilter: Prisma.MemberWhereInput = {
+        email: loginEmail,
+      };
+
+      const accessLevelFilter: Prisma.MemberWhereInput = {
+        accessLevel: { notIn: ['L0', 'L1'] },
+      };
+
+      queryOptions.where = {
+        AND: [
+          {
+            OR: [accessLevelFilter, emailFilter],
+          },
+          queryOptions.where ?? {},
+        ],
+      };
+
+      const [members, membersCount] = await Promise.all([
+        this.prisma.member.findMany(queryOptions),
+        this.prisma.member.count({ where: queryOptions.where }),
+      ]);
+
+      return { count: membersCount, members };
+    } catch (error) {
+      return this.handleErrors(error);
+    }
+  }
+
 
   /**
    * Retrieves a member based on unique query options

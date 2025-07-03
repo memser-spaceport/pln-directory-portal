@@ -60,9 +60,13 @@ export class MembersTool {
     if (args.isFeatured !== undefined) where.isFeatured = args.isFeatured;
     if (args.openToWork !== undefined) where.openToWork = args.openToWork;
     if (args.plnFriend !== undefined) where.plnFriend = args.plnFriend;
-
     const members = await this.prisma.member.findMany({
-      where,
+      where: {
+        ...where,
+        accessLevel: {
+          notIn: ['L0', 'L1'],
+        },
+      },
       include: {
         image: true,
         location: true,
@@ -93,10 +97,10 @@ export class MembersTool {
       },
       orderBy: args.orderBy
         ? {
-            ...(args.orderBy === 'name' && { name: 'asc' }),
-            ...(args.orderBy === 'date' && { createdAt: 'desc' }),
-            ...(args.orderBy === 'plnStartDate' && { plnStartDate: 'desc' }),
-          }
+          ...(args.orderBy === 'name' && { name: 'asc' }),
+          ...(args.orderBy === 'date' && { createdAt: 'desc' }),
+          ...(args.orderBy === 'plnStartDate' && { plnStartDate: 'desc' }),
+        }
         : undefined,
       take: 10,
     });
