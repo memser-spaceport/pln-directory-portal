@@ -122,21 +122,23 @@ export class MembersService {
    */
   async findAllFiltered(
     queryOptions: Prisma.MemberFindManyArgs,
-    loginEmail: string
+    loginEmail: string | null
   ): Promise<{ count: number; members: Member[] }> {
     try {
-      const emailFilter: Prisma.MemberWhereInput = {
-        email: loginEmail,
-      };
-
       const accessLevelFilter: Prisma.MemberWhereInput = {
         accessLevel: { notIn: ['L0', 'L1', 'Rejected'] },
       };
 
+      const filters: Prisma.MemberWhereInput[] = [accessLevelFilter];
+
+      if (loginEmail) {
+        filters.push({ email: loginEmail });
+      }
+
       queryOptions.where = {
         AND: [
           {
-            OR: [accessLevelFilter, emailFilter],
+            OR: filters,
           },
           queryOptions.where ?? {},
         ],
