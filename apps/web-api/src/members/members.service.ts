@@ -1775,7 +1775,7 @@ export class MembersService {
       },
     });
 
-    if (result.count > 0) {
+    if (result.count > 0 && [AccessLevel.L2, AccessLevel.L3, AccessLevel.L4].includes(accessLevel as AccessLevel)) {
       for (const member of notApprovedMembers) {
         if (!member.email) {
           this.logger.error(
