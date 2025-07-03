@@ -129,10 +129,13 @@ function purifyHtml(html) {
 
 async function indexMembers(lastCheckpoint) {
   const res = await pgClient.query(`
-        SELECT m.uid, m.name, m.bio, i.url FROM "Member" m
-        LEFT JOIN "Image" i ON m."imageUid" = i.uid
-        WHERE m."createdAt" > $1 OR m."updatedAt" > $1
-    `, [lastCheckpoint]);
+    SELECT m.uid, m.name, m.bio, i.url
+    FROM "Member" m
+           LEFT JOIN "Image" i ON m."imageUid" = i.uid
+    WHERE
+      (m."createdAt" > $1 OR m."updatedAt" > $1)
+      AND m."accessLevel" NOT IN ('L0', 'L1')
+  `, [lastCheckpoint]);
 
   console.log('Got data from Member table: ' + res.rows.length);
 

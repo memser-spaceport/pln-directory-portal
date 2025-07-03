@@ -1,8 +1,8 @@
-import { 
-  Injectable, 
-  BadRequestException, 
-  ConflictException, 
-  NotFoundException 
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+  NotFoundException
 } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
@@ -17,9 +17,9 @@ export class MemberFollowUpsService {
 
   async createFollowUp(
     followUp: Prisma.MemberFollowUpUncheckedCreateInput,
-    interaction, 
+    interaction,
     tx?: Prisma.TransactionClient
-  ) { 
+  ) {
     try {
       await (tx || this.prisma).memberFollowUp.create({
         data: {
@@ -32,12 +32,22 @@ export class MemberFollowUpsService {
   }
 
   async getFollowUps(
-    query: Prisma.MemberFollowUpFindManyArgs, 
+    query: Prisma.MemberFollowUpFindManyArgs,
     tx?: Prisma.TransactionClient
   ) {
     try {
       return await (tx || this.prisma).memberFollowUp.findMany({
         ...query,
+        where: {
+          ...query.where,
+          interaction: {
+            sourceMember: {
+              accessLevel: {
+                notIn: ['L0', 'L1', 'Rejected'],
+              },
+            },
+          },
+        },
         include: {
           interaction: {
             select: {
@@ -45,28 +55,29 @@ export class MemberFollowUpsService {
               type: true,
               sourceMember: {
                 select: {
-                  name:true,
-                  image:true
-                }
+                  name: true,
+                  image: true,
+                },
               },
-              targetMember:  {
+              targetMember: {
                 select: {
-                  name:true,
-                  image:true
-                }
-              }      
-            }
-          }
-        }
+                  name: true,
+                  image: true,
+                },
+              },
+            },
+          },
+        },
       });
-    } catch(error) {
+    } catch (error) {
       this.handleErrors(error);
     }
   }
 
+
   async updateFollowUpStatusByUid(
-    uid: string, 
-    status, 
+    uid: string,
+    status,
     tx?: Prisma.TransactionClient
   ) {
     try {
@@ -84,7 +95,7 @@ export class MemberFollowUpsService {
   }
 
   buildDelayedFollowUpQuery() {
-    const daysAgo = parseInt(process.env.INTERACTION_FOLLOWUP_DELAY_IN_DAYS || "7") 
+    const daysAgo = parseInt(process.env.INTERACTION_FOLLOWUP_DELAY_IN_DAYS || "7")
     const dateOfNthWeekAgo = new Date();
     dateOfNthWeekAgo.setDate(dateOfNthWeekAgo.getDate() - daysAgo);
     return {
@@ -101,7 +112,7 @@ export class MemberFollowUpsService {
             lte: dateOfNthWeekAgo,
           }
         }
-      ] 
+      ]
     }
   };
 

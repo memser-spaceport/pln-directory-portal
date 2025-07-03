@@ -18,10 +18,10 @@ export class HomeService {
     private plEventLocationService: PLEventLocationsService
   ) { }
 
-  async fetchAllFeaturedData(loggedlnMember) {
+  async fetchAllFeaturedData(loggedInMember: string) {
     try {
       return {
-        members: await this.memberService.findAll({
+        members: await this.memberService.findAllFiltered({
           where: { isFeatured: true },
           include: {
             image: true,
@@ -35,14 +35,14 @@ export class HomeService {
               },
             },
           },
-        }),
+        }, loggedInMember),
         teams: await this.teamsService.findAll({
           where: { isFeatured: true },
           include: { logo: true }
         }),
         events: await this.plEventsService.getPLEvents({ where: { isFeatured: true } }),
         projects: await this.projectsService.getProjects({ where: { isFeatured: true } }),
-        locations: await this.plEventLocationService.getFeaturedLocationsWithSubscribers({ where: { isFeatured: true } }, loggedlnMember)
+        locations: await this.plEventLocationService.getFeaturedLocationsWithSubscribers({ where: { isFeatured: true } }, loggedInMember)
       };
     } catch (error) {
       throw new InternalServerErrorException(`Error occured while retrieving featured data: ${error.message}`);
@@ -52,7 +52,7 @@ export class HomeService {
   /**
    * Retrieves a list of teams and projects based on search term.
    * Builds a Prisma query from the queryable fields and adds filters for team and project name.
-   * 
+   *
    * @param request - HTTP request object containing query parameters
    * @returns Array of projects and teams.
    */
@@ -73,7 +73,7 @@ export class HomeService {
   /**
    * Retrieves a list of teams based on search term.
    * Builds a Prisma query from the queryable fields and adds filters for team name.
-   * 
+   *
    * @param name - name of the team to be searched for.
    * @returns Array of resultant teams.
    */
@@ -103,7 +103,7 @@ export class HomeService {
   /**
    * Retrieves a list of projects based on search term.
    * Builds a Prisma query from the queryable fields and adds filters for project name.
-   * 
+   *
    * @param name - name of the project to be searched for.
    * @returns Array of resultant projects.
    */

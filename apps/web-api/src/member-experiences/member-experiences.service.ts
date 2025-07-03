@@ -8,9 +8,9 @@ import {
 import { Prisma, MemberExperience } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
-import { 
-  CreateMemberExperienceDto, 
-  UpdateMemberExperienceDto 
+import {
+  CreateMemberExperienceDto,
+  UpdateMemberExperienceDto
 } from '../../../../libs/contracts/src/schema/member-experience';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { CacheService } from '../utils/cache/cache.service';
@@ -27,7 +27,7 @@ export class MemberExperiencesService {
 
   /**
    * Creates a new member experience in the database.
-   * 
+   *
    * @param dto - The data transfer object for the new member experience
    * @returns The created member experience record
    */
@@ -52,7 +52,7 @@ export class MemberExperiencesService {
 
   /**
    * Retrieves a single member experience by its UID.
-   * 
+   *
    * @param uid - The UID of the member experience to retrieve
    * @param options - Additional query options
    * @returns The requested member experience record
@@ -79,7 +79,7 @@ export class MemberExperiencesService {
 
   /**
    * Updates a member experience by its UID.
-   * 
+   *
    * @param uid - The UID of the member experience to update
    * @param dto - The data transfer object with fields to update
    * @returns The updated member experience record
@@ -88,13 +88,13 @@ export class MemberExperiencesService {
     try {
       const existingExperience = await this.findOne(uid);
       const { memberUid, ...experienceData } = updateMemberExperiencedto;
-      
+
       const updateData: Prisma.MemberExperienceUpdateInput = {
         ...experienceData,
         userUpdatedAt: new Date(),
         isModifiedByUser: true,
       };
-      
+
       const experience = await this.prisma.$transaction(async (tx) => {
         const updatedExperience = await tx.memberExperience.update({
           where: { uid },
@@ -126,10 +126,10 @@ export class MemberExperiencesService {
 
  /**
    * Removes a member experience by its UID.
-   * 
+   *
    * @param uid - The UID of the member experience to remove
    * @returns The deleted member experience record
-   */ 
+   */
   async remove(uid: string) {
     try {
       const experience = await this.prisma.memberExperience.delete({
@@ -145,7 +145,7 @@ export class MemberExperiencesService {
   /**
    * Retrieves all member experiences for a specific member,
    * sorted with current positions first, then by end date (most recent first).
-   * 
+   *
    * @param uid - The UID of the member to retrieve experiences for
    * @returns An array of member experiences
    */
@@ -153,18 +153,21 @@ export class MemberExperiencesService {
     try {
       const experiences = await this.prisma.memberExperience.findMany({
         include: {
-          member: true
+          member: true,
         },
         where: {
           member: {
-            uid: uid
-          }
+            uid: uid,
+            accessLevel: {
+              notIn: ['L0', 'L1', 'Rejected'],
+            },
+          },
         },
         orderBy: [
           { isCurrent: 'desc' },
           { endDate: 'desc' },
-          { startDate: 'desc' }
-        ]
+          { startDate: 'desc' },
+        ],
       });
       return experiences;
     } catch (error) {

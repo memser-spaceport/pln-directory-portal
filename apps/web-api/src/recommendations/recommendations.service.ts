@@ -579,7 +579,12 @@ export class RecommendationsService {
 
     while (hasMore) {
       const members = await this.prisma.member.findMany({
-        where,
+        where: {
+          ...where,
+          accessLevel: {
+            notIn: ['L0', 'L1', 'Rejected'],
+          },
+        },
         skip,
         take: chunkSize,
         include: {
@@ -632,6 +637,9 @@ export class RecommendationsService {
   async getMembersWithEnabledRecommendations() {
     return this.prisma.member.findMany({
       where: {
+        accessLevel: {
+          notIn: ['L0', 'L1', 'Rejected'],
+        },
         notificationSetting: {
           subscribed: true,
         },
@@ -666,8 +674,8 @@ export class RecommendationsService {
 
   async getUniqueRoles(): Promise<string[]> {
     const result = await this.prisma.$queryRaw<Array<{ role: string }>>`
-      SELECT DISTINCT role 
-      FROM "TeamMemberRole" 
+      SELECT DISTINCT role
+      FROM "TeamMemberRole"
       WHERE role IS NOT NULL AND role != ''
       ORDER BY role
     `;
