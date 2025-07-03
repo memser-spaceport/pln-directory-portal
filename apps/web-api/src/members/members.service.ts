@@ -1775,17 +1775,19 @@ export class MembersService {
       },
     });
 
-    if (result.count > 0 && [AccessLevel.L2, AccessLevel.L3, AccessLevel.L4].includes(accessLevel as AccessLevel)) {
-      for (const member of notApprovedMembers) {
-        if (!member.email) {
-          this.logger.error(
-            `Missing email for member with uid ${member.uid}. Can't send an approval notification email`
-          );
-        } else {
-          await this.notificationService.notifyForMemberCreationApproval(member.name, member.uid, member.email, true);
+    if (result.count > 0) {
+      if ([AccessLevel.L2, AccessLevel.L3, AccessLevel.L4].includes(accessLevel as AccessLevel)) {
+        for (const member of notApprovedMembers) {
+          if (!member.email) {
+            this.logger.error(
+              `Missing email for member with uid ${member.uid}. Can't send an approval notification email`
+            );
+          } else {
+            await this.notificationService.notifyForMemberCreationApproval(member.name, member.uid, member.email, true);
+          }
         }
+        await this.notificationSettingsService.enableRecommendationsFor(notApprovedMembers.map(({ uid }) => uid));
       }
-      await this.notificationSettingsService.enableRecommendationsFor(notApprovedMembers.map(({ uid }) => uid));
       await this.forestAdminService.triggerAirtableSync();
     }
 
