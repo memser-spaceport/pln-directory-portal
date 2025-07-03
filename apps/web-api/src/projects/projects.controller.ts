@@ -13,6 +13,9 @@ import {
 } from 'libs/contracts/src/schema';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
+import { AccessLevelsGuard } from '../guards/access-levels.guard';
+import { AccessLevels } from '../decorators/access-levels.decorator';
+import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 
 const server = initNestServer(apiProjects);
 type RouteShape = typeof server.routeShapes;
@@ -51,7 +54,8 @@ export class ProjectsController {
 
   @Api(server.route.createProject)
   @UsePipes(ZodValidationPipe)
-  @UseGuards(UserTokenValidation)
+  @UseGuards(UserTokenValidation, AccessLevelsGuard)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   async create(
     @Body() body: CreateProjectDto,
     @Req() request
@@ -61,7 +65,8 @@ export class ProjectsController {
 
   @Api(server.route.modifyProject)
   @UsePipes(ZodValidationPipe)
-  @UseGuards(UserTokenValidation)
+  @UseGuards(UserTokenValidation, AccessLevelsGuard)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   update(@Param('uid') uid: string,
     @Body() body: UpdateProjectDto,
     @Req() request
@@ -109,7 +114,8 @@ export class ProjectsController {
 
   @Api(server.route.removeProject)
   @UsePipes(ZodValidationPipe)
-  @UseGuards(UserTokenValidation)
+  @UseGuards(UserTokenValidation, AccessLevelsGuard)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   remove(@Param('uid') uid: string,
     @Req() request
   ) {
@@ -117,7 +123,8 @@ export class ProjectsController {
   }
 
   @Api(server.route.patchAskProject)
-  @UseGuards(UserTokenValidation)
+  @UseGuards(UserTokenValidation, AccessLevelsGuard)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   async addEditAsk(@Param('uid') projectUid, @Body() body, @Req() req) {
     return await this.projectsService.addEditProjectAsk(projectUid,req.userEmail,body);
   }
