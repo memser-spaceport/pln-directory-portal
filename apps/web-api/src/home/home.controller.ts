@@ -41,7 +41,7 @@ export class HomeController {
     @Req() request: Request,
   ) {
     const loggedInMember = request['userEmail'] ? await this.memberService.findMemberByEmail(request['userEmail']) : null;
-    return await this.homeService.fetchAllFeaturedData(loggedInMember?.email);
+    return await this.homeService.fetchAllFeaturedData(loggedInMember);
   }
 
   @Api(server.route.getAllDiscoveryQuestions)

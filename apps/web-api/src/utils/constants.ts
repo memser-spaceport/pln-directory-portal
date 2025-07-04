@@ -62,6 +62,7 @@ export const DIRECTORYADMIN = 'DIRECTORYADMIN';
 export const JOIN_NOW_SUBJECT = 'A request to be a part of network';
 
 export const ONBOARDING_SUBJECT = 'Complete your profile on Protocol Lab’s LabOS';
+export const MEMBER_APPROVED_SUBJECT = 'Your profile on Protocol Lab’s LabOS is approved';
 
 export const ASK_QUESTION = 'Ask a Question';
 export const FEEDBACK = 'Give Feedback';

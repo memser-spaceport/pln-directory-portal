@@ -155,7 +155,6 @@ export class MembersService {
     }
   }
 
-
   /**
    * Retrieves a member based on unique query options
    * @param queryOptions - Object containing unique field value pairs
@@ -1821,6 +1820,7 @@ export class MembersService {
         uid: true,
         name: true,
         email: true,
+        accessLevel: true,
       },
     });
 
@@ -1842,10 +1842,19 @@ export class MembersService {
               `Missing email for member with uid ${member.uid}. Can't send an approval notification email`
             );
           } else {
-            await this.notificationService.notifyForMemberCreationApproval(member.name, member.uid, member.email, true);
+            await this.notificationService.notifyForMemberCreationApproval(
+              member.name,
+              member.uid,
+              member.email,
+              false
+            );
           }
         }
-        await this.notificationSettingsService.enableRecommendationsFor(notApprovedMembers.map(({ uid }) => uid));
+
+        // Enable recommendations for L4 members only
+        await this.notificationSettingsService.enableRecommendationsFor(
+          notApprovedMembers.filter(({ accessLevel }) => accessLevel === AccessLevel.L4).map(({ uid }) => uid)
+        );
       }
       await this.forestAdminService.triggerAirtableSync();
     }
@@ -1885,7 +1894,7 @@ export class MembersService {
         },
         notificationSetting: {
           create: {
-            recommendationsEnabled: true,
+            recommendationsEnabled: memberData.accessLevel === AccessLevel.L4,
           },
         },
       };
@@ -1894,7 +1903,7 @@ export class MembersService {
         createdMember.name,
         createdMember.uid,
         createdMember.email,
-        true
+        memberData.accessLevel === AccessLevel.L4
       );
       await this.membersHooksService.postCreateActions(createdMember, memberData.email);
     });

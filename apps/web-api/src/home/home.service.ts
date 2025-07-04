@@ -1,12 +1,8 @@
-import {
-  Injectable,
-  InternalServerErrorException
-} from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { MembersService } from '../members/members.service';
 import { TeamsService } from '../teams/teams.service';
 import { PLEventsService } from '../pl-events/pl-events.service';
 import { ProjectsService } from '../projects/projects.service';
-import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
 import { PLEventLocationsService } from '../pl-events/pl-event-locations.service';
 @Injectable()
 export class HomeService {
@@ -16,33 +12,39 @@ export class HomeService {
     private plEventsService: PLEventsService,
     private projectsService: ProjectsService,
     private plEventLocationService: PLEventLocationsService
-  ) { }
+  ) {}
 
-  async fetchAllFeaturedData(loggedInMember: string) {
+  async fetchAllFeaturedData(loggedInMember) {
     try {
       return {
-        members: await this.memberService.findAllFiltered({
-          where: { isFeatured: true },
-          include: {
-            image: true,
-            location: true,
-            skills: true,
-            teamMemberRoles: {
-              include: {
-                team: {
-                  include: { logo: true },
+        members: await this.memberService.findAllFiltered(
+          {
+            where: { isFeatured: true },
+            include: {
+              image: true,
+              location: true,
+              skills: true,
+              teamMemberRoles: {
+                include: {
+                  team: {
+                    include: { logo: true },
+                  },
                 },
               },
             },
           },
-        }, loggedInMember),
+          loggedInMember?.email
+        ),
         teams: await this.teamsService.findAll({
           where: { isFeatured: true },
-          include: { logo: true }
+          include: { logo: true },
         }),
         events: await this.plEventsService.getPLEvents({ where: { isFeatured: true } }),
         projects: await this.projectsService.getProjects({ where: { isFeatured: true } }),
-        locations: await this.plEventLocationService.getFeaturedLocationsWithSubscribers({ where: { isFeatured: true } }, loggedInMember)
+        locations: await this.plEventLocationService.getFeaturedLocationsWithSubscribers(
+          { where: { isFeatured: true } },
+          loggedInMember
+        ),
       };
     } catch (error) {
       throw new InternalServerErrorException(`Error occured while retrieving featured data: ${error.message}`);
@@ -57,17 +59,17 @@ export class HomeService {
    * @returns Array of projects and teams.
    */
   async fetchTeamsAndProjects(queryParams) {
-    let result: any[] = []
-    const entities: string[] = queryParams.include?.split(",");
+    let result: any[] = [];
+    const entities: string[] = queryParams.include?.split(',');
     if (entities.includes('teams')) {
       const resultantTeams = await this.fetchTeamsBySearchTerm(queryParams.name);
-      resultantTeams.teams.forEach((team) => result.push({ ...team, category: "TEAM" }));
+      resultantTeams.teams.forEach((team) => result.push({ ...team, category: 'TEAM' }));
     }
     if (entities.includes('projects')) {
       const resultantProjects = await this.fetchProjectsBySearchTerm(queryParams.name);
-      resultantProjects?.projects.forEach((project) => result.push({ ...project, category: "PROJECT" }));
+      resultantProjects?.projects.forEach((project) => result.push({ ...project, category: 'PROJECT' }));
     }
-    return [...result].sort((team, project) => team.name.localeCompare(project.name))
+    return [...result].sort((team, project) => team.name.localeCompare(project.name));
   }
 
   /**
@@ -82,8 +84,8 @@ export class HomeService {
       where: {
         name: {
           startsWith: name,
-          mode: 'insensitive'
-        }
+          mode: 'insensitive',
+        },
       },
       select: {
         uid: true,
@@ -91,13 +93,13 @@ export class HomeService {
         logo: {
           select: {
             url: true,
-          }
-        }
+          },
+        },
       },
       orderBy: {
-        name: 'asc'
-      }
-    })
+        name: 'asc',
+      },
+    });
   }
 
   /**
@@ -112,8 +114,8 @@ export class HomeService {
       where: {
         name: {
           startsWith: name,
-          mode: 'insensitive'
-        }
+          mode: 'insensitive',
+        },
       },
       select: {
         uid: true,
@@ -121,12 +123,12 @@ export class HomeService {
         logo: {
           select: {
             url: true,
-          }
-        }
+          },
+        },
       },
       orderBy: {
-        name: 'asc'
-      }
-    })
+        name: 'asc',
+      },
+    });
   }
 }

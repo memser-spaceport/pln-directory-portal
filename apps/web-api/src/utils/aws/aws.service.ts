@@ -91,7 +91,6 @@ export class AwsService {
       },
     };
     // Send the email with attachment using RawMessage
-    console.log("going to send an email");
     return await AWS_SES.sendRawEmail(params).promise();
   }
 
