@@ -135,12 +135,12 @@ export function useMembersTable({
     return members ?? [];
   }, [members]);
 
-  const customFilterFn = (row, columnId, filterValue) => {
-    if (row.original.email.toLowerCase().includes(filterValue.toLowerCase())) {
+  const customFilterFn = (row, _, filterValue) => {
+    if (row.original.email?.toLowerCase().includes(filterValue?.toLowerCase())) {
       return true;
     }
 
-    if (row.original.name.toLowerCase().includes(filterValue.toLowerCase())) {
+    if (row.original.name?.toLowerCase().includes(filterValue?.toLowerCase())) {
       return true;
     }
 
