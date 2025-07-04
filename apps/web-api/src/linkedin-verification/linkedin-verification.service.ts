@@ -14,6 +14,7 @@ import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member'
 import path from 'path';
 import { AwsService } from '../utils/aws/aws.service';
 import { Member } from '@prisma/client';
+import {MemberService} from "../admin/member.service";
 
 @Injectable()
 export class LinkedInVerificationService implements OnModuleDestroy {
@@ -27,7 +28,7 @@ export class LinkedInVerificationService implements OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly logger: LogService,
-    private readonly memberService: MembersService,
+    private readonly memberService: MemberService,
     private awsService: AwsService
   ) {
     this.redis = new Redis(process.env.REDIS_CACHE_URL as string, {

@@ -11,13 +11,13 @@ import { LogService } from '../shared/log.service';
 import { MembersService } from '../members/members.service';
 import axios from 'axios';
 import { AccessLevel } from 'libs/contracts/src/schema/admin-member';
+import {MemberService} from "../admin/member.service";
 
 @Injectable()
 export class AccessLevelsGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
-    private readonly logger: LogService,
-    private membersService: MembersService
+    private memberService: MemberService
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -38,7 +38,7 @@ export class AccessLevelsGuard implements CanActivate {
       if (validationResult?.data?.active && validationResult?.data?.email) {
         const email = validationResult.data.email;
 
-        const userAccessLevel = await this.membersService.getAccessLevelByMemberEmail(email);
+        const userAccessLevel = await this.memberService.getAccessLevelByMemberEmail(email);
         if (!userAccessLevel) {
           return false;
         }
