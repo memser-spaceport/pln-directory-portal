@@ -24,6 +24,37 @@
   letter-spacing: -0.75px;
 }
 
+.filters {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md, 12px);
+}
+
+.input {
+  display: flex;
+  height: 48px;
+  padding: 10px 16px;
+  align-items: center;
+  gap: 8px;
+  align-self: stretch;
+  border-radius: 8px;
+  border: 1px solid rgba(203, 213, 225, 0.50);
+  background: #FFF;
+  outline: none;
+  min-width: 320px;
+
+  &:focus {
+    border-radius: 8px;
+    border: 1px solid #5E718D;
+    background: #FFF;
+    box-shadow: 0 0 0 4px rgba(27, 56, 96, 0.12) !important;
+  }
+
+  &.error {
+    border-color: darkred;
+  }
+}
+
 .addNewBtn.addNewBtn {
   display: flex;
   padding: 8px var(--global-size-size-125, 10px);

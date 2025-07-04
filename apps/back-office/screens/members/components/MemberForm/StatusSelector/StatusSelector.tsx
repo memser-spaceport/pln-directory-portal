@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import Select from 'react-select';
 import { Level0Icon, Level1Icon, Level2Icon } from '../../icons';
 import { useFormContext } from 'react-hook-form';
@@ -69,7 +69,7 @@ export const options = [
   },
 ];
 
-export const StatusSelector = () => {
+export const StatusSelector = ({ isAddNew }: { isAddNew: boolean }) => {
   const {
     watch,
     setValue,
@@ -77,12 +77,20 @@ export const StatusSelector = () => {
   } = useFormContext<TMemberForm>();
   const { accessLevel } = watch();
 
+  const _options = useMemo(() => {
+    if (!isAddNew) {
+      return options;
+    }
+
+    return options.filter((option) => option.value !== 'L0' && option.value !== 'L1' && option.value !== 'Rejected');
+  }, [isAddNew]);
+
   return (
     <div className={s.field}>
       <div className={clsx(s.label, s.required)}>Select Status</div>
       <Select
         menuPlacement="bottom"
-        options={options}
+        options={_options}
         isClearable={false}
         value={accessLevel}
         onChange={(val) => {
@@ -122,6 +130,7 @@ export const StatusSelector = () => {
             ...baseStyles,
             height: '32px',
             padding: 0,
+            opacity: 0,
             // background: 'tomato',
           }),
           placeholder: (base) => ({

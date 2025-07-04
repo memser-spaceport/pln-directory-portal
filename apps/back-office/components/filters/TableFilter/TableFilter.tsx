@@ -9,6 +9,7 @@ interface Props {
     label: string;
     count: number;
     id: string;
+    activeColor: string;
   }[];
   active: string;
   onFilterClick: (id: string) => void;
@@ -25,7 +26,9 @@ export const TableFilter = ({ active, items, onFilterClick, children }: PropsWit
           key={item.id}
           onClick={() => onFilterClick(item.id)}
         >
-          {item.icon}
+          <span className={s.iconWrapper} style={{ color: active === item.id ? item.activeColor : 'inherit' }}>
+            {item.icon}
+          </span>
           <span className={s.itemLabel}>{item.label}</span>
           <span className={s.itemCount}>{item.count}</span>
         </div>

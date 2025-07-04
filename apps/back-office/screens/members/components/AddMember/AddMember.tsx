@@ -98,7 +98,7 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
             exit="exit"
             variants={fade}
             transition={{ duration: 0.2 }}
-            style={{ zIndex: 100, position: 'absolute' }}
+            // style={{ zIndex: 100, position: 'fixed', inset: '0 0 0 0' }}
           >
             <MemberForm
               onClose={handleClose}

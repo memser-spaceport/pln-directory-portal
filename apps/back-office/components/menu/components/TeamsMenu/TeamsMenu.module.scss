@@ -33,7 +33,7 @@
 
   display: flex;
   flex-direction: column;
-  padding: 8px 16px;
+  padding: 12px;
   align-items: flex-start;
   border-radius: var(--corner-radius-2xl, 16px);
   background: var(--background-base-white, #FFF);
@@ -92,4 +92,37 @@
   border-radius: var(--corner-radius-Full-round, 9999px);
   background: var(--transparent-dark-6, rgba(14, 15, 17, 0.06));
   transition: all 0.3s ease;
+}
+
+.root {
+  position: relative;
+}
+
+.trigger {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s;
+  z-index: 10;
+}
+
+.menu.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.chevron {
+  transition: transform 0.25s ease;
+  &.open {
+    transform: rotate(180deg);
+  }
 }

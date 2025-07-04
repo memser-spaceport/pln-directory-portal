@@ -133,6 +133,7 @@ export const StatusCell = ({ member, authToken }: { member: Member; authToken: s
             ...baseStyles,
             height: '32px',
             padding: 0,
+            opacity: 0,
             // background: 'tomato',
           }),
           placeholder: (base) => ({

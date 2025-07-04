@@ -187,6 +187,10 @@
 
   .optionRoot {
     padding-left: 8px;
+
+    &:hover {
+      background: transparent;
+    }
   }
 }
 

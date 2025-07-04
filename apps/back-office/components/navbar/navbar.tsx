@@ -1,9 +1,7 @@
 import Link from 'next/link';
 import { Menu } from '../menu/menu';
 import { useNavbarContext } from '../../context/navbar-context';
-import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/protocol-labs-logo.svg';
 import { ReactComponent as LogOut } from '/public/assets/images/log-out.svg';
-import APP_CONSTANTS, { ROUTE_CONSTANTS } from '../../utils/constants';
 import { removeToken } from '../../utils/auth';
 import router from 'next/router';
 
@@ -13,12 +11,13 @@ function onLogout() {
 }
 
 export function Navbar() {
-  const { isOpenRequest, showMenu } = useNavbarContext();
+  const { showMenu } = useNavbarContext();
+
   return (
     <div className="header sticky top-0 z-50 h-[8%] min-h-[80px] bg-white">
       <nav className="navbar gap-6only-of-type:shadow-[0_1px_4px_0_#e2e8f0] top-0 mx-auto flex h-[80px] w-full max-w-[1440px] items-center justify-start px-12 py-4">
         <div className="flex h-full items-center space-x-5">
-          <Link href={ROUTE_CONSTANTS.PENDING_LIST}>
+          <Link href="/">
             <a className="">
               <AppLogo />
             </a>
@@ -26,32 +25,6 @@ export function Navbar() {
         </div>
         <div>{showMenu && <Menu />}</div>
         <div className="ml-auto flex space-x-4 text-sm text-gray-700">
-          {/*<Link href={ROUTE_CONSTANTS.RECOMMENDATIONS_RUNS}>*/}
-          {/*  <a*/}
-          {/*    target="_self"*/}
-          {/*    className="on-focus shadow-request-button*/}
-          {/*    hover:shadow-on-hover flex h-10 items-center justify-center rounded-lg border border-blue-700*/}
-          {/*    bg-white py-2 px-4 text-sm font-medium*/}
-          {/*    text-blue-700 hover:border-slate-200 hover:ring-2 hover:ring-blue-300 focus:outline-none*/}
-          {/*    focus:ring-2 focus:ring-blue-300 active:border-blue-700 active:ring-2 active:ring-blue-300"*/}
-          {/*  >*/}
-          {/*    {APP_CONSTANTS.VIEW_RECOMMENDATIONS_LABEL}*/}
-          {/*  </a>*/}
-          {/*</Link>*/}
-          {/*<Link href={isOpenRequest ? ROUTE_CONSTANTS.CLOSED_LIST : ROUTE_CONSTANTS.PENDING_LIST}>*/}
-          {/*  <a*/}
-          {/*    target="_self"*/}
-          {/*    className={`on-focus shadow-request-button*/}
-          {/*  hover:shadow-on-hover flex h-10 items-center justify-center rounded-lg border border-blue-700*/}
-          {/*  py-2 px-4 text-sm font-medium hover:border-slate-200*/}
-          {/*  hover:ring-2 hover:ring-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300*/}
-          {/*  active:border-blue-700 active:ring-2 active:ring-blue-300 ${*/}
-          {/*    isOpenRequest ? 'bg-white text-blue-700 ' : 'bg-[#1D4ED8] text-white'*/}
-          {/*  }`}*/}
-          {/*  >*/}
-          {/*    {isOpenRequest ? APP_CONSTANTS.VIEW_CLOSED_REQUEST_LABEL : APP_CONSTANTS.EXIT_CLOSED_REQUEST_LABEL}*/}
-          {/*  </a>*/}
-          {/*</Link>*/}
           <LogOut onClick={onLogout} className="w-[30px] cursor-pointer" title="LogOut" width="24" height="24" />
         </div>
       </nav>

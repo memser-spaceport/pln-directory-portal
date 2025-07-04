@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import s from './styles.module.scss';
 import { ApprovalLayout } from '../../layout/approval-layout';
@@ -6,27 +6,20 @@ import { TableFilter } from '../../components/filters/TableFilter/TableFilter';
 import { useRouter } from 'next/router';
 import { flexRender, PaginationState, SortingState } from '@tanstack/react-table';
 import { useMembersTable } from '../../screens/members/hooks/useMembersTable';
-import { GetServerSideProps } from 'next';
-import { parseCookies } from 'nookies';
 import { useMembersList } from '../../hooks/members/useMembersList';
-import {
-  AddIcon,
-  Level0Icon,
-  Level1Icon,
-  Level2Icon,
-  RejectedIcon,
-  SortIcon,
-} from '../../screens/members/components/icons';
+import { Level0Icon, Level1Icon, Level2Icon, RejectedIcon, SortIcon } from '../../screens/members/components/icons';
 import clsx from 'clsx';
 import { MultieditControls } from '../../screens/members/components/MultieditControls';
 import { useAccessLevelCounts } from '../../hooks/members/useAccessLevelCounts';
 import PaginationControls from '../../screens/members/components/PaginationControls/PaginationControls';
 import { AddMember } from '../../screens/members/components/AddMember/AddMember';
+import { useCookie } from 'react-use';
 
-const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
+const MembersPage = () => {
   const router = useRouter();
   const query = router.query;
   const { filter } = query;
+  const [authToken] = useCookie('plnadmin');
   const { data: counts } = useAccessLevelCounts({ authToken });
   const items = useMemo(() => {
     return [
@@ -35,24 +28,28 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
         icon: <Level1Icon />,
         label: 'L1',
         count: counts?.L1 ?? 0,
+        activeColor: '#4174FF',
       },
       {
         id: 'level2',
         icon: <Level2Icon />,
         label: 'L2-L4',
         count: (counts?.L2 ?? 0) + (counts?.L3 ?? 0) + (counts?.L4 ?? 0),
+        activeColor: '#0A9952',
       },
       {
         id: 'level0',
         icon: <Level0Icon />,
         label: 'L0',
         count: counts?.L0 ?? 0,
+        activeColor: '#D97706',
       },
       {
         id: 'rejected',
         icon: <RejectedIcon />,
         label: 'Rejected',
         count: counts?.Rejected ?? 0,
+        activeColor: '#D21A0E',
       },
     ];
   }, [counts]);
@@ -67,6 +64,7 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
     pageIndex: 0,
     pageSize: 10,
   });
+  const [globalFilter, setGlobalFilter] = useState<string>('');
 
   const { data } = useMembersList({ authToken, accessLevel: getAccessLevel(filter as string) });
   const { table } = useMembersTable({
@@ -78,7 +76,15 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
     authToken,
     pagination,
     setPagination,
+    globalFilter,
+    setGlobalFilter,
   });
+
+  useEffect(() => {
+    if (!authToken) {
+      router.push(`/?backlink=${router.asPath}`);
+    }
+  }, [authToken, router]);
 
   return (
     <ApprovalLayout>
@@ -87,6 +93,17 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
           <span className={s.title}>Members</span>
 
           <span className={s.filters}>
+            <input
+              value={globalFilter}
+              onChange={(e) => table.setGlobalFilter(String(e.target.value))}
+              placeholder="Filter by name or email"
+              className={clsx(s.input)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  table.setGlobalFilter('');
+                }
+              }}
+            />
             <TableFilter
               items={items}
               active={filter as string}
@@ -189,35 +206,6 @@ const MembersPage = ({ authToken }: { authToken: string | undefined }) => {
 };
 
 export default MembersPage;
-
-export const getServerSideProps: GetServerSideProps = async (context) => {
-  const { plnadmin } = parseCookies(context);
-  try {
-    if (!plnadmin) {
-      const currentUrl = context.resolvedUrl;
-      const loginUrl = `/?backlink=${currentUrl}`;
-      return {
-        redirect: {
-          destination: loginUrl,
-          permanent: false,
-        },
-      };
-    }
-
-    return {
-      props: {
-        authToken: plnadmin,
-      },
-    };
-  } catch (error) {
-    return {
-      props: {
-        authToken: '',
-        isError: true,
-      },
-    };
-  }
-};
 
 function getAccessLevel(filter: string | undefined) {
   switch (filter) {
