@@ -89,17 +89,16 @@ export class NotificationService {
    * @returns Sends an approval email to the member and posts a notification to Slack.
    */
   async notifyForMemberCreationApproval(memberName: string, uid: string, memberEmailId: string, isOnboarding: boolean) {
+    if (isOnboarding) {
+      await this.notifyForOnboarding(memberName, memberEmailId);
+    } else {
+      await this.notifyForMemberApproved(memberName, memberEmailId, uid);
+    }
+
     const memberUrl = `${
       process.env.WEB_UI_BASE_URL
     }/members/${uid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`;
     const slackConfig = { requestLabel: 'New Labber Added', url: memberUrl, name: memberName };
-
-    if (isOnboarding) {
-      await this.notifyForOnboarding(memberName, memberEmailId);
-    } else {
-      await this.notifyForMemberApproved(memberName, memberEmailId, memberUrl);
-    }
-
     await this.slackService.notifyToChannel(slackConfig);
   }
 
@@ -215,7 +214,12 @@ export class NotificationService {
     );
   }
 
-  async notifyForMemberApproved(memberName: string, memberEmailId: string, memberUrl: string) {
+  async notifyForMemberApproved(memberName: string, memberEmailId: string, memberUid: string) {
+    const memberUrl = `${
+      process.env.WEB_UI_BASE_URL
+    }/members?utm_source=member_approval&prefillEmail=${encodeURIComponent(
+      memberEmailId
+    )}&loginFlow=login&target_uid=${memberUid}&target_email=${encodeURIComponent(memberEmailId)}`;
     await this.awsService.sendEmailWithTemplate(
       path.join(__dirname, '/shared/memberApproved.hbs'),
       {
@@ -223,7 +227,7 @@ export class NotificationService {
         link: memberUrl,
       },
       '',
-      MEMBER_APPROVED_SUBJECT,
+      `Welcome, ${memberName} to Protocol Labs!`,
       process.env.SES_SOURCE_EMAIL || '',
       [memberEmailId],
       [],
