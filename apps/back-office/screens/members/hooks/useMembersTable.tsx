@@ -2,6 +2,7 @@ import React, { Dispatch, HTMLProps, SetStateAction, useMemo } from 'react';
 import {
   createColumnHelper,
   getCoreRowModel,
+  getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   PaginationState,
@@ -28,6 +29,8 @@ export function useMembersTable({
   authToken,
   pagination,
   setPagination,
+  globalFilter,
+  setGlobalFilter,
 }: {
   rowSelection: Record<string, boolean>;
   setRowSelection: Dispatch<SetStateAction<Record<string, boolean>>>;
@@ -37,6 +40,8 @@ export function useMembersTable({
   authToken: string;
   pagination: PaginationState;
   setPagination: Dispatch<SetStateAction<PaginationState>>;
+  globalFilter: string;
+  setGlobalFilter: Dispatch<SetStateAction<string>>;
 }) {
   const columns = useMemo(() => {
     return [
@@ -130,6 +135,18 @@ export function useMembersTable({
     return members ?? [];
   }, [members]);
 
+  const customFilterFn = (row, columnId, filterValue) => {
+    if (row.original.email.toLowerCase().includes(filterValue.toLowerCase())) {
+      return true;
+    }
+
+    if (row.original.name.toLowerCase().includes(filterValue.toLowerCase())) {
+      return true;
+    }
+
+    return false;
+  };
+
   const table = useReactTable({
     columns,
     data,
@@ -139,23 +156,19 @@ export function useMembersTable({
       sorting,
       rowSelection,
       pagination,
+      globalFilter,
     },
     onSortingChange: setSorting,
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     getPaginationRowModel: getPaginationRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    globalFilterFn: customFilterFn,
     onPaginationChange: setPagination,
     getRowId: (row) => {
       return row.uid;
     },
-    // initialState: {
-    //   sorting: [
-    //     {
-    //       id: 'accessLevel',
-    //       desc: true,
-    //     },
-    //   ],
-    // },
+    onGlobalFilterChange: setGlobalFilter,
   });
 
   return { table };

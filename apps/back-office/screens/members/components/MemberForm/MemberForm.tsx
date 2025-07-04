@@ -3,7 +3,7 @@ import React, { useEffect } from 'react';
 import s from './MemberForm.module.scss';
 import { CloseIcon } from '../icons';
 import { FormProvider, useForm } from 'react-hook-form';
-import { StatusSelector } from './StatusSelector';
+import { options, StatusSelector } from './StatusSelector';
 import { TMemberForm } from '../../types/member';
 import { ProfileDetails } from './ProfileDetails/ProfileDetails';
 import { ProfileLocationInput } from './ProfileLocationInput';
@@ -23,7 +23,7 @@ interface Props {
 export const MemberForm = ({ onClose, title, desc, onSubmit, initialData }: Props) => {
   const methods = useForm<TMemberForm>({
     defaultValues: {
-      accessLevel: null,
+      accessLevel: options.find((option) => option.value === 'L4') ?? null,
       image: null,
       name: '',
       email: '',
@@ -76,7 +76,7 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData }: Prop
               }
             }}
           >
-            <StatusSelector />
+            <StatusSelector isAddNew={!initialData} />
             <ProfileDetails />
             <hr className="border-gray-200 dark:border-gray-200" />
             <ProfileLocationInput />

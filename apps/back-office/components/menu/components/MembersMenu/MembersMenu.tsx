@@ -1,73 +1,69 @@
 import Link from 'next/link';
-import React, { useCallback, useRef, useState } from 'react';
-
-import { useOnClickOutside } from '../../../../hooks/useOnClickOutside';
-
-import s from './MembersMenu.module.scss';
+import React, { useRef, useState } from 'react';
 import { useAccessLevelCounts } from '../../../../hooks/members/useAccessLevelCounts';
 import { useCookie } from 'react-use';
 import { AddMember } from '../../../../screens/members/components/AddMember/AddMember';
+import { useOnClickOutside } from '../../../../hooks/useOnClickOutside';
+
+import s from './MembersMenu.module.scss';
+import { clsx } from 'clsx';
 
 export const MembersMenu = () => {
   const menuRef = useRef(null);
   const [open, setOpen] = useState(false);
-
   const [cookieValue] = useCookie('plnadmin');
-
-  const handleClickOutside = useCallback(() => {
-    setOpen(false);
-  }, []);
-
-  useOnClickOutside([menuRef], handleClickOutside);
 
   const { data: counts } = useAccessLevelCounts({ authToken: cookieValue });
 
+  useOnClickOutside([menuRef], () => setOpen(false));
+
   return (
-    <div className={s.root}>
-      <button className={s.trigger} onClick={() => setOpen(true)}>
-        <MembersIcon /> Members <ChevronDownIcon />
+    <div className={s.root} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <button className={s.trigger}>
+        <MembersIcon /> Members{' '}
+        <span
+          className={clsx(s.chevron, {
+            [s.open]: open,
+          })}
+        >
+          <ChevronDownIcon />
+        </span>
       </button>
-      {open && (
-        <div className={s.menu} ref={menuRef}>
-          <Link href="/members?filter=level1" passHref>
-            <a className={s.menuItem} onClick={handleClickOutside}>
-              <Level1Icon />
-              <span className={s.menuItemLabel}>1 level</span>
-              <span className={s.menuItemCount}>{counts?.L1}</span>
-              <CaretIcon />
-            </a>
-          </Link>
-
-          <Link href="/members?filter=level0" passHref>
-            <div className={s.menuItem} onClick={handleClickOutside}>
-              <Level0Icon />
-              <span className={s.menuItemLabel}>0 Level</span>
-              <span className={s.menuItemCount}>{counts?.L0}</span>
-              <CaretIcon />
-            </div>
-          </Link>
-
-          <Link href="/members?filter=level2" passHref>
-            <div className={s.menuItem} onClick={handleClickOutside}>
-              <Level2Icon />
-              <span className={s.menuItemLabel}>2-4 Level</span>
-              <span className={s.menuItemCount}>{(counts?.L2 ?? 0) + (counts?.L3 ?? 0) + (counts?.L4 ?? 0)}</span>
-              <CaretIcon />
-            </div>
-          </Link>
-
-          <Link href="/members?filter=rejected" passHref>
-            <div className={s.menuItem} onClick={handleClickOutside}>
-              <RejectedIcon />
-              <span className={s.menuItemLabel}>Rejected</span>
-              <span className={s.menuItemCount}>{counts?.Rejected}</span>
-              <CaretIcon />
-            </div>
-          </Link>
-
-          <AddMember authToken={cookieValue} className={s.addMemberBtn} onClick={handleClickOutside} />
-        </div>
-      )}
+      <div ref={menuRef} className={`${s.menu} ${open ? s.open : ''}`}>
+        <Link href="/members?filter=level1" passHref>
+          <a className={s.menuItem}>
+            <Level1Icon />
+            <span className={s.menuItemLabel}>1 level</span>
+            <span className={s.menuItemCount}>{counts?.L1}</span>
+            <CaretIcon />
+          </a>
+        </Link>
+        <Link href="/members?filter=level0" passHref>
+          <div className={s.menuItem}>
+            <Level0Icon />
+            <span className={s.menuItemLabel}>0 Level</span>
+            <span className={s.menuItemCount}>{counts?.L0}</span>
+            <CaretIcon />
+          </div>
+        </Link>
+        <Link href="/members?filter=level2" passHref>
+          <div className={s.menuItem}>
+            <Level2Icon />
+            <span className={s.menuItemLabel}>2-4 Level</span>
+            <span className={s.menuItemCount}>{(counts?.L2 ?? 0) + (counts?.L3 ?? 0) + (counts?.L4 ?? 0)}</span>
+            <CaretIcon />
+          </div>
+        </Link>
+        <Link href="/members?filter=rejected" passHref>
+          <div className={s.menuItem}>
+            <RejectedIcon />
+            <span className={s.menuItemLabel}>Rejected</span>
+            <span className={s.menuItemCount}>{counts?.Rejected}</span>
+            <CaretIcon />
+          </div>
+        </Link>
+        <AddMember authToken={cookieValue} className={s.addMemberBtn} />
+      </div>
     </div>
   );
 };

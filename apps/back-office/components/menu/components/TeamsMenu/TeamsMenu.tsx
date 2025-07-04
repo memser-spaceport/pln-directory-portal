@@ -1,59 +1,61 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 
 import { useOnClickOutside } from '../../../../hooks/useOnClickOutside';
 import Link from 'next/link';
 
 import s from './TeamsMenu.module.scss';
+import { clsx } from 'clsx';
 
 export const TeamsMenu = () => {
   const menuRef = useRef(null);
   const [open, setOpen] = useState(false);
 
-  const handleClickOutside = useCallback(() => {
-    setOpen(false);
-  }, []);
-
-  useOnClickOutside([menuRef], handleClickOutside);
+  useOnClickOutside([menuRef], () => setOpen(false));
 
   return (
-    <div className={s.root}>
-      <button className={s.trigger} onClick={() => setOpen(true)}>
-        <TeamsIcon /> Teams <ChevronDownIcon />
+    <div className={s.root} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <button className={s.trigger}>
+        <TeamsIcon /> Teams{' '}
+        <span
+          className={clsx(s.chevron, {
+            [s.open]: open,
+          })}
+        >
+          <ChevronDownIcon />
+        </span>
       </button>
-      {open && (
-        <div className={s.menu} ref={menuRef}>
-          <Link href="/pending-list" passHref>
-            <a className={s.menuItem}>
-              <PendingIcon />
-              <span className={s.menuItemLabel}>Pending</span>
-              <span className={s.menuItemCount}></span>
-              <CaretIcon />
-            </a>
-          </Link>
+      <div ref={menuRef} className={`${s.menu} ${open ? s.open : ''}`}>
+        <Link href="/pending-list" passHref>
+          <a className={s.menuItem}>
+            <PendingIcon />
+            <span className={s.menuItemLabel}>Pending</span>
+            <span className={s.menuItemCount}></span>
+            <CaretIcon />
+          </a>
+        </Link>
 
-          {/*<div className={s.menuItem}>*/}
-          {/*  <VerifiedIcon />*/}
-          {/*  <span className={s.menuItemLabel}>Verified</span>*/}
-          {/*  <span className={s.menuItemCount}>2</span>*/}
-          {/*  <CaretIcon />*/}
-          {/*</div>*/}
+        {/*<div className={s.menuItem}>*/}
+        {/*  <VerifiedIcon />*/}
+        {/*  <span className={s.menuItemLabel}>Verified</span>*/}
+        {/*  <span className={s.menuItemCount}>2</span>*/}
+        {/*  <CaretIcon />*/}
+        {/*</div>*/}
 
-          {/*<div className={s.menuItem}>*/}
-          {/*  <ApprovedIcon />*/}
-          {/*  <span className={s.menuItemLabel}>Approved</span>*/}
-          {/*  <span className={s.menuItemCount}>2</span>*/}
-          {/*  <CaretIcon />*/}
-          {/*</div>*/}
+        {/*<div className={s.menuItem}>*/}
+        {/*  <ApprovedIcon />*/}
+        {/*  <span className={s.menuItemLabel}>Approved</span>*/}
+        {/*  <span className={s.menuItemCount}>2</span>*/}
+        {/*  <CaretIcon />*/}
+        {/*</div>*/}
 
-          {/*<div className={s.menuItem}>*/}
-          {/*  <RejectedIcon />*/}
-          {/*  <span className={s.menuItemLabel}>Rejecyed</span>*/}
-          {/*  <span className={s.menuItemCount}>2</span>*/}
-          {/*  <CaretIcon />*/}
-          {/*</div>*/}
-          {/*<button className={s.menuItem}>Add New Team</button>*/}
-        </div>
-      )}
+        {/*<div className={s.menuItem}>*/}
+        {/*  <RejectedIcon />*/}
+        {/*  <span className={s.menuItemLabel}>Rejecyed</span>*/}
+        {/*  <span className={s.menuItemCount}>2</span>*/}
+        {/*  <CaretIcon />*/}
+        {/*</div>*/}
+        {/*<button className={s.menuItem}>Add New Team</button>*/}
+      </div>
     </div>
   );
 };

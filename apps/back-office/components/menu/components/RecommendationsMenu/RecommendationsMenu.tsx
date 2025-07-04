@@ -4,52 +4,56 @@ import { useOnClickOutside } from '../../../../hooks/useOnClickOutside';
 
 import s from './RecommendationsMenu.module.scss';
 import Link from 'next/link';
+import { useCookie } from 'react-use';
+import { useAccessLevelCounts } from '../../../../hooks/members/useAccessLevelCounts';
+import { clsx } from 'clsx';
 
 export const RecommendationsMenu = () => {
   const menuRef = useRef(null);
   const [open, setOpen] = useState(false);
 
-  const handleClickOutside = useCallback(() => {
-    setOpen(false);
-  }, []);
-
-  useOnClickOutside([menuRef], handleClickOutside);
+  useOnClickOutside([menuRef], () => setOpen(false));
 
   return (
-    <div className={s.root}>
-      <button className={s.trigger} onClick={() => setOpen(true)}>
-        <RecommendationsIcon /> Recommendations <ChevronDownIcon />
+    <div className={s.root} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <button className={s.trigger}>
+        <RecommendationsIcon /> Recommendations{' '}
+        <span
+          className={clsx(s.chevron, {
+            [s.open]: open,
+          })}
+        >
+          <ChevronDownIcon />
+        </span>
       </button>
-      {open && (
-        <div className={s.menu} ref={menuRef}>
-          <Link href="/recommendations/runs" passHref>
-            <a className={s.menuItem}>
-              <RunsIcon />
-              <span className={s.menuItemLabel}>Runs</span>
-              <span className={s.menuItemCount}>2</span>
-              <CaretIcon />
-            </a>
-          </Link>
+      <div ref={menuRef} className={`${s.menu} ${open ? s.open : ''}`}>
+        <Link href="/recommendations/runs" passHref>
+          <a className={s.menuItem}>
+            <RunsIcon />
+            <span className={s.menuItemLabel}>Runs</span>
+            <span className={s.menuItemCount}>2</span>
+            <CaretIcon />
+          </a>
+        </Link>
 
-          <Link href="/recommendations/members" passHref>
-            <a className={s.menuItem}>
-              <OptinIcon />
-              <span className={s.menuItemLabel}>Opted-in</span>
-              <span className={s.menuItemCount}>1</span>
-              <CaretIcon />
-            </a>
-          </Link>
+        <Link href="/recommendations/members" passHref>
+          <a className={s.menuItem}>
+            <OptinIcon />
+            <span className={s.menuItemLabel}>Opted-in</span>
+            <span className={s.menuItemCount}>1</span>
+            <CaretIcon />
+          </a>
+        </Link>
 
-          <Link href="/recommendations/history" passHref>
-            <a className={s.menuItem}>
-              <HistoryIcon />
-              <span className={s.menuItemLabel}>History</span>
-              <span className={s.menuItemCount}>2</span>
-              <CaretIcon />
-            </a>
-          </Link>
-        </div>
-      )}
+        <Link href="/recommendations/history" passHref>
+          <a className={s.menuItem}>
+            <HistoryIcon />
+            <span className={s.menuItemLabel}>History</span>
+            <span className={s.menuItemCount}>2</span>
+            <CaretIcon />
+          </a>
+        </Link>
+      </div>
     </div>
   );
 };
