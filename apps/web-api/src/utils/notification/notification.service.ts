@@ -3,7 +3,7 @@ import * as path from 'path';
 import { AwsService } from '../aws/aws.service';
 import { SlackService } from '../slack/slack.service';
 import { getRandomId, isEmails } from '../helper/helper';
-import { ONBOARDING_SUBJECT, MEMBER_APPROVED_SUBJECT } from '../constants';
+import { ONBOARDING_SUBJECT } from '../constants';
 
 @Injectable()
 export class NotificationService {
