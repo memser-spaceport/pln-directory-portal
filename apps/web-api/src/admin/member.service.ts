@@ -795,6 +795,7 @@ export class MemberService {
   }
 
   async updateAccessLevel({ memberUids, accessLevel }: UpdateAccessLevelDto): Promise<{ updatedCount: number }> {
+    // Fetch members whose current access level is L0, L1, or Rejected
     const notApprovedMembers = await this.prisma.member.findMany({
       where: {
         uid: { in: memberUids },
@@ -808,8 +809,10 @@ export class MemberService {
       },
     });
 
+    // Resolve isVerified and plnFriend flags based on new access level
     const { isVerified, plnFriend } = this.resolveFlagsFromAccessLevel(accessLevel as AccessLevel);
 
+    // Update access level and associated flags
     const result = await this.prisma.member.updateMany({
       where: {
         uid: { in: memberUids },
@@ -823,6 +826,7 @@ export class MemberService {
     });
 
     if (result.count > 0) {
+      // Send approval emails for L2, L3, L4
       if ([AccessLevel.L2, AccessLevel.L3, AccessLevel.L4].includes(accessLevel as AccessLevel)) {
         for (const member of notApprovedMembers) {
           if (!member.email) {
@@ -839,11 +843,32 @@ export class MemberService {
           }
         }
 
-        // Enable recommendations for L4 members only
-        await this.notificationSettingsService.enableRecommendationsFor(
-          notApprovedMembers.filter(({ accessLevel }) => accessLevel === AccessLevel.L4).map(({ uid }) => uid)
-        );
+        // Enable recommendations only for L4
+        if (accessLevel === AccessLevel.L4) {
+          await this.notificationSettingsService.enableRecommendationsFor(
+            memberUids
+          );
+        }
       }
+
+      // Send rejection emails for members marked as Rejected
+      if (accessLevel === AccessLevel.REJECTED) {
+        for (const member of notApprovedMembers) {
+          if (!member.email) {
+            this.logger.error(
+              `Missing email for member with uid ${member.uid}. Can't send a rejection notification email`
+            );
+          } else {
+            await this.notificationService.notifyForRejection(
+              member.name,
+              member.uid,
+              member.email
+            );
+          }
+        }
+      }
+
+      // Trigger external sync
       await this.forestAdminService.triggerAirtableSync();
     }
 

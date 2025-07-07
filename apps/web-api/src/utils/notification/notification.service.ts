@@ -236,6 +236,23 @@ export class NotificationService {
     );
   }
 
+  async notifyForRejection(memberName: string, memberEmailId: string, memberUid: string) {
+
+      await this.awsService.sendEmailWithTemplate(
+        path.join(__dirname, '/shared/memberRejected.hbs'),
+        {
+          name: memberName,
+        },
+        '',
+        `Your application to join Protocol Labs network`,
+        process.env.SES_SOURCE_EMAIL || '',
+        [memberEmailId],
+        [],
+        this.getSupportEmail(),
+        true
+      );
+    }
+
   private getSupportEmail(): string | undefined {
     const supportEmails = process.env.SUPPORT_EMAILS?.split(',') ?? [];
     if (isEmails(supportEmails)) {
