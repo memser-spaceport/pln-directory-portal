@@ -44,7 +44,7 @@ export function Index() {
       .then((res) => {
         if (res.ok) {
           const backLink = router.query.backlink?.toString() ?? '';
-          router.push(backLink ? backLink : ROUTE_CONSTANTS.PENDING_LIST);
+          router.push(backLink ? backLink : '/members?filter=level1');
         } else if (res.status === 401) {
           setError('Incorrect Username or Password!');
         }
