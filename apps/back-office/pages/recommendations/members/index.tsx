@@ -25,6 +25,15 @@ interface Member {
     createdAt: string;
     status: string;
   }>;
+  notificationSetting?: {
+    subscribed?: boolean;
+    focusAreaList?: any[];
+    fundingStageList?: any[];
+    roleList?: any[];
+    technologyList?: any[];
+    industryTagList?: any[];
+    keywordList?: any[];
+  };
   accessLevel: string;
 }
 
@@ -89,6 +98,8 @@ export default function MembersWithRecommendationsPage() {
               <thead>
                 <tr className="border-b bg-white">
                   <th className="py-3 text-left">Member</th>
+                  <th className="py-3 text-left">Onboarding opt-in</th>
+                  <th className="py-3 text-left">Settings opt-in</th>
                   <th className="py-3 text-left">Last Run</th>
                   <th className="py-3 text-left">Total Runs</th>
                   <th className="py-3 text-left">Actions</th>
@@ -119,6 +130,19 @@ export default function MembersWithRecommendationsPage() {
                           {member.name}
                         </a>
                       </div>
+                    </td>
+                    <td className="py-3">
+                      {member.notificationSetting?.subscribed ? 'Yes' : 'No'}
+                    </td>
+                    <td className="py-3">
+                      {(member.notificationSetting?.focusAreaList?.length ||
+                        member.notificationSetting?.fundingStageList?.length ||
+                        member.notificationSetting?.roleList?.length ||
+                        member.notificationSetting?.technologyList?.length ||
+                        member.notificationSetting?.industryTagList?.length ||
+                        member.notificationSetting?.keywordList?.length) > 0
+                        ? 'Yes'
+                        : 'No'}
                     </td>
                     <td className="py-3">
                       {member.recommendationRunsAsTarget?.length > 0 ? (
