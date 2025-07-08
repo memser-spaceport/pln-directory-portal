@@ -7,4 +7,4 @@ UPDATE public."Member"
 SET
   "deletedAt" = NOW(),
   "deletionReason" = 'Your application to join the Protocol Labs network was not approved. You may reapply in the future.'
-WHERE "accessLevel" = 'REJECTED';
+WHERE "accessLevel" = 'Rejected';
