@@ -51,7 +51,7 @@ export class MembersService {
     private cacheService: CacheService,
     private membersHooksService: MembersHooksService,
     @Inject(forwardRef(() => NotificationSettingsService))
-    private notificationSettingsService: NotificationSettingsService,
+    private notificationSettingsService: NotificationSettingsService
   ) {}
 
   /**
@@ -579,6 +579,7 @@ export class MembersService {
       uid: memberInfo.uid,
       roles: memberInfo.memberRoles?.map((r) => r.name) ?? [],
       leadingTeams: memberInfo.teamMemberRoles?.filter((role) => role.teamLead).map((role) => role.teamUid) ?? [],
+      accessLevel: memberInfo.accessLevel,
     };
   }
 

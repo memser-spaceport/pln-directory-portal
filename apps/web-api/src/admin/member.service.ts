@@ -7,16 +7,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import axios from 'axios';
-import {Location, Member, ParticipantsRequest, Prisma} from '@prisma/client';
-import {PrismaService} from '../shared/prisma.service';
-import {ParticipantsRequestService} from '../participants-request/participants-request.service';
-import {LocationTransferService} from '../utils/location-transfer/location-transfer.service';
-import {NotificationService} from '../utils/notification/notification.service';
-import {LogService} from '../shared/log.service';
-import {DEFAULT_MEMBER_ROLES} from '../utils/constants';
-import {buildMultiRelationMapping, copyObj} from '../utils/helper/helper';
-import {CacheService} from '../utils/cache/cache.service';
-import {NotificationSettingsService} from '../notification-settings/notification-settings.service';
+import { Location, Member, ParticipantsRequest, Prisma } from '@prisma/client';
+import { PrismaService } from '../shared/prisma.service';
+import { ParticipantsRequestService } from '../participants-request/participants-request.service';
+import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
+import { NotificationService } from '../utils/notification/notification.service';
+import { LogService } from '../shared/log.service';
+import { DEFAULT_MEMBER_ROLES } from '../utils/constants';
+import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
+import { CacheService } from '../utils/cache/cache.service';
+import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 import {
   AccessLevel,
   AccessLevelCounts,
@@ -25,12 +25,11 @@ import {
   UpdateAccessLevelDto,
   UpdateMemberDto,
 } from '../../../../libs/contracts/src/schema/admin-member';
-import {ForestAdminService} from '../utils/forest-admin/forest-admin.service';
-import {MembersHooksService} from "../members/members.hooks.service";
+import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
+import { MembersHooksService } from '../members/members.hooks.service';
 
 @Injectable()
 export class MemberService {
-
   constructor(
     private prisma: PrismaService,
     private locationTransferService: LocationTransferService,
@@ -66,8 +65,6 @@ export class MemberService {
     }
   }
 
-
-
   /**
    * Updates the Member data in the database within a transaction.
    *
@@ -93,7 +90,6 @@ export class MemberService {
     }
   }
 
-
   /**
    * Fetches existing member data including relationships.
    * @param tx - Prisma transaction client or Prisma client.
@@ -116,8 +112,6 @@ export class MemberService {
       return this.handleErrors(error);
     }
   }
-
-
 
   async updateMemberFromParticipantsRequest(
     memberUid: string,
@@ -231,8 +225,8 @@ export class MemberService {
     member['image'] = memberData.imageUid
       ? { connect: { uid: memberData.imageUid } }
       : type === 'Update'
-        ? { disconnect: true }
-        : undefined;
+      ? { disconnect: true }
+      : undefined;
     member['skills'] = buildMultiRelationMapping('skills', memberData, type);
     if (type === 'Create') {
       if (Array.isArray(memberData.teamAndRoles)) {
@@ -573,7 +567,6 @@ export class MemberService {
     }
   }
 
-
   /**
    * Logs the participant request in the participants request table for audit and tracking purposes.
    *
@@ -651,7 +644,6 @@ export class MemberService {
     await this.cacheService.reset({ service: 'members' });
     return response;
   }
-
 
   /**
    * Handles database-related errors specifically for the Member entity.
@@ -809,6 +801,7 @@ export class MemberService {
       },
     });
 
+    // Resolve isVerified and plnFriend flags based on new access level
     const { isVerified, plnFriend } = this.resolveFlagsFromAccessLevel(accessLevel as AccessLevel);
     const now = new Date();
 
@@ -830,7 +823,7 @@ export class MemberService {
       updateData.deletionReason = null;
     }
 
-    // Perform the update
+    // Update access level and associated flags
     const result = await this.prisma.member.updateMany({
       where: {
         uid: { in: memberUids },
@@ -873,11 +866,7 @@ export class MemberService {
               `Missing email for member with uid ${member.uid}. Can't send a rejection notification email`
             );
           } else {
-            await this.notificationService.notifyForRejection(
-              member.name,
-              member.uid,
-              member.email
-            );
+            await this.notificationService.notifyForRejection(member.name, member.email);
           }
         }
       }
@@ -1028,8 +1017,8 @@ export class MemberService {
   async getAccessLevelByMemberEmail(email: string): Promise<string | null> {
     try {
       const member = await this.prisma.member.findUnique({
-        where: {email: email},
-        select: {accessLevel: true},
+        where: { email: email },
+        select: { accessLevel: true },
       });
 
       return member?.accessLevel ?? null;
@@ -1049,5 +1038,4 @@ export class MemberService {
         return { isVerified: false, plnFriend: false };
     }
   }
-
 }

@@ -91,6 +91,7 @@ export class AuthService implements OnModuleInit {
           accessToken: access_token,
         };
       } else {
+        this.logger.error(`Email changed for ${foundUser.uid} | foundUser.email: ${foundUser.email} | email: ${email}`);
         return {
           isEmailChanged: true,
         };
@@ -102,6 +103,9 @@ export class AuthService implements OnModuleInit {
     if (foundUser) {
       // Check soft delete
       if (foundUser.deletedAt) {
+        this.logger.error(
+          `Login attempt for deleted member [uid=${foundUser.uid}, email=${foundUser.email}]. Reason: ${foundUser.deletionReason || 'not specified'}`
+        );
         throw new ForbiddenException(foundUser.deletionReason || 'Your account has been deactivated.');
       }
 

@@ -85,14 +85,14 @@ export class NotificationService {
    * This method sends notifications after a member is approved.
    * @param memberName The name of the member being approved
    * @param uid The unique identifier for the member
-   * @param memberEmailId The email address of the member being approved
+   * @param memberEmail The email address of the member being approved
    * @returns Sends an approval email to the member and posts a notification to Slack.
    */
-  async notifyForMemberCreationApproval(memberName: string, uid: string, memberEmailId: string, isOnboarding: boolean) {
+  async notifyForMemberCreationApproval(memberName: string, uid: string, memberEmail: string, isOnboarding: boolean) {
     if (isOnboarding) {
-      await this.notifyForOnboarding(memberName, memberEmailId);
+      await this.notifyForOnboarding(memberName, memberEmail);
     } else {
-      await this.notifyForMemberApproved(memberName, memberEmailId, uid);
+      await this.notifyForMemberApproved(memberName, memberEmail, uid);
     }
 
     const memberUrl = `${
@@ -106,10 +106,10 @@ export class NotificationService {
    * This method sends notifications after a member's profile is approved for edits.
    * @param memberName The name of the member whose profile was edited
    * @param uid The unique identifier for the member
-   * @param memberEmailId The email address of the member
+   * @param memberEmail The email address of the member
    * @returns Sends an email notifying approval and posts a notification to Slack.
    */
-  async notifyForMemberEditApproval(memberName: string, uid: string, memberEmailId: string) {
+  async notifyForMemberEditApproval(memberName: string, uid: string, memberEmail: string) {
     const memberUrl = `${
       process.env.WEB_UI_BASE_URL
     }/members/${uid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`;
@@ -119,7 +119,7 @@ export class NotificationService {
       memberUid: uid,
       adminSiteUrl: memberUrl,
     });
-    await this.awsService.sendEmail('EditMemberSuccess', false, [memberEmailId], {
+    await this.awsService.sendEmail('EditMemberSuccess', false, [memberEmail], {
       memberName,
       memberProfileLink: memberUrl,
     });
@@ -190,12 +190,12 @@ export class NotificationService {
   /**
    * This method sends notifications for onboarding.
    * @param memberName The name of the member being onboarded
-   * @param memberEmailId The email address of the member being onboarded
+   * @param memberEmail The email address of the member being onboarded
    * @returns Sends an email to the member with the onboarding link.
    */
-  async notifyForOnboarding(memberName: string, memberEmailId: string) {
+  async notifyForOnboarding(memberName: string, memberEmail: string) {
     const memberUrl = `${process.env.WEB_UI_BASE_URL}/?loginFlow=onboarding&prefillEmail=${encodeURIComponent(
-      memberEmailId
+      memberEmail
     )}`;
     await this.awsService.sendEmailWithTemplate(
       path.join(__dirname, '/shared/onboarding.hbs'),
@@ -207,19 +207,19 @@ export class NotificationService {
       '',
       ONBOARDING_SUBJECT,
       process.env.SES_SOURCE_EMAIL || '',
-      [memberEmailId],
+      [memberEmail],
       [],
       this.getSupportEmail(),
       true
     );
   }
 
-  async notifyForMemberApproved(memberName: string, memberEmailId: string, memberUid: string) {
+  async notifyForMemberApproved(memberName: string, memberEmail: string, memberUid: string) {
     const memberUrl = `${
       process.env.WEB_UI_BASE_URL
     }/members?utm_source=member_approval&prefillEmail=${encodeURIComponent(
-      memberEmailId
-    )}&loginFlow=login&target_uid=${memberUid}&target_email=${encodeURIComponent(memberEmailId)}`;
+      memberEmail
+    )}&loginFlow=login&target_uid=${memberUid}&target_email=${encodeURIComponent(memberEmail)}`;
     await this.awsService.sendEmailWithTemplate(
       path.join(__dirname, '/shared/memberApproved.hbs'),
       {
@@ -229,30 +229,29 @@ export class NotificationService {
       '',
       `Welcome, ${memberName} to Protocol Labs!`,
       process.env.SES_SOURCE_EMAIL || '',
-      [memberEmailId],
+      [memberEmail],
       [],
       this.getSupportEmail(),
       true
     );
   }
 
-  async notifyForRejection(memberName: string, memberEmailId: string, memberUid: string) {
-
-      await this.awsService.sendEmailWithTemplate(
-        path.join(__dirname, '/shared/memberRejected.hbs'),
-        {
-          name: memberName,
-        },
-        '',
-        `Your application to join Protocol Labs network`,
-        process.env.SES_SOURCE_EMAIL || '',
-        [memberEmailId],
-        [],
-        this.getSupportEmail(),
-        true
-      );
-    }
-
+  async notifyForRejection(memberName: string, memberEmail: string) {
+    await this.awsService.sendEmailWithTemplate(
+      path.join(__dirname, '/shared/memberRejected.hbs'),
+      {
+        name: memberName,
+      },
+      '',
+      `Your application to join Protocol Labs network`,
+      process.env.SES_SOURCE_EMAIL || '',
+      [memberEmail],
+      [],
+      this.getSupportEmail(),
+      true
+    );
+  }
+  
   private getSupportEmail(): string | undefined {
     const supportEmails = process.env.SUPPORT_EMAILS?.split(',') ?? [];
     if (isEmails(supportEmails)) {
