@@ -137,8 +137,8 @@ model Member {
   linkedinProfile              LinkedInProfile?
   accessLevel                  String?
   accessLevelUpdatedAt         DateTime                      @default(now())
-  deletedAt      DateTime?   // soft delete timestamp
-  deletionReason String?     // reason for deletion
+  deletedAt                    DateTime? // soft delete timestamp
+  deletionReason               String? // reason for deletion
 }
 
 model MemberRole {
@@ -739,6 +739,8 @@ model NotificationSetting {
   exampleSent            Boolean   @default(false)
   exampleAttempts        Int       @default(0)
   lastExampleSentAt      DateTime?
+  onboardingAttempts     Int       @default(0)
+  lastOnboardingSentAt   DateTime?
   showInvitationDialog   Boolean   @default(true)
   emailFrequency         Int       @default(14)
   byFocusArea            Boolean   @default(true)
