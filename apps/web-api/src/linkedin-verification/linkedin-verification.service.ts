@@ -9,6 +9,12 @@ import {
   LinkedInVerificationResponseDto,
   LinkedInVerificationStatusDto,
 } from 'libs/contracts/src/schema/linkedin-verification';
+import { MembersService } from '../members/members.service';
+import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
+import path from 'path';
+import { AwsService } from '../utils/aws/aws.service';
+import { Member } from '@prisma/client';
+import {MemberService} from "../admin/member.service";
 
 @Injectable()
 export class LinkedInVerificationService implements OnModuleDestroy {
@@ -16,9 +22,15 @@ export class LinkedInVerificationService implements OnModuleDestroy {
   private readonly clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
   private readonly redirectUri = process.env.LINKEDIN_REDIRECT_URI;
   private readonly CACHE_TTL = 3600;
+  private readonly adminEmails: string[];
   private redis: Redis;
 
-  constructor(private readonly prisma: PrismaService, private readonly logger: LogService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly logger: LogService,
+    private readonly memberService: MemberService,
+    private awsService: AwsService
+  ) {
     this.redis = new Redis(process.env.REDIS_CACHE_URL as string, {
       ...(process.env.REDIS_CACHE_TLS && {
         tls: {
@@ -26,6 +38,7 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         },
       }),
     });
+    this.adminEmails = this.getAdminEmails();
   }
 
   async onModuleDestroy() {
@@ -166,6 +179,19 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         });
       }
 
+      let accessLevel = member.accessLevel;
+      if (member.accessLevel === AccessLevel.L0) {
+        const result = await this.memberService.updateAccessLevel({
+          memberUids: [member.uid],
+          accessLevel: AccessLevel.L1,
+        });
+        if (result.updatedCount > 0) {
+          accessLevel = AccessLevel.L1;
+          const emailData = await this.prepareEmailTemplateData(member);
+          await this.sendLinkedinVerifiedEmailToAdmin(emailData, `New Member LinkedIn Verified : ${member.name}`);
+        }
+      }
+
       this.logger.info(`LinkedIn verification completed for member ${member.uid}`, 'LinkedInVerification');
 
       return {
@@ -174,7 +200,8 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         linkedinProfileId: linkedinProfile.linkedinProfileId,
         linkedinHandler: linkedinProfile.linkedinHandler || undefined,
         profileData: linkedinProfile.profileData as any,
-        redirectUrl: `${redirectUrl}${redirectUrl.includes('?') ? '&' : '?'}status=success`,
+        redirectUrl: `${redirectUrl}${redirectUrl.includes('?') ? '&' : '?'}status=success&accesslevel=${accessLevel}`,
+        newAccessLevel: accessLevel,
       };
     } catch (error) {
       this.logger.error('LinkedIn verification failed', error, 'LinkedInVerification');
@@ -190,6 +217,7 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         redirectUrl: `${redirectUrl}${
           redirectUrl.includes('?') ? '&' : '?'
         }status=error&error_message=${encodeURIComponent(errorMessage)}`,
+        newAccessLevel: null,
       };
     }
   }
@@ -222,6 +250,60 @@ export class LinkedInVerificationService implements OnModuleDestroy {
             updatedAt: member.linkedinProfile.updatedAt.toISOString(),
           }
         : undefined,
+    };
+  }
+
+  private async sendLinkedinVerifiedEmailToAdmin(emailData: any, subject: string): Promise<void> {
+    const result = await this.awsService.sendEmailWithTemplate(
+      path.join(__dirname, '/shared/linkedinVerifiedAdmin.hbs'),
+      emailData,
+      '',
+      subject,
+      process.env.SES_SOURCE_EMAIL || '',
+      this.adminEmails,
+      [],
+      undefined,
+      true
+    );
+
+    this.logger.info(`Admin email sent to ${this.adminEmails} ref: ${result?.MessageId}`);
+  }
+
+  private getAdminEmails(): string[] {
+    const adminEmailIdsFromEnv = process.env.SES_ADMIN_EMAIL_IDS;
+    return adminEmailIdsFromEnv?.split('|') ?? [];
+  }
+
+  private async prepareEmailTemplateData(member: Member): Promise<{
+    adminName: string;
+    targetName: string;
+    targetEmail: string | null;
+    otherUsers: Array<{
+      name: string;
+      email: string | null;
+    }>;
+    backofficeReference: string | undefined;
+  }> {
+    const pendingMembers = await this.prisma.member.findMany({
+      where: {
+        accessLevel: 'L1',
+        uid: {
+          not: member.uid,
+        },
+      },
+      select: {
+        name: true,
+        email: true,
+      },
+      take: 3,
+    });
+
+    return {
+      adminName: 'Directory Admin',
+      targetName: member.name,
+      targetEmail: member.email,
+      otherUsers: pendingMembers,
+      backofficeReference: process.env.WEB_ADMIN_UI_BASE_URL,
     };
   }
 }

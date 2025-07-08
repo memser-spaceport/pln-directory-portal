@@ -58,28 +58,37 @@ export class MemberSubscriptionService {
 
   /**
    * Retrieves multiple member subscription records based on the provided query criteria.
-   * 
-   * This method leverages Prisma's `findMany` to perform a flexible query. 
-   * The query object allows the caller to specify filters, sorting, pagination, 
+   *
+   * This method leverages Prisma's `findMany` to perform a flexible query.
+   * The query object allows the caller to specify filters, sorting, pagination,
    * and include related entities as needed.
-   * 
+   *
    * @param query - A `Prisma.MemberFollowFindManyArgs` object that defines the query criteria.
    *   - `where`: Conditions to filter the records (e.g., by `memberUid` or `status`).
    *   - `orderBy`: Sorting criteria for the results (e.g., by `createdAt` in ascending order).
    *   - `skip`: The number of records to skip for pagination.
    *   - `take`: The number of records to retrieve (limit for pagination).
    *   - `include`: Related entities to include in the results (e.g., `member`).
-   * 
+   *
    * @returns An array of member subscription records matching the query criteria.
-   * 
+   *
    */
   async getSubscriptions(query: Prisma.MemberSubscriptionFindManyArgs) {
     try {
-      return await this.prisma.memberSubscription.findMany(query);
+      return await this.prisma.memberSubscription.findMany({
+        ...query,
+        where: {
+          ...query.where,
+          member: {
+            accessLevel: { notIn: ['L0', 'L1', 'Rejected'] },
+          },
+        },
+      });
     } catch (error) {
       this.handleErrors(error);
     }
   }
+
 
   /**
    * Handles errors occurring during database operations.

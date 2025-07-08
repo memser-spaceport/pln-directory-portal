@@ -18,7 +18,7 @@ export class AwsService {
   }
   async sendEmail(templateName, includeAdmins, toAddresses, data) {
     try {
-      if (!this.isEmailServiceEnabled()) 
+      if (!this.isEmailServiceEnabled())
         return null;
       const AWS_SES = new AWS.SES(CONFIG);
       const adminEmailIdsFromEnv = process.env.SES_ADMIN_EMAIL_IDS;
@@ -50,7 +50,7 @@ export class AwsService {
     replyTo?: string,
     isEmailEnabled = this.isEmailServiceEnabled()
   ) {
-    if (!isEmailEnabled) 
+    if (!isEmailEnabled)
       return null;
     const emailTemplate = fs.readFileSync(
       templateName,

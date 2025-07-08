@@ -25,6 +25,7 @@ interface Member {
     createdAt: string;
     status: string;
   }>;
+  accessLevel: string;
 }
 
 export default function MembersWithRecommendationsPage() {

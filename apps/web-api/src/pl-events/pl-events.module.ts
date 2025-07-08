@@ -10,6 +10,7 @@ import { MemberSubscriptionsModule } from '../member-subscriptions/member-subscr
 import { PLEventSyncService } from './pl-event-sync.service';
 import { AuthModule } from '../auth/auth.module';
 import { TeamsModule } from '../teams/teams.module';
+import {AdminModule} from "../admin/admin.module";
 @Module({
   controllers: [PLEventsController],
   providers: [
@@ -25,8 +26,9 @@ import { TeamsModule } from '../teams/teams.module';
     PLEventGuestsService
   ],
   imports:[
-    MembersModule, 
-    forwardRef(() => NotificationsModule), 
+    MembersModule,
+    forwardRef(() => AdminModule),
+    forwardRef(() => NotificationsModule),
     MemberSubscriptionsModule,
     AuthModule,
     TeamsModule

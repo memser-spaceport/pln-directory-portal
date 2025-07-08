@@ -21,6 +21,7 @@ body {
   font-family: inherit;
   line-height: inherit;
   margin: 0;
+  overscroll-behavior: none;
 }
 h1,
 h2,

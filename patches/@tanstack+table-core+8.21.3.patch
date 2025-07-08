@@ -1,0 +1,12 @@
+diff --git a/node_modules/@tanstack/table-core/src/utils/document.ts b/node_modules/@tanstack/table-core/src/utils/document.ts
+index 3d46d95..f16ab0e 100644
+--- a/node_modules/@tanstack/table-core/src/utils/document.ts
++++ b/node_modules/@tanstack/table-core/src/utils/document.ts
+@@ -7,6 +7,6 @@ export function safelyAccessDocumentEvent(event: Event): Document | null {
+     !!event.target &&
+     typeof event.target === 'object' &&
+     'ownerDocument' in event.target
+-    ? (event.target.ownerDocument as Document | null)
++    ? ((event.target as HTMLElement).ownerDocument as Document | null)
+     : null
+ }

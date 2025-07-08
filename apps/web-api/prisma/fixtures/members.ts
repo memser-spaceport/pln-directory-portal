@@ -16,19 +16,16 @@ const getUidsFrom = async (model, where = {}) => {
   });
 };
 
-const membersFactory = Factory.define<Omit<Member, 'id'>>(
-  ({ sequence, onCreate }) => {
-    onCreate(async (member) => {
-      const locationUids = await (
-        await getUidsFrom(Prisma.ModelName.Location)
-      ).map((result) => result.uid);
-      member.locationUid = sample(locationUids) || '';
-      const imageUids = await (
-        await getUidsFrom(Prisma.ModelName.Image, { thumbnailToUid: null })
-      ).map((result) => result.uid);
-      member.imageUid = sample(imageUids) || '';
-      return member;
-    });
+const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate }) => {
+  onCreate(async (member) => {
+    const locationUids = await (await getUidsFrom(Prisma.ModelName.Location)).map((result) => result.uid);
+    member.locationUid = sample(locationUids) || '';
+    const imageUids = await (
+      await getUidsFrom(Prisma.ModelName.Image, { thumbnailToUid: null })
+    ).map((result) => result.uid);
+    member.imageUid = sample(imageUids) || '';
+    return member;
+  });
 
     const name = faker.helpers.unique(faker.name.firstName);
     return {
@@ -73,6 +70,8 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(
         showSubscription:true
       },
       linkedInDetails: {},
+      accessLevel: faker.helpers.arrayElement(['L0', 'L1', 'L2', 'L3', 'L4']),
+      accessLevelUpdatedAt: faker.date.past(),
     };
   }
 );

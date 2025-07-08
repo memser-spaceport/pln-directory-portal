@@ -1,0 +1,30 @@
+.root {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 128px;
+}
+
+.empty {
+  display: flex;
+  padding: var(--spacing-5xs, 2px);
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-5xs, 2px);
+  border-radius: var(--corner-radius-Full-round, 9999px);
+  border: 1px solid var(--border-neutral-muted, rgba(27, 56, 96, 0.24));
+}
+
+.badge {
+  display: flex;
+  padding: var(--spacing-5xs, 2px);
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-5xs, 2px);
+  border-radius: var(--corner-radius-Full-round, 9999px);
+  border: 1px solid var(--border-success-subtle, rgba(4, 135, 70, 0.32));
+  background: var(--background-base-white, #FFF);
+}

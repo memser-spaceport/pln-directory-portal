@@ -18,6 +18,7 @@ const LinkedInVerificationResponseSchema = z.object({
   linkedinHandler: z.string().optional(),
   profileData: z.record(z.any()).optional(),
   redirectUrl: z.string(),
+  newAccessLevel: z.string().nullable(),
 });
 
 const LinkedInProfileDataSchema = z.object({
