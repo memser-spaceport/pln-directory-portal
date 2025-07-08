@@ -28,6 +28,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
   });
 
     const name = faker.helpers.unique(faker.name.firstName);
+    const accessLevel = faker.helpers.arrayElement(['L0', 'L1', 'L2', 'L3', 'L4', 'Rejected']);
     return {
       uid: faker.helpers.slugify(`uid-${name.toLowerCase()}`),
       name,
@@ -70,8 +71,13 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
         showSubscription:true
       },
       linkedInDetails: {},
-      accessLevel: faker.helpers.arrayElement(['L0', 'L1', 'L2', 'L3', 'L4']),
+      accessLevel: accessLevel,
       accessLevelUpdatedAt: faker.date.past(),
+      deletedAt: accessLevel === 'Rejected' ? new Date() : null,
+      deletionReason:
+        accessLevel === 'Rejected'
+          ? 'Your application to join the Protocol Labs network was not approved. You may reapply in the future.'
+          : null,
     };
   }
 );

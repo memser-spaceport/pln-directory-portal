@@ -71,7 +71,16 @@ export class AuthService implements OnModuleInit {
 
     // Find User by externalId
     let foundUser = await this.membersService.findMemberByExternalId(externalId);
+
     if (foundUser) {
+      // Check soft delete
+      if (foundUser.deletedAt) {
+        this.logger.error(
+          `Login attempt for deleted member [uid=${foundUser.uid}, email=${foundUser.email}]. Reason: ${foundUser.deletionReason || 'not specified'}`
+        );
+        throw new ForbiddenException(foundUser.deletionReason || 'Your account has been deactivated.');
+      }
+
       if (foundUser.email === email) {
         // Track login event
         await this.trackLoginEvent(foundUser);
@@ -88,11 +97,14 @@ export class AuthService implements OnModuleInit {
       }
     }
 
-    // If there is no user found for externalId, then find user by  and update externalId
-    // if user found by email has externalid, delete user in privy
-    // if user found by email doesn't has email id then its a new user. update external id for user
+    // Try finding by email if externalId doesn't match any user
     foundUser = await this.membersService.findMemberByEmail(email);
     if (foundUser) {
+      // Check soft delete
+      if (foundUser.deletedAt) {
+        throw new ForbiddenException(foundUser.deletionReason || 'Your account has been deactivated.');
+      }
+
       if (foundUser.externalId) {
         return {
           isDeleteAccount: true,

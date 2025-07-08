@@ -137,6 +137,8 @@ model Member {
   linkedinProfile              LinkedInProfile?
   accessLevel                  String?
   accessLevelUpdatedAt         DateTime                      @default(now())
+  deletedAt      DateTime?   // soft delete timestamp
+  deletionReason String?     // reason for deletion
 }
 
 model MemberRole {

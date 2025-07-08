@@ -809,22 +809,36 @@ export class MemberService {
       },
     });
 
-    // Resolve isVerified and plnFriend flags based on new access level
     const { isVerified, plnFriend } = this.resolveFlagsFromAccessLevel(accessLevel as AccessLevel);
+    const now = new Date();
 
-    // Update access level and associated flags
+    // Determine if soft delete or restore logic should be applied
+    let updateData: Prisma.MemberUpdateManyArgs['data'] = {
+      accessLevel,
+      accessLevelUpdatedAt: now,
+      isVerified,
+      plnFriend,
+    };
+
+    if (accessLevel === AccessLevel.REJECTED) {
+      // Soft delete if access level is set to REJECTED
+      updateData.deletedAt = now;
+      updateData.deletionReason = 'Access level changed to Rejected';
+    } else {
+      // Restore if access level is changed from REJECTED to something else
+      updateData.deletedAt = null;
+      updateData.deletionReason = null;
+    }
+
+    // Perform the update
     const result = await this.prisma.member.updateMany({
       where: {
         uid: { in: memberUids },
       },
-      data: {
-        accessLevel,
-        accessLevelUpdatedAt: new Date(),
-        isVerified,
-        plnFriend,
-      },
+      data: updateData,
     });
 
+    // Notify users based on the new access level
     if (result.count > 0) {
       // Send approval emails for L2, L3, L4
       if ([AccessLevel.L2, AccessLevel.L3, AccessLevel.L4].includes(accessLevel as AccessLevel)) {
