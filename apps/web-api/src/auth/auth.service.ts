@@ -82,6 +82,7 @@ export class AuthService implements OnModuleInit {
           accessToken: access_token,
         };
       } else {
+        this.logger.error(`Email changed for ${foundUser.uid} | foundUser.email: ${foundUser.email} | email: ${email}`);
         return {
           isEmailChanged: true,
         };
