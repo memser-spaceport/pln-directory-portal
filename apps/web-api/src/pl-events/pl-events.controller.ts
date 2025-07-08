@@ -1,18 +1,30 @@
-import { Controller, Req, Body, Param, NotFoundException, ForbiddenException, UsePipes, UseGuards, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  NotFoundException,
+  Param,
+  Req,
+  UnauthorizedException,
+  UseGuards,
+  UsePipes
+} from '@nestjs/common';
 import { ApiParam } from '@nestjs/swagger';
-import { Api, initNestServer, ApiDecorator } from '@ts-rest/nest';
+import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
 import { apiEvents } from 'libs/contracts/src/lib/contract-pl-events';
 import {
-  PLEventLocationQueryParams,
-  ResponsePLEventLocationWithRelationsSchema,
-  PLEventQueryParams,
-  ResponsePLEventSchemaWithRelationsSchema,
   CreatePLEventGuestSchemaDto,
-  UpdatePLEventGuestSchemaDto,
+  CreatePLEventSchemaDto,
   DeletePLEventGuestsSchemaDto,
   PLEventGuestQuerySchema,
-  CreatePLEventSchemaDto, ResponseUpcomingEvents
+  PLEventLocationQueryParams,
+  PLEventQueryParams,
+  ResponsePLEventLocationWithRelationsSchema,
+  ResponsePLEventSchemaWithRelationsSchema,
+  ResponseUpcomingEvents,
+  UpdatePLEventGuestSchemaDto
 } from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
@@ -31,6 +43,9 @@ import { isEmpty } from 'lodash';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { InternalAuthGuard } from '../guards/auth.guard';
 import { TeamsService } from '../teams/teams.service';
+import { AccessLevelsGuard } from '../guards/access-levels.guard';
+import { AccessLevels } from '../decorators/access-levels.decorator';
+import { AccessLevel } from 'libs/contracts/src/schema/admin-member';
 
 const server = initNestServer(apiEvents);
 type RouteShape = typeof server.routeShapes;
@@ -66,7 +81,7 @@ export class PLEventsController {
   }
 
   @Api(server.route.getPLEventGuestsByLocation)
-  @UseGuards(UserAuthValidateGuard)
+  @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
   @NoCache()
   async findPLEventGuestsByLocation(
     @Req() request: Request,
@@ -79,7 +94,7 @@ export class PLEventsController {
   @Api(server.route.getPLEventBySlug)
   @ApiParam({ name: 'slug', type: 'string' })
   @ApiOkResponseFromZod(ResponsePLEventSchemaWithRelationsSchema)
-  @UseGuards(UserAuthValidateGuard)
+  @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
   @NoCache()
   async findOne(
     @ApiDecorator() { params: { slug } }: RouteShape['getPLEventBySlug'],
@@ -106,7 +121,8 @@ export class PLEventsController {
 
   @Api(server.route.createPLEventGuestByLocation)
   @UsePipes(ZodValidationPipe)
-  @UseGuards(UserTokenValidation)
+  @UseGuards(UserTokenValidation, AccessLevelsGuard)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   async createPLEventGuestByLocation(
     @Param("uid") locationUid,
     @Body() body: CreatePLEventGuestSchemaDto,
@@ -133,7 +149,8 @@ export class PLEventsController {
 
   @Api(server.route.modifyPLEventGuestByLocation)
   @UsePipes(ZodValidationPipe)
-  @UseGuards(UserTokenValidation)
+  @UseGuards(UserTokenValidation, AccessLevelsGuard)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   async modifyPLEventGuestByLocation(
     @Param("uid") locationUid,
     @Param("guestUid") guestUid,
@@ -159,7 +176,8 @@ export class PLEventsController {
 
   @Api(server.route.deletePLEventGuestsByLocation)
   @UsePipes(ZodValidationPipe)
-  @UseGuards(UserTokenValidation)
+  @UseGuards(UserTokenValidation, AccessLevelsGuard)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   async deletePLEventGuestsByLocation(
     @Param("uid") locationUid,
     @Body() body: DeletePLEventGuestsSchemaDto,
@@ -178,7 +196,7 @@ export class PLEventsController {
   @Api(server.route.getPLEventsByLoggedInMember)
   @ApiQueryFromZod(PLEventQueryParams)
   @ApiOkResponseFromZod(ResponsePLEventSchemaWithRelationsSchema.array())
-  @UseGuards(UserTokenValidation)
+  @UseGuards(UserTokenValidation, AccessLevelsGuard)
   @NoCache()
   async getPLEventsByLoggedInMember(
     @Param("uid") locationUid,
@@ -211,7 +229,7 @@ export class PLEventsController {
   }
 
   @Api(server.route.getPLEventGuestByUidAndLocation)
-  @UseGuards(UserTokenValidation)
+  @UseGuards(UserTokenValidation, AccessLevelsGuard)
   async getPLEventGuestByUidAndLocation(
     @Req() request,
     @Param('uid') locationUid: string,
@@ -246,7 +264,7 @@ export class PLEventsController {
   }
 
   @Api(server.route.getPLEventGuestTopics)
-  @UseGuards(UserTokenValidation)
+  @UseGuards(UserTokenValidation, AccessLevelsGuard)
   @NoCache()
   async getPLEventGuestTopics(
     @Param('uid') locationUid: string,
@@ -269,7 +287,7 @@ export class PLEventsController {
   }
 
   @Api(server.route.getAllAggregatedData)
-  @UseGuards(UserAuthValidateGuard)
+  @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
   @NoCache()
   async getAllAggregatedData(
     @Req() request: Request
@@ -279,7 +297,8 @@ export class PLEventsController {
   }
 
   @Api(server.route.sendEventGuestPresenceRequest)
-  @UseGuards(UserTokenValidation)
+  @UseGuards(UserTokenValidation, AccessLevelsGuard)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   async sendEventGuestPresenceRequest(
     @Param('uid') locationUid: string,
     @Body() body,

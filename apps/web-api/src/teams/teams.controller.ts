@@ -19,6 +19,9 @@ import { TeamsService } from './teams.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
+import { AccessLevelsGuard } from '../guards/access-levels.guard';
+import { AccessLevels } from '../decorators/access-levels.decorator';
+import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 
 const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
@@ -124,7 +127,8 @@ export class TeamsController {
   }
 
   @Api(server.route.modifyTeam)
-  @UseGuards(UserTokenValidation)
+  @UseGuards(UserTokenValidation, AccessLevelsGuard)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   @UsePipes(new ParticipantsReqValidationPipe())
   async updateOne(@Param('uid') teamUid, @Body() body, @Req() req) {
     await this.teamsService.validateRequestor(req.userEmail, teamUid);
@@ -133,7 +137,8 @@ export class TeamsController {
 
   // TODO: Remove this endpoint after frontend integration with new ask api
   @Api(server.route.patchTeam)
-  @UseGuards(UserTokenValidation)
+  @UseGuards(UserTokenValidation, AccessLevelsGuard)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
   async addAsk(@Param('uid') teamUid, @Body() body, @Req() req) {
     await this.teamsService.isTeamMemberOrAdmin(req.userEmail, teamUid);
     const res = await this.teamsService.addEditTeamAsk(teamUid,body.teamName,req.userEmail,body.ask);

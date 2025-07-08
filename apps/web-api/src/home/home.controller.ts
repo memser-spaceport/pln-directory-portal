@@ -40,8 +40,8 @@ export class HomeController {
   async getAllFeaturedData(
     @Req() request: Request,
   ) {
-    const loggedlnMember = request['userEmail'] ? await this.memberService.findMemberByEmail(request['userEmail']) : null;
-    return await this.homeService.fetchAllFeaturedData(loggedlnMember);
+    const loggedInMember = request['userEmail'] ? await this.memberService.findMemberByEmail(request['userEmail']) : null;
+    return await this.homeService.fetchAllFeaturedData(loggedInMember);
   }
 
   @Api(server.route.getAllDiscoveryQuestions)
@@ -117,7 +117,7 @@ export class HomeController {
 
   /**
    * Retrieves a list of teams and projects based on search query.
-   * 
+   *
    * @param request - HTTP request object containing query parameters
    * @returns Array of projects and teams.
    */

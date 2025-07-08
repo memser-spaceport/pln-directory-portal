@@ -96,11 +96,37 @@ export class ProjectsService {
 
   async getProjects(queryOptions: Prisma.ProjectFindManyArgs) {
     try {
+      const whereWithFilter: Prisma.ProjectWhereInput = {
+        ...queryOptions.where,
+        creator: {
+          accessLevel: {
+            notIn: ['L0', 'L1', 'Rejected'],
+          },
+        },
+      };
+
       const [projects, projectsCount] = await Promise.all([
-        this.prisma.project.findMany(queryOptions),
-        this.prisma.project.count({ where: queryOptions.where }),
+        this.prisma.project.findMany({
+          ...queryOptions,
+          where: whereWithFilter,
+          ...(queryOptions.select
+            ? {
+                select: {
+                  ...queryOptions.select,
+                  creator: { select: { accessLevel: true } },
+                },
+              }
+            : ({
+                include: {
+                  ...(queryOptions.include || {}),
+                  creator: true,
+                },
+              } as any)),
+        }),
+        this.prisma.project.count({ where: whereWithFilter }),
       ]);
-      return { count: projectsCount, projects: projects }
+
+      return { count: projectsCount, projects };
     } catch (err) {
       this.handleErrors(err);
     }
@@ -378,9 +404,9 @@ export class ProjectsService {
    * Constructs a dynamic filter query for retrieving recent projects based on the 'is_recent' query parameter.
    * If 'is_recent' is set to 'true', it creates a 'createdAt' filter to retrieve records created within a
    * specified number of days. The number of days is configured via an environment variable.
-   * 
+   *
    * If a filter array is passed, it pushes the 'createdAt' filter to the existing filters.
-   * 
+   *
    * @param queryParams - HTTP request query parameters object
    * @param filter - Optional existing filter array to which the recent filter will be added if provided
    * @returns The constructed query with a 'createdAt' filter if 'is_recent' is 'true',
@@ -427,7 +453,7 @@ export class ProjectsService {
 
   /**
    * Fetches team names that maintain atleast a single project.
-   * 
+   *
    * @returns Set of team names.
    */
   async getProjectFilters(queryParams) {
@@ -464,7 +490,7 @@ export class ProjectsService {
         },
       })
     ])
-    
+
     return {
       askTags: this.askService.formatAskFilterResponse(askTags),
       tags: this.aggregatePropertyCount(tags,'tags')
@@ -472,7 +498,7 @@ export class ProjectsService {
     // return { maintainedBy: maintainingTeams.map((team) => ({ uid: team.uid, name: team.name, logo: team.logo?.url })) };
   }
 
-  
+
   /**
    * Aggregates the counts of a specified property from an array of objects.
    *

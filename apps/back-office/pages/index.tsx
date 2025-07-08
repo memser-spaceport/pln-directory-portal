@@ -14,9 +14,7 @@ export function Index() {
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  function onChange(
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) {
+  function onChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = event.target;
     name === 'name' ? setUsername(value) : setPassword(value);
   }
@@ -46,7 +44,7 @@ export function Index() {
       .then((res) => {
         if (res.ok) {
           const backLink = router.query.backlink?.toString() ?? '';
-          router.push(backLink ? backLink : ROUTE_CONSTANTS.PENDING_LIST);
+          router.push(backLink ? backLink : '/members?filter=level1');
         } else if (res.status === 401) {
           setError('Incorrect Username or Password!');
         }
@@ -65,20 +63,10 @@ export function Index() {
       <div className="absolute left-[50%] top-[50%] w-[75%] translate-x-[-50%] translate-y-[-50%] rounded-lg bg-white p-8 md:w-[30%]">
         <div className="inline-block">
           <div className="inline-block">
-            <LogoImage
-              className="pl-3"
-              height={95}
-              width={195}
-              alt="Protocol Labs Logo"
-            />
+            <LogoImage className="pl-3" height={95} width={195} alt="Protocol Labs Logo" />
           </div>
           <div className="fixed right-[30px] top-[66px] inline-block h-[29px] w-[113px] rounded-[4px] bg-[#9D3DE8] bg-opacity-10">
-            <Building
-              className="relative left-[7px] inline-block"
-              title="building"
-              width="14"
-              height="20"
-            />
+            <Building className="relative left-[7px] inline-block" title="building" width="14" height="20" />
             <span className="relative left-[10px] text-[14px] font-semibold text-[#9C3DE8]">
               {APP_CONSTANTS.BACK_OFFICE_LABEL}
             </span>
@@ -136,7 +124,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   if (plnadmin) {
     return {
       redirect: {
-        destination: '/pending-list',
+        destination: '/members?filter=level1',
         permanent: false,
       },
     };

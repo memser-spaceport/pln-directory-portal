@@ -7,11 +7,13 @@ import { ParticipantsRequestModule } from '../participants-request/participants-
 import { MembersModule } from '../members/members.module';
 import { AskModule } from '../asks/asks.module';
 import { HuskyModule } from '../husky/husky.module';
+import {AdminModule} from "../admin/admin.module";
 
 @Module({
   imports: [
     forwardRef(() => ParticipantsRequestModule),
     forwardRef(() => MembersModule),
+    forwardRef(() => AdminModule),
     SharedModule,
     forwardRef(() => AskModule),
     HuskyModule,

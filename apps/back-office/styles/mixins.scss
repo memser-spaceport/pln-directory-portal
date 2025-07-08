@@ -1,0 +1,200 @@
+@use 'media';
+
+@mixin side-paddings {
+  padding-left: 16px;
+  padding-right: 16px;
+
+  @include media.tablet-portrait {
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+
+  @include media.tablet-landscape {
+    padding-left: 42px;
+    padding-right: 42px;
+  }
+
+  @include media.desktop {
+    padding-left: 74px;
+    padding-right: 74px;
+  }
+}
+
+@mixin typography(
+  $font-size,
+  $line-height,
+  $font-family: var(--font-family-primary),
+  $font-weight: normal
+) {
+  font-family: $font-family;
+  font-size: $font-size;
+  font-weight: $font-weight;
+  line-height: $line-height;
+}
+
+@mixin ellipse-text {
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@mixin truncate-multiline($lineCount) {
+  /* stylelint-disable-next-line property-no-vendor-prefix */
+  -webkit-box-orient: vertical;
+  /* stylelint-disable-next-line value-no-vendor-prefix */
+  display: -webkit-box;
+  -webkit-line-clamp: $lineCount;
+  overflow: hidden;
+}
+
+@mixin font($size, $height, $weight) {
+  font-size: $size;
+  font-weight: $weight;
+  line-height: $height;
+}
+
+@mixin placeholder {
+  &::placeholder {
+    @content;
+  }
+}
+
+@mixin centralize {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+}
+
+@mixin editable-content {
+  color: var(--color-neutral-90);
+
+  ul,
+  pre {
+    margin: 0;
+  }
+
+  p {
+    margin: 0 0 10px;
+  }
+
+  p,
+  ul {
+    font-size: 14px;
+    line-height: 24px;
+  }
+
+  pre {
+    background-color: var(--color-neutral-20);
+    font-family: monospace, monospace;
+    font-size: 12px;
+    margin: 4px 0;
+    padding: 5px 10px;
+  }
+
+  img {
+    max-width: 100%;
+  }
+}
+
+@mixin hide-scrollbar {
+  // stylelint-disable
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+
+  /* Turn off scrollbar */
+  &::-webkit-scrollbar {
+    background: transparent;
+    border-radius: 0;
+    display: none;
+    height: 0;
+    width: 0;
+  }
+}
+
+@mixin custom-scrollbar-horizontal {
+  /* Turn on custom 4px wide scrollbar */
+  &::-webkit-scrollbar {
+    background: transparent;
+    border-radius: 0;
+    height: 2px;
+  }
+
+  /* hover effect for both scrollbar area, and scrollbar 'thumb' */
+  &::-webkit-scrollbar:hover {
+    background-color: rgba(232, 224, 255, 0.09);
+  }
+
+  /* The scrollbar 'thumb' ...that marque oval shape in a scrollbar */
+  &::-webkit-scrollbar-thumb:horizontal {
+    background-color: rgba(232, 224, 255, 1);
+    border-radius: 0;
+  }
+
+  &::-webkit-scrollbar-thumb:horizontal:active {
+    /* Some darker color when you click it */
+    background: rgba(232, 224, 255, 0.61);
+    border-radius: 0;
+  }
+}
+
+@mixin custom-scrollbar-vertical {
+  /* Turn on custom 4px wide scrollbar */
+  &::-webkit-scrollbar {
+    background: transparent;
+    border-radius: 24px;
+    width: 2px;
+  }
+
+  /* hover effect for both scrollbar area, and scrollbar 'thumb' */
+  &::-webkit-scrollbar:hover {
+    background-color: var(--chakra-colors-gray-4);
+  }
+
+  /* The scrollbar 'thumb' ...that marque oval shape in a scrollbar */
+  &::-webkit-scrollbar-thumb:vertical {
+    background-color: var(--chakra-colors-neutral-500);
+    border-radius: 24px;
+  }
+
+  &::-webkit-scrollbar-thumb:vertical:active {
+    /* Some darker color when you click it */
+    background: var(--chakra-colors-gray-4);
+    border-radius: 24px;
+  }
+}
+
+@mixin clampLines($lines) {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: $lines;
+  display: -webkit-box;
+  line-clamp: 2;
+  overflow: hidden;
+  word-wrap: break-word;
+}
+
+@mixin page-appear {
+  animation: appear 0.6s ease-out;
+  @keyframes appear {
+    0% {
+      opacity: 0;
+    }
+
+    100% {
+      opacity: 1;
+    }
+  }
+}
+
+@mixin block-appear {
+  animation: appear 0.3s ease-out;
+  @keyframes appear {
+    0% {
+      opacity: 0;
+    }
+
+    100% {
+      opacity: 1;
+    }
+  }
+}
