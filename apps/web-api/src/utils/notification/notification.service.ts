@@ -251,7 +251,7 @@ export class NotificationService {
       true
     );
   }
-
+  
   private getSupportEmail(): string | undefined {
     const supportEmails = process.env.SUPPORT_EMAILS?.split(',') ?? [];
     if (isEmails(supportEmails)) {
