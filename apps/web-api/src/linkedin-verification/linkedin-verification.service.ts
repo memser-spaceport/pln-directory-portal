@@ -312,7 +312,11 @@ export class LinkedInVerificationService implements OnModuleDestroy {
       adminName: 'Directory Admin',
       targetName: member.name,
       targetEmail: member.email,
-      otherUsers: pendingMembers,
+      otherUsers: pendingMembers.map((user) => ({
+        name: user.name,
+        email: user.email,
+        link: `${process.env.WEB_ADMIN_UI_BASE_URL}/members?filter=level1&search=${user.email}`,
+      })),
       backofficeReference: process.env.WEB_ADMIN_UI_BASE_URL,
     };
   }
