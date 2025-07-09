@@ -3,34 +3,30 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LinkedIn verification completed for member {{targetName}}</title>
+    <title>Recommendations on PL network</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: Inter, sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="background-color: #ffffff;">
     <tr>
         <td align="center">
-
             <!-- Container Table -->
             <table width="640" cellpadding="0" cellspacing="0" border="0" style="margin: auto;">
-
                 <!-- Header -->
                 <tr>
                     <td align="center" style="padding: 8px 24px;">
                         <img src="https://pl-directory-images-dev.s3.us-west-1.amazonaws.com/protocol-labs-logo.png" width="246" height="56" alt="Protocol Labs" />
                     </td>
                 </tr>
-
                 <!-- Title -->
                 <tr>
                     <td align="center" style="padding: 24px;">
-                        <h1 style="margin: 0; font-size: 24px; font-weight: 400; text-align: center;">Hi, {{adminName}}</h1>
+                        <h1 style="margin: 0; font-size: 24px; font-weight: 400; text-align: center;">Hi, {{name}}</h1>
                         <br />
                         <p style="color: #667085; font-size: 15px; line-height: 24px; margin: 0; text-align: center;">
                             A new user has verified their identity. Please review their profile.
                         </p>
                     </td>
                 </tr>
-
                 <tr>
                     <td align="center" style="padding: 24px;">
                         <h3 style="margin: 0; font-size: 16px; font-weight: 600; text-align: center;">New user:</h3>
@@ -41,16 +37,15 @@
                         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border: 1px solid rgba(102,112,133,0.12); border-radius: 8px; padding: 8px 16px;border-collapse: separate; width: 100%;">
                             <tr>
                                 <td width="112" valign="top">
-                                    <span style="font-size: 20px; font-weight: 500; color: #101828;">{{targetName}}</span>
+                                    <span style="font-size: 20px; font-weight: 500; color: #101828;">{{this.newUser.name}}</span>
                                 </td>
                                 <td width="112" valign="top" align="right">
-                                    <span style="text-align: right; color: #667085; font-size: 15px;">{{targetEmail}}</span>
+                                    <a href="{{this.link}}?filter=level0&search={{this.newUser.email}}" style="text-align: right; color: #667085; font-size: 15px;">{{this.newUser.email}}</a>
                                 </td>
                             </tr>
                         </table>
                     </td>
                 </tr>
-
                 {{#if otherUsers.length}}
                     <tr>
                         <td align="center" style="padding: 24px;">
@@ -66,7 +61,7 @@
                                             <span style="font-size: 20px; font-weight: 500; color: #101828;">{{this.name}}</span>
                                         </td>
                                         <td width="112" valign="top" align="right">
-                                            <span style="text-align: right; color: #667085; font-size: 15px;">{{this.email}}</span>
+                                            <a href="{{../link}}?filter=level0&search={{this.email}}" style="text-align: right; color: #667085; font-size: 15px;">{{this.email}}</a>
                                         </td>
                                     </tr>
                                 </table>
@@ -74,26 +69,22 @@
                         </tr>
                     {{/each}}
                 {{/if}}
-
                 <tr>
                     <td align="center" style="padding: 12px 0 24px;">
                         <hr style="border-top: none; border-width: 1px; border-color: #E2E8F0;"/>
                     </td>
                 </tr>
-
                 <!-- CTA -->
                 <tr>
                     <td align="center" style="padding: 0 12px;">
-                        <a href="{{backofficeReference}}" style="display: inline-block; background-color: #156FF7; color: #FFF; padding: 12px 0; border-radius: 10px; font-size: 16px; text-decoration: none; width: 100%; max-width: 320px;">Go to the admin panel</a>
+                        <a href="{{this.link}}" style="display: inline-block; background-color: #156FF7; color: #FFF; padding: 12px 0; border-radius: 10px; font-size: 16px; text-decoration: none; width: 100%; max-width: 320px;">Go to the admin panel</a>
                     </td>
                 </tr>
-
                 <tr>
                     <td align="center" style="padding: 48px 24px 24px;">
                         <p style="color: #667085; margin: 0;">Protocol Labs - LabOS</p>
                     </td>
                 </tr>
-
             </table>
         </td>
     </tr>
