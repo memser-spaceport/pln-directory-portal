@@ -658,10 +658,10 @@ export class RecommendationsService {
         },
         recommendationRunsAsTarget: {
           include: {
+            emailNotifications: true,
             recommendations: {
               include: {
                 recommendedMember: true,
-                emailNotifications: true,
               },
             },
           },
