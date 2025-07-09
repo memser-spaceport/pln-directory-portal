@@ -20,7 +20,7 @@
                 <!-- Title -->
                 <tr>
                     <td align="center" style="padding: 24px;">
-                        <h1 style="margin: 0; font-size: 24px; font-weight: 400; text-align: center;">Hi, {{name}}</h1>
+                        <h1 style="margin: 0; font-size: 24px; font-weight: 400; text-align: center;">Hi, {{adminName}}</h1>
                         <br />
                         <p style="color: #667085; font-size: 15px; line-height: 24px; margin: 0; text-align: center;">
                             A new user has verified their identity. Please review their profile.
@@ -37,10 +37,10 @@
                         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border: 1px solid rgba(102,112,133,0.12); border-radius: 8px; padding: 8px 16px;border-collapse: separate; width: 100%;">
                             <tr>
                                 <td width="112" valign="top">
-                                    <span style="font-size: 20px; font-weight: 500; color: #101828;">{{this.newUser.name}}</span>
+                                    <span style="font-size: 20px; font-weight: 500; color: #101828;">{{targetName}}</span>
                                 </td>
                                 <td width="112" valign="top" align="right">
-                                    <a href="{{this.link}}?filter=level0&search={{this.newUser.email}}" style="text-align: right; color: #667085; font-size: 15px;">{{this.newUser.email}}</a>
+                                    <a href="{{this.link}}?filter=level0&search={{targetEmail}}" style="text-align: right; color: #667085; font-size: 15px;">{{targetEmail}}</a>
                                 </td>
                             </tr>
                         </table>
