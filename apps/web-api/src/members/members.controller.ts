@@ -176,11 +176,6 @@ export class MemberController {
       throw new NotFoundException('Member not found');
     }
 
-    if (member.accessLevel === 'Rejected') {
-      this.logger.error(`Member rejected: uid=${uid}, accessLevel=${member.accessLevel}`);
-      throw new NotFoundException('Member not found');
-    }
-
     return member;
   }
 
