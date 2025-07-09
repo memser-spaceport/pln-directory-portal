@@ -39,8 +39,8 @@ export class TeamsService {
     private notificationService: NotificationService,
     private cacheService: CacheService,
     private askService: AskService,
-    private teamsHooksService: TeamsHooksService,
-  ) { }
+    private teamsHooksService: TeamsHooksService
+  ) {}
 
   /**
    * Find all teams based on provided query options.
@@ -112,10 +112,12 @@ export class TeamsService {
               },
             },
             where: {
-              isHost: true,
+              OR: [{ isHost: true }, { isSponsor: true }],
             },
             distinct: ['eventUid'],
             select: {
+              isHost: true,
+              isSponsor: true,
               event: {
                 select: {
                   uid: true,
@@ -189,9 +191,10 @@ export class TeamsService {
    * @returns The created team record
    */
   async createTeam(
-   team: Prisma.TeamUncheckedCreateInput,
-   tx: Prisma.TransactionClient,
-   requestorEmail: string): Promise<Team> {
+    team: Prisma.TeamUncheckedCreateInput,
+    tx: Prisma.TransactionClient,
+    requestorEmail: string
+  ): Promise<Team> {
     try {
       const createdTeam = await tx.team.create({
         data: team,
@@ -264,7 +267,7 @@ export class TeamsService {
               break;
 
             case 'Delete':
-              toDelete.push(updatedRole)
+              toDelete.push(updatedRole);
               break;
 
             case 'Add':
@@ -333,7 +336,7 @@ export class TeamsService {
    */
   private async addNewTeamMemberRoleEntry(teamAndRoles: any[], tx: Prisma.TransactionClient) {
     await tx.teamMemberRole.createMany({
-      data: teamAndRoles
+      data: teamAndRoles,
     });
   }
 
@@ -395,8 +398,8 @@ export class TeamsService {
     team['logo'] = teamData.logoUid
       ? { connect: { uid: teamData.logoUid } }
       : type === 'Update'
-        ? { disconnect: true }
-        : undefined;
+      ? { disconnect: true }
+      : undefined;
     return team;
   }
 
@@ -723,24 +726,24 @@ export class TeamsService {
     return {};
   }
 
-  buildAskTagFilter(queryParams, filter?){
+  buildAskTagFilter(queryParams, filter?) {
     const { askTags } = queryParams;
-    let tagFilter={}
-    if(askTags){
+    let tagFilter = {};
+    if (askTags) {
       //when all is given as value to askTags, all the teams with asks are returned.
       if (askTags === 'all') {
         tagFilter = {
-          asks: { some: {}, },
+          asks: { some: {} },
         };
       } else {
-        const tags = askTags.split(',')
+        const tags = askTags.split(',');
         tagFilter = {
-          asks: { some: { tags: { hasSome: tags }, }, },
+          asks: { some: { tags: { hasSome: tags } } },
         };
       }
     }
     if (filter) {
-      filter.push(tagFilter)
+      filter.push(tagFilter);
     } else {
       return tagFilter;
     }
@@ -939,16 +942,15 @@ export class TeamsService {
         select: {
           tags: true,
         },
-      })
+      }),
     ]);
-
 
     return {
       industryTags: industryTags.map((tag) => tag.title),
       membershipSources: membershipSources.map((source) => source.title),
       fundingStages: fundingStages.map((stage) => stage.title),
       technologies: technologies.map((tech) => tech.title),
-      askTags: this.askService.formatAskFilterResponse(askTags)
+      askTags: this.askService.formatAskFilterResponse(askTags),
     };
   }
 
@@ -989,7 +991,7 @@ export class TeamsService {
           if (data.isDeleted) {
             //deleting asks
             addEditResponse = await this.prisma.ask.delete({
-              where: { uid: data.uid }
+              where: { uid: data.uid },
             });
           } else {
             //updating asks
@@ -1054,13 +1056,9 @@ export class TeamsService {
         where: {
           eventGuests: {
             some: {
-              OR: [
-                { isHost: true },
-                { isSpeaker: true },
-                { isSponsor: true }
-              ]
-            }
-          }
+              OR: [{ isHost: true }, { isSpeaker: true }, { isSponsor: true }],
+            },
+          },
         },
         select: {
           uid: true,
@@ -1068,11 +1066,7 @@ export class TeamsService {
           logo: true,
           eventGuests: {
             where: {
-              OR: [
-                { isHost: true },
-                { isSpeaker: true },
-                { isSponsor: true }
-              ]
+              OR: [{ isHost: true }, { isSpeaker: true }, { isSponsor: true }],
             },
             distinct: ['memberUid'], // Ensures unique members per team
             select: {
@@ -1084,18 +1078,18 @@ export class TeamsService {
                 select: {
                   uid: true,
                   name: true,
-                  image: true
-                }
+                  image: true,
+                },
               },
               event: {
                 select: {
                   uid: true,
-                  name: true
-                }
-              }
-            }
-          }
-        }
+                  name: true,
+                },
+              },
+            },
+          },
+        },
       });
     } catch (error) {
       this.logger.error(`error occured while fetching event contributors`, error);
