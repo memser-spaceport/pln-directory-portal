@@ -38,47 +38,51 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
 
   const onSubmit = useCallback(
     async (formData: TMemberForm) => {
-      let image;
+      try {
+        let image;
 
-      if (formData.image) {
-        const imgResponse = await saveRegistrationImage(formData.image);
+        if (formData.image) {
+          const imgResponse = await saveRegistrationImage(formData.image);
 
-        image = imgResponse?.image.uid;
-      }
+          image = imgResponse?.image.uid;
+        }
 
-      const payload = {
-        imageUid: image ?? '',
-        name: formData.name,
-        accessLevel: formData.accessLevel?.value,
-        email: formData.email,
-        joinDate: formData.joinDate?.toISOString() ?? '',
-        bio: formData.bio,
-        country: formData.country ?? '',
-        region: formData.state ?? '',
-        city: formData.city ?? '',
-        skills: formData.skills.map((item) => item.value),
-        teamOrProjectURL: formData.teamOrProjectURL,
-        teamMemberRoles: formData.teamsAndRoles.map((item) => {
-          return {
-            teamUid: item.team.value,
-            role: item.role,
-          };
-        }),
-        linkedinHandler: formData.linkedin,
-        discordHandler: formData.discord,
-        twitterHandler: formData.twitter,
-        telegramHandler: formData.telegram,
-        officeHours: formData.officeHours,
-        githubHandler: formData.github,
-      };
+        const payload = {
+          imageUid: image ?? '',
+          name: formData.name,
+          accessLevel: formData.accessLevel?.value,
+          email: formData.email,
+          joinDate: formData.joinDate?.toISOString() ?? '',
+          bio: formData.bio,
+          country: formData.country ?? '',
+          region: formData.state ?? '',
+          city: formData.city ?? '',
+          skills: formData.skills.map((item) => item.value),
+          teamOrProjectURL: formData.teamOrProjectURL,
+          teamMemberRoles: formData.teamsAndRoles.map((item) => {
+            return {
+              teamUid: item.team.value,
+              role: item.role,
+            };
+          }),
+          linkedinHandler: formData.linkedin,
+          discordHandler: formData.discord,
+          twitterHandler: formData.twitter,
+          telegramHandler: formData.telegram,
+          officeHours: formData.officeHours,
+          githubHandler: formData.github,
+        };
 
-      const res = await mutateAsync({ payload, authToken });
+        const res = await mutateAsync({ payload, authToken });
 
-      if (res?.data) {
-        setOpen(false);
-        toast.success('New member added successfully!');
-      } else {
-        toast.error('Failed to add new member. Please try again.');
+        if (res?.data) {
+          setOpen(false);
+          toast.success('New member added successfully!');
+        } else {
+          toast.error('Failed to add new member. Please try again.');
+        }
+      } catch (e) {
+        toast.error(e?.response?.data?.message ?? 'Failed to add new member. Please try again.');
       }
     },
     [mutateAsync, authToken]
