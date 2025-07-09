@@ -134,7 +134,7 @@ async function indexMembers(lastCheckpoint) {
            LEFT JOIN "Image" i ON m."imageUid" = i.uid
     WHERE
       (m."createdAt" > $1 OR m."updatedAt" > $1)
-      AND m."accessLevel" NOT IN ('L0', 'L1')
+      AND m."accessLevel" NOT IN ('L0', 'L1', 'Rejected')
   `, [lastCheckpoint]);
 
   console.log('Got data from Member table: ' + res.rows.length);
