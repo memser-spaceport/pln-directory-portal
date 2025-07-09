@@ -661,6 +661,7 @@ export class RecommendationsService {
             recommendations: {
               include: {
                 recommendedMember: true,
+                emailNotifications: true,
               },
             },
           },
