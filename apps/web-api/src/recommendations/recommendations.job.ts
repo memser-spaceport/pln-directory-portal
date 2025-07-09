@@ -30,6 +30,7 @@ export class RecommendationsJob {
   }
 
   /**
+   * TODO: Move to EKS jobs when notification service is moved to EKS
    * Daily job that runs at 9:00 AM UTC to send example emails
    * Sends example emails to members who:
    * - Are subscribed and have no settings configured
@@ -170,6 +171,7 @@ export class RecommendationsJob {
   }
 
   /**
+   * TODO: Move to EKS jobs when notification service is moved to EKS
    * Bi-monthly job that runs on the 1st and 15th of every month at 9:00 AM UTC
    * Creates recommendation runs for all members with recommendations enabled and settings configured
    */

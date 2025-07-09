@@ -852,9 +852,7 @@ export class MemberService {
 
         // Enable recommendations only for L4
         if (accessLevel === AccessLevel.L4) {
-          await this.notificationSettingsService.enableRecommendationsFor(
-            memberUids
-          );
+          await this.notificationSettingsService.enableRecommendationsFor(memberUids);
         }
       }
 
@@ -915,6 +913,13 @@ export class MemberService {
         },
         notificationSetting: {
           create: {
+            // Set onboarding notification attempts for L4 members
+            ...(memberData.accessLevel === AccessLevel.L4
+              ? {
+                  onboardingAttempts: 1,
+                  lastOnboardingSentAt: new Date(),
+                }
+              : {}),
             recommendationsEnabled: memberData.accessLevel === AccessLevel.L4,
           },
         },
