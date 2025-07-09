@@ -661,7 +661,8 @@ export class MemberService {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       switch (error?.code) {
         case 'P2002':
-          throw new ConflictException('Unique key constraint error on Member:', error.message);
+          const fieldName = (error.meta as any)?.target?.[0] || 'field';
+          throw new ConflictException(`This ${fieldName} is already in the system.`);
         case 'P2003':
           throw new BadRequestException('Foreign key constraint error on Member', error.message);
         case 'P2025':
@@ -885,7 +886,7 @@ export class MemberService {
 
       const newMember = {
         name: memberData.name,
-        email: memberData.email,
+        email: memberData.email.toLowerCase().trim(),
         imageUid: memberData.imageUid,
         accessLevel: memberData.accessLevel,
         isVerified,
