@@ -127,6 +127,25 @@ function purifyHtml(html) {
   return withoutTags.replaceAll('&nbsp;', ' ');
 }
 
+async function deleteRejectedMembersFromOpenSearch() {
+  const res = await pgClient.query(`
+    SELECT uid FROM "Member"
+    WHERE "accessLevel" IN ('Rejected', 'L0', 'L1')
+  `);
+  const uids = res.rows.map(row => row.uid);
+  if (!uids.length) return;
+
+  const body = uids.flatMap(uid => [{ delete: { _index: 'member', _id: uid } }]);
+  const response = await osClient.bulk({ body });
+
+  if (response.body.errors) {
+    console.error('Some deletions failed');
+  } else {
+    console.log(`Deleted ${uids.length} rejected/L0/L1 members`);
+  }
+}
+
+
 async function indexMembers(lastCheckpoint) {
   const res = await pgClient.query(`
     SELECT m.uid, m.name, m.bio, i.url
@@ -134,7 +153,7 @@ async function indexMembers(lastCheckpoint) {
            LEFT JOIN "Image" i ON m."imageUid" = i.uid
     WHERE
       (m."createdAt" > $1 OR m."updatedAt" > $1)
-      AND m."accessLevel" NOT IN ('L0', 'L1')
+      AND m."accessLevel" NOT IN ('L0', 'L1', 'Rejected')
   `, [lastCheckpoint]);
 
   console.log('Got data from Member table: ' + res.rows.length);
@@ -165,10 +184,10 @@ async function indexMembers(lastCheckpoint) {
 
 async function indexTeams(lastCheckpoint) {
   const res = await pgClient.query(`
-        SELECT t.uid, t.name, t."shortDescription", t."longDescription", i.url FROM "Team" t
-        LEFT JOIN "Image" i ON t."logoUid" = i.uid
-        WHERE t."createdAt" > $1 OR t."updatedAt" > $1
-    `, [lastCheckpoint]);
+    SELECT t.uid, t.name, t."shortDescription", t."longDescription", i.url FROM "Team" t
+                                                                                  LEFT JOIN "Image" i ON t."logoUid" = i.uid
+    WHERE t."createdAt" > $1 OR t."updatedAt" > $1
+  `, [lastCheckpoint]);
 
   console.log('Got data from Team table: ' + res.rows.length);
 
@@ -291,6 +310,7 @@ export const handler = async () => {
   await initPgPool();
 
   try {
+    await deleteRejectedMembersFromOpenSearch();
     const memberRowsChanged = await indexMembers(lastCheckpoint);
     const teamRowsChanged = await indexTeams(lastCheckpoint);
     const projectRowsChanged = await indexProjects(lastCheckpoint);

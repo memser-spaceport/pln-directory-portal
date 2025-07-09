@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Req, UseGuards, UsePipes, UseInterceptors, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Body, Controller, Param, Req, UseGuards, UsePipes, UseInterceptors, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
@@ -170,6 +170,12 @@ export class MemberController {
     const builder = new PrismaQueryBuilder(queryableFields, ENABLED_RETRIEVAL_PROFILE);
     const builtQuery = builder.build(request.query);
     const member = await this.membersService.findOne(uid, builtQuery);
+
+    if (!member) {
+      this.logger.error(`Member not found: uid=${uid}`);
+      throw new NotFoundException('Member not found');
+    }
+
     return member;
   }
 

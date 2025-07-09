@@ -9,12 +9,11 @@ import {
   LinkedInVerificationResponseDto,
   LinkedInVerificationStatusDto,
 } from 'libs/contracts/src/schema/linkedin-verification';
-import { MembersService } from '../members/members.service';
 import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 import path from 'path';
 import { AwsService } from '../utils/aws/aws.service';
 import { Member } from '@prisma/client';
-import {MemberService} from "../admin/member.service";
+import { MemberService } from '../admin/member.service';
 
 @Injectable()
 export class LinkedInVerificationService implements OnModuleDestroy {
@@ -71,14 +70,19 @@ export class LinkedInVerificationService implements OnModuleDestroy {
 
     await this.redis.set(`linkedin_auth:${state}`, JSON.stringify(authData), 'EX', this.CACHE_TTL);
 
+    // Build auth URL with parameters to prevent Safari issues
     const authUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${
       this.clientId
-    }&redirect_uri=${encodeURIComponent(this.redirectUri)}&state=${state}&scope=${encodeURIComponent(scope)}`;
+    }&redirect_uri=${encodeURIComponent(this.redirectUri)}&state=${state}&scope=${encodeURIComponent(
+      scope
+    )}&prompt=consent&auth_type=rerequest`;
 
     return { authUrl, state };
   }
 
   async handleLinkedInCallback(request: LinkedInCallbackRequestDto): Promise<LinkedInVerificationResponseDto> {
+    this.logger.info(`LinkedIn callback received for member ${request.state}`, 'LinkedInVerification');
+
     // Retrieve auth data from Redis cache
     const authDataString = await this.redis.get(`linkedin_auth:${request.state}`);
 
@@ -88,6 +92,12 @@ export class LinkedInVerificationService implements OnModuleDestroy {
 
     const authData = JSON.parse(authDataString) as { memberUid: string; redirectUrl: string; timestamp: number };
     const { memberUid, redirectUrl = `${process.env.WEB_UI_BASE_URL}/profile` } = authData;
+
+    // Log callback attempt for debugging mobile Safari issues
+    this.logger.info(
+      `LinkedIn callback received for member ${memberUid}, state: ${request.state}`,
+      'LinkedInVerification'
+    );
 
     try {
       if (!request.code) {
@@ -101,14 +111,14 @@ export class LinkedInVerificationService implements OnModuleDestroy {
       // Clean up the cache entry
       await this.redis.del(`linkedin_auth:${request.state}`);
 
-      // Get access token
+      // Get access token - use the same redirect URI that was used in the authorization request
       const tokenResponse = await axios.post('https://www.linkedin.com/oauth/v2/accessToken', null, {
         params: {
           grant_type: 'authorization_code',
           code: request.code,
           client_id: this.clientId,
           client_secret: this.clientSecret,
-          redirect_uri: this.redirectUri,
+          redirect_uri: this.redirectUri, // Always use the main redirect URI for token exchange
         },
       });
 
@@ -302,7 +312,11 @@ export class LinkedInVerificationService implements OnModuleDestroy {
       adminName: 'Directory Admin',
       targetName: member.name,
       targetEmail: member.email,
-      otherUsers: pendingMembers,
+      otherUsers: pendingMembers.map((user) => ({
+        name: user.name,
+        email: user.email,
+        link: `${process.env.WEB_ADMIN_UI_BASE_URL}/members?filter=level1&search=${user.email}`,
+      })),
       backofficeReference: process.env.WEB_ADMIN_UI_BASE_URL,
     };
   }

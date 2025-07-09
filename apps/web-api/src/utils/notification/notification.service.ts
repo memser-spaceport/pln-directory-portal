@@ -193,7 +193,7 @@ export class NotificationService {
    * @param memberEmail The email address of the member being onboarded
    * @returns Sends an email to the member with the onboarding link.
    */
-  async notifyForOnboarding(memberName: string, memberEmail: string) {
+  async notifyForOnboarding(memberName: string, memberEmail: string, subject = ONBOARDING_SUBJECT) {
     const memberUrl = `${process.env.WEB_UI_BASE_URL}/?loginFlow=onboarding&prefillEmail=${encodeURIComponent(
       memberEmail
     )}`;
@@ -205,7 +205,7 @@ export class NotificationService {
         from: 'La Christa Eccles',
       },
       '',
-      ONBOARDING_SUBJECT,
+      subject,
       process.env.SES_SOURCE_EMAIL || '',
       [memberEmail],
       [],
