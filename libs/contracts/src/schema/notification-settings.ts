@@ -6,6 +6,8 @@ export const NotificationSettingsResponseSchema = z.object({
   recommendationsEnabled: z.boolean(),
   subscribed: z.boolean(),
   exampleSent: z.boolean(),
+  exampleAttempts: z.number(),
+  lastExampleSentAt: z.date().nullable(),
   showInvitationDialog: z.boolean(),
   emailFrequency: z.number(),
   byFocusArea: z.boolean(),

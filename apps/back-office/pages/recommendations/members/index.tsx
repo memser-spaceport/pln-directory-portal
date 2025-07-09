@@ -24,7 +24,22 @@ interface Member {
     uid: string;
     createdAt: string;
     status: string;
+    emailNotifications: Array<{
+      email: string;
+      subject: string;
+      isExample: boolean;
+      sentAt: string;
+    }>;
   }>;
+  notificationSetting?: {
+    subscribed?: boolean;
+    focusAreaList?: any[];
+    fundingStageList?: any[];
+    roleList?: any[];
+    technologyList?: any[];
+    industryTagList?: any[];
+    keywordList?: any[];
+  };
   accessLevel: string;
 }
 
@@ -89,63 +104,82 @@ export default function MembersWithRecommendationsPage() {
               <thead>
                 <tr className="border-b bg-white">
                   <th className="py-3 text-left">Member</th>
+                  <th className="py-3 text-left">Onboarding opt-in</th>
+                  <th className="py-3 text-left">Settings opt-in</th>
                   <th className="py-3 text-left">Last Run</th>
                   <th className="py-3 text-left">Total Runs</th>
                   <th className="py-3 text-left">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {members.map((member) => (
-                  <tr key={member.uid} className="border-b">
-                    <td className="py-3">
-                      <div className="flex items-center space-x-3">
-                        {member.image?.url ? (
-                          <img
-                            src={member.image.url}
-                            alt={member.name}
-                            className="h-10 w-10 rounded-full object-cover"
-                          />
+                {members.map((member) => {
+                  const recommendationRunsAsTarget = member.recommendationRunsAsTarget?.filter(
+                    (run) =>
+                      !run.emailNotifications || run.emailNotifications.every((notification) => !notification.isExample)
+                  );
+                  return (
+                    <tr key={member.uid} className="border-b">
+                      <td className="py-3">
+                        <div className="flex items-center space-x-3">
+                          {member.image?.url ? (
+                            <img
+                              src={member.image.url}
+                              alt={member.name}
+                              className="h-10 w-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-lg font-medium text-gray-500">
+                              {member.name.charAt(0)}
+                            </div>
+                          )}
+                          <a
+                            href={`${WEB_UI_BASE_URL}/members/${member.uid}`}
+                            className="text-blue-600 hover:underline"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {member.name}
+                          </a>
+                        </div>
+                      </td>
+                      <td className="py-3">{member.notificationSetting?.subscribed ? 'Yes' : 'No'}</td>
+                      <td className="py-3">
+                        {(member.notificationSetting?.focusAreaList?.length ||
+                          member.notificationSetting?.fundingStageList?.length ||
+                          member.notificationSetting?.roleList?.length ||
+                          member.notificationSetting?.technologyList?.length ||
+                          member.notificationSetting?.industryTagList?.length ||
+                          member.notificationSetting?.keywordList?.length) > 0
+                          ? 'Yes'
+                          : 'No'}
+                      </td>
+                      <td className="py-3">
+                        {recommendationRunsAsTarget?.length > 0 ? (
+                          <a
+                            href={`${ROUTE_CONSTANTS.RECOMMENDATIONS_RUNS}/${recommendationRunsAsTarget[0].uid}`}
+                            className="text-blue-600 hover:underline"
+                          >
+                            {`${new Date(recommendationRunsAsTarget[0].createdAt).toLocaleDateString()} (${
+                              recommendationRunsAsTarget[0].status
+                            })`}
+                          </a>
                         ) : (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-lg font-medium text-gray-500">
-                            {member.name.charAt(0)}
-                          </div>
+                          'No runs'
                         )}
-                        <a
-                          href={`${WEB_UI_BASE_URL}/members/${member.uid}`}
-                          className="text-blue-600 hover:underline"
-                          target="_blank"
-                          rel="noreferrer"
+                      </td>
+                      <td className="py-3">{recommendationRunsAsTarget?.length || 0}</td>
+                      <td className="py-3">
+                        <button
+                          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-gray-400"
+                          onClick={() => handleCreateRun(member.uid)}
+                          disabled={isCreatingRun === member.uid}
                         >
-                          {member.name}
-                        </a>
-                      </div>
-                    </td>
-                    <td className="py-3">
-                      {member.recommendationRunsAsTarget?.length > 0 ? (
-                        <a
-                          href={`${ROUTE_CONSTANTS.RECOMMENDATIONS_RUNS}/${member.recommendationRunsAsTarget[0].uid}`}
-                          className="text-blue-600 hover:underline"
-                        >
-                          {`${new Date(member.recommendationRunsAsTarget[0].createdAt).toLocaleDateString()} (${
-                            member.recommendationRunsAsTarget[0].status
-                          })`}
-                        </a>
-                      ) : (
-                        'No runs'
-                      )}
-                    </td>
-                    <td className="py-3">{member.recommendationRunsAsTarget?.length || 0}</td>
-                    <td className="py-3">
-                      <button
-                        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-gray-400"
-                        onClick={() => handleCreateRun(member.uid)}
-                        disabled={isCreatingRun === member.uid}
-                      >
-                        {isCreatingRun === member.uid ? 'Creating...' : 'Start Run'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                          {isCreatingRun === member.uid ? 'Creating...' : 'Start Run'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

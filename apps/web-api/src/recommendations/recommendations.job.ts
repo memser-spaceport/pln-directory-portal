@@ -30,10 +30,15 @@ export class RecommendationsJob {
   }
 
   /**
+   * TODO: Move to EKS jobs when notification service is moved to EKS
    * Daily job that runs at 9:00 AM UTC to send example emails
    * Sends example emails to members who:
    * - Are subscribed and have no settings configured
-   * - Haven't received an example email yet (exampleSent = false)
+   * - Haven't received 3 example emails yet (exampleAttempts < 3)
+   * - Meet the timing requirements for subsequent attempts:
+   *   - 1st time: No previous attempts
+   *   - 2nd time: 1 week after first attempt
+   *   - 3rd time: 2 weeks after second attempt
    */
   @Cron('0 9 * * *', {
     name: 'daily-example-emails',
@@ -56,6 +61,7 @@ export class RecommendationsJob {
 
       let successCount = 0;
       let errorCount = 0;
+      let skippedCount = 0;
 
       for (const member of membersWithRecommendationsEnabled) {
         try {
@@ -66,9 +72,43 @@ export class RecommendationsJob {
             continue;
           }
 
-          // Skip if member already received an example email
-          if (member.notificationSetting?.exampleSent) {
+          const currentAttempts = member.notificationSetting?.exampleAttempts || 0;
+          const lastExampleSentAt = member.notificationSetting?.lastExampleSentAt;
+
+          // Skip if already sent 3 attempts
+          if (currentAttempts >= 3) {
+            this.logger.info(`Skipping member ${member.uid} - already sent ${currentAttempts} example emails`);
+            skippedCount++;
             continue;
+          }
+
+          // Check timing requirements for subsequent attempts
+          if (currentAttempts > 0 && lastExampleSentAt) {
+            const now = new Date();
+            const timeSinceLastEmail = now.getTime() - lastExampleSentAt.getTime();
+            const daysSinceLastEmail = timeSinceLastEmail / (1000 * 60 * 60 * 24);
+
+            // 2nd attempt: must be at least 7 days after 1st attempt
+            if (currentAttempts === 1 && daysSinceLastEmail < 7) {
+              this.logger.info(
+                `Skipping member ${member.uid} - 2nd attempt too soon (${daysSinceLastEmail.toFixed(
+                  1
+                )} days since last email)`
+              );
+              skippedCount++;
+              continue;
+            }
+
+            // 3rd attempt: must be at least 14 days after 2nd attempt
+            if (currentAttempts === 2 && daysSinceLastEmail < 14) {
+              this.logger.info(
+                `Skipping member ${member.uid} - 3rd attempt too soon (${daysSinceLastEmail.toFixed(
+                  1
+                )} days since last email)`
+              );
+              skippedCount++;
+              continue;
+            }
           }
 
           // Send example email
@@ -86,21 +126,25 @@ export class RecommendationsJob {
             await this.recommendationsService.sendRecommendations(recommendationRun.uid, {
               approvedRecommendationUids: recommendationRun.recommendations.map((r) => r.uid),
               email: member.email ?? undefined,
-              emailSubject: '[Action required] Your Recommendations from PL Network',
+              emailSubject: this.getExampleEmailSubject(currentAttempts + 1),
               isExample: true,
             });
 
-            // Mark example as sent
+            // Update example email tracking
             await this.prisma.notificationSetting.update({
               where: { memberUid: member.uid },
               data: {
                 exampleSent: true,
+                exampleAttempts: currentAttempts + 1,
+                lastExampleSentAt: new Date(),
                 subscribed: true,
               },
             });
           }
 
-          this.logger.info(`Successfully sent example email for member ${member.uid} (${member.name})`);
+          this.logger.info(
+            `Successfully sent example email #${currentAttempts + 1} for member ${member.uid} (${member.name})`
+          );
           successCount++;
         } catch (error) {
           this.logger.error(`Failed to send example email for member ${member.uid}: ${error.message}`);
@@ -112,11 +156,12 @@ export class RecommendationsJob {
       this.logger.info(`Daily example emails job completed:`);
       this.logger.info(`- Total members processed: ${membersWithRecommendationsEnabled.length}`);
       this.logger.info(`- Successful emails sent: ${successCount}`);
+      this.logger.info(`- Skipped: ${skippedCount}`);
       this.logger.info(`- Errors: ${errorCount}`);
 
       // Log to the application log service for monitoring
       this.logger.info(
-        `Daily example emails job completed: ${successCount} successful, ${errorCount} errors`,
+        `Daily example emails job completed: ${successCount} successful, ${skippedCount} skipped, ${errorCount} errors`,
         'daily-example-emails'
       );
     } catch (error) {
@@ -126,6 +171,7 @@ export class RecommendationsJob {
   }
 
   /**
+   * TODO: Move to EKS jobs when notification service is moved to EKS
    * Bi-monthly job that runs on the 1st and 15th of every month at 9:00 AM UTC
    * Creates recommendation runs for all members with recommendations enabled and settings configured
    */
@@ -242,5 +288,21 @@ export class RecommendationsJob {
   async triggerExampleEmails() {
     this.logger.info('Manually triggering daily example emails generation');
     await this.sendExampleEmails();
+  }
+
+  /**
+   * Get the appropriate email subject based on the attempt number
+   */
+  private getExampleEmailSubject(attemptNumber: number): string {
+    switch (attemptNumber) {
+      case 1:
+        return '[Action required] Your Recommendations from PL Network';
+      case 2:
+        return '[Reminder] Your Recommendations from PL Network';
+      case 3:
+        return '[Final reminder] Your Recommendations from PL Network';
+      default:
+        return '[Action required] Your Recommendations from PL Network';
+    }
   }
 }

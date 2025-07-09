@@ -18,7 +18,7 @@ import { useCookie } from 'react-use';
 const MembersPage = () => {
   const router = useRouter();
   const query = router.query;
-  const { filter } = query;
+  const { filter, search } = query;
   const [authToken] = useCookie('plnadmin');
   const { data: counts } = useAccessLevelCounts({ authToken });
   const items = useMemo(() => {
@@ -64,7 +64,7 @@ const MembersPage = () => {
     pageIndex: 0,
     pageSize: 10,
   });
-  const [globalFilter, setGlobalFilter] = useState<string>('');
+  const [globalFilter, setGlobalFilter] = useState<string>((search as string | undefined) ?? '');
 
   const { data } = useMembersList({ authToken, accessLevel: getAccessLevel(filter as string) });
   const { table } = useMembersTable({
@@ -85,6 +85,12 @@ const MembersPage = () => {
       router.push(`/?backlink=${router.asPath}`);
     }
   }, [authToken, router]);
+
+  useEffect(() => {
+    if (search) {
+      setGlobalFilter(search as string);
+    }
+  }, [search]);
 
   return (
     <ApprovalLayout>

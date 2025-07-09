@@ -661,7 +661,8 @@ export class MemberService {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       switch (error?.code) {
         case 'P2002':
-          throw new ConflictException('Unique key constraint error on Member:', error.message);
+          const fieldName = (error.meta as any)?.target?.[0] || 'field';
+          throw new ConflictException(`This ${fieldName} is already in the system.`);
         case 'P2003':
           throw new BadRequestException('Foreign key constraint error on Member', error.message);
         case 'P2025':
@@ -803,20 +804,35 @@ export class MemberService {
 
     // Resolve isVerified and plnFriend flags based on new access level
     const { isVerified, plnFriend } = this.resolveFlagsFromAccessLevel(accessLevel as AccessLevel);
+    const now = new Date();
+
+    // Determine if soft delete or restore logic should be applied
+    let updateData: Prisma.MemberUpdateManyArgs['data'] = {
+      accessLevel,
+      accessLevelUpdatedAt: now,
+      isVerified,
+      plnFriend,
+    };
+
+    if (accessLevel === AccessLevel.REJECTED) {
+      // Soft delete if access level is set to REJECTED
+      updateData.deletedAt = now;
+      updateData.deletionReason = 'Access level changed to Rejected';
+    } else {
+      // Restore if access level is changed from REJECTED to something else
+      updateData.deletedAt = null;
+      updateData.deletionReason = null;
+    }
 
     // Update access level and associated flags
     const result = await this.prisma.member.updateMany({
       where: {
         uid: { in: memberUids },
       },
-      data: {
-        accessLevel,
-        accessLevelUpdatedAt: new Date(),
-        isVerified,
-        plnFriend,
-      },
+      data: updateData,
     });
 
+    // Notify users based on the new access level
     if (result.count > 0) {
       // Send approval emails for L2, L3, L4
       if ([AccessLevel.L2, AccessLevel.L3, AccessLevel.L4].includes(accessLevel as AccessLevel)) {
@@ -870,7 +886,7 @@ export class MemberService {
 
       const newMember = {
         name: memberData.name,
-        email: memberData.email,
+        email: memberData.email.toLowerCase().trim(),
         imageUid: memberData.imageUid,
         accessLevel: memberData.accessLevel,
         isVerified,
@@ -898,6 +914,13 @@ export class MemberService {
         },
         notificationSetting: {
           create: {
+            // Set onboarding notification attempts for L4 members
+            ...(memberData.accessLevel === AccessLevel.L4
+              ? {
+                  onboardingAttempts: 1,
+                  lastOnboardingSentAt: new Date(),
+                }
+              : {}),
             recommendationsEnabled: memberData.accessLevel === AccessLevel.L4,
           },
         },
