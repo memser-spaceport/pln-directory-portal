@@ -42,12 +42,8 @@ export class OnboardingRemindersJob {
           twitterHandler: null,
           discordHandler: null,
           telegramHandler: null,
-          imageUid: null,
           locationUid: null,
           officeHours: null,
-          skills: {
-            none: {},
-          },
           notificationSetting: {
             onboardingAttempts: {
               lt: 4,
