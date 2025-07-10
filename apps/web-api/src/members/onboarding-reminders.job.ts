@@ -11,11 +11,7 @@ export class OnboardingRemindersJob {
     private prisma: PrismaService,
     private logger: LogService,
     private notificationService: NotificationService
-  ) {
-    setTimeout(() => {
-      this.sendOnboardingReminders();
-    }, 1000);
-  }
+  ) {}
 
   /**
    * TODO: Move to EKS jobs when notification service is moved to EKS
