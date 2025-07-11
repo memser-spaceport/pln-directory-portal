@@ -209,8 +209,7 @@ export class NotificationService {
       process.env.SES_SOURCE_EMAIL || '',
       [memberEmail],
       [],
-      this.getSupportEmail(),
-      true
+      this.getSupportEmail()
     );
   }
 
@@ -231,8 +230,7 @@ export class NotificationService {
       process.env.SES_SOURCE_EMAIL || '',
       [memberEmail],
       [],
-      this.getSupportEmail(),
-      true
+      this.getSupportEmail()
     );
   }
 
@@ -247,8 +245,7 @@ export class NotificationService {
       process.env.SES_SOURCE_EMAIL || '',
       [memberEmail],
       [],
-      this.getSupportEmail(),
-      true
+      this.getSupportEmail()
     );
   }
 

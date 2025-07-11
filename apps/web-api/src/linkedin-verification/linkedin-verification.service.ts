@@ -272,8 +272,7 @@ export class LinkedInVerificationService implements OnModuleDestroy {
       process.env.SES_SOURCE_EMAIL || '',
       this.adminEmails,
       [],
-      undefined,
-      true
+      undefined
     );
 
     this.logger.info(`Admin email sent to ${this.adminEmails} ref: ${result?.MessageId}`);

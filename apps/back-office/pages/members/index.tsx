@@ -4,7 +4,7 @@ import s from './styles.module.scss';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { TableFilter } from '../../components/filters/TableFilter/TableFilter';
 import { useRouter } from 'next/router';
-import { flexRender, PaginationState, SortingState } from '@tanstack/react-table';
+import { ColumnFiltersState, flexRender, PaginationState, SortingState } from '@tanstack/react-table';
 import { useMembersTable } from '../../screens/members/hooks/useMembersTable';
 import { useMembersList } from '../../hooks/members/useMembersList';
 import { Level0Icon, Level1Icon, Level2Icon, RejectedIcon, SortIcon } from '../../screens/members/components/icons';
@@ -14,6 +14,7 @@ import { useAccessLevelCounts } from '../../hooks/members/useAccessLevelCounts';
 import PaginationControls from '../../screens/members/components/PaginationControls/PaginationControls';
 import { AddMember } from '../../screens/members/components/AddMember/AddMember';
 import { useCookie } from 'react-use';
+import { StatusFilter } from '../../screens/members/components/StatusFilter';
 
 const MembersPage = () => {
   const router = useRouter();
@@ -65,7 +66,7 @@ const MembersPage = () => {
     pageSize: 10,
   });
   const [globalFilter, setGlobalFilter] = useState<string>((search as string | undefined) ?? '');
-
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const { data } = useMembersList({ authToken, accessLevel: getAccessLevel(filter as string) });
   const { table } = useMembersTable({
     members: data?.data,
@@ -78,6 +79,8 @@ const MembersPage = () => {
     setPagination,
     globalFilter,
     setGlobalFilter,
+    columnFilters,
+    setColumnFilters,
   });
 
   useEffect(() => {
@@ -113,13 +116,14 @@ const MembersPage = () => {
             <TableFilter
               items={items}
               active={filter as string}
-              onFilterClick={(id) =>
+              onFilterClick={(id) => {
+                setColumnFilters([]);
                 router.replace({
                   query: {
                     filter: id,
                   },
-                })
-              }
+                });
+              }}
             >
               <AddMember className={s.addNewBtn} authToken={authToken} />
             </TableFilter>
@@ -161,6 +165,23 @@ const MembersPage = () => {
                     >
                       {flexRender(header.column.columnDef.header, header.getContext())}
                       {header.column.getCanSort() && <SortIcon />}
+
+                      {header.column.id === 'accessLevel' && filter === 'level2' && (
+                        <div
+                          className="ml-auto"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                        >
+                          <StatusFilter
+                            onSelect={(v) => {
+                              header.column.setFilterValue(v || undefined);
+                            }}
+                            value={columnFilters}
+                          />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
