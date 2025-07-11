@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 import s from './MultieditControls.module.scss';
 import clsx from 'clsx';
 import Select from 'react-select';
 import { Level0Icon, Level1Icon, Level2Icon } from '../icons';
 import { useUpdateMembersStatus } from '../../../../hooks/members/useUpdateMembersStatus';
+import { toast } from 'react-toastify';
+import { useToggle } from 'react-use';
+import { ConfirmDialog } from '../ConfirmDialog';
 
 interface Props {
   ids: string[];
@@ -77,158 +80,178 @@ const options = [
 
 export const MultieditControls = ({ ids, onReset, authToken }: Props) => {
   const [_value, setValue] = React.useState<any>([]);
+  const [openConfirm, toggleConfirm] = useToggle(false);
 
-  const { mutateAsync } = useUpdateMembersStatus();
+  const { mutateAsync, isPending } = useUpdateMembersStatus();
+
+  const handleSubmit = async () => {
+    toggleConfirm(false);
+    const res = await mutateAsync({
+      authToken,
+      memberUids: ids,
+      accessLevel: _value.value,
+    });
+
+    if (res.status === 200) {
+      onReset();
+      toast.success(`Successfully updated access level.`);
+    } else {
+      toast.error(`Failed to update access level. Please try again later.`);
+    }
+  };
 
   return (
-    <div
-      className={clsx(s.root, {
-        [s.visible]: ids.length > 0,
-      })}
-    >
-      <button
-        type="button"
-        className={s.btn}
-        disabled={false}
-        onClick={() => {
-          onReset();
-        }}
+    <>
+      <div
+        className={clsx(s.root, {
+          [s.visible]: ids.length > 0,
+        })}
       >
-        <CloseIcon />
-      </button>
-      <div className={s.message}>
-        Apply status to -{' '}
-        <span className={s.accent}>
-          {ids.length} Member{ids.length > 1 ? 's' : ''}
-        </span>
-      </div>
-      <Select
-        menuPlacement="top"
-        options={options}
-        isClearable={false}
-        value={_value}
-        onChange={(val) => {
-          setValue(val);
-        }}
-        styles={{
-          container: (base) => ({
-            ...base,
-            width: '100%',
-          }),
-          control: (baseStyles) => ({
-            ...baseStyles,
-            alignItems: 'center',
-            gap: '8px',
-            alignSelf: 'stretch',
-            borderRadius: '8px',
-            border: '1px solid rgba(203, 213, 225, 0.50)',
-            background: '#fff',
-            outline: 'none',
-            fontSize: '14px',
-            minWidth: '140px',
-            width: '100%',
-            borderColor: 'rgba(203, 213, 225, 0.50) !important',
-            position: 'relative',
-            boxShadow: 'none !important',
-            '&:hover': {
-              border: '1px solid #5E718D',
-              boxShadow: '0 0 0 4px rgba(27, 56, 96, 0.12) !important',
-              borderColor: '#5E718D !important',
-            },
-            '&:focus-visible, &:focus': {
-              borderColor: '#5E718D !important',
-              boxShadow: '0 0 0 4px rgba(27, 56, 96, 0.12) !important',
-            },
-          }),
-          input: (baseStyles) => ({
-            ...baseStyles,
-            height: '32px',
-            padding: 0,
-            // background: 'tomato',
-          }),
-          placeholder: (base) => ({
-            ...base,
-            // border: '1px solid red',
-            width: 'fit-content',
-            fontSize: '14px',
-            color: '#455468A0',
-          }),
-          option: (baseStyles) => ({
-            ...baseStyles,
-            fontSize: '14px',
-            fontWeight: 300,
-            color: '#455468',
-            '&:hover': {
-              background: 'rgba(27, 56, 96, 0.12)',
-            },
-          }),
-          menu: (baseStyles) => ({
-            ...baseStyles,
-            outline: 'none',
-            zIndex: 3,
-          }),
-          indicatorContainer: (base) => ({
-            display: 'none',
-          }),
-          indicatorSeparator: (base) => ({
-            display: 'none',
-          }),
-        }}
-        components={{
-          Control: ({ children, innerProps, innerRef, getValue }) => {
-            const val = getValue();
-            const selected = val.length > 0 ? val[0] : null;
-
-            return (
-              <div {...innerProps} ref={innerRef} className={s.control}>
-                {selected ? (
-                  <>
-                    <div className={s.optionRoot}>
-                      {selected.icon} <span className={s.name}>{selected.name}</span>{' '}
-                      <span className={s.desc}>{selected.desc}</span>
-                    </div>
-                    <div className={s.childrenWrapper}>{children}</div>
-                  </>
-                ) : (
-                  children
-                )}
-              </div>
-            );
-          },
-          Option: (props) => {
-            return (
-              <div
-                className={s.optionRoot}
-                onClick={() => {
-                  props.selectOption(props.data);
-                }}
-              >
-                {props.data.icon} <span className={s.name}>{props.data.name}</span>{' '}
-                <span className={s.desc}>{props.data.desc}</span>
-              </div>
-            );
-          },
-        }}
-      />
-      <div className={s.right}>
-        <button
-          type="button"
-          className={s.primaryBtn}
-          disabled={false}
-          onClick={async () => {
-            await mutateAsync({
-              authToken,
-              memberUids: ids,
-              accessLevel: _value.value,
-            });
-
-            onReset();
-          }}
-        >
-          Save
+        <button type="button" className={s.btn} disabled={false} onClick={onReset}>
+          <CloseIcon />
         </button>
+        <div className={s.message}>
+          Apply status to -{' '}
+          <span className={s.accent}>
+            {ids.length} Member{ids.length > 1 ? 's' : ''}
+          </span>
+        </div>
+        <Select
+          menuPlacement="top"
+          options={options}
+          isClearable={false}
+          value={_value}
+          onChange={(val) => {
+            setValue(val);
+          }}
+          styles={{
+            container: (base) => ({
+              ...base,
+              width: '100%',
+            }),
+            control: (baseStyles) => ({
+              ...baseStyles,
+              alignItems: 'center',
+              gap: '8px',
+              alignSelf: 'stretch',
+              borderRadius: '8px',
+              border: '1px solid rgba(203, 213, 225, 0.50)',
+              background: '#fff',
+              outline: 'none',
+              fontSize: '14px',
+              minWidth: '140px',
+              width: '100%',
+              borderColor: 'rgba(203, 213, 225, 0.50) !important',
+              position: 'relative',
+              boxShadow: 'none !important',
+              '&:hover': {
+                border: '1px solid #5E718D',
+                boxShadow: '0 0 0 4px rgba(27, 56, 96, 0.12) !important',
+                borderColor: '#5E718D !important',
+              },
+              '&:focus-visible, &:focus': {
+                borderColor: '#5E718D !important',
+                boxShadow: '0 0 0 4px rgba(27, 56, 96, 0.12) !important',
+              },
+            }),
+            input: (baseStyles) => ({
+              ...baseStyles,
+              height: '32px',
+              padding: 0,
+              // background: 'tomato',
+            }),
+            placeholder: (base) => ({
+              ...base,
+              // border: '1px solid red',
+              width: 'fit-content',
+              fontSize: '14px',
+              color: '#455468A0',
+            }),
+            option: (baseStyles) => ({
+              ...baseStyles,
+              fontSize: '14px',
+              fontWeight: 300,
+              color: '#455468',
+              '&:hover': {
+                background: 'rgba(27, 56, 96, 0.12)',
+              },
+            }),
+            menu: (baseStyles) => ({
+              ...baseStyles,
+              outline: 'none',
+              zIndex: 3,
+            }),
+            indicatorContainer: (base) => ({
+              display: 'none',
+            }),
+            indicatorSeparator: (base) => ({
+              display: 'none',
+            }),
+          }}
+          components={{
+            Control: ({ children, innerProps, innerRef, getValue }) => {
+              const val = getValue();
+              const selected = val.length > 0 ? val[0] : null;
+
+              return (
+                <div {...innerProps} ref={innerRef} className={s.control}>
+                  {selected ? (
+                    <>
+                      <div className={s.optionRoot}>
+                        {selected.icon} <span className={s.name}>{selected.name}</span>{' '}
+                        <span className={s.desc}>{selected.desc}</span>
+                      </div>
+                      <div className={s.childrenWrapper}>{children}</div>
+                    </>
+                  ) : (
+                    children
+                  )}
+                </div>
+              );
+            },
+            Option: (props) => {
+              return (
+                <div
+                  className={s.optionRoot}
+                  onClick={() => {
+                    props.selectOption(props.data);
+                  }}
+                >
+                  {props.data.icon} <span className={s.name}>{props.data.name}</span>{' '}
+                  <span className={s.desc}>{props.data.desc}</span>
+                </div>
+              );
+            },
+          }}
+        />
+        <div className={s.right}>
+          <button
+            type="button"
+            className={s.primaryBtn}
+            disabled={false}
+            onClick={() => {
+              if (_value.value === 'Rejected') {
+                toggleConfirm();
+              } else {
+                handleSubmit();
+              }
+            }}
+          >
+            {isPending ? 'Processing...' : 'Save'}
+          </button>
+        </div>
       </div>
-    </div>
+      {openConfirm && (
+        <ConfirmDialog
+          title="Warning"
+          desc="Are you sure you want to change access level of selected users to Rejected? This operation can be reverted later on."
+          onClose={() => {
+            toggleConfirm(false);
+          }}
+          onSubmit={handleSubmit}
+        />
+      )}
+    </>
   );
 };
 

@@ -1,122 +1,58 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import Select from 'react-select';
-import { Member } from '../../types/member';
 
-import s from './StatusCell.module.scss';
-import { Level0Icon, Level1Icon, Level2Icon } from '../icons';
-import { useUpdateMembersStatus } from '../../../../hooks/members/useUpdateMembersStatus';
-import { format } from 'date-fns';
-import { ConfirmDialog } from '../ConfirmDialog';
-import { useToggle } from 'react-use';
-import { toast } from 'react-toastify';
+import s from './StatusFilter.module.scss';
+import { Level2Icon } from '../icons';
+import { ColumnFiltersState } from '@tanstack/react-table';
 
 const options = [
   {
-    icon: (
-      <span className={s.orange}>
-        <Level0Icon />
-      </span>
-    ),
-    name: 'L0',
-    value: 'L0',
-    desc: '- Pending Account Verification',
+    // icon: <span className={s.orange}></span>,
+    name: 'All',
+    value: '',
   },
   {
-    icon: (
-      <span className={s.blue}>
-        <Level1Icon />
-      </span>
-    ),
-    name: 'L1',
-    value: 'L1',
-    desc: '- Verified via LinkedIn',
-  },
-  {
-    icon: (
-      <span className={s.green}>
-        <Level2Icon />
-      </span>
-    ),
+    // icon: (
+    //   <span className={s.green}>
+    //     <Level2Icon />
+    //   </span>
+    // ),
     name: 'L2',
     value: 'L2',
-    desc: '- Approved - Pending Missing Alignment Check',
   },
   {
-    icon: (
-      <span className={s.green}>
-        <Level2Icon />
-      </span>
-    ),
+    // icon: (
+    //   <span className={s.green}>
+    //     <Level2Icon />
+    //   </span>
+    // ),
     name: 'L3',
     value: 'L3',
-    desc: '- Approved – Mission Aligned',
   },
   {
-    icon: (
-      <span className={s.green}>
-        <Level2Icon />
-      </span>
-    ),
+    // icon: (
+    //   <span className={s.green}>
+    //     <Level2Icon />
+    //   </span>
+    // ),
     name: 'L4',
     value: 'L4',
-    desc: '- Approved - Portco or CC (Close Contributor)',
-  },
-  {
-    icon: (
-      <span className={s.red}>
-        <Level2Icon />
-      </span>
-    ),
-    name: 'Rejected',
-    value: 'Rejected',
-    desc: '- Access Denied',
   },
 ];
 
-export const StatusCell = ({ member, authToken }: { member: Member; authToken: string }) => {
-  const [val, setVal] = useState(null);
-  const _value = useMemo(() => {
-    const val = options.find((option) => option.value === member.accessLevel);
-
-    if (val) {
-      return [
-        {
-          ...val,
-          updatedAt: member.accessLevelUpdatedAt,
-        },
-      ];
-    }
-  }, [member.accessLevel, member.accessLevelUpdatedAt]);
-
-  const { mutateAsync } = useUpdateMembersStatus();
-
-  const handleSubmit = async (val) => {
-    setVal(null);
-    const res = await mutateAsync({
-      authToken,
-      memberUids: [member.uid],
-      accessLevel: val.value,
-    });
-
-    if (res.status === 200) {
-      toast.success(`Successfully updated access level for ${member.name} to ${val.name}`);
-    } else {
-      toast.error(`Failed to update access level for ${member.name}`);
-    }
-  };
+export const StatusFilter = ({ onSelect, value }: { onSelect: (v: string) => void; value: ColumnFiltersState }) => {
+  console.log(value);
+  const _value = options.find((option) => option.value === value?.[0]?.value);
 
   return (
     <div className={s.root}>
       <Select
+        menuPortalTarget={document.body}
         options={options}
         isClearable={false}
-        value={_value}
+        value={_value ?? options[0]}
         onChange={(val) => {
-          if (val.value === 'Rejected') {
-            setVal(val);
-          } else {
-            handleSubmit(val);
-          }
+          onSelect(val.value);
         }}
         styles={{
           container: (base) => ({
@@ -193,9 +129,7 @@ export const StatusCell = ({ member, authToken }: { member: Member; authToken: s
                 {selected ? (
                   <>
                     <div className={s.optionRoot}>
-                      {selected.icon} <span className={s.name}>{selected.name}</span>{' '}
-                      <span className={s.desc}>{selected.desc}</span>
-                      <span className={s.desc}>{format(selected.updatedAt, 'dd/MM/yyyy, HH:mm')}</span>
+                      <span className={s.name}>{selected.name}</span>{' '}
                     </div>
                     <div className={s.childrenWrapper}>{children}</div>
                   </>
@@ -213,23 +147,12 @@ export const StatusCell = ({ member, authToken }: { member: Member; authToken: s
                   props.selectOption(props.data);
                 }}
               >
-                {props.data.icon} <span className={s.name}>{props.data.name}</span>{' '}
-                <span className={s.desc}>{props.data.desc}</span>
+                <span className={s.name}>{props.data.name}</span>{' '}
               </div>
             );
           },
         }}
       />
-      {!!val && (
-        <ConfirmDialog
-          title="Warning"
-          desc="Are you sure you want to change access level of selected user to Rejected? This operation can be reverted later on."
-          onClose={() => setVal(null)}
-          onSubmit={() => handleSubmit(val)}
-        />
-      )}
     </div>
   );
 };
-
-export default StatusCell;

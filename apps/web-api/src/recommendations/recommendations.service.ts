@@ -451,8 +451,7 @@ export class RecommendationsService {
       process.env.SES_SOURCE_EMAIL || '',
       [toEmail],
       [],
-      this.supportEmail,
-      true
+      this.supportEmail
     );
 
     this.logger.info(`Recommendations email sent to ${toEmail} ref: ${result?.MessageId}`);
@@ -467,8 +466,7 @@ export class RecommendationsService {
       process.env.SES_SOURCE_EMAIL || '',
       [toEmail],
       [],
-      this.supportEmail,
-      true
+      this.supportEmail
     );
 
     this.logger.info(`Example recommendations email sent to ${toEmail} ref: ${result?.MessageId}`);
