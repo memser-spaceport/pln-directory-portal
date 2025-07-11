@@ -45,7 +45,7 @@ export const options = [
     ),
     name: 'L3',
     value: 'L3',
-    desc: '- Approved – Mission Aligned',
+    desc: '- Approved - Mission Aligned',
   },
   {
     icon: (
