@@ -16,7 +16,7 @@ async function mutation(params: MutationParams) {
     },
   };
 
-  await api.put(`${API_ROUTE.ADMIN_MEMBERS}/access-level`, params, config);
+  return api.put(`${API_ROUTE.ADMIN_MEMBERS}/access-level`, params, config);
 }
 
 export function useUpdateMembersStatus() {

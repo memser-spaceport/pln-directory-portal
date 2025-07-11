@@ -1,5 +1,6 @@
 import React, { Dispatch, HTMLProps, SetStateAction, useMemo } from 'react';
 import {
+  ColumnFilter,
   createColumnHelper,
   getCoreRowModel,
   getFilteredRowModel,
@@ -31,6 +32,8 @@ export function useMembersTable({
   setPagination,
   globalFilter,
   setGlobalFilter,
+  columnFilters,
+  setColumnFilters,
 }: {
   rowSelection: Record<string, boolean>;
   setRowSelection: Dispatch<SetStateAction<Record<string, boolean>>>;
@@ -42,6 +45,8 @@ export function useMembersTable({
   setPagination: Dispatch<SetStateAction<PaginationState>>;
   globalFilter: string;
   setGlobalFilter: Dispatch<SetStateAction<string>>;
+  columnFilters: ColumnFilter[];
+  setColumnFilters: Dispatch<SetStateAction<ColumnFilter[]>>;
 }) {
   const columns = useMemo(() => {
     return [
@@ -157,12 +162,14 @@ export function useMembersTable({
       rowSelection,
       pagination,
       globalFilter,
+      columnFilters,
     },
     onSortingChange: setSorting,
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    onColumnFiltersChange: setColumnFilters,
     globalFilterFn: customFilterFn,
     onPaginationChange: setPagination,
     getRowId: (row) => {
