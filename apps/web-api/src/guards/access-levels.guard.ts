@@ -7,18 +7,14 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ACCESS_LEVELS_KEY } from '../decorators/access-levels.decorator';
-import { LogService } from '../shared/log.service';
-import { MembersService } from '../members/members.service';
 import axios from 'axios';
 import { AccessLevel } from 'libs/contracts/src/schema/admin-member';
-import {MemberService} from "../admin/member.service";
+import { MemberService } from '../admin/member.service';
+import { extractTokenFromRequest } from '../utils/auth';
 
 @Injectable()
 export class AccessLevelsGuard implements CanActivate {
-  constructor(
-    private reflector: Reflector,
-    private memberService: MemberService
-  ) {}
+  constructor(private reflector: Reflector, private memberService: MemberService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const requiredAccessLevels = this.reflector.getAllAndOverride<AccessLevel[]>(ACCESS_LEVELS_KEY, [
@@ -31,7 +27,7 @@ export class AccessLevelsGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const token = this.extractTokenFromHeader(request);
+    const token = extractTokenFromRequest(request);
 
     try {
       const validationResult: any = await axios.post(`${process.env.AUTH_API_URL}/auth/introspect`, { token: token });
@@ -63,10 +59,5 @@ export class AccessLevelsGuard implements CanActivate {
 
   private isValidAccessLevel(role: unknown): role is AccessLevel {
     return typeof role === 'string' && Object.values(AccessLevel).includes(role as AccessLevel);
-  }
-
-  private extractTokenFromHeader(request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
   }
 }
