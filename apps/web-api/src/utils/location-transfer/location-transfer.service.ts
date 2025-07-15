@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { IAirtableMember } from '@protocol-labs-network/airtable';
 import axios from 'axios';
 import { PrismaService } from '../../shared/prisma.service';
@@ -32,13 +32,7 @@ export class LocationTransferService {
   }
 
   // TODO: Refactor this function to improve readability and maintainability
-  async fetchLocation(
-    providedCity,
-    providedCountry,
-    providedContinent,
-    providedRegion,
-    providedMetroArea
-  ) {
+  async fetchLocation(providedCity, providedCountry, providedContinent, providedRegion, providedMetroArea) {
     const hasCityCountryFields = providedCity || providedCountry;
     const hasProvidedLocation =
       (providedCity && providedCity.toLowerCase() !== 'not provided') ||
@@ -47,18 +41,9 @@ export class LocationTransferService {
     if (!hasCityCountryFields || !hasProvidedLocation) {
       return { status: 'NOT_PROVIDED' };
     }
-    const city =
-      providedCity && providedCity.toLowerCase() !== 'not provided'
-        ? providedCity
-        : '';
-    const country =
-      providedCountry && providedCountry.toLowerCase() !== 'not provided'
-        ? providedCountry
-        : '';
-    const region =
-      providedRegion && providedCountry.toLowerCase() !== 'not provided'
-        ? providedRegion
-        : '';
+    const city = providedCity && providedCity.toLowerCase() !== 'not provided' ? providedCity : '';
+    const country = providedCountry && providedCountry.toLowerCase() !== 'not provided' ? providedCountry : '';
+    const region = providedRegion && providedCountry.toLowerCase() !== 'not provided' ? providedRegion : '';
     /**
      * Looking for the same city and country in the same string is not working
      * we should strip one if they are the same
@@ -88,29 +73,21 @@ export class LocationTransferService {
     if (city) {
       requiredPlace =
         placeResponse.data.predictions &&
-        placeResponse.data.predictions.find(
-          (place) =>
-            place.types && place.types.find((type) => type === 'locality')
-        );
+        placeResponse.data.predictions.find((place) => place.types && place.types.find((type) => type === 'locality'));
     }
 
     if (!requiredPlace && (city || region)) {
       requiredPlace =
         placeResponse.data.predictions &&
         placeResponse.data.predictions.find(
-          (place) =>
-            place.types &&
-            place.types.find((type) => type === 'administrative_area_level_1')
+          (place) => place.types && place.types.find((type) => type === 'administrative_area_level_1')
         );
     }
 
     if (!requiredPlace)
       requiredPlace =
         placeResponse.data.predictions &&
-        placeResponse.data.predictions.find(
-          (place) =>
-            place.types && place.types.find((type) => type === 'country')
-        );
+        placeResponse.data.predictions.find((place) => place.types && place.types.find((type) => type === 'country'));
 
     /**
      * This catches the islands like Kauai, Maui, etc
@@ -119,9 +96,7 @@ export class LocationTransferService {
       requiredPlace =
         placeResponse.data.predictions &&
         placeResponse.data.predictions.find(
-          (place) =>
-            place.types &&
-            place.types.find((type) => type === 'natural_feature')
+          (place) => place.types && place.types.find((type) => type === 'natural_feature')
         );
 
     if (!requiredPlace) {
@@ -166,12 +141,68 @@ export class LocationTransferService {
       continent: providedContinent ? providedContinent : 'Not Defined',
       region: providedRegion && apiState ? apiState.long_name : null,
       metroArea: providedMetroArea ? providedMetroArea : null,
-      regionAbbreviation:
-        providedRegion && apiState ? apiState.short_name : null,
+      regionAbbreviation: providedRegion && apiState ? apiState.short_name : null,
       latitude: lat,
       longitude: lng,
     };
 
     return { status: 'OK', location: finalResult };
+  }
+
+  async autocompleteLocation(searchString: string) {
+    if (!searchString || searchString.length < 3) {
+      throw new BadRequestException('Search string must be at least 3 characters long');
+    }
+
+    const result = await axios.get(
+      `https://maps.googleapis.com/maps/api/place/autocomplete/json?types=(regions)&input=${encodeURIComponent(
+        searchString
+      )}&key=${process.env.GOOGLE_PLACES_API_KEY}`
+    );
+
+    console.log(result);
+
+    if (result.data.status === 'ZERO_RESULTS') {
+      return [];
+    }
+
+    if (!result.data.predictions) {
+      return [];
+    }
+
+    return result.data.predictions.map((prediction) => ({
+      description: prediction.description,
+      placeId: prediction.place_id,
+    }));
+  }
+
+  async fetchLocationDetails(placeId: string) {
+    const placeDetails = await axios.get(
+      `https://maps.googleapis.com/maps/api/geocode/json?place_id=${placeId}&key=${process.env.GOOGLE_PLACES_API_KEY}`
+    );
+
+    const apiCity = placeDetails.data.results[0].address_components.find(
+      (component) => component.types[0] === 'locality'
+    );
+    const apiCountry = placeDetails.data.results[0].address_components.find(
+      (component) => component.types[0] === 'country'
+    );
+    const apiState = placeDetails.data.results[0].address_components.find(
+      (component) => component.types[0] === 'administrative_area_level_1'
+    );
+    const lat = placeDetails.data.results[0].geometry.location.lat;
+    const lng = placeDetails.data.results[0].geometry.location.lng;
+
+    return {
+      placeId,
+      city: apiCity ? apiCity.long_name : null,
+      country: apiCountry ? apiCountry.long_name : null,
+      continent: 'Not Defined',
+      region: apiState ? apiState.long_name : null,
+      metroArea: null,
+      regionAbbreviation: apiState ? apiState.short_name : null,
+      latitude: lat,
+      longitude: lng,
+    };
   }
 }
