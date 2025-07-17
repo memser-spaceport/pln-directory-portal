@@ -16,20 +16,6 @@ export class RecommendationsJob {
   ) {}
 
   /**
-   * Checks if a member has any notification settings configured
-   */
-  private hasNotificationSettings(member): boolean {
-    return !!(
-      member.notificationSetting?.focusAreaList?.length > 0 ||
-      member.notificationSetting?.fundingStageList?.length > 0 ||
-      member.notificationSetting?.roleList?.length > 0 ||
-      member.notificationSetting?.technologyList?.length > 0 ||
-      member.notificationSetting?.industryTagList?.length > 0 ||
-      member.notificationSetting?.keywordList?.length > 0
-    );
-  }
-
-  /**
    * TODO: Move to EKS jobs when notification service is moved to EKS
    * Daily job that runs at 9:00 AM UTC to send example emails
    * Sends example emails to members who:
@@ -65,7 +51,7 @@ export class RecommendationsJob {
 
       for (const member of membersWithRecommendationsEnabled) {
         try {
-          const hasSomeSettings = this.hasNotificationSettings(member);
+          const hasSomeSettings = this.recommendationsService.hasNotificationSettings(member);
 
           // Skip if member has settings configured
           if (hasSomeSettings) {
@@ -200,7 +186,7 @@ export class RecommendationsJob {
 
       for (const member of membersWithRecommendationsEnabled) {
         try {
-          const hasSomeSettings = this.hasNotificationSettings(member);
+          const hasSomeSettings = this.recommendationsService.hasNotificationSettings(member);
 
           // Only send regular recommendations if member has settings configured
           if (!hasSomeSettings) {
@@ -230,19 +216,11 @@ export class RecommendationsJob {
             continue;
           }
 
-          const createDto: CreateRecommendationRunRequest = {
-            targetMemberUid: member.uid,
-          };
-
-          const recommendationRun = await this.recommendationsService.createRecommendationRun(createDto, allMembers);
-
-          if (recommendationRun.recommendations.length > 0) {
-            await this.recommendationsService.sendRecommendations(recommendationRun.uid, {
-              approvedRecommendationUids: recommendationRun.recommendations.map((r) => r.uid),
-              email: member.email ?? undefined,
-              emailSubject: 'Your Recommendations from PL Network',
-            });
-          }
+          await this.recommendationsService.generateAndSendRecommendationsForMember(
+            member.uid,
+            allMembers,
+            'Your Recommendations from PL Network'
+          );
 
           this.logger.info(`Successfully created recommendation run for member ${member.uid} (${member.name})`);
           successCount++;
