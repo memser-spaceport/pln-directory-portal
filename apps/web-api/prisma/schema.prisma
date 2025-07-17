@@ -364,8 +364,6 @@ model ProjectContribution {
   member         Member?   @relation(fields: [memberUid], references: [uid])
   projectUid     String
   project        Project?  @relation(fields: [projectUid], references: [uid])
-
-  @@unique([memberUid, projectUid])
 }
 
 model Project {
