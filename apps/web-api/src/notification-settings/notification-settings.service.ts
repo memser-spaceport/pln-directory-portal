@@ -35,8 +35,6 @@ export class NotificationSettingsService {
       });
     }
 
-    await this.recommendationsService.triggerRecommendationForMemberIfNeverReceived(memberUid);
-
     return notificationSettings;
   }
 
@@ -49,7 +47,7 @@ export class NotificationSettingsService {
       throw new NotFoundException(`Member with uid '${memberUid}' not found`);
     }
 
-    return this.prisma.notificationSetting.upsert({
+    const notificationSetting = await this.prisma.notificationSetting.upsert({
       where: { memberUid },
       update: data,
       create: {
@@ -57,6 +55,8 @@ export class NotificationSettingsService {
         ...data,
       },
     });
+    await this.recommendationsService.triggerRecommendationForMemberIfNeverReceived(memberUid);
+    return notificationSetting;
   }
 
   async updateParticipation(memberUid: string, data: UpdateParticipationDto) {
