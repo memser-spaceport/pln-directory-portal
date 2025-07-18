@@ -145,6 +145,24 @@ async function deleteRejectedMembersFromOpenSearch() {
   }
 }
 
+async function deleteDeletedProjectsFromOpenSearch() {
+  const res = await pgClient.query(`
+    SELECT uid FROM "Project"
+    WHERE "isDeleted" = true
+  `);
+  const uids = res.rows.map(row => row.uid);
+  if (!uids.length) return;
+
+  const body = uids.flatMap(uid => [{ delete: { _index: 'project', _id: uid } }]);
+  const response = await osClient.bulk({ body });
+
+  if (response.body.errors) {
+    console.error('Some deletions failed');
+  } else {
+    console.log(`Deleted ${uids.length} deleted projects`);
+  }
+}
+
 
 async function indexMembers(lastCheckpoint) {
   const res = await pgClient.query(`
@@ -221,7 +239,7 @@ async function indexProjects(lastCheckpoint) {
   const res = await pgClient.query(`
         SELECT p.uid, p.name, p.tagline, p.description, p."readMe", p.tags, i.url FROM "Project" p
         LEFT JOIN "Image" i ON p."logoUid" = i.uid
-        WHERE p."createdAt" > $1 OR p."updatedAt" > $1
+        WHERE (p."createdAt" > $1 OR p."updatedAt" > $1) AND p."isDeleted" = false
     `, [lastCheckpoint]);
 
   console.log('Got data from Project table: ' + res.rows.length);
@@ -311,6 +329,7 @@ export const handler = async () => {
 
   try {
     await deleteRejectedMembersFromOpenSearch();
+    await deleteDeletedProjectsFromOpenSearch();
     const memberRowsChanged = await indexMembers(lastCheckpoint);
     const teamRowsChanged = await indexTeams(lastCheckpoint);
     const projectRowsChanged = await indexProjects(lastCheckpoint);

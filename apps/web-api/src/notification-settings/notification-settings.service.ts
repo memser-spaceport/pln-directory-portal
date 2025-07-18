@@ -2,10 +2,15 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
 import { UpdateNotificationSettingsDto, UpdateParticipationDto } from 'libs/contracts/src/schema/notification-settings';
+import { RecommendationsService } from '../recommendations/recommendations.service';
 
 @Injectable()
 export class NotificationSettingsService {
-  constructor(private prisma: PrismaService, private logger: LogService) {}
+  constructor(
+    private prisma: PrismaService,
+    private logger: LogService,
+    private recommendationsService: RecommendationsService
+  ) {}
 
   async getNotificationSettings(memberUid: string) {
     const member = await this.prisma.member.findUnique({
@@ -42,7 +47,7 @@ export class NotificationSettingsService {
       throw new NotFoundException(`Member with uid '${memberUid}' not found`);
     }
 
-    return this.prisma.notificationSetting.upsert({
+    const notificationSetting = await this.prisma.notificationSetting.upsert({
       where: { memberUid },
       update: data,
       create: {
@@ -50,6 +55,8 @@ export class NotificationSettingsService {
         ...data,
       },
     });
+    await this.recommendationsService.triggerRecommendationForMemberIfNeverReceived(memberUid);
+    return notificationSetting;
   }
 
   async updateParticipation(memberUid: string, data: UpdateParticipationDto) {

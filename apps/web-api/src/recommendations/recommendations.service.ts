@@ -327,6 +327,7 @@ export class RecommendationsService {
       link: string;
       reason: string;
     }>;
+    footer_text: string;
   }> {
     const utmSource = isExample ? 'recommendations_example' : 'recommendations';
     const recommendations = await Promise.all(
@@ -439,6 +440,10 @@ export class RecommendationsService {
         targetMember.uid
       }&target_email=${encodeURIComponent(targetMember.email || '')}`,
       recommendations: recommendations,
+      footer_text:
+        new Date(targetMember.createdAt) < new Date('2025-07-17T00:00:00Z')
+          ? 'You received this email because you are a member of the PL network'
+          : 'You received this email because you opted in for Recommendations when signing up on LabOS',
     };
   }
 
@@ -694,6 +699,135 @@ export class RecommendationsService {
     }
 
     return Array.from(normalizedMap.values()).sort();
+  }
+
+  /**
+   * Generate and send recommendations for a specific member
+   */
+  async generateAndSendRecommendationsForMember(
+    memberUid: string,
+    allMembers: MemberWithRelations[],
+    emailSubject = 'Your Recommendations from PL Network',
+    isExample = false
+  ) {
+    const member = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+      include: {
+        notificationSetting: true,
+      },
+    });
+
+    if (!member) {
+      return;
+    }
+
+    // Check if member has recommendations enabled
+    if (!member.notificationSetting?.subscribed) {
+      return;
+    }
+
+    // For non-example recommendations, check if member has notification settings configured
+    if (!isExample && !this.hasNotificationSettings(member)) {
+      return;
+    }
+
+    const createDto: CreateRecommendationRunRequest = {
+      targetMemberUid: member.uid,
+    };
+
+    const recommendationRun = await this.createRecommendationRun(createDto, allMembers, isExample);
+
+    if (recommendationRun.recommendations.length > 0) {
+      await this.sendRecommendations(recommendationRun.uid, {
+        approvedRecommendationUids: recommendationRun.recommendations.map((r) => r.uid),
+        email: member.email ?? undefined,
+        emailSubject,
+        isExample,
+      });
+    }
+
+    return recommendationRun;
+  }
+
+  /**
+   * Check if a member has notification settings configured
+   */
+  hasNotificationSettings(member: any): boolean {
+    return !!(
+      member.notificationSetting?.focusAreaList?.length > 0 ||
+      member.notificationSetting?.fundingStageList?.length > 0 ||
+      member.notificationSetting?.roleList?.length > 0 ||
+      member.notificationSetting?.technologyList?.length > 0 ||
+      member.notificationSetting?.industryTagList?.length > 0 ||
+      member.notificationSetting?.keywordList?.length > 0
+    );
+  }
+
+  /**
+   * Check if a member has ever received real (non-example) recommendations
+   */
+  async hasReceivedRealRecommendations(memberUid: string): Promise<boolean> {
+    const existingRecommendation = await this.prisma.recommendationNotification.findFirst({
+      where: {
+        targetMemberUid: memberUid,
+        isExample: false,
+      },
+    });
+
+    return !!existingRecommendation;
+  }
+
+  /**
+   * Triggers recommendations for a specific member by UID
+   */
+  async triggerRecommendationForMember(memberUid: string) {
+    if (process.env.IS_RECOMMENDATIONS_ENABLED !== 'true') {
+      this.logger.info('Skipping recommendation generation as it is disabled');
+      return;
+    }
+
+    this.logger.info(`Triggering recommendation for member ${memberUid}`);
+
+    try {
+      const allMembers = await this.loadRecommendationMembersInChunks(500);
+      const recommendationRun = await this.generateAndSendRecommendationsForMember(memberUid, allMembers);
+
+      if (recommendationRun) {
+        this.logger.info(`Successfully sent recommendation for member ${memberUid}`);
+      } else {
+        this.logger.info(`No recommendations sent for member ${memberUid}`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to send recommendation for member ${memberUid}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Checks if a member has never received real (not example) recommendations and triggers them if needed
+   */
+  async triggerRecommendationForMemberIfNeverReceived(memberUid: string) {
+    if (process.env.IS_RECOMMENDATIONS_ENABLED !== 'true') {
+      this.logger.info('Skipping recommendation generation as it is disabled');
+      return;
+    }
+
+    this.logger.info(`Checking if member ${memberUid} has never received real recommendations`);
+
+    try {
+      const hasReceived = await this.hasReceivedRealRecommendations(memberUid);
+
+      if (hasReceived) {
+        this.logger.info(`Member ${memberUid} has already received real recommendations`);
+        return;
+      }
+
+      this.logger.info(`Member ${memberUid} has never received real recommendations, triggering now`);
+      await this.triggerRecommendationForMember(memberUid);
+    } catch (error) {
+      this.logger.error(`Failed to check/trigger recommendation for member ${memberUid}: ${error.message}`);
+      throw error;
+    }
   }
 
   private getSupportEmail(): string | undefined {

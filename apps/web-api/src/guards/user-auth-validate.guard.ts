@@ -1,12 +1,12 @@
 import {
   CanActivate,
   ExecutionContext,
-  HttpException,
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
 import axios from 'axios';
+import { extractTokenFromRequest } from '../utils/auth';
 
 @Injectable()
 export class UserAuthValidateGuard implements CanActivate {
@@ -14,7 +14,8 @@ export class UserAuthValidateGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const token = this.extractTokenFromHeader(request);
+    const token = extractTokenFromRequest(request);
+
     if (!token && request.method !== 'GET') {
       throw new UnauthorizedException();
     }
@@ -22,14 +23,9 @@ export class UserAuthValidateGuard implements CanActivate {
       return true;
     }
     try {
-      const validationResult: any = await axios.post(
-        `${process.env.AUTH_API_URL}/auth/introspect`,
-        { token: token }
-      );
-      if (
-        validationResult?.data?.active &&
-        validationResult?.data?.email
-      ) {
+      const validationResult: any = await axios.post(`${process.env.AUTH_API_URL}/auth/introspect`, { token: token });
+
+      if (validationResult?.data?.active && validationResult?.data?.email) {
         request['isUserLoggedIn'] = true;
         request['userEmail'] = validationResult.data.email;
       }
@@ -38,17 +34,15 @@ export class UserAuthValidateGuard implements CanActivate {
         throw new UnauthorizedException();
       }
     } catch (error) {
-      if ( error instanceof UnauthorizedException || error?.response?.status === 400
-        || error?.response?.status === 401) {
+      if (
+        error instanceof UnauthorizedException ||
+        error?.response?.status === 400 ||
+        error?.response?.status === 401
+      ) {
         throw new UnauthorizedException('Invalid Session. Please login and try again');
       }
       throw new InternalServerErrorException('Unexpected Error');
     }
     return true;
-  }
-
-  private extractTokenFromHeader(request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
   }
 }
