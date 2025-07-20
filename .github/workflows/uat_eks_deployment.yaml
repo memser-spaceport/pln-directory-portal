@@ -1,0 +1,115 @@
+name: Deploy to EKS with Helm
+
+on:
+  push:
+    branches:
+      - release/*   # Triggers UAT deployment
+jobs:
+  uat-deploy:
+    name: Deploy Helm Chart to EKS preprod
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: uat
+      APPNAME: directory-service
+      DOCKER_IMAGE: directory-service
+      ECR_REPOSITORY: pln-directory-service
+      GITHUB_SHA: ${{ github.sha }}
+      CLUSTER_NAME: preprod-pln
+      APP_MODE: directory_service
+
+    permissions:
+      id-token: write # Required for OIDC auth to AWS
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+            aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            aws-region: us-west-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ env.DOCKER_IMAGE }} .
+
+      - name: Tag Docker image
+        run: |
+          git_hash=$(git rev-parse --short "$GITHUB_SHA")
+          ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
+
+          docker tag ${{ env.DOCKER_IMAGE }}:latest $ECR_REGISTRY:$git_hash
+          docker tag ${{ env.DOCKER_IMAGE }}:latest $ECR_REGISTRY:uat
+
+      - name: Push Docker image to ECR
+        run: |
+          git_hash=$(git rev-parse --short "$GITHUB_SHA")
+          ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
+          docker push $ECR_REGISTRY:$git_hash
+          docker push $ECR_REGISTRY:uat
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Checkout infrastructure repository
+        uses: actions/checkout@v4
+        with:
+          repository: 'memser-spaceport/pl-infra-pipeline'
+          ref: 'prod_release_v1' # branch, tag or commit SHA
+          token: ${{ secrets.GIT_TOKEN }}
+          path: './'
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+
+      - name: Update kubeconfig for EKS
+        run: |
+          aws eks update-kubeconfig --region us-west-1 --name ${{ env.CLUSTER_NAME }}
+
+      - name: poetry install for comprehend modules
+        run: |
+          poetry install --no-root
+        working-directory: ./deployment/config_gen
+
+      - name: Config generator
+        run: |
+          poetry run python main.py APPNAME=${{ env.APPNAME }} ENVIRONMENT=${{ env.ENVIRONMENT }} APP_MODE=${{ env.APP_MODE }}
+        working-directory: ./deployment/config_gen
+
+      - name: Get Certificate ARN from SSM Parameter Store
+        id: get-secret
+        run: |
+          CERT_ARN=$(aws ssm get-parameter \
+            --name "/pln/acm/config" \
+            --with-decryption \
+            --query "Parameter.Value" \
+            --output text)
+          echo "CERT_ARN=$CERT_ARN" >> "$GITHUB_ENV"
+
+      - name: Deploy using Helm
+        run: |
+          git_hash=$(git rev-parse --short "$GITHUB_SHA")
+          ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
+          helm upgrade --install directory-service deployment/chart/ --set image.repository=$ECR_REGISTRY --set image.tag=$git_hash --set nodeSelector.allocationtags=pln-uat-k8s --set ingress.grpname=uat-pln-internal --set ingress.healthcheck_path=/ --set ingress.host=uat-directory.plnetwork.io --set service.port=3000 --set ingress.acm_arn=$CERT_ARN -f deployment/chart/${{ env.APP_MODE }}_secret_values.yaml -n pln-uat
