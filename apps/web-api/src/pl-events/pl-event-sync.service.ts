@@ -28,7 +28,8 @@ export class PLEventSyncService {
         where: {
           AND:{
             externalId: { not: null },
-            locationUid: locationUid
+            locationUid: locationUid,
+            isDeleted: false
           }
         },
         select: {
@@ -62,7 +63,7 @@ export class PLEventSyncService {
    */
   private async fetchEventsFromService(params) {
     try {
-      const { clientSecret, conference, selectedEventUids, locationName } = params;
+      const { selectedEventUids, locationName } = params;
       const queryParams = new URLSearchParams({
         status: 'APPROVED',
         location: locationName,
@@ -76,7 +77,7 @@ export class PLEventSyncService {
         `${process.env.EVENT_SERVICE_URL}/events?${queryParams.toString()}`,
         {
           headers: {
-            'x-client-secret': clientSecret,
+            'origin': process.env.IRL_DOMAIN,
           }
         }
       );
@@ -135,8 +136,11 @@ export class PLEventSyncService {
     const eventsToDelete = existingEvents.filter(e => !eventIds.includes(e.externalId));
     if (eventsToDelete.length) {
       this.logger.log(`Events to be deleted: ${eventsToDelete.map(e => `${e.name} (ID: ${e.externalId})`).join(', ')}`);
-      await this.prisma.pLEvent.deleteMany({
+      await this.prisma.pLEvent.updateMany({
         where: { uid: { in: eventsToDelete.map(e => e.uid) } },
+        data: {
+          isDeleted: true
+        }
       });
       this.logger.log(`Deleted ${eventsToDelete?.length} events from the database.`);
     } else {
@@ -187,7 +191,8 @@ export class PLEventSyncService {
       slugURL: event.event_id,
       locationUid,
       logoUid: logo?.uid,
-      resources
+      resources,
+      isDeleted: false,
     };
   }
 

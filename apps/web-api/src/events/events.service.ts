@@ -46,6 +46,20 @@ export class EventsService {
     }
   }
 
+  /**
+   * Deletes an event from the event service.
+   * 
+   * @param eventUid - The unique identifier of the event to be deleted.
+   * @returns The response from the event service.
+   */
+  async deletePLEvent(eventUid: string) {
+    try {
+      await this.eventsToolingService.deleteEvent(eventUid);
+    } catch (error) {
+      throw error;
+    }
+  }
+
   private handleAxiosError(error) {
     const url = error.config?.url || 'unknown URL';
     this.logger.error(`Error occurred while submitting event: ${error.message}`);
