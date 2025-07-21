@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MemberController } from './members.controller';
 import { MembersService } from './members.service';
 import { MembersHooksService } from './members.hooks.service';
@@ -11,7 +11,14 @@ import { HuskyModule } from '../husky/husky.module';
 import { NotificationSettingsModule } from '../notification-settings/notification-settings.module';
 
 @Module({
-  imports: [SharedModule, AuthModule, OtpModule, ParticipantsRequestModule, HuskyModule, NotificationSettingsModule],
+  imports: [
+    SharedModule,
+    AuthModule,
+    OtpModule,
+    ParticipantsRequestModule,
+    HuskyModule,
+    forwardRef(() => NotificationSettingsModule),
+  ],
   providers: [MembersService, MembersHooksService, OnboardingRemindersJob],
   controllers: [MemberController],
   exports: [MembersService, MembersHooksService, OnboardingRemindersJob],
