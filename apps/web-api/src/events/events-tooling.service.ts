@@ -41,4 +41,37 @@ export class EventsToolingService {
       throw error;
     }
   }
+
+  /**
+   * Deletes an event from the event service.
+   * 
+   * @param eventUid - The unique identifier of the event to be deleted.
+   * @returns The response from the event service.
+   */
+  async deleteEvent(eventUid: string) {
+    try {
+      const baseUrl = process.env.EVENT_SERVICE_BASE_URL;
+      if (!baseUrl) {
+        throw new BadRequestException('Event service base url is not set in ENV');
+      }
+      const irlDomain = process.env.IRL_DOMAIN;
+      const internalAuthToken = process.env.EVENT_SERVICE_INTERNAL_AUTH_TOKEN;
+      if (!irlDomain || !internalAuthToken) {
+        throw new BadRequestException('IRL domain or internal auth token is not set in ENV variables');
+      }
+      const response = await axios.delete(
+        `${baseUrl}/internals/events/${eventUid}`,
+        {
+          headers: {
+            'origin': irlDomain,
+            'x-internal-auth-token': internalAuthToken
+          }
+        }
+      );
+      this.logger.info(`Event deleted successfully: ${eventUid}`);
+      return response.data;
+    } catch (error) {
+       throw error;
+    }
+  }
 }

@@ -442,6 +442,7 @@ model PLEvent {
   additionalInfo   Json?
   startDate        DateTime
   endDate          DateTime
+  isDeleted        Boolean             @default(false)
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   syncedAt         DateTime?

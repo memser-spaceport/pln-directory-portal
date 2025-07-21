@@ -15,6 +15,9 @@ import { MembersService } from '../members/members.service';
 import { PLEventLocationsService } from './pl-event-locations.service';
 import moment from 'moment-timezone';
 import { ResponseUpcomingEvents } from '@protocol-labs-network/contracts';
+import { EventsToolingService } from '../events/events-tooling.service';
+import { CacheService } from '../utils/cache/cache.service';
+
 
 @Injectable()
 export class PLEventsService {
@@ -26,6 +29,8 @@ export class PLEventsService {
     private notificationService: NotificationService,
     private memberService: MembersService,
     private locationService: PLEventLocationsService,
+    private eventsToolingService: EventsToolingService,
+    private cacheService: CacheService
   ) { }
 
   /**
@@ -54,6 +59,10 @@ export class PLEventsService {
   async getPLEvents(queryOptions: Prisma.PLEventFindManyArgs): Promise<PLEvent[]> {
     return await this.prisma.pLEvent.findMany({
       ...queryOptions,
+      where: {
+        ...queryOptions.where,
+        isDeleted: false
+      },
       include: {
         logo: true,
         banner: true,
@@ -79,8 +88,11 @@ export class PLEventsService {
    */
   async getPLEventBySlug(slug, query, isUserLoggedIn): Promise<PLEvent> {
     try {
-      const plEvent = await this.prisma.pLEvent.findUniqueOrThrow({
-        where: { slugURL: slug },
+      const plEvent = await this.prisma.pLEvent.findFirst({
+        where: { 
+          slugURL: slug,
+          isDeleted: false
+        },
         include: {
           logo: { select: { url: true } },
           banner: { select: { url: true } },
@@ -158,7 +170,7 @@ export class PLEventsService {
         plEvent.eventGuests = this.eventGuestsService.restrictTelegramBasedOnMemberPreference(plEvent?.eventGuests, query.isUserLoggedIn);
         // plEvent.eventGuests = this.eventGuestsService.restrictOfficeHours(plEvent?.eventGuests, isUserLoggedIn);
       }
-      return plEvent;
+      return plEvent as PLEvent;
     } catch (err) {
       return this.handleErrors(err, query.slug);
     }
@@ -176,6 +188,7 @@ export class PLEventsService {
       return this.prisma.pLEvent.findMany({
         where: {
           locationUid,
+          isDeleted: false,
           eventGuests: {
             some: {
               memberUid: member?.uid
@@ -195,6 +208,7 @@ export class PLEventsService {
           startDate: {
             gte: new Date(),
           },
+          isDeleted: false,
           location: {
             is: {
               timezone: {
@@ -375,6 +389,22 @@ export class PLEventsService {
       venue: location
     }
     return notification;
+  }
+
+  async deleteEvent(locationUid: string, eventUid: string) {
+    try {
+      const deletedEvent = await this.prisma.pLEvent.update({
+        where: { uid: eventUid },
+        data: {
+          isDeleted: true
+        }
+      });
+      await this.eventsToolingService.deleteEvent(deletedEvent.externalId ?? '');
+      this.cacheService.reset({ service: 'PLEventGuest' });
+      return deletedEvent;
+    } catch (error) {
+      this.handleErrors(error);
+    }
   }
 
 }

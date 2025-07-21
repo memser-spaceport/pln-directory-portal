@@ -155,5 +155,14 @@ export const apiEvents = contract.router({
     responses: {
       200: ResponseUpcomingEventSchema.array(),
     },
+  },
+  deleteEvent: {
+    method: 'DELETE',
+    path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/events/:eventUid`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Delete Event using eventUid',
   }
 });

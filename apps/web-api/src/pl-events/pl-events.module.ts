@@ -12,6 +12,7 @@ import { AuthModule } from '../auth/auth.module';
 import { TeamsModule } from '../teams/teams.module';
 import { AdminModule } from '../admin/admin.module';
 
+import { EventsModule } from '../events/events.module';
 @Module({
   controllers: [PLEventsController],
   providers: [PLEventsService, PLEventLocationsService, PLEventGuestsService, JwtService, PLEventSyncService],
@@ -23,6 +24,7 @@ import { AdminModule } from '../admin/admin.module';
     MemberSubscriptionsModule,
     AuthModule,
     forwardRef(() => TeamsModule),
+    forwardRef(() => EventsModule),
   ],
 })
 export class PLEventsModule {}
