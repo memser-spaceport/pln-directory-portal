@@ -247,14 +247,8 @@ export class PLEventsController {
     @Param('uid') locationUid: string,
     @Body() body
   ) {
-    const { clientSecret, conference, selectedEventUids, locationName } = body;
-    if (!clientSecret) {
-      throw new UnauthorizedException('client secret is missing');
-    }
-    if (!conference) {
-      throw new BadRequestException('conference is missing');
-    }
-    return await this.eventSyncService.syncEvents({ locationUid, clientSecret, conference, selectedEventUids, locationName });
+    const { selectedEventUids, locationName } = body;
+    return await this.eventSyncService.syncEvents({ locationUid, selectedEventUids, locationName });
   }
 
   @Api(server.route.getAllPLEventGuests)
@@ -317,4 +311,20 @@ export class PLEventsController {
   async getAllUpcomingEvents(): Promise<ResponseUpcomingEvents[]> {
     return await this.eventService.getUpcomingPLEvents();
   }
+
+  @Api(server.route.deleteEvent)
+  @UseGuards(UserTokenValidation)
+  async deleteEvent(
+    @Param('uid') locationUid: string,
+    @Param('eventUid') eventUid: string,
+    @Req() request
+  ) {
+    const requestor = await this.memberService.findMemberByEmail(request['userEmail']);
+    if ( !requestor.isDirectoryAdmin ) {
+      throw new ForbiddenException(`Member isn't authorized to delete the event`);
+    }
+    return await this.eventService.deleteEvent(locationUid, eventUid);
+  }
+
+
 }
