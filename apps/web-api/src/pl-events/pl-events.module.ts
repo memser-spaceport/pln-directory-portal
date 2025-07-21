@@ -10,28 +10,19 @@ import { MemberSubscriptionsModule } from '../member-subscriptions/member-subscr
 import { PLEventSyncService } from './pl-event-sync.service';
 import { AuthModule } from '../auth/auth.module';
 import { TeamsModule } from '../teams/teams.module';
-import {AdminModule} from "../admin/admin.module";
+import { AdminModule } from '../admin/admin.module';
+
 @Module({
   controllers: [PLEventsController],
-  providers: [
-    PLEventsService,
-    PLEventLocationsService,
-    PLEventGuestsService,
-    JwtService,
-    PLEventSyncService
-  ],
-  exports: [
-    PLEventsService,
-    PLEventLocationsService,
-    PLEventGuestsService
-  ],
-  imports:[
-    MembersModule,
+  providers: [PLEventsService, PLEventLocationsService, PLEventGuestsService, JwtService, PLEventSyncService],
+  exports: [PLEventsService, PLEventLocationsService, PLEventGuestsService],
+  imports: [
+    forwardRef(() => MembersModule),
     forwardRef(() => AdminModule),
     forwardRef(() => NotificationsModule),
     MemberSubscriptionsModule,
     AuthModule,
-    TeamsModule
-  ]
+    forwardRef(() => TeamsModule),
+  ],
 })
 export class PLEventsModule {}

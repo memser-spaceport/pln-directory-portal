@@ -42,6 +42,13 @@ export const UpdateParticipationSchema = z.object({
   recommendationsEnabled: z.boolean(),
 });
 
+export const UpdateForumSettingsSchema = z.object({
+  forumDigestEnabled: z.boolean(),
+  forumDigestFrequency: z.number(),
+  forumReplyNotificationsEnabled: z.boolean(),
+});
+
 export class NotificationSettingsResponse extends createZodDto(NotificationSettingsResponseSchema) {}
 export class UpdateNotificationSettingsDto extends createZodDto(UpdateNotificationSettingsSchema) {}
 export class UpdateParticipationDto extends createZodDto(UpdateParticipationSchema) {}
+export class UpdateForumSettingsDto extends createZodDto(UpdateForumSettingsSchema) {}
