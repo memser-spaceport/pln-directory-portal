@@ -1,34 +1,22 @@
-import axios from 'axios';
 import { isEmpty } from 'lodash';
 import { Process, Processor } from '@nestjs/bull';
 import { NotificationService } from './notifications.service';
+import { NotificationServiceClient } from './notification-service.client';
 import { LogService } from '../shared/log.service';
 import { MemberSubscriptionService } from '../member-subscriptions/member-subscriptions.service';
 import { NotificationStatus, Prisma } from '@prisma/client';
 import { EMAIL_TEMPLATES, NOTIFICATION_CHANNEL } from '../utils/constants';
-import { ConflictException, BadRequestException, NotFoundException, HttpException, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 
 @Processor('notifications')
 export class NotificationConsumer {
-  private notificationServiceBaseUrl: string = "";
-  private notificationServiceSecret: string = "";
   private createdNotification;
   constructor(
     private logger: LogService,
     private notificationService: NotificationService,
-    private memberSubscriptionService: MemberSubscriptionService,
-  ) {
-    this.notificationServiceBaseUrl = process.env.NOTIFICATION_SERVICE_BASE_URL as string;
-    this.notificationServiceSecret = process.env.NOTIFICATION_SERVICE_CLIENT_SECRET as string;
-    if (!this.notificationServiceBaseUrl) {
-      this.logger.error('NOTIFICATION_SERVICE_BASE_URL is not defined in the environment variables.');
-      return;
-    }
-    if (!this.notificationServiceSecret) {
-      this.logger.error('NOTIFICATION_SERVICE_CLIENT_SECRET is not defined in the environment variables.');
-      return;
-    }
-  }
+    private notificationServiceClient: NotificationServiceClient,
+    private memberSubscriptionService: MemberSubscriptionService
+  ) {}
 
   /**
    * Processes a notification job and handles its lifecycle.
@@ -38,22 +26,22 @@ export class NotificationConsumer {
    */
   @Process({
     name: 'notify',
-    concurrency: 1 // Ensures only one job is processed at a time
+    concurrency: 1, // Ensures only one job is processed at a time
   })
   async process(job) {
     try {
       this.logger.info(`Processing notification with id: ${job.id}`);
       if (job.name === 'notify') {
         const notificationData = job.data;
-        const subscribers: any[] = await this.getSubscribers(notificationData.entityType, notificationData.
-          entityUid) || [];
+        const subscribers: any[] =
+          (await this.getSubscribers(notificationData.entityType, notificationData.entityUid)) || [];
         if (isEmpty(subscribers)) {
           this.logger.info(`No susbscribers found for the provided entity uid ${notificationData.entityUid}`);
           return;
         }
         this.createdNotification = await this.notificationService.createNotification(notificationData);
         switch (notificationData.entityType) {
-          case "EVENT_LOCATION":
+          case 'EVENT_LOCATION':
             await this.sendEventLocationNotification(subscribers, notificationData);
         }
         await this.notificationService.updateNotificationStatus(this.createdNotification.uid, NotificationStatus.SENT);
@@ -74,25 +62,24 @@ export class NotificationConsumer {
    */
   private async getSubscribers(entityType, entityUid) {
     try {
-     return await this.memberSubscriptionService.getSubscriptions({
+      return await this.memberSubscriptionService.getSubscriptions({
         where: {
           AND: {
             entityType: entityType,
             entityUid: entityUid,
-            isActive: true
-          }
+            isActive: true,
+          },
         },
         include: {
           member: {
             select: {
               email: true,
-            }
-          }
-        }
+            },
+          },
+        },
       });
-
     } catch (error) {
-      this.handleErrors(error)
+      this.handleErrors(error);
     }
   }
 
@@ -107,28 +94,28 @@ export class NotificationConsumer {
       return {
         isPriority: true,
         deliveryChannel: NOTIFICATION_CHANNEL.EMAIL,
-        templateName: "",
+        templateName: '',
         recipientsInfo: {},
         deliveryPayload: {
-          body: {}
+          body: {},
         },
         entityType: notificationData.entityType,
         actionType: notificationData.actionType,
-        targetReasonType: "",
+        targetReasonType: '',
         sourceMeta: {
           activityId: notificationData.entityUid,
           activityType: notificationData.entityType,
           activityUserId: notificationData.additionalInfo.sourceUid,
-          activityUserName: notificationData.additionalInfo.sourceName
+          activityUserName: notificationData.additionalInfo.sourceName,
         },
         targetMeta: {
-          emailId: "",
-          userId: "",
-          userName: "",
-        }
-      }
+          emailId: '',
+          userId: '',
+          userName: '',
+        },
+      };
     } catch (error) {
-      this.handleErrors(error)
+      this.handleErrors(error);
     }
   }
 
@@ -158,7 +145,7 @@ export class NotificationConsumer {
    */
   private async generateActionSpecificEmailPayload(message, notificationData) {
     switch (notificationData.entityAction) {
-      case "IRL_UPDATE":
+      case 'IRL_UPDATE':
         return await this.generateEmailPayloadForIRLUpdates(message, notificationData);
       default:
         return null;
@@ -199,67 +186,33 @@ export class NotificationConsumer {
    */
   private async addEmailRecipients(emailPayload, subscribers) {
     try {
-      const subscriberEmails = subscribers.flatMap(subscriber => [subscriber.member.email]).filter(email => email != null);
+      const subscriberEmails = subscribers
+        .flatMap((subscriber) => [subscriber.member.email])
+        .filter((email) => email != null);
       const batchSize = Number(process.env.IRL_NOTIFICATION_BATCH_SIZE) || 50;
       for (let i = 0; i < subscriberEmails.length; i += batchSize) {
         const emailBatch = subscriberEmails.slice(i, i + batchSize);
-        const batchPayload = { ...emailPayload };         // Create a copy of the original payload for each batch
-        batchPayload.recipientsInfo.bcc = emailBatch;          // Add the batch of emails to the BCC field
+        const batchPayload = { ...emailPayload }; // Create a copy of the original payload for each batch
+        batchPayload.recipientsInfo.bcc = emailBatch; // Add the batch of emails to the BCC field
         if (batchPayload && emailBatch.length <= (Number(process.env.IRL_NOTIFICATION_BATCH_SIZE) || 50)) {
-          await this.sendNotification(batchPayload);     // Send the notification for this batch
-        }
-      }
-
-    } catch (error) {
-      this.handleErrors(error)
-    }
-
-  }
-
-  /**
-   * Sends a notification using the specified payload.
-   * Handles potential errors during the API request and updates notification status as FAILED.
-   *
-   * @param payload - The data to send with the notification request.
-   * @returns A Promise that resolves to the response from the API, or throws an error if the request fails.
-   */
-  async sendNotification(payload) {
-    try {
-      return await axios.post(
-        `${this.notificationServiceBaseUrl}/notifications`,
-        payload,
-        {
-          headers: {
-            'Authorization': `Basic ${this.notificationServiceSecret}`
+          try {
+            await this.notificationServiceClient.sendNotification(batchPayload); // Send the notification for this batch
+          } catch (notificationError) {
+            // Update notification status to FAILED if sending fails
+            if (this.createdNotification?.uid) {
+              await this.notificationService.updateNotificationStatus(
+                this.createdNotification.uid,
+                NotificationStatus.FAILED
+              );
+            }
+            throw notificationError;
           }
         }
-      );
-    } catch (error) {
-      await this.notificationService.updateNotificationStatus(this.createdNotification.uid, NotificationStatus.FAILED)
-      if (axios.isAxiosError(error)) {
-        // Check if the error is an Axios-specific error
-        switch (error.response?.status) {
-          case 400:
-            throw new BadRequestException('Notification payload is invalid or malformed.');
-          case 401:
-            throw new UnauthorizedException('Authentication failed. Check API keys or tokens.');
-          case 404:
-            throw new NotFoundException('Endpoint not found. Verify the URL.');
-          case 500:
-            throw new InternalServerErrorException('Internal server error. Retry later.');
-          default:
-            throw new HttpException(
-              `Unhandled error with status ${error.response?.status || 'unknown'}.`,
-              error.response?.status || 500
-            );
-        }
-      } else {
-        // Handle errors unrelated to Axios (e.g., runtime exceptions)
-        throw new InternalServerErrorException('Unexpected error during notification sending.');
       }
+    } catch (error) {
+      this.handleErrors(error);
     }
   }
-
 
   /**
    * Handles errors occurring during database operations.
@@ -269,7 +222,9 @@ export class NotificationConsumer {
    * @throws ConflictException, BadRequestException, NotFoundException, or the original error.
    */
   private handleErrors(error: any, message?: string) {
-    this.notificationService.updateNotificationStatus(this.createdNotification.uid, NotificationStatus.FAILED)
+    if (this.createdNotification?.uid) {
+      this.notificationService.updateNotificationStatus(this.createdNotification.uid, NotificationStatus.FAILED);
+    }
     this.logger.error(error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       switch (error.code) {
@@ -287,8 +242,7 @@ export class NotificationConsumer {
     }
   }
   private async delay(ms: number) {
-    this.logger.info(`Processing underway `)
-    return new Promise(resolve => setTimeout(resolve, ms));
+    this.logger.info(`Processing underway `);
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
-
 }
