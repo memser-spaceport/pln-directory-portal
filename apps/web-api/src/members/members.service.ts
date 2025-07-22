@@ -339,6 +339,11 @@ export class MembersService {
           },
           experiences: true,
           eventGuests: {
+            where: {
+              event: {
+                isDeleted: false
+              }
+            },
             orderBy: {
               event: {
                 startDate: 'desc',
