@@ -244,11 +244,10 @@ export class PLEventsController {
   @Api(server.route.syncPLEventsByLocation)
   @UseGuards(InternalAuthGuard)
   async syncPLEventsByLocation(
-    @Param('uid') locationUid: string,
     @Body() body
   ) {
-    const { selectedEventUids, locationName } = body;
-    return await this.eventSyncService.syncEvents({ locationUid, selectedEventUids, locationName });
+    const { selectedEventUids } = body;
+    return await this.eventSyncService.syncEvents({selectedEventUids });
   }
 
   @Api(server.route.getAllPLEventGuests)

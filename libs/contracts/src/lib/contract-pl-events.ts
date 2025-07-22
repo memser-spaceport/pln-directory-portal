@@ -110,7 +110,7 @@ export const apiEvents = contract.router({
   },
   syncPLEventsByLocation: {
     method: 'POST',
-    path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/events/sync`,
+    path: `${getAPIVersionAsPath('1')}/irl/events/sync`,
     body: contract.body<unknown>(),
     responses: {
       200: contract.response<unknown>(),
