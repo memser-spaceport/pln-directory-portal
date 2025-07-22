@@ -1735,4 +1735,24 @@ export class MembersService {
     }
     return {};
   }
+
+  async findByExternalId(externalId: string, query: any) {
+    return this.prisma.member.findFirst({
+      where: { externalId },
+      ...query,
+      include: {
+        image: true,
+        memberRoles: true,
+        teamMemberRoles: {
+          include: {
+            team: {
+              include: {
+                logo: true,
+              },
+            },
+          },
+        },
+      }
+    });
+  }
 }

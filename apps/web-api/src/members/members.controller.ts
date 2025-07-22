@@ -306,4 +306,28 @@ export class MemberController {
   async getGitProjects(@Param('uid') uid) {
     return await this.membersService.getGitProjects(uid);
   }
+
+  /**
+   * Retrieves member details by externalId.
+   *
+   * @param externalId - External ID of the member to fetch
+   * @returns Member details with related data
+   */
+  @Api(server.route.getMemberByExternalId)
+  @UseInterceptors(IsVerifiedMemberInterceptor)
+  @NoCache()
+  async getMemberByExternalId(@Param('externalId') externalId: string, @Req() request: Request) {
+    const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
+    const builder = new PrismaQueryBuilder(queryableFields, ENABLED_RETRIEVAL_PROFILE);
+    const builtQuery = builder.build(request.query);
+    const member = await this.membersService.findByExternalId(externalId, builtQuery);
+
+    if (!member) {
+      this.logger.error(`Member not found: externalId=${externalId}`);
+      throw new NotFoundException('Member not found');
+    }
+
+    return member;
+  }
+
 }
