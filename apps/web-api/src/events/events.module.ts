@@ -8,6 +8,6 @@ import { EventsToolingService } from './events-tooling.service';
   controllers: [EventsController],
   providers: [EventsService, EventsToolingService],
   imports: [forwardRef(() => PLEventsModule)],
-  exports: [EventsToolingService]
+  exports: [EventsToolingService, EventsService]
 })
 export class EventsModule {}

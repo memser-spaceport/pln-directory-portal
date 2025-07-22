@@ -4,6 +4,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { getFilenameFromUrl, getFileTypeFromUrl } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { isEmpty } from 'lodash';
+import { EventsService } from '../events/events.service';
 
 @Injectable()
 export class PLEventSyncService {
@@ -11,6 +12,7 @@ export class PLEventSyncService {
   constructor(
     private readonly prisma: PrismaService,
     private cacheService: CacheService,
+    private eventsService: EventsService
   ) {}
 
   /**
@@ -21,14 +23,13 @@ export class PLEventSyncService {
    */
   async syncEvents(body) {
     try {
-      const { locationUid, selectedEventUids } = body;
+      const {selectedEventUids } = body;
       const events = await this.fetchEventsFromService(body);
       if (!events) return [];
       const existingEvents = await this.prisma.pLEvent.findMany({
         where: {
           AND:{
             externalId: { not: null },
-            locationUid: locationUid,
             isDeleted: false
           }
         },
@@ -42,7 +43,7 @@ export class PLEventSyncService {
       // Create a mapping of existing events for quick lookup
       const eventMap = new Map(existingEvents.map(event => [event.externalId, event]));
       // Insert or update events based on fetched data
-      await this.createOrUpdateEvents(events, eventMap, locationUid);
+      await this.createOrUpdateEvents(events, eventMap);
       // Remove events that no longer exist in the external source
       if (isEmpty(selectedEventUids)) {
         await this.deleteStaleEvents(existingEvents, events);
@@ -63,10 +64,9 @@ export class PLEventSyncService {
    */
   private async fetchEventsFromService(params) {
     try {
-      const { selectedEventUids, locationName } = params;
+      const { selectedEventUids } = params;
       const queryParams = new URLSearchParams({
         status: 'APPROVED',
-        location: locationName,
         conference: ""
       });
   
@@ -99,7 +99,7 @@ export class PLEventSyncService {
    * @param eventMap - Map of existing events stored in the database.
    * @param locationUid - Unique identifier for the location.
    */
-  private async createOrUpdateEvents(events, eventMap, locationUid) {
+  private async createOrUpdateEvents(events, eventMap) {
     for (const event of events) {
       const existingEvent = eventMap.get(event.event_id);
       if (existingEvent) {
@@ -107,18 +107,22 @@ export class PLEventSyncService {
         const updatedAt = new Date(event.updatedAt);
         const existingEventUpdatedAt = new Date(existingEvent.syncedAt);
         if (updatedAt > existingEventUpdatedAt) {
+          const location = await this.eventsService.createEventLocation(event);
+          event.locationUid = location?.uid;
           await this.prisma.pLEvent.update({
             where: { uid: existingEvent.uid },
-            data: await this.mapEventData(event, locationUid),
+            data: await this.mapEventData(event),
           });
           this.logger.log(`Updated event: "${event.event_name}" (ID: ${event.event_id}).`);
         } else {
           this.logger.log(`No update needed for event: "${event.event_name}" (ID: ${event.event_id}), already up to date.`);
         }
       } else {
+        const location = await this.eventsService.createEventLocation(event);
         // Create a new event if it does not exist in the database
+        event.locationUid = location?.uid;
         const createdEvent = await this.prisma.pLEvent.create({
-          data: await this.mapEventData(event, locationUid)
+          data: await this.mapEventData(event)
         });
         this.logger.log(`Created new event: "${createdEvent.name}" (ID: ${createdEvent.externalId}).`);
       }
@@ -154,7 +158,7 @@ export class PLEventSyncService {
    * @param locationUid - Unique identifier for the location.
    * @returns Mapped event object ready for database insertion/update.
    */
-  private async mapEventData(event, locationUid) {
+  private async mapEventData(event) {
     const logo = await this.createLogo(this.prisma, event.event_logo);
     const resources: Array<{ 
       name: string; 
@@ -189,7 +193,7 @@ export class PLEventSyncService {
       createdAt: event.createdAt,
       syncedAt: event.updatedAt,
       slugURL: event.event_id,
-      locationUid,
+      locationUid: event.locationUid,
       logoUid: logo?.uid,
       resources,
       isDeleted: false,
