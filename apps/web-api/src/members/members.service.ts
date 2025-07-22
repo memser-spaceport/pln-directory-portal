@@ -1735,4 +1735,11 @@ export class MembersService {
     }
     return {};
   }
+
+  async findByExternalId(externalId: string, query: any) {
+    return this.prisma.member.findFirst({
+      where: { externalId },
+      ...query,
+    });
+  }
 }

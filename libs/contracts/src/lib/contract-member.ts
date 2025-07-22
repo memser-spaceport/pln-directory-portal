@@ -8,6 +8,7 @@ import {
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
 const contract = initContract();
+import { z } from 'zod';
 
 export const apiMembers = contract.router({
   getMembers: {
@@ -106,5 +107,17 @@ export const apiMembers = contract.router({
       200: contract.response<unknown>(),
     },
     summary: 'Get member Projects',
-  }
+  },
+  getMemberByExternalId: {
+    method: 'GET',
+    path: '/members/external/:externalId',
+    responses: {
+      200: ResponseMemberWithRelationsSchema,
+      404: z.object({ message: z.string() }),
+    },
+    pathParams: z.object({
+      externalId: z.string(),
+    }),
+    query: MemberDetailQueryParams.optional(),
+  } as const,
 });

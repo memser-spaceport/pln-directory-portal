@@ -1,21 +1,21 @@
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - '${PORT}:3000'
-    env_file:
-      - .env
-    depends_on:
-      - postgres
-      - oso_postgres
-      - redis
-      - redis-cache
-      - redis-queue
-      - mongodb
-    networks:
-      - pl-directory-backend
+#  app:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    ports:
+#      - '${PORT}:3000'
+#    env_file:
+#      - .env
+#    depends_on:
+#      - postgres
+#      - oso_postgres
+#      - redis
+#      - redis-cache
+#      - redis-queue
+#      - mongodb
+#    networks:
+#      - pl-directory-backend
 
   postgres:
     image: postgres:13.8
