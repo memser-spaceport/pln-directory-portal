@@ -73,9 +73,5 @@ COPY --chown=nodejs:nodejs --from=builder /app/node_modules/.prisma ./dist/apps/
 # Expose the application port
 EXPOSE 3000
 
-# Add a health check to ensure the application is running
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD [ "node", "-e", "require('http').get('http://localhost:3001', (res) => process.exit(res.statusCode === 200 ? 0 : 1))" ]
-
 # The command to run the application
 CMD [ "npm", "run", "start:migrate:prod" ]

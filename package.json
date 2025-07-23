@@ -20,9 +20,9 @@
     "build:storybook": "nx build-storybook storybook-host",
     "deploy:staging": "gh workflow run staging.yml",
     "deploy:production": "gh workflow run production.yml",
-    "start:prod": "node dist/apps/web-api/main",
-    "start:migrate:prod": "npx prisma migrate deploy --schema=./apps/web-api/prisma/schema.prisma && npm run start:prod",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "start:prod": "node --trace-warnings --max-old-space-size=4096 dist/apps/web-api/main",
+    "start:migrate:prod": "npx prisma migrate deploy --schema=./apps/web-api/prisma/schema.prisma && npm run start:prod"
   },
   "private": true,
   "prisma": {
