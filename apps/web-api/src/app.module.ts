@@ -58,31 +58,31 @@ import { ProfileModule } from './profile/profile.module';
       ttl: 1,
       limit: 10,
     }),
-    CacheModule.register<any>({
-      store: redisStore,
-      url: process.env.REDIS_TLS_URL,
-      isGlobal: true,
-      ttl: 86400, // 1 day in seconds
-      max: 100, // maximum number of items in cache
-      tls: process.env.REDIS_WITH_TLS
-        ? {
-            rejectUnauthorized: false,
-            requestCert: true,
-          }
-        : null,
-    }),
-    BullModule.forRoot({
-      url: process.env.QUEUE_REDIS_WITH_TLS,
-      redis: {
-        tls: {
-          rejectUnauthorized: false,
-          requestCert: true,
-        },
-      },
-      settings: {
-        lockDuration: 20000,
-      },
-    }),
+    // CacheModule.register<any>({
+    //   store: redisStore,
+    //   url: process.env.REDIS_TLS_URL,
+    //   isGlobal: true,
+    //   ttl: 86400, // 1 day in seconds
+    //   max: 100, // maximum number of items in cache
+    //   tls: process.env.REDIS_WITH_TLS
+    //     ? {
+    //         rejectUnauthorized: false,
+    //         requestCert: true,
+    //       }
+    //     : null,
+    // }),
+    // BullModule.forRoot({
+    //   url: process.env.QUEUE_REDIS_WITH_TLS,
+    //   redis: {
+    //     tls: {
+    //       rejectUnauthorized: false,
+    //       requestCert: true,
+    //     },
+    //   },
+    //   settings: {
+    //     lockDuration: 20000,
+    //   },
+    // }),
     ScheduleModule.forRoot(),
     MembersModule,
     HealthModule,
@@ -117,8 +117,8 @@ import { ProfileModule } from './profile/profile.module';
     AskModule,
     EventsModule,
     MemberExperiencesModule,
-    SearchModule,
-    OpenSearchModule,
+    // SearchModule,
+    // OpenSearchModule,
     RecommendationsModule,
     NotificationSettingsModule,
     ProfileModule,
