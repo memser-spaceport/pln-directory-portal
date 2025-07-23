@@ -5551,7 +5551,6 @@
     source-map "0.7.3"
     source-map-loader "^3.0.0"
     style-loader "^3.3.0"
-    stylus "^0.55.0"
     stylus-loader "^6.2.0"
     terser-webpack-plugin "^5.3.0"
     ts-loader "^9.2.6"
@@ -5564,6 +5563,11 @@
     webpack-merge "^5.8.0"
     webpack-sources "^3.0.2"
     webpack-subresource-integrity "^5.1.0"
+
+stylus@^0.55.0, stylus@0.55.0, stylus@^0.59.0:
+  version "0.59.0"
+  resolved "https://registry.npmjs.org/stylus/-/stylus-0.59.0.tgz"
+  integrity sha512-1hKSt+I0a0oVwYrOeLyP0sNIT5kYk8So1ekq2MxSVO3e2Mw2jW1CgRpRE+H9FEoUqlu4Eszzk8UuY0WZrEkkyg==
 
 "@nrwl/workspace@13.9.7":
   version "13.9.7"
@@ -26123,6 +26127,11 @@ stylus-loader@^6.2.0:
     fast-glob "^3.2.7"
     klona "^2.0.4"
     normalize-path "^3.0.0"
+
+stylus@^0.0.1-security:
+  version "0.0.1-security"
+  resolved "https://registry.yarnpkg.com/stylus/-/stylus-0.0.1-security.tgz#7fbf8df07e6c1202fce29d57fed2ecbf960e6a3b"
+  integrity sha512-qTLX5NJwuj5dqdJyi1eAjXGE4HfjWDoPLbSIpYWn/rAEdiyZnsngS/Yj0BRjM7wC41e/+spK4QCXFqz7LM0fFQ==
 
 stylus@^0.55.0:
   version "0.55.0"
