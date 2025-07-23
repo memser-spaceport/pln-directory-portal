@@ -1736,23 +1736,18 @@ export class MembersService {
     return {};
   }
 
-  async findByExternalId(externalId: string, query: any) {
+  async findByExternalId(externalId: string) {
     return this.prisma.member.findFirst({
       where: { externalId },
-      ...query,
       include: {
         image: true,
         memberRoles: true,
         teamMemberRoles: {
           include: {
-            team: {
-              include: {
-                logo: true,
-              },
-            },
+            team: { include: { logo: true } },
           },
         },
-      }
+      },
     });
   }
 }
