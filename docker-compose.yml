@@ -8,11 +8,11 @@ services:
     env_file:
       - .env
     depends_on:
-      - postgres
-      - oso_postgres
-      - redis
-      - redis-cache
-      - redis-queue
+      # - postgres
+      # - oso_postgres
+      # - redis
+      # - redis-cache
+      # - redis-queue
       - mongodb
     networks:
       - pl-directory-backend
