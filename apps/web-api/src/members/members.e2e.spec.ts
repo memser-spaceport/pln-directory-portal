@@ -23,25 +23,19 @@ describe('Members', () => {
 
   describe('When getting all members', () => {
     it('should list all the members with a valid schema', async () => {
-      const response = await supertest(app.getHttpServer())
-        .get('/v1/members')
-        .expect(200);
+      const response = await supertest(app.getHttpServer()).get('/v1/members').expect(200);
       const members = response.body;
       expect(members).toHaveLength(5);
-      const hasValidSchema =
-        ResponseMemberWithRelationsSchema.array().safeParse(members).success;
+      const hasValidSchema = ResponseMemberWithRelationsSchema.array().safeParse(members).success;
       expect(hasValidSchema).toBeTruthy();
     });
 
     describe('and with an invalid query param', () => {
       it('should list all the members with a valid schema', async () => {
-        const response = await supertest(app.getHttpServer())
-          .get('/v1/members?invalid=true')
-          .expect(200);
+        const response = await supertest(app.getHttpServer()).get('/v1/members?invalid=true').expect(200);
         const members = response.body;
         expect(members).toHaveLength(5);
-        const hasValidSchema =
-          ResponseMemberWithRelationsSchema.array().safeParse(members).success;
+        const hasValidSchema = ResponseMemberWithRelationsSchema.array().safeParse(members).success;
         expect(hasValidSchema).toBeTruthy();
       });
     });
@@ -53,8 +47,7 @@ describe('Members', () => {
           .expect(200);
         const members = response.body;
         expect(members).toHaveLength(1);
-        const hasValidSchema =
-          ResponseMemberWithRelationsSchema.array().safeParse(members).success;
+        const hasValidSchema = ResponseMemberWithRelationsSchema.array().safeParse(members).success;
         expect(hasValidSchema).toBeTruthy();
       });
     });
@@ -62,12 +55,9 @@ describe('Members', () => {
 
   describe('When getting an member by uid', () => {
     it('should return the member with a valid schema', async () => {
-      const response = await supertest(app.getHttpServer())
-        .get('/v1/members/uid-1')
-        .expect(200);
+      const response = await supertest(app.getHttpServer()).get('/v1/members/uid-1').expect(200);
       const member = response.body;
-      const hasValidSchema =
-        ResponseMemberWithRelationsSchema.safeParse(member).success;
+      const hasValidSchema = ResponseMemberWithRelationsSchema.safeParse(member).success;
       expect(hasValidSchema).toBeTruthy();
     });
   });

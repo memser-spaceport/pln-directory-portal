@@ -1,4 +1,15 @@
-import { Body, Controller, Param, Req, UseGuards, UsePipes, UseInterceptors, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Param,
+  Req,
+  UseGuards,
+  UsePipes,
+  UseInterceptors,
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
@@ -33,7 +44,7 @@ type RouteShape = typeof server.routeShapes;
 @Controller()
 @NoCache()
 export class MemberController {
-  constructor(private readonly membersService: MembersService, private logger: LogService) { }
+  constructor(private readonly membersService: MembersService, private logger: LogService) {}
 
   /**
    * Retrieves a list of members based on query parameters.
@@ -56,7 +67,8 @@ export class MemberController {
     if (name__icontains) {
       delete builtQuery.where?.name;
     }
-    if (isHost || isSpeaker || isSponsor) {  //Remove isHost and isSpeaker from the default query since it is to be added in eventGuest.
+    if (isHost || isSpeaker || isSponsor) {
+      //Remove isHost and isSpeaker from the default query since it is to be added in eventGuest.
       delete builtQuery.where?.isHost;
       delete builtQuery.where?.isSpeaker;
       delete builtQuery.where?.isSponsor;
@@ -67,7 +79,7 @@ export class MemberController {
         this.membersService.buildNameFilters(queryParams),
         this.membersService.buildRoleFilters(queryParams),
         this.membersService.buildRecentMembersFilter(queryParams),
-        this.membersService.buildParticipationTypeFilter(queryParams)
+        this.membersService.buildParticipationTypeFilter(queryParams),
       ],
     };
     // Check for the office hours blank when OH not null is passed
@@ -79,6 +91,20 @@ export class MemberController {
       });
     }
     return await this.membersService.findAll(builtQuery);
+  }
+
+  /**
+   * Retrieves a list of members by their UIDs.
+   * Returns simplified member data with only UID, name, and email.
+   *
+   * @param body - Request body containing an array of member UIDs
+   * @returns Array of simplified member data
+   */
+  @Api(server.route.getMembersByIds)
+  @UseInterceptors(IsVerifiedMemberInterceptor)
+  @NoCache()
+  async findMembersByIds(@ApiDecorator() { body }: RouteShape['getMembersByIds']) {
+    return await this.membersService.findMembersByIds(body.memberIds);
   }
 
   /**
@@ -100,7 +126,8 @@ export class MemberController {
     if (name__icontains) {
       delete builtQuery.where?.name;
     }
-    if (isHost || isSpeaker || isSponsor) {  //Remove isHost and isSpeaker from the default query since it is to be added in eventGuest.
+    if (isHost || isSpeaker || isSponsor) {
+      //Remove isHost and isSpeaker from the default query since it is to be added in eventGuest.
       delete builtQuery.where?.isHost;
       delete builtQuery.where?.isSpeaker;
       delete builtQuery.where?.isSponsor;
@@ -110,7 +137,7 @@ export class MemberController {
         builtQuery.where,
         this.membersService.buildNameFilters(queryParams),
         this.membersService.buildRecentMembersFilter(queryParams),
-        this.membersService.buildParticipationTypeFilter(queryParams)
+        this.membersService.buildParticipationTypeFilter(queryParams),
       ],
     };
     return await this.membersService.getRolesWithCount(builtQuery, queryParams);
@@ -134,7 +161,8 @@ export class MemberController {
     if (name__icontains) {
       delete builtQuery.where?.name;
     }
-    if (isHost || isSpeaker || isSponsor) { //Remove isHost and isSpeaker from the default query since it is to be added in eventGuest.
+    if (isHost || isSpeaker || isSponsor) {
+      //Remove isHost and isSpeaker from the default query since it is to be added in eventGuest.
       delete builtQuery.where?.isHost;
       delete builtQuery.where?.isSpeaker;
       delete builtQuery.where?.isSponsor;
@@ -145,7 +173,7 @@ export class MemberController {
         this.membersService.buildNameFilters(queryParams),
         this.membersService.buildRoleFilters(queryParams),
         this.membersService.buildRecentMembersFilter(queryParams),
-        this.membersService.buildParticipationTypeFilter(queryParams)
+        this.membersService.buildParticipationTypeFilter(queryParams),
       ],
     };
     return await this.membersService.getMemberFilters(builtQuery);
@@ -195,16 +223,18 @@ export class MemberController {
     this.logger.info(`Member update request - Initated by -> ${req.userEmail}`);
     const requestor = await this.membersService.findMemberByEmail(req.userEmail);
     const { referenceUid } = participantsRequest;
-    if (
-      !requestor.isDirectoryAdmin &&
-      referenceUid !== requestor.uid
-    ) {
+    if (!requestor.isDirectoryAdmin && referenceUid !== requestor.uid) {
       throw new ForbiddenException(`Member isn't authorized to update the member`);
     }
     if (!isEmpty(participantsRequest.newData.isVerified) && !this.membersService.checkIfAdminUser(requestor)) {
       throw new ForbiddenException(`Member isn't authorized to verify a member`);
     }
-    return await this.membersService.updateMemberFromParticipantsRequest(uid, participantsRequest, requestor.email, requestor.isDirectoryAdmin);
+    return await this.membersService.updateMemberFromParticipantsRequest(
+      uid,
+      participantsRequest,
+      requestor.email,
+      requestor.isDirectoryAdmin
+    );
   }
 
   /**
@@ -227,10 +257,7 @@ export class MemberController {
   async updateMemberByUid(@Param('uid') uid, @Body() body, @Req() req) {
     this.logger.info(`Member update request - Initated by -> ${req.userEmail}`);
     const requestor = await this.membersService.findMemberByEmail(req.userEmail);
-    if (
-      !requestor.isDirectoryAdmin &&
-      uid !== requestor.uid
-    ) {
+    if (!requestor.isDirectoryAdmin && uid !== requestor.uid) {
       throw new ForbiddenException(`Member isn't authorized to update the member`);
     }
     if (!isEmpty(body.isVerified) && !this.membersService.checkIfAdminUser(requestor)) {
@@ -291,7 +318,7 @@ export class MemberController {
   async updateMemberEmail(@Body() changeEmailRequest: ChangeEmailRequestDto, @Req() req) {
     const memberInfo = await this.membersService.findMemberByEmail(req.userEmail);
     if (!memberInfo || !memberInfo.externalId) {
-      throw new ForbiddenException("Please login again and try")
+      throw new ForbiddenException('Please login again and try');
     }
     return await this.membersService.updateMemberEmail(changeEmailRequest.newEmail, req.userEmail, memberInfo);
   }
@@ -326,5 +353,4 @@ export class MemberController {
 
     return member;
   }
-
 }

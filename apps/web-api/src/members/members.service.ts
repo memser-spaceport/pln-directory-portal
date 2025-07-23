@@ -9,7 +9,7 @@ import {
 import { z } from 'zod';
 import axios from 'axios';
 import * as path from 'path';
-import { Location, Member, ParticipantsRequest, Prisma } from '@prisma/client';
+import { Member, ParticipantsRequest, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
@@ -25,15 +25,7 @@ import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { MembersHooksService } from './members.hooks.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
-import {
-  AccessLevel,
-  AccessLevelCounts,
-  CreateMemberDto,
-  RequestMembersDto,
-  UpdateAccessLevelDto,
-  UpdateMemberDto,
-} from '../../../../libs/contracts/src/schema/admin-member';
-import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
+import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 
 @Injectable()
 export class MembersService {
@@ -84,7 +76,7 @@ export class MembersService {
    *                       the members. These options are based on Prisma's `MemberFindManyArgs`.
    * @returns A promise that resolves to an array of member records matching the query criteria.
    */
-  async findAll(queryOptions: Prisma.MemberFindManyArgs): Promise<{ count: Number; members: Member[] }> {
+  async findAll(queryOptions: Prisma.MemberFindManyArgs): Promise<{ count: number; members: Member[] }> {
     try {
       const where = {
         ...queryOptions.where,
@@ -99,6 +91,41 @@ export class MembersService {
       ]);
 
       return { count: membersCount, members };
+    } catch (error) {
+      return this.handleErrors(error);
+    }
+  }
+
+  /**
+   * Retrieves members by a list of UIDs.
+   * Returns simplified member data with only UID, name, and email.
+   *
+   * @param memberIds - Array of member UIDs to retrieve
+   * @returns A promise that resolves to an array of simplified member records
+   */
+  async findMembersByIds(memberIds: string[]): Promise<Array<{ uid: string; name: string; email: string }>> {
+    try {
+      const members = await this.prisma.member.findMany({
+        where: {
+          uid: {
+            in: memberIds,
+          },
+          accessLevel: {
+            notIn: ['L0', 'L1', 'Rejected'],
+          },
+          email: {
+            not: null,
+          },
+        },
+        select: {
+          uid: true,
+          name: true,
+          email: true,
+        },
+      });
+
+      // Filter out any members with null emails (type safety)
+      return members.filter((member): member is { uid: string; name: string; email: string } => member.email !== null);
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -341,8 +368,8 @@ export class MembersService {
           eventGuests: {
             where: {
               event: {
-                isDeleted: false
-              }
+                isDeleted: false,
+              },
             },
             orderBy: {
               event: {

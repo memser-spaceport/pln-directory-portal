@@ -4,6 +4,8 @@ import {
   MemberQueryParams,
   PreferenceSchema,
   ResponseMemberWithRelationsSchema,
+  SimpleMemberSchema,
+  MembersByIdsRequestSchema,
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -19,6 +21,15 @@ export const apiMembers = contract.router({
       200: ResponseMemberWithRelationsSchema.array(),
     },
     summary: 'Get all members',
+  },
+  getMembersByIds: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/members/by-ids`,
+    body: MembersByIdsRequestSchema,
+    responses: {
+      200: SimpleMemberSchema.array(),
+    },
+    summary: 'Get members by list of IDs',
   },
   getMemberRoles: {
     method: 'GET',
