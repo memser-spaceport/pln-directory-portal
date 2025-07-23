@@ -316,11 +316,8 @@ export class MemberController {
   @Api(server.route.getMemberByExternalId)
   @UseInterceptors(IsVerifiedMemberInterceptor)
   @NoCache()
-  async getMemberByExternalId(@Param('externalId') externalId: string, @Req() request: Request) {
-    const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
-    const builder = new PrismaQueryBuilder(queryableFields, ENABLED_RETRIEVAL_PROFILE);
-    const builtQuery = builder.build(request.query);
-    const member = await this.membersService.findByExternalId(externalId, builtQuery);
+  async getMemberByExternalId(@Param('externalId') externalId: string) {
+    const member = await this.membersService.findByExternalId(externalId);
 
     if (!member) {
       this.logger.error(`Member not found: externalId=${externalId}`);
