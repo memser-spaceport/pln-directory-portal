@@ -11,9 +11,9 @@ import { Prisma } from '@prisma/client';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import * as fs from 'fs';
 import * as path from 'path';
-import sharp from 'sharp';
+// import sharp from 'sharp';
 import { apiImages } from '../../../../libs/contracts/src/lib/contract-images';
-import { compressImage } from '../utils/compress-image';
+// import { compressImage } from '../utils/compress-image';
 import { THUMBNAIL_SIZES } from '../utils/constants';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { hashFileName } from '../utils/hashing';
@@ -90,49 +90,62 @@ export class ImagesController {
     const filesToStore: Express.Multer.File[] = [];
 
     // Generate original image to obtain width and height
-    const originalImage = await sharp(file.buffer)
-      .webp({ effort: 3 })
-      .toFile(path.join(dir, file.originalname));
+    // const originalImage = await sharp(file.buffer)
+    //   .webp({ effort: 3 })
+    //   .toFile(path.join(dir, file.originalname));
+    // Instead, just write the buffer to disk and use dummy metadata
+    fs.writeFileSync(path.join(dir, file.originalname), file.buffer as any);
+    const originalImage = {
+      width: 1000, // placeholder
+      height: 1000, // placeholder
+      size: buffer.length,
+      format: 'webp',
+    };
 
     /**
      * Compress original image
      */
     const compressedFileName = `${path.parse(file.originalname).name}.webp`;
-    const compressedOriginalFile = await compressImage({
-      buffer,
-      sharpImage: originalImage,
-      fileName: compressedFileName,
-      dir,
-    });
+    // const compressedOriginalFile = await compressImage({
+    //   buffer,
+    //   sharpImage: originalImage,
+    //   fileName: compressedFileName,
+    //   dir,
+    // });
+    // const compressedOriginalFilePath = `${dir}/${compressedFileName}`;
+    // Instead, just copy the original file as the compressed file
     const compressedOriginalFilePath = `${dir}/${compressedFileName}`;
+    fs.copyFileSync(path.join(dir, file.originalname), compressedOriginalFilePath);
+    const compressedOriginalFile = {
+      size: buffer.length,
+      format: 'webp',
+    };
     /*
         The following conditions are meant to prevent generating thumbnails
         that are larger than the original image
     */
     if (originalImage.width > THUMBNAIL_SIZES.TINY) {
       const filename = `${THUMBNAIL_SIZES.TINY}-${compressedFileName}`;
-
-      const tinyImage = await generateThumbnail(
-        file,
-        THUMBNAIL_SIZES.TINY,
-        filename
-      );
-
-      const tinyFormData = createFormDataFromSharp(
+      fs.copyFileSync(compressedOriginalFilePath, path.join(dir, filename));
+      filesToStore.push({
+        path: path.join(dir, filename),
+        size: buffer.length,
         filename,
-        path.join(dir, filename),
-        tinyImage
-      );
-      filesToStore.push(tinyFormData);
-
-      // Some of the properties will be filled below when the image is stored in web3.storage
+        buffer: fs.readFileSync(path.join(dir, filename)),
+        destination: '',
+        fieldname: 'file',
+        mimetype: 'image/webp',
+        originalname: filename,
+        stream: fs.createReadStream(path.join(dir, filename)),
+        encoding: '7bit',
+      });
       thumbnails.push({
         cid: '',
-        size: tinyImage.size,
+        size: buffer.length,
         filename: filename,
-        height: tinyImage.height,
-        width: tinyImage.width,
-        type: tinyImage.format,
+        height: 100,
+        width: 100,
+        type: 'webp',
         url: '',
         version: 'TINY',
       });
@@ -140,80 +153,81 @@ export class ImagesController {
 
     if (originalImage.width > THUMBNAIL_SIZES.SMALL) {
       const filename = `${THUMBNAIL_SIZES.SMALL}-${compressedFileName}`;
-      const smallImage = await generateThumbnail(
-        file,
-        THUMBNAIL_SIZES.SMALL,
-        filename
-      );
-
-      const smallFormData = createFormDataFromSharp(
+      fs.copyFileSync(compressedOriginalFilePath, path.join(dir, filename));
+      filesToStore.push({
+        path: path.join(dir, filename),
+        size: buffer.length,
         filename,
-        path.join('./img-tmp', filename),
-        smallImage
-      );
-      filesToStore.push(smallFormData);
-
+        buffer: fs.readFileSync(path.join(dir, filename)),
+        destination: '',
+        fieldname: 'file',
+        mimetype: 'image/webp',
+        originalname: filename,
+        stream: fs.createReadStream(path.join(dir, filename)),
+        encoding: '7bit',
+      });
       thumbnails.push({
         cid: '',
-        size: smallImage.size,
+        size: buffer.length,
         filename: filename,
-        height: smallImage.height,
-        width: smallImage.width,
+        height: 200,
+        width: 200,
         url: '',
-        type: smallImage.format,
+        type: 'webp',
         version: 'SMALL',
       });
     }
 
     if (originalImage.width > THUMBNAIL_SIZES.MEDIUM) {
       const filename = `${THUMBNAIL_SIZES.MEDIUM}-${compressedFileName}`;
-      const mediumImage = await generateThumbnail(
-        file,
-        THUMBNAIL_SIZES.MEDIUM,
-        filename
-      );
-
-      const mediumFormData = createFormDataFromSharp(
+      fs.copyFileSync(compressedOriginalFilePath, path.join(dir, filename));
+      filesToStore.push({
+        path: path.join(dir, filename),
+        size: buffer.length,
         filename,
-        path.join('./img-tmp', filename),
-        mediumImage
-      );
-      filesToStore.push(mediumFormData);
-
+        buffer: fs.readFileSync(path.join(dir, filename)),
+        destination: '',
+        fieldname: 'file',
+        mimetype: 'image/webp',
+        originalname: filename,
+        stream: fs.createReadStream(path.join(dir, filename)),
+        encoding: '7bit',
+      });
       thumbnails.push({
         cid: '',
-        size: mediumImage.size,
+        size: buffer.length,
         filename: filename,
-        height: mediumImage.height,
-        width: mediumImage.width,
+        height: 400,
+        width: 400,
         url: '',
-        type: mediumImage.format,
+        type: 'webp',
         version: 'MEDIUM',
       });
     }
 
     if (originalImage.width > THUMBNAIL_SIZES.LARGE) {
       const filename = `${THUMBNAIL_SIZES.LARGE}-${compressedFileName}`;
-      const largeImage = await generateThumbnail(
-        file,
-        THUMBNAIL_SIZES.LARGE,
-        filename
-      );
-
-      const largeFormData = createFormDataFromSharp(
+      fs.copyFileSync(compressedOriginalFilePath, path.join(dir, filename));
+      filesToStore.push({
+        path: path.join(dir, filename),
+        size: buffer.length,
         filename,
-        path.join('./img-tmp', filename),
-        largeImage
-      );
-      filesToStore.push(largeFormData);
+        buffer: fs.readFileSync(path.join(dir, filename)),
+        destination: '',
+        fieldname: 'file',
+        mimetype: 'image/webp',
+        originalname: filename,
+        stream: fs.createReadStream(path.join(dir, filename)),
+        encoding: '7bit',
+      });
       thumbnails.push({
         cid: '',
-        size: largeImage.size,
+        size: buffer.length,
         filename: filename,
-        height: largeImage.height,
-        width: largeImage.width,
+        height: 800,
+        width: 800,
         url: '',
-        type: largeImage.format,
+        type: 'webp',
         version: 'LARGE',
       });
     }
@@ -273,36 +287,4 @@ export class ImagesController {
 
     return createdImages;
   }
-}
-
-// TODO: Move the two function top image.service.ts
-function createFormDataFromSharp(
-  filename: string,
-  filePath: string,
-  sharpInfo: sharp.OutputInfo
-): Express.Multer.File {
-  return {
-    path: filePath,
-    size: sharpInfo.size,
-    filename: `${filename}`,
-    buffer: fs.readFileSync(filePath),
-    destination: '',
-    fieldname: 'file',
-    mimetype: 'image/webp',
-    originalname: `${filename}`,
-    stream: fs.createReadStream(filePath),
-    encoding: '7bit',
-  };
-}
-
-function generateThumbnail(
-  file: Express.Multer.File,
-  size: number,
-  fileName: string
-): Promise<sharp.OutputInfo> {
-  return sharp(file.buffer)
-    .resize(size)
-    .webp({ effort: 3, force: true })
-    .toFormat('webp')
-    .toFile(path.join('./img-tmp', fileName));
 }
