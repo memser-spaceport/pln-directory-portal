@@ -1,6 +1,6 @@
 import { CollectionCustomizer } from '@forestadmin/agent';
+const redisStore = require('../mock-redis-store');
 import cacheManager from 'cache-manager';
-import redisStore from 'cache-manager-redis-store';
 
 /**
  * This is a quick & short-term solution
@@ -22,19 +22,22 @@ export async function resetCacheAfterCreateOrUpdateOrDelete(
   const collections: CollectionCustomizer[] = collection
     ? [collection]
     : dataSource.collections;
-  const redisCache = cacheManager.caching({
-    store: redisStore,
-    host: process.env.REDIS_HOST,
-    url: process.env.REDIS_TLS_URL,
-    port: Number(process.env.REDIS_PORT),
-    password: process.env.REDIS_PASSWORD,
-    tls: process.env.REDIS_WITH_TLS
-      ? {
-          rejectUnauthorized: false,
-          requestCert: true,
-        }
-      : null,
-  });
+  const redisCache = cacheManager.caching(
+      { store: redisStore }
+      // : {
+      //     store: redisStore,
+      //     host: process.env.REDIS_HOST,
+      //     url: process.env.REDIS_TLS_URL,
+      //     port: Number(process.env.REDIS_PORT),
+      //     password: process.env.REDIS_PASSWORD,
+      //     tls: process.env.REDIS_WITH_TLS
+      //       ? {
+      //           rejectUnauthorized: false,
+      //           requestCert: true,
+      //         }
+      //       : null,
+      //   }
+  );
 
   // Clear cache after create or update
   for (const currentCollection of collections) {

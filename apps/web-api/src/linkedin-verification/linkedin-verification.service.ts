@@ -1,8 +1,4 @@
 import { Injectable, BadRequestException, NotFoundException, OnModuleDestroy } from '@nestjs/common';
-import Redis from 'ioredis';
-import axios from 'axios';
-import { PrismaService } from '../shared/prisma.service';
-import { LogService } from '../shared/log.service';
 import {
   LinkedInAuthUrlRequestDto,
   LinkedInCallbackRequestDto,
@@ -14,6 +10,10 @@ import path from 'path';
 import { AwsService } from '../utils/aws/aws.service';
 import { Member } from '@prisma/client';
 import { MemberService } from '../admin/member.service';
+const Redis = require('../utils/mock-ioredis');
+import axios from 'axios';
+import { PrismaService } from '../shared/prisma.service';
+import { LogService } from '../shared/log.service';
 
 @Injectable()
 export class LinkedInVerificationService implements OnModuleDestroy {
@@ -22,7 +22,7 @@ export class LinkedInVerificationService implements OnModuleDestroy {
   private readonly redirectUri = process.env.LINKEDIN_REDIRECT_URI;
   private readonly CACHE_TTL = 3600;
   private readonly adminEmails: string[];
-  private redis: Redis;
+  private redis: any;
 
   constructor(
     private readonly prisma: PrismaService,

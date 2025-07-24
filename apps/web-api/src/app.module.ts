@@ -3,7 +3,8 @@ import { CacheModule, MiddlewareConsumer, Module, RequestMethod } from '@nestjs/
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
-import * as redisStore from 'cache-manager-redis-store';
+const useMockRedis = process.env.USE_MOCK_REDIS === 'true';
+const redisStore = require('./utils/mock-redis-store');
 import { AppController } from './app.controller';
 import { FundingStagesModule } from './funding-stages/funding-stages.module';
 import { HealthModule } from './health/health.module';
@@ -58,19 +59,21 @@ import { ProfileModule } from './profile/profile.module';
       ttl: 1,
       limit: 10,
     }),
-    CacheModule.register<any>({
-      store: redisStore,
-      url: process.env.REDIS_TLS_URL,
-      isGlobal: true,
-      ttl: 86400, // 1 day in seconds
-      max: 100, // maximum number of items in cache
-      tls: process.env.REDIS_WITH_TLS
+    CacheModule.register<any>(
+      useMockRedis
         ? {
-            rejectUnauthorized: false,
-            requestCert: true,
+            store: redisStore,
+            isGlobal: true,
+            ttl: 86400, // 1 day in seconds
+            max: 100, // maximum number of items in cache
           }
-        : null,
-    }),
+        : {
+            store: redisStore,
+            isGlobal: true,
+            ttl: 86400, // 1 day in seconds
+            max: 100
+          }
+    ),
     // BullModule.forRoot({
     //   url: process.env.QUEUE_REDIS_WITH_TLS,
     //   redis: {

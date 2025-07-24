@@ -1,12 +1,14 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
-import Redis from 'ioredis';
+import { Injectable, OnModuleDestroy, Res } from '@nestjs/common';
 import { HuskyCacheDbService } from './husky-db.interface';
 
 @Injectable()
 export class RedisCacheDbService implements OnModuleDestroy, HuskyCacheDbService {
-  private redis: Redis;
+  private redis: any;
 
   constructor() {
+    
+    const Redis = require('../../utils/mock-ioredis');
+    this.redis = new Redis();
     // this.redis = new Redis(process.env.REDIS_CACHE_URL as string, {
     //   ...(process.env.REDIS_CACHE_TLS && {
     //     tls: {

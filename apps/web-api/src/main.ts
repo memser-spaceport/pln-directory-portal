@@ -33,7 +33,29 @@ export async function bootstrap() {
   });
  
 
-
+  process.on('SIGABRT', (signal) => {
+    console.error('SIGABRT received:', signal);
+    console.error('Stack trace:', new Error().stack);
+    process.exit(1);
+  });
+  
+  process.on('SIGSEGV', (signal) => {
+    console.error('SIGSEGV received:', signal);
+    console.error('Stack trace:', new Error().stack);
+    process.exit(1);
+  });
+  
+  process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    console.error('Stack:', error.stack);
+    process.exit(1);
+  });
+  
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    process.exit(1);
+  });
+  
   await app.listen(process.env.PORT || 3000);
 }
 
