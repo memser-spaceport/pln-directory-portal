@@ -12,7 +12,7 @@ import { IndustryTagsModule } from './industry-tags/industry-tags.module';
 import { MyCacheInterceptor } from './interceptors/cache.interceptor';
 import { ConcealEntityIDInterceptor } from './interceptors/conceal-entity-id.interceptor';
 import { LocationsModule } from './locations/locations.module';
-import { LinkedInVerificationModule } from './linkedin-verification/linkedin-verification.module';
+// import { LinkedInVerificationModule } from './linkedin-verification/linkedin-verification.module';
 import { MembersModule } from './members/members.module';
 import { MembershipSourcesModule } from './membership-sources/membership-sources.module';
 import { ContentTypeMiddleware } from './middlewares/content-type.middleware';
@@ -34,7 +34,7 @@ import { EmptyStringToNullInterceptor } from './interceptors/empty-string-to-nul
 import { OfficeHoursModule } from './office-hours/office-hours.module';
 import { MemberFollowUpsModule } from './member-follow-ups/member-follow-ups.module';
 import { MemberFeedbacksModule } from './member-feedbacks/member-feedbacks.module';
-import { HuskyModule } from './husky/husky.module';
+// import { HuskyModule } from './husky/husky.module';
 import { HomeModule } from './home/home.module';
 import { InternalsModule } from './internals/internals.module';
 import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
@@ -89,7 +89,7 @@ import { ProfileModule } from './profile/profile.module';
     TeamsModule,
     IndustryTagsModule,
     ImagesModule,
-    LinkedInVerificationModule,
+    // LinkedInVerificationModule,
     MembershipSourcesModule,
     FundingStagesModule,
     SkillsModule,
@@ -108,20 +108,20 @@ import { ProfileModule } from './profile/profile.module';
     OfficeHoursModule,
     MemberFollowUpsModule,
     MemberFeedbacksModule,
-    HuskyModule,
+    // HuskyModule,
     HomeModule,
     InternalsModule,
     OsoMetricsModule,
     MemberSubscriptionsModule,
     NotificationsModule,
     AskModule,
-    EventsModule,
-    MemberExperiencesModule,
-    SearchModule,
-    OpenSearchModule,
-    RecommendationsModule,
-    NotificationSettingsModule,
-    ProfileModule,
+    // EventsModule,
+    // MemberExperiencesModule,
+    // SearchModule,
+    // OpenSearchModule,
+    // RecommendationsModule,
+    // NotificationSettingsModule,
+    // ProfileModule,
   ],
   providers: [
     {
