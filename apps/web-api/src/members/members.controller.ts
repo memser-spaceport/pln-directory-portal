@@ -82,6 +82,20 @@ export class MemberController {
   }
 
   /**
+   * Retrieves a list of members by their UIDs.
+   * Returns simplified member data with only UID, name, and email.
+   *
+   * @param body - Request body containing an array of member UIDs
+   * @returns Array of simplified member data
+   */
+  @Api(server.route.getMembersByIds)
+  @UseInterceptors(IsVerifiedMemberInterceptor)
+  @NoCache()
+  async findMembersByIds(@ApiDecorator() { body }: RouteShape['getMembersByIds']) {
+    return await this.membersService.findMembersByIds(body.memberIds);
+  }
+
+  /**
    * Retrieves member roles based on query parameters with their counts.
    * Builds a Prisma query and applies filters to return roles with the count of associated members.
    *
