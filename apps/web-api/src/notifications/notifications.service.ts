@@ -1,7 +1,7 @@
 import { Injectable, ConflictException, BadRequestException, NotFoundException, Logger, forwardRef, Inject } from '@nestjs/common';
 import { NotificationStatus, Prisma, SubscriptionEntityType } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
-import { InjectQueue } from '@nestjs/bull';
+// import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 
 @Injectable()
@@ -10,7 +10,7 @@ export class NotificationService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @InjectQueue('notifications') private notificationQ: Queue
+    // @InjectQueue('notifications') private notificationQ: Queue
   ) { }
 
   /**
@@ -87,13 +87,13 @@ export class NotificationService {
   async sendNotification(notification: Prisma.NotificationUncheckedCreateInput) {
     this.logger.log('Preparing to send notification', JSON.stringify(notification));
     try {
-      const job = await this.notificationQ.add('notify', notification, {
-        attempts: 3,
-        removeOnFail: true,
-        delay: 5000
-      });
-      this.logger.log(`Notification job added to queue with ID: ${job.id}`);
-      return job;
+      // const job = await this.notificationQ.add('notify', notification, {
+      //   attempts: 3,
+      //   removeOnFail: true,
+      //   delay: 5000
+      // });
+      // this.logger.log(`Notification job added to queue with ID: ${job.id}`);
+      return {};
     } catch (error) {
       this.logger.error('Failed to add notification to the queue', error);
       return null;
