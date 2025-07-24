@@ -21,7 +21,8 @@
     "deploy:staging": "gh workflow run staging.yml",
     "deploy:production": "gh workflow run production.yml",
     "postinstall": "patch-package",
-    "start:prod": "node --trace-warnings --max-old-space-size=4096 dist/apps/web-api/main",
+    "start:prod": "node --trace-warnings --trace-uncaught --trace-exit --trace-deprecation --max-old-space-size=4096 dist/apps/web-api/main",
+    "start:prod:inspect": "node --inspect=0.0.0.0:9229 --trace-warnings --trace-uncaught --trace-exit --trace-deprecation --max-old-space-size=4096 dist/apps/web-api/main",
     "start:migrate:prod": "npx prisma migrate deploy --schema=./apps/web-api/prisma/schema.prisma && npm run start:prod"
   },
   "private": true,

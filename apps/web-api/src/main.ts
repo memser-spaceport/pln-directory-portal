@@ -31,7 +31,11 @@ export async function bootstrap() {
     environment: process.env.ENVIRONMENT,
     enabled: process.env.ENVIRONMENT === APP_ENV.PRODUCTION || process.env.ENVIRONMENT === APP_ENV.STAGING,
   });
-
+ 
+  setInterval(() => {
+    console.log('Memory usage:', process.memoryUsage());
+  }, 10000);
+  
   await app.listen(process.env.PORT || 3000);
 }
 
