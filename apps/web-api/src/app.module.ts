@@ -1,4 +1,4 @@
-// import { BullModule } from '@nestjs/bull';
+import { BullModule } from '@nestjs/bull';
 import { CacheModule, MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -71,18 +71,18 @@ import { ProfileModule } from './profile/profile.module';
           }
         : null,
     }),
-    // BullModule.forRoot({
-    //   url: process.env.QUEUE_REDIS_WITH_TLS,
-    //   redis: {
-    //     tls: {
-    //       rejectUnauthorized: false,
-    //       requestCert: true,
-    //     },
-    //   },
-    //   settings: {
-    //     lockDuration: 20000,
-    //   },
-    // }),
+    BullModule.forRoot({
+      url: process.env.QUEUE_REDIS_WITH_TLS,
+      redis: {
+        tls: {
+          rejectUnauthorized: false,
+          requestCert: true,
+        },
+      },
+      settings: {
+        lockDuration: 20000,
+      },
+    }),
     ScheduleModule.forRoot(),
     MembersModule,
     HealthModule,

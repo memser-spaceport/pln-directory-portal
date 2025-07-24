@@ -2,7 +2,7 @@ import { forwardRef, Module } from '@nestjs/common';
 import { NotificationService } from './notifications.service';
 import { NotificationConsumer } from './notifications.processor';
 import { NotificationServiceClient } from './notification-service.client';
-// import { BullModule } from '@nestjs/bull';
+import { BullModule } from '@nestjs/bull';
 import { SharedModule } from '../shared/shared.module';
 import { MemberSubscriptionsModule } from '../member-subscriptions/member-subscriptions.module';
 import { PLEventsModule } from '../pl-events/pl-events.module';
@@ -14,10 +14,10 @@ import { PLEventsModule } from '../pl-events/pl-events.module';
   imports: [
     SharedModule,
     MemberSubscriptionsModule,
-    forwardRef(() => PLEventsModule)
-    // BullModule.registerQueue({
-    //   name: 'notifications',
-    // }),
+    forwardRef(() => PLEventsModule),
+    BullModule.registerQueue({
+      name: 'notifications',
+    }),
   ],
 })
 export class NotificationsModule {}
