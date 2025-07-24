@@ -73,6 +73,16 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   experiences: ResponseMemberExperienceSchema.array().optional(),
 });
 
+export const SimpleMemberSchema = ResponseMemberSchema.pick({
+  uid: true,
+  name: true,
+  email: true,
+});
+
+export const MembersByIdsRequestSchema = z.object({
+  memberIds: z.array(z.string()).min(1, 'At least one member ID is required'),
+});
+
 export const CreateMemberSchema = MemberSchema.pick({
   name: true,
   email: true,
