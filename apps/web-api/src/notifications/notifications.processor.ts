@@ -1,5 +1,5 @@
 import { isEmpty } from 'lodash';
-import { Process, Processor } from '@nestjs/bull';
+// import { Process, Processor } from '@nestjs/bull';
 import { NotificationService } from './notifications.service';
 import { NotificationServiceClient } from './notification-service.client';
 import { LogService } from '../shared/log.service';
@@ -8,7 +8,7 @@ import { NotificationStatus, Prisma } from '@prisma/client';
 import { EMAIL_TEMPLATES, NOTIFICATION_CHANNEL } from '../utils/constants';
 import { ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 
-@Processor('notifications')
+//  @Processor('notifications')
 export class NotificationConsumer {
   private createdNotification;
   constructor(
@@ -24,10 +24,10 @@ export class NotificationConsumer {
    * @returns A Promise that resolves when the notification is processed successfully.
    * @throws Updates the notification status to FAILED if an error occurs.
    */
-  @Process({
-    name: 'notify',
-    concurrency: 1, // Ensures only one job is processed at a time
-  })
+  // @Process({
+  //   name: 'notify',
+  //   concurrency: 1, // Ensures only one job is processed at a time
+  // })
   async process(job) {
     try {
       this.logger.info(`Processing notification with id: ${job.id}`);
