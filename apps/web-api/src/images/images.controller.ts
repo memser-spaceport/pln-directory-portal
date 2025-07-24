@@ -11,7 +11,7 @@ import { Prisma } from '@prisma/client';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import * as fs from 'fs';
 import * as path from 'path';
-// import sharp from 'sharp';
+import sharp from 'sharp';
 import { apiImages } from '../../../../libs/contracts/src/lib/contract-images';
 import { compressImage } from '../utils/compress-image';
 import { THUMBNAIL_SIZES } from '../utils/constants';
@@ -90,9 +90,9 @@ export class ImagesController {
     const filesToStore: Express.Multer.File[] = [];
 
     // Generate original image to obtain width and height
-    // const originalImage = await sharp(file.buffer)
-    //   .webp({ effort: 3 })
-    //   .toFile(path.join(dir, file.originalname));
+    const originalImage = await sharp(file.buffer)
+      .webp({ effort: 3 })
+      .toFile(path.join(dir, file.originalname));
 
     /**
      * Compress original image
@@ -100,7 +100,7 @@ export class ImagesController {
     const compressedFileName = `${path.parse(file.originalname).name}.webp`;
     const compressedOriginalFile = await compressImage({
       buffer,
-      // sharpImage: originalImage,
+      sharpImage: originalImage,
       fileName: compressedFileName,
       dir,
     });
@@ -109,7 +109,7 @@ export class ImagesController {
         The following conditions are meant to prevent generating thumbnails
         that are larger than the original image
     */
-    if (/*originalImage.width > THUMBNAIL_SIZES.TINY*/ true) {
+    if (originalImage.width > THUMBNAIL_SIZES.TINY) {
       const filename = `${THUMBNAIL_SIZES.TINY}-${compressedFileName}`;
 
       const tinyImage = await generateThumbnail(
@@ -138,7 +138,7 @@ export class ImagesController {
       });
     }
 
-    if (/*originalImage.width > THUMBNAIL_SIZES.SMALL*/ true) {
+    if (originalImage.width > THUMBNAIL_SIZES.SMALL) {
       const filename = `${THUMBNAIL_SIZES.SMALL}-${compressedFileName}`;
       const smallImage = await generateThumbnail(
         file,
@@ -165,7 +165,7 @@ export class ImagesController {
       });
     }
 
-    if (/*originalImage.width > THUMBNAIL_SIZES.MEDIUM*/ true) {
+    if (originalImage.width > THUMBNAIL_SIZES.MEDIUM) {
       const filename = `${THUMBNAIL_SIZES.MEDIUM}-${compressedFileName}`;
       const mediumImage = await generateThumbnail(
         file,
@@ -192,7 +192,7 @@ export class ImagesController {
       });
     }
 
-    if (/*originalImage.width > THUMBNAIL_SIZES.LARGE*/ true) {
+    if (originalImage.width > THUMBNAIL_SIZES.LARGE) {
       const filename = `${THUMBNAIL_SIZES.LARGE}-${compressedFileName}`;
       const largeImage = await generateThumbnail(
         file,
@@ -255,15 +255,15 @@ export class ImagesController {
       {
         cid: resp,
         filename: compressedFileName,
-        size: /*originalImage.size*/ 0,
-        height: /*originalImage.height*/ 0,
+        size: originalImage.size,
+        height: originalImage.height,
         url: process.env.FILE_STORAGE === 'ipfs' ? await this.fileUploadService.getDecryptedFileUrl(
           resp,
           compressedFileName
         ): resp,
-        width: /*originalImage.width*/ 0,
+        width: originalImage.width,
         version: 'ORIGINAL',
-        type: /*originalImage.format*/ 'webp',
+        type: originalImage.format,
       },
       hasThumbnails ? thumbnails : undefined
     );
@@ -276,19 +276,14 @@ export class ImagesController {
 }
 
 // TODO: Move the two function top image.service.ts
-// Remove all sharp-related code and replace with stubs or default values
-// Remove all references to originalImage, sharpImage, and sharp.OutputInfo
-// Replace any function or variable that depended on sharp with a stub or default value (e.g., 0, 'webp', etc.)
-
-// Stub for createFormDataFromSharp
 function createFormDataFromSharp(
   filename: string,
   filePath: string,
-  info: { size: number; height: number; width: number; format: string }
+  sharpInfo: sharp.OutputInfo
 ): Express.Multer.File {
   return {
     path: filePath,
-    size: info.size,
+    size: sharpInfo.size,
     filename: `${filename}`,
     buffer: fs.readFileSync(filePath),
     destination: '',
@@ -300,12 +295,14 @@ function createFormDataFromSharp(
   };
 }
 
-// Stub for generateThumbnail
-async function generateThumbnail(
+function generateThumbnail(
   file: Express.Multer.File,
   size: number,
   fileName: string
-): Promise<{ size: number; height: number; width: number; format: string }> {
-  // Just return dummy values
-  return { size: 0, height: size, width: size, format: 'webp' };
+): Promise<sharp.OutputInfo> {
+  return sharp(file.buffer)
+    .resize(size)
+    .webp({ effort: 3, force: true })
+    .toFormat('webp')
+    .toFile(path.join('./img-tmp', fileName));
 }
