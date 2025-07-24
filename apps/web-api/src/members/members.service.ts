@@ -155,6 +155,41 @@ export class MembersService {
   }
 
   /**
+   * Retrieves members by a list of UIDs.
+   * Returns simplified member data with only UID, name, and email.
+   *
+   * @param memberIds - Array of member UIDs to retrieve
+   * @returns A promise that resolves to an array of simplified member records
+   */
+  async findMembersByIds(memberIds: string[]): Promise<Array<{ uid: string; name: string; email: string }>> {
+    try {
+      const members = await this.prisma.member.findMany({
+        where: {
+          uid: {
+            in: memberIds,
+          },
+          accessLevel: {
+            notIn: ['L0', 'L1', 'Rejected'],
+          },
+          email: {
+            not: null,
+          },
+        },
+        select: {
+          uid: true,
+          name: true,
+          email: true,
+        },
+      });
+
+      // Filter out any members with null emails (type safety)
+      return members.filter((member): member is { uid: string; name: string; email: string } => member.email !== null);
+    } catch (error) {
+      return this.handleErrors(error);
+    }
+  }
+
+  /**
    * Retrieves a member based on unique query options
    * @param queryOptions - Object containing unique field value pairs
    * @returns  A promise resolving to member if found else null
