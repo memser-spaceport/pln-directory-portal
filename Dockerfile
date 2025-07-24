@@ -19,7 +19,6 @@ ENV COREPACK_HOME=/app/.corepack-cache
 ENV YARN_CACHE_FOLDER=/app/.yarn-cache
 ENV NPM_CONFIG_CACHE=/app/.npm-cache
 ENV CYPRESS_INSTALL_BINARY=0
-ENV DEBUG="prisma*"
 
 # Switch to the non-root user
 USER nodejs
@@ -60,6 +59,7 @@ RUN chown -R nodejs:nodejs /app
 ENV COREPACK_HOME=/app/.corepack-cache
 ENV YARN_CACHE_FOLDER=/app/.yarn-cache
 ENV NPM_CONFIG_CACHE=/app/.npm-cache
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 
 # Switch to the non-root user
 USER nodejs
