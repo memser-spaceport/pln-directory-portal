@@ -13,7 +13,6 @@ export class SetupService {
             winston.format.timestamp(),
             winston.format.ms(),
             winston.format.printf((info) => {
-              console.log(info)
               return `${JSON.stringify(info)}`;;
             })
             //nestWinstonModuleUtilities.format.nestLike()
