@@ -144,4 +144,86 @@ export class NotificationServiceClient {
       }
     }
   }
+
+  /**
+   * Finds a notification setting item for a member by type and optional contextId.
+   * @param memberUid - The member UID.
+   * @param type - The item type.
+   * @param contextId - The context ID (optional).
+   */
+  async findItem(memberUid: string, type: string, contextId?: string) {
+    try {
+      const response = await axios.get(
+        `${this.notificationServiceBaseUrl}/notification-settings/${memberUid}/item/${type}` +
+          (contextId ? `?contextId=${encodeURIComponent(contextId)}` : ''),
+        {
+          headers: {
+            Authorization: `Basic ${this.notificationServiceSecret}`,
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        switch (error.response?.status) {
+          case 400:
+            throw new BadRequestException('Invalid parameters for findItem.');
+          case 401:
+            throw new UnauthorizedException('Authentication failed. Check API keys or tokens.');
+          case 404:
+            throw new NotFoundException('Notification setting item not found.');
+          case 500:
+            throw new InternalServerErrorException('Internal server error. Retry later.');
+          default:
+            throw new HttpException(
+              `Unhandled error with status ${error.response?.status || 'unknown'}.`,
+              error.response?.status || 500
+            );
+        }
+      } else {
+        throw new InternalServerErrorException('Unexpected error during findItem.');
+      }
+    }
+  }
+
+  /**
+   * Upserts a notification setting item for a member by type and contextId.
+   * @param memberUid - The member UID.
+   * @param type - The item type.
+   * @param dto - The item DTO (should include contextId, settings, memberExternalId).
+   */
+  async upsertItem(memberUid: string, type: string, dto: any) {
+    try {
+      const response = await axios.put(
+        `${this.notificationServiceBaseUrl}/notification-settings/${memberUid}/item/${type}`,
+        dto,
+        {
+          headers: {
+            Authorization: `Basic ${this.notificationServiceSecret}`,
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        switch (error.response?.status) {
+          case 400:
+            throw new BadRequestException('Invalid payload for upsertItem.');
+          case 401:
+            throw new UnauthorizedException('Authentication failed. Check API keys or tokens.');
+          case 404:
+            throw new NotFoundException('Notification setting item endpoint not found.');
+          case 500:
+            throw new InternalServerErrorException('Internal server error. Retry later.');
+          default:
+            throw new HttpException(
+              `Unhandled error with status ${error.response?.status || 'unknown'}.`,
+              error.response?.status || 500
+            );
+        }
+      } else {
+        throw new InternalServerErrorException('Unexpected error during upsertItem.');
+      }
+    }
+  }
 }
