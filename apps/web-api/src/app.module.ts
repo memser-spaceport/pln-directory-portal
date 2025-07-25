@@ -106,8 +106,8 @@ import { AskModule } from './asks/asks.module';
     HomeModule,
     InternalsModule,
     //OsoMetricsModule,
-    MemberSubscriptionsModule,
-    NotificationsModule,
+    //MemberSubscriptionsModule,
+    //NotificationsModule,
     AskModule
   ],
   providers: [
