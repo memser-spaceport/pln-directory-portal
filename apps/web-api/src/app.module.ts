@@ -41,7 +41,7 @@ import { MemberFeedbacksModule } from './member-feedbacks/member-feedbacks.modul
 import { HuskyModule } from './husky/husky.module';
 import { HomeModule } from './home/home.module';
 import { InternalsModule } from './internals/internals.module';
-import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
+//import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
 import { MemberSubscriptionsModule } from './member-subscriptions/member-subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AskModule } from './asks/asks.module';
@@ -105,7 +105,7 @@ import { AskModule } from './asks/asks.module';
     HuskyModule,
     HomeModule,
     InternalsModule,
-    OsoMetricsModule,
+    //OsoMetricsModule,
     MemberSubscriptionsModule,
     NotificationsModule,
     AskModule
