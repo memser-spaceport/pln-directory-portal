@@ -3,12 +3,11 @@ import {
   Body,
   Controller,
   ForbiddenException,
-  forwardRef,
   Get,
-  Inject,
   Param,
   Patch,
   Put,
+  Query,
   Req,
   UseGuards,
   UsePipes,
@@ -21,6 +20,7 @@ import {
   UpdateNotificationSettingsDto,
   UpdateParticipationDto,
   UpdateForumSettingsDto,
+  CreateNotificationSettingItemDto,
 } from 'libs/contracts/src/schema/notification-settings';
 import { MembersService } from '../members/members.service';
 import { ZodValidationPipe } from '@abitia/zod-dto';
@@ -32,9 +32,7 @@ import { NotificationServiceClient } from '../notifications/notification-service
 export class NotificationSettingsController {
   constructor(
     private notificationSettingsService: NotificationSettingsService,
-    @Inject(forwardRef(() => MembersService))
     private memberService: MembersService,
-    @Inject(forwardRef(() => NotificationServiceClient))
     private notificationServiceClient: NotificationServiceClient
   ) {}
 
@@ -109,6 +107,41 @@ export class NotificationSettingsController {
     return this.notificationServiceClient.upsertNotificationSetting(memberUid, {
       ...body,
       memberUid,
+      memberExternalId: authenticatedUser.externalId,
+    });
+  }
+
+  @Get(':memberUid/item/:type')
+  async findItem(
+    @Param('memberUid') memberUid: string,
+    @Param('type') type: string,
+    @Query('contextId') contextId: string,
+    @Req() request: Request
+  ) {
+    const userEmail = request['userEmail'];
+    const authenticatedUser = await this.memberService.findMemberFromEmail(userEmail);
+    if (authenticatedUser.uid !== memberUid) {
+      throw new ForbiddenException(`User isn't authorized to get the item settings`);
+    }
+    return this.notificationServiceClient.findItem(memberUid, type, contextId);
+  }
+
+  @Put(':memberUid/item/:type')
+  @UsePipes(ZodValidationPipe)
+  async upsertItem(
+    @Param('memberUid') memberUid: string,
+    @Param('type') type: string,
+    @Body() dto: CreateNotificationSettingItemDto,
+    @Req() request: Request
+  ) {
+    const userEmail = request['userEmail'];
+    const authenticatedUser = await this.memberService.findMemberFromEmail(userEmail);
+    if (authenticatedUser.uid !== memberUid) {
+      throw new ForbiddenException(`User isn't authorized to update the item settings`);
+    }
+    return this.notificationServiceClient.upsertItem(memberUid, type, {
+      ...dto,
+      memberExternalId: authenticatedUser.externalId,
     });
   }
 }
