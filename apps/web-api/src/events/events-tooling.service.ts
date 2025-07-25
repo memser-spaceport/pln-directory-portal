@@ -20,17 +20,17 @@ export class EventsToolingService {
       if (!baseUrl) {
         throw new BadRequestException('Event service base url is not set in ENV');
       }
-      const irlDomain = process.env.IRL_DOMAIN;
+      const clientSecret = process.env.EVENT_SERVICE_SECRET;
       const internalAuthToken = process.env.EVENT_SERVICE_INTERNAL_AUTH_TOKEN;
-      if (!irlDomain || !internalAuthToken) {
-        throw new BadRequestException('IRL domain or internal auth token is not set in ENV variables');
+      if (!clientSecret || !internalAuthToken) {
+        throw new BadRequestException('Event service secret or internal auth token is not set in ENV variables');
       }
       const response = await axios.post(
         `${baseUrl}/internals/events/submit`,
         { event: event, requestorEmail: requestorEmail },
         {
           headers: {
-            'origin': irlDomain,
+            'x-client-secret': clientSecret,
             'x-internal-auth-token': internalAuthToken
           }
         }
