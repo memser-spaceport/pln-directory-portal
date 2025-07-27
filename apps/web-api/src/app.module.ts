@@ -1,4 +1,5 @@
 import { BullModule } from '@nestjs/bull';
+import { SharedModule } from './shared/shared.module';
 import { CacheModule, MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -22,7 +23,6 @@ import { TeamsModule } from './teams/teams.module';
 import { TechnologiesModule } from './technologies/technologies.module';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
-import { SharedModule } from './shared/shared.module';
 import { LogException } from './filters/log-exception.filter';
 import { OtpModule } from './otp/otp.module';
 import { FaqModule } from './faq/faq.module';
@@ -53,6 +53,7 @@ import { ProfileModule } from './profile/profile.module';
 @Module({
   controllers: [AppController],
   imports: [
+    SharedModule,
     AnalyticsModule,
     ThrottlerModule.forRoot({
       ttl: 1,
@@ -82,8 +83,7 @@ import { ProfileModule } from './profile/profile.module';
       settings: {
         lockDuration: 20000,
       },
-    }),
-    SharedModule,
+    }),    
     ScheduleModule.forRoot(),
     MembersModule,
     HealthModule,
