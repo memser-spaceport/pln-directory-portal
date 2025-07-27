@@ -1,23 +1,23 @@
 # ============================
 # Stage 1: Builder
 # ============================
-FROM node:18-bullseye-slim AS builder
+FROM node:18-bookworm AS builder
 
 WORKDIR /app
 
 # Enable corepack (for Yarn support)
 RUN corepack enable
 
-# Copy dependency files and install all dependencies
+# Copy dependency files
 COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile
 
-# Copy full source code
+# Copy source code
 COPY . .
 
-# Generate both Prisma clients
-RUN npx prisma generate --schema=./apps/web-api/prisma/schema.prisma
-RUN npx prisma generate --schema=./apps/web-api/prisma/oso-schema.prisma
+# Generate Prisma clients
+RUN npx prisma generate --schema=apps/web-api/prisma/schema.prisma
+RUN npx prisma generate --schema=apps/web-api/prisma/oso-schema.prisma
 
 # Build the app
 RUN yarn build
@@ -25,22 +25,25 @@ RUN yarn build
 # ============================
 # Stage 2: Production
 # ============================
-FROM node:18-bullseye-slim
+FROM node:18-bookworm
 
 # Create a non-root user for security
 RUN groupadd -r app && useradd -r -g app app
 
 WORKDIR /app
-USER app
 
 # Copy built artifacts and only required files
 COPY --from=builder /app/package.json /app/yarn.lock ./
-COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/apps/web-api/prisma ./apps/web-api/prisma
-COPY --from=builder /app/node_modules/.prisma ./dist/apps/web-api/.prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-# Expose your application port
+ENV NODE_ENV=production
+ENV DEBUG=prisma:*
+
+USER app
+
 EXPOSE 3000
 
 # Start command with better error handling

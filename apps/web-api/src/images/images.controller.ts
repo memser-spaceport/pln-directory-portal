@@ -11,10 +11,7 @@ import { Prisma } from '@prisma/client';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import * as fs from 'fs';
 import * as path from 'path';
-import sharp from 'sharp';
 import { apiImages } from '../../../../libs/contracts/src/lib/contract-images';
-import { compressImage } from '../utils/compress-image';
-import { THUMBNAIL_SIZES } from '../utils/constants';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { hashFileName } from '../utils/hashing';
 import { ImagesService } from './images.service';
@@ -86,223 +83,44 @@ export class ImagesController {
       fs.mkdirSync(dir);
     }
 
-    const thumbnails: Prisma.ImageCreateManyInput[] = [];
-    const filesToStore: Express.Multer.File[] = [];
+    // Store the original file without processing
+    const originalFilePath = path.join(dir, file.originalname);
+    fs.writeFileSync(originalFilePath, buffer);
 
-    // Generate original image to obtain width and height
-    const originalImage = await sharp(file.buffer)
-      .webp({ effort: 3 })
-      .toFile(path.join(dir, file.originalname));
-
-    /**
-     * Compress original image
-     */
-    const compressedFileName = `${path.parse(file.originalname).name}.webp`;
-    const compressedOriginalFile = await compressImage({
-      buffer,
-      sharpImage: originalImage,
-      fileName: compressedFileName,
-      dir,
-    });
-    const compressedOriginalFilePath = `${dir}/${compressedFileName}`;
-    /*
-        The following conditions are meant to prevent generating thumbnails
-        that are larger than the original image
-    */
-    if (originalImage.width > THUMBNAIL_SIZES.TINY) {
-      const filename = `${THUMBNAIL_SIZES.TINY}-${compressedFileName}`;
-
-      const tinyImage = await generateThumbnail(
-        file,
-        THUMBNAIL_SIZES.TINY,
-        filename
-      );
-
-      const tinyFormData = createFormDataFromSharp(
-        filename,
-        path.join(dir, filename),
-        tinyImage
-      );
-      filesToStore.push(tinyFormData);
-
-      // Some of the properties will be filled below when the image is stored in web3.storage
-      thumbnails.push({
-        cid: '',
-        size: tinyImage.size,
-        filename: filename,
-        height: tinyImage.height,
-        width: tinyImage.width,
-        type: tinyImage.format,
-        url: '',
-        version: 'TINY',
-      });
-    }
-
-    if (originalImage.width > THUMBNAIL_SIZES.SMALL) {
-      const filename = `${THUMBNAIL_SIZES.SMALL}-${compressedFileName}`;
-      const smallImage = await generateThumbnail(
-        file,
-        THUMBNAIL_SIZES.SMALL,
-        filename
-      );
-
-      const smallFormData = createFormDataFromSharp(
-        filename,
-        path.join('./img-tmp', filename),
-        smallImage
-      );
-      filesToStore.push(smallFormData);
-
-      thumbnails.push({
-        cid: '',
-        size: smallImage.size,
-        filename: filename,
-        height: smallImage.height,
-        width: smallImage.width,
-        url: '',
-        type: smallImage.format,
-        version: 'SMALL',
-      });
-    }
-
-    if (originalImage.width > THUMBNAIL_SIZES.MEDIUM) {
-      const filename = `${THUMBNAIL_SIZES.MEDIUM}-${compressedFileName}`;
-      const mediumImage = await generateThumbnail(
-        file,
-        THUMBNAIL_SIZES.MEDIUM,
-        filename
-      );
-
-      const mediumFormData = createFormDataFromSharp(
-        filename,
-        path.join('./img-tmp', filename),
-        mediumImage
-      );
-      filesToStore.push(mediumFormData);
-
-      thumbnails.push({
-        cid: '',
-        size: mediumImage.size,
-        filename: filename,
-        height: mediumImage.height,
-        width: mediumImage.width,
-        url: '',
-        type: mediumImage.format,
-        version: 'MEDIUM',
-      });
-    }
-
-    if (originalImage.width > THUMBNAIL_SIZES.LARGE) {
-      const filename = `${THUMBNAIL_SIZES.LARGE}-${compressedFileName}`;
-      const largeImage = await generateThumbnail(
-        file,
-        THUMBNAIL_SIZES.LARGE,
-        filename
-      );
-
-      const largeFormData = createFormDataFromSharp(
-        filename,
-        path.join('./img-tmp', filename),
-        largeImage
-      );
-      filesToStore.push(largeFormData);
-      thumbnails.push({
-        cid: '',
-        size: largeImage.size,
-        filename: filename,
-        height: largeImage.height,
-        width: largeImage.width,
-        url: '',
-        type: largeImage.format,
-        version: 'LARGE',
-      });
-    }
-
-    // Create a new file to store the compressed original image
-    const expressCompressedOriginalFile: Express.Multer.File = {
-      path: compressedOriginalFilePath,
-      size: compressedOriginalFile.size,
-      filename: compressedFileName,
-      buffer: fs.readFileSync(compressedOriginalFilePath),
+    // Create a file object for the original image
+    const expressOriginalFile: Express.Multer.File = {
+      path: originalFilePath,
+      size: buffer.length,
+      filename: file.originalname,
+      buffer: buffer,
       destination: '',
       fieldname: 'file',
-      mimetype: `image/${compressedOriginalFile.format}`,
-      originalname: compressedFileName,
-      stream: fs.createReadStream(compressedOriginalFilePath),
+      mimetype: mimetype,
+      originalname: file.originalname,
+      stream: fs.createReadStream(originalFilePath),
       encoding: '7bit',
     };
 
-    // Store all files in web3.storage or s3 based on env config
-    const resp = await this.fileUploadService.storeFiles([
-      expressCompressedOriginalFile,
-      ...filesToStore,
-    ]);
-    // Update thumbnails with the cid and url of the image
-    thumbnails.map(async (thumbnail) => {
-      thumbnail.cid = resp;
-      if (process.env.FILE_STORAGE === IPFS) {
-        thumbnail.url = await this.fileUploadService.getDecryptedFileUrl(
-          resp,
-          thumbnail.filename
-        );
-      } else {
-        thumbnail.url = resp;
-      }
-    });
+    // Store the original file in web3.storage or s3 based on env config
+    const resp = await this.fileUploadService.storeFiles([expressOriginalFile]);
 
-    const hasThumbnails = thumbnails.length > 0;
+    // Create the image record with basic metadata
     const createdImages = await this.imagesService.bulkCreate(
       {
         cid: resp,
-        filename: compressedFileName,
-        size: originalImage.size,
-        height: originalImage.height,
+        filename: file.originalname,
+        size: buffer.length,
+        height: 0, // No processing, so set to 0
         url: process.env.FILE_STORAGE === 'ipfs' ? await this.fileUploadService.getDecryptedFileUrl(
           resp,
-          compressedFileName
+          file.originalname
         ): resp,
-        width: originalImage.width,
+        width: 0, // No processing, so set to 0
         version: 'ORIGINAL',
-        type: originalImage.format,
+        type: mimetype.split('/')[1], // Extract format from mimetype
       },
-      hasThumbnails ? thumbnails : undefined
+      undefined // No thumbnails
     );
-
-    // Remove temporary folder
-    fs.rmSync(dir, { recursive: true, force: true });
-
-    return createdImages;
+    return { image: createdImages[0] };
   }
-}
-
-// TODO: Move the two function top image.service.ts
-function createFormDataFromSharp(
-  filename: string,
-  filePath: string,
-  sharpInfo: sharp.OutputInfo
-): Express.Multer.File {
-  return {
-    path: filePath,
-    size: sharpInfo.size,
-    filename: `${filename}`,
-    buffer: fs.readFileSync(filePath),
-    destination: '',
-    fieldname: 'file',
-    mimetype: 'image/webp',
-    originalname: `${filename}`,
-    stream: fs.createReadStream(filePath),
-    encoding: '7bit',
-  };
-}
-
-function generateThumbnail(
-  file: Express.Multer.File,
-  size: number,
-  fileName: string
-): Promise<sharp.OutputInfo> {
-  return sharp(file.buffer)
-    .resize(size)
-    .webp({ effort: 3, force: true })
-    .toFormat('webp')
-    .toFile(path.join('./img-tmp', fileName));
 }

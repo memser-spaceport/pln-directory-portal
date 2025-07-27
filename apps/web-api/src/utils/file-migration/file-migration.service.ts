@@ -25,24 +25,18 @@ export class FileMigrationService {
     } catch (error) {
       throw new Error(`Failed downloading the image - ${error}`);
     }
-    const originalFilePath = `./${filename}`;
-
-    const hashedFileName = `${hashFileName(
-      `${path.parse(filename).name}-${id}`
-    )}.webp`;
-    let compressedFile;
-
-    const filePath = `./${hashedFileName}`;
-
+    // Remove all sharp, compression, and .webp conversion logic
+    // Only download and upload the original file
+    const filePath = `./${filename}`;
     const newFile: Express.Multer.File = {
       path: filePath,
       size: size,
-      filename: hashedFileName,
+      filename: filename,
       buffer: fs.readFileSync(filePath),
       destination: '',
       fieldname: 'file',
       mimetype: type,
-      originalname: hashedFileName,
+      originalname: filename,
       stream: fs.createReadStream(filePath),
       encoding: '7bit',
     };
@@ -59,11 +53,6 @@ export class FileMigrationService {
       fs.unlink(filePath, function (err) {
         if (err) throw err;
       });
-      if (originalFilePath !== filePath) {
-        fs.unlink(originalFilePath, function (err) {
-          if (err) throw err;
-        });
-      }
     }
     return image;
   }
