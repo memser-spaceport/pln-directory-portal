@@ -3,18 +3,56 @@ import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
+  private static isInitialized = false;
+  private static initializationPromise: Promise<void> | null = null;
+
   async onModuleInit() {
-    console.log('in prisma service module init...........');
-    await this.$connect();
-    console.log('after prisma connect........');
-    // Setting up Prisma Middleware for handling Team updates
-    this.$use(async (params, next) => {
-      const result = await next(params);
-      if (params.model === 'Team' && params.action === 'update') {
-        await this.createTeamFocusAreaVersionHistory(params);
-      }
-      return result;
-    });
+    if (PrismaService.isInitialized) {
+      return;
+    }
+
+    if (PrismaService.initializationPromise) {
+      await PrismaService.initializationPromise;
+      return;
+    }
+
+    PrismaService.initializationPromise = this.initializePrisma();
+    await PrismaService.initializationPromise;
+  }
+
+  private async initializePrisma() {
+    try {
+      console.log('🔄 Initializing PrismaService...');
+      await this.$connect();
+      
+      // Setting up Prisma Middleware for handling Team updates
+      this.$use(async (params, next) => {
+        const result = await next(params);
+        if (params.model === 'Team' && params.action === 'update') {
+          await this.createTeamFocusAreaVersionHistory(params);
+        }
+        return result;
+      });
+      
+      console.log('✅ PrismaService initialized successfully');
+      PrismaService.isInitialized = true;
+    } catch (error) {
+      console.error('❌ PrismaService initialization failed:', error);
+      throw error;
+    }
+  }
+
+  public static isReady(): boolean {
+    return PrismaService.isInitialized;
+  }
+
+  public static async waitForReady(): Promise<void> {
+    if (PrismaService.isInitialized) {
+      return;
+    }
+    if (PrismaService.initializationPromise) {
+      await PrismaService.initializationPromise;
+    }
   }
 
   async enableShutdownHooks(app: INestApplication) {

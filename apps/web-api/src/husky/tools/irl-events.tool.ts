@@ -12,14 +12,21 @@ export class IrlEventsTool {
   constructor(private logger: LogService, private prisma: PrismaService) {}
 
   async initialize() {
-    console.log('in initialize husky tools........');
-    const locations = await this.prisma.pLEventLocation.findMany({
-      select: {
-        location: true,
-      },
-    });
-    console.log('after locations........');
-    this.locationsList = locations.map((location) => location.location);
+    try {
+      // Wait for PrismaService to be ready
+      await PrismaService.waitForReady();
+      
+      const locations = await this.prisma.pLEventLocation.findMany({
+        select: {
+          location: true,
+        },
+      });
+      this.locationsList = locations.map((location) => location.location);
+    } catch (error) {
+      console.error('Failed to initialize IrlEventsTool:', error);
+      // Set empty array as fallback
+      this.locationsList = [];
+    }
   }
 
   getTool(): CoreTool {

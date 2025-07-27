@@ -53,7 +53,8 @@ import { ProfileModule } from './profile/profile.module';
 @Module({
   controllers: [AppController],
   imports: [
-    // SharedModule must be first to ensure PrismaService is available globally
+    // CRITICAL: SharedModule must be first to ensure PrismaService is available globally
+    // This prevents segmentation faults with external databases in production
     SharedModule,
     AnalyticsModule,
     ThrottlerModule.forRoot({

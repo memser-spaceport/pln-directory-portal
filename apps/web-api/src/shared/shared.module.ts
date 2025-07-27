@@ -16,6 +16,11 @@ import { CacheService } from '../utils/cache/cache.service';
 @Global()
 @Module({
   providers: [
+    // Core services that must initialize first
+    {
+      provide: 'INIT_ORDER',
+      useValue: 'FIRST',
+    },
     PrismaService,
     OsoPrismaService,
     LogService,
