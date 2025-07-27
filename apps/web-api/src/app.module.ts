@@ -121,7 +121,7 @@ import { ProfileModule } from './profile/profile.module';
     OpenSearchModule,
     RecommendationsModule,
     NotificationSettingsModule,
-    ProfileModule,
+    ProfileModule
   ],
   providers: [
     {
