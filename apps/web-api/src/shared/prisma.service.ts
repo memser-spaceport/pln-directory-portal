@@ -4,7 +4,9 @@ import { PrismaClient } from '@prisma/client';
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
   async onModuleInit() {
+    console.log('in prisma service module init...........');
     await this.$connect();
+    console.log('after prisma connect........');
     // Setting up Prisma Middleware for handling Team updates
     this.$use(async (params, next) => {
       const result = await next(params);
