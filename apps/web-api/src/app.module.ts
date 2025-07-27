@@ -53,6 +53,7 @@ import { ProfileModule } from './profile/profile.module';
 @Module({
   controllers: [AppController],
   imports: [
+    // SharedModule must be first to ensure PrismaService is available globally
     SharedModule,
     AnalyticsModule,
     ThrottlerModule.forRoot({
@@ -108,13 +109,13 @@ import { ProfileModule } from './profile/profile.module';
     OfficeHoursModule,
     MemberFollowUpsModule,
     MemberFeedbacksModule,
-    // HuskyModule,
     HomeModule,
     InternalsModule,
     OsoMetricsModule,
     MemberSubscriptionsModule,
     NotificationsModule,
     AskModule,
+    // HuskyModule,
     // EventsModule,
     // MemberExperiencesModule,
     // SearchModule,

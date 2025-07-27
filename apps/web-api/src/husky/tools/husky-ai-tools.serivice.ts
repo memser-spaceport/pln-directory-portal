@@ -25,7 +25,25 @@ export class HuskyAiToolsService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    console.log('to initialize husky tools.......');
+    
+    // Wait for PrismaService to be ready
+    let retries = 0;
+    const maxRetries = 10;
+    
+    while (retries < maxRetries) {
+      try {
+        await this.prisma.$connect();
+        break;
+      } catch (error) {
+        retries++;
+        console.log(`Waiting for PrismaService to be ready... (${retries}/${maxRetries})`);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+    
     await this.irlEventsTool.initialize();
+    console.log('after husky tools initiliazed........');
   }
 
   public getTools(isLoggedIn: boolean): Record<string, CoreTool> {

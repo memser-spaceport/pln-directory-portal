@@ -10,11 +10,11 @@ import { HuskyRevalidationService } from './husky-revalidation.service';
 import { HuskyAiToolsModule } from './tools/husky-ai-tools.module';
 import { HuskyGenerationService } from './husky-generation.service';
 import { HuskyGenerationController } from './husky-generation.controller';
-import { SharedModule } from '../shared/shared.module';
+//import { SharedModule } from '../shared/shared.module';
 @Module({
   controllers: [HuskyChatsController, HuskyThreadsController, HuskyGenerationController],
   providers: [HuskyService, HuskyAiService, RedisCacheDbService, QdrantVectorDbService, MongoPersistantDbService, HuskyRevalidationService, HuskyGenerationService],
-  imports: [SharedModule, HuskyAiToolsModule],
+  imports: [HuskyAiToolsModule],
   exports: [HuskyService, HuskyAiService, RedisCacheDbService, QdrantVectorDbService, MongoPersistantDbService, HuskyRevalidationService, HuskyGenerationService,],
 })
 export class HuskyModule {}
