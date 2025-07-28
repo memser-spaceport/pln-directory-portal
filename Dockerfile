@@ -39,7 +39,10 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/apps/web-api/prisma ./apps/web-api/prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-ENV NODE_ENV=production
+# Ensure /app is owned by the 'app' user and is writable (for Forest Admin schema file)
+# Security note: This grants write access to the app directory for the app user only, not globally
+RUN chown -R app:app /app && chmod -R u+w /app
+
 ENV DEBUG=prisma:*
 
 USER app
