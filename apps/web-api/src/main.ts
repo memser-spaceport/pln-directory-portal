@@ -32,8 +32,12 @@ export async function bootstrap() {
     enabled: process.env.ENVIRONMENT === APP_ENV.PRODUCTION || process.env.ENVIRONMENT === APP_ENV.STAGING,
   });
  
-
-
+  
+  if (!!process.env.FOREST_AUTH_SECRET) {
+    const agent = createForestAdminAgent();
+    await agent.mountOnNestJs(app).start();
+  }
+  
   await app.listen(process.env.PORT || 3000);
 }
 
