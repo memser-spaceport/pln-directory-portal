@@ -106,9 +106,6 @@ export class PLEventLocationsService {
         ...queryOptions,
         include: {
           events: {
-            where: {
-              isDeleted: false
-            },
             select: {
               slugURL: true,
               uid: true,
