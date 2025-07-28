@@ -4,9 +4,6 @@ import { Prisma } from '@prisma/client';
 export type PLEventLocationWithEvents = Prisma.PLEventLocationGetPayload<{
   include: {
     events: {
-      where: {
-        isDeleted: false
-      },
       select: {
         slugURL: true,
         uid: true,
