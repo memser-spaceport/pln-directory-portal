@@ -43,8 +43,6 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 # Security note: This grants write access to the app directory for the app user only, not globally
 RUN chown -R app:app /app && chmod -R u+w /app
 
-ENV DEBUG=prisma:*
-
 USER app
 
 EXPOSE 3000
