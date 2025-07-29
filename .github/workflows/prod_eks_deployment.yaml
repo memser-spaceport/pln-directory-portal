@@ -3,13 +3,13 @@ name: Deploy to EKS with Helm
 on:
   push:
     branches:
-      - develop   # Triggers Dev deployment
+      - master   # Triggers PROD deployment
 jobs:
-  dev-deploy:
+  prod-deploy:
     name: Deploy Helm Chart to EKS preprod
     runs-on: ubuntu-latest
     env:
-      ENVIRONMENT: dev
+      ENVIRONMENT: prod
       APPNAME: directory-service
       DOCKER_IMAGE: directory-service
       ECR_REPOSITORY: pln-directory-service
@@ -46,14 +46,14 @@ jobs:
           ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
 
           docker tag ${{ env.DOCKER_IMAGE }}:latest $ECR_REGISTRY:$git_hash
-          docker tag ${{ env.DOCKER_IMAGE }}:latest $ECR_REGISTRY:dev
+          docker tag ${{ env.DOCKER_IMAGE }}:latest $ECR_REGISTRY:prod
 
       - name: Push Docker image to ECR
         run: |
           git_hash=$(git rev-parse --short "$GITHUB_SHA")
           ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
           docker push $ECR_REGISTRY:$git_hash
-          docker push $ECR_REGISTRY:dev
+          docker push $ECR_REGISTRY:prod
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -112,4 +112,4 @@ jobs:
         run: |
           git_hash=$(git rev-parse --short "$GITHUB_SHA")
           ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
-          helm upgrade --install directory-service deployment/chart/ --set image.repository=$ECR_REGISTRY --set image.tag=$git_hash --set nodeSelector.allocationtags=pln-dev-k8s --set ingress.grpname=dev-pln-internal --set ingress.healthcheck_path=/ --set ingress.host=dev-directory.plnetwork.io --set service.port=3000 --set ingress.acm_arn=$CERT_ARN -f deployment/chart/${{ env.APP_MODE }}_secret_values.yaml -n pln-dev
+          helm upgrade --install directory-service deployment/chart/ --set image.repository=$ECR_REGISTRY --set image.tag=$git_hash --set nodeSelector.allocationtags=pln-k8s --set ingress.grpname=prod-pln-internal --set ingress.healthcheck_path=/ --set ingress.host=prod-directory.plnetwork.io --set service.port=3000 --set ingress.acm_arn=$CERT_ARN -f deployment/chart/${{ env.APP_MODE }}_secret_values.yaml -n pln-prod
