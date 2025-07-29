@@ -82,6 +82,7 @@ export class NotificationSettingsController {
   }
 
   @Get(':memberUid/forum')
+  @NoCache()
   @UsePipes(ZodValidationPipe)
   async getForumSettings(@Param('memberUid') memberUid: string, @Req() request: Request) {
     const userEmail = request['userEmail'];
@@ -112,6 +113,7 @@ export class NotificationSettingsController {
   }
 
   @Get(':memberUid/item/:type')
+  @NoCache()
   async findItem(
     @Param('memberUid') memberUid: string,
     @Param('type') type: string,
