@@ -49,6 +49,7 @@ import { RecommendationsModule } from './recommendations/recommendations.module'
 import { AnalyticsModule } from './analytics/analytics.module';
 import { NotificationSettingsModule } from './notification-settings/notification-settings.module';
 import { ProfileModule } from './profile/profile.module';
+import { ForumModule } from './forum/forum.module';
 
 @Module({
   controllers: [AppController],
@@ -121,7 +122,8 @@ import { ProfileModule } from './profile/profile.module';
     OpenSearchModule,
     RecommendationsModule,
     NotificationSettingsModule,
-    ProfileModule
+    ProfileModule,
+    ForumModule,
   ],
   providers: [
     {
