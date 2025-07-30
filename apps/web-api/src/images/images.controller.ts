@@ -121,6 +121,6 @@ export class ImagesController {
       },
       undefined // No thumbnails
     );
-    return { image: createdImages[0] };
+    return createdImages;
   }
 }
