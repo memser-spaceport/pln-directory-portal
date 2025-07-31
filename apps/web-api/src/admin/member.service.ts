@@ -57,9 +57,13 @@ export class MemberService {
     tx: Prisma.TransactionClient = this.prisma
   ): Promise<Member> {
     try {
-      return await tx.member.create({
+      const createdMember = await tx.member.create({
         data: member,
       });
+      await this.notificationSettingsService.createForumNotificationSetting(createdMember.uid).catch((error) => {
+        this.logger.error(`Error creating forum notification setting for member ${createdMember.uid}: ${error}`);
+      });
+      return createdMember;
     } catch (error) {
       return this.handleErrors(error);
     }

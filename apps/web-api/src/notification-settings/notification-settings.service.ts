@@ -3,13 +3,15 @@ import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
 import { UpdateNotificationSettingsDto, UpdateParticipationDto } from 'libs/contracts/src/schema/notification-settings';
 import { RecommendationsService } from '../recommendations/recommendations.service';
+import { NotificationServiceClient } from '../notifications/notification-service.client';
 
 @Injectable()
 export class NotificationSettingsService {
   constructor(
     private prisma: PrismaService,
     private logger: LogService,
-    private recommendationsService: RecommendationsService
+    private recommendationsService: RecommendationsService,
+    private notificationServiceClient: NotificationServiceClient
   ) {}
 
   async getNotificationSettings(memberUid: string) {
@@ -97,5 +99,14 @@ export class NotificationSettingsService {
     } catch (err) {
       this.logger.error(`The recommendations weren't enabled for ${memberUids.join(', ')}`, err);
     }
+  }
+
+  async createForumNotificationSetting(memberUid: string) {
+    const notificationSetting = await this.notificationServiceClient.upsertNotificationSetting(memberUid, {
+      forumDigestEnabled: true,
+      forumDigestFrequency: 1,
+      memberUid,
+    });
+    return notificationSetting;
   }
 }
