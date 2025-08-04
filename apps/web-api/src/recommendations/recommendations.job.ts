@@ -74,23 +74,12 @@ export class RecommendationsJob {
             const timeSinceLastEmail = now.getTime() - lastExampleSentAt.getTime();
             const daysSinceLastEmail = timeSinceLastEmail / (1000 * 60 * 60 * 24);
 
-            // 2nd attempt: must be at least 7 days after 1st attempt
-            if (currentAttempts === 1 && daysSinceLastEmail < 7) {
+            // 2nd and 3rd attempt: must be at least 7 days after 1st attempt
+            if ((currentAttempts === 1 || currentAttempts === 2) && daysSinceLastEmail < 7) {
               this.logger.info(
-                `Skipping member ${member.uid} - 2nd attempt too soon (${daysSinceLastEmail.toFixed(
-                  1
-                )} days since last email)`
-              );
-              skippedCount++;
-              continue;
-            }
-
-            // 3rd attempt: must be at least 14 days after 2nd attempt
-            if (currentAttempts === 2 && daysSinceLastEmail < 14) {
-              this.logger.info(
-                `Skipping member ${member.uid} - 3rd attempt too soon (${daysSinceLastEmail.toFixed(
-                  1
-                )} days since last email)`
+                `Skipping member ${member.uid} - ${
+                  currentAttempts + 1
+                }nd attempt too soon (${daysSinceLastEmail.toFixed(1)} days since last email)`
               );
               skippedCount++;
               continue;
