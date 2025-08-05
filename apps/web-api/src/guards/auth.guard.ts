@@ -25,13 +25,7 @@ export class AuthGuard implements CanActivate {
       const token = this.authService.checkIfTokenAttached(request);
       request = await this.authService.validateToken(request, token);
 
-      if (
-        await this.validateUserEmail(
-          request.params.uid,
-          request.userEmail,
-          request.method
-        )
-      ) {
+      if (await this.validateUserEmail(request.params.uid, request.userEmail, request.method)) {
         return true;
       } else {
         throw new ForbiddenException();
@@ -43,9 +37,7 @@ export class AuthGuard implements CanActivate {
         error?.response?.status === 401 ||
         error?.name === 'NotFoundError'
       ) {
-        throw new UnauthorizedException(
-          'Invalid Session. Please login and try again'
-        );
+        throw new UnauthorizedException('Invalid Session. Please login and try again');
       } else if (error instanceof ForbiddenException) {
         throw new ForbiddenException('Forbidden. Email doesn`t match');
       }
@@ -55,18 +47,8 @@ export class AuthGuard implements CanActivate {
 
   validateUserEmail = async (uid, email, method) => {
     const memberResponse = await this.membersService.findOne(uid);
-    const tokenMemberResponse = await this.membersService.findMemberFromEmail(
-      email
-    );
-    if (method === 'PATCH') {
-      return memberResponse && memberResponse.email === email;
-    } else {
-      return (
-        memberResponse &&
-        (memberResponse.email === email ||
-          this.checkIfAdminUser(tokenMemberResponse))
-      );
-    }
+    const tokenMemberResponse = await this.membersService.findMemberFromEmail(email);
+    return memberResponse && (memberResponse.email === email || this.checkIfAdminUser(tokenMemberResponse));
   };
 
   checkIfAdminUser = (member) => {
@@ -79,9 +61,7 @@ export class AuthGuard implements CanActivate {
 
 @Injectable()
 export class InternalAuthGuard implements CanActivate {
-  constructor(
-    private authService: AuthService
-  ) {}
+  constructor(private authService: AuthService) {}
 
   canActivate(context: ExecutionContext): boolean {
     try {
