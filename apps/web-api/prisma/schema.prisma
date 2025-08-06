@@ -224,6 +224,11 @@ enum PLEventLocationStatus {
   MANUALLY_MAPPED
 }
 
+enum PLEventLocationStatus {
+  AUTO_MAPPED
+  MANUALLY_MAPPED
+}
+
 model ParticipantsRequest {
   id               Int             @id @default(autoincrement())
   uid              String          @unique @default(cuid())
@@ -470,6 +475,42 @@ model PLEventLocationAssociation {
 }
 
 model PLEvent {
+  id                            Int                         @id @default(autoincrement())
+  uid                           String                      @unique @default(cuid())
+  type                          PLEventType?
+  eventsCount                   Int?
+  telegramId                    String?
+  logoUid                       String?
+  logo                          Image?                      @relation("logo", fields: [logoUid], references: [uid])
+  bannerUid                     String?
+  banner                        Image?                      @relation("banner", fields: [bannerUid], references: [uid])
+  name                          String
+  description                   String?
+  shortDescription              String?
+  websiteURL                    String?
+  externalId                    String?
+  isFeatured                    Boolean?                    @default(false)
+  isAggregated                  Boolean                     @default(false)
+  slugURL                       String                      @unique
+  resources                     Json[]
+  priority                      Int?
+  additionalInfo                Json?
+  startDate                     DateTime
+  endDate                       DateTime
+  isDeleted                     Boolean                     @default(false)
+  createdAt                     DateTime                    @default(now())
+  updatedAt                     DateTime                    @updatedAt
+  syncedAt                      DateTime?
+  relatedQuestions              DiscoveryQuestion[]         @relation("PLEventRelatedDiscoveryQuestions")
+  locationUid                   String?
+  location                      PLEventLocation?            @relation(fields: [locationUid], references: [uid])
+  locationStatus                PLEventLocationStatus?
+  eventGuests                   PLEventGuest[]
+  reviewer                      Member?                     @relation("PLEventReviewer", fields: [reviewerUid], references: [uid])
+  reviewerUid                   String?
+  aggregatedPriority            Int?
+  pLEventLocationAssociationUid String?
+  pLEventLocationAssociation    PLEventLocationAssociation? @relation(fields: [pLEventLocationAssociationUid], references: [uid])
   id                            Int                         @id @default(autoincrement())
   uid                           String                      @unique @default(cuid())
   type                          PLEventType?
