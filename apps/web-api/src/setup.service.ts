@@ -13,7 +13,11 @@ export class SetupService {
             winston.format.timestamp(),
             winston.format.ms(),
             winston.format.printf((info) => {
-              return `${JSON.stringify(info)}`;;
+              try {
+                return `${JSON.stringify(info)}`;
+              } catch (error) {
+                return String(info);
+              }
             })
             //nestWinstonModuleUtilities.format.nestLike()
           ),
