@@ -322,7 +322,7 @@ export class PLEventsController {
     if ( !requestor.isDirectoryAdmin ) {
       throw new ForbiddenException(`Member isn't authorized to delete the event`);
     }
-    return await this.eventService.deleteEvent(locationUid, eventUid);
+    return await this.eventService.deleteEventByUid(eventUid);
   }
 
 
