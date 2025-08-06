@@ -179,6 +179,7 @@ export class MembersService {
           uid: true,
           name: true,
           email: true,
+          accessLevel: true,
         },
       });
 
