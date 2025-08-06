@@ -214,7 +214,7 @@ export class HuskyAiService {
   }
 
   async updateChatSummaryInMongo(threadId: string, summary: string) {
-    await this.huskyPersistentDbService.upsertByKeyValue(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', 'threadId', threadId, {
+    await this.huskyPersistentDbService.upsertByKeyValue(process.env.MONGO_CHATS_SUMMARY_COLLECTION || 'chats_summary', 'threadId', threadId, {
       threadId,
       summary,
       createdAt: Date.now(),
@@ -232,7 +232,7 @@ export class HuskyAiService {
     actions: any[] = []
   ) {
 
-    let doc = await this.huskyPersistentDbService.getDocByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
+    let doc = await this.huskyPersistentDbService.getDocByKeyValue(process.env.MONGO_THREADS_COLLECTION || 'threads', 'threadId', threadId);
     if (!doc) {
       const newDoc = {
         threadId,
@@ -250,7 +250,7 @@ export class HuskyAiService {
           }
         ],
       }
-      await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || '', newDoc);
+      await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || 'threads', newDoc);
 
     } else {
       const contextual = doc?.contextual || [];
@@ -269,7 +269,7 @@ export class HuskyAiService {
 
       doc.updatedAt = Date.now();
       doc.contextual = updatedContextual;
-      await this.huskyPersistentDbService.updateDocByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId, doc);
+      await this.huskyPersistentDbService.updateDocByKeyValue(process.env.MONGO_THREADS_COLLECTION || 'threads', 'threadId', threadId, doc);
     }
 
 
@@ -279,8 +279,8 @@ export class HuskyAiService {
     if(email && guestUserId) {
       throw new BadRequestException('You cannot duplicate a thread with both email and guestUserId');
     }
-    const threadPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
-    const summaryPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', 'threadId', threadId);
+    const threadPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || 'threads', 'threadId', threadId);
+    const summaryPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_CHATS_SUMMARY_COLLECTION || 'chats_summary', 'threadId', threadId);
     const [thread, summary] = await Promise.all([threadPromise, summaryPromise]);
     if (!thread) {
       throw new NotFoundException('Thread not found');
@@ -320,11 +320,11 @@ export class HuskyAiService {
       ...(guestUserId && { guestUserId: guestUserId }),
     } as { [key: string]: any };
 
-    await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || '', newThread);
+    await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || 'threads', newThread);
 
     if (summary) {
        await Promise.all([
-        this.huskyPersistentDbService.create(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', {
+        this.huskyPersistentDbService.create(process.env.MONGO_CHATS_SUMMARY_COLLECTION || 'chats_summary', {
           summary: summary?.summary,
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -340,14 +340,14 @@ export class HuskyAiService {
   }
 
   async deleteThreadEmail(threadId: string, email: string) {
-    const thread = await this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
+    const thread = await this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || 'threads', 'threadId', threadId);
     if (!thread) {
       throw new NotFoundException('Thread not found');
     }
     if (thread?.email !== email) {
       throw new ForbiddenException('You are not authorized to delete this thread');
     }
-    await this.huskyPersistentDbService.deleteDocByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
+    await this.huskyPersistentDbService.deleteDocByKeyValue(process.env.MONGO_THREADS_COLLECTION || 'threads', 'threadId', threadId);
   }
 
   async getEmbeddingForText(text: string) {
@@ -516,7 +516,7 @@ export class HuskyAiService {
   }
 
   async createThread(threadId: string, email: string) {
-    return await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || '', {
+    return await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || 'threads', {
       threadId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -527,7 +527,7 @@ export class HuskyAiService {
   }
 
   async createThreadBasicInfo(threadId: string, question: string, email: string = '') {
-    const thread = await this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
+    const thread = await this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || 'threads', 'threadId', threadId);
     if (!thread) {
       throw new NotFoundException('Thread not found');
     }
@@ -558,7 +558,7 @@ export class HuskyAiService {
       prompt: prompt,
     });
     const createdTitle = text || '';
-    await this.huskyPersistentDbService.updateByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId, {
+    await this.huskyPersistentDbService.updateByKeyValue(process.env.MONGO_THREADS_COLLECTION || 'threads', 'threadId', threadId, {
       ...(memberDetails && { memberName: memberDetails?.name, memberImage: memberDetails?.image?.url }),
       title: createdTitle,
     });
@@ -566,7 +566,7 @@ export class HuskyAiService {
 
   async getThreadsByEmail(email: string) {
     try {
-      const threads = await this.huskyPersistentDbService.findByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'email', email);
+      const threads = await this.huskyPersistentDbService.findByKeyValue(process.env.MONGO_THREADS_COLLECTION || 'threads', 'email', email);
       return threads
         .filter((thread) => thread?.title?.length > 0)
         .sort((a, b) => b.updatedAt - a.updatedAt)
@@ -585,8 +585,8 @@ export class HuskyAiService {
 
 
   async getThreadById(threadId: string, email: string = '') {
-    const threadPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || '', 'threadId', threadId);
-    const summaryPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_CHATS_SUMMARY_COLLECTION || '', 'threadId', threadId);
+    const threadPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_THREADS_COLLECTION || 'threads', 'threadId', threadId);
+    const summaryPromise = this.huskyPersistentDbService.findOneByKeyValue(process.env.MONGO_CHATS_SUMMARY_COLLECTION || 'chats_summary', 'threadId', threadId);
 
     const [thread, summaryData] = await Promise.all([threadPromise, summaryPromise]);
     if (!thread) {
