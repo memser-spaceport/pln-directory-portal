@@ -21,10 +21,13 @@ import {
   PLEventGuestQuerySchema,
   PLEventLocationQueryParams,
   PLEventQueryParams,
+  PLEventAggregatedDataQueryParams,
   ResponsePLEventLocationWithRelationsSchema,
   ResponsePLEventSchemaWithRelationsSchema,
   ResponseUpcomingEvents,
-  UpdatePLEventGuestSchemaDto
+  UpdatePLEventGuestSchemaDto,
+  UpdatePLEventLocationSchemaDto,
+  UpdateIRLAggregatedPriorityDto
 } from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
@@ -280,13 +283,14 @@ export class PLEventsController {
   }
 
   @Api(server.route.getAllAggregatedData)
+  @ApiQueryFromZod(PLEventAggregatedDataQueryParams)
   @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
   @NoCache()
   async getAllAggregatedData(
     @Req() request: Request
   ) {
     const loggedInMember = request['userEmail'] ? await this.memberService.findMemberByEmail(request['userEmail']) : null;
-    return await this.eventGuestService.getAllAggregatedData(loggedInMember);
+    return await this.eventGuestService.getAllAggregatedData(loggedInMember, request.query);
   }
 
   @Api(server.route.sendEventGuestPresenceRequest)
@@ -325,5 +329,33 @@ export class PLEventsController {
     return await this.eventService.deleteEvent(locationUid, eventUid);
   }
 
+  @Api(server.route.modifyIRLAggregatedData)
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  async modifyIRLAggregatedData(
+    @Body() body: UpdateIRLAggregatedPriorityDto,
+    @Req() request
+  ) {
+    const requestor = await this.memberService.findMemberByEmail(request['userEmail']);
+    if ( !requestor.isDirectoryAdmin ) {
+      throw new ForbiddenException(`Member with email ${request['userEmail']} isn't authorized to modify the event location`);
+    }
+    return await this.eventLocationService.setAggregatedPriority(body);
+  }
+
+  @Api(server.route.modifyPLEventLocation)
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  async modifyPLEventLocation(
+    @Param('uid') locationUid: string,
+    @Body() body: UpdatePLEventLocationSchemaDto,
+    @Req() request
+  ) {
+    const requestor = await this.memberService.findMemberByEmail(request['userEmail']);
+    if ( !requestor.isDirectoryAdmin ) {
+      throw new ForbiddenException(`Member with email ${request['userEmail']} isn't authorized to modify the event location`);
+    }
+    return await this.eventLocationService.modifyPLEventLocation(locationUid, body);
+  }
 
 }
