@@ -80,7 +80,7 @@ export class PLEventsController {
   ) {
     const event = { ...body };
     const requestor = await this.memberService.findMemberByRole();
-    return await this.eventService.createPLEvent(event, requestor?.email)
+    return await this.eventService.createPLEvent(event)
   }
 
   @Api(server.route.getPLEventGuestsByLocation)
@@ -326,7 +326,7 @@ export class PLEventsController {
     if ( !requestor.isDirectoryAdmin ) {
       throw new ForbiddenException(`Member isn't authorized to delete the event`);
     }
-    return await this.eventService.deleteEvent(locationUid, eventUid);
+    return await this.eventService.deleteEventByUid(eventUid);
   }
 
   @Api(server.route.modifyIRLAggregatedData)
