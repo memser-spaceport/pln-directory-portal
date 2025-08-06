@@ -1121,22 +1121,71 @@ export class PLEventGuestsService {
   }
 
   /**
-   * This method retrieves all aggregated event and location data.
+   * This method retrieves all aggregated event and location data with optional search functionality.
+   * @param loggedInMember The logged in member object
+   * @param searchParams Optional search parameters including name and isAggregated for filtering
    * @returns An object containing:
-   * - `events`: An array of aggregated event objects.
-   * - `locations`: An array of aggregated location objects.
+   * - `events`: An array of event objects filtered by search and aggregation status if provided.
+   * - `locations`: An array of location objects filtered by search and aggregation status if provided.
    * @throws an `InternalServerErrorException` if an error occurs during data retrieval.
    */
-  async getAllAggregatedData(loggedInMember) {
+  async getAllAggregatedData(loggedInMember, queryParams) {
     try {
+      // Build search conditions for events and locations
+      const eventSearchCondition = queryParams?.name ? {
+        name: {
+          contains: queryParams.name,
+          mode: 'insensitive' as const
+        }
+      } : {};
+
+      const locationSearchCondition = queryParams?.name ? {
+        location: {
+          contains: queryParams.name,
+          mode: 'insensitive' as const
+        }
+      } : {};
+
+       // Build orderBy conditions based on queryParams.orderBy
+       const eventOrderBy = await this.buildOrderByCondition(queryParams?.orderBy) || { aggregatedPriority: 'desc' };
+       const locationOrderBy = await this.buildOrderByCondition(queryParams?.orderBy) || { aggregatedPriority: 'desc' };
+
       return {
-        events: await this.eventService.getPLEvents({ where: { isAggregated: true } }),
-        locations: await this.eventLocationsService.getFeaturedLocationsWithSubscribers({ where: { isAggregated: true } }, loggedInMember)
+        events: await this.eventService.getPLEvents({ 
+          where: { 
+            isAggregated: queryParams.isAggregated !== undefined ? queryParams.isAggregated === 'true' : true,
+            ...eventSearchCondition
+          },
+          ...(eventOrderBy && { orderBy: eventOrderBy })
+        }),
+
+        locations: await this.eventLocationsService.getFeaturedLocationsWithSubscribers({ 
+          where: { 
+            isAggregated: queryParams.isAggregated !== undefined ? queryParams.isAggregated === 'true' : true,
+            ...locationSearchCondition
+          },
+          ...(locationOrderBy && { orderBy: locationOrderBy as any })
+        }, loggedInMember)
       };
     } catch (error) {
-      throw new InternalServerErrorException(`Error occured while retrieving aggregated data: ${error.message}`);
+      this.logger.error(`Error occured while retrieving aggregated data: ${error}`);
+      this.handleErrors(error);
     }
   }
+
+  private buildOrderByCondition(orderBy?: string) {
+    if (!orderBy) return null;
+    
+    // Handle descending order (prefixed with -)
+    if (orderBy.startsWith('-')) {
+      const field = orderBy.substring(1);
+      return { [field]: 'desc' };
+    }
+    
+    // Handle ascending order (default)
+    return { [orderBy]: 'asc' };
+  }
+
 
   enrichEvents(events) {
     return events.map((event) => ({
