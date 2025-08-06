@@ -14,5 +14,12 @@ export const apiPLEvents = contract.router({
     },
     summary: 'Create new event',
   },
-
+  fetchAssociations: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/events/location-associations`,
+    query: contract.query,
+    responses: {
+      200: contract.body<unknown>(),
+    },
+  }
 });
