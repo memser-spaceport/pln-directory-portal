@@ -161,7 +161,7 @@ export class MembersService {
    * @param memberIds - Array of member UIDs to retrieve
    * @returns A promise that resolves to an array of simplified member records
    */
-  async findMembersByIds(memberIds: string[]): Promise<Array<{ uid: string; name: string; email: string }>> {
+  async findMembersByIds(memberIds: string[]): Promise<Array<{ uid: string; name: string; email: string; accessLevel: string }>> {
     try {
       const members = await this.prisma.member.findMany({
         where: {
@@ -184,7 +184,7 @@ export class MembersService {
       });
 
       // Filter out any members with null emails (type safety)
-      return members.filter((member): member is { uid: string; name: string; email: string } => member.email !== null);
+      return members.filter((member): member is { uid: string; name: string; email: string;  accessLevel: string } => member.email !== null);
     } catch (error) {
       return this.handleErrors(error);
     }
