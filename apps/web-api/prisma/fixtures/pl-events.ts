@@ -1,5 +1,5 @@
 import { Factory } from 'fishery';
-import { PLEvent } from '@prisma/client';
+import { PLEvent, PLEventLocationStatus } from '@prisma/client';
 import { faker } from '@faker-js/faker';
 import sample from 'lodash/sample';
 import { prisma } from './../index';
@@ -63,6 +63,10 @@ const eventFactory = Factory.define<Omit<PLEvent, 'id'>>(
       isAggregated: false,
       isDeleted: false,
       aggregatedPriority: faker.datatype.number({ min: 1, max: 100 }),
+      // Added required fields after schema updates
+      locationStatus: 'AUTO_MAPPED' as PLEventLocationStatus,
+      reviewerUid: null,
+      pLEventLocationAssociationUid: null,
       // country: faker.address.country(),
     };
   }
