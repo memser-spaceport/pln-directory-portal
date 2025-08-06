@@ -77,6 +77,7 @@ export const SimpleMemberSchema = ResponseMemberSchema.pick({
   uid: true,
   name: true,
   email: true,
+  accessLevel: true,
 });
 
 export const MembersByIdsRequestSchema = z.object({
