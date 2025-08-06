@@ -39,10 +39,13 @@ export class PLEventsService {
    * @param event The event creation payload containing the required event details, such as name, type, description,
    *             startDate, endDate, resources, and locationUid.
    * @param tx - The transaction object.
+   * @param tx - The transaction object.
    * @returns The newly created event object with details such as name, type, start and end dates, and location.
    */
   async createPLEvent(event, tx?) {
+  async createPLEvent(event, tx?) {
     try {
+      const createdEvent = await (tx || this.prisma).pLEvent.create({
       const createdEvent = await (tx || this.prisma).pLEvent.create({
         data: event
       });
@@ -402,7 +405,36 @@ export class PLEventsService {
    * @returns The updated event object.
    */
   async updateEventByUid(uid: string, event: Prisma.PLEventUncheckedUpdateInput, tx?) {
+  /**
+   * This method updates an event by its unique identifier.
+   * @param uid - The unique identifier of the event to update.
+   * @param event - The event data containing the updated information.
+   * @param tx - The transaction object.
+   * @returns The updated event object.
+   */
+  async updateEventByUid(uid: string, event: Prisma.PLEventUncheckedUpdateInput, tx?) {
     try {
+      const updatedEvent = await (tx || this.prisma).pLEvent.update({
+        where: { uid },
+        data: event
+      });
+      this.cacheService.reset({ service: 'PLEventGuest' });
+      return updatedEvent;
+    } catch (error) {
+      this.handleErrors(error);
+    }
+  }
+
+  /**
+   * This method deletes an event by its unique identifier.
+   * @param uid - The unique identifier of the event to delete.
+   * @param tx - The transaction object.
+   * @returns The deleted event object.
+   */
+  async deleteEventByUid(uid: string, tx?) {
+    try {
+      const deletedEvent = await (tx || this.prisma).pLEvent.update({
+        where: { uid },
       const updatedEvent = await (tx || this.prisma).pLEvent.update({
         where: { uid },
         data: event

@@ -6,13 +6,25 @@ import { EventsConsumer } from './events.consumer';
 import { PLEventsModule } from '../pl-events/pl-events.module';
 import { EventsToolingService } from './events-tooling.service';
 import { EventConsumerHelper } from './event-consumer.helper';
-import { AuthModule }  from '../auth/auth.module';
 import { SharedModule } from '../shared/shared.module';
+import { AuthModule }  from '../auth/auth.module';
 
 @Module({
   controllers: [EventsController],
-  providers: [EventsService, EventsToolingService, EventsConsumer, EventConsumerHelper],
+  providers: [EventsService, EventsToolingService, EventsConsumer, EventConsumerHelper, EventsConsumer, EventConsumerHelper],
   imports: [
+    SqsModule.register({
+      consumers: [
+        {
+          name: 'events',
+          queueUrl: process.env.EVENTS_QUEUE_URL || '',
+          region: process.env.AWS_REGION,
+          pollingWaitTimeMs: (process.env.POLLING_INTERVAL as unknown as number) || 5000
+        },
+      ],
+      producers: [],
+    }),
+    
     SqsModule.register({
       consumers: [
         {
@@ -27,6 +39,8 @@ import { SharedModule } from '../shared/shared.module';
     forwardRef(() => PLEventsModule),
     AuthModule,
     SharedModule
+  ,
+    AuthModule
   ],
   exports: [EventsToolingService, EventsService]
 })
