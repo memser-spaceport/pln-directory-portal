@@ -5,6 +5,7 @@ import { getFilenameFromUrl, getFileTypeFromUrl } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { isEmpty } from 'lodash';
 import { EventsService } from '../events/events.service';
+import { PLEventType } from '@prisma/client';
 
 @Injectable()
 export class PLEventSyncService {
@@ -107,8 +108,10 @@ export class PLEventSyncService {
         const updatedAt = new Date(event.updatedAt);
         const existingEventUpdatedAt = new Date(existingEvent.syncedAt);
         if (updatedAt > existingEventUpdatedAt) {
-          const location = await this.eventsService.createEventLocation(event);
-          event.locationUid = location?.uid;
+          if (event?.format != PLEventType.VIRTUAL) {
+            const location = await this.eventsService.createEventLocation(event);
+            event.locationUid = location?.uid;
+          }
           await this.prisma.pLEvent.update({
             where: { uid: existingEvent.uid },
             data: await this.mapEventData(event),
@@ -118,9 +121,11 @@ export class PLEventSyncService {
           this.logger.log(`No update needed for event: "${event.event_name}" (ID: ${event.event_id}), already up to date.`);
         }
       } else {
+        if (event?.format != PLEventType.VIRTUAL) {
         const location = await this.eventsService.createEventLocation(event);
-        // Create a new event if it does not exist in the database
-        event.locationUid = location?.uid;
+          // Create a new event if it does not exist in the database
+          event.locationUid = location?.uid;
+        }
         const createdEvent = await this.prisma.pLEvent.create({
           data: await this.mapEventData(event)
         });
