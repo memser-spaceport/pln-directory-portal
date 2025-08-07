@@ -1,9 +1,10 @@
-import { Body, Controller, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Query, Req, UseGuards } from '@nestjs/common';
 import { Api, initNestServer } from '@ts-rest/nest';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { apiPLEvents } from 'libs/contracts/src/lib/contract-events';
 import { EventsService } from './events.service';
 import { SkipEmptyStringToNull } from '../decorators/skip-empty-string-to-null.decorator';
+import { PLEventLocationAssociationService } from '../pl-events/pl-event-location-association.service';
 
 
 const server = initNestServer(apiPLEvents);
@@ -14,7 +15,8 @@ type RouteShape = typeof server.routeShapes;
 @SkipEmptyStringToNull()
 export class EventsController {
   constructor(
-    private readonly eventService: EventsService
+    private readonly eventService: EventsService,
+    private readonly locationAssociationService: PLEventLocationAssociationService
   ) { }
 
   @Api(server.route.createEvent)
@@ -24,6 +26,22 @@ export class EventsController {
     @Req() request
   ) {
     return await this.eventService.submitPLEvent(body, request['userEmail']);
+  }
+
+  @Api(server.route.fetchLocationAssociation)
+  @UseGuards(UserTokenValidation)
+  async fetchLocationAssociation(
+    @Query() query
+  ) {
+    return await this.locationAssociationService.findLocationAssociation(query);
+  }
+
+  @Api(server.route.fetchLocations)
+  @UseGuards(UserTokenValidation)
+  async fetchLocations(
+    @Query() query,
+  ) {
+    return await this.eventService.fetchLocations();
   }
 }
 

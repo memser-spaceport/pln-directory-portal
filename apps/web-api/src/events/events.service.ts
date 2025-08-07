@@ -1,8 +1,6 @@
 import { BadRequestException, Injectable, UnauthorizedException, ForbiddenException, NotFoundException, ConflictException, HttpException, GatewayTimeoutException, ServiceUnavailableException, InternalServerErrorException } from '@nestjs/common';
-import axios from 'axios';
 import { PLEventLocationsService } from '../pl-events/pl-event-locations.service';
 import { LogService } from '../shared/log.service';
-import { PLEventType } from '@prisma/client';
 import { EventsToolingService } from './events-tooling.service';
 
 @Injectable()
@@ -22,9 +20,6 @@ export class EventsService {
    */
   async submitPLEvent(event, requestorEmail: string) {
     try {
-      if (event?.format != PLEventType.VIRTUAL) {
-        await this.createEventLocation(event);
-      }
       return await this.eventsToolingService.createEvent(event, requestorEmail);
     } catch (error) {
       this.handleAxiosError(error);
@@ -64,6 +59,24 @@ export class EventsService {
     } catch (error) {
       throw error;
     }
+  }
+  
+  /**
+   * Fetches all locations from the PLEvent location service.
+   * 
+   * @returns The response from the PLEvent location service.
+   */
+  async fetchLocations() {
+    return await this.locationService.getPLEventLocations({ 
+      where: {
+        isDeleted: false
+      },
+      select: { 
+        uid: true, 
+        location: true, 
+        type: true 
+      }
+    });
   }
 
   private handleAxiosError(error) {
