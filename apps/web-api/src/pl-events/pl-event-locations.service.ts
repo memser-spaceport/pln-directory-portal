@@ -624,14 +624,17 @@ export class PLEventLocationsService {
       // First, check if a location with the same city name exists
       const existingLocation = await this.prisma.pLEventLocation.findFirst({
         where: {
-          location: location.location
+          location: {
+            equals: location.location,
+            mode: 'insensitive'
+          }
         }
       });
 
       if (existingLocation) {
         // Calculate the deviation between existing and new coordinates
-        const latitudeDeviation = Math.abs(parseFloat(existingLocation.latitude) - parseFloat(location.latitude));
-        const longitudeDeviation = Math.abs(parseFloat(existingLocation.longitude) - parseFloat(location.longitude));
+        const latitudeDeviation = Math.abs(Math.abs(parseFloat(existingLocation.latitude)) - Math.abs(parseFloat(location.latitude)));
+        const longitudeDeviation = Math.abs(Math.abs(parseFloat(existingLocation.longitude)) - Math.abs(parseFloat(location.longitude)));
 
         // Check if deviation is within provided degrees
         if (latitudeDeviation <= Number(process.env.ALLOWED_LATITUDE_DEVIATION || 2) && longitudeDeviation <= Number(process.env.ALLOWED_LONGITUDE_DEVIATION || 2)) {
