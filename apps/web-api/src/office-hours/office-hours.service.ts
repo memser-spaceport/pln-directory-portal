@@ -1,4 +1,11 @@
-import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { MemberFollowUpsService } from '../member-follow-ups/member-follow-ups.service';
@@ -28,6 +35,7 @@ export class OfficeHoursService {
     private readonly followUpService: MemberFollowUpsService,
     private readonly feedbackService: MemberFeedbacksService,
     private readonly notificationClient: NotificationServiceClient,
+    @Inject(forwardRef(() => MembersService))
     private readonly membersService: MembersService
   ) {}
 
