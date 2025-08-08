@@ -1,6 +1,6 @@
 import moment from 'moment-timezone';
 import { Prisma, SubscriptionEntityType } from '@prisma/client';
-import { forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { MemberSubscriptionService } from '../member-subscriptions/member-subscriptions.service';
@@ -624,14 +624,17 @@ export class PLEventLocationsService {
       // First, check if a location with the same city name exists
       const existingLocation = await this.prisma.pLEventLocation.findFirst({
         where: {
-          location: location.location
+          location: {
+            equals: location.location,
+            mode: 'insensitive'
+          }
         }
       });
 
       if (existingLocation) {
         // Calculate the deviation between existing and new coordinates
-        const latitudeDeviation = Math.abs(parseFloat(existingLocation.latitude) - parseFloat(location.latitude));
-        const longitudeDeviation = Math.abs(parseFloat(existingLocation.longitude) - parseFloat(location.longitude));
+        const latitudeDeviation = Math.abs(Math.abs(parseFloat(existingLocation.latitude)) - Math.abs(parseFloat(location.latitude)));
+        const longitudeDeviation = Math.abs(Math.abs(parseFloat(existingLocation.longitude)) - Math.abs(parseFloat(location.longitude)));
 
         // Check if deviation is within provided degrees
         if (latitudeDeviation <= Number(process.env.ALLOWED_LATITUDE_DEVIATION || 2) && longitudeDeviation <= Number(process.env.ALLOWED_LONGITUDE_DEVIATION || 2)) {
@@ -658,5 +661,61 @@ export class PLEventLocationsService {
     }
   }
 
+  /**
+   * Modifies multiple event locations and events by updating their aggregatedPriority values.
+   *
+   * @param updateData The data containing locations and events to update with their aggregatedPriority values.
+   * @returns The updated locations and events.
+   * @throws {Error} - If an error occurs during the update process, it will be passed to the `handleErrors` method.
+   */
+  async setAggregatedPriority(updatedData: {
+    locations?: { uid: string; aggregatedPriority: number; isAggregated: boolean }[];
+    events?: { uid: string; aggregatedPriority: number; isAggregated: boolean }[];
+  }) {
+    try {
+      let updatedLocations: any[] = [];
+      let updatedEvents: any[] = [];
+      if (updatedData?.locations && updatedData?.locations.length > 0) {
+       updatedLocations = await Promise.all(
+          updatedData?.locations.map(({ uid, aggregatedPriority, isAggregated }) =>
+            this.prisma.pLEventLocation.update({
+              where: { uid },
+              data: { aggregatedPriority, isAggregated },
+            })
+          )
+        );
+      }
+      if (updatedData?.events && updatedData?.events.length > 0) {
+        updatedEvents = await Promise.all(
+          updatedData?.events.map(({ uid, aggregatedPriority, isAggregated }) =>
+            this.prisma.pLEvent.update({
+              where: { uid },
+              data: { aggregatedPriority, isAggregated },
+            })
+          )
+        );
+      }
+      return {
+        locations: updatedLocations,
+        events: updatedEvents
+      }
+    } catch (error) {
+      this.logger.error(`Error while setting aggregated Priority: ${error}`);
+      this.handleErrors(error);
+    }
+  }
+
+  async modifyPLEventLocation(locationUid: string, updatedLocation: {location?: string}) {
+    try {
+      const location = await this.prisma.pLEventLocation.update({
+        where: { uid: locationUid },
+        data: updatedLocation
+      });
+      return location;
+    } catch (error) { 
+      this.logger.error(`Error while modifying pl event location ${locationUid}: ${error}`);
+      this.handleErrors(error);
+    }  
+  }
 
 }

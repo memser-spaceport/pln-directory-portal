@@ -98,6 +98,11 @@ export const PLEventDetailQueryParams = PLEventQueryParams.unwrap()
   .pick(RETRIEVAL_QUERY_FILTERS)
   .optional();
 
+export const PLEventAggregatedDataQueryParams = z.object({
+  name: z.string().optional(),
+  isAggregated: z.boolean().optional(),
+}).optional();
+
 export class CreatePLEventSchemaDto extends createZodDto(PLCreateEventSchema) {}
 
 export class ResponseUpcomingEvents extends createZodDto(ResponseUpcomingEventSchema) {}
