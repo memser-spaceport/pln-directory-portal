@@ -92,6 +92,9 @@ model Member {
   telegramHandler              String?                       @unique
   telegramUid                  String?                       @unique
   officeHours                  String?
+  ohStatus                     String?
+  ohInterest                   String?
+  ohHelpWith                   String?
   moreDetails                  String?
   bio                          String?
   plnFriend                    Boolean?                      @default(false)

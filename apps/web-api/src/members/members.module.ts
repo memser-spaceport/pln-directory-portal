@@ -9,6 +9,7 @@ import { SharedModule } from '../shared/shared.module';
 import { AuthModule } from '../auth/auth.module';
 import { HuskyModule } from '../husky/husky.module';
 import { NotificationSettingsModule } from '../notification-settings/notification-settings.module';
+import { OfficeHoursModule } from '../office-hours/office-hours.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { NotificationSettingsModule } from '../notification-settings/notificatio
     ParticipantsRequestModule,
     HuskyModule,
     forwardRef(() => NotificationSettingsModule),
+    forwardRef(() => OfficeHoursModule),
   ],
   providers: [MembersService, MembersHooksService, OnboardingRemindersJob],
   controllers: [MemberController],
