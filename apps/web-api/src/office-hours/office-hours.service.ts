@@ -142,8 +142,8 @@ export class OfficeHoursService {
   }
 
   // --- New: Office hours link checks ---
-  async checkLink(link: string): Promise<'OK' | 'BROKEN'> {
-    if (!link) return 'BROKEN';
+  async checkLink(link: string): Promise<'OK' | 'BROKEN' | 'NOT_FOUND'> {
+    if (!link) return 'NOT_FOUND';
     try {
       const response = await axios.get(link, { maxRedirects: 5, timeout: 8000, validateStatus: () => true });
       const status = response.status;
@@ -221,10 +221,11 @@ export class OfficeHoursService {
             targetUid: target.uid,
             requesterName: requesterMember.name,
             requesterUid: requesterMember.uid,
+            link: `${process.env.WEB_UI_BASE_URL}/members/${target.uid}`,
           },
         },
         entityType: NOTIFICATION_ENTITY_TYPES.OFFICE_HOURS,
-        entityAction: OFFICE_HOURS_ACTIONS.BROKEN_LINK_ATTEMPT,
+        actionType: OFFICE_HOURS_ACTIONS.BROKEN_LINK_ATTEMPT,
         sourceMeta: {
           activityId: target.uid,
           activityType: NOTIFICATION_ENTITY_TYPES.OFFICE_HOURS,
@@ -304,6 +305,7 @@ export class OfficeHoursService {
               targetUid: target.uid,
               requesterName: requester.name,
               requesterUid: requester.uid,
+              link: `${process.env.WEB_UI_BASE_URL}/members/${target.uid}`,
             },
           },
           entityType: NOTIFICATION_ENTITY_TYPES.OFFICE_HOURS,
@@ -334,6 +336,14 @@ export class OfficeHoursService {
         this.logger.error('Failed to notify requester about fixed OH link', e);
       }
     }
+  }
+
+  async checkAndUpdateMemberLink(memberUid: string) {
+    const member = await this.membersService.findOne(memberUid);
+    const link = member?.officeHours as string | null;
+    const status = await this.checkLink(link || '');
+    await this.prisma.member.update({ where: { uid: memberUid }, data: { ohStatus: status } });
+    return { uid: memberUid, ohStatus: status };
   }
 
   private handleErrors(error, message?) {

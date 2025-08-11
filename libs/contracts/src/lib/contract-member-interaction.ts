@@ -69,4 +69,13 @@ export const apiMemberInteractions = contract.router({
     },
     summary: 'Record a broken office hours booking attempt and notify the target member',
   },
+  checkMemberOfficeHoursLink: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/office-hours/check`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: "Check a member's office hours link and update status",
+  },
 });

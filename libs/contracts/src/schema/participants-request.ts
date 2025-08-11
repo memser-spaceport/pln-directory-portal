@@ -46,6 +46,8 @@ const newDataMemberSchema = z.object({
   linkedinHandler: z.string().optional().nullable(),
   telegramHandler: z.string().optional().nullable(),
   officeHours: z.string().optional().nullable(),
+  ohInterest: z.array(z.string()).optional().default([]),
+  ohHelpWith: z.array(z.string()).optional().default([]),
   imageUid: z.string().optional().nullish(),
   moreDetails: z.string().optional().nullish(),
   projectContributions: z.array(ProjectContributionSchema as any).optional(),
@@ -59,7 +61,7 @@ const newDataMemberSchema = z.object({
   isVerified: z.boolean().nullish(),
   isUserConsent: z.boolean().nullish(),
   isSubscribedToNewsletter: z.boolean().nullish(),
-  teamOrProjectURL: z.string().nullish()
+  teamOrProjectURL: z.string().nullish(),
 });
 
 const newDataTeamSchema = z.object({
@@ -68,10 +70,7 @@ const newDataTeamSchema = z.object({
   industryTags: z.array(industrTagsMappingSchema).nonempty(),
   fundingStage: fundingStageMappingSchema,
   technologies: z.array(TechnologiesMappingSchema),
-  membershipSources: z
-    .array(membershipSourcesMappingSchema)
-    .optional()
-    .nullable(),
+  membershipSources: z.array(membershipSourcesMappingSchema).optional().nullable(),
   website: z.string().optional().nullable(),
   blog: z.string().optional().nullable(),
   shortDescription: z.string().optional().nullable(),
@@ -110,19 +109,19 @@ export const ParticipantRequestTeamSchema = z.object({
 
 export const FindUniqueIdentiferSchema = z.object({
   type: participantTypeEnum,
-  identifier: z.string()
-})
+  identifier: z.string(),
+});
 
 const ProcessParticipantRequest = z.object({
   status: statusEnum,
-  isVerified: z.boolean()
-})
+  isVerified: z.boolean(),
+});
 const ProcessBulkRequest = z.object({
   uid: z.string(),
   status: statusEnum,
   participantType: participantTypeEnum,
-  isVerified: z.boolean()
-})
-export class ProcessBulkParticipantRequest extends createZodDto(ProcessBulkRequest) { }
-export class ProcessParticipantReqDto extends createZodDto(ProcessParticipantRequest) { }
-export class FindUniqueIdentiferDto extends createZodDto(FindUniqueIdentiferSchema) { }
+  isVerified: z.boolean(),
+});
+export class ProcessBulkParticipantRequest extends createZodDto(ProcessBulkRequest) {}
+export class ProcessParticipantReqDto extends createZodDto(ProcessParticipantRequest) {}
+export class FindUniqueIdentiferDto extends createZodDto(FindUniqueIdentiferSchema) {}

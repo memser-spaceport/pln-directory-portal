@@ -61,6 +61,8 @@ export const CreateMemberSchema = z.object({
   linkedinHandler: z.string().nullable(),
   telegramHandler: z.string().nullable(),
   officeHours: z.string().nullable(),
+  ohInterest: z.array(z.string()).default([]),
+  ohHelpWith: z.array(z.string()).default([]),
 });
 
 export const UpdateMemberSchema = z.object({
@@ -94,6 +96,8 @@ export const UpdateMemberSchema = z.object({
   linkedinHandler: z.string().optional().nullable(),
   telegramHandler: z.string().optional().nullable(),
   officeHours: z.string().optional().nullable(),
+  ohInterest: z.array(z.string()).optional().default([]),
+  ohHelpWith: z.array(z.string()).optional().default([]),
 });
 
 export const UpdateAccessLevelSchema = z.object({

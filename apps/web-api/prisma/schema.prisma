@@ -93,8 +93,8 @@ model Member {
   telegramUid                  String?                       @unique
   officeHours                  String?
   ohStatus                     String?
-  ohInterest                   String?
-  ohHelpWith                   String?
+  ohInterest                   String[]                      @default([])
+  ohHelpWith                   String[]                      @default([])
   moreDetails                  String?
   bio                          String?
   plnFriend                    Boolean?                      @default(false)

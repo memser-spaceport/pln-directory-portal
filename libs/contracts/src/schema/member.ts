@@ -40,6 +40,8 @@ export const MemberSchema = z.object({
   telegramHandler: z.string().nullish(),
   telegramUid: z.string().nullable(),
   officeHours: z.string().nullish(),
+  ohInterest: z.array(z.string()).default([]),
+  ohHelpWith: z.array(z.string()).default([]),
   airtableRecId: z.string().nullish(),
   plnFriend: z.boolean().nullish(),
   bio: z.string().nullish(),

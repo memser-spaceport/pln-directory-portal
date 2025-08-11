@@ -121,7 +121,6 @@ export class OfficeHoursController {
         },
       },
     });
-    console.log(followUps);
     if (followUps && followUps.length === 0) {
       throw new NotFoundException(`There is no follow-up associated with the given ID: ${interactionFollowUpUid}`);
     }
@@ -169,8 +168,14 @@ export class OfficeHoursController {
   @Api(server.route.reportBrokenOfficeHoursAttempt)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
-  async reportBrokenOfficeHoursAttempt(@Param('uid') uid: string, @Body() body: any, @Req() request: Request) {
+  async reportBrokenOfficeHoursAttempt(@Param('uid') uid: string, @Req() request: Request) {
     const requester: any = await this.memberService.findMemberByEmail(request['userEmail']);
-    return await this.interactionService.reportBrokenOHAttempt(body.targetMemberUid, requester);
+    return await this.interactionService.reportBrokenOHAttempt(uid, requester);
+  }
+
+  @Api(server.route.checkMemberOfficeHoursLink)
+  @UseGuards(UserTokenValidation)
+  async checkMemberOfficeHoursLink(@Param('uid') uid: string) {
+    return await this.interactionService.checkAndUpdateMemberLink(uid);
   }
 }
