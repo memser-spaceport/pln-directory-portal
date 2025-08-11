@@ -14,7 +14,7 @@ const CONFIG = {
 @Injectable()
 export class AwsService {
   isEmailServiceEnabled() {
-    return process.env.IS_EMAIL_ENABLED === 'true';
+    return process.env.IS_EMAIL_ENABLED?.toLowerCase() === 'true';
   }
   async sendEmail(templateName, includeAdmins, toAddresses, data) {
     try {
