@@ -1,54 +1,60 @@
-import { 
-  Injectable, 
-  BadRequestException, 
-  ConflictException, 
-  NotFoundException 
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { MemberFollowUpsService } from '../member-follow-ups/member-follow-ups.service';
 import { MemberFeedbacksService } from '../member-feedbacks/member-feedbacks.service';
 import { Prisma } from '@prisma/client';
+import { MemberFollowUpStatus, MemberFollowUpType, MemberFeedbackResponseType } from 'libs/contracts/src/schema';
 import {
-  MemberFollowUpStatus,
-  MemberFollowUpType,
-  MemberFeedbackResponseType
-} from 'libs/contracts/src/schema';
-import { InteractionFailureReasons } from '../utils/constants';
+  InteractionFailureReasons,
+  EMAIL_TEMPLATES,
+  NOTIFICATION_CHANNEL,
+  NOTIFICATION_ENTITY_TYPES,
+  OFFICE_HOURS_ACTIONS,
+} from '../utils/constants';
+import axios from 'axios';
+import { NotificationServiceClient } from '../notifications/notification-service.client';
+import { MembersService } from '../members/members.service';
 
 @Injectable()
 export class OfficeHoursService {
-  private delayedFollowUps = [ 
-    MemberFollowUpType.Enum.MEETING_SCHEDULED, 
-    MemberFollowUpType.Enum.MEETING_YET_TO_HAPPEN 
-  ];
+  private delayedFollowUps = [MemberFollowUpType.Enum.MEETING_SCHEDULED, MemberFollowUpType.Enum.MEETING_YET_TO_HAPPEN];
+
+  private isBatchRunning = false;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly logger: LogService,
     private readonly followUpService: MemberFollowUpsService,
-    private readonly feedbackService: MemberFeedbacksService
+    private readonly feedbackService: MemberFeedbacksService,
+    private readonly notificationClient: NotificationServiceClient,
+    @Inject(forwardRef(() => MembersService))
+    private readonly membersService: MembersService
   ) {}
 
-  async createInteraction(
-    interaction: Prisma.MemberInteractionUncheckedCreateInput,
-    loggedInMember
-  ) {
+  async createInteraction(interaction: Prisma.MemberInteractionUncheckedCreateInput, loggedInMember) {
     try {
-      return this.prisma.$transaction(async(tx) => {
+      return this.prisma.$transaction(async (tx) => {
         const result = await tx.memberInteraction.create({
-          data:{
+          data: {
             ...interaction,
-            sourceMemberUid: loggedInMember?.uid
-          }
+            sourceMemberUid: loggedInMember?.uid,
+          },
         });
         if (result?.hasFollowUp) {
           await this.createInteractionFollowUp(result, loggedInMember, MemberFollowUpType.Enum.MEETING_INITIATED, tx);
           await this.createInteractionFollowUp(result, loggedInMember, MemberFollowUpType.Enum.MEETING_SCHEDULED, tx);
-        };
+        }
         return result;
       });
-    } catch(exception) {
+    } catch (exception) {
       this.handleErrors(exception);
     }
   }
@@ -56,12 +62,12 @@ export class OfficeHoursService {
   async findInteractions(queryOptions: Prisma.MemberInteractionFindManyArgs) {
     try {
       return await this.prisma.memberInteraction.findMany({
-        ...queryOptions
+        ...queryOptions,
       });
-    } catch(exception) {
+    } catch (exception) {
       this.handleErrors(exception);
     }
-  };
+  }
 
   async createInteractionFollowUp(interaction, loggedInMember, type, tx?, scheduledAt?) {
     const followUp: any = {
@@ -70,9 +76,9 @@ export class OfficeHoursService {
       createdBy: loggedInMember?.uid,
       type,
       data: {
-        ...interaction.data
+        ...interaction.data,
       },
-      isDelayed: this.delayedFollowUps.includes(type)
+      isDelayed: this.delayedFollowUps.includes(type),
     };
     if (scheduledAt != null) {
       followUp.createdAt = new Date(scheduledAt);
@@ -81,38 +87,38 @@ export class OfficeHoursService {
   }
 
   async createInteractionFeedback(feedback, member, followUp) {
-    feedback.comments = feedback.comments?.map(comment => InteractionFailureReasons[comment] || comment) || [];
+    feedback.comments = feedback.comments?.map((comment) => InteractionFailureReasons[comment] || comment) || [];
     return await this.prisma.$transaction(async (tx) => {
       if (
         followUp.type === MemberFollowUpType.Enum.MEETING_INITIATED &&
         feedback.response === MemberFeedbackResponseType.Enum.NEGATIVE
       ) {
-        const delayedFollowUps = await this.followUpService.getFollowUps({ 
-          where: { 
-            interactionUid: followUp.interactionUid,
-            type: MemberFollowUpType.Enum.MEETING_SCHEDULED  
-          } 
-        }, tx);
+        const delayedFollowUps = await this.followUpService.getFollowUps(
+          {
+            where: {
+              interactionUid: followUp.interactionUid,
+              type: MemberFollowUpType.Enum.MEETING_SCHEDULED,
+            },
+          },
+          tx
+        );
         if (delayedFollowUps?.length) {
           await this.followUpService.updateFollowUpStatusByUid(
-            delayedFollowUps[0]?.uid, 
+            delayedFollowUps[0]?.uid,
             MemberFollowUpStatus.Enum.COMPLETED,
             tx
           );
         }
       }
-      if ( 
-        feedback.response === MemberFeedbackResponseType.Enum.NEGATIVE && 
-        feedback.comments?.includes('IFR0004')
-      ) {
+      if (feedback.response === MemberFeedbackResponseType.Enum.NEGATIVE && feedback.comments?.includes('IFR0004')) {
         await this.createInteractionFollowUp(
           followUp.interaction,
-          member, 
+          member,
           MemberFollowUpType.Enum.MEETING_YET_TO_HAPPEN,
           tx
-        ); 
-      } else if ( 
-        feedback.response === MemberFeedbackResponseType.Enum.NEGATIVE && 
+        );
+      } else if (
+        feedback.response === MemberFeedbackResponseType.Enum.NEGATIVE &&
         feedback.comments?.includes('IFR0005')
       ) {
         await this.createInteractionFollowUp(
@@ -121,7 +127,7 @@ export class OfficeHoursService {
           MemberFollowUpType.Enum.MEETING_RESCHEDULED,
           tx,
           feedback?.data?.scheduledAt
-        ); 
+        );
       }
       return await this.feedbackService.createFeedback(feedback, member, followUp, tx);
     });
@@ -130,9 +136,214 @@ export class OfficeHoursService {
   async closeMemberInteractionFollowUpByID(followUpUid) {
     try {
       return await this.followUpService.updateFollowUpStatusByUid(followUpUid, MemberFollowUpStatus.Enum.CLOSED);
-    } catch(error) {
+    } catch (error) {
       this.handleErrors(error, followUpUid);
-    }   
+    }
+  }
+
+  // --- New: Office hours link checks ---
+  async checkLink(link: string): Promise<'OK' | 'BROKEN' | 'NOT_FOUND'> {
+    if (!link) return 'NOT_FOUND';
+    try {
+      const response = await axios.get(link, { maxRedirects: 5, timeout: 8000, validateStatus: () => true });
+      const status = response.status;
+      return status >= 200 && status < 400 ? 'OK' : 'BROKEN';
+    } catch (e) {
+      return 'BROKEN';
+    }
+  }
+
+  async checkProvidedLink(link: string) {
+    const status = await this.checkLink(link);
+    return { status };
+  }
+
+  async checkAllLinksBatch(): Promise<{ started: boolean; message?: string }> {
+    if (this.isBatchRunning) {
+      return { started: false, message: 'Already running' };
+    }
+    this.isBatchRunning = true;
+    try {
+      const batchSize = 10;
+      let skip = 0;
+      while (true) {
+        const members = await this.prisma.member.findMany({
+          where: { officeHours: { not: null } },
+          select: { uid: true, officeHours: true },
+          take: batchSize,
+          skip,
+        });
+        if (!members.length) break;
+        const updates = await Promise.allSettled(
+          members.map(async (m) => {
+            const status = await this.checkLink(m.officeHours as string);
+            await this.prisma.member.update({ where: { uid: m.uid }, data: { ohStatus: status } });
+          })
+        );
+        this.logger.info(
+          `Processed OH links batch: skip=${skip}, succeeded=${updates.filter((u) => u.status === 'fulfilled').length}`
+        );
+        skip += batchSize;
+      }
+      return { started: true };
+    } catch (e) {
+      this.logger.error(e);
+      return { started: true, message: 'Completed with errors' };
+    } finally {
+      this.isBatchRunning = false;
+    }
+  }
+
+  // --- New: Report broken OH booking attempt and notify target ---
+  async reportBrokenOHAttempt(targetMemberUid: string, requester) {
+    const target = await this.membersService.findOne(targetMemberUid);
+    const requesterMember = requester; // requester is already member object from token
+
+    await this.prisma.memberInteraction.create({
+      data: {
+        type: 'BROKEN_OH_BOOKING_ATTEMPT',
+        targetMemberUid,
+        sourceMemberUid: requesterMember.uid,
+        data: {},
+        hasFollowUp: false,
+      },
+    });
+
+    try {
+      const payload: any = {
+        isPriority: true,
+        deliveryChannel: NOTIFICATION_CHANNEL.EMAIL,
+        templateName: EMAIL_TEMPLATES.BROKEN_OH_BOOKING_ATTEMPT,
+        recipientsInfo: { to: [target.email] },
+        deliveryPayload: {
+          body: {
+            targetName: target.name,
+            targetUid: target.uid,
+            requesterName: requesterMember.name,
+            requesterUid: requesterMember.uid,
+            link: `${process.env.WEB_UI_BASE_URL}/members/${target.uid}`,
+          },
+        },
+        entityType: NOTIFICATION_ENTITY_TYPES.OFFICE_HOURS,
+        actionType: OFFICE_HOURS_ACTIONS.BROKEN_LINK_ATTEMPT,
+        sourceMeta: {
+          activityId: target.uid,
+          activityType: NOTIFICATION_ENTITY_TYPES.OFFICE_HOURS,
+          activityUserId: requesterMember.uid,
+          activityUserName: requesterMember.name,
+        },
+        targetMeta: {
+          emailId: target.email,
+          userId: target.uid,
+          userName: target.name,
+        },
+      };
+      await this.notificationClient.sendNotification(payload);
+    } catch (e) {
+      this.logger.error('Failed to send broken OH attempt notification', e);
+    }
+
+    return { success: true };
+  }
+
+  // --- New: When link updated and OK, notify requesters from last 30 days (not yet notified) ---
+  async handleLinkUpdated(memberUid: string, newLink: string) {
+    const status = await this.checkLink(newLink);
+    await this.prisma.member.update({ where: { uid: memberUid }, data: { ohStatus: status } });
+    if (status !== 'OK') return;
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const attempts = await this.prisma.memberInteraction.findMany({
+      where: {
+        type: 'BROKEN_OH_BOOKING_ATTEMPT',
+        targetMemberUid: memberUid,
+        createdAt: { gte: thirtyDaysAgo },
+      },
+      select: { sourceMemberUid: true },
+    });
+
+    const requesterUids = Array.from(new Set(attempts.map((a) => a.sourceMemberUid)));
+    if (!requesterUids.length) return;
+
+    for (const requesterUid of requesterUids) {
+      const lastAttempt = await this.prisma.memberInteraction.findFirst({
+        where: {
+          type: 'BROKEN_OH_BOOKING_ATTEMPT',
+          targetMemberUid: memberUid,
+          sourceMemberUid: requesterUid,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!lastAttempt) continue;
+
+      const fixedAfter = await this.prisma.memberInteraction.findFirst({
+        where: {
+          type: 'BROKEN_OH_FIXED_NOTIFICATION_SENT',
+          targetMemberUid: memberUid,
+          sourceMemberUid: requesterUid,
+          createdAt: { gte: lastAttempt.createdAt },
+        },
+      });
+      if (fixedAfter) continue;
+
+      const [target, requester] = await Promise.all([
+        this.membersService.findOne(memberUid),
+        this.membersService.findOne(requesterUid),
+      ]);
+
+      try {
+        const payload: any = {
+          isPriority: true,
+          deliveryChannel: NOTIFICATION_CHANNEL.EMAIL,
+          templateName: EMAIL_TEMPLATES.BROKEN_OH_LINK_FIXED,
+          recipientsInfo: { to: [requester.email] },
+          deliveryPayload: {
+            body: {
+              targetName: target.name,
+              targetUid: target.uid,
+              requesterName: requester.name,
+              requesterUid: requester.uid,
+              link: `${process.env.WEB_UI_BASE_URL}/members/${target.uid}`,
+            },
+          },
+          entityType: NOTIFICATION_ENTITY_TYPES.OFFICE_HOURS,
+          actionType: OFFICE_HOURS_ACTIONS.BROKEN_LINK_FIXED,
+          sourceMeta: {
+            activityId: target.uid,
+            activityType: NOTIFICATION_ENTITY_TYPES.OFFICE_HOURS,
+            activityUserId: target.uid,
+            activityUserName: target.name,
+          },
+          targetMeta: {
+            emailId: requester.email,
+            userId: requester.uid,
+            userName: requester.name,
+          },
+        };
+        await this.notificationClient.sendNotification(payload);
+        await this.prisma.memberInteraction.create({
+          data: {
+            type: 'BROKEN_OH_FIXED_NOTIFICATION_SENT',
+            targetMemberUid: memberUid,
+            sourceMemberUid: requesterUid,
+            data: {},
+            hasFollowUp: false,
+          },
+        });
+      } catch (e) {
+        this.logger.error('Failed to notify requester about fixed OH link', e);
+      }
+    }
+  }
+
+  async checkAndUpdateMemberLink(memberUid: string) {
+    const member = await this.membersService.findOne(memberUid);
+    const link = member?.officeHours as string | null;
+    const status = await this.checkLink(link || '');
+    await this.prisma.member.update({ where: { uid: memberUid }, data: { ohStatus: status } });
+    return { uid: memberUid, ohStatus: status };
   }
 
   private handleErrors(error, message?) {
@@ -152,5 +363,5 @@ export class OfficeHoursService {
       throw new BadRequestException('Database field validation error on Interactions', error.message);
     }
     throw error;
-  };
+  }
 }

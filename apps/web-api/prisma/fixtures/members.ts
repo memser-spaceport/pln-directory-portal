@@ -27,60 +27,62 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
     return member;
   });
 
-    const name = faker.helpers.unique(faker.name.firstName);
-    const accessLevel = faker.helpers.arrayElement(['L0', 'L1', 'L2', 'L3', 'L4', 'Rejected']);
-    return {
-      uid: faker.helpers.slugify(`uid-${name.toLowerCase()}`),
-      name,
-      email: faker.internet.email(),
-      imageUid: '',
-      githubHandler: faker.internet.userName(name),
-      discordHandler: faker.internet.userName(name),
-      twitterHandler: faker.internet.userName(name),
-      linkedinHandler: faker.internet.userName(name),
-      telegramHandler: faker.internet.userName(name),
-      telegramUid: faker.helpers.slugify(`uid-tele-${name.toLowerCase()}`),
-      officeHours: faker.helpers.arrayElement([null, faker.internet.url()]),
-      moreDetails: faker.helpers.arrayElement([null, faker.lorem.paragraph()]),
-      plnFriend: faker.datatype.boolean(),
-      airtableRecId: `airtable-rec-id-${sequence}`,
-      externalId: null,
-      bio: faker.datatype.string(),
-      isFeatured: faker.datatype.boolean(),
-      createdAt: faker.date.past(),
-      approvedAt: faker.date.past(),
-      plnStartDate: faker.date.past(),
-      updatedAt: faker.date.recent(),
-      locationUid: '',
-      signUpSource: faker.company.name(),
-      signUpCampaign: faker.company.name(),
-      signUpMedium: faker.company.name(),
-      isVerified: faker.datatype.boolean(),
-      isUserConsent: faker.datatype.boolean(),
-      isSubscribedToNewsletter: faker.datatype.boolean(),
-      teamOrProjectURL: faker.internet.url(),
-      openToWork: faker.datatype.boolean(),
-      preferences: {
-        showEmail:true,
-        showGithubHandle:true,
-        showTelegram:true,
-        showLinkedin:true,
-        showDiscord:false,
-        showGithubProjects:false,
-        showTwitter:true,
-        showSubscription:true
-      },
-      linkedInDetails: {},
-      accessLevel: accessLevel,
-      accessLevelUpdatedAt: faker.date.past(),
-      deletedAt: accessLevel === 'Rejected' ? new Date() : null,
-      deletionReason:
-        accessLevel === 'Rejected'
-          ? 'Your application to join the Protocol Labs network was not approved. You may reapply in the future.'
-          : null,
-    };
-  }
-);
+  const name = faker.helpers.unique(faker.name.firstName);
+  const accessLevel = faker.helpers.arrayElement(['L0', 'L1', 'L2', 'L3', 'L4', 'Rejected']);
+  return {
+    uid: faker.helpers.slugify(`uid-${name.toLowerCase()}`),
+    name,
+    email: faker.internet.email(),
+    imageUid: '',
+    githubHandler: faker.internet.userName(name),
+    discordHandler: faker.internet.userName(name),
+    twitterHandler: faker.internet.userName(name),
+    linkedinHandler: faker.internet.userName(name),
+    telegramHandler: faker.internet.userName(name),
+    telegramUid: faker.helpers.slugify(`uid-tele-${name.toLowerCase()}`),
+    officeHours: faker.helpers.arrayElement([null, faker.internet.url()]),
+    ohStatus: null,
+    ohInterest: [],
+    ohHelpWith: [],
+    moreDetails: faker.helpers.arrayElement([null, faker.lorem.paragraph()]),
+    plnFriend: faker.datatype.boolean(),
+    airtableRecId: `airtable-rec-id-${sequence}`,
+    externalId: null,
+    bio: faker.datatype.string(),
+    isFeatured: faker.datatype.boolean(),
+    createdAt: faker.date.past(),
+    approvedAt: faker.date.past(),
+    plnStartDate: faker.date.past(),
+    updatedAt: faker.date.recent(),
+    locationUid: '',
+    signUpSource: faker.company.name(),
+    signUpCampaign: faker.company.name(),
+    signUpMedium: faker.company.name(),
+    isVerified: faker.datatype.boolean(),
+    isUserConsent: faker.datatype.boolean(),
+    isSubscribedToNewsletter: faker.datatype.boolean(),
+    teamOrProjectURL: faker.internet.url(),
+    openToWork: faker.datatype.boolean(),
+    preferences: {
+      showEmail: true,
+      showGithubHandle: true,
+      showTelegram: true,
+      showLinkedin: true,
+      showDiscord: false,
+      showGithubProjects: false,
+      showTwitter: true,
+      showSubscription: true,
+    },
+    linkedInDetails: {},
+    accessLevel,
+    accessLevelUpdatedAt: faker.date.past(),
+    deletedAt: accessLevel === 'Rejected' ? new Date() : null,
+    deletionReason:
+      accessLevel === 'Rejected'
+        ? 'Your application to join the Protocol Labs network was not approved. You may reapply in the future.'
+        : null,
+  };
+});
 
 export const members = async () => await membersFactory.createList(25);
 
