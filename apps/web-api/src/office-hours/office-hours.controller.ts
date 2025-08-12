@@ -69,9 +69,6 @@ export class OfficeHoursController {
         createdAt: 'desc',
       },
     });
-    if (result && result.length > 0 && result[0]?.interactionFollowUps?.length > 0) {
-      throw new ForbiddenException(`Interaction with same user within ${interval / (60 * 1000)} minutes is forbidden`);
-    }
     if (member.uid === body.targetMemberUid) {
       throw new ForbiddenException('Interaction with yourself is forbidden');
     }
