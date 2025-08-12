@@ -28,7 +28,7 @@ export class FaqService {
   ){
     this.supportEmails = this.getSupportEmails();
     this.isSupportEmailsValid = this.validateSupportEmails();
-    this.isEmailEnabled = process.env.IS_EMAIL_ENABLED;
+    this.isEmailEnabled = process.env.IS_EMAIL_ENABLED?.toLowerCase();
   }
   async addQuestion(question: CustomQuestionSchemaDto, requestIP: string) {
     try {
