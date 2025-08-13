@@ -141,11 +141,13 @@ export class OfficeHoursService {
     }
   }
 
-  // --- New: Office hours link checks ---
   async checkLink(link: string): Promise<'OK' | 'BROKEN' | 'NOT_FOUND'> {
     if (!link) return 'NOT_FOUND';
+
+    const normalizedLink = this.normalizeUrl(link);
+
     try {
-      const response = await axios.get(link, { maxRedirects: 5, timeout: 8000, validateStatus: () => true });
+      const response = await axios.get(normalizedLink, { maxRedirects: 5, timeout: 8000, validateStatus: () => true });
       const status = response.status;
       return status >= 200 && status < 400 ? 'OK' : 'BROKEN';
     } catch (e) {
@@ -363,5 +365,22 @@ export class OfficeHoursService {
       throw new BadRequestException('Database field validation error on Interactions', error.message);
     }
     throw error;
+  }
+
+  // --- New: Office hours link checks ---
+  private normalizeUrl(link: string): string {
+    if (!link) return link;
+
+    let normalizedLink = link.trim();
+
+    // Add protocol if missing
+    if (!normalizedLink.match(/^https?:\/\//i)) {
+      normalizedLink = `https://${normalizedLink}`;
+    }
+
+    // Remove trailing slashes for consistency
+    normalizedLink = normalizedLink.replace(/\/+$/, '');
+
+    return normalizedLink;
   }
 }
