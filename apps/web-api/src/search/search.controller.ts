@@ -16,7 +16,7 @@ export class SearchController {
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async getFullTextSearchResults(@Query() query: SearchQueryDto): Promise<ResponseSearchResultDto> {
-    return this.searchService.fetchAllIndices(query.q);
+    return this.searchService.fetchAllIndices(query.q, { strict: query.strict });
   }
 
   @TsRest(apiSearch.autocompleteSearch)

@@ -3,6 +3,13 @@ import { createZodDto } from '@abitia/zod-dto';
 
 const SearchQuerySchema = z.object({
   q: z.string().min(1),
+  strict: z.union([z.boolean(), z.string()])
+          .transform(v => {
+            if (typeof v === 'boolean') return v;
+            return ['true', '1', 'yes', 'on'].includes(v.toLowerCase());
+          })
+          .optional()
+          .default(true)
 });
 
 const MatchSchema = z.object({
