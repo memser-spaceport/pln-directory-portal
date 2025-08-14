@@ -3,12 +3,15 @@ import { SearchResult, SearchResultSchema } from 'libs/contracts/src/schema/glob
 import { OpenSearchService } from '../opensearch/opensearch.service';
 import { truncate } from '../utils/formatters';
 
-const MAX_SEARCH_RESULTS_PER_INDEX = 1000;
+const MAX_SEARCH_RESULTS_PER_INDEX = 50;
 const AUTOMCOMPLETE_MAX_LENGTH = 50;
 
 type FetchAllOptions = {
-  /** If true, switches to strict (phrase) search instead of OR-like loose search */
   strict?: boolean;
+  perIndexSize?: number;   // default: MAX_SEARCH_RESULTS_PER_INDEX
+  topN?: number;           // default: 50 (controls result.top)
+  page?: number;           // 1-based; optional combined pagination
+  pageSize?: number;       // optional combined pagination
 };
 
 @Injectable()
@@ -32,38 +35,86 @@ export class SearchService {
   }
 
   /**
-   * Build a "strict" query:
-   *  - multi_match with type 'phrase' to force exact ordered phrase within analyzed text
-   *  - OR exact keyword term match (if your mapping has <field>.keyword). If keyword subfield
-   *    doesn't exist, this clause simply won't match (and won't throw).
-   *
-   * Using bool+should allows either precise phrase or exact keyword to hit. Keyword gets higher boost.
+   * Strict search for all fields.
+   * - Boosts every text field equally (you can tune per field).
+   * - Uses best_fields (+tie_breaker), exact phrase, and phrase_prefix.
+   * - Handles keyword-only fields via term/prefix; no phrase_* on keyword fields.
    */
   private buildStrictQuery(fields: string[], text: string) {
-    const phraseClause = {
+    const keywordOnly = new Set<string>([
+      'tags', 'image',
+      'name_suggest','tagline_suggest','tags_suggest','shortDescription_suggest','location_suggest',
+    ]);
+
+    const textFields = fields.filter(f => !keywordOnly.has(f));
+    const kwFields   = fields.filter(f => keywordOnly.has(f));
+
+    // Boost all text fields (tune here if you want per-field weights, e.g., name^4, tagline^3, etc.)
+    const weightedText = textFields.map(f => `${f}^3`);
+
+    const bestFields = textFields.length ? {
       multi_match: {
         query: text,
-        type: 'phrase', // strict ordered phrase, no slop
-        fields,
+        type: 'best_fields',
+        fields: weightedText,
+        operator: 'and',
+        tie_breaker: 0.2,
+        boost: 1.2,
+      },
+    } : undefined;
+
+    const exactPhrase = textFields.length ? {
+      multi_match: {
+        query: text,
+        type: 'phrase',
+        fields: weightedText,
         slop: 0,
-        boost: 2.0,
+        boost: 3.0,
       },
-    };
+    } : undefined;
 
-    // Attempt exact string match against <field>.keyword (if present in mapping)
-    const keywordClauses = fields.map((f) => ({
-      term: { [`${f}.keyword`]: { value: text, boost: 5.0 } },
-    }));
-
-    return {
-      query: {
-        bool: {
-          minimum_should_match: 1,
-          should: [phraseClause, ...keywordClauses],
-        },
+    const phrasePrefix = textFields.length ? {
+      multi_match: {
+        query: text,
+        type: 'phrase_prefix',
+        fields: weightedText,
+        slop: 0,
+        max_expansions: 50,
+        boost: 3.0,
       },
-    };
+    } : undefined;
+
+    const keywordClauses: any[] = [
+      // exact match on <field>.keyword if present
+      ...fields.map(f => ({ term: { [`${f}.keyword`]: { value: text, boost: 10.0 } } })),
+      // exact on keyword-only fields
+      ...kwFields.map(f => ({ term: { [f]: { value: text, boost: 10.0 } } })),
+    ];
+
+    const terms = text.trim().split(/\s+/);
+    if (terms.length === 1) {
+      // single-word boost: prefix across keyword fields
+      for (const f of fields) {
+        keywordClauses.push({ prefix: { [`${f}.keyword`]: { value: text.toLowerCase(), boost: 4.0 } } });
+      }
+    }
+
+    for (const f of kwFields) {
+      keywordClauses.push({ prefix: { [f]: { value: text.toLowerCase(), boost: 1.5 } } });
+    }
+
+    const should: any[] = [
+      ...(bestFields ? [bestFields] : []),
+      ...(exactPhrase ? [exactPhrase] : []),
+      ...(phrasePrefix ? [phrasePrefix] : []),
+      ...keywordClauses,
+    ];
+
+    return { query: { bool: { minimum_should_match: 1, should } } };
   }
+
+
+
 
   /**
    * Adds highlighter config for the provided fields.
@@ -80,47 +131,38 @@ export class SearchService {
     };
   }
 
-  /**
-   * Fetch results across multiple indices.
-   * Default (strict=false): preserves current "loose" behavior.
-   * If strict=true: uses exact-phrase semantics (match_phrase/multi_match phrase) + keyword exact match.
-   */
   async fetchAllIndices(text: string, options?: FetchAllOptions): Promise<SearchResult> {
     const indices: Record<string, [string, string[]]> = {
-      events: ['event', ['name', 'description', 'shortDescription', 'additionalInfo', 'location']],
-      projects: ['project', ['name', 'tagline', 'description', 'readMe', 'tags']],
-      teams: ['team', ['name', 'shortDescription', 'longDescription']],
-      members: ['member', ['name', 'bio']],
+      events:  ['event',  ['name','description','shortDescription','additionalInfo','location']],
+      projects:['project',['name','tagline','description','readMe','tags']],
+      teams:   ['team',   ['name','shortDescription','longDescription']],
+      members: ['member', ['name','bio']],
     };
 
-    const result: SearchResult = {
-      events: [],
-      projects: [],
-      teams: [],
-      members: [],
-      top: [],
-    };
+    const perIndexSize = options?.perIndexSize ?? MAX_SEARCH_RESULTS_PER_INDEX;
+    const topN         = options?.topN ?? 50;
 
+    const result: SearchResult = { events: [], projects: [], teams: [], members: [], top: [] };
     const allHits: Array<{
-      uid: string;
-      name: string;
-      image: string;
-      index: string;
+      uid: string; name: string; image: string; index: string;
       matches: Array<{ field: string; content: string }>;
       score: number;
     }> = [];
 
     for (const key of Object.keys(indices)) {
       const [index, fields] = indices[key];
-
-      // Choose query body based on strict flag, then add highlight
       const queryBody = options?.strict
         ? this.buildStrictQuery(fields, text)
         : this.buildLooseQuery(fields, text);
 
-      const body = this.withHighlight(queryBody, fields);
+      // Ask OS to sort by _score (explicit), track totals
+      const body = {
+        ...this.withHighlight(queryBody, fields),
+        sort: [{ _score: 'desc' }],
+        track_total_hits: true,
+      };
 
-      const res = await this.openSearchService.searchWithLimit(index, MAX_SEARCH_RESULTS_PER_INDEX, body);
+      const res = await this.openSearchService.searchWithLimit(index, perIndexSize, body);
 
       for (const hit of res.body.hits.hits) {
         const matches = Object.entries(hit.highlight || {}).map(([field, value]: [string, any]) => ({
@@ -138,30 +180,34 @@ export class SearchService {
 
         (result as any)[key].push(item);
 
-        const rawScore = hit._score;
-        const score = typeof rawScore === 'number' ? rawScore : 0;
-
         allHits.push({
           uid: hit._id,
           name: item.name,
           image: item.image,
           index: key,
           matches,
-          score,
+          score: typeof hit._score === 'number' ? hit._score : 0,
         });
       }
     }
 
-    result.top = allHits
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 10)
-      .map((item) => ({
-        uid: item.uid,
-        name: item.name,
-        image: item.image,
-        index: item.index,
-        matches: item.matches,
+    // Combined, globally sorted by _score
+    allHits.sort((a, b) => b.score - a.score);
+
+    // Optional combined pagination
+    if (options?.page && options?.pageSize) {
+      const start = (options.page - 1) * options.pageSize;
+      const pageItems = allHits.slice(start, start + options.pageSize).map(item => ({
+        uid: item.uid, name: item.name, image: item.image, index: item.index, matches: item.matches,
       }));
+      // expose as `top` page slice
+      result.top = pageItems;
+    } else {
+      // TopN (default 50) for the "top" section
+      result.top = allHits.slice(0, topN).map(item => ({
+        uid: item.uid, name: item.name, image: item.image, index: item.index, matches: item.matches,
+      }));
+    }
 
     return SearchResultSchema.parse(result);
   }
