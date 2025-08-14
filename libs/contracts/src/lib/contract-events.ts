@@ -1,6 +1,7 @@
 import { initContract } from '@ts-rest/core';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 import { ResponsePLEventSchemaWithRelationsSchema } from '../schema/pl-event';
+import { ResponsePLEventLocationSchema } from '../schema/pl-event-location';
 
 const contract = initContract();
 
@@ -14,5 +15,20 @@ export const apiPLEvents = contract.router({
     },
     summary: 'Create new event',
   },
-
+  fetchLocations: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/events/locations`,
+    query: contract.query,
+    responses: {
+      200: ResponsePLEventLocationSchema,
+    },
+  },
+  fetchAssociations: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/events/location-associations`,
+    query: contract.query,
+    responses: {
+      200: contract.body<unknown>(),
+    },
+  }
 });
