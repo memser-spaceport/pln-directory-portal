@@ -201,6 +201,39 @@ export class OfficeHoursService {
     const target = await this.membersService.findOne(targetMemberUid);
     const requesterMember = requester; // requester is already member object from token
 
+    // Check if the same requester already reported this target within the last 4 hours
+    const oneHourAgo = new Date();
+    oneHourAgo.setHours(oneHourAgo.getHours() - 4);
+
+    const existingReport = await this.prisma.memberInteraction.findFirst({
+      where: {
+        type: 'BROKEN_OH_BOOKING_ATTEMPT',
+        targetMemberUid,
+        sourceMemberUid: requesterMember.uid,
+        createdAt: { gte: oneHourAgo },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // If a report already exists within the last hour, check if it was fixed after the report
+    if (existingReport) {
+      // Check if there was a BROKEN_OH_FIXED_NOTIFICATION_SENT after the existing report
+      const fixedAfterReport = await this.prisma.memberInteraction.findFirst({
+        where: {
+          type: 'BROKEN_OH_FIXED_NOTIFICATION_SENT',
+          targetMemberUid,
+          sourceMemberUid: requesterMember.uid,
+          createdAt: { gte: existingReport.createdAt },
+        },
+      });
+
+      // If no fix notification was sent after the existing report, don't create a new report
+      if (!fixedAfterReport) {
+        return { success: true, message: 'Report already exists within the last hour' };
+      }
+      // If there was a fix notification, allow creating a new report
+    }
+
     await this.prisma.memberInteraction.create({
       data: {
         type: 'BROKEN_OH_BOOKING_ATTEMPT',
@@ -223,7 +256,11 @@ export class OfficeHoursService {
             targetUid: target.uid,
             requesterName: requesterMember.name,
             requesterUid: requesterMember.uid,
-            link: `${process.env.WEB_UI_BASE_URL}/members/${target.uid}`,
+            link: `${process.env.WEB_UI_BASE_URL}/members/${
+              target.uid
+            }?utm_source=oh_broken_link_book_attempt&target_uid=${target.uid}&target_email=${encodeURIComponent(
+              target.email || ''
+            )}&requester_uid=${requesterMember.uid}&requester_email=${encodeURIComponent(requesterMember.email || '')}`,
           },
         },
         entityType: NOTIFICATION_ENTITY_TYPES.OFFICE_HOURS,
@@ -307,7 +344,11 @@ export class OfficeHoursService {
               targetUid: target.uid,
               requesterName: requester.name,
               requesterUid: requester.uid,
-              link: `${process.env.WEB_UI_BASE_URL}/members/${target.uid}`,
+              link: `${process.env.WEB_UI_BASE_URL}/members/${target.uid}?utm_source=oh_broken_link_fixed&target_uid=${
+                target.uid
+              }&target_email=${encodeURIComponent(target.email || '')}&requester_uid=${
+                requester.uid
+              }&requester_email=${encodeURIComponent(requester.email || '')}`,
             },
           },
           entityType: NOTIFICATION_ENTITY_TYPES.OFFICE_HOURS,
