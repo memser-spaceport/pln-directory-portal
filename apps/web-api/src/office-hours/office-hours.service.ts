@@ -202,21 +202,23 @@ export class OfficeHoursService {
     const requesterMember = requester; // requester is already member object from token
 
     // Check if the same requester already reported this target within the last 4 hours
-    const oneHourAgo = new Date();
-    oneHourAgo.setHours(oneHourAgo.getHours() - 4);
+    const fourHoursAgo = new Date();
+    fourHoursAgo.setHours(fourHoursAgo.getHours() - 4);
 
     const existingReport = await this.prisma.memberInteraction.findFirst({
       where: {
         type: 'BROKEN_OH_BOOKING_ATTEMPT',
         targetMemberUid,
         sourceMemberUid: requesterMember.uid,
-        createdAt: { gte: oneHourAgo },
+        createdAt: { gte: fourHoursAgo },
       },
       orderBy: { createdAt: 'desc' },
     });
 
     // If a report already exists within the last hour, check if it was fixed after the report
     if (existingReport) {
+      this.logger.info(`Existing report found for target ${targetMemberUid} and requester ${requesterMember.uid}`);
+
       // Check if there was a BROKEN_OH_FIXED_NOTIFICATION_SENT after the existing report
       const fixedAfterReport = await this.prisma.memberInteraction.findFirst({
         where: {
@@ -229,6 +231,9 @@ export class OfficeHoursService {
 
       // If no fix notification was sent after the existing report, don't create a new report
       if (!fixedAfterReport) {
+        this.logger.info(
+          `No fix notification was sent after the existing report for target ${targetMemberUid} and requester ${requesterMember.uid}`
+        );
         return { success: true, message: 'Report already exists within the last hour' };
       }
       // If there was a fix notification, allow creating a new report
