@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ResponsePLEventSchemaWithRelationsSchema } from './pl-event';
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
+import { createZodDto } from '@abitia/zod-dto';
 
 export const PLEventLocationSchema = z.object({
   id: z.number().int(),
@@ -58,4 +59,25 @@ export const PLEventLocationQueryParams = QueryParams({
 export const PLEventLocationDetailQueryParams = PLEventLocationQueryParams.unwrap()
   .pick(RETRIEVAL_QUERY_FILTERS)
   .optional();
+
+export const UpdateIRLAggregatedPriority = z.object({
+  locations: z.array(z.object({
+    uid: z.string(),
+    aggregatedPriority: z.number().int(),
+    isAggregated: z.boolean()
+  })).optional(),
+  events: z.array(z.object({
+    uid: z.string(),
+    aggregatedPriority: z.number().int(),
+    isAggregated: z.boolean()
+  })).optional()
+});
+
+export const UpdatePLEventLocationSchema = z.object({
+  location: z.string().optional()
+});
+
+export class UpdatePLEventLocationSchemaDto extends createZodDto(UpdatePLEventLocationSchema) {}
+
+export class UpdateIRLAggregatedPriorityDto extends createZodDto(UpdateIRLAggregatedPriority) {}
 

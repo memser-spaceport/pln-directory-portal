@@ -34,6 +34,7 @@ import {
   UpdateMemberDto,
 } from '../../../../libs/contracts/src/schema/admin-member';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
+import { OfficeHoursService } from '../office-hours/office-hours.service';
 
 @Injectable()
 export class MembersService {
@@ -51,7 +52,9 @@ export class MembersService {
     private cacheService: CacheService,
     private membersHooksService: MembersHooksService,
     @Inject(forwardRef(() => NotificationSettingsService))
-    private notificationSettingsService: NotificationSettingsService
+    private notificationSettingsService: NotificationSettingsService,
+    @Inject(forwardRef(() => OfficeHoursService))
+    private officeHoursService: OfficeHoursService
   ) {}
 
   /**
@@ -161,7 +164,9 @@ export class MembersService {
    * @param memberIds - Array of member UIDs to retrieve
    * @returns A promise that resolves to an array of simplified member records
    */
-  async findMembersByIds(memberIds: string[]): Promise<Array<{ uid: string; name: string; email: string; accessLevel: string }>> {
+  async findMembersByIds(
+    memberIds: string[]
+  ): Promise<Array<{ uid: string; name: string; email: string; accessLevel: string }>> {
     try {
       const members = await this.prisma.member.findMany({
         where: {
@@ -184,7 +189,9 @@ export class MembersService {
       });
 
       // Filter out any members with null emails (type safety)
-      return members.filter((member): member is { uid: string; name: string; email: string;  accessLevel: string } => member.email !== null);
+      return members.filter(
+        (member): member is { uid: string; name: string; email: string; accessLevel: string } => member.email !== null
+      );
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -319,11 +326,24 @@ export class MembersService {
     tx: Prisma.TransactionClient = this.prisma
   ): Promise<Member> {
     try {
+      // Detect officeHours change to trigger OH link fix notifications
+      const existing = await tx.member.findUnique({ where: { uid }, select: { officeHours: true } });
       const result = await tx.member.update({
         where: { uid },
         data: member,
       });
       await this.cacheService.reset({ service: 'members' });
+      // Handle OH link update post-commit best-effort (no transaction dependency)
+      if ((member as any)?.officeHours != null && existing?.officeHours !== (member as any)?.officeHours) {
+        this.officeHoursService
+          .handleLinkUpdated(uid, (member as any)?.officeHours as string)
+          .then(() => {
+            this.logger.info(`OH link updated for member ${uid}`);
+          })
+          .catch((e) => {
+            this.logger.error('Failed to process OH link update', e);
+          });
+      }
       return result;
     } catch (error) {
       return this.handleErrors(error);
@@ -377,8 +397,8 @@ export class MembersService {
           eventGuests: {
             where: {
               event: {
-                isDeleted: false
-              }
+                isDeleted: false,
+              },
             },
             orderBy: {
               event: {

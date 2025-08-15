@@ -1,4 +1,13 @@
-import { Body, Controller, NotFoundException, Req, UseGuards, UsePipes, Param, ForbiddenException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  NotFoundException,
+  Req,
+  UseGuards,
+  UsePipes,
+  Param,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Api, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
 import { NoCache } from '../decorators/no-cache.decorator';
@@ -9,12 +18,12 @@ import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import {
-   CreateMemberInteractionSchemaDto,
-   CreateMemberFeedbackSchemaDto,
-   MemberFollowUpQueryParams,
-   ResponseMemberFollowUpWithRelationsSchema,
-   MemberFollowUpStatus,
-   MemberFollowUpType
+  CreateMemberInteractionSchemaDto,
+  CreateMemberFeedbackSchemaDto,
+  MemberFollowUpQueryParams,
+  ResponseMemberFollowUpWithRelationsSchema,
+  MemberFollowUpStatus,
+  MemberFollowUpType,
 } from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
@@ -35,37 +44,31 @@ export class OfficeHoursController {
   @Api(server.route.createMemberInteraction)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
-  async createMemberInteraction(
-    @Body() body: CreateMemberInteractionSchemaDto,
-    @Req() request: Request
-  ): Promise<any> {
-    const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
-    const interval = parseInt(process.env.INTERACTION_INTERVAL_DELAY_IN_MILLISECONDS || '1800000')
+  async createMemberInteraction(@Body() body: CreateMemberInteractionSchemaDto, @Req() request: Request): Promise<any> {
+    const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
+    const interval = parseInt(process.env.INTERACTION_INTERVAL_DELAY_IN_MILLISECONDS || '1800000');
     const result: any = await this.interactionService.findInteractions({
       where: {
         sourceMemberUid: member?.uid,
         targetMemberUid: body?.targetMemberUid,
         createdAt: {
-          gte: new Date(new Date().getTime() - interval)
-        }
+          gte: new Date(new Date().getTime() - interval),
+        },
       },
       include: {
         interactionFollowUps: {
           where: {
             type: MemberFollowUpType.Enum.MEETING_INITIATED,
             status: {
-              in: [ MemberFollowUpStatus.Enum.PENDING, MemberFollowUpStatus.Enum.CLOSED ]
-            }
-          }
-        }
+              in: [MemberFollowUpStatus.Enum.PENDING, MemberFollowUpStatus.Enum.CLOSED],
+            },
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: 'desc',
+      },
     });
-    if (result && result.length > 0 && result[0]?.interactionFollowUps?.length > 0) {
-      throw new ForbiddenException(`Interaction with same user within ${interval / (60 * 1000)} minutes is forbidden`);
-    }
     if (member.uid === body.targetMemberUid) {
       throw new ForbiddenException('Interaction with yourself is forbidden');
     }
@@ -77,27 +80,23 @@ export class OfficeHoursController {
   @ApiOkResponseFromZod(ResponseMemberFollowUpWithRelationsSchema.array())
   @UseGuards(UserTokenValidation)
   @NoCache()
-  async findAll(
-    @Req() request: Request
-  ) {
-    const queryableFields = prismaQueryableFieldsFromZod(
-      ResponseMemberFollowUpWithRelationsSchema
-    );
-    const { status } : any = request.query;
+  async findAll(@Req() request: Request) {
+    const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberFollowUpWithRelationsSchema);
+    const { status }: any = request.query;
     delete request.query.status;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
-    const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
+    const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
     builtQuery.where = {
       AND: [
         builtQuery.where,
         {
           createdBy: member?.uid,
-          status: status ? { in: status.split(',') } : {}
+          status: status ? { in: status.split(',') } : {},
         },
-        this.followUpService.buildDelayedFollowUpQuery()
-      ]
-    }
+        this.followUpService.buildDelayedFollowUpQuery(),
+      ],
+    };
     return this.followUpService.getFollowUps(builtQuery);
   }
 
@@ -109,17 +108,16 @@ export class OfficeHoursController {
     @Body() body: CreateMemberFeedbackSchemaDto,
     @Req() request: Request
   ): Promise<any> {
-    const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
+    const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
     const followUps = await this.followUpService.getFollowUps({
       where: {
-        uid : interactionFollowUpUid,
+        uid: interactionFollowUpUid,
         createdBy: member?.uid,
         status: {
-          in: [ MemberFollowUpStatus.Enum.PENDING, MemberFollowUpStatus.Enum.CLOSED ]
-        }
-      }
+          in: [MemberFollowUpStatus.Enum.PENDING, MemberFollowUpStatus.Enum.CLOSED],
+        },
+      },
     });
-    console.log(followUps)
     if (followUps && followUps.length === 0) {
       throw new NotFoundException(`There is no follow-up associated with the given ID: ${interactionFollowUpUid}`);
     }
@@ -134,19 +132,47 @@ export class OfficeHoursController {
     @Param('followUpUid') followUpUid: string,
     @Req() request: Request
   ): Promise<any> {
-    const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
+    const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
     const followUps = await this.followUpService.getFollowUps({
       where: {
-        uid : followUpUid,
+        uid: followUpUid,
         interactionUid,
         createdBy: member?.uid,
-        status:  MemberFollowUpStatus.Enum.PENDING
-      }
+        status: MemberFollowUpStatus.Enum.PENDING,
+      },
     });
     if (followUps && followUps.length === 0) {
       throw new NotFoundException(`No pending follow-up found for the given ID: ${followUpUid}.
        It may have been closed or does not exist.`);
     }
     return await this.interactionService.closeMemberInteractionFollowUpByID(followUpUid);
+  }
+
+  // New endpoints
+  @Api(server.route.checkAllOfficeHoursLinks)
+  @UseGuards(UserTokenValidation)
+  async checkAllOfficeHoursLinks() {
+    return await this.interactionService.checkAllLinksBatch();
+  }
+
+  @Api(server.route.checkOfficeHoursLink)
+  @UsePipes(ZodValidationPipe)
+  @UseGuards(UserTokenValidation)
+  async checkOfficeHoursLink(@Body() body: any) {
+    return await this.interactionService.checkProvidedLink(body.link);
+  }
+
+  @Api(server.route.reportBrokenOfficeHoursAttempt)
+  @UsePipes(ZodValidationPipe)
+  @UseGuards(UserTokenValidation)
+  async reportBrokenOfficeHoursAttempt(@Param('uid') uid: string, @Req() request: Request) {
+    const requester: any = await this.memberService.findMemberByEmail(request['userEmail']);
+    return await this.interactionService.reportBrokenOHAttempt(uid, requester);
+  }
+
+  @Api(server.route.checkMemberOfficeHoursLink)
+  @UseGuards(UserTokenValidation)
+  async checkMemberOfficeHoursLink(@Param('uid') uid: string) {
+    return await this.interactionService.checkAndUpdateMemberLink(uid);
   }
 }

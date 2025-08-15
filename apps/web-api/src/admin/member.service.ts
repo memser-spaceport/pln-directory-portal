@@ -212,6 +212,8 @@ export class MemberService {
       'linkedinHandler',
       'telegramHandler',
       'officeHours',
+      'ohInterest',
+      'ohHelpWith',
       'moreDetails',
       'plnStartDate',
       'plnFriend',
@@ -903,6 +905,8 @@ export class MemberService {
         linkedinHandler: memberData.linkedinHandler,
         telegramHandler: memberData.telegramHandler,
         officeHours: memberData.officeHours,
+        ohInterest: memberData.ohInterest || [],
+        ohHelpWith: memberData.ohHelpWith || [],
         teamOrProjectURL: memberData.teamOrProjectURL,
         locationUid: location?.uid || null,
         skills: {

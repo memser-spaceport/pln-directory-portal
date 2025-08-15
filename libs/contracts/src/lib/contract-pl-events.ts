@@ -1,6 +1,7 @@
 import { initContract } from '@ts-rest/core';
 import {
   PLEventDetailQueryParams,
+  PLEventAggregatedDataQueryParams,
   ResponsePLEventSchemaWithRelationsSchema,
   PLEventLocationQueryParams,
   ResponsePLEventLocationWithRelationsSchema, ResponseUpcomingEventSchema
@@ -144,7 +145,7 @@ export const apiEvents = contract.router({
   getAllAggregatedData: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/irl/aggregated-data`,
-    query: PLEventDetailQueryParams,
+    query: PLEventAggregatedDataQueryParams,
     responses: {
       200: ResponsePLEventLocationWithRelationsSchema.array(),
     },
@@ -164,5 +165,30 @@ export const apiEvents = contract.router({
       200: contract.response<unknown>(),
     },
     summary: 'Delete Event using eventUid',
+  },
+  getAggregatedEventsAndLocations: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/irl/events/upcoming`,
+    responses: {
+      200: ResponseUpcomingEventSchema.array(),
+    },
+  },
+  modifyIRLAggregatedData: {
+    method: 'PATCH',
+    path: `${getAPIVersionAsPath('1')}/irl/aggregated-data`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Modify aggregated data',
+  },
+  modifyPLEventLocation: {
+    method: 'PATCH',
+    path: `${getAPIVersionAsPath('1')}/irl/locations/:uid`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Modify PL event location',
   }
 });
