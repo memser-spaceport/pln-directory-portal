@@ -1,8 +1,10 @@
-import { z,  } from "zod";
+import { z } from 'zod';
 import { createZodDto } from '@abitia/zod-dto';
 
 export const MemberInteractionType = z.enum([
-  "SCHEDULE_MEETING"
+  'SCHEDULE_MEETING',
+  'BROKEN_OH_BOOKING_ATTEMPT',
+  'BROKEN_OH_FIXED_NOTIFICATION_SENT',
 ]);
 
 const MemberInteractionSchema = z.object({
@@ -20,7 +22,7 @@ const MemberInteractionSchema = z.object({
 export const CreateMemberInteractionSchema = MemberInteractionSchema.pick({
   type: true,
   data: true,
-  targetMemberUid: true
+  targetMemberUid: true,
 });
 
 export const ResponseMemberInteractionSchema = MemberInteractionSchema.omit({ id: true }).strict();

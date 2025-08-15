@@ -173,7 +173,9 @@ export const HUSKY_POSTGRES_ERROR_CODES = {
 export const EMAIL_TEMPLATES :  { [key: string]: string } = {
   "EVENT_ADDED": "EVENT_ADDED",
   "HOST_SPEAKER_ADDED": "HOST_SPEAKER_ADDED",
-  "IRL_UPDATES":"IRL_UPDATE"
+  "IRL_UPDATES":"IRL_UPDATE",
+  "BROKEN_OH_BOOKING_ATTEMPT": "BROKEN_OH_BOOKING_ATTEMPT",
+  "BROKEN_OH_LINK_FIXED": "BROKEN_OH_LINK_FIXED"
 };
 
 export const NOTIFICATION_CHANNEL: { [key: string]: string } = {
@@ -187,6 +189,16 @@ export const DELETE = "DELETE";
 
 export const  EventInvitationToMember ="EventInvitationToMember";
 export const  EVENT_GUEST_PRESENCE_REQUEST_TEMPLATE_NAME = "EventGuestPresenceRequest";
+
+// Office hours notification entity/action constants
+export const NOTIFICATION_ENTITY_TYPES = {
+  OFFICE_HOURS: 'OFFICE_HOURS'
+};
+
+export const OFFICE_HOURS_ACTIONS = {
+  BROKEN_LINK_ATTEMPT: 'BROKEN_LINK_ATTEMPT',
+  BROKEN_LINK_FIXED: 'BROKEN_LINK_FIXED'
+};
 
 // Analytics Events
 export const ANALYTICS_EVENTS = {

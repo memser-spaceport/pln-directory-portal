@@ -22,6 +22,7 @@ const eventLocationFactory = Factory.define<Omit<PLEventLocation, 'id'>>(({ onCr
     additionalInfo: {},
     isFeatured: false,
     isAggregated: false,
+    aggregatedPriority: faker.datatype.number({ min: 1, max: 100 }),
   };
 });
 
