@@ -97,7 +97,7 @@ export class MembersService {
         return { count: membersCount, members };
       }
 
-      const uids = members.map(m => m.uid);
+      const uids = members.map((m) => m.uid);
 
       const scheduleByUid = await this.prisma.memberInteraction.groupBy({
         by: ['targetMemberUid'],
@@ -108,11 +108,9 @@ export class MembersService {
         _count: { _all: true },
       });
 
-      const cntMap = new Map<string, number>(
-        scheduleByUid.map(r => [r.targetMemberUid!, r._count._all])
-      );
+      const cntMap = new Map<string, number>(scheduleByUid.map((r) => [r.targetMemberUid!, r._count._all]));
 
-      const enriched = members.map(m => ({
+      const enriched = members.map((m) => ({
         ...(m as any),
         scheduleMeetingCount: cntMap.get(m.uid) ?? 0,
       }));
@@ -1681,7 +1679,6 @@ export class MembersService {
     topics?: string[];
     roles?: string[];
     search?: string;
-    includePlnFriend?: boolean;
     sort?: 'name:asc' | 'name:desc';
     page?: number;
     limit?: number;
@@ -1690,13 +1687,11 @@ export class MembersService {
     const limit = Math.min(filters.limit || 20, 100);
     const skip = (page - 1) * limit;
 
-    // Base where clause excluding rejected access levels and PLN friends by default
+    // Base where clause excluding rejected access levels
     const baseWhere: Prisma.MemberWhereInput = {
       accessLevel: {
         notIn: ['L0', 'L1', 'Rejected'],
       },
-      // Exclude PLN friends by default unless includePlnFriend is true
-      ...(filters.includePlnFriend !== true && !filters.hasOfficeHours ? { plnFriend: false } : {}),
     };
 
     const whereConditions: Prisma.MemberWhereInput[] = [baseWhere];
@@ -1840,7 +1835,6 @@ export class MembersService {
             ohInterest: true,
             ohHelpWith: true,
             openToWork: true,
-            plnFriend: true,
             image: {
               select: {
                 uid: true,
@@ -1912,7 +1906,6 @@ export class MembersService {
               accessLevel: {
                 notIn: ['L0', 'L1', 'Rejected'],
               },
-              plnFriend: false,
             },
           },
         },
@@ -1938,7 +1931,6 @@ export class MembersService {
             accessLevel: {
               notIn: ['L0', 'L1', 'Rejected'],
             },
-            plnFriend: false,
           },
         },
         _count: {
@@ -1952,7 +1944,6 @@ export class MembersService {
           accessLevel: {
             notIn: ['L0', 'L1', 'Rejected'],
           },
-          plnFriend: false,
           OR: [
             {
               ohInterest: {
@@ -2063,7 +2054,6 @@ export class MembersService {
             accessLevel: {
               notIn: ['L0', 'L1', 'Rejected'],
             },
-            plnFriend: false,
           },
         },
         _count: {
