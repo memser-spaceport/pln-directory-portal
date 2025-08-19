@@ -158,7 +158,6 @@ export const MemberFilterQueryParams = z.object({
   topics: z.array(z.string()).optional(),
   roles: z.array(z.string()).optional(),
   search: z.string().optional(),
-  includePlnFriend: z.boolean().optional(),
   sort: z.enum(['name:asc', 'name:desc']).optional(),
   page: z.number().positive().optional(),
   limit: z.number().positive().max(100).optional(),
