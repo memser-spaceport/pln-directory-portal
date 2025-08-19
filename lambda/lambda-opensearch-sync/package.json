@@ -12,6 +12,7 @@
     "@aws-sdk/client-ssm": "^3.821.0",
     "@aws-sdk/credential-provider-node": "^3.821.0",
     "@opensearch-project/opensearch": "^3.5.1",
+    "mongodb": "^6.9.0",
     "pg": "^8.16.0",
     "sanitize-html": "^2.17.0"
   }

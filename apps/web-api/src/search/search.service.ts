@@ -113,9 +113,6 @@ export class SearchService {
     return { query: { bool: { minimum_should_match: 1, should } } };
   }
 
-
-
-
   /**
    * Adds highlighter config for the provided fields.
    */
@@ -137,16 +134,24 @@ export class SearchService {
       projects:['project',['name','tagline','description','readMe','tags']],
       teams:   ['team',   ['name','shortDescription','longDescription']],
       members: ['member', ['name','bio']],
+
+      // NEW: forum indices
+      forumTopics: ['forum_topic', ['title','name','slug','url']],
+      forumPosts:  ['forum_post',  ['content','topicTitle','name','topicSlug','url']],
     };
 
     const perIndexSize = options?.perIndexSize ?? MAX_SEARCH_RESULTS_PER_INDEX;
     const topN         = options?.topN ?? 50;
 
-    const result: SearchResult = { events: [], projects: [], teams: [], members: [], top: [] };
+    // NOTE: extend SearchResult to include forumTopics/forumPosts & new item fields, or relax schema.
+    const result: any = { events: [], projects: [], teams: [], members: [], forumTopics: [], forumPosts: [], top: [] };
     const allHits: Array<{
       uid: string; name: string; image: string; index: string;
       matches: Array<{ field: string; content: string }>;
       score: number;
+      kind?: 'forum_topic' | 'forum_post';
+      isComment?: boolean;
+      source?: any;
     }> = [];
 
     for (const key of Object.keys(indices)) {
@@ -165,27 +170,45 @@ export class SearchService {
       const res = await this.openSearchService.searchWithLimit(index, perIndexSize, body);
 
       for (const hit of res.body.hits.hits) {
+        const src = hit._source || {};
+
         const matches = Object.entries(hit.highlight || {}).map(([field, value]: [string, any]) => ({
           field,
           content: (Array.isArray(value) ? value : [value]).join(' '),
         }));
 
+        // Display name/image rules for forum docs
+        let displayName = src?.name ?? '';
+        let displayImage = src?.image ?? '';
+        let kind: 'forum_topic' | 'forum_post' | undefined;
+        let isComment: boolean | undefined;
+
+        if (index === 'forum_topic') {
+          kind = 'forum_topic';
+          displayName = src?.title ?? src?.name ?? '';
+        } else if (index === 'forum_post') {
+          kind = 'forum_post';
+          isComment = Boolean(src?.isComment);
+          displayName = src?.name
+            ?? (src?.topicTitle ? `[${src.topicTitle}] ${String(src?.content || '').slice(0, 120)}`
+              : String(src?.content || '').slice(0, 120));
+        }
+
         const item = {
           uid: hit._id,
-          name: hit._source?.name ?? '',
-          image: hit._source?.image ?? '',
+          name: displayName,
+          image: displayImage,
           index: key,
+          kind,
+          isComment,
           matches,
+          source: src,
         };
 
         (result as any)[key].push(item);
 
         allHits.push({
-          uid: hit._id,
-          name: item.name,
-          image: item.image,
-          index: key,
-          matches,
+          ...item,
           score: typeof hit._score === 'number' ? hit._score : 0,
         });
       }
@@ -198,14 +221,15 @@ export class SearchService {
     if (options?.page && options?.pageSize) {
       const start = (options.page - 1) * options.pageSize;
       const pageItems = allHits.slice(start, start + options.pageSize).map(item => ({
-        uid: item.uid, name: item.name, image: item.image, index: item.index, matches: item.matches,
+        uid: item.uid, name: item.name, image: item.image, index: item.index,
+        kind: item.kind, isComment: item.isComment, matches: item.matches, source: item.source,
       }));
-      // expose as `top` page slice
       result.top = pageItems;
     } else {
       // TopN (default 50) for the "top" section
       result.top = allHits.slice(0, topN).map(item => ({
-        uid: item.uid, name: item.name, image: item.image, index: item.index, matches: item.matches,
+        uid: item.uid, name: item.name, image: item.image, index: item.index,
+        kind: item.kind, isComment: item.isComment, matches: item.matches, source: item.source,
       }));
     }
 
@@ -213,8 +237,7 @@ export class SearchService {
   }
 
   /**
-   * Autocomplete stays unchanged: uses completion suggesters.
-   * NOTE: This endpoint is typically not "strict", because completion suggests benefit from prefix/partial matches.
+   * Autocomplete uses completion suggesters (now includes forum indices).
    */
   async autocompleteSearch(text: string, size = 5): Promise<SearchResult> {
     const indices: Record<string, [string, string[]]> = {
@@ -222,13 +245,20 @@ export class SearchService {
       projects: ['project', ['name_suggest', 'tagline_suggest', 'tags_suggest']],
       teams: ['team', ['name_suggest', 'shortDescription_suggest']],
       members: ['member', ['name_suggest']],
+
+      // NEW: forum suggesters (both indices have name_suggest)
+      forumTopics: ['forum_topic', ['name_suggest']],
+      forumPosts:  ['forum_post',  ['name_suggest']],
     };
 
-    const results: SearchResult = {
+    // NOTE: extend SearchResult to include forum* and allow source/isComment/kind if needed.
+    const results: any = {
       events: [],
       teams: [],
       projects: [],
       members: [],
+      forumTopics: [],
+      forumPosts: [],
       top: [],
     };
 
@@ -251,7 +281,9 @@ export class SearchService {
 
       const foundItem: Record<
         string,
-        { uid: string; index: string; matches: Array<{ field: string; content: string }>; name?: string; image?: string }
+        { uid: string; index: string; matches: Array<{ field: string; content: string }>;
+          name?: string; image?: string; kind?: 'forum_topic' | 'forum_post'; isComment?: boolean; source?: any;
+        }
       > = {};
       const idsToFetch = new Set<string>();
 
@@ -274,6 +306,7 @@ export class SearchService {
               uid,
               index: index_key,
               matches: [],
+              kind: index === 'forum_topic' ? 'forum_topic' : index === 'forum_post' ? 'forum_post' : undefined,
             };
           }
 
@@ -290,12 +323,24 @@ export class SearchService {
             const item = foundItem[doc._id];
             const source = doc._source;
 
-            item.name = source.name ?? 'unknown';
-            item.image = source.image ?? '';
+            // name/image shaping for forum docs
+            let displayName = source?.name ?? '';
+            if (index === 'forum_topic') {
+              displayName = source?.title ?? source?.name ?? '';
+            } else if (index === 'forum_post') {
+              displayName = source?.name
+                ?? (source?.topicTitle ? `[${source.topicTitle}] ${String(source?.content || '').slice(0, 120)}`
+                  : String(source?.content || '').slice(0, 120));
+            }
 
+            item.name = displayName || 'unknown';
+            item.image = source?.image ?? '';
+            item.isComment = index === 'forum_post' ? Boolean(source?.isComment) : undefined;
+            item.source = source;
+
+            // replace suggest token with truncated real field value for nicer UX
             item.matches.forEach((match) => {
               const fullFieldValue = source[match.field];
-
               if (typeof fullFieldValue === 'string') {
                 match.content = truncate(fullFieldValue, AUTOMCOMPLETE_MAX_LENGTH);
               } else if (Array.isArray(fullFieldValue)) {
