@@ -363,7 +363,6 @@ export class MemberController {
   @Api(server.route.autocompleteTopics)
   @ApiQueryFromZod(AutocompleteQueryParams.optional())
   @UseInterceptors(IsVerifiedMemberInterceptor)
-  @NoCache()
   async autocompleteTopics(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof AutocompleteQueryParams>;
     const { q, page, limit } = params || {};
@@ -382,7 +381,6 @@ export class MemberController {
   @Api(server.route.autocompleteRoles)
   @ApiQueryFromZod(AutocompleteQueryParams.optional())
   @UseInterceptors(IsVerifiedMemberInterceptor)
-  @NoCache()
   async autocompleteRoles(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof AutocompleteQueryParams>;
     const { q, page, limit } = params || {};
@@ -400,7 +398,6 @@ export class MemberController {
    */
   @Api(server.route.getMemberByExternalId)
   @UseInterceptors(IsVerifiedMemberInterceptor)
-  @NoCache()
   async getMemberByExternalId(@Param('externalId') externalId: string) {
     const member = await this.membersService.findByExternalId(externalId);
 
