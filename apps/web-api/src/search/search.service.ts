@@ -152,6 +152,7 @@ export class SearchService {
       kind?: 'forum_topic' | 'forum_post';
       isComment?: boolean;
       source?: any;
+      scheduleMeetingCount?: number;
     }> = [];
 
     for (const key of Object.keys(indices)) {
@@ -194,7 +195,7 @@ export class SearchService {
               : String(src?.content || '').slice(0, 120));
         }
 
-        const item = {
+        const item: any = {
           uid: hit._id,
           name: displayName,
           image: displayImage,
@@ -204,6 +205,10 @@ export class SearchService {
           matches,
           source: src,
         };
+
+        if (key === 'members' && typeof src.scheduleMeetingCount === 'number') {
+          item.scheduleMeetingCount = src.scheduleMeetingCount;
+        }
 
         (result as any)[key].push(item);
 
@@ -223,6 +228,7 @@ export class SearchService {
       const pageItems = allHits.slice(start, start + options.pageSize).map(item => ({
         uid: item.uid, name: item.name, image: item.image, index: item.index,
         kind: item.kind, isComment: item.isComment, matches: item.matches, source: item.source,
+        scheduleMeetingCount: item.scheduleMeetingCount, // keep in top too
       }));
       result.top = pageItems;
     } else {
@@ -230,6 +236,7 @@ export class SearchService {
       result.top = allHits.slice(0, topN).map(item => ({
         uid: item.uid, name: item.name, image: item.image, index: item.index,
         kind: item.kind, isComment: item.isComment, matches: item.matches, source: item.source,
+        scheduleMeetingCount: item.scheduleMeetingCount,
       }));
     }
 
@@ -283,6 +290,7 @@ export class SearchService {
         string,
         { uid: string; index: string; matches: Array<{ field: string; content: string }>;
           name?: string; image?: string; kind?: 'forum_topic' | 'forum_post'; isComment?: boolean; source?: any;
+          scheduleMeetingCount?: number;
         }
       > = {};
       const idsToFetch = new Set<string>();
@@ -338,7 +346,10 @@ export class SearchService {
             item.isComment = index === 'forum_post' ? Boolean(source?.isComment) : undefined;
             item.source = source;
 
-            // replace suggest token with truncated real field value for nicer UX
+            if (index === 'member' && typeof source?.scheduleMeetingCount === 'number') {
+              item.scheduleMeetingCount = source.scheduleMeetingCount;
+            }
+
             item.matches.forEach((match) => {
               const fullFieldValue = source[match.field];
               if (typeof fullFieldValue === 'string') {
