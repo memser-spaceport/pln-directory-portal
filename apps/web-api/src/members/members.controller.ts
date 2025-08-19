@@ -371,10 +371,7 @@ export class MemberController {
   async autocompleteTopics(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof AutocompleteQueryParams>;
     const { q, page, limit } = params || {};
-    if (!q) {
-      throw new BadRequestException('Query parameter "q" is required');
-    }
-    return await this.membersService.autocompleteTopics(q, page, limit);
+    return await this.membersService.autocompleteTopics(q || '', page, limit);
   }
 
   /**
@@ -391,10 +388,7 @@ export class MemberController {
   async autocompleteRoles(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof AutocompleteQueryParams>;
     const { q, page, limit } = params || {};
-    if (!q) {
-      throw new BadRequestException('Query parameter "q" is required');
-    }
-    return await this.membersService.autocompleteRoles(q, page, limit);
+    return await this.membersService.autocompleteRoles(q || '', page, limit);
   }
 
   /**
