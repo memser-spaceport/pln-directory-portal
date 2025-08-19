@@ -164,7 +164,7 @@ export const MemberFilterQueryParams = z.object({
 });
 
 export const AutocompleteQueryParams = z.object({
-  q: z.string().min(1),
+  q: z.string().optional(),
   page: z.number().positive().optional(),
   limit: z.number().positive().max(50).optional(),
 });
