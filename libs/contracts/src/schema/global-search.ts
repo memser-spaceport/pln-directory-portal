@@ -28,6 +28,7 @@ const SearchResultItemSchema = z.object({
   kind: z.enum(['forum_topic', 'forum_post']).optional(),
   isComment: z.boolean().optional(),
   source: z.any().optional(),
+  scheduleMeetingCount: z.number().optional(),
 });
 
 export const SearchResultSchema = z.object({

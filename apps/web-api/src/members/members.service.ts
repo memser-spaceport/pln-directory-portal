@@ -93,7 +93,31 @@ export class MembersService {
         this.prisma.member.count({ where }),
       ]);
 
-      return { count: membersCount, members };
+      if (members.length === 0) {
+        return { count: membersCount, members };
+      }
+
+      const uids = members.map(m => m.uid);
+
+      const scheduleByUid = await this.prisma.memberInteraction.groupBy({
+        by: ['targetMemberUid'],
+        where: {
+          type: 'SCHEDULE_MEETING',
+          targetMemberUid: { in: uids },
+        },
+        _count: { _all: true },
+      });
+
+      const cntMap = new Map<string, number>(
+        scheduleByUid.map(r => [r.targetMemberUid!, r._count._all])
+      );
+
+      const enriched = members.map(m => ({
+        ...(m as any),
+        scheduleMeetingCount: cntMap.get(m.uid) ?? 0,
+      }));
+
+      return { count: membersCount, members: enriched };
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -358,7 +382,9 @@ export class MembersService {
     tx?: Prisma.TransactionClient
   ): Promise<Member> {
     try {
-      return await (tx || this.prisma).member.findUniqueOrThrow({
+      const prisma = tx || this.prisma;
+
+      const member = await prisma.member.findUniqueOrThrow({
         where: { uid },
         ...queryOptions,
         include: {
@@ -422,6 +448,18 @@ export class MembersService {
           },
         },
       });
+
+      const scheduleMeetingCount = await prisma.memberInteraction.count({
+        where: {
+          type: 'SCHEDULE_MEETING',
+          targetMemberUid: uid,
+        },
+      });
+
+      return {
+        ...(member as any),
+        scheduleMeetingCount,
+      };
     } catch (error) {
       return this.handleErrors(error);
     }
