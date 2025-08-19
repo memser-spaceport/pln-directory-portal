@@ -151,3 +151,42 @@ const SendEmailOtpRequestSchema = z.object({
 
 export class SendEmailOtpRequestDto extends createZodDto(SendEmailOtpRequestSchema) {}
 export class ChangeEmailRequestDto extends createZodDto(ChangeEmailRequestSchema) {}
+
+// New filtering schemas
+export const MemberFilterQueryParams = z.object({
+  hasOfficeHours: z.boolean().optional(),
+  topics: z.array(z.string()).optional(),
+  roles: z.array(z.string()).optional(),
+  search: z.string().optional(),
+  includePlnFriend: z.boolean().optional(),
+  sort: z.enum(['name:asc', 'name:desc']).optional(),
+  page: z.number().positive().optional(),
+  limit: z.number().positive().max(100).optional(),
+});
+
+export const AutocompleteQueryParams = z.object({
+  q: z.string().min(1),
+  page: z.number().positive().optional(),
+  limit: z.number().positive().max(50).optional(),
+});
+
+export const TopicAutocompleteResult = z.object({
+  topic: z.string(),
+  count: z.number(),
+});
+
+export const RoleAutocompleteResult = z.object({
+  role: z.string(),
+  count: z.number(),
+});
+
+export const AutocompleteResponse = z.object({
+  results: z.array(z.union([TopicAutocompleteResult, RoleAutocompleteResult])),
+  total: z.number(),
+  page: z.number(),
+  hasMore: z.boolean(),
+});
+
+export class MemberFilterQueryParamsDto extends createZodDto(MemberFilterQueryParams) {}
+export class AutocompleteQueryParamsDto extends createZodDto(AutocompleteQueryParams) {}
+export class AutocompleteResponseDto extends createZodDto(AutocompleteResponse) {}
