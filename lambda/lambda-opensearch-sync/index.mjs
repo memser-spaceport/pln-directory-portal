@@ -208,19 +208,35 @@ async function deleteDeletedProjectsFromOpenSearch() {
 
 async function indexMembers(lastCheckpoint) {
   const r = await pgClient.query(`
-    SELECT m.uid, m.name, m.bio, i.url
+    WITH mi AS (
+      SELECT "targetMemberUid" AS uid, COUNT(*)::int AS cnt
+      FROM "MemberInteraction"
+      WHERE type = 'SCHEDULE_MEETING'
+      GROUP BY "targetMemberUid"
+    )
+    SELECT m.uid, m.name, m.bio, i.url, COALESCE(mi.cnt, 0) AS "scheduleMeetingCount"
     FROM "Member" m
            LEFT JOIN "Image" i ON m."imageUid" = i.uid
+           LEFT JOIN mi ON mi.uid = m.uid
     WHERE (m."createdAt" > $1 OR m."updatedAt" > $1)
       AND m."accessLevel" NOT IN ('L0', 'L1', 'Rejected')
   `, [lastCheckpoint]);
+
   console.log('Got data from Member table:', r.rows.length);
   if (!r.rows.length) return 0;
 
   const body = r.rows.flatMap(row => [
     { index: { _index: 'member', _id: row.uid } },
-    { uid: row.uid, name: row.name, image: row.url, bio: purifyHtml(row.bio), name_suggest: { input: generateSuggestInput(row.name) } }
+    {
+      uid: row.uid,
+      name: row.name,
+      image: row.url,
+      bio: purifyHtml(row.bio),
+      scheduleMeetingCount: row.scheduleMeetingCount,
+      name_suggest: { input: generateSuggestInput(row.name) }
+    }
   ]);
+
   const resp = await osClient.bulk({ body });
   if (resp.body.errors) {
     const failed = resp.body.items.filter(x => x.index && x.index.error);
@@ -229,6 +245,7 @@ async function indexMembers(lastCheckpoint) {
   }
   return r.rows.length;
 }
+
 
 async function indexTeams(lastCheckpoint) {
   const r = await pgClient.query(`
