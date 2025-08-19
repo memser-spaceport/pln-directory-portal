@@ -17,10 +17,7 @@ export class MyCacheInterceptor extends CacheInterceptor {
     const request = http.getRequest();
 
     // Get the ignoreCaching metadata from the handler
-    const ignoreCaching: boolean = this.reflector.get(
-      'ignoreCaching',
-      context.getHandler()
-    );
+    const ignoreCaching: boolean = this.reflector.get('ignoreCaching', context.getHandler());
 
     // Only cache GET requests that don't have the ignoreCaching flag
     return !ignoreCaching && request.method === 'GET';
@@ -28,9 +25,10 @@ export class MyCacheInterceptor extends CacheInterceptor {
 
   /**
    * Generates a cache key based on the request and authentication status
-   * Creates separate cache spaces for authenticated and guest users
+   * Creates separate cache spaces for authenticated and guest users,
+   * unless the endpoint is marked for query-based caching
    * @param context Execution context containing the request
-   * @returns Cache key string with auth/guest prefix
+   * @returns Cache key string with appropriate prefix
    */
   trackBy(context: ExecutionContext): string | undefined {
     const request = context.switchToHttp().getRequest<Request>();
@@ -40,13 +38,21 @@ export class MyCacheInterceptor extends CacheInterceptor {
     if (!baseKey) {
       return baseKey; // If no base key, return undefined
     }
-    
+
+    // Check if this endpoint should use query-based caching
+    const isQueryBasedCache: boolean = this.reflector.get('queryBasedCache', context.getHandler());
+
+    // If query-based cache is enabled, only use environment prefix
+    if (isQueryBasedCache) {
+      return `${process.env.ENVIRONMENT}:query:${baseKey}`;
+    }
+
     // Check for any authentication indicators set by the various guards
     const isAuthenticated = !!(
-      request['userEmail'] || 
-      request['isUserLoggedIn'] || 
-      request['userUid'] || 
-      request['userAccessToken'] 
+      request['userEmail'] ||
+      request['isUserLoggedIn'] ||
+      request['userUid'] ||
+      request['userAccessToken']
     );
 
     // Prefix the key with the environment to prevent cache collisions between deployment stages.
