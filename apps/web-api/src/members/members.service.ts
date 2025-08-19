@@ -1894,13 +1894,18 @@ export class MembersService {
     const searchQuery = query.toLowerCase();
 
     try {
+      // Build where clause - if no query, get all topics; if query, filter by it
+      const titleFilter = query.trim()
+        ? {
+            contains: searchQuery,
+            mode: 'insensitive' as const,
+          }
+        : undefined;
+
       // Get skills matching the query
       const skillsPromise = this.prisma.skill.findMany({
         where: {
-          title: {
-            contains: searchQuery,
-            mode: 'insensitive',
-          },
+          ...(titleFilter && { title: titleFilter }),
           members: {
             some: {
               accessLevel: {
@@ -1923,10 +1928,7 @@ export class MembersService {
       const experiencesPromise = this.prisma.memberExperience.groupBy({
         by: ['title'],
         where: {
-          title: {
-            contains: searchQuery,
-            mode: 'insensitive',
-          },
+          ...(titleFilter && { title: titleFilter }),
           member: {
             accessLevel: {
               notIn: ['L0', 'L1', 'Rejected'],
@@ -1944,18 +1946,35 @@ export class MembersService {
           accessLevel: {
             notIn: ['L0', 'L1', 'Rejected'],
           },
-          OR: [
-            {
-              ohInterest: {
-                hasSome: [searchQuery],
+          ...(query.trim() && {
+            OR: [
+              {
+                ohInterest: {
+                  hasSome: [searchQuery],
+                },
               },
-            },
-            {
-              ohHelpWith: {
-                hasSome: [searchQuery],
+              {
+                ohHelpWith: {
+                  hasSome: [searchQuery],
+                },
               },
-            },
-          ],
+            ],
+          }),
+          // If no query, get members with any ohInterest or ohHelpWith
+          ...(!query.trim() && {
+            OR: [
+              {
+                ohInterest: {
+                  isEmpty: false,
+                },
+              },
+              {
+                ohHelpWith: {
+                  isEmpty: false,
+                },
+              },
+            ],
+          }),
         },
         select: {
           ohInterest: true,
@@ -1986,13 +2005,15 @@ export class MembersService {
 
       ohData.forEach((member) => {
         member.ohInterest.forEach((interest) => {
-          if (interest.toLowerCase().includes(searchQuery)) {
+          // If no query, include all topics; if query, filter by it
+          if (!query.trim() || interest.toLowerCase().includes(searchQuery)) {
             const topic = interest.toLowerCase();
             ohInterestCounts.set(topic, (ohInterestCounts.get(topic) || 0) + 1);
           }
         });
         member.ohHelpWith.forEach((help) => {
-          if (help.toLowerCase().includes(searchQuery)) {
+          // If no query, include all topics; if query, filter by it
+          if (!query.trim() || help.toLowerCase().includes(searchQuery)) {
             const topic = help.toLowerCase();
             ohHelpWithCounts.set(topic, (ohHelpWithCounts.get(topic) || 0) + 1);
           }
@@ -2046,8 +2067,10 @@ export class MembersService {
         where: {
           role: {
             not: null,
-            contains: query,
-            mode: 'insensitive',
+            ...(query.trim() && {
+              contains: query,
+              mode: 'insensitive' as const,
+            }),
           },
           mainTeam: true,
           member: {
