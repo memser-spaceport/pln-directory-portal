@@ -9,6 +9,7 @@ import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
+  CacheTTL,
 } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
@@ -40,6 +41,7 @@ import { LogService } from '../shared/log.service';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
 import { IsVerifiedMemberInterceptor } from '../interceptors/verified-member.interceptor';
 import { isEmpty } from 'lodash';
+import { QueryCache } from '../decorators/query-cache.decorator';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
@@ -348,7 +350,8 @@ export class MemberController {
   @Api(server.route.searchMembers)
   @ApiQueryFromZod(MemberFilterQueryParams.optional())
   @UseInterceptors(IsVerifiedMemberInterceptor)
-  @NoCache()
+  @QueryCache()
+  @CacheTTL(7200) // 2 hours
   async searchMembers(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof MemberFilterQueryParams>;
     return await this.membersService.searchMembers(params || {});
@@ -363,7 +366,8 @@ export class MemberController {
   @Api(server.route.autocompleteTopics)
   @ApiQueryFromZod(AutocompleteQueryParams.optional())
   @UseInterceptors(IsVerifiedMemberInterceptor)
-  @NoCache()
+  @QueryCache()
+  @CacheTTL(7200) // 2 hours
   async autocompleteTopics(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof AutocompleteQueryParams>;
     const { q, page, limit } = params || {};
@@ -382,7 +386,8 @@ export class MemberController {
   @Api(server.route.autocompleteRoles)
   @ApiQueryFromZod(AutocompleteQueryParams.optional())
   @UseInterceptors(IsVerifiedMemberInterceptor)
-  @NoCache()
+  @QueryCache()
+  @CacheTTL(7200) // 2 hours
   async autocompleteRoles(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof AutocompleteQueryParams>;
     const { q, page, limit } = params || {};
