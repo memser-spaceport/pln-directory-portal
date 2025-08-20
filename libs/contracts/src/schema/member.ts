@@ -167,6 +167,7 @@ export const AutocompleteQueryParams = z.object({
   q: z.string().optional(),
   page: z.number().positive().optional(),
   limit: z.number().positive().max(50).optional(),
+  hasOfficeHours: z.boolean().optional(),
 });
 
 export const TopicAutocompleteResult = z.object({
