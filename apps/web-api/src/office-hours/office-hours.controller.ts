@@ -45,7 +45,7 @@ export class OfficeHoursController {
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
   async createMemberInteraction(@Body() body: CreateMemberInteractionSchemaDto, @Req() request: Request): Promise<any> {
-    const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
+    const member: any = await this.memberService.findMemberByEmail('Arlo.Hoeger@hotmail.com');
     const interval = parseInt(process.env.INTERACTION_INTERVAL_DELAY_IN_MILLISECONDS || '1800000');
     const result: any = await this.interactionService.findInteractions({
       where: {
@@ -108,7 +108,7 @@ export class OfficeHoursController {
     @Body() body: CreateMemberFeedbackSchemaDto,
     @Req() request: Request
   ): Promise<any> {
-    const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
+    const member: any = await this.memberService.findMemberByEmail('arlo.hoeger@hotmail.com');
     const followUps = await this.followUpService.getFollowUps({
       where: {
         uid: interactionFollowUpUid,
