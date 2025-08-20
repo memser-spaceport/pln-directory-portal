@@ -1859,9 +1859,10 @@ export class MembersService {
    * @param query - Search query string
    * @param page - Page number for pagination
    * @param limit - Results per page
+   * @param hasOfficeHours - Filter by members who have office hours
    * @returns Paginated autocomplete results with counts
    */
-  async autocompleteTopics(query: string, page = 1, limit = 20) {
+  async autocompleteTopics(query: string, page = 1, limit = 20, hasOfficeHours?: boolean) {
     limit = Math.min(limit, 50);
     const skip = (page - 1) * limit;
     const searchQuery = query.toLowerCase();
@@ -1875,16 +1876,33 @@ export class MembersService {
           }
         : undefined;
 
+      // Build member filter for office hours
+      const memberFilter: any = {
+        accessLevel: {
+          notIn: ['L0', 'L1', 'Rejected'],
+        },
+        ...(hasOfficeHours && {
+          AND: [
+            {
+              officeHours: {
+                not: null,
+              },
+            },
+            {
+              officeHours: {
+                not: '',
+              },
+            },
+          ],
+        }),
+      };
+
       // Get skills matching the query
       const skillsPromise = this.prisma.skill.findMany({
         where: {
           ...(titleFilter && { title: titleFilter }),
           members: {
-            some: {
-              accessLevel: {
-                notIn: ['L0', 'L1', 'Rejected'],
-              },
-            },
+            some: memberFilter,
           },
         },
         select: {
@@ -1902,11 +1920,7 @@ export class MembersService {
         by: ['title'],
         where: {
           ...(titleFilter && { title: titleFilter }),
-          member: {
-            accessLevel: {
-              notIn: ['L0', 'L1', 'Rejected'],
-            },
-          },
+          member: memberFilter,
         },
         _count: {
           memberUid: true,
@@ -1916,9 +1930,7 @@ export class MembersService {
       // Get ohInterest and ohHelpWith matching the query
       const ohDataPromise = this.prisma.member.findMany({
         where: {
-          accessLevel: {
-            notIn: ['L0', 'L1', 'Rejected'],
-          },
+          ...memberFilter,
           ...(query.trim() && {
             OR: [
               {
@@ -2028,13 +2040,35 @@ export class MembersService {
    * @param query - Search query string
    * @param page - Page number for pagination
    * @param limit - Results per page
+   * @param hasOfficeHours - Filter by members who have office hours
    * @returns Paginated autocomplete results with counts
    */
-  async autocompleteRoles(query: string, page = 1, limit = 20) {
+  async autocompleteRoles(query: string, page = 1, limit = 20, hasOfficeHours?: boolean) {
     limit = Math.min(limit, 50);
     const skip = (page - 1) * limit;
 
     try {
+      // Build member filter for office hours
+      const memberFilter: any = {
+        accessLevel: {
+          notIn: ['L0', 'L1', 'Rejected'],
+        },
+        ...(hasOfficeHours && {
+          AND: [
+            {
+              officeHours: {
+                not: null,
+              },
+            },
+            {
+              officeHours: {
+                not: '',
+              },
+            },
+          ],
+        }),
+      };
+
       const roles = await this.prisma.teamMemberRole.groupBy({
         by: ['role'],
         where: {
@@ -2046,11 +2080,7 @@ export class MembersService {
             }),
           },
           mainTeam: true,
-          member: {
-            accessLevel: {
-              notIn: ['L0', 'L1', 'Rejected'],
-            },
-          },
+          member: memberFilter,
         },
         _count: {
           memberUid: true,
