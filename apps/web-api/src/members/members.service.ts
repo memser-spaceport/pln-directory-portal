@@ -1924,7 +1924,7 @@ export class MembersService {
         }),
       };
 
-      // Get skills matching the query
+      // Get skills matching the query with filtered member count
       const skillsPromise = this.prisma.skill.findMany({
         where: {
           ...(titleFilter && { title: titleFilter }),
@@ -1934,9 +1934,10 @@ export class MembersService {
         },
         select: {
           title: true,
-          _count: {
+          members: {
+            where: memberFilter,
             select: {
-              members: true,
+              uid: true,
             },
           },
         },
@@ -2002,7 +2003,7 @@ export class MembersService {
       // Process skills
       skills.forEach((skill) => {
         const topic = skill.title.toLowerCase();
-        topicCounts.set(topic, (topicCounts.get(topic) || 0) + skill._count.members);
+        topicCounts.set(topic, (topicCounts.get(topic) || 0) + skill.members.length);
       });
 
       // Process experiences
