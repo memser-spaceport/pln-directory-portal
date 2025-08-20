@@ -370,8 +370,8 @@ export class MemberController {
   @CacheTTL(7200) // 2 hours
   async autocompleteTopics(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof AutocompleteQueryParams>;
-    const { q, page, limit } = params || {};
-    return await this.membersService.autocompleteTopics(q || '', page, limit);
+    const { q, page, limit, hasOfficeHours } = params || {};
+    return await this.membersService.autocompleteTopics(q || '', page, limit, hasOfficeHours);
   }
 
   /**
@@ -387,8 +387,8 @@ export class MemberController {
   @CacheTTL(7200) // 2 hours
   async autocompleteRoles(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof AutocompleteQueryParams>;
-    const { q, page, limit } = params || {};
-    return await this.membersService.autocompleteRoles(q || '', page, limit);
+    const { q, page, limit, hasOfficeHours } = params || {};
+    return await this.membersService.autocompleteRoles(q || '', page, limit, hasOfficeHours);
   }
 
   /**
