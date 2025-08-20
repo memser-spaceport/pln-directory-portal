@@ -67,6 +67,7 @@ async function load(fixtures) {
       : null;
     await prisma[model].createMany({
       data: fixturesToCreate,
+      skipDuplicates: true,
     });
     console.log(`✅ Added ${model} data`);
     console.log('\r');
@@ -119,7 +120,7 @@ load([
     fixtures: eventGuests
   }},
   { [Prisma.ModelName.FocusArea]: focusAreas },
-  { 
+  {
     [Prisma.ModelName.TeamFocusArea]: {
       fixtures: teamFocusAreas
     }
