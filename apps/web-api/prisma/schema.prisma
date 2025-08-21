@@ -140,6 +140,8 @@ model Member {
   notificationSetting          NotificationSetting?
   linkedinProfile              LinkedInProfile?
   accessLevel                  String?
+  scheduleMeetingCount         Int                           @default(0)
+  createdAdjustments           MemberInteractionAdjustment[] @relation("AdjustmentCreatedBy")
   accessLevelUpdatedAt         DateTime                      @default(now())
   deletedAt                    DateTime? // soft delete timestamp
   deletionReason               String? // reason for deletion
@@ -553,18 +555,21 @@ model TeamFocusAreaVersionHistory {
 }
 
 model MemberInteraction {
-  id                   Int              @id @default(autoincrement())
-  uid                  String           @unique @default(cuid())
+  id                   Int                           @id @default(autoincrement())
+  uid                  String                        @unique @default(cuid())
   type                 String
   data                 Json?
-  hasFollowUp          Boolean          @default(false)
+  hasFollowUp          Boolean                       @default(false)
   sourceMemberUid      String
-  sourceMember         Member           @relation("SourceMemberInteractions", fields: [sourceMemberUid], references: [uid])
+  sourceMember         Member                        @relation("SourceMemberInteractions", fields: [sourceMemberUid], references: [uid])
   targetMemberUid      String?
-  targetMember         Member?          @relation("TargetMemberInteractions", fields: [targetMemberUid], references: [uid])
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
+  targetMember         Member?                       @relation("TargetMemberInteractions", fields: [targetMemberUid], references: [uid])
+  createdAt            DateTime                      @default(now())
+  updatedAt            DateTime                      @updatedAt
+  adjustments          MemberInteractionAdjustment[] @relation("InteractionAdjustments")
   interactionFollowUps MemberFollowUp[]
+
+  @@index([targetMemberUid, type], name: "MemberInteraction_target_type_idx")
 }
 
 model MemberFollowUp {
@@ -774,4 +779,26 @@ model LinkedInProfile {
   verifiedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+}
+
+enum CounterAdjustmentReason {
+  NEGATIVE_FEEDBACK
+  CANCELLED
+  RESCHEDULED
+}
+
+model MemberInteractionAdjustment {
+  id             Int                     @id @default(autoincrement())
+  uid            String                  @unique
+  interactionUid String
+  reason         CounterAdjustmentReason
+  createdBy      String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @default(now())
+
+  // Named relations pointing to back fields on MemberInteraction and Member
+  interaction   MemberInteraction @relation("InteractionAdjustments", fields: [interactionUid], references: [uid], onDelete: Cascade, onUpdate: Cascade)
+  createdByUser Member?           @relation("AdjustmentCreatedBy", fields: [createdBy], references: [uid], onDelete: SetNull, onUpdate: Cascade)
+
+  @@unique([interactionUid, reason], name: "MemberInteractionAdjustment_interaction_reason_unique")
 }

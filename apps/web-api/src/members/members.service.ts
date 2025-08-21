@@ -79,7 +79,9 @@ export class MembersService {
    *                       the members. These options are based on Prisma's `MemberFindManyArgs`.
    * @returns A promise that resolves to an array of member records matching the query criteria.
    */
-  async findAll(queryOptions: Prisma.MemberFindManyArgs): Promise<{ count: number; members: Member[] }> {
+  async findAll(
+    queryOptions: Prisma.MemberFindManyArgs
+  ): Promise<{ count: number; members: Member[] }> {
     try {
       const where = {
         ...queryOptions.where,
@@ -88,34 +90,12 @@ export class MembersService {
         },
       };
 
-      const [members, membersCount] = await Promise.all([
+      const [members, membersCount] = await this.prisma.$transaction([
         this.prisma.member.findMany({ ...queryOptions, where }),
         this.prisma.member.count({ where }),
       ]);
 
-      if (members.length === 0) {
-        return { count: membersCount, members };
-      }
-
-      const uids = members.map((m) => m.uid);
-
-      const scheduleByUid = await this.prisma.memberInteraction.groupBy({
-        by: ['targetMemberUid'],
-        where: {
-          type: 'SCHEDULE_MEETING',
-          targetMemberUid: { in: uids },
-        },
-        _count: { _all: true },
-      });
-
-      const cntMap = new Map<string, number>(scheduleByUid.map((r) => [r.targetMemberUid!, r._count._all]));
-
-      const enriched = members.map((m) => ({
-        ...(m as any),
-        scheduleMeetingCount: cntMap.get(m.uid) ?? 0,
-      }));
-
-      return { count: membersCount, members: enriched };
+      return { count: membersCount, members };
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -447,16 +427,9 @@ export class MembersService {
         },
       });
 
-      const scheduleMeetingCount = await prisma.memberInteraction.count({
-        where: {
-          type: 'SCHEDULE_MEETING',
-          targetMemberUid: uid,
-        },
-      });
 
       return {
-        ...(member as any),
-        scheduleMeetingCount,
+        ...(member as any)
       };
     } catch (error) {
       return this.handleErrors(error);

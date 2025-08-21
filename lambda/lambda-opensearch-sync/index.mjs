@@ -208,18 +208,16 @@ async function deleteDeletedProjectsFromOpenSearch() {
 
 async function indexMembers(lastCheckpoint) {
   const r = await pgClient.query(`
-    WITH mi AS (
-      SELECT "targetMemberUid" AS uid, COUNT(*)::int AS cnt
-      FROM "MemberInteraction"
-      WHERE type = 'SCHEDULE_MEETING'
-      GROUP BY "targetMemberUid"
-    )
-    SELECT m.uid, m.name, m.bio, i.url, COALESCE(mi.cnt, 0) AS "scheduleMeetingCount"
-    FROM "Member" m
-           LEFT JOIN "Image" i ON m."imageUid" = i.uid
-           LEFT JOIN mi ON mi.uid = m.uid
-    WHERE (m."createdAt" > $1 OR m."updatedAt" > $1)
-      AND m."accessLevel" NOT IN ('L0', 'L1', 'Rejected')
+          SELECT
+            m.uid,
+            m.name,
+            m.bio,
+            i.url,
+            m."scheduleMeetingCount"
+          FROM "Member" m
+                 LEFT JOIN "Image" i ON m."imageUid" = i.uid
+          WHERE (m."createdAt" > $1 OR m."updatedAt" > $1)
+            AND m."accessLevel" NOT IN ('L0', 'L1', 'Rejected')
   `, [lastCheckpoint]);
 
   console.log('Got data from Member table:', r.rows.length);

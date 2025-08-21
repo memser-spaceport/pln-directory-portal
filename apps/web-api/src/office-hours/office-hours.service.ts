@@ -22,6 +22,7 @@ import {
 import axios from 'axios';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { MembersService } from '../members/members.service';
+import { MemberInteractionAdjustmentsService } from '../member-interaction-adjustments/member-interaction-adjustments.service';
 
 @Injectable()
 export class OfficeHoursService {
@@ -36,7 +37,8 @@ export class OfficeHoursService {
     private readonly feedbackService: MemberFeedbacksService,
     private readonly notificationClient: NotificationServiceClient,
     @Inject(forwardRef(() => MembersService))
-    private readonly membersService: MembersService
+    private readonly membersService: MembersService,
+    private readonly adjustmentsService: MemberInteractionAdjustmentsService,
   ) {}
 
   async createInteraction(interaction: Prisma.MemberInteractionUncheckedCreateInput, loggedInMember) {
@@ -48,6 +50,15 @@ export class OfficeHoursService {
             sourceMemberUid: loggedInMember?.uid,
           },
         });
+
+        if (result?.type === 'SCHEDULE_MEETING' && result?.targetMemberUid) {
+          await this.adjustmentsService.bumpOnScheduleMeetingTx(tx, {
+            uid: result.uid,
+            type: result.type,
+            targetMemberUid: result.targetMemberUid,
+          });
+        }
+
         if (result?.hasFollowUp) {
           await this.createInteractionFollowUp(result, loggedInMember, MemberFollowUpType.Enum.MEETING_INITIATED, tx);
           await this.createInteractionFollowUp(result, loggedInMember, MemberFollowUpType.Enum.MEETING_SCHEDULED, tx);
