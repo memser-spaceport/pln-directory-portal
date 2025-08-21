@@ -79,9 +79,7 @@ export class MembersService {
    *                       the members. These options are based on Prisma's `MemberFindManyArgs`.
    * @returns A promise that resolves to an array of member records matching the query criteria.
    */
-  async findAll(
-    queryOptions: Prisma.MemberFindManyArgs
-  ): Promise<{ count: number; members: Member[] }> {
+  async findAll(queryOptions: Prisma.MemberFindManyArgs): Promise<{ count: number; members: Member[] }> {
     try {
       const where = {
         ...queryOptions.where,
@@ -427,9 +425,8 @@ export class MembersService {
         },
       });
 
-
       return {
-        ...(member as any)
+        ...(member as any),
       };
     } catch (error) {
       return this.handleErrors(error);
@@ -1917,14 +1914,14 @@ export class MembersService {
         },
       });
 
-      // Get experiences matching the query
-      const experiencesPromise = this.prisma.memberExperience.groupBy({
-        by: ['title'],
+      // Get experiences matching the query with member UIDs
+      const experiencesPromise = this.prisma.memberExperience.findMany({
         where: {
           ...(titleFilter && { title: titleFilter }),
           member: memberFilter,
         },
-        _count: {
+        select: {
+          title: true,
           memberUid: true,
         },
       });
@@ -1964,6 +1961,7 @@ export class MembersService {
           }),
         },
         select: {
+          uid: true,
           ohInterest: true,
           ohHelpWith: true,
         },
@@ -1971,54 +1969,56 @@ export class MembersService {
 
       const [skills, experiences, ohData] = await Promise.all([skillsPromise, experiencesPromise, ohDataPromise]);
 
-      // Use a Map to deduplicate topics and sum their counts
-      const topicCounts = new Map<string, number>();
+      // Use a Map to collect unique members per topic
+      const topicMemberSets = new Map<string, Set<string>>();
 
       // Process skills
       skills.forEach((skill) => {
         const topic = skill.title.toLowerCase();
-        topicCounts.set(topic, (topicCounts.get(topic) || 0) + skill.members.length);
+        if (!topicMemberSets.has(topic)) {
+          topicMemberSets.set(topic, new Set());
+        }
+        skill.members.forEach((member) => {
+          topicMemberSets.get(topic)!.add(member.uid);
+        });
       });
 
       // Process experiences
       experiences.forEach((exp) => {
         const topic = exp.title.toLowerCase();
-        topicCounts.set(topic, (topicCounts.get(topic) || 0) + exp._count.memberUid);
+        if (!topicMemberSets.has(topic)) {
+          topicMemberSets.set(topic, new Set());
+        }
+        topicMemberSets.get(topic)!.add(exp.memberUid);
       });
 
       // Process ohInterest and ohHelpWith
-      const ohInterestCounts = new Map<string, number>();
-      const ohHelpWithCounts = new Map<string, number>();
-
       ohData.forEach((member) => {
         member.ohInterest.forEach((interest) => {
           // If no query, include all topics; if query, filter by it
           if (!query.trim() || interest.toLowerCase().includes(searchQuery)) {
             const topic = interest.toLowerCase();
-            ohInterestCounts.set(topic, (ohInterestCounts.get(topic) || 0) + 1);
+            if (!topicMemberSets.has(topic)) {
+              topicMemberSets.set(topic, new Set());
+            }
+            topicMemberSets.get(topic)!.add(member.uid);
           }
         });
         member.ohHelpWith.forEach((help) => {
           // If no query, include all topics; if query, filter by it
           if (!query.trim() || help.toLowerCase().includes(searchQuery)) {
             const topic = help.toLowerCase();
-            ohHelpWithCounts.set(topic, (ohHelpWithCounts.get(topic) || 0) + 1);
+            if (!topicMemberSets.has(topic)) {
+              topicMemberSets.set(topic, new Set());
+            }
+            topicMemberSets.get(topic)!.add(member.uid);
           }
         });
       });
 
-      // Add ohInterest and ohHelpWith counts to the main map
-      ohInterestCounts.forEach((count, topic) => {
-        topicCounts.set(topic, (topicCounts.get(topic) || 0) + count);
-      });
-
-      ohHelpWithCounts.forEach((count, topic) => {
-        topicCounts.set(topic, (topicCounts.get(topic) || 0) + count);
-      });
-
       // Convert map to array and sort by count descending, then by topic name
-      const results = Array.from(topicCounts.entries())
-        .map(([topic, count]) => ({ topic, count }))
+      const results = Array.from(topicMemberSets.entries())
+        .map(([topic, memberSet]) => ({ topic, count: memberSet.size }))
         .sort((a, b) => {
           if (b.count !== a.count) return b.count - a.count;
           return a.topic.localeCompare(b.topic);
