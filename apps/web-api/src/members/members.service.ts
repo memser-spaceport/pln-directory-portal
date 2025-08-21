@@ -1808,6 +1808,7 @@ export class MembersService {
             ohInterest: true,
             ohHelpWith: true,
             openToWork: true,
+            scheduleMeetingCount: true,
             image: {
               select: {
                 uid: true,
