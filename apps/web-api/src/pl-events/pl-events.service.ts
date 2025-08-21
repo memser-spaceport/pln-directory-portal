@@ -40,7 +40,7 @@ export class PLEventsService {
    *             startDate, endDate, resources, and locationUid.
    * @returns The newly created event object with details such as name, type, start and end dates, and location.
    */
-  async createPLEvent(event, requestorEmail) {
+  async createPLEvent(event) {
     try {
       const createdEvent = await this.prisma.pLEvent.create({
         data: event
@@ -391,21 +391,43 @@ export class PLEventsService {
     return notification;
   }
 
-  async deleteEvent(locationUid: string, eventUid: string) {
+  /**
+   * This method updates an event by its unique identifier.
+   * @param uid - The unique identifier of the event to update.
+   * @param event - The event data containing the updated information.
+   * @returns The updated event object.
+   */
+  async updateEventByUid(uid: string, event: Prisma.PLEventUncheckedUpdateInput) {
+    try {
+      const updatedEvent = await this.prisma.pLEvent.update({
+        where: { uid },
+        data: event
+      });
+      this.cacheService.reset({ service: 'PLEventGuest' });
+      return updatedEvent;
+    } catch (error) {
+      this.handleErrors(error);
+    }
+  }
+
+  /**
+   * This method deletes an event by its unique identifier.
+   * @param uid - The unique identifier of the event to delete.
+   * @returns The deleted event object.
+   */
+  async deleteEventByUid(uid: string) {
     try {
       const deletedEvent = await this.prisma.pLEvent.update({
-        where: { uid: eventUid },
+        where: { uid },
         data: {
           isDeleted: true
         }
       });
-      await this.eventsToolingService.deleteEvent(deletedEvent.externalId ?? '');
       this.cacheService.reset({ service: 'PLEventGuest' });
       return deletedEvent;
     } catch (error) {
       this.handleErrors(error);
     }
   }
-
 }
 
