@@ -1714,19 +1714,54 @@ export class MembersService {
         },
       });
 
-      // Search in ohInterest
-      topicsConditions.push({
-        ohInterest: {
-          hasSome: topicsArray.map((topic) => topic.toLowerCase()),
-        },
-      });
+      // Get member IDs that match ohInterest/ohHelpWith topics using raw SQL
+      if (topicsArray.length > 0) {
+        const [ohInterestMemberIds, ohHelpWithMemberIds] = await Promise.all([
+          this.prisma.$queryRaw<{ id: number }[]>`
+            SELECT DISTINCT id FROM "Member" 
+            WHERE ${Prisma.raw(
+              topicsArray
+                .map(
+                  (topic) => `
+                  EXISTS (
+                    SELECT 1 FROM unnest("ohInterest") AS interest_item 
+                    WHERE LOWER(interest_item) LIKE LOWER('%${topic.replace(/'/g, "''")}%')
+                  )
+                `
+                )
+                .join(' OR ')
+            )}
+          `,
+          this.prisma.$queryRaw<{ id: number }[]>`
+            SELECT DISTINCT id FROM "Member" 
+            WHERE ${Prisma.raw(
+              topicsArray
+                .map(
+                  (topic) => `
+                  EXISTS (
+                    SELECT 1 FROM unnest("ohHelpWith") AS help_item 
+                    WHERE LOWER(help_item) LIKE LOWER('%${topic.replace(/'/g, "''")}%')
+                  )
+                `
+                )
+                .join(' OR ')
+            )}
+          `,
+        ]);
 
-      // Search in ohHelpWith
-      topicsConditions.push({
-        ohHelpWith: {
-          hasSome: topicsArray.map((topic) => topic.toLowerCase()),
-        },
-      });
+        const allOhMemberIds = [
+          ...ohInterestMemberIds.map((row) => row.id),
+          ...ohHelpWithMemberIds.map((row) => row.id),
+        ];
+
+        if (allOhMemberIds.length > 0) {
+          topicsConditions.push({
+            id: {
+              in: allOhMemberIds,
+            },
+          });
+        }
+      }
 
       whereConditions.push({
         OR: topicsConditions,
@@ -1926,24 +1961,39 @@ export class MembersService {
         },
       });
 
-      // Get ohInterest and ohHelpWith matching the query
+      // Get ohInterest and ohHelpWith matching the query using SQL-level filtering
+      let ohMemberIds: number[] = [];
+      if (query.trim()) {
+        // Get member IDs that match the search query in ohInterest or ohHelpWith
+        const [ohInterestIds, ohHelpWithIds] = await Promise.all([
+          this.prisma.$queryRaw<{ id: number }[]>`
+            SELECT DISTINCT id FROM "Member" 
+            WHERE EXISTS (
+              SELECT 1 FROM unnest("ohInterest") AS interest_item 
+              WHERE LOWER(interest_item) LIKE LOWER(${`%${searchQuery}%`})
+            )
+          `,
+          this.prisma.$queryRaw<{ id: number }[]>`
+            SELECT DISTINCT id FROM "Member" 
+            WHERE EXISTS (
+              SELECT 1 FROM unnest("ohHelpWith") AS help_item 
+              WHERE LOWER(help_item) LIKE LOWER(${`%${searchQuery}%`})
+            )
+          `,
+        ]);
+
+        ohMemberIds = [...ohInterestIds.map((row) => row.id), ...ohHelpWithIds.map((row) => row.id)];
+      }
+
       const ohDataPromise = this.prisma.member.findMany({
         where: {
           ...memberFilter,
-          ...(query.trim() && {
-            OR: [
-              {
-                ohInterest: {
-                  hasSome: [searchQuery],
-                },
+          ...(query.trim() &&
+            ohMemberIds.length > 0 && {
+              id: {
+                in: ohMemberIds,
               },
-              {
-                ohHelpWith: {
-                  hasSome: [searchQuery],
-                },
-              },
-            ],
-          }),
+            }),
           // If no query, get members with any ohInterest or ohHelpWith
           ...(!query.trim() && {
             OR: [
