@@ -6,7 +6,7 @@ on:
       - main   # Triggers PROD deployment
 jobs:
   prod-deploy:
-    name: Deploy Helm Chart to EKS preprod
+    name: Deploy Helm Chart to EKS prod
     runs-on: ubuntu-latest
     env:
       ENVIRONMENT: prod
@@ -14,7 +14,7 @@ jobs:
       DOCKER_IMAGE: directory-service
       ECR_REPOSITORY: pln-directory-service
       GITHUB_SHA: ${{ github.sha }}
-      CLUSTER_NAME: preprod-pln
+      CLUSTER_NAME: prod-pln
       APP_MODE: directory_service
 
     permissions:
