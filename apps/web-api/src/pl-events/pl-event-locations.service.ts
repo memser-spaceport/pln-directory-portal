@@ -97,13 +97,29 @@ export class PLEventLocationsService {
   async getPLEventLocations(queryOptions: Prisma.PLEventLocationFindManyArgs): Promise<FormattedLocationWithEvents[]> {
     try {
       if (queryOptions.select) {
-        // If select is present, use the query as-is
-        const locations = await this.prisma.pLEventLocation.findMany(queryOptions);
+        // If select is present, use the query as-is but add filter for locations with events
+        const locations = await this.prisma.pLEventLocation.findMany({
+          ...queryOptions,
+          where: {
+            events: {
+              some: {
+                isDeleted: false
+              }
+            }
+          }
+        });
         // No transformation, just return as is (cast for compatibility)
         return locations as unknown as FormattedLocationWithEvents[];
       }
       const locations = await this.prisma.pLEventLocation.findMany({
         ...queryOptions,
+        where: {
+          events: {
+            some: {
+              isDeleted: false
+            }
+          }
+        },
         include: {
           events: {
             where: {
