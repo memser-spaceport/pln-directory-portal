@@ -10,6 +10,7 @@ RUN corepack enable
 
 # Copy dependency files
 COPY package.json yarn.lock ./
+COPY .forestadmin-schema.json ./
 RUN yarn install --frozen-lockfile
 
 # Copy source code
@@ -38,6 +39,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/apps/web-api/prisma ./apps/web-api/prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/.forestadmin-schema.json ./
 
 # Ensure /app is owned by the 'app' user and is writable (for Forest Admin schema file)
 # Security note: This grants write access to the app directory for the app user only, not globally
