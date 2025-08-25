@@ -3,7 +3,7 @@ name: Deploy to EKS with Helm
 on:
   push:
     branches:
-      - main   # Triggers PROD deployment
+      - fix/check-prod-issue   # Triggers PROD deployment
 jobs:
   prod-deploy:
     name: Deploy Helm Chart to EKS prod
