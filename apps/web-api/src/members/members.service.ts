@@ -2329,4 +2329,88 @@ export class MembersService {
       },
     });
   }
+
+  /**
+   * Retrieves members for NodeBB forum service by UIDs or external IDs.
+   * Returns the specific fields needed by the forum service.
+   *
+   * @param memberIds - Array of member UIDs to retrieve (optional)
+   * @param externalIds - Array of external IDs to retrieve (optional)
+   * @returns A promise that resolves to an array of member records with forum-specific fields
+   */
+  async findMembersBulk(memberIds?: string[], externalIds?: string[]): Promise<any[]> {
+    try {
+      if (!memberIds?.length && !externalIds?.length) {
+        return [];
+      }
+
+      const whereConditions: any[] = [];
+
+      if (memberIds?.length) {
+        whereConditions.push({
+          uid: {
+            in: memberIds,
+          },
+        });
+      }
+
+      if (externalIds?.length) {
+        whereConditions.push({
+          externalId: {
+            in: externalIds,
+          },
+        });
+      }
+
+      const members = await this.prisma.member.findMany({
+        where: {
+          OR: whereConditions,
+        },
+        select: {
+          uid: true,
+          name: true,
+          externalId: true,
+          email: true,
+          accessLevel: true,
+          officeHours: true,
+          ohStatus: true,
+          image: {
+            select: {
+              uid: true,
+              url: true,
+              filename: true,
+            },
+          },
+          memberRoles: {
+            select: {
+              name: true,
+            },
+          },
+          teamMemberRoles: {
+            select: {
+              role: true,
+              mainTeam: true,
+              teamLead: true,
+              team: {
+                select: {
+                  name: true,
+                  logo: {
+                    select: {
+                      uid: true,
+                      url: true,
+                      filename: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      return members;
+    } catch (error) {
+      return this.handleErrors(error);
+    }
+  }
 }

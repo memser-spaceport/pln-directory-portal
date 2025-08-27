@@ -9,6 +9,8 @@ import {
   MemberFilterQueryParams,
   AutocompleteQueryParams,
   AutocompleteResponse,
+  MembersForNodebbSchema,
+  MembersForNodebbRequestSchema,
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -165,5 +167,14 @@ export const apiMembers = contract.router({
       200: AutocompleteResponse,
     },
     summary: 'Autocomplete roles for member search',
+  },
+  getMembersBulk: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/members-bulk`,
+    body: MembersForNodebbRequestSchema,
+    responses: {
+      200: MembersForNodebbSchema.array(),
+    },
+    summary: 'Get members in bulk by UIDs or external IDs',
   },
 });

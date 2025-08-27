@@ -24,6 +24,7 @@ import {
   SendEmailOtpRequestDto,
   MemberFilterQueryParams,
   AutocompleteQueryParams,
+  MembersForNodebbRequestDto,
 } from 'libs/contracts/src/schema';
 import { apiMembers } from '../../../../libs/contracts/src/lib/contract-member';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
@@ -409,5 +410,25 @@ export class MemberController {
     }
 
     return member;
+  }
+
+  /**
+   * Retrieves members in bulk by UIDs or external IDs.
+   * This endpoint allows fetching multiple member records efficiently.
+   *
+   * @param body - Request body containing arrays of member UIDs and/or external IDs
+   * @returns Array of member records with selected fields
+   */
+  @Api(server.route.getMembersBulk)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async getMembersBulk(@Body() body: MembersForNodebbRequestDto) {
+    const { memberIds, externalIds } = body;
+
+    if (!memberIds?.length && !externalIds?.length) {
+      throw new BadRequestException('Either memberIds or externalIds must be provided');
+    }
+
+    return await this.membersService.findMembersBulk(memberIds, externalIds);
   }
 }
