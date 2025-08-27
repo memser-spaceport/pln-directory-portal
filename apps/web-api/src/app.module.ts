@@ -50,9 +50,10 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { NotificationSettingsModule } from './notification-settings/notification-settings.module';
 import { ProfileModule } from './profile/profile.module';
 import { ForumModule } from './forum/forum.module';
+import { MetricsController } from './metrics/metrics.controller';
 
 @Module({
-  controllers: [AppController],
+  controllers: [AppController, MetricsController],
   imports: [
     AnalyticsModule,
     ThrottlerModule.forRoot({
