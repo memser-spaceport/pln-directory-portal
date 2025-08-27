@@ -51,6 +51,7 @@ import { NotificationSettingsModule } from './notification-settings/notification
 import { ProfileModule } from './profile/profile.module';
 import { ForumModule } from './forum/forum.module';
 import { MetricsController } from './metrics/metrics.controller';
+import { MetricsMiddleware } from './metrics/metrics.interceptor';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -159,6 +160,12 @@ export class AppModule {
         { path: '*', method: RequestMethod.PUT },
         { path: '*', method: RequestMethod.PATCH }
       );
+
+    consumer
+      .apply(MetricsMiddleware)
+      .exclude({ path: 'metrics', method: RequestMethod.ALL })
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
+
     // we can use .exclude() to exclude routes from the middleware (e.g. file upload endpoint)
   }
 }
