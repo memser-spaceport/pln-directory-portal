@@ -249,7 +249,7 @@ async function deleteDeletedProjectsFromOpenSearch() {
 // ----- OpenSearch indexing (PG) -----
 async function indexMembers(lastCheckpoint) {
   const r = await pgClient.query(`
-    SELECT m.uid, m.name, m.bio, i.url, m."scheduleMeetingCount"
+    SELECT m.uid, m.name, m.bio, i.url, m."scheduleMeetingCount", m."officeHours"
     FROM "Member" m
            LEFT JOIN "Image" i ON m."imageUid" = i.uid
     WHERE (m."createdAt" > $1 OR m."updatedAt" > $1)
@@ -259,17 +259,25 @@ async function indexMembers(lastCheckpoint) {
   console.log('Got data from Member table:', r.rows.length);
   if (!r.rows.length) return 0;
 
-  const body = r.rows.flatMap(row => [
-    { index: { _index: 'member', _id: row.uid } },
-    {
-      uid: row.uid,
-      name: row.name,
-      image: row.url,
-      bio: purifyHtml(row.bio),
-      scheduleMeetingCount: row.scheduleMeetingCount,
-      name_suggest: { input: generateSuggestInput(row.name) }
-    }
-  ]);
+  const body = r.rows.flatMap(row => {
+    const officeHoursUrl = row.officeHours && String(row.officeHours).trim()
+      ? String(row.officeHours).trim()
+      : null;
+
+    return [
+      { index: { _index: 'member', _id: row.uid } },
+      {
+        uid: row.uid,
+        name: row.name,
+        image: row.url,
+        bio: purifyHtml(row.bio),
+        scheduleMeetingCount: row.scheduleMeetingCount,
+        officeHoursUrl,
+        availableToConnect: Boolean(officeHoursUrl),
+        name_suggest: { input: generateSuggestInput(row.name) }
+      }
+    ];
+  });
 
   const resp = await osClient.bulk({ body });
   if (resp.body?.errors) {
