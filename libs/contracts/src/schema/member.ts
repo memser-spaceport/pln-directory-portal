@@ -1,6 +1,6 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
-import { ResponseImageWithRelationsSchema } from './image';
+import { ResponseImageWithRelationsSchema, ResponseImageSchema } from './image';
 import { LocationResponseSchema } from './location';
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseSkillSchema } from './skill';
@@ -40,6 +40,8 @@ export const MemberSchema = z.object({
   telegramHandler: z.string().nullish(),
   telegramUid: z.string().nullable(),
   officeHours: z.string().nullish(),
+  ohStatus: z.string().nullish(),
+  scheduleMeetingCount: z.number().nullish(),
   ohInterest: z.array(z.string()).default([]),
   ohHelpWith: z.array(z.string()).default([]),
   airtableRecId: z.string().nullish(),
@@ -190,3 +192,51 @@ export const AutocompleteResponse = z.object({
 export class MemberFilterQueryParamsDto extends createZodDto(MemberFilterQueryParams) {}
 export class AutocompleteQueryParamsDto extends createZodDto(AutocompleteQueryParams) {}
 export class AutocompleteResponseDto extends createZodDto(AutocompleteResponse) {}
+
+// Forum service schema
+export const MembersForNodebbRequestSchema = z.object({
+  memberIds: z.array(z.string()).optional(),
+  externalIds: z.array(z.string()).optional(),
+});
+
+export const MembersForNodebbSchema = ResponseMemberSchema.pick({
+  uid: true,
+  name: true,
+  externalId: true,
+  email: true,
+  accessLevel: true,
+  officeHours: true,
+  ohStatus: true,
+}).extend({
+  image: ResponseImageSchema.pick({
+    uid: true,
+    url: true,
+    filename: true,
+  }).optional(),
+  memberRoles: z
+    .array(
+      z.object({
+        name: z.string(),
+      })
+    )
+    .optional(),
+  teamMemberRoles: z
+    .array(
+      z.object({
+        role: z.string(),
+        mainTeam: z.boolean(),
+        teamLead: z.boolean(),
+        team: z.object({
+          name: z.string(),
+          logo: ResponseImageSchema.pick({
+            uid: true,
+            url: true,
+            filename: true,
+          }).optional(),
+        }),
+      })
+    )
+    .optional(),
+});
+
+export class MembersForNodebbRequestDto extends createZodDto(MembersForNodebbRequestSchema) {}
