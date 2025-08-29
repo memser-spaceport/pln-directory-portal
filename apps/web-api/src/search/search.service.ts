@@ -180,8 +180,16 @@ export class SearchService {
         };
 
         // Members: pass through extra context
-        if (key === 'members' && typeof src.scheduleMeetingCount === 'number') {
-          item.scheduleMeetingCount = src.scheduleMeetingCount;
+        if (key === 'members') {
+          if (typeof src.scheduleMeetingCount === 'number') {
+            item.scheduleMeetingCount = src.scheduleMeetingCount;
+          }
+          if (typeof src.officeHoursUrl === 'string') {
+            item.officeHoursUrl = src.officeHoursUrl;
+          }
+          if (typeof src.availableToConnect === 'boolean') {
+            item.availableToConnect = src.availableToConnect;
+          }
         }
 
         // Forum threads: decorate and compute a better display name/snippet
@@ -307,6 +315,12 @@ export class SearchService {
 
           if (key === 'members' && typeof src?.scheduleMeetingCount === 'number') {
             item.scheduleMeetingCount = src.scheduleMeetingCount;
+          }
+          if (key === 'members' && typeof src?.officeHoursUrl === 'string') {
+            item.officeHoursUrl = src.officeHoursUrl;
+          }
+          if (key === 'members' && typeof src?.availableToConnect === 'boolean') {
+            item.availableToConnect = src.availableToConnect;
           }
         }
       }
