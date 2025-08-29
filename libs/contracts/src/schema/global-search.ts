@@ -44,7 +44,8 @@ export const SearchResultItemSchema = z.object({
 
   // Members-only extra (kept for backward compatibility)
   scheduleMeetingCount: z.number().optional(),
-
+  officeHoursUrl: z.string().optional(),
+  availableToConnect: z.boolean().optional(),
   // Forum thread extras (one document per thread)
   topicTitle: z.string().optional(),
   topicSlug: z.string().optional(),
