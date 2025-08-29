@@ -352,7 +352,7 @@ export class MemberController {
   @ApiQueryFromZod(MemberFilterQueryParams.optional())
   @UseInterceptors(IsVerifiedMemberInterceptor)
   @QueryCache()
-  @CacheTTL(7200) // 2 hours
+  @CacheTTL(300) // 5 minutes
   async searchMembers(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof MemberFilterQueryParams>;
     return await this.membersService.searchMembers(params || {});
