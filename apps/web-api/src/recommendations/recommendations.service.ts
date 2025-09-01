@@ -19,6 +19,7 @@ import { getRandomId, isEmails } from '../utils/helper/helper';
 export class RecommendationsService {
   private readonly recommendationsPerRun = 1;
   private supportEmail: string | undefined;
+  private readonly isRecommendationsEnabled: boolean;
 
   constructor(
     private prisma: PrismaService,
@@ -27,6 +28,7 @@ export class RecommendationsService {
     private huskyGenerationService: HuskyGenerationService
   ) {
     this.supportEmail = this.getSupportEmail();
+    this.isRecommendationsEnabled = process.env.IS_RECOMMENDATIONS_ENABLED?.toLowerCase() === 'true';
   }
 
   async createRecommendationRun(
@@ -781,7 +783,7 @@ export class RecommendationsService {
    * Triggers recommendations for a specific member by UID
    */
   async triggerRecommendationForMember(memberUid: string) {
-    if (process.env.IS_RECOMMENDATIONS_ENABLED !== 'true') {
+    if (!this.isRecommendationsEnabled) {
       this.logger.info('Skipping recommendation generation as it is disabled');
       return;
     }
@@ -807,7 +809,7 @@ export class RecommendationsService {
    * Checks if a member has never received real (not example) recommendations and triggers them if needed
    */
   async triggerRecommendationForMemberIfNeverReceived(memberUid: string) {
-    if (process.env.IS_RECOMMENDATIONS_ENABLED !== 'true') {
+    if (!this.isRecommendationsEnabled) {
       this.logger.info('Skipping recommendation generation as it is disabled');
       return;
     }
