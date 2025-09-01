@@ -8,12 +8,15 @@ import { CreateRecommendationRunRequest } from 'libs/contracts/src/schema/recomm
 @Injectable()
 export class RecommendationsJob {
   private readonly recommendationIntervalMs = 14 * 24 * 60 * 60 * 1000;
+  private readonly isRecommendationsEnabled: boolean;
 
   constructor(
     private prisma: PrismaService,
     private logger: LogService,
     private recommendationsService: RecommendationsService
-  ) {}
+  ) {
+    this.isRecommendationsEnabled = process.env.IS_RECOMMENDATIONS_ENABLED?.toLowerCase() === 'true';
+  }
 
   /**
    * TODO: Move to EKS jobs when notification service is moved to EKS
@@ -31,7 +34,7 @@ export class RecommendationsJob {
     timeZone: 'UTC',
   })
   async sendExampleEmails() {
-    if (process.env.IS_RECOMMENDATIONS_ENABLED !== 'true') {
+    if (!this.isRecommendationsEnabled) {
       this.logger.info('Skipping example emails as recommendations are disabled');
       return;
     }
@@ -155,7 +158,7 @@ export class RecommendationsJob {
     timeZone: 'UTC',
   })
   async generateRecommendations() {
-    if (process.env.IS_RECOMMENDATIONS_ENABLED !== 'true') {
+    if (!this.isRecommendationsEnabled) {
       this.logger.info('Skipping recommendations generation as it is disabled');
       return;
     }
