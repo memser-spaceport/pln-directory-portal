@@ -19,10 +19,15 @@ export class SearchQueryDto extends createZodDto(SearchQuerySchema) {}
 
 /**
  * Match snippet used in results highlighting.
+ * For forum threads, `pid`, `uidAuthor`, and `cid` may be present when the match
+ * came from a specific post/comment.
  */
 export const MatchSchema = z.object({
   field: z.string(),
   content: z.string(),
+  pid: z.number().optional(),
+  uidAuthor: z.number().optional(),
+  cid: z.number().optional(),
 });
 
 /**
@@ -30,6 +35,7 @@ export const MatchSchema = z.object({
  * - `index` is the logical section name (events/projects/teams/members/forumThreads)
  * - `kind` distinguishes special result shapes (here: forum threads)
  * - `source` holds the raw OpenSearch document (optional pass-through)
+ * - `cid` is provided for forum threads (topic category id), when available
  */
 export const SearchResultItemSchema = z.object({
   uid: z.string(),
@@ -46,12 +52,16 @@ export const SearchResultItemSchema = z.object({
   scheduleMeetingCount: z.number().optional(),
   officeHoursUrl: z.string().optional(),
   availableToConnect: z.boolean().optional(),
+
   // Forum thread extras (one document per thread)
   topicTitle: z.string().optional(),
   topicSlug: z.string().optional(),
   topicUrl: z.string().optional(),
   replyCount: z.number().optional(),
   lastReplyAt: z.any().optional(), // Date or ISO string depending on serializer
+
+  // Forum thread category id (if available)
+  cid: z.number().optional(),
 });
 export type SearchResultItem = z.infer<typeof SearchResultItemSchema>;
 

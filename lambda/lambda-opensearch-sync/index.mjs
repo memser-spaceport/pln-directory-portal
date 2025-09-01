@@ -397,7 +397,7 @@ async function indexForumThreadsWithCheckpoint() {
   }
   console.log('Forum checkpoint (ts, pid):', cp.ts.toISOString(), cp.pid);
 
-  // find changed threads since (ts, pid)
+  // find changed posts since (ts, pid)
   const pipelineNew = [
     { $match: { _key: { $regex: /^post:\d+$/ } } },
     { $addFields: {
@@ -446,13 +446,27 @@ async function indexForumThreadsWithCheckpoint() {
   let changed = 0;
 
   for (const tid of changedTids) {
+    // topic with cid
     const topic = await coll.findOne(
       { _key: `topic:${tid}` },
-      { projection: { _id: 0, title: 1, slug: 1 } }
+      { projection: { _id: 0, title: 1, slug: 1, cid: 1 } }
     );
     const topicTitle = topic?.title || '';
-    const topicSlug = topic?.slug || null;
+    const topicSlug  = topic?.slug  || null;
+    const topicCid   = topic?.cid   ?? null;
+
+    // category slug (optional, but handy for redirects)
+    let categorySlug = null;
+    if (topicCid != null) {
+      const category = await coll.findOne(
+        { _key: `category:${topicCid}` },
+        { projection: { _id: 0, slug: 1 } }
+      );
+      categorySlug = category?.slug || null;
+    }
+
     const topicUrl = topicSlug ? `${FORUM_BASE_URL}/topic/${topicSlug}` : null;
+    const categoryUrl = categorySlug ? `${FORUM_BASE_URL}/category/${categorySlug}` : null;
 
     const postPipe = [
       { $match: { _key: { $regex: /^post:\d+$/ } } },
@@ -507,7 +521,8 @@ async function indexForumThreadsWithCheckpoint() {
       author: toAuthor(first.user),
       timestamp: posts[0].tsDate || null,
       url: makeUrl(first.pid),
-      content: stripHtml(first.content)
+      content: stripHtml(first.content),
+      cid: topicCid
     };
 
     const replies = posts.slice(1).map(p => ({
@@ -516,15 +531,19 @@ async function indexForumThreadsWithCheckpoint() {
       author: toAuthor(p.user),
       timestamp: p.tsDate || null,
       url: makeUrl(p.pid),
-      content: stripHtml(p.content)
+      content: stripHtml(p.content),
+      cid: topicCid
     }));
 
     const doc = {
       uid: String(tid),
       tid,
+      cid: topicCid,
       topicTitle,
       topicSlug,
       topicUrl,
+      categorySlug,
+      categoryUrl,
       rootPost,
       replies,
       replyCount: replies.length,
