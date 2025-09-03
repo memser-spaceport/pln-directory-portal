@@ -123,103 +123,40 @@ export class SearchService {
 
   /** Attach a basic highlighter for the provided fields. */
   private withHighlight(baseBody: any, fields: string[]) {
+    const short = new Set(['name', 'topicTitle', 'tagline', 'shortDescription', 'location']);
+    const cfg: Record<string, any> = {};
+    for (const f of fields) {
+      cfg[f] = short.has(f)
+        ? { number_of_fragments: 0 }
+        : { fragment_size: 140, number_of_fragments: 1, no_match_size: 0 };
+    }
+
     return {
       ...baseBody,
       highlight: {
-        fields: fields.reduce<Record<string, object>>((acc, f) => {
-          acc[f] = {};
-          return acc;
-        }, {}),
+        pre_tags: ['<em>'],
+        post_tags: ['</em>'],
+        require_field_match: false,
+        encoder: 'html',
+        fields: cfg,
       },
     };
   }
 
-  /** -------- lightweight text matching for forumThreads -------- */
-  private normalize(s: string) {
-    return (s ?? '').toString().toLowerCase();
-  }
-  private includes(haystack: string, needle: string) {
-    return this.normalize(haystack).includes(this.normalize(needle));
-  }
-
   /**
-   * Build matches for forum threads manually from _source:
-   * - include only real matches
-   * - always show topic (fallback to topicTitle if no matches)
-   * - include pid, uidAuthor, cid for posts and comments
-   */
-  private pickForumMatchesFromSource(src: any, text: string, maxCommentMatches = 5) {
-    const matches: Array<{ field: string; content: string; pid?: number; uidAuthor?: number; cid?: number }> = [];
-    const cid = typeof src?.cid === 'number' ? src.cid : undefined;
-
-    // Topic-level fields
-    if (this.includes(src?.topicTitle ?? '', text)) {
-      matches.push({ field: 'topicTitle', content: String(src.topicTitle), cid });
-    }
-    if (this.includes(src?.name ?? '', text) && src?.name && src?.name !== src?.topicTitle) {
-      matches.push({ field: 'name', content: String(src.name), cid });
-    }
-    if (this.includes(src?.topicSlug ?? '', text)) {
-      matches.push({ field: 'topicSlug', content: String(src.topicSlug), cid });
-    }
-    if (this.includes(src?.topicUrl ?? '', text)) {
-      matches.push({ field: 'topicUrl', content: String(src.topicUrl), cid });
-    }
-
-    // Root post
-    const root = src?.rootPost;
-    if (root?.content && this.includes(root.content, text)) {
-      matches.push({
-        field: 'rootPost.content',
-        content: String(root.content),
-        pid: typeof root.pid === 'number' ? root.pid : undefined,
-        uidAuthor: typeof root.uidAuthor === 'number' ? root.uidAuthor : undefined,
-        cid,
-      });
-    }
-
-    // Replies
-    const replies: any[] = Array.isArray(src?.replies) ? src.replies : [];
-    for (const r of replies) {
-      if (r?.content && this.includes(r.content, text)) {
-        matches.push({
-          field: 'replies.content',
-          content: String(r.content),
-          pid: typeof r.pid === 'number' ? r.pid : undefined,
-          uidAuthor: typeof r.uidAuthor === 'number' ? r.uidAuthor : undefined,
-          cid,
-        });
-        if (matches.length >= maxCommentMatches) break;
-      }
-    }
-
-    // Fallback if nothing matched
-    if (matches.length === 0 && src?.topicTitle) {
-      matches.push({ field: 'topicTitle', content: String(src.topicTitle), cid });
-    }
-
-    return matches;
-  }
-
-  /** ------------------------------------------------------------------------ */
-
-  /**
-   * Full search across all sections with combined "top".
-   * Simpler forumThreads handling:
-   * - ignore OpenSearch highlights
-   * - build matches manually from _source with pid/uidAuthor/cid
-   * - always include topic
+   * Full search across all logical sections and a combined "top".
+   * Forum content is unified under `forumThreads` (sourced from OS index `forum_thread`).
    */
   async fetchAllIndices(text: string, options?: FetchAllOptions): Promise<SearchResult> {
+    // Logical section -> [OpenSearch index name, field list]
     const indices: Record<string, [string, string[]]> = {
-      events: ['event', ['name', 'description', 'shortDescription', 'additionalInfo', 'location']],
-      projects: ['project', ['name', 'tagline', 'description', 'readMe', 'tags']],
-      teams: ['team', ['name', 'shortDescription', 'longDescription']],
-      members: ['member', ['name', 'bio']],
-      forumThreads: [
-        'forum_thread',
-        ['name', 'topicTitle', 'topicSlug', 'topicUrl', 'rootPost.content', 'replies.content'],
-      ],
+      events:   ['event',      ['name','description','shortDescription','additionalInfo','location']],
+      projects: ['project',    ['name','tagline','description','readMe','tags']],
+      teams:    ['team',       ['name','shortDescription','longDescription']],
+      members:  ['member',     ['name','bio']],
+
+      // Unified forum threads index: each doc is a whole thread
+      forumThreads: ['forum_thread', ['name','topicTitle','topicSlug','topicUrl','rootPost.content','replies.content']],
     };
 
     const perIndexSize = options?.perIndexSize ?? MAX_SEARCH_RESULTS_PER_INDEX;
@@ -240,27 +177,29 @@ export class SearchService {
       const [index, fields] = indices[key];
       const queryBody = options?.strict ? this.buildStrictQuery(fields, text) : this.buildLooseQuery(fields, text);
 
-      const body =
-        key === 'forumThreads'
-          ? { ...queryBody, sort: [{ _score: 'desc' }], track_total_hits: true }
-          : { ...this.withHighlight(queryBody, fields), sort: [{ _score: 'desc' }], track_total_hits: true };
+      const body: any = {
+        ...this.withHighlight(queryBody, fields),
+        sort: [{ _score: 'desc' }],
+        track_total_hits: true,
+      };
+
+      if (queryBody?.query) {
+        body.highlight.highlight_query = queryBody.query;
+      }
 
       const res = await this.openSearchService.searchWithLimit(index, perIndexSize, body);
 
       for (const hit of res.body.hits.hits) {
         const src = hit._source || {};
+        const hl = (hit as any).highlight || {};
 
-        let matches: any[] = [];
-        if (key === 'forumThreads') {
-          matches = this.pickForumMatchesFromSource(src, text);
-        } else {
-          matches = Object.entries(hit.highlight || {}).map(([field, value]: [string, any]) => ({
-            field,
-            content: (Array.isArray(value) ? value : [value]).join(' '),
-          }));
-        }
+        const matches = Object.entries(hl).map(([field, value]: [string, any]) => ({
+          field,
+          content: (Array.isArray(value) ? value : [value]).join(' '),
+        }));
 
-        let item: SearchResultItem & { cid?: number } = {
+        // Default shape
+        let item: SearchResultItem = {
           uid: String(hit._id),
           name: src?.name ?? '',
           image: src?.image ?? '',
@@ -285,17 +224,27 @@ export class SearchService {
         // Forum threads: decorate and compute a better display name/snippet
         if (key === 'forumThreads') {
           item.kind = 'forum_thread';
-          const summary = src?.rootPost?.content ? String(src.rootPost.content).slice(0, 120) : '';
-          item.name = src?.topicTitle ? `[${src.topicTitle}] ${summary}` : src?.name ?? summary;
+
+          const hlTitle =
+            (Array.isArray(hl['topicTitle']) && hl['topicTitle'][0]) ||
+            (Array.isArray(hl['name']) && hl['name'][0]) ||
+            src?.topicTitle || src?.name || '';
+
+          const hlRoot =
+            (Array.isArray(hl['rootPost.content']) && hl['rootPost.content'][0]) || '';
+          const hlReply =
+            (Array.isArray(hl['replies.content']) && hl['replies.content'][0]) || '';
+
+          const summary = hlRoot || hlReply ||
+            (src?.rootPost?.content ? String(src.rootPost.content).slice(0, 120) : '');
+
+          item.name = hlTitle ? `[${hlTitle}] ${summary}` : (src?.name ?? summary);
+
           item.topicTitle = src?.topicTitle;
           item.topicSlug = src?.topicSlug;
           item.topicUrl = src?.topicUrl;
           item.replyCount = typeof src?.replyCount === 'number' ? src.replyCount : undefined;
           item.lastReplyAt = src?.lastReplyAt ?? undefined;
-
-          if (typeof src?.cid === 'number') {
-            (item as any).cid = src.cid;
-          }
         }
 
         (result as any)[key].push(item);
@@ -318,8 +267,8 @@ export class SearchService {
   }
 
   /**
-   * Autocomplete via completion suggesters.
-   * Forum: forum_thread.name_suggest is used to suggest thread titles/summaries.
+   * Autocomplete using completion suggesters.
+   * Forum: `forum_thread.name_suggest` is used to suggest thread titles/summaries.
    */
   async autocompleteSearch(text: string, size = 5): Promise<SearchResult> {
     const indices: Record<string, [string, string[]]> = {
@@ -354,7 +303,7 @@ export class SearchService {
 
       const response = await this.openSearchService.searchWithLimit(index, MAX_SEARCH_RESULTS_PER_INDEX, body);
 
-      const found: Record<string, SearchResultItem & { cid?: number }> = {};
+      const found: Record<string, SearchResultItem> = {};
       const ids = new Set<string>();
 
       // Collect suggestion IDs and basic match snippets
@@ -373,7 +322,7 @@ export class SearchService {
               image: '',
               index: key as SearchResultItem['index'],
               matches: [],
-            } as any;
+            };
           }
           const field = sk.replace('suggest_', '').replace('_suggest', '');
           found[id].matches.push({ field, content: String(opt.text) });
@@ -397,10 +346,6 @@ export class SearchService {
             item.topicUrl = src?.topicUrl;
             item.replyCount = typeof src?.replyCount === 'number' ? src.replyCount : undefined;
             item.lastReplyAt = src?.lastReplyAt ?? undefined;
-
-            if (typeof src?.cid === 'number') {
-              (item as any).cid = src.cid;
-            }
           } else {
             item.name = src?.name ?? 'unknown';
           }
@@ -410,7 +355,7 @@ export class SearchService {
 
           // Trim matched content snippets for UX
           item.matches.forEach((m) => {
-            const full = src[m.field];
+            const full = (src as any)[m.field];
             if (typeof full === 'string') m.content = truncate(full, AUTOMCOMPLETE_MAX_LENGTH);
             else if (Array.isArray(full)) m.content = truncate(full.join(', '), AUTOMCOMPLETE_MAX_LENGTH);
           });
