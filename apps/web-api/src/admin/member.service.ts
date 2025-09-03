@@ -713,8 +713,10 @@ export class MemberService {
       select: {
         uid: true,
         name: true,
+        imageUid: true,
         image: {
           select: {
+            uid: true,
             url: true,
           },
         },
@@ -722,6 +724,15 @@ export class MemberService {
         isSubscribedToNewsletter: true,
         accessLevel: true,
         teamOrProjectURL: true,
+        locationUid: true,
+        location: {
+          select: {
+            uid: true,
+            city: true,
+            country: true,
+            region: true,
+          },
+        },
         teamMemberRoles: {
           select: {
             team: {

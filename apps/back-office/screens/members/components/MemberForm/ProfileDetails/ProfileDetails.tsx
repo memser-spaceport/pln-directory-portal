@@ -4,11 +4,15 @@ import { FormField } from '../../../../../components/FormField';
 import { FormDateField } from '../../../../../components/FormDateField';
 import { FormAreaField } from '../../../../../components/FormAreaField';
 
-export const ProfileDetails = () => {
+interface Props {
+  existingImageUrl?: string;
+}
+
+export const ProfileDetails = ({ existingImageUrl }: Props) => {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-start gap-3">
-        <ProfileImageInput />
+        <ProfileImageInput existingImageUrl={existingImageUrl} />
         <FormField name="name" label="Name" placeholder="Name" isRequired />
       </div>
       <div className="flex w-full items-start gap-4">
