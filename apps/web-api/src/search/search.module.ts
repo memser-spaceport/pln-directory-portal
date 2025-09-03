@@ -7,5 +7,6 @@ import { OpenSearchModule } from '../opensearch/opensearch.module';
   imports: [OpenSearchModule],
   controllers: [SearchController],
   providers: [SearchService],
+  exports: [SearchService],
 })
 export class SearchModule {}
