@@ -162,7 +162,7 @@ export class SearchService {
         ? this.buildStrictQuery(fields, text)
         : this.buildLooseQuery(fields, text);
 
-      const body = {
+      const body: any = {
         ...this.withHighlight(queryBody, fields),
         sort: [{ _score: 'desc' }],
         track_total_hits: true,
@@ -336,7 +336,7 @@ export class SearchService {
 
           // Trim matched content snippets for UX
           item.matches.forEach((m) => {
-            const full = src[m.field];
+            const full = (src as any)[m.field];
             if (typeof full === 'string') m.content = truncate(full, AUTOMCOMPLETE_MAX_LENGTH);
             else if (Array.isArray(full)) m.content = truncate(full.join(', '), AUTOMCOMPLETE_MAX_LENGTH);
           });
