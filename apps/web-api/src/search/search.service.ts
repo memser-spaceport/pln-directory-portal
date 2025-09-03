@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {SearchResult, SearchResultItem} from 'libs/contracts/src/schema/global-search';
+import { SearchResult, SearchResultItem } from 'libs/contracts/src/schema/global-search';
 import { OpenSearchService } from '../opensearch/opensearch.service';
 import { truncate } from '../utils/formatters';
 
@@ -111,13 +111,22 @@ export class SearchService {
 
   /** Attach a basic highlighter for the provided fields. */
   private withHighlight(baseBody: any, fields: string[]) {
+    const short = new Set(['name', 'topicTitle', 'tagline', 'shortDescription', 'location']);
+    const cfg: Record<string, any> = {};
+    for (const f of fields) {
+      cfg[f] = short.has(f)
+        ? { number_of_fragments: 0 }
+        : { fragment_size: 140, number_of_fragments: 1, no_match_size: 0 };
+    }
+
     return {
       ...baseBody,
       highlight: {
-        fields: fields.reduce<Record<string, object>>((acc, f) => {
-          acc[f] = {};
-          return acc;
-        }, {}),
+        pre_tags: ['<em>'],
+        post_tags: ['</em>'],
+        require_field_match: false,
+        encoder: 'html',
+        fields: cfg,
       },
     };
   }
@@ -159,12 +168,17 @@ export class SearchService {
         track_total_hits: true,
       };
 
+      if (queryBody?.query) {
+        body.highlight.highlight_query = queryBody.query;
+      }
+
       const res = await this.openSearchService.searchWithLimit(index, perIndexSize, body);
 
       for (const hit of res.body.hits.hits) {
         const src = hit._source || {};
+        const hl = (hit as any).highlight || {};
 
-        const matches = Object.entries(hit.highlight || {}).map(([field, value]: [string, any]) => ({
+        const matches = Object.entries(hl).map(([field, value]: [string, any]) => ({
           field,
           content: (Array.isArray(value) ? value : [value]).join(' '),
         }));
@@ -195,8 +209,22 @@ export class SearchService {
         // Forum threads: decorate and compute a better display name/snippet
         if (key === 'forumThreads') {
           item.kind = 'forum_thread';
-          const summary = src?.rootPost?.content ? String(src.rootPost.content).slice(0, 120) : '';
-          item.name = src?.topicTitle ? `[${src.topicTitle}] ${summary}` : (src?.name ?? summary);
+
+          const hlTitle =
+            (Array.isArray(hl['topicTitle']) && hl['topicTitle'][0]) ||
+            (Array.isArray(hl['name']) && hl['name'][0]) ||
+            src?.topicTitle || src?.name || '';
+
+          const hlRoot =
+            (Array.isArray(hl['rootPost.content']) && hl['rootPost.content'][0]) || '';
+          const hlReply =
+            (Array.isArray(hl['replies.content']) && hl['replies.content'][0]) || '';
+
+          const summary = hlRoot || hlReply ||
+            (src?.rootPost?.content ? String(src.rootPost.content).slice(0, 120) : '');
+
+          item.name = hlTitle ? `[${hlTitle}] ${summary}` : (src?.name ?? summary);
+
           item.topicTitle = src?.topicTitle;
           item.topicSlug  = src?.topicSlug;
           item.topicUrl   = src?.topicUrl;
