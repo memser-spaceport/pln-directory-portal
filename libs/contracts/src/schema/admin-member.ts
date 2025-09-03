@@ -96,8 +96,8 @@ export const UpdateMemberSchema = z.object({
   linkedinHandler: z.string().optional().nullable(),
   telegramHandler: z.string().optional().nullable(),
   officeHours: z.string().optional().nullable(),
-  ohInterest: z.array(z.string()).optional().default([]),
-  ohHelpWith: z.array(z.string()).optional().default([]),
+  ohInterest: z.array(z.string()).optional(),
+  ohHelpWith: z.array(z.string()).optional(),
 });
 
 export const UpdateAccessLevelSchema = z.object({

@@ -50,16 +50,12 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
           image = imgResponse?.image.uid;
         }
 
-        const payload = {
-          imageUid: image ?? '',
+        const payload: any = {
           name: formData.name,
           accessLevel: formData.accessLevel?.value,
           email: formData.email,
           joinDate: formData.joinDate?.toISOString() ?? '',
           bio: formData.bio,
-          country: formData.country ?? '',
-          region: formData.state ?? '',
-          city: formData.city ?? '',
           skills: formData.skills.map((item) => item.value),
           teamOrProjectURL: formData.teamOrProjectURL,
           teamMemberRoles: formData.teamsAndRoles.map((item) => {
@@ -75,6 +71,22 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
           officeHours: formData.officeHours,
           githubHandler: formData.github,
         };
+
+        // Only include imageUid if there's a new image uploaded
+        if (image) {
+          payload.imageUid = image;
+        }
+
+        // Only include location fields if they have values
+        if (formData.country && formData.country.trim()) {
+          payload.country = formData.country;
+        }
+        if (formData.state && formData.state.trim()) {
+          payload.region = formData.state;
+        }
+        if (formData.city && formData.city.trim()) {
+          payload.city = formData.city;
+        }
 
         const res = await mutateAsync({ uid, payload, authToken });
 
@@ -106,19 +118,20 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
       email: data.email ?? '',
       joinDate: data.plnStartDate ? new Date(data.plnStartDate) : null,
       teamOrProjectURL: data.teamOrProjectURL ?? '',
-      teamsAndRoles: data.teamMemberRoles?.map((item) => {
-        const _team = formOptions.teams.find((team) => team.teamUid === item.teamUid);
+      teamsAndRoles:
+        data.teamMemberRoles?.map((item) => {
+          const _team = formOptions.teams.find((team) => team.teamUid === item.teamUid);
 
-        return { team: _team ? { value: _team.teamUid, label: _team.teamTitle } : null, role: item.role } ?? [];
-      }),
+          return { team: _team ? { value: _team.teamUid, label: _team.teamTitle } : null, role: item.role };
+        }) ?? [],
       bio: data.bio ?? '',
       country: data.location?.country ?? '',
-      state: data.location?.state ?? '',
+      state: data.location?.region ?? '',
       city: data.location?.city ?? '',
       skills: data.skills?.map((item) => ({ value: item.id, label: item.name })) ?? [],
       discord: data.discordHandler ?? '',
       github: data.githubHandler ?? '',
-      linkedin: data.linkedInHandler ?? '',
+      linkedin: data.linkedinHandler ?? '',
       officeHours: data.officeHours ?? '',
       telegram: data.telegramHandler ?? '',
       twitter: data.twitterHandler ?? '',
@@ -147,6 +160,7 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
               desc="Verify the information or change the member's information."
               onSubmit={onSubmit}
               initialData={initialData}
+              existingImageUrl={data?.image?.url}
             />
           </motion.div>
         )}
