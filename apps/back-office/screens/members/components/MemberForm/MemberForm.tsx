@@ -18,9 +18,10 @@ interface Props {
   desc: string;
   onSubmit: (data: TMemberForm) => Promise<void>;
   initialData?: TMemberForm;
+  existingImageUrl?: string;
 }
 
-export const MemberForm = ({ onClose, title, desc, onSubmit, initialData }: Props) => {
+export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existingImageUrl }: Props) => {
   const methods = useForm<TMemberForm>({
     defaultValues: {
       accessLevel: options.find((option) => option.value === 'L4') ?? null,
@@ -77,7 +78,7 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData }: Prop
             }}
           >
             <StatusSelector isAddNew={!initialData} />
-            <ProfileDetails />
+            <ProfileDetails existingImageUrl={existingImageUrl} />
             <hr className="border-gray-200 dark:border-gray-200" />
             <ProfileLocationInput />
             <hr className="border-gray-200 dark:border-gray-200" />
