@@ -9,9 +9,9 @@ const AUTOMCOMPLETE_MAX_LENGTH = 50;
 type FetchAllOptions = {
   strict?: boolean;
   perIndexSize?: number; // default: MAX_SEARCH_RESULTS_PER_INDEX
-  topN?: number;         // default: 50 (controls result.top when no pagination)
-  page?: number;         // 1-based; optional combined pagination
-  pageSize?: number;     // optional combined pagination
+  topN?: number; // default: 50 (controls result.top when no pagination)
+  page?: number; // 1-based; optional combined pagination
+  pageSize?: number; // optional combined pagination
 };
 
 @Injectable()
@@ -40,51 +40,63 @@ export class SearchService {
    */
   private buildStrictQuery(fields: string[], text: string) {
     const keywordOnly = new Set<string>([
-      'tags', 'image',
-      'name_suggest','tagline_suggest','tags_suggest','shortDescription_suggest','location_suggest',
+      'tags',
+      'image',
+      'name_suggest',
+      'tagline_suggest',
+      'tags_suggest',
+      'shortDescription_suggest',
+      'location_suggest',
+      'timestamp_suggest',
     ]);
 
-    const textFields = fields.filter(f => !keywordOnly.has(f));
-    const kwFields   = fields.filter(f => keywordOnly.has(f));
-    const weightedText = textFields.map(f => `${f}^3`);
+    const textFields = fields.filter((f) => !keywordOnly.has(f));
+    const kwFields = fields.filter((f) => keywordOnly.has(f));
+    const weightedText = textFields.map((f) => `${f}^3`);
 
-    const bestFields = textFields.length ? {
-      multi_match: {
-        query: text,
-        type: 'best_fields',
-        fields: weightedText,
-        operator: 'and',
-        tie_breaker: 0.2,
-        boost: 1.2,
-      },
-    } : undefined;
+    const bestFields = textFields.length
+      ? {
+          multi_match: {
+            query: text,
+            type: 'best_fields',
+            fields: weightedText,
+            operator: 'and',
+            tie_breaker: 0.2,
+            boost: 1.2,
+          },
+        }
+      : undefined;
 
-    const exactPhrase = textFields.length ? {
-      multi_match: {
-        query: text,
-        type: 'phrase',
-        fields: weightedText,
-        slop: 0,
-        boost: 3.0,
-      },
-    } : undefined;
+    const exactPhrase = textFields.length
+      ? {
+          multi_match: {
+            query: text,
+            type: 'phrase',
+            fields: weightedText,
+            slop: 0,
+            boost: 3.0,
+          },
+        }
+      : undefined;
 
-    const phrasePrefix = textFields.length ? {
-      multi_match: {
-        query: text,
-        type: 'phrase_prefix',
-        fields: weightedText,
-        slop: 0,
-        max_expansions: 50,
-        boost: 3.0,
-      },
-    } : undefined;
+    const phrasePrefix = textFields.length
+      ? {
+          multi_match: {
+            query: text,
+            type: 'phrase_prefix',
+            fields: weightedText,
+            slop: 0,
+            max_expansions: 50,
+            boost: 3.0,
+          },
+        }
+      : undefined;
 
     const keywordClauses: any[] = [
       // exact <field>.keyword if exists
-      ...fields.map(f => ({ term: { [`${f}.keyword`]: { value: text, boost: 10.0 } } })),
+      ...fields.map((f) => ({ term: { [`${f}.keyword`]: { value: text, boost: 10.0 } } })),
       // exact on keyword-only fields
-      ...kwFields.map(f => ({ term: { [f]: { value: text, boost: 10.0 } } })),
+      ...kwFields.map((f) => ({ term: { [f]: { value: text, boost: 10.0 } } })),
     ];
 
     // For single-word queries, prefix-match over keyword fields as a fallback
@@ -148,19 +160,22 @@ export class SearchService {
     };
 
     const perIndexSize = options?.perIndexSize ?? MAX_SEARCH_RESULTS_PER_INDEX;
-    const topN         = options?.topN ?? 50;
+    const topN = options?.topN ?? 50;
 
     const result: SearchResult = {
-      events: [], projects: [], teams: [], members: [], forumThreads: [], top: [],
+      events: [],
+      projects: [],
+      teams: [],
+      members: [],
+      forumThreads: [],
+      top: [],
     };
 
     const allHits: Array<SearchResultItem & { score: number }> = [];
 
     for (const key of Object.keys(indices)) {
       const [index, fields] = indices[key];
-      const queryBody = options?.strict
-        ? this.buildStrictQuery(fields, text)
-        : this.buildLooseQuery(fields, text);
+      const queryBody = options?.strict ? this.buildStrictQuery(fields, text) : this.buildLooseQuery(fields, text);
 
       const body: any = {
         ...this.withHighlight(queryBody, fields),
@@ -226,8 +241,8 @@ export class SearchService {
           item.name = hlTitle ? `[${hlTitle}] ${summary}` : (src?.name ?? summary);
 
           item.topicTitle = src?.topicTitle;
-          item.topicSlug  = src?.topicSlug;
-          item.topicUrl   = src?.topicUrl;
+          item.topicSlug = src?.topicSlug;
+          item.topicUrl = src?.topicUrl;
           item.replyCount = typeof src?.replyCount === 'number' ? src.replyCount : undefined;
           item.lastReplyAt = src?.lastReplyAt ?? undefined;
         }
@@ -243,8 +258,7 @@ export class SearchService {
     // Optional combined pagination
     if (options?.page && options?.pageSize) {
       const start = (options.page - 1) * options.pageSize;
-      result.top = allHits.slice(start, start + options.pageSize)
-        .map(({ score, ...rest }) => rest);
+      result.top = allHits.slice(start, start + options.pageSize).map(({ score, ...rest }) => rest);
     } else {
       result.top = allHits.slice(0, topN).map(({ score, ...rest }) => rest);
     }
@@ -258,17 +272,22 @@ export class SearchService {
    */
   async autocompleteSearch(text: string, size = 5): Promise<SearchResult> {
     const indices: Record<string, [string, string[]]> = {
-      events:       ['event',      ['name_suggest','shortDescription_suggest','location_suggest']],
-      projects:     ['project',    ['name_suggest','tagline_suggest','tags_suggest']],
-      teams:        ['team',       ['name_suggest','shortDescription_suggest']],
-      members:      ['member',     ['name_suggest']],
+      events: ['event', ['name_suggest', 'shortDescription_suggest', 'location_suggest']],
+      projects: ['project', ['name_suggest', 'tagline_suggest', 'tags_suggest']],
+      teams: ['team', ['name_suggest', 'shortDescription_suggest']],
+      members: ['member', ['name_suggest']],
 
       // Forum threads suggester
       forumThreads: ['forum_thread', ['name_suggest']],
     };
 
     const results: SearchResult = {
-      events: [], teams: [], projects: [], members: [], forumThreads: [], top: [],
+      events: [],
+      teams: [],
+      projects: [],
+      members: [],
+      forumThreads: [],
+      top: [],
     };
 
     for (const key of Object.keys(indices)) {
@@ -321,10 +340,10 @@ export class SearchService {
           if (key === 'forumThreads') {
             item.kind = 'forum_thread';
             const summary = src?.rootPost?.content ? String(src.rootPost.content).slice(0, 120) : '';
-            item.name = src?.topicTitle ? `[${src.topicTitle}] ${summary}` : (src?.name ?? summary);
+            item.name = src?.topicTitle ? `[${src.topicTitle}] ${summary}` : src?.name ?? summary;
             item.topicTitle = src?.topicTitle;
-            item.topicSlug  = src?.topicSlug;
-            item.topicUrl   = src?.topicUrl;
+            item.topicSlug = src?.topicSlug;
+            item.topicUrl = src?.topicUrl;
             item.replyCount = typeof src?.replyCount === 'number' ? src.replyCount : undefined;
             item.lastReplyAt = src?.lastReplyAt ?? undefined;
           } else {
@@ -358,5 +377,50 @@ export class SearchService {
 
     // No combined "top" for autocomplete by default (can be added if needed)
     return results;
+  }
+
+  /**
+   * Search forum posts only by query
+   */
+  async searchForumPosts(query: string, limit = 10): Promise<any[]> {
+    const index = 'forum_thread';
+    const fields = ['name', 'topicTitle', 'topicSlug', 'topicUrl', 'rootPost.content', 'replies.content'];
+    const queryBody = this.buildLooseQuery(fields, query);
+
+    const res = await this.openSearchService.searchWithLimit(index, limit, {
+      ...queryBody,
+      sort: [{ _score: 'desc' }],
+      track_total_hits: true,
+    });
+
+    return res.body.hits.hits.map((hit: any) => {
+      const src = hit._source;
+      return {
+        tid: src.tid,
+        cid: src.cid,
+        topicTitle: src.topicTitle,
+        topicSlug: src.topicSlug,
+        topicUrl: src.topicUrl,
+        forumLink: `/forum/topics/${src.cid}/${src.tid}`,
+        rootPost: {
+          pid: src.rootPost.pid,
+          uidAuthor: src.rootPost.uidAuthor,
+          author: src.rootPost.author,
+          content: src.rootPost.content,
+          timestamp: src.rootPost.timestamp,
+        },
+        replies:
+          src.replies?.map((reply: any) => ({
+            pid: reply.pid,
+            uidAuthor: reply.uidAuthor,
+            author: reply.author,
+            content: reply.content,
+            timestamp: reply.timestamp,
+          })) || [],
+        replyCount: src.replyCount || 0,
+        lastReplyAt: src.lastReplyAt,
+        score: hit._score,
+      };
+    });
   }
 }
