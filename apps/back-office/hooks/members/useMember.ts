@@ -3,56 +3,43 @@ import { MembersQueryKeys } from './constants/queryKeys';
 import api from '../../utils/api';
 
 interface IMemberResponse {
-  accessLevel: string;
-  accessLevelUpdatedAt: string;
-  airtableRecId: string;
-  approvedAt: string;
-  bio: string;
-  createdAt: string;
-  discordHandler: string;
-  email: string;
-  eventGuests: [];
-  experiences: [];
-  externalId: null;
-  githubHandler: string;
-  image: { uid: 'uid-8'; cid: 'cid-8'; width: 277; height: 222; url: 'https://loremflickr.com/640/480/animals' };
-  imageUid: string;
-  imageUrl: string;
-  isFeatured: boolean;
-  isSubscribedToNewsletter: boolean;
-  isUserConsent: boolean;
-  isVerified: boolean;
-  linkedInDetails: Record<string, string>;
-  linkedinHandler: string;
-  linkedinProfile: string | null;
-  location: {
-    uid: 'uid-lake-shannyview';
-    placeId: 'placeId-lake-shannyview';
-    city: 'Lake Shannyview';
-    country: 'United States';
-    continent: 'North America';
-  };
-  locationUid: 'uid-lake-shannyview';
-  memberRoles: [];
-  moreDetails: string;
-  name: string;
-  officeHours: string;
-  openToWork: boolean;
-  plnFriend: boolean;
-  plnStartDate: string;
-  preferences: Record<string, boolean>;
-  projectContributions: [];
-  signUpCampaign: string;
-  signUpMedium: string;
-  signUpSource: string;
-  skills: [];
-  teamMemberRoles: [];
-  teamOrProjectURL: string;
-  telegramHandler: string;
-  telegramUid: string;
-  twitterHandler: string;
   uid: string;
-  updatedAt: string;
+  name: string;
+  imageUid?: string;
+  image?: {
+    uid: string;
+    url: string;
+  };
+  email: string;
+  isSubscribedToNewsletter: boolean;
+  accessLevel: string;
+  teamOrProjectURL?: string;
+  locationUid?: string;
+  location?: {
+    uid: string;
+    city: string;
+    country: string;
+    region?: string;
+  };
+  teamMemberRoles: Array<{
+    team: {
+      uid: string;
+      name: string;
+    };
+  }>;
+  projectContributions: [];
+  linkedinProfile?: string;
+  accessLevelUpdatedAt: string;
+  // Other fields that might be present
+  bio?: string;
+  discordHandler?: string;
+  githubHandler?: string;
+  linkedinHandler?: string;
+  officeHours?: string;
+  plnStartDate?: string;
+  skills?: [];
+  telegramHandler?: string;
+  twitterHandler?: string;
 }
 
 export const getMemberInfo = async (memberUid: string) => {

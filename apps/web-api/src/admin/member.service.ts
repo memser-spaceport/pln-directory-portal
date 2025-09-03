@@ -199,7 +199,7 @@ export class MemberService {
     memberData,
     existingMember,
     tx: Prisma.TransactionClient,
-    type: string = 'Create'
+    type = 'Create'
   ) {
     const member: any = {};
     const directFields = [
@@ -713,8 +713,10 @@ export class MemberService {
       select: {
         uid: true,
         name: true,
+        imageUid: true,
         image: {
           select: {
+            uid: true,
             url: true,
           },
         },
@@ -722,6 +724,15 @@ export class MemberService {
         isSubscribedToNewsletter: true,
         accessLevel: true,
         teamOrProjectURL: true,
+        locationUid: true,
+        location: {
+          select: {
+            uid: true,
+            city: true,
+            country: true,
+            region: true,
+          },
+        },
         teamMemberRoles: {
           select: {
             team: {
@@ -813,7 +824,7 @@ export class MemberService {
     const now = new Date();
 
     // Determine if soft delete or restore logic should be applied
-    let updateData: Prisma.MemberUpdateManyArgs['data'] = {
+    const updateData: Prisma.MemberUpdateManyArgs['data'] = {
       accessLevel,
       accessLevelUpdatedAt: now,
       isVerified,
@@ -848,11 +859,13 @@ export class MemberService {
               `Missing email for member with uid ${member.uid}. Can't send an approval notification email`
             );
           } else {
+            // Send onboarding email for L4 members, approval email for L2/L3
+            const isOnboarding = accessLevel === AccessLevel.L4;
             await this.notificationService.notifyForMemberCreationApproval(
               member.name,
               member.uid,
               member.email,
-              false
+              isOnboarding
             );
           }
         }

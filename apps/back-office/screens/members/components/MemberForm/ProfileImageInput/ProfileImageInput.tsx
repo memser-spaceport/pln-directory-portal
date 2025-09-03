@@ -5,7 +5,11 @@ import { useDropzone } from 'react-dropzone';
 import s from './ProfileImageInput.module.scss';
 import { TMemberForm } from '../../../types/member';
 
-export const ProfileImageInput = () => {
+interface Props {
+  existingImageUrl?: string;
+}
+
+export const ProfileImageInput = ({ existingImageUrl }: Props) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const { setValue } = useFormContext<TMemberForm>();
 
@@ -44,7 +48,9 @@ export const ProfileImageInput = () => {
   return (
     <div className={s.dropzone} {...getRootProps()}>
       <input {...getInputProps()} />
-      {imagePreview && <img src={imagePreview} alt="Preview" className="absolute h-full w-full" />}
+      {(imagePreview || existingImageUrl) && (
+        <img src={imagePreview || existingImageUrl} alt="Profile" className="absolute h-full w-full object-cover" />
+      )}
 
       <div className={s.dropzoneHint}>
         <EditIcon />
