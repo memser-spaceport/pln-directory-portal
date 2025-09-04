@@ -25,11 +25,12 @@ export class ForestAdminService {
 }
 
 function airtableSlugs() {
+  //TODO - Move these to envs
   return process.env.ENVIRONMENT === APP_ENV.PRODUCTION
-    ? {
-        team: 'team-stage-to-airtable',
-        member: 'member-stage-to-airtable',
-        industry: 'industry-tag-stage-to-airtable',
+    ? { 
+        team: 'team-to-pln-airtable',
+        member: 'member-to-pln-airtable',
+        industry: 'industry-tag-to-pln-airtable',
       }
     : {
         team: 'team-stage-to-airtable-stage',
