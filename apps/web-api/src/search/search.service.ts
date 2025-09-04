@@ -150,13 +150,16 @@ export class SearchService {
   async fetchAllIndices(text: string, options?: FetchAllOptions): Promise<SearchResult> {
     // Logical section -> [OpenSearch index name, field list]
     const indices: Record<string, [string, string[]]> = {
-      events:   ['event',      ['name','description','shortDescription','additionalInfo','location']],
-      projects: ['project',    ['name','tagline','description','readMe','tags']],
-      teams:    ['team',       ['name','shortDescription','longDescription']],
-      members:  ['member',     ['name','bio']],
+      events: ['event', ['name', 'description', 'shortDescription', 'additionalInfo', 'location']],
+      projects: ['project', ['name', 'tagline', 'description', 'readMe', 'tags']],
+      teams: ['team', ['name', 'shortDescription', 'longDescription']],
+      members: ['member', ['name', 'bio']],
 
       // Unified forum threads index: each doc is a whole thread
-      forumThreads: ['forum_thread', ['name','topicTitle','topicSlug','topicUrl','rootPost.content','replies.content']],
+      forumThreads: [
+        'forum_thread',
+        ['name', 'topicTitle', 'topicSlug', 'topicUrl', 'rootPost.content', 'replies.content'],
+      ],
     };
 
     const perIndexSize = options?.perIndexSize ?? MAX_SEARCH_RESULTS_PER_INDEX;
@@ -228,17 +231,17 @@ export class SearchService {
           const hlTitle =
             (Array.isArray(hl['topicTitle']) && hl['topicTitle'][0]) ||
             (Array.isArray(hl['name']) && hl['name'][0]) ||
-            src?.topicTitle || src?.name || '';
+            src?.topicTitle ||
+            src?.name ||
+            '';
 
-          const hlRoot =
-            (Array.isArray(hl['rootPost.content']) && hl['rootPost.content'][0]) || '';
-          const hlReply =
-            (Array.isArray(hl['replies.content']) && hl['replies.content'][0]) || '';
+          const hlRoot = (Array.isArray(hl['rootPost.content']) && hl['rootPost.content'][0]) || '';
+          const hlReply = (Array.isArray(hl['replies.content']) && hl['replies.content'][0]) || '';
 
-          const summary = hlRoot || hlReply ||
-            (src?.rootPost?.content ? String(src.rootPost.content).slice(0, 120) : '');
+          const summary =
+            hlRoot || hlReply || (src?.rootPost?.content ? String(src.rootPost.content).slice(0, 120) : '');
 
-          item.name = hlTitle ? `[${hlTitle}] ${summary}` : (src?.name ?? summary);
+          item.name = hlTitle ? `[${hlTitle}] ${summary}` : src?.name ?? summary;
 
           item.topicTitle = src?.topicTitle;
           item.topicSlug = src?.topicSlug;
@@ -401,7 +404,7 @@ export class SearchService {
         topicTitle: src.topicTitle,
         topicSlug: src.topicSlug,
         topicUrl: src.topicUrl,
-        forumLink: `/forum/topics/${src.cid}/${src.tid}`,
+        forumLink: `${process.env.WEB_UI_BASE_URL}/forum/topics/${src.cid}/${src.tid}`,
         rootPost: {
           pid: src.rootPost.pid,
           uidAuthor: src.rootPost.uidAuthor,
