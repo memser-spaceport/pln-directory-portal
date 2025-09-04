@@ -194,7 +194,7 @@ export class NotificationService {
    * @returns Sends an email to the member with the onboarding link.
    */
   async notifyForOnboarding(memberName: string, memberEmail: string, subject = ONBOARDING_SUBJECT) {
-    const memberUrl = `${process.env.WEB_UI_BASE_URL}/?loginFlow=onboarding&prefillEmail=${encodeURIComponent(
+    const memberUrl = `${process.env.WEB_UI_BASE_URL}/members?loginFlow=onboarding&prefillEmail=${encodeURIComponent(
       memberEmail
     )}`;
     await this.awsService.sendEmailWithTemplate(
