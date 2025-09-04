@@ -112,4 +112,4 @@ jobs:
         run: |
           git_hash=$(git rev-parse --short "$GITHUB_SHA")
           ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
-          helm upgrade --install directory-service deployment/chart/ --set image.repository=$ECR_REGISTRY --set image.tag=$git_hash --set nodeSelector.allocationtags=pln-uat-k8s --set ingress.grpname=uat-pln-internal --set ingress.healthcheck_path=/ --set ingress.host=uat-directory.plnetwork.io --set service.port=3000 --set ingress.acm_arn=$CERT_ARN -f deployment/chart/${{ env.APP_MODE }}_secret_values.yaml -n pln-uat
+          helm upgrade --install directory-service deployment/chart/ --set image.repository=$ECR_REGISTRY --set image.tag=$git_hash --set nodeSelector.allocationtags=pln-uat-k8s --set ingress.grpname=uat-pln-internal --set ingress.healthcheck_path=/ --set ingress.host=api-uat-directory.plnetwork.io --set service.port=3000 --set ingress.acm_arn=$CERT_ARN -f deployment/chart/${{ env.APP_MODE }}_secret_values.yaml -n pln-uat
