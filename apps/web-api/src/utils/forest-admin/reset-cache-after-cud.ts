@@ -27,7 +27,8 @@ export async function resetCacheAfterCreateOrUpdateOrDelete(
     host: process.env.REDIS_HOST,
     url: process.env.REDIS_TLS_URL,
     port: Number(process.env.REDIS_PORT),
-    password: process.env.REDIS_PASSWORD,
+    // No need if we are using elasticache
+    ...(process.env.REDIS_PASSWORD && { password: process.env.REDIS_PASSWORD }),
     tls: process.env.REDIS_WITH_TLS
       ? {
           rejectUnauthorized: false,

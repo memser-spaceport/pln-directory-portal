@@ -37,12 +37,10 @@ export class FileUploadService {
 
   async storeFiles(uploadedFiles: Array<Express.Multer.File>) {
     if (process.env.FILE_STORAGE === IPFS) {
-      console.log("Inside storeFiles");
       const client = this.makeStorageClient();
       const encryptedFiles = this.encryptFiles(uploadedFiles);
       const fileObjects = this.makeFileObjects(encryptedFiles);
       const cid = await client.put(fileObjects);
-      console.log("Inside storeFiles");
       return cid;
     } else {
       let response; 
