@@ -51,6 +51,7 @@ model Team {
   teamFocusAreasVersionHistory TeamFocusAreaVersionHistory[]
   relatedQuestions             DiscoveryQuestion[]           @relation("TeamRelatedDiscoveryQuestions")
   asks                         Ask[]
+  fundraisingProfile           TeamFundraisingProfile?
 }
 
 enum AskStatus {
@@ -146,6 +147,7 @@ model Member {
   deletedAt                    DateTime? // soft delete timestamp
   deletionReason               String? // reason for deletion
   reviewedEvents               PLEvent[]                     @relation("PLEventReviewer")
+  modifiedFundraisingProfiles  TeamFundraisingProfile[]      @relation("TfpLastModifiedBy")
 }
 
 model MemberRole {
@@ -290,12 +292,13 @@ model IndustryTag {
 }
 
 model FundingStage {
-  id        Int      @id @default(autoincrement())
-  uid       String   @unique @default(cuid())
-  title     String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  teams     Team[]
+  id                  Int                      @id @default(autoincrement())
+  uid                 String                   @unique @default(cuid())
+  title               String                   @unique
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  teams               Team[]
+  fundraisingProfiles TeamFundraisingProfile[] @relation("TfpFundingStage")
 }
 
 model MembershipSource {
@@ -528,6 +531,7 @@ model FocusArea {
   focusAreas                  FocusAreaHierarchy[]          @relation("focusAreas")
   subFocusAreas               FocusAreaHierarchy[]          @relation("subfocusAreas")
   TeamFocusAreaVersionHistory TeamFocusAreaVersionHistory[]
+  fundraisingProfiles         TeamFundraisingProfile[]      @relation("TfpFocusArea")
 }
 
 model TeamFocusArea {
@@ -829,4 +833,36 @@ model MemberInteractionAdjustment {
   createdByUser Member?           @relation("AdjustmentCreatedBy", fields: [createdBy], references: [uid], onDelete: SetNull, onUpdate: Cascade)
 
   @@unique([interactionUid, reason], name: "MemberInteractionAdjustment_interaction_reason_unique")
+}
+
+enum TeamFundraisingProfileStatus {
+  DISABLED
+  DRAFT
+  PUBLISHED
+}
+
+model TeamFundraisingProfile {
+  id  Int    @id @default(autoincrement())
+  uid String @unique @default(cuid())
+
+  teamUid String @unique
+  team    Team   @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+
+  focusAreaUid String?
+  focusArea    FocusArea? @relation("TfpFocusArea", fields: [focusAreaUid], references: [uid])
+
+  fundingStageUid String?
+  fundingStage    FundingStage? @relation("TfpFundingStage", fields: [fundingStageUid], references: [uid])
+
+  onePagerUrl String?
+  videoUrl    String?
+
+  status TeamFundraisingProfileStatus @default(DRAFT)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  lastModifiedBy String?
+  lastModifier   Member?  @relation("TfpLastModifiedBy", fields: [lastModifiedBy], references: [uid])
+
+  @@index([status])
 }

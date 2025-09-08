@@ -52,6 +52,7 @@ import { ProfileModule } from './profile/profile.module';
 import { ForumModule } from './forum/forum.module';
 import { MetricsController } from './metrics/metrics.controller';
 import { MetricsMiddleware } from './metrics/metrics.interceptor';
+import { TeamFundraisingModule } from './team-fundraising/team-fundraising.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -126,6 +127,7 @@ import { MetricsMiddleware } from './metrics/metrics.interceptor';
     NotificationSettingsModule,
     ProfileModule,
     ForumModule,
+    TeamFundraisingModule,
   ],
   providers: [
     {
