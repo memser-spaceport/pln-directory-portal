@@ -146,6 +146,7 @@ model Member {
   deletedAt                    DateTime? // soft delete timestamp
   deletionReason               String? // reason for deletion
   reviewedEvents               PLEvent[]                     @relation("PLEventReviewer")
+  uploads                      Upload[]                      @relation("MemberUploads")
 }
 
 model MemberRole {
@@ -829,4 +830,69 @@ model MemberInteractionAdjustment {
   createdByUser Member?           @relation("AdjustmentCreatedBy", fields: [createdBy], references: [uid], onDelete: SetNull, onUpdate: Cascade)
 
   @@unique([interactionUid, reason], name: "MemberInteractionAdjustment_interaction_reason_unique")
+}
+
+enum UploadStorage {
+  IPFS
+  S3
+}
+
+enum UploadKind {
+  IMAGE
+  SLIDE
+  VIDEO
+  OTHER
+}
+
+enum UploadScopeType {
+  NONE
+  TEAM
+  MEMBER
+  PROJECT
+}
+
+enum UploadStatus {
+  UPLOADED
+  PROCESSING
+  READY
+  FAILED
+}
+
+model Upload {
+  id  Int    @id @default(autoincrement())
+  uid String @unique @default(cuid())
+
+  storage UploadStorage
+  kind    UploadKind
+  status  UploadStatus  @default(READY)
+
+  // Generic scoping so the same module can be reused anywhere in the app
+  scopeType UploadScopeType @default(NONE)
+  scopeUid  String?
+
+  uploaderUid String?
+  uploader    Member? @relation("MemberUploads", fields: [uploaderUid], references: [uid])
+
+  // S3 fields
+  bucket String?
+  key    String?
+
+  // IPFS fields
+  cid String?
+
+  // The URL you return to clients (worker URL or presigned GET)
+  url String
+
+  filename String
+  mimetype String
+  size     Int
+  checksum String? // sha256 or similar
+  meta     Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scopeType, scopeUid])
+  @@index([kind])
+  @@index([uploaderUid])
 }

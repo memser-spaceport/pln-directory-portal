@@ -52,6 +52,8 @@ import { ProfileModule } from './profile/profile.module';
 import { ForumModule } from './forum/forum.module';
 import { MetricsController } from './metrics/metrics.controller';
 import { MetricsMiddleware } from './metrics/metrics.interceptor';
+import { UploadsService } from './uploads/uploads.service';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -126,6 +128,7 @@ import { MetricsMiddleware } from './metrics/metrics.interceptor';
     NotificationSettingsModule,
     ProfileModule,
     ForumModule,
+    UploadsModule,
   ],
   providers: [
     {
@@ -148,13 +151,17 @@ import { MetricsMiddleware } from './metrics/metrics.interceptor';
       provide: APP_FILTER,
       useClass: LogException,
     },
+    UploadsService,
   ],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(ContentTypeMiddleware)
-      .exclude({ path: 'v1/images', method: RequestMethod.POST })
+      .exclude(
+        { path: 'v1/images', method: RequestMethod.POST },
+        { path: 'v1/uploads', method: RequestMethod.POST },
+      )
       .forRoutes(
         { path: '*', method: RequestMethod.POST },
         { path: '*', method: RequestMethod.PUT },
