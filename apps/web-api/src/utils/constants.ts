@@ -2,6 +2,7 @@ export enum APP_ENV {
   DEV = 'development',
   STAGING = 'staging',
   PRODUCTION = 'production',
+  UAT = 'uat',
 }
 
 export const ALLOWED_CORS_ORIGINS = {
@@ -28,6 +29,15 @@ export const ALLOWED_CORS_ORIGINS = {
     /dev-auth-app.plnetwork.io/,
     /dev-analytics.plnetwork.io/,
     /staging-admin.plnetwork.io/,
+  ],
+  [APP_ENV.UAT]: [
+    /app.forestadmin.com/,
+    /uat.plnetwork.io/,
+    /uat-auth-admin.plnetwork.io/,
+    /uat-auth-app.plnetwork.io/,
+    /uat-analytics.plnetwork.io/,
+    /dev-analytics.plnetwork.io/,
+    /uat-admin.plnetwork.io/,
   ],
   [APP_ENV.PRODUCTION]: ['https://www.plnetwork.io', /app.forestadmin.com/, /admin.plnetwork.io/, /plnetwork.io/,/protocol.ai/],
 };
