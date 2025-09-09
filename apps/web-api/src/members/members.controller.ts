@@ -1,7 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Param,
+  Get,
+  Put,
   Req,
   UseGuards,
   UsePipes,
@@ -34,6 +37,7 @@ import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { ENABLED_RETRIEVAL_PROFILE } from '../utils/prisma-query-builder/profile/defaults';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { MembersService } from './members.service';
+import { InvestorProfileService } from './investor-profile.service';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { AuthGuard } from '../guards/auth.guard';
@@ -50,7 +54,11 @@ type RouteShape = typeof server.routeShapes;
 @Controller()
 @NoCache()
 export class MemberController {
-  constructor(private readonly membersService: MembersService, private logger: LogService) {}
+  constructor(
+    private readonly membersService: MembersService,
+    private readonly investorProfileService: InvestorProfileService,
+    private logger: LogService
+  ) {}
 
   /**
    * Retrieves a list of members based on query parameters.
@@ -430,5 +438,47 @@ export class MemberController {
     }
 
     return await this.membersService.findMembersBulk(memberIds, externalIds);
+  }
+
+  /**
+   * Creates or updates the investor profile for the authenticated member.
+   * Only L5 and L6 members can manage their investor profile.
+   *
+   * @param uid - UID of the member
+   * @param body - Request body containing investor profile data
+   * @param req - HTTP request object containing user information
+   * @returns The created/updated investor profile
+   */
+  @Api(server.route.createOrUpdateInvestorProfile)
+  @UsePipes(ZodValidationPipe)
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async createOrUpdateInvestorProfile(@Param('uid') uid: string, @Body() body, @Req() req) {
+    const member = await this.membersService.findMemberByEmail(req.userEmail);
+    if (!member || (!member.isDirectoryAdmin && member.uid !== uid)) {
+      throw new ForbiddenException('You can only manage your own investor profile');
+    }
+
+    return await this.investorProfileService.createOrUpdateInvestorProfile(uid, body.investorProfile);
+  }
+
+  /**
+   * Retrieves the investor profile for the authenticated member.
+   * Only L5 and L6 members can view their investor profile.
+   *
+   * @param uid - UID of the member
+   * @param req - HTTP request object containing user information
+   * @returns The investor profile or null if not found
+   */
+  @Api(server.route.getInvestorProfile)
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async getInvestorProfile(@Param('uid') uid: string, @Req() req) {
+    const member = await this.membersService.findMemberByEmail(req.userEmail);
+    if (!member || (!member.isDirectoryAdmin && member.uid !== uid)) {
+      throw new ForbiddenException('You can only view your own investor profile');
+    }
+
+    return await this.investorProfileService.getInvestorProfile(uid);
   }
 }

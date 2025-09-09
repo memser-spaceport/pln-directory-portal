@@ -157,6 +157,7 @@ export class TeamsService {
               },
             },
           },
+          investorProfile: true,
         },
       });
       team.teamFocusAreas = this.removeDuplicateFocusAreas(team.teamFocusAreas);
@@ -251,8 +252,9 @@ export class TeamsService {
     const existingTeam = await this.findTeamByUid(teamUid);
     let result;
     this.logger.info(`Going to update information about the '${teamUid}' team`);
+    const requestor = await this.membersService.findMemberByEmail(requestorEmail);
     await this.prisma.$transaction(async (tx) => {
-      const team = await this.formatTeam(teamUid, updatedTeam, tx, 'Update');
+      const { team, investorProfileData } = await this.formatTeam(teamUid, updatedTeam, tx, 'Update');
       result = await this.updateTeamByUid(teamUid, team, tx, requestorEmail);
       const toAdd: any[] = [];
       const toDelete: { teamUid: string; memberUid: string }[] = [];
@@ -286,6 +288,12 @@ export class TeamsService {
         this.logger.info(`Going to delete members ${toDelete.map((r) => r.memberUid).join(', ')} from the ${teamUid}`);
         await this.deleteTeamMemberRoleEntry(toDelete, tx);
       }
+
+      // Handle investor profile updates
+      if (investorProfileData) {
+        await this.updateTeamInvestorProfile(teamUid, investorProfileData, tx, requestor.accessLevel);
+      }
+
       await this.logParticipantRequest(requestorEmail, updatedTeam, existingTeam.uid, tx);
     });
     await this.notificationService.notifyForTeamEditApproval(updatedTeam.name, teamUid, requestorEmail);
@@ -352,8 +360,19 @@ export class TeamsService {
     tx: Prisma.TransactionClient
   ): Promise<Team> {
     const newTeam: any = teamParticipantRequest.newData;
-    const formattedTeam = await this.formatTeam(null, newTeam, tx);
+    this.logger.info(`Creating team from participant request with data: ${JSON.stringify(newTeam)}`);
+    const { team: formattedTeam, investorProfileData } = await this.formatTeam(null, newTeam, tx);
+    this.logger.info(`Formatted team data, investorProfileData: ${JSON.stringify(investorProfileData)}`);
     const createdTeam = await this.createTeam(formattedTeam, tx, teamParticipantRequest.requesterEmailId);
+
+    // Handle investor profile creation for teams
+    if (investorProfileData) {
+      this.logger.info(`Creating investor profile for team ${createdTeam.uid}`);
+      await this.updateTeamInvestorProfile(createdTeam.uid, investorProfileData, tx);
+    } else {
+      this.logger.info(`No investor profile data to process for team ${createdTeam.uid}`);
+    }
+
     return createdTeam;
   }
 
@@ -366,7 +385,17 @@ export class TeamsService {
    * @param type - Operation type ('create' or 'update')
    * @returns - Formatted team data for Prisma query
    */
-  async formatTeam(teamUid: string | null, teamData: Partial<Team>, tx: Prisma.TransactionClient, type = 'Create') {
+  async formatTeam(
+    teamUid: string | null,
+    teamData: Partial<Team> & {
+      investorProfile?: {
+        investmentFocus?: string[];
+        typicalCheckSize?: string;
+      };
+    },
+    tx: Prisma.TransactionClient,
+    type = 'Create'
+  ): Promise<{ team: any; investorProfileData: any }> {
     const team: any = {};
     const directFields = [
       'name',
@@ -400,7 +429,95 @@ export class TeamsService {
       : type === 'Update'
       ? { disconnect: true }
       : undefined;
-    return team;
+
+    // Handle investor profile
+    let investorProfileData: any;
+    if (teamData.investorProfile && Object.keys(teamData.investorProfile).length > 0) {
+      this.logger.info(
+        `Processing investor profile for team creation/update: ${JSON.stringify(teamData.investorProfile)}`
+      );
+      if (type === 'create') {
+        team['investorProfile'] = {
+          create: {
+            investmentFocus: teamData.investorProfile.investmentFocus || [],
+            typicalCheckSize: teamData.investorProfile.typicalCheckSize,
+          },
+        };
+        this.logger.info(`Added investor profile to team object for creation`);
+      } else {
+        // For updates, we'll handle this separately after team creation/update
+        investorProfileData = teamData.investorProfile;
+        this.logger.info(`Set investor profile data for separate update processing`);
+      }
+    } else {
+      this.logger.info(`No investor profile data found in teamData: ${JSON.stringify(teamData.investorProfile)}`);
+    }
+
+    return { team, investorProfileData };
+  }
+
+  /**
+   * Handles investor profile updates for a team
+   *
+   * @param teamUid - The unique identifier of the team
+   * @param investorProfileData - The investor profile data to update
+   * @param tx - Transaction client for atomic operations
+   * @param requestorAccessLevel - The access level of the requestor to check permissions
+   */
+  async updateTeamInvestorProfile(
+    teamUid: string,
+    investorProfileData: any,
+    tx: Prisma.TransactionClient,
+    requestorAccessLevel?: string
+  ) {
+    this.logger.info(
+      `updateTeamInvestorProfile called for team ${teamUid} with data: ${JSON.stringify(investorProfileData)}`
+    );
+    // Check if requestor has permission to update investor profile (L5, L6, or directory admin)
+    if (requestorAccessLevel && !['L5', 'L6'].includes(requestorAccessLevel)) {
+      // Check if they're a directory admin
+      const requestor = await tx.member.findFirst({
+        where: { memberRoles: { some: { name: 'DIRECTORYADMIN' } } },
+      });
+      if (!requestor) {
+        throw new ForbiddenException('Insufficient permissions to update investor profile');
+      }
+    }
+
+    const team = await tx.team.findUnique({
+      where: { uid: teamUid },
+      select: { investorProfileId: true },
+    });
+
+    if (!team) {
+      throw new NotFoundException('Team not found');
+    }
+
+    if (team.investorProfileId) {
+      // Update existing investor profile
+      await tx.investorProfile.update({
+        where: { uid: team.investorProfileId },
+        data: {
+          investmentFocus: investorProfileData.investmentFocus || [],
+          typicalCheckSize: investorProfileData.typicalCheckSize,
+        },
+      });
+    } else {
+      // Create new investor profile
+      const newInvestorProfile = await tx.investorProfile.create({
+        data: {
+          investmentFocus: investorProfileData.investmentFocus || [],
+          typicalCheckSize: investorProfileData.typicalCheckSize,
+          teamUid: teamUid,
+        },
+      });
+
+      // Link the investor profile to the team
+      await tx.team.update({
+        where: { uid: teamUid },
+        data: { investorProfileId: newInvestorProfile.uid },
+      });
+    }
   }
 
   /**

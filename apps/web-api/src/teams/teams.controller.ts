@@ -4,11 +4,7 @@ import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
 import { apiTeam } from 'libs/contracts/src/lib/contract-team';
-import {
-  ResponseTeamWithRelationsSchema,
-  TeamDetailQueryParams,
-  TeamQueryParams,
-} from 'libs/contracts/src/schema';
+import { ResponseTeamWithRelationsSchema, TeamDetailQueryParams, TeamQueryParams } from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { NOT_FOUND_GLOBAL_RESPONSE_SCHEMA } from '../utils/constants';
@@ -27,19 +23,18 @@ const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
 @Controller()
 export class TeamsController {
-  constructor(private readonly teamsService: TeamsService) { }
+  constructor(private readonly teamsService: TeamsService) {}
 
   @Api(server.route.teamFilters)
   @ApiQueryFromZod(TeamQueryParams)
   @NoCache()
   async getTeamFilters(@Req() request: Request) {
-    const queryableFields = prismaQueryableFieldsFromZod(
-      ResponseTeamWithRelationsSchema
-    );
+    const queryableFields = prismaQueryableFieldsFromZod(ResponseTeamWithRelationsSchema);
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
-    const { focusAreas, isHost } : any = request.query;
-    if(isHost) {  //Remove isHost from the default query since it is to be added in eventGuest.
+    const { focusAreas, isHost }: any = request.query;
+    if (isHost) {
+      //Remove isHost from the default query since it is to be added in eventGuest.
       delete builtQuery.where?.isHost;
     }
     builtQuery.where = {
@@ -48,23 +43,23 @@ export class TeamsController {
         this.teamsService.buildFocusAreaFilters(focusAreas),
         this.teamsService.buildRecentTeamsFilter(request.query),
         this.teamsService.buildParticipationTypeFilter(request.query),
-        this.teamsService.buildAskTagFilter(request.query)
-      ]
-    }
+        this.teamsService.buildAskTagFilter(request.query),
+      ],
+    };
     return await this.teamsService.getTeamFilters(builtQuery);
   }
 
   @Api(server.route.getTeams)
   @ApiQueryFromZod(TeamQueryParams)
   @ApiOkResponseFromZod(ResponseTeamWithRelationsSchema.array())
+  @NoCache()
   findAll(@Req() request: Request) {
-    const queryableFields = prismaQueryableFieldsFromZod(
-      ResponseTeamWithRelationsSchema
-    );
+    const queryableFields = prismaQueryableFieldsFromZod(ResponseTeamWithRelationsSchema);
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
-    const { focusAreas, isHost, isSponsor} : any = request.query;
-    if(isHost || isSponsor) {  //Remove isHost from the default query since it is to be added in eventGuest.
+    const { focusAreas, isHost, isSponsor }: any = request.query;
+    if (isHost || isSponsor) {
+      //Remove isHost from the default query since it is to be added in eventGuest.
       delete builtQuery.where?.isHost;
       delete builtQuery.where?.isSponsor;
     }
@@ -74,7 +69,7 @@ export class TeamsController {
         this.teamsService.buildFocusAreaFilters(focusAreas),
         this.teamsService.buildRecentTeamsFilter(request.query),
         this.teamsService.buildParticipationTypeFilter(request.query),
-        this.teamsService.buildAskTagFilter(request.query)
+        this.teamsService.buildAskTagFilter(request.query),
       ],
     };
     // Check for the office hours blank when OH not null is passed
@@ -87,18 +82,18 @@ export class TeamsController {
     }
 
     //when "default" is passed as a parameter to orderBy, teams with asks will appear at the beginning of the list.
-    const orderByQuery: any = request.query.orderBy
-    if(orderByQuery && orderByQuery.includes('default')){
+    const orderByQuery: any = request.query.orderBy;
+    if (orderByQuery && orderByQuery.includes('default')) {
       let order: any = [
         {
           asks: {
-                _count: 'desc',
-              }
+            _count: 'desc',
+          },
         },
-      ]
-      const queryOrderBy : any= builtQuery.orderBy;
-      if(builtQuery.orderBy){
-        order = [...order,...queryOrderBy]
+      ];
+      const queryOrderBy: any = builtQuery.orderBy;
+      if (builtQuery.orderBy) {
+        order = [...order, ...queryOrderBy];
       }
       builtQuery.orderBy = order;
     }
@@ -111,24 +106,16 @@ export class TeamsController {
   @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
   @ApiQueryFromZod(TeamDetailQueryParams)
   @NoCache()
-  findOne(
-    @Req() request: Request,
-    @ApiDecorator() { params: { uid } }: RouteShape['getTeam']
-  ) {
-    const queryableFields = prismaQueryableFieldsFromZod(
-      ResponseTeamWithRelationsSchema
-    );
-    const builder = new PrismaQueryBuilder(
-      queryableFields,
-      ENABLED_RETRIEVAL_PROFILE
-    );
+  findOne(@Req() request: Request, @ApiDecorator() { params: { uid } }: RouteShape['getTeam']) {
+    const queryableFields = prismaQueryableFieldsFromZod(ResponseTeamWithRelationsSchema);
+    const builder = new PrismaQueryBuilder(queryableFields, ENABLED_RETRIEVAL_PROFILE);
     const builtQuery = builder.build(request.query);
     return this.teamsService.findTeamByUid(uid, builtQuery);
   }
 
   @Api(server.route.modifyTeam)
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
   @UsePipes(new ParticipantsReqValidationPipe())
   async updateOne(@Param('uid') teamUid, @Body() body, @Req() req) {
     await this.teamsService.validateRequestor(req.userEmail, teamUid);
@@ -138,10 +125,10 @@ export class TeamsController {
   // TODO: Remove this endpoint after frontend integration with new ask api
   @Api(server.route.patchTeam)
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
   async addAsk(@Param('uid') teamUid, @Body() body, @Req() req) {
     await this.teamsService.isTeamMemberOrAdmin(req.userEmail, teamUid);
-    const res = await this.teamsService.addEditTeamAsk(teamUid,body.teamName,req.userEmail,body.ask);
+    const res = await this.teamsService.addEditTeamAsk(teamUid, body.teamName, req.userEmail, body.ask);
     return res;
   }
 }

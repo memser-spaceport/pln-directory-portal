@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   forwardRef,
   Inject,
   Injectable,
@@ -132,7 +133,7 @@ export class MemberService {
       this.logger.info(
         `Member update request - Initiaing update for member uid - ${existingMember.uid}, requestId -> ${memberUid}`
       );
-      const member = await this.prepareMemberFromParticipantRequest(
+      const { member, investorProfileData } = await this.prepareMemberFromParticipantRequest(
         memberUid,
         memberData,
         existingMember,
@@ -150,6 +151,12 @@ export class MemberService {
       );
       await this.updateMemberEmailChange(memberUid, isEmailChanged, isExternalIdAvailable, memberData, existingMember);
       await this.logParticipantRequest(requestorEmail, memberData, existingMember.uid, tx);
+
+      // Handle investor profile updates
+      if (investorProfileData) {
+        await this.updateMemberInvestorProfile(memberUid, investorProfileData, tx, existingMember.accessLevel);
+      }
+
       if (isEmailChanged && isDirectoryAdmin) {
         this.notificationService.notifyForMemberChangesByAdmin(
           memberData.name,
@@ -200,8 +207,9 @@ export class MemberService {
     existingMember,
     tx: Prisma.TransactionClient,
     type = 'Create'
-  ) {
+  ): Promise<{ member: any; investorProfileData: any }> {
     const member: any = {};
+    let investorProfileData: any = null;
     const directFields = [
       'name',
       'email',
@@ -247,7 +255,78 @@ export class MemberService {
       await this.updateProjectContributions(memberData, existingMember, memberUid, tx);
       await this.updateTeamMemberRoles(memberData, existingMember, memberUid, tx);
     }
-    return member;
+
+    // Handle investor profile
+    if (memberData.investorProfile && Object.keys(memberData.investorProfile).length > 0) {
+      if (type === 'Create') {
+        member['investorProfile'] = {
+          create: {
+            investmentFocus: memberData.investorProfile.investmentFocus || [],
+            typicalCheckSize: memberData.investorProfile.typicalCheckSize,
+          },
+        };
+      } else {
+        // For updates, we'll handle this separately after member creation/update
+        investorProfileData = memberData.investorProfile;
+      }
+    }
+
+    return { member, investorProfileData };
+  }
+
+  /**
+   * Handles investor profile updates for a member
+   *
+   * @param memberUid - The unique identifier of the member
+   * @param investorProfileData - The investor profile data to update
+   * @param tx - Transaction client for atomic operations
+   * @param memberAccessLevel - The access level of the member to check permissions
+   */
+  async updateMemberInvestorProfile(
+    memberUid: string,
+    investorProfileData: any,
+    tx: Prisma.TransactionClient,
+    memberAccessLevel?: string
+  ) {
+    // Check if member has permission to update investor profile (L5 or L6)
+    if (memberAccessLevel && !['L5', 'L6'].includes(memberAccessLevel)) {
+      throw new ForbiddenException('Insufficient permissions to update investor profile');
+    }
+
+    const existingMember = await tx.member.findUnique({
+      where: { uid: memberUid },
+      select: { investorProfileId: true },
+    });
+
+    if (!existingMember) {
+      throw new NotFoundException('Member not found');
+    }
+
+    if (existingMember.investorProfileId) {
+      // Update existing investor profile
+      await tx.investorProfile.update({
+        where: { uid: existingMember.investorProfileId },
+        data: {
+          investmentFocus: investorProfileData.investmentFocus || [],
+          typicalCheckSize: investorProfileData.typicalCheckSize,
+        },
+      });
+    } else {
+      // Create new investor profile
+      const newInvestorProfile = await tx.investorProfile.create({
+        data: {
+          investmentFocus: investorProfileData.investmentFocus || [],
+          typicalCheckSize: investorProfileData.typicalCheckSize,
+          member: { connect: { uid: memberUid } },
+        },
+      });
+
+      // Link the investor profile to the member
+      await tx.member.update({
+        where: { uid: memberUid },
+        data: { investorProfileId: newInvestorProfile.uid },
+      });
+    }
   }
 
   /**
@@ -852,7 +931,11 @@ export class MemberService {
     // Notify users based on the new access level
     if (result.count > 0) {
       // Send approval emails for L2, L3, L4
-      if ([AccessLevel.L2, AccessLevel.L3, AccessLevel.L4].includes(accessLevel as AccessLevel)) {
+      if (
+        [AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6].includes(
+          accessLevel as AccessLevel
+        )
+      ) {
         for (const member of notApprovedMembers) {
           if (!member.email) {
             this.logger.error(
@@ -945,6 +1028,14 @@ export class MemberService {
             recommendationsEnabled: memberData.accessLevel === AccessLevel.L4,
           },
         },
+        ...(memberData.investorProfile && {
+          investorProfile: {
+            create: {
+              investmentFocus: memberData.investorProfile.investmentFocus,
+              typicalCheckSize: memberData.investorProfile.typicalCheckSize,
+            },
+          },
+        }),
       };
 
       createdMember = await this.createMember(newMember, tx);
@@ -961,7 +1052,7 @@ export class MemberService {
   }
 
   async updateMemberByAdmin(uid: string, dto: UpdateMemberDto): Promise<string> {
-    const { country, region, city, skills, teamMemberRoles, joinDate, ...rest } = dto;
+    const { country, region, city, skills, teamMemberRoles, joinDate, investorProfile, ...rest } = dto;
 
     const data: any = {
       ...rest,
@@ -1007,6 +1098,37 @@ export class MemberService {
             },
           })),
         };
+      }
+
+      // Handle investor profile updates
+      if (investorProfile) {
+        const existingMember = await tx.member.findUnique({
+          where: { uid },
+          select: { investorProfileId: true },
+        });
+
+        if (existingMember?.investorProfileId) {
+          // Update existing investor profile
+          await tx.investorProfile.update({
+            where: { uid: existingMember.investorProfileId },
+            data: {
+              investmentFocus: investorProfile.investmentFocus,
+              typicalCheckSize: investorProfile.typicalCheckSize,
+            },
+          });
+        } else {
+          // Create new investor profile
+          const newInvestorProfile = await tx.investorProfile.create({
+            data: {
+              investmentFocus: investorProfile.investmentFocus,
+              typicalCheckSize: investorProfile.typicalCheckSize,
+              memberUid: uid,
+            },
+          });
+
+          // Link the investor profile to the member
+          data.investorProfileId = newInvestorProfile.uid;
+        }
       }
 
       updatedMember = await tx.member.update({
@@ -1057,6 +1179,8 @@ export class MemberService {
   private resolveFlagsFromAccessLevel(accessLevel: AccessLevel): { isVerified: boolean; plnFriend: boolean } {
     switch (accessLevel) {
       case AccessLevel.L4:
+      case AccessLevel.L5:
+      case AccessLevel.L6:
         return { isVerified: true, plnFriend: false };
       case AccessLevel.L3:
         return { isVerified: true, plnFriend: true };

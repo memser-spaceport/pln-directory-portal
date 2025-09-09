@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   forwardRef,
   Inject,
   Injectable,
@@ -369,6 +370,7 @@ export class MembersService {
           skills: true,
           memberRoles: true,
           linkedinProfile: true,
+          investorProfile: true,
           teamMemberRoles: {
             include: {
               team: {
@@ -425,9 +427,13 @@ export class MembersService {
         },
       });
 
-      return {
-        ...(member as any),
-      };
+      // Only return investor profile for L5 and L6 members
+      const memberData = { ...(member as any) };
+      if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
+        delete memberData.investorProfile;
+      }
+
+      return memberData;
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -792,7 +798,7 @@ export class MembersService {
     tx: Prisma.TransactionClient = this.prisma
   ): Promise<Member> {
     const memberData: any = memberParticipantRequest.newData;
-    const member = await this.prepareMemberFromParticipantRequest(null, memberData, null, tx);
+    const { member } = await this.prepareMemberFromParticipantRequest(null, memberData, null, tx);
     await this.mapLocationToMember(memberData, null, member, tx);
     const createdMember = await this.createMember(member, tx);
     await this.membersHooksService.postCreateActions(createdMember, memberParticipantRequest.requesterEmailId);
@@ -802,7 +808,7 @@ export class MembersService {
   async createMemberFromSignUpData(memberData: any): Promise<Member> {
     let createdMember: any;
     await this.prisma.$transaction(async (tx) => {
-      const member = await this.prepareMemberFromParticipantRequest(null, memberData, null, tx);
+      const { member } = await this.prepareMemberFromParticipantRequest(null, memberData, null, tx);
       member.accessLevel = AccessLevel.L0;
       await this.mapLocationToMember(memberData, null, member, tx);
       createdMember = await this.createMember(member, tx);
@@ -826,7 +832,7 @@ export class MembersService {
       this.logger.info(
         `Member update request - Initiaing update for member uid - ${existingMember.uid}, requestId -> ${memberUid}`
       );
-      const member = await this.prepareMemberFromParticipantRequest(
+      const { member, investorProfileData } = await this.prepareMemberFromParticipantRequest(
         memberUid,
         memberData,
         existingMember,
@@ -844,6 +850,12 @@ export class MembersService {
       );
       await this.updateMemberEmailChange(memberUid, isEmailChanged, isExternalIdAvailable, memberData, existingMember);
       await this.logParticipantRequest(requestorEmail, memberData, existingMember.uid, tx);
+
+      // Handle investor profile updates
+      if (investorProfileData) {
+        await this.updateMemberInvestorProfile(memberUid, investorProfileData, tx, existingMember.accessLevel);
+      }
+
       if (isEmailChanged && isDirectoryAdmin) {
         this.notificationService.notifyForMemberChangesByAdmin(
           memberData.name,
@@ -894,8 +906,9 @@ export class MembersService {
     existingMember,
     tx: Prisma.TransactionClient,
     type = 'Create'
-  ) {
+  ): Promise<{ member: any; investorProfileData: any }> {
     const member: any = {};
+    let investorProfileData: any = null;
     const directFields = [
       'name',
       'email',
@@ -939,7 +952,78 @@ export class MembersService {
       await this.updateProjectContributions(memberData, existingMember, memberUid, tx);
       await this.updateTeamMemberRoles(memberData, existingMember, memberUid, tx);
     }
-    return member;
+
+    // Handle investor profile
+    if (memberData.investorProfile && Object.keys(memberData.investorProfile).length > 0) {
+      if (type === 'Create') {
+        member['investorProfile'] = {
+          create: {
+            investmentFocus: memberData.investorProfile.investmentFocus || [],
+            typicalCheckSize: memberData.investorProfile.typicalCheckSize,
+          },
+        };
+      } else {
+        // For updates, we'll handle this separately after member creation/update
+        investorProfileData = memberData.investorProfile;
+      }
+    }
+
+    return { member, investorProfileData };
+  }
+
+  /**
+   * Handles investor profile updates for a member
+   *
+   * @param memberUid - The unique identifier of the member
+   * @param investorProfileData - The investor profile data to update
+   * @param tx - Transaction client for atomic operations
+   * @param memberAccessLevel - The access level of the member to check permissions
+   */
+  async updateMemberInvestorProfile(
+    memberUid: string,
+    investorProfileData: any,
+    tx: Prisma.TransactionClient,
+    memberAccessLevel?: string
+  ) {
+    // Check if member has permission to update investor profile (L5 or L6)
+    if (memberAccessLevel && !['L5', 'L6'].includes(memberAccessLevel)) {
+      throw new ForbiddenException('Insufficient permissions to update investor profile');
+    }
+
+    const existingMember = await tx.member.findUnique({
+      where: { uid: memberUid },
+      select: { investorProfileId: true },
+    });
+
+    if (!existingMember) {
+      throw new NotFoundException('Member not found');
+    }
+
+    if (existingMember.investorProfileId) {
+      // Update existing investor profile
+      await tx.investorProfile.update({
+        where: { uid: existingMember.investorProfileId },
+        data: {
+          investmentFocus: investorProfileData.investmentFocus || [],
+          typicalCheckSize: investorProfileData.typicalCheckSize,
+        },
+      });
+    } else {
+      // Create new investor profile
+      const newInvestorProfile = await tx.investorProfile.create({
+        data: {
+          investmentFocus: investorProfileData.investmentFocus || [],
+          typicalCheckSize: investorProfileData.typicalCheckSize,
+          member: { connect: { uid: memberUid } },
+        },
+      });
+
+      // Link the investor profile to the member
+      await tx.member.update({
+        where: { uid: memberUid },
+        data: { investorProfileId: newInvestorProfile.uid },
+      });
+    }
   }
 
   /**
@@ -2316,7 +2400,7 @@ export class MembersService {
   }
 
   async findByExternalId(externalId: string) {
-    return this.prisma.member.findFirst({
+    const member = await this.prisma.member.findFirst({
       where: { externalId },
       include: {
         image: true,
@@ -2326,8 +2410,19 @@ export class MembersService {
             team: { include: { logo: true } },
           },
         },
+        investorProfile: true,
       },
     });
+
+    if (member) {
+      // Only return investor profile for L5 and L6 members
+      if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
+        return { ...member, investorProfile: null };
+      }
+      return member;
+    }
+
+    return member;
   }
 
   /**
@@ -2405,10 +2500,22 @@ export class MembersService {
               },
             },
           },
+          investorProfile: {
+            select: {
+              investmentFocus: true,
+              typicalCheckSize: true,
+            },
+          },
         },
       });
 
-      return members;
+      // Apply conditional logic to only return investor profile for L5 and L6 members
+      return members.map((member) => {
+        if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
+          return { ...member, investorProfile: null };
+        }
+        return member;
+      });
     } catch (error) {
       return this.handleErrors(error);
     }
