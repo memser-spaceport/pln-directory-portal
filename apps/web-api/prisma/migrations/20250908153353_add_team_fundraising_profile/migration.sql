@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS "TeamFundraisingProfile"
   "videoUrl"        TEXT,
   "status"          "TeamFundraisingProfileStatus" NOT NULL DEFAULT 'DRAFT',
   "createdAt"       TIMESTAMP(3)                   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt"       TIMESTAMP(3)                   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt"       TIMESTAMP(3)                   NOT NULL,
   "lastModifiedBy"  TEXT,
 
   CONSTRAINT "TeamFundraisingProfile_uid_key" UNIQUE ("uid"),
@@ -42,7 +42,3 @@ CREATE TABLE IF NOT EXISTS "TeamFundraisingProfile"
 -- Helpful indexes
 CREATE INDEX IF NOT EXISTS "TeamFundraisingProfile_status_idx"
   ON "TeamFundraisingProfile" ("status");
-
--- Optional: speed up team lookups (unique already exists)
-CREATE INDEX IF NOT EXISTS "TeamFundraisingProfile_teamUid_idx"
-  ON "TeamFundraisingProfile" ("teamUid");

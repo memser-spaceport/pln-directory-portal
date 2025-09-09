@@ -109,4 +109,10 @@ export class AwsService {
     };
     return await s3.upload(params).promise();
   }
+
+
+  async getPresignedGetUrl(bucket?: string, key?: string, expiresInSeconds = 3600) {
+    const s3 = new AWS.S3(CONFIG);
+    return s3.getSignedUrl('getObject', { Bucket: bucket, Key: key, Expires: expiresInSeconds });
+  }
 }

@@ -53,6 +53,8 @@ import { ForumModule } from './forum/forum.module';
 import { MetricsController } from './metrics/metrics.controller';
 import { MetricsMiddleware } from './metrics/metrics.interceptor';
 import { TeamFundraisingModule } from './team-fundraising/team-fundraising.module';
+import { UploadsService } from './uploads/uploads.service';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -128,6 +130,7 @@ import { TeamFundraisingModule } from './team-fundraising/team-fundraising.modul
     ProfileModule,
     ForumModule,
     TeamFundraisingModule,
+    UploadsModule,
   ],
   providers: [
     {
@@ -150,13 +153,17 @@ import { TeamFundraisingModule } from './team-fundraising/team-fundraising.modul
       provide: APP_FILTER,
       useClass: LogException,
     },
+    UploadsService,
   ],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(ContentTypeMiddleware)
-      .exclude({ path: 'v1/images', method: RequestMethod.POST })
+      .exclude(
+        { path: 'v1/images', method: RequestMethod.POST },
+        { path: 'v1/uploads', method: RequestMethod.POST },
+      )
       .forRoutes(
         { path: '*', method: RequestMethod.POST },
         { path: '*', method: RequestMethod.PUT },
