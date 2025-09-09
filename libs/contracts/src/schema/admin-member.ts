@@ -7,6 +7,8 @@ export enum AccessLevel {
   L2 = 'L2',
   L3 = 'L3',
   L4 = 'L4',
+  L5 = 'L5',
+  L6 = 'L6',
   REJECTED = 'Rejected',
 }
 
@@ -20,6 +22,8 @@ export const AccessLevelDescriptions: Record<AccessLevel, string> = {
   [AccessLevel.L3]: 'Mission Aligned = former verified + friends of PL',
   [AccessLevel.L4]:
     'Portfolio Investment or Core Contributors = former verified + Member = All users La Christa adds via the Back Office "Add Member" flow go here',
+  [AccessLevel.L5]: 'Investor Level 5 = Advanced investor access with team investor profile capabilities',
+  [AccessLevel.L6]: 'Investor Level 6 = Premium investor access with team and personal investor profile capabilities',
   [AccessLevel.REJECTED]: 'User has been rejected by admin = former rejected',
 };
 
@@ -63,6 +67,13 @@ export const CreateMemberSchema = z.object({
   officeHours: z.string().nullable(),
   ohInterest: z.array(z.string()).default([]),
   ohHelpWith: z.array(z.string()).default([]),
+
+  investorProfile: z
+    .object({
+      investmentFocus: z.array(z.string()),
+      typicalCheckSize: z.string().nullable(),
+    })
+    .optional(),
 });
 
 export const UpdateMemberSchema = z.object({
@@ -98,6 +109,13 @@ export const UpdateMemberSchema = z.object({
   officeHours: z.string().optional().nullable(),
   ohInterest: z.array(z.string()).optional(),
   ohHelpWith: z.array(z.string()).optional(),
+
+  investorProfile: z
+    .object({
+      investmentFocus: z.array(z.string()),
+      typicalCheckSize: z.string().nullable(),
+    })
+    .optional(),
 });
 
 export const UpdateAccessLevelSchema = z.object({

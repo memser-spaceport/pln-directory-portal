@@ -25,7 +25,7 @@ export class ParticipantsRequestController {
   @Post('/')
   @UsePipes(new ParticipantsReqValidationPipe())
   @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
   async addRequest(@Body() body) {
     const uniqueIdentifier = this.participantsRequestService.getUniqueIdentifier(body);
     // Validate unique identifier existence

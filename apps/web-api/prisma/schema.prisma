@@ -52,6 +52,8 @@ model Team {
   relatedQuestions             DiscoveryQuestion[]           @relation("TeamRelatedDiscoveryQuestions")
   asks                         Ask[]
   fundraisingProfile           TeamFundraisingProfile?
+  investorProfile              InvestorProfile?              @relation("TeamInvestorProfile", fields: [investorProfileId], references: [uid])
+  investorProfileId            String?                       @unique
 }
 
 enum AskStatus {
@@ -149,6 +151,8 @@ model Member {
   reviewedEvents               PLEvent[]                     @relation("PLEventReviewer")
   modifiedFundraisingProfiles  TeamFundraisingProfile[]      @relation("TfpLastModifiedBy")
   uploads                      Upload[]                      @relation("MemberUploads")
+  investorProfile              InvestorProfile?              @relation("MemberInvestorProfile", fields: [investorProfileId], references: [uid])
+  investorProfileId            String?                       @unique
 }
 
 model MemberRole {
@@ -931,4 +935,20 @@ model Upload {
   @@index([scopeType, scopeUid])
   @@index([kind])
   @@index([uploaderUid])
+}
+
+model InvestorProfile {
+  id               Int      @id @default(autoincrement())
+  uid              String   @unique @default(cuid())
+  investmentFocus  String[]
+  typicalCheckSize String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  teamUid          String?
+  team             Team?    @relation("TeamInvestorProfile")
+  memberUid        String?
+  member           Member?  @relation("MemberInvestorProfile")
+
+  @@unique([teamUid])
+  @@unique([memberUid])
 }

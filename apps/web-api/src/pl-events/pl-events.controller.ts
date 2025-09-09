@@ -125,7 +125,7 @@ export class PLEventsController {
   @Api(server.route.createPLEventGuestByLocation)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
   async createPLEventGuestByLocation(
     @Param("uid") locationUid,
     @Body() body: CreatePLEventGuestSchemaDto,
@@ -153,7 +153,7 @@ export class PLEventsController {
   @Api(server.route.modifyPLEventGuestByLocation)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
   async modifyPLEventGuestByLocation(
     @Param("uid") locationUid,
     @Param("guestUid") guestUid,
@@ -180,7 +180,7 @@ export class PLEventsController {
   @Api(server.route.deletePLEventGuestsByLocation)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
   async deletePLEventGuestsByLocation(
     @Param("uid") locationUid,
     @Body() body: DeletePLEventGuestsSchemaDto,
@@ -295,7 +295,7 @@ export class PLEventsController {
 
   @Api(server.route.sendEventGuestPresenceRequest)
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
   async sendEventGuestPresenceRequest(
     @Param('uid') locationUid: string,
     @Body() body,
