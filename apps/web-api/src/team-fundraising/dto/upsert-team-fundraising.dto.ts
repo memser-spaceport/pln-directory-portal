@@ -1,8 +1,9 @@
 export class UpsertTeamFundraisingDto {
   focusAreaUid?: string | null;
   fundingStageUid?: string | null;
-  onePagerUrl?: string | null;
-  videoUrl?: string | null;
+
+  onePagerUploadUid?: string | null;
+  videoUploadUid?: string | null;
 }
 
 export class ChangeStatusDto {
