@@ -859,8 +859,11 @@ model TeamFundraisingProfile {
   fundingStageUid String?
   fundingStage    FundingStage? @relation("TfpFundingStage", fields: [fundingStageUid], references: [uid])
 
-  onePagerUrl String?
-  videoUrl    String?
+  onePagerUploadUid String?
+  onePagerUpload    Upload? @relation("TFP_onePagerUpload", fields: [onePagerUploadUid], references: [uid])
+
+  videoUploadUid String?
+  videoUpload    Upload? @relation("TFP_videoUpload", fields: [videoUploadUid], references: [uid])
 
   status TeamFundraisingProfileStatus @default(DRAFT)
 
@@ -899,38 +902,33 @@ enum UploadStatus {
 }
 
 model Upload {
-  id  Int    @id @default(autoincrement())
-  uid String @unique @default(cuid())
-
+  id      Int           @id @default(autoincrement())
+  uid     String        @unique @default(cuid())
   storage UploadStorage
   kind    UploadKind
   status  UploadStatus  @default(READY)
 
-  // Generic scoping so the same module can be reused anywhere in the app
   scopeType UploadScopeType @default(NONE)
   scopeUid  String?
 
   uploaderUid String?
   uploader    Member? @relation("MemberUploads", fields: [uploaderUid], references: [uid])
 
-  // S3 fields
-  bucket String?
-  key    String?
-
-  // IPFS fields
-  cid String?
-
-  // The URL you return to clients (worker URL or presigned GET)
-  url String
-
+  bucket   String?
+  key      String?
+  cid      String?
+  url      String
   filename String
   mimetype String
   size     Int
-  checksum String? // sha256 or similar
+  checksum String?
   meta     Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  teamFundraisingProfilesAsOnePager TeamFundraisingProfile[] @relation("TFP_onePagerUpload")
+  teamFundraisingProfilesAsVideo    TeamFundraisingProfile[] @relation("TFP_videoUpload")
 
   @@index([scopeType, scopeUid])
   @@index([kind])

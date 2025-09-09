@@ -51,7 +51,7 @@ export class UploadsController {
     const kind = parseEnum<UploadKind>(kindParam, ['IMAGE', 'SLIDE', 'VIDEO', 'OTHER'], 'OTHER');
     const scopeType = parseEnum<UploadScopeType>(scopeTypeParam, ['NONE', 'TEAM', 'MEMBER', 'PROJECT'], 'NONE');
 
-    const member: any = await this.memberService.findMemberByEmail((request as any)['userEmail']);
+    const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
     const uploaderUid: string | null = member?.uid ?? null;
 
     if (scopeType === 'TEAM' && scopeUid) {
