@@ -4,11 +4,11 @@ import {AdminTeamFundraisingController} from "./admin-team-fundraising/admin-tea
 import {TeamFundraisingService} from './team-fundraising/team-fundraising.service';
 import {PrismaService} from "../shared/prisma.service";
 import {JwtService} from "../utils/jwt/jwt.service";
-
+import {UploadsService} from "../uploads/uploads.service";
 
 @Module({
   controllers: [TeamFundraisingController, AdminTeamFundraisingController],
-  providers: [TeamFundraisingService, PrismaService, JwtService],
+  providers: [TeamFundraisingService, PrismaService, JwtService, UploadsService],
   exports: [TeamFundraisingService],
 })
 export class TeamFundraisingModule {}
