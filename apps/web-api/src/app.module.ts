@@ -52,6 +52,7 @@ import { ProfileModule } from './profile/profile.module';
 import { ForumModule } from './forum/forum.module';
 import { MetricsController } from './metrics/metrics.controller';
 import { MetricsMiddleware } from './metrics/metrics.interceptor';
+import { TeamFundraisingModule } from './team-fundraising/team-fundraising.module';
 import { UploadsService } from './uploads/uploads.service';
 import { UploadsModule } from './uploads/uploads.module';
 
@@ -128,6 +129,7 @@ import { UploadsModule } from './uploads/uploads.module';
     NotificationSettingsModule,
     ProfileModule,
     ForumModule,
+    TeamFundraisingModule,
     UploadsModule,
   ],
   providers: [
