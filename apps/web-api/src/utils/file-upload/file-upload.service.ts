@@ -38,7 +38,7 @@ export class FileUploadService {
     return files.map((file) => this.fileEcryptionService.getEncryptedFile(file));
   }
 
-  async storeFiles(uploadedFiles: Array<Express.Multer.File>) {
+  async storeImageFiles(uploadedFiles: Array<Express.Multer.File>) {
     if (process.env.FILE_STORAGE === IPFS) {
       const client = this.makeStorageClient();
       const encryptedFiles = this.encryptFiles(uploadedFiles);
@@ -49,9 +49,9 @@ export class FileUploadService {
       let response;
       for (const file of uploadedFiles) {
         if (!response) {
-          response = await this.awsService.uploadFileToS3(file, process.env.AWS_S3_BUCKET_NAME , file.originalname);
+          response = await this.awsService.uploadFileToS3(file, process.env.AWS_S3_IMAGE_BUCKET_NAME , file.originalname);
         } else {
-          await this.awsService.uploadFileToS3(file, process.env.AWS_S3_BUCKET_NAME , file.originalname);
+          await this.awsService.uploadFileToS3(file, process.env.AWS_S3_IMAGE_BUCKET_NAME , file.originalname);
         }
       }
       return response.Location;

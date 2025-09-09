@@ -79,7 +79,7 @@ export class UploadsService {
         scopeType: params.scopeType ?? 'NONE',
         scopeUid: params.scopeUid ?? null,
         uploaderUid: params.uploaderUid ?? null,
-        bucket: storageEnum === 'S3' ? process.env.AWS_S3_BUCKET_NAME ?? null : null,
+        bucket: storageEnum === 'S3' ? process.env.AWS_S3_UPLOAD_BUCKET_NAME ?? null : null,
         key: storageEnum === 'S3' ? keyOrPath : null,
         cid: storageEnum === 'IPFS' ? keyOrPath : null,
         url,

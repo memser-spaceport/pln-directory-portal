@@ -102,7 +102,7 @@ export class ImagesController {
     };
 
     // Store the original file in web3.storage or s3 based on env config
-    const resp = await this.fileUploadService.storeFiles([expressOriginalFile]);
+    const resp = await this.fileUploadService.storeImageFiles([expressOriginalFile]);
 
     // Create the image record with basic metadata
     const createdImages = await this.imagesService.bulkCreate(
