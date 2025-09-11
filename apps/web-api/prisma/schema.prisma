@@ -936,16 +936,18 @@ model Upload {
 }
 
 model InvestorProfile {
-  id               Int      @id @default(autoincrement())
-  uid              String   @unique @default(cuid())
-  investmentFocus  String[]
-  typicalCheckSize String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  teamUid          String?
-  team             Team?    @relation("TeamInvestorProfile")
-  memberUid        String?
-  member           Member?  @relation("MemberInvestorProfile")
+  id                 Int       @id @default(autoincrement())
+  uid                String    @unique @default(cuid())
+  secRulesAccepted   Boolean   @default(false)
+  secRulesAcceptedAt DateTime?
+  investmentFocus    String[]
+  typicalCheckSize   Float?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  teamUid            String?
+  team               Team?     @relation("TeamInvestorProfile")
+  memberUid          String?
+  member             Member?   @relation("MemberInvestorProfile")
 
   @@unique([teamUid])
   @@unique([memberUid])

@@ -9,6 +9,8 @@ type ResponseCounts = {
   L2: number;
   L3: number;
   L4: number;
+  L5: number;
+  L6: number;
   Rejected: number;
 };
 

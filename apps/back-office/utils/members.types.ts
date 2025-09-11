@@ -67,5 +67,11 @@ export interface IFormValues {
   openToWork: boolean;
   projectContributions: IProjectContribution[];
   teamOrProjectURL: string;
-  isSubscribedToNewsletter: boolean
+  isSubscribedToNewsletter: boolean;
+  accessLevel: string;
+  investorProfile: {
+    investmentFocus: string[];
+    typicalCheckSize: number;
+    secRulesAccepted: boolean;
+  };
 }

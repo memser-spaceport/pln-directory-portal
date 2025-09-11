@@ -40,6 +40,12 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
       officeHours: '',
       telegram: '',
       twitter: '',
+      investorProfile: {
+        investmentFocus: [],
+        typicalCheckSize: null,
+        secRulesAccepted: false,
+      },
+      teamsAndRoles: [],
     },
     resolver: yupResolver(memberFormSchema),
   });

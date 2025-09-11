@@ -4,12 +4,7 @@ import TeamStepTwo from '../components/teams/teamsteptwo';
 import TeamStepThree from '../components/teams/teamstepthree';
 import { IFormValues } from '../utils/teams.types';
 import api from '../utils/api';
-import APP_CONSTANTS, {
-  API_ROUTE,
-  ENROLLMENT_TYPE,
-  FILTER_API_ROUTES,
-  ROUTE_CONSTANTS,
-} from '../utils/constants';
+import APP_CONSTANTS, { API_ROUTE, ENROLLMENT_TYPE, FILTER_API_ROUTES, ROUTE_CONSTANTS } from '../utils/constants';
 import { ApprovalLayout } from '../layout/approval-layout';
 import { FooterButtons } from '../components/footer-buttons/footer-buttons';
 import router from 'next/router';
@@ -22,10 +17,7 @@ function validateBasicForm(formValues, imageUrl) {
   const errors = [];
   const emailRE =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-  if (
-    !formValues.requestorEmail?.trim() ||
-    !formValues.requestorEmail?.trim().match(emailRE)
-  ) {
+  if (!formValues.requestorEmail?.trim() || !formValues.requestorEmail?.trim().match(emailRE)) {
     errors.push('Please add a valid Requestor email');
   }
   if (!formValues.name?.trim()) {
@@ -97,14 +89,8 @@ export default function TeamView(props) {
   const [disableSave, setDisableSave] = useState<boolean>(false);
   const [nameExists, setNameExists] = useState<boolean>(false);
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
-  const [resetImg, setResetImg] = useState(false); 
-  const {
-    setIsOpenRequest,
-    setMemberList,
-    setTeamList,
-    setIsTeamActive,
-    setShowMenu,
-  } = useNavbarContext();
+  const [resetImg, setResetImg] = useState(false);
+  const { setIsOpenRequest, setMemberList, setTeamList, setIsTeamActive, setShowMenu } = useNavbarContext();
   setIsTeamActive(true);
   setMemberList(props.memberList);
   setTeamList(props.teamList);
@@ -113,17 +99,15 @@ export default function TeamView(props) {
 
   const handleResetImg = () => {
     setResetImg(false);
-  }
+  };
 
   function formatData() {
     const formattedTags = formValues.industryTags.map((item) => {
       return { uid: item?.value, title: item?.label };
     });
-    const formattedMembershipSource = formValues.membershipSources.map(
-      (item) => {
-        return { uid: item?.value, title: item?.label };
-      }
-    );
+    const formattedMembershipSource = formValues.membershipSources.map((item) => {
+      return { uid: item?.value, title: item?.label };
+    });
     const formattedtechnologies = formValues.technologies.map((item) => {
       return { uid: item?.value, title: item?.label };
     });
@@ -149,6 +133,13 @@ export default function TeamView(props) {
       industryTags: formattedTags,
       membershipSources: formattedMembershipSource,
       technologies: formattedtechnologies,
+      investorProfile:
+        formValues.investmentFocus?.length > 0 || formValues.typicalCheckSize
+          ? {
+              investmentFocus: formValues.investmentFocus?.map((item) => item.value) ?? [],
+              typicalCheckSize: Number(formValues.typicalCheckSize) ?? null,
+            }
+          : undefined,
       oldName: name,
     };
     delete formattedValue.requestorEmail;
@@ -163,12 +154,12 @@ export default function TeamView(props) {
       requestId: props.id,
     };
     api
-      .get(`/v1/participants-request/unique-identifier?type=${data?.participantType}&identifier=${data.uniqueIdentifier}`)
+      .get(
+        `/v1/participants-request/unique-identifier?type=${data?.participantType}&identifier=${data.uniqueIdentifier}`
+      )
       .then((response) => {
         setDisableSave(false);
-        response?.data &&
-        (response.data?.isUniqueIdentifierExist ||
-          response.data?.isRequestPending)
+        response?.data && (response.data?.isUniqueIdentifierExist || response.data?.isRequestPending)
           ? setNameExists(true)
           : setNameExists(false);
       });
@@ -200,12 +191,10 @@ export default function TeamView(props) {
               'content-type': 'multipart/form-data',
             },
           };
-          image = await api
-            .post(API_ROUTE.IMAGES, formData, config)
-            .then((response) => {
-              delete values.logoFile;
-              return response?.data?.image;
-            });
+          image = await api.post(API_ROUTE.IMAGES, formData, config).then((response) => {
+            delete values.logoFile;
+            return response?.data?.image;
+          });
         }
         const configuration = {
           headers: {
@@ -224,11 +213,7 @@ export default function TeamView(props) {
           },
         };
         const res = await api
-          .put(
-            `${API_ROUTE.PARTICIPANTS_REQUEST}/${props.id}`,
-            data,
-            configuration
-          )
+          .put(`${API_ROUTE.PARTICIPANTS_REQUEST}/${props.id}`, data, configuration)
           .then((response) => {
             setSaveCompleted(true);
             setIsEditEnabled(false);
@@ -243,9 +228,7 @@ export default function TeamView(props) {
     [formValues, imageUrl, imageChanged, nameExists]
   );
 
-  function handleInputChange(
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) {
+  function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = event.target;
     setFormValues({ ...formValues, [name]: value });
   }
@@ -269,22 +252,18 @@ export default function TeamView(props) {
 
   function redirectToList() {
     const route =
-      props.status === APP_CONSTANTS.PENDING_LABEL
-        ? ROUTE_CONSTANTS.PENDING_LIST
-        : ROUTE_CONSTANTS.CLOSED_LIST;
+      props.status === APP_CONSTANTS.PENDING_LABEL ? ROUTE_CONSTANTS.PENDING_LIST : ROUTE_CONSTANTS.CLOSED_LIST;
     router.push({
       pathname: route,
     });
   }
 
   const handleFocusSubmit = (focusAreas) => {
-    const isSame =
-      JSON.stringify(formValues.focusAreas) === JSON.stringify(focusAreas);
+    const isSame = JSON.stringify(formValues.focusAreas) === JSON.stringify(focusAreas);
     if (!isSame) {
       setFormValues({ ...formValues, focusAreas: focusAreas });
     }
   };
-
 
   return (
     <>
@@ -331,6 +310,7 @@ export default function TeamView(props) {
                     isEditEnabled={isEditEnabled}
                     focusAreas={focusAreas}
                     handleFoucsAreaSave={handleFocusSubmit}
+                    isRequired={true}
                     from="Edit team"
                   />
                   <TeamStepThree
@@ -404,7 +384,7 @@ export const getServerSideProps = async (context) => {
     fundingStagesResponse,
     industryTagsResponse,
     technologiesResponse,
-    focusAreasResponse
+    focusAreasResponse,
   ] = await Promise.all([
     api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, config),
     api.get(API_ROUTE.PARTICIPANTS_REQUEST, config),
@@ -412,7 +392,7 @@ export const getServerSideProps = async (context) => {
     api.get(API_ROUTE.FUNDING_STAGE),
     api.get(API_ROUTE.INDUSTRIES),
     api.get(API_ROUTE.TECHNOLOGIES),
-    api.get(FILTER_API_ROUTES.FOCUS_AREA)
+    api.get(FILTER_API_ROUTES.FOCUS_AREA),
   ]);
 
   if (
@@ -456,6 +436,12 @@ export const getServerSideProps = async (context) => {
       telegramHandler: team.telegramHandler ?? '',
       blog: team.blog ?? '',
       officeHours: team.officeHours ?? '',
+      investmentFocus:
+        team?.investorProfile?.investmentFocus?.map((item: string) => ({
+          value: item,
+          label: item,
+        })) ?? [],
+      typicalCheckSize: team?.investorProfile?.typicalCheckSize ?? null,
       // focusAreas: team?.focusAreas ?? []
     };
     imageUrl = team?.logoUrl ?? '';
@@ -489,9 +475,8 @@ export const getServerSideProps = async (context) => {
       return { value: item.uid, label: item.title };
     });
 
-    const filteredFocusArea = focusAreasResponse?.data?.filter((item) => !item?.parentUid)
+    const filteredFocusArea = focusAreasResponse?.data?.filter((item) => !item?.parentUid);
     focusAreas = filteredFocusArea ?? [];
-
   }
 
   // Redirects user to the 404 page if response from
@@ -518,7 +503,7 @@ export const getServerSideProps = async (context) => {
       memberList,
       plnadmin,
       oldName,
-      focusAreas
+      focusAreas,
     },
   };
 };

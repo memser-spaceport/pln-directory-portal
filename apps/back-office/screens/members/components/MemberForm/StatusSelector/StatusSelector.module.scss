@@ -6,11 +6,11 @@
   flex-direction: row;
   border-radius: var(--corner-radius-xl, 12px);
   border: 1px solid var(--border-neutral-muted, rgba(27, 56, 96, 0.24));
-  background: var(--background-base-white, #FFF);
-
+  background: var(--background-base-white, #fff);
 
   /* Shadow/xl */
-  box-shadow: 0px 10px 20px -5px var(--transparent-dark-6, rgba(14, 15, 17, 0.06)), 0px 20px 65px -5px var(--transparent-dark-6, rgba(14, 15, 17, 0.06));
+  box-shadow: 0px 10px 20px -5px var(--transparent-dark-6, rgba(14, 15, 17, 0.06)),
+    0px 20px 65px -5px var(--transparent-dark-6, rgba(14, 15, 17, 0.06));
 
   position: fixed;
   bottom: 24px;
@@ -30,7 +30,7 @@
 }
 
 .message {
-  color: var(--foreground-neutral-primary, #0A0C11);
+  color: var(--foreground-neutral-primary, #0a0c11);
   font-size: 16px;
   font-style: normal;
   font-weight: 500;
@@ -39,7 +39,7 @@
   white-space: nowrap;
 
   .accent {
-    color: #1B4DFF;
+    color: #1b4dff;
   }
 }
 
@@ -65,7 +65,7 @@
   /* Button/regular/light */
   box-shadow: 0px -2px 4px 0px var(--transparent-dark-2, rgba(14, 15, 17, 0.02)) inset;
 
-  color: var(--Text-text-dark, #0F172A);
+  color: var(--Text-text-dark, #0f172a);
   font-feature-settings: 'liga' off, 'clig' off;
 
   /* Body 2/Medium */
@@ -91,13 +91,13 @@
   max-width: 72px;
 
   border-radius: 8px;
-  border: 1px solid var(--Neutral-Slate-300, #CBD5E1);
-  background: var(--Button-surface-brand-button, #156FF7);
+  border: 1px solid var(--Neutral-Slate-300, #cbd5e1);
+  background: var(--Button-surface-brand-button, #156ff7);
 
   /* Button Shadow */
   box-shadow: 0px 1px 1px 0px rgba(15, 23, 42, 0.08);
 
-  color: var(--Text-text-lightest, #FFF);
+  color: var(--Text-text-lightest, #fff);
   font-feature-settings: 'liga' off, 'clig' off;
 
   /* Body 2/Medium */
@@ -143,7 +143,7 @@
   -webkit-line-clamp: 1;
   flex: 1 0 0;
   overflow: hidden;
-  color: #8897AE;
+  color: #8897ae;
   text-overflow: ellipsis;
 
   font-size: 12px;
@@ -154,19 +154,23 @@
 }
 
 .orange {
-  color: #D97706;
+  color: #d97706;
 }
 
 .blue {
-  color: #1B4DFF;
+  color: #1b4dff;
 }
 
 .green {
-  color: #0A9952;
+  color: #0a9952;
 }
 
 .red {
-  color: #D21A0E;
+  color: #d21a0e;
+}
+
+.purple {
+  color: #7c3aed;
 }
 
 .control {
@@ -176,7 +180,7 @@
 
   border-radius: var(--corner-radius-md, 8px);
   border: 1px solid var(--action-border-neutral-light_active, rgba(14, 15, 17, 0.16));
-  background: var(--background-base-white, #FFF);
+  background: var(--background-base-white, #fff);
   width: 100%;
   max-height: 40px;
   flex-wrap: nowrap;
