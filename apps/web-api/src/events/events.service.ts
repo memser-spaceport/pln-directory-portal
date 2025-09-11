@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, UnauthorizedException, ForbiddenException, NotFoundException, ConflictException, HttpException, GatewayTimeoutException, ServiceUnavailableException, InternalServerErrorException } from '@nestjs/common';
+import axios from 'axios';
 import { PLEventLocationsService } from '../pl-events/pl-event-locations.service';
 import { LogService } from '../shared/log.service';
+import { PLEventType } from '@prisma/client';
 import { EventsToolingService } from './events-tooling.service';
 
 @Injectable()
@@ -20,6 +22,9 @@ export class EventsService {
    */
   async submitPLEvent(event, requestorEmail: string) {
     try {
+      if (event?.format != PLEventType.VIRTUAL) {
+        await this.createEventLocation(event);
+      }
       return await this.eventsToolingService.createEvent(event, requestorEmail);
     } catch (error) {
       this.handleAxiosError(error);
@@ -60,7 +65,7 @@ export class EventsService {
       throw error;
     }
   }
-  
+
   private handleAxiosError(error) {
     const url = error.config?.url || 'unknown URL';
     this.logger.error(`Error occurred while submitting event: ${error.message}`);

@@ -11,25 +11,12 @@ import { PLEventSyncService } from './pl-event-sync.service';
 import { AuthModule } from '../auth/auth.module';
 import { TeamsModule } from '../teams/teams.module';
 import { AdminModule } from '../admin/admin.module';
-import { PLEventLocationAssociationService } from './pl-event-location-association.service';
 
 import { EventsModule } from '../events/events.module';
 @Module({
   controllers: [PLEventsController],
-  providers: [
-    PLEventsService,
-    PLEventLocationsService,
-    PLEventGuestsService,
-    JwtService,
-    PLEventSyncService,
-    PLEventLocationAssociationService,
-  ],
-  exports: [
-    PLEventsService,
-    PLEventLocationsService,
-    PLEventGuestsService,
-    PLEventLocationAssociationService,
-  ],
+  providers: [PLEventsService, PLEventLocationsService, PLEventGuestsService, JwtService, PLEventSyncService],
+  exports: [PLEventsService, PLEventLocationsService, PLEventGuestsService],
   imports: [
     forwardRef(() => MembersModule),
     forwardRef(() => AdminModule),
