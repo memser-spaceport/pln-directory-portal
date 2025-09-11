@@ -8,11 +8,7 @@ import { InputField } from '@protocol-labs-network/ui';
 import api from '../utils/api';
 import { ApprovalLayout } from '../layout/approval-layout';
 import { FooterButtons } from '../components/footer-buttons/footer-buttons';
-import APP_CONSTANTS, {
-  API_ROUTE,
-  ENROLLMENT_TYPE,
-  ROUTE_CONSTANTS,
-} from '../utils/constants';
+import APP_CONSTANTS, { API_ROUTE, ENROLLMENT_TYPE, ROUTE_CONSTANTS } from '../utils/constants';
 import router from 'next/router';
 import Loader from '../components/common/loader';
 import { useNavbarContext } from '../context/navbar-context';
@@ -86,13 +82,7 @@ export default function MemberView(props) {
   const [formValues, setFormValues] = useState<IFormValues>(props?.formValues);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [resetImg, setResetImg] = useState(false);
-  const {
-    setIsOpenRequest,
-    setMemberList,
-    setTeamList,
-    setIsTeamActive,
-    setShowMenu,
-  } = useNavbarContext();
+  const { setIsOpenRequest, setMemberList, setTeamList, setIsTeamActive, setShowMenu } = useNavbarContext();
   setIsTeamActive(false);
   setMemberList(props.memberList);
   setTeamList(props.teamList);
@@ -105,7 +95,7 @@ export default function MemberView(props) {
 
   const handleResetImg = () => {
     setResetImg(false);
-  }
+  };
 
   function formatData() {
     const teamAndRoles = structuredClone(formValues.teamAndRoles);
@@ -131,15 +121,13 @@ export default function MemberView(props) {
       officeHours: formValues.officeHours?.trim() === '' ? null : formValues.officeHours?.trim(),
       comments: formValues.comments?.trim(),
       teamOrProjectURL: formValues.teamOrProjectURL,
-      plnStartDate: formValues.plnStartDate
-        ? new Date(formValues.plnStartDate)?.toISOString()
-        : null,
+      plnStartDate: formValues.plnStartDate ? new Date(formValues.plnStartDate)?.toISOString() : null,
       skills: skills,
       teamAndRoles: formattedTeamAndRoles,
       openToWork: formValues.openToWork,
       projectContributions: formValues.projectContributions,
       oldName: name,
-      isSubscribedToNewsletter: formValues.isSubscribedToNewsletter
+      isSubscribedToNewsletter: formValues.isSubscribedToNewsletter,
     };
     delete formattedData.requestorEmail;
     return formattedData;
@@ -153,12 +141,12 @@ export default function MemberView(props) {
       requestId: props.id,
     };
     api
-      .get(`/v1/participants-request/unique-identifier?type=${data?.participantType}&identifier=${data?.uniqueIdentifier}`)
+      .get(
+        `/v1/participants-request/unique-identifier?type=${data?.participantType}&identifier=${data?.uniqueIdentifier}`
+      )
       .then((response) => {
         setDisableSave(false);
-        response?.data &&
-        (response.data?.isUniqueIdentifierExist ||
-          response.data?.isRequestPending)
+        response?.data && (response.data?.isUniqueIdentifierExist || response.data?.isRequestPending)
           ? setEmailExists(true)
           : setEmailExists(false);
       });
@@ -194,11 +182,9 @@ export default function MemberView(props) {
               'content-type': 'multipart/form-data',
             },
           };
-          image = await api
-            .post(API_ROUTE.IMAGES, formData, config)
-            .then((response) => {
-              return response?.data?.image;
-            });
+          image = await api.post(API_ROUTE.IMAGES, formData, config).then((response) => {
+            return response?.data?.image;
+          });
         }
 
         delete values?.imageFile;
@@ -213,32 +199,21 @@ export default function MemberView(props) {
             imageUid: image?.uid ?? values.imageUid,
             imageUrl: image?.url ?? imageUrl,
           },
-        };   
+        };
         const configuration = {
           headers: {
             authorization: `Bearer ${props.plnadmin}`,
           },
         };
 
-        if(props?.from === "approved") {
-          await api.patch(
-            `${API_ROUTE.ADMIN_APPROVAL}/${props.id}`,
-            data,
-            configuration
-          )
-          .then((response) => {
+        if (props?.from === 'approved') {
+          await api.patch(`${API_ROUTE.ADMIN_APPROVAL}/${props.id}`, data, configuration).then((response) => {
             setSaveCompleted(true);
             setIsEditEnabled(false);
             setResetImg(true);
           });
         } else {
-          await api
-          .put(
-            `${API_ROUTE.PARTICIPANTS_REQUEST}/${props.id}`,
-            data,
-            configuration
-          )
-          .then((response) => {
+          await api.put(`${API_ROUTE.PARTICIPANTS_REQUEST}/${props.id}`, data, configuration).then((response) => {
             setSaveCompleted(true);
             setIsEditEnabled(false);
             setResetImg(true);
@@ -257,10 +232,7 @@ export default function MemberView(props) {
 
   function handleAddNewRole() {
     const newRoles = formValues.teamAndRoles;
-    const counter =
-      newRoles.length == 0
-        ? 1
-        : Math.max(...newRoles.map((item) => item.rowId + 1));
+    const counter = newRoles.length == 0 ? 1 : Math.max(...newRoles.map((item) => item.rowId + 1));
     newRoles.push({ teamUid: '', teamTitle: '', role: '', rowId: counter });
     setFormValues({ ...formValues, teamAndRoles: newRoles });
   }
@@ -280,9 +252,7 @@ export default function MemberView(props) {
     setFormValues({ ...formValues, teamAndRoles: newTeamAndRoles });
   }
 
-  function handleInputChange(
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) {
+  function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = event.target;
     setFormValues({ ...formValues, [name]: value });
   }
@@ -305,17 +275,13 @@ export default function MemberView(props) {
   };
 
   function handleDeleteRolesRow(rowId) {
-    const newRoles = formValues.teamAndRoles.filter(
-      (item) => item.rowId != rowId
-    );
+    const newRoles = formValues.teamAndRoles.filter((item) => item.rowId != rowId);
     setFormValues({ ...formValues, teamAndRoles: newRoles });
   }
 
   function redirectToList() {
     const route =
-      props.status === APP_CONSTANTS.PENDING_LABEL
-        ? ROUTE_CONSTANTS.PENDING_LIST
-        : ROUTE_CONSTANTS.CLOSED_LIST;
+      props.status === APP_CONSTANTS.PENDING_LABEL ? ROUTE_CONSTANTS.PENDING_LIST : ROUTE_CONSTANTS.CLOSED_LIST;
     router.push({
       pathname: route,
     });
@@ -380,11 +346,7 @@ export default function MemberView(props) {
                   isEditEnabled={isEditEnabled}
                   referenceUid={props.referenceUid}
                 />
-                <MemberSocialForm
-                  formValues={formValues}
-                  onChange={handleInputChange}
-                  isEditEnabled={isEditEnabled}
-                />
+                <MemberSocialForm formValues={formValues} onChange={handleInputChange} isEditEnabled={isEditEnabled} />
               </div>
             </div>
           </div>
@@ -408,7 +370,11 @@ export default function MemberView(props) {
 }
 
 export const getServerSideProps = async (context) => {
-  const { id, from, backLink = ROUTE_CONSTANTS.PENDING_LIST } = context.query as {
+  const {
+    id,
+    from,
+    backLink = ROUTE_CONSTANTS.PENDING_LIST,
+  } = context.query as {
     id: string;
     backLink: string;
     from: string;
@@ -437,14 +403,8 @@ export const getServerSideProps = async (context) => {
   let teamList = [];
   let oldName = '';
 
-  
-  if (from !== "approved") {
-    const [
-      requestDetailResponse,
-      allRequestResponse,
-      memberTeamsResponse,
-      skillsResponse,
-    ] = await Promise.all([
+  if (from !== 'approved') {
+    const [requestDetailResponse, allRequestResponse, memberTeamsResponse, skillsResponse] = await Promise.all([
       api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, config),
       api.get(API_ROUTE.PARTICIPANTS_REQUEST, config),
       api.get(API_ROUTE.TEAMS),
@@ -457,12 +417,8 @@ export const getServerSideProps = async (context) => {
       memberTeamsResponse.status === 200 &&
       skillsResponse.status === 200
     ) {
-      teamList = allRequestResponse?.data?.filter(
-        (item) => item.participantType === ENROLLMENT_TYPE.TEAM
-      );
-      memberList = allRequestResponse?.data?.filter(
-        (item) => item.participantType === ENROLLMENT_TYPE.MEMBER
-      );
+      teamList = allRequestResponse?.data?.filter((item) => item.participantType === ENROLLMENT_TYPE.TEAM);
+      memberList = allRequestResponse?.data?.filter((item) => item.participantType === ENROLLMENT_TYPE.MEMBER);
 
       let counter = 1;
       referenceUid = requestDetailResponse?.data?.referenceUid ?? '';
@@ -473,7 +429,7 @@ export const getServerSideProps = async (context) => {
         requestData?.teamAndRoles?.length &&
         requestData?.teamAndRoles?.map((team) => {
           return {
-            role: team.role ?? "",
+            role: team.role ?? '',
             teamUid: team.teamUid,
             teamTitle: team.teamTitle,
             rowId: counter++,
@@ -499,16 +455,24 @@ export const getServerSideProps = async (context) => {
         officeHours: requestData?.officeHours ?? '',
         requestorEmail: requestDetailResponse?.data?.requesterEmailId ?? '',
         comments: requestData?.comments ?? '',
-        teamAndRoles: teamAndRoles || [
-          // { teamUid: '', teamTitle: '', role: '', rowId: 1 },
-        ],
+        teamAndRoles:
+          teamAndRoles ||
+          [
+            // { teamUid: '', teamTitle: '', role: '', rowId: 1 },
+          ],
         teamOrProjectURL: requestData?.teamOrProjectURL ?? '',
-        skills: requestData?.skills?.map((item) => {
-          return { value: item.uid, label: item.title };
-        }) || [],
+        skills:
+          requestData?.skills?.map((item) => {
+            return { value: item.uid, label: item.title };
+          }) || [],
         openToWork: requestData?.openToWork ?? '',
         projectContributions: requestData?.projectContributions ?? [],
-        isSubscribedToNewsletter: requestData?.isSubscribedToNewsletter ?? false
+        isSubscribedToNewsletter: requestData?.isSubscribedToNewsletter ?? false,
+        accessLevel: requestData?.accessLevel ?? '',
+        investorProfile: requestData?.investorProfile ?? {
+          investmentFocus: [],
+          typicalCheckSize: '',
+        },
       };
       imageUrl = requestData?.imageUrl ?? '';
 
@@ -528,10 +492,11 @@ export const getServerSideProps = async (context) => {
           .filter((item) => item.status !== APP_CONSTANTS.PENDING_LABEL);
       }
 
-      teams = Array.isArray(memberTeamsResponse?.data) ?
-        memberTeamsResponse?.data?.map((item) => {
-          return { value: item.uid, label: item.name };
-        }) : [];
+      teams = Array.isArray(memberTeamsResponse?.data)
+        ? memberTeamsResponse?.data?.map((item) => {
+            return { value: item.uid, label: item.name };
+          })
+        : [];
       skills = skillsResponse?.data?.map((item) => {
         return { value: item.uid, label: item.title };
       });
@@ -544,15 +509,15 @@ export const getServerSideProps = async (context) => {
     if (approvedApiResponse.status === 200) {
       const requestData = approvedApiResponse?.data;
       const teamAndRoles =
-    requestData?.teamMemberRoles?.length &&
-    requestData?.teamMemberRoles?.map((team) => {
-      return {
-        role: team.role ?? "",
-        teamUid: team.teamUid,
-        teamTitle: team.team.name,
-        rowId: counter++,
-      };
-    });
+        requestData?.teamMemberRoles?.length &&
+        requestData?.teamMemberRoles?.map((team) => {
+          return {
+            role: team.role ?? '',
+            teamUid: team.teamUid,
+            teamTitle: team.team.name,
+            rowId: counter++,
+          };
+        });
       formValues = {
         name: requestData?.name,
         email: requestData?.email,
@@ -571,7 +536,8 @@ export const getServerSideProps = async (context) => {
         telegramHandler: requestData?.telegramHandler ?? '',
         officeHours: requestData?.officeHours ?? '',
         comments: requestData?.comments ?? '',
-        teamAndRoles: teamAndRoles || 
+        teamAndRoles:
+          teamAndRoles ||
           [
             // { teamUid: '', teamTitle: '', role: '', rowId: 1 },
           ],
@@ -581,33 +547,38 @@ export const getServerSideProps = async (context) => {
         }),
         openToWork: requestData?.openToWork ?? '',
         projectContributions: requestData?.projectContributions ?? [],
-        isSubscribedToNewsletter: requestData?.isSubscribedToNewsletter ?? false
+        isSubscribedToNewsletter: requestData?.isSubscribedToNewsletter ?? false,
+        accessLevel: requestData?.accessLevel ?? '',
+        investorProfile: requestData?.investorProfile ?? {
+          investmentFocus: [],
+          typicalCheckSize: '',
+        },
       };
-      imageUrl = requestData?.image?.url ?? '',
+      imageUrl = requestData?.image?.url ?? '';
       teamList = approvedApiResponse?.data?.teamList ?? [];
       memberList = approvedApiResponse?.data?.memberList ?? [];
       teams = approvedApiResponse?.data?.teams ?? [];
       skills = skillsResponse?.data?.map((item) => {
         return { value: item.uid, label: item.title };
       });
-      status= APP_CONSTANTS.PENDING_LABEL;
+      status = APP_CONSTANTS.PENDING_LABEL;
     }
   }
 
-    return {
-      props: {
-        formValues,
-        teams,
-        skills,
-        id,
-        // referenceUid,
-        imageUrl,
-        status,
-        backLink,
-        teamList,
-        memberList,
-        plnadmin,
-        oldName,
-      },
-    };
+  return {
+    props: {
+      formValues,
+      teams,
+      skills,
+      id,
+      // referenceUid,
+      imageUrl,
+      status,
+      backLink,
+      teamList,
+      memberList,
+      plnadmin,
+      oldName,
+    },
   };
+};
