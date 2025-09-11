@@ -158,7 +158,7 @@ export class SearchService {
       // Unified forum threads index: each doc is a whole thread
       forumThreads: [
         'forum_thread',
-        ['name', 'topicTitle', 'topicSlug', 'topicUrl', 'rootPost.content', 'replies.content', 'rootPost.author.name'],
+        ['name', 'topicTitle', 'topicSlug', 'topicUrl', 'rootPost.content', 'replies.content', 'rootPost.author.name', 'replies.author.name'],
       ],
     };
 
@@ -387,7 +387,7 @@ export class SearchService {
    */
   async searchForumPosts(query: string, limit = 10): Promise<any[]> {
     const index = 'forum_thread';
-    const fields = ['name', 'topicTitle', 'topicSlug', 'topicUrl', 'rootPost.content', 'replies.content', 'rootPost.author.name'];
+    const fields = ['name', 'topicTitle', 'topicSlug', 'topicUrl', 'rootPost.content', 'replies.content', 'rootPost.author.name', 'replies.author.name'];
     const queryBody = this.buildLooseQuery(fields, query);
 
     const res = await this.openSearchService.searchWithLimit(index, limit, {
