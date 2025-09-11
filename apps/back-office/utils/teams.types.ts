@@ -42,6 +42,8 @@ export interface IFormValues {
   blog: string;
   officeHours: string;
   focusAreas?: TFocusArea[];
+  investmentFocus: DropDownProps[];
+  typicalCheckSize: string;
 }
 
 export type TFocusArea = {
@@ -54,4 +56,4 @@ export type TFocusArea = {
   parents: any[];
   children: TFocusArea[];
   teamAncestorFocusAreas: ITeam[];
-}
+};

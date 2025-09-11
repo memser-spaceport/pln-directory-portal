@@ -840,6 +840,13 @@ export class MemberService {
           },
         },
         accessLevelUpdatedAt: true,
+        investorProfile: {
+          select: {
+            uid: true,
+            investmentFocus: true,
+            typicalCheckSize: true,
+          },
+        },
       },
       skip: (page - 1) * limit,
       take: limit,
