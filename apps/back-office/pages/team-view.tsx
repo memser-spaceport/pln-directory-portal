@@ -134,10 +134,10 @@ export default function TeamView(props) {
       membershipSources: formattedMembershipSource,
       technologies: formattedtechnologies,
       investorProfile:
-        formValues.investmentFocus?.length > 0 || formValues.typicalCheckSize?.trim()
+        formValues.investmentFocus?.length > 0 || formValues.typicalCheckSize
           ? {
               investmentFocus: formValues.investmentFocus?.map((item) => item.value) ?? [],
-              typicalCheckSize: formValues.typicalCheckSize?.trim() ?? '',
+              typicalCheckSize: Number(formValues.typicalCheckSize) ?? null,
             }
           : undefined,
       oldName: name,
@@ -441,7 +441,7 @@ export const getServerSideProps = async (context) => {
           value: item,
           label: item,
         })) ?? [],
-      typicalCheckSize: team?.investorProfile?.typicalCheckSize ?? '',
+      typicalCheckSize: team?.investorProfile?.typicalCheckSize ?? null,
       // focusAreas: team?.focusAreas ?? []
     };
     imageUrl = team?.logoUrl ?? '';

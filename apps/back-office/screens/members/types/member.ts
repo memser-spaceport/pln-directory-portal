@@ -33,6 +33,7 @@ export type TMemberForm = {
   officeHours: string;
   investorProfile?: {
     investmentFocus: { label: string; value: string }[];
-    typicalCheckSize: string;
+    typicalCheckSize: number;
+    secRulesAccepted: boolean;
   };
 };

@@ -163,6 +163,11 @@ export const MemberFilterQueryParams = z.object({
   sort: z.enum(['name:asc', 'name:desc']).optional(),
   page: z.number().positive().optional(),
   limit: z.number().positive().max(100).optional(),
+  // Investor-related filters
+  isInvestor: z.boolean().optional(),
+  minTypicalCheckSize: z.number().min(0).optional(),
+  maxTypicalCheckSize: z.number().min(0).optional(),
+  investmentFocus: z.array(z.string()).optional(),
 });
 
 export const AutocompleteQueryParams = z.object({

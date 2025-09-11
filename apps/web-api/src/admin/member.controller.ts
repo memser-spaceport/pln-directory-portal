@@ -6,15 +6,16 @@ import {
   AccessLevelCounts,
   CreateMemberDto,
   RequestMembersDto,
-  UpdateAccessLevelDto, UpdateMemberDto
+  UpdateAccessLevelDto,
+  UpdateMemberDto,
 } from 'libs/contracts/src/schema/admin-member';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { Member } from '@prisma/client';
-import {MemberService} from "./member.service";
+import { MemberService } from './member.service';
 
 @Controller('v1/admin/members')
 export class MemberController {
-  constructor(private readonly memberService: MemberService) { }
+  constructor(private readonly memberService: MemberService) {}
 
   @Get()
   @UseGuards(AdminAuthGuard)
@@ -58,7 +59,7 @@ export class MemberController {
    * @param body - array of memberIds to be updated.
    * @returns Array of updation status of the provided memberIds.
    */
-  @Post("/")
+  @Post('/')
   @UseGuards(AdminAuthGuard)
   async verifyMembers(@Body() body) {
     const requestor = await this.memberService.findMemberByRole();
@@ -72,12 +73,11 @@ export class MemberController {
    * @param body - participation request data with updated member details
    * @returns updated member object
    */
-  @Patch("/:uid")
+  @Patch('/:uid')
   @UseGuards(AdminAuthGuard)
   async updateMemberAndVerify(@Param('uid') uid, @Body() participantsRequest) {
     const requestor = await this.memberService.findMemberByRole();
     const requestorEmail = requestor?.email ?? '';
     return await this.memberService.updateMemberFromParticipantsRequest(uid, participantsRequest, requestorEmail, true);
   }
-
 }

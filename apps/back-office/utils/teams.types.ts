@@ -43,7 +43,7 @@ export interface IFormValues {
   officeHours: string;
   focusAreas?: TFocusArea[];
   investmentFocus: DropDownProps[];
-  typicalCheckSize: string;
+  typicalCheckSize: number;
 }
 
 export type TFocusArea = {

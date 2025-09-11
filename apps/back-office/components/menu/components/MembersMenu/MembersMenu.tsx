@@ -54,6 +54,14 @@ export const MembersMenu = () => {
             <CaretIcon />
           </div>
         </Link>
+        <Link href="/members?filter=level56" passHref>
+          <div className={s.menuItem}>
+            <Level2Icon />
+            <span className={s.menuItemLabel}>5-6 Level</span>
+            <span className={s.menuItemCount}>{(counts?.L5 ?? 0) + (counts?.L6 ?? 0)}</span>
+            <CaretIcon />
+          </div>
+        </Link>
         <Link href="/members?filter=rejected" passHref>
           <div className={s.menuItem}>
             <RejectedIcon />

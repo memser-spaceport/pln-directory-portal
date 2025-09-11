@@ -471,7 +471,8 @@ export const getServerSideProps = async (context) => {
         accessLevel: requestData?.accessLevel ?? '',
         investorProfile: requestData?.investorProfile ?? {
           investmentFocus: [],
-          typicalCheckSize: '',
+          typicalCheckSize: null,
+          secRulesAccepted: false,
         },
       };
       imageUrl = requestData?.imageUrl ?? '';
@@ -551,7 +552,8 @@ export const getServerSideProps = async (context) => {
         accessLevel: requestData?.accessLevel ?? '',
         investorProfile: requestData?.investorProfile ?? {
           investmentFocus: [],
-          typicalCheckSize: '',
+          typicalCheckSize: null,
+          secRulesAccepted: false,
         },
       };
       imageUrl = requestData?.image?.url ?? '';

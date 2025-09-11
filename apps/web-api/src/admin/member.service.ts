@@ -263,6 +263,8 @@ export class MemberService {
           create: {
             investmentFocus: memberData.investorProfile.investmentFocus || [],
             typicalCheckSize: memberData.investorProfile.typicalCheckSize,
+            secRulesAccepted: memberData.investorProfile.secRulesAccepted,
+            secRulesAcceptedAt: memberData.investorProfile.secRulesAccepted ? new Date() : null,
           },
         };
       } else {
@@ -295,12 +297,18 @@ export class MemberService {
 
     const existingMember = await tx.member.findUnique({
       where: { uid: memberUid },
-      select: { investorProfileId: true },
+      select: { investorProfileId: true, investorProfile: true },
     });
 
     if (!existingMember) {
       throw new NotFoundException('Member not found');
     }
+
+    const secRulesAcceptedAt =
+      investorProfileData.secRulesAccepted &&
+      existingMember.investorProfile?.secRulesAccepted !== investorProfileData.secRulesAccepted
+        ? new Date()
+        : existingMember.investorProfile?.secRulesAcceptedAt;
 
     if (existingMember.investorProfileId) {
       // Update existing investor profile
@@ -309,6 +317,8 @@ export class MemberService {
         data: {
           investmentFocus: investorProfileData.investmentFocus || [],
           typicalCheckSize: investorProfileData.typicalCheckSize,
+          secRulesAccepted: investorProfileData.secRulesAccepted,
+          secRulesAcceptedAt,
         },
       });
     } else {
@@ -317,6 +327,8 @@ export class MemberService {
         data: {
           investmentFocus: investorProfileData.investmentFocus || [],
           typicalCheckSize: investorProfileData.typicalCheckSize,
+          secRulesAccepted: investorProfileData.secRulesAccepted,
+          secRulesAcceptedAt,
           member: { connect: { uid: memberUid } },
         },
       });
@@ -938,11 +950,7 @@ export class MemberService {
     // Notify users based on the new access level
     if (result.count > 0) {
       // Send approval emails for L2, L3, L4
-      if (
-        [AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6].includes(
-          accessLevel as AccessLevel
-        )
-      ) {
+      if ([AccessLevel.L2, AccessLevel.L3, AccessLevel.L4].includes(accessLevel as AccessLevel)) {
         for (const member of notApprovedMembers) {
           if (!member.email) {
             this.logger.error(
@@ -993,6 +1001,21 @@ export class MemberService {
 
       const { isVerified, plnFriend } = this.resolveFlagsFromAccessLevel(memberData.accessLevel as AccessLevel);
 
+      let investorProfileId: string | null = null;
+
+      if (memberData.investorProfile) {
+        // Create investorProfile first and get its id
+        const investorProfile = await tx.investorProfile.create({
+          data: {
+            investmentFocus: memberData.investorProfile.investmentFocus,
+            typicalCheckSize: memberData.investorProfile.typicalCheckSize,
+            secRulesAccepted: memberData.investorProfile.secRulesAccepted,
+            secRulesAcceptedAt: memberData.investorProfile.secRulesAccepted ? new Date() : null,
+          },
+        });
+        investorProfileId = investorProfile.uid;
+      }
+
       const newMember = {
         name: memberData.name,
         email: memberData.email.toLowerCase().trim(),
@@ -1035,24 +1058,20 @@ export class MemberService {
             recommendationsEnabled: memberData.accessLevel === AccessLevel.L4,
           },
         },
-        ...(memberData.investorProfile && {
-          investorProfile: {
-            create: {
-              investmentFocus: memberData.investorProfile.investmentFocus,
-              typicalCheckSize: memberData.investorProfile.typicalCheckSize,
-            },
-          },
-        }),
+        ...(investorProfileId && { investorProfileId }),
       };
 
       createdMember = await this.createMember(newMember, tx);
 
-      await this.notificationService.notifyForMemberCreationApproval(
-        createdMember.name,
-        createdMember.uid,
-        createdMember.email,
-        memberData.accessLevel === AccessLevel.L4
-      );
+      if ([AccessLevel.L2, AccessLevel.L3, AccessLevel.L4].includes(memberData.accessLevel as AccessLevel)) {
+        await this.notificationService.notifyForMemberCreationApproval(
+          createdMember.name,
+          createdMember.uid,
+          createdMember.email,
+          memberData.accessLevel === AccessLevel.L4
+        );
+      }
+
       await this.membersHooksService.postCreateActions(createdMember, memberData.email);
     });
     return createdMember;
@@ -1111,8 +1130,14 @@ export class MemberService {
       if (investorProfile) {
         const existingMember = await tx.member.findUnique({
           where: { uid },
-          select: { investorProfileId: true },
+          select: { investorProfileId: true, investorProfile: true },
         });
+
+        const secRulesAcceptedAt =
+          investorProfile.secRulesAccepted &&
+          existingMember?.investorProfile?.secRulesAccepted !== investorProfile.secRulesAccepted
+            ? new Date()
+            : existingMember?.investorProfile?.secRulesAcceptedAt;
 
         if (existingMember?.investorProfileId) {
           // Update existing investor profile
@@ -1121,6 +1146,8 @@ export class MemberService {
             data: {
               investmentFocus: investorProfile.investmentFocus,
               typicalCheckSize: investorProfile.typicalCheckSize,
+              secRulesAccepted: investorProfile.secRulesAccepted,
+              secRulesAcceptedAt,
             },
           });
         } else {
@@ -1129,6 +1156,8 @@ export class MemberService {
             data: {
               investmentFocus: investorProfile.investmentFocus,
               typicalCheckSize: investorProfile.typicalCheckSize,
+              secRulesAccepted: investorProfile.secRulesAccepted,
+              secRulesAcceptedAt,
               memberUid: uid,
             },
           });

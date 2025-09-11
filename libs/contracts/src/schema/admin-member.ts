@@ -70,8 +70,9 @@ export const CreateMemberSchema = z.object({
 
   investorProfile: z
     .object({
+      secRulesAccepted: z.boolean().optional(),
       investmentFocus: z.array(z.string()),
-      typicalCheckSize: z.string().nullable(),
+      typicalCheckSize: z.number().nullable(),
     })
     .optional(),
 });
@@ -112,8 +113,9 @@ export const UpdateMemberSchema = z.object({
 
   investorProfile: z
     .object({
+      secRulesAccepted: z.boolean().optional(),
       investmentFocus: z.array(z.string()),
-      typicalCheckSize: z.string().nullable(),
+      typicalCheckSize: z.number().nullable(),
     })
     .optional(),
 });

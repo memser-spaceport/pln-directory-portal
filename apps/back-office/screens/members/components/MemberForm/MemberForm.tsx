@@ -42,7 +42,8 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
       twitter: '',
       investorProfile: {
         investmentFocus: [],
-        typicalCheckSize: '',
+        typicalCheckSize: null,
+        secRulesAccepted: false,
       },
       teamsAndRoles: [],
     },

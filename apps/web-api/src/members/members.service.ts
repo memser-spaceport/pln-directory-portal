@@ -960,6 +960,7 @@ export class MembersService {
           create: {
             investmentFocus: memberData.investorProfile.investmentFocus || [],
             typicalCheckSize: memberData.investorProfile.typicalCheckSize,
+            secRulesAccepted: memberData.investorProfile.secRulesAccepted,
           },
         };
       } else {
@@ -992,12 +993,18 @@ export class MembersService {
 
     const existingMember = await tx.member.findUnique({
       where: { uid: memberUid },
-      select: { investorProfileId: true },
+      select: { investorProfileId: true, investorProfile: true },
     });
 
     if (!existingMember) {
       throw new NotFoundException('Member not found');
     }
+
+    const secRulesAcceptedAt =
+      investorProfileData.secRulesAccepted &&
+      existingMember.investorProfile?.secRulesAccepted !== investorProfileData.secRulesAccepted
+        ? new Date()
+        : existingMember.investorProfile?.secRulesAcceptedAt;
 
     if (existingMember.investorProfileId) {
       // Update existing investor profile
@@ -1006,6 +1013,8 @@ export class MembersService {
         data: {
           investmentFocus: investorProfileData.investmentFocus || [],
           typicalCheckSize: investorProfileData.typicalCheckSize,
+          secRulesAccepted: investorProfileData.secRulesAccepted,
+          secRulesAcceptedAt,
         },
       });
     } else {
@@ -1014,6 +1023,8 @@ export class MembersService {
         data: {
           investmentFocus: investorProfileData.investmentFocus || [],
           typicalCheckSize: investorProfileData.typicalCheckSize,
+          secRulesAccepted: investorProfileData.secRulesAccepted,
+          secRulesAcceptedAt,
           member: { connect: { uid: memberUid } },
         },
       });
@@ -1725,7 +1736,7 @@ export class MembersService {
 
   /**
    * Advanced member search with filtering
-   * @param filters - Filter parameters including office hours, topics, roles, and sorting
+   * @param filters - Filter parameters including office hours, topics, roles, investor filters, and sorting
    * @returns Paginated search results with members and metadata
    */
   async searchMembers(filters: {
@@ -1736,6 +1747,11 @@ export class MembersService {
     sort?: 'name:asc' | 'name:desc';
     page?: number;
     limit?: number;
+    // Investor-related filters
+    isInvestor?: boolean;
+    minTypicalCheckSize?: number;
+    maxTypicalCheckSize?: number;
+    investmentFocus?: string[];
   }) {
     const page = filters.page || 1;
     const limit = Math.min(filters.limit || 20, 100);
@@ -1896,6 +1912,85 @@ export class MembersService {
       });
     }
 
+    // Investor filters
+    if (filters.isInvestor) {
+      whereConditions.push({
+        AND: [
+          {
+            accessLevel: {
+              in: ['L5', 'L6'],
+            },
+          },
+          {
+            investorProfile: {
+              secRulesAccepted: true,
+            },
+          },
+        ],
+      });
+    }
+
+    // Typical check size filters
+    if (
+      (filters.minTypicalCheckSize && Number(filters.minTypicalCheckSize) > 0) ||
+      (filters.maxTypicalCheckSize && Number(filters.maxTypicalCheckSize) > 0)
+    ) {
+      const checkSizeFilter: any = {};
+
+      if (filters.minTypicalCheckSize && Number(filters.minTypicalCheckSize) > 0) {
+        checkSizeFilter.gte = Number(filters.minTypicalCheckSize);
+      }
+
+      if (filters.maxTypicalCheckSize && Number(filters.maxTypicalCheckSize) > 0) {
+        checkSizeFilter.lte = Number(filters.maxTypicalCheckSize);
+      }
+
+      whereConditions.push({
+        investorProfile: {
+          typicalCheckSize: checkSizeFilter,
+        },
+      });
+    }
+
+    // Investment focus filter - using substring matching
+    if (filters.investmentFocus && filters.investmentFocus.length > 0) {
+      // Ensure investmentFocus is always an array (query params might come as string)
+      const focusArray = Array.isArray(filters.investmentFocus) ? filters.investmentFocus : [filters.investmentFocus];
+
+      // Get member IDs that match investment focus using substring matching
+      const matchingMemberIds = await this.prisma.$queryRaw<{ id: number }[]>`
+        SELECT DISTINCT m.id FROM "Member" m
+        INNER JOIN "InvestorProfile" ip ON m."investorProfileId" = ip.uid
+        WHERE ${Prisma.raw(
+          focusArray
+            .map(
+              (focus) => `
+              EXISTS (
+                SELECT 1 FROM unnest(ip."investmentFocus") AS focus_item 
+                WHERE LOWER(focus_item) LIKE LOWER('%${focus.replace(/'/g, "''")}%')
+              )
+            `
+            )
+            .join(' OR ')
+        )}
+      `;
+
+      if (matchingMemberIds.length > 0) {
+        whereConditions.push({
+          id: {
+            in: matchingMemberIds.map((row) => row.id),
+          },
+        });
+      } else {
+        // If no members match, add an impossible condition to return no results
+        whereConditions.push({
+          id: {
+            in: [],
+          },
+        });
+      }
+    }
+
     const where: Prisma.MemberWhereInput = {
       AND: whereConditions,
     };
@@ -1955,13 +2050,29 @@ export class MembersService {
                 title: true,
               },
             },
+            investorProfile: {
+              select: {
+                investmentFocus: true,
+                typicalCheckSize: true,
+                secRulesAccepted: true,
+                secRulesAcceptedAt: true,
+              },
+            },
           },
         }),
         this.prisma.member.count({ where }),
       ]);
 
+      // Filter investorProfile based on access level (only show for L5 and L6 members)
+      const filteredMembers = members.map((member) => {
+        if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
+          return { ...member, investorProfile: null };
+        }
+        return member;
+      });
+
       return {
-        members,
+        members: filteredMembers,
         total,
         page: Number(page),
         hasMore: page * limit < total,
@@ -2504,6 +2615,8 @@ export class MembersService {
             select: {
               investmentFocus: true,
               typicalCheckSize: true,
+              secRulesAccepted: true,
+              secRulesAcceptedAt: true,
             },
           },
         },

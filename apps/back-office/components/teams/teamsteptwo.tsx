@@ -175,12 +175,12 @@ export default function TeamStepTwo(props) {
           Typical Check Size
         </label>
         <input
-          type="text"
+          type="number"
           id="typicalCheckSize"
           name="typicalCheckSize"
-          value={values.typicalCheckSize || ''}
+          value={values.typicalCheckSize}
           onChange={handleInputChange}
-          placeholder="e.g., $50,000 - $500,000"
+          placeholder="e.g., $50,000"
           disabled={!props.isEditEnabled}
           className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
         />

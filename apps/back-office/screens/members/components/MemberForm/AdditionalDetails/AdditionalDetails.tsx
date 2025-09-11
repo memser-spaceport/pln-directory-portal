@@ -3,6 +3,7 @@ import { FormMultiselectField } from '../../../../../components/FormMultiselectF
 import { FormTagInput } from '../../../../../components/FormTagInput';
 import { useMemberFormOptions } from '../../../../../hooks/members/useMemberFormOptions';
 import { FormField } from '../../../../../components/FormField';
+import { FormCheckboxField } from '../../../../../components/FormCheckboxField';
 import { FormSelectField } from '../../../../../components/FormSelectField';
 import { useFieldArray, useFormContext } from 'react-hook-form';
 import { TMemberForm } from '../../../types/member';
@@ -42,17 +43,17 @@ export const AdditionalDetails = () => {
       {isInvestor && (
         <div className="flex flex-col gap-4">
           <h3 className="text-lg font-semibold text-gray-900">Investor Profile</h3>
+          <FormCheckboxField
+            name="investorProfile.secRulesAccepted"
+            label="I'm an accredited investor under SEC rules"
+          />
           <FormTagInput
             name="investorProfile.investmentFocus"
             placeholder="Type and press enter to add investment focus areas"
             label="Investment Focus"
             description="Add custom investment focus areas (e.g., AI, Web3, DeFi)"
           />
-          <FormField
-            name="investorProfile.typicalCheckSize"
-            label="Typical Check Size"
-            placeholder="e.g., $50,000 - $500,000"
-          />
+          <FormField name="investorProfile.typicalCheckSize" label="Typical Check Size" placeholder="e.g., $50,000" />
         </div>
       )}
 

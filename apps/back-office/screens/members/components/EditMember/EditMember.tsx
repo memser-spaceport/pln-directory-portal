@@ -69,7 +69,7 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
           telegramHandler: string;
           officeHours: string;
           githubHandler: string;
-          investorProfile?: { investmentFocus: string[]; typicalCheckSize: string };
+          investorProfile?: { investmentFocus: string[]; typicalCheckSize: number; secRulesAccepted: boolean };
         } = {
           imageUid: image || '', // Use empty string if no new image
           name: formData.name,
@@ -102,7 +102,8 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
             investmentFocus: formData.investorProfile.investmentFocus.map(
               (item: { label: string; value: string }) => item.value
             ),
-            typicalCheckSize: formData.investorProfile.typicalCheckSize,
+            typicalCheckSize: Number(formData.investorProfile.typicalCheckSize),
+            secRulesAccepted: !!formData.investorProfile.secRulesAccepted,
           };
         }
 
@@ -159,7 +160,8 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
               label: focus,
               value: focus,
             })),
-            typicalCheckSize: data.investorProfile?.typicalCheckSize ?? '',
+            typicalCheckSize: data.investorProfile?.typicalCheckSize ?? null,
+            secRulesAccepted: !!data.investorProfile?.secRulesAccepted,
           }
         : undefined,
     };

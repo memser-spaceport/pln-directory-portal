@@ -20,13 +20,14 @@ export class InvestorProfileService {
     memberUid: string,
     investorProfileData: {
       investmentFocus: string[];
-      typicalCheckSize?: string;
+      typicalCheckSize?: number;
+      secRulesAccepted?: boolean;
     }
   ) {
     try {
       const member = await this.prisma.member.findUnique({
         where: { uid: memberUid },
-        select: { investorProfileId: true },
+        select: { investorProfileId: true, investorProfile: true },
       });
 
       if (!member) {
@@ -34,6 +35,12 @@ export class InvestorProfileService {
       }
 
       let result;
+      const secRulesAcceptedAt =
+        investorProfileData.secRulesAccepted &&
+        member.investorProfile?.secRulesAccepted !== investorProfileData.secRulesAccepted
+          ? new Date()
+          : member.investorProfile?.secRulesAcceptedAt;
+
       if (member.investorProfileId) {
         // Update existing investor profile
         result = await this.prisma.investorProfile.update({
@@ -41,6 +48,8 @@ export class InvestorProfileService {
           data: {
             investmentFocus: investorProfileData.investmentFocus,
             typicalCheckSize: investorProfileData.typicalCheckSize,
+            secRulesAccepted: investorProfileData.secRulesAccepted,
+            secRulesAcceptedAt,
           },
         });
       } else {
@@ -49,6 +58,8 @@ export class InvestorProfileService {
           data: {
             investmentFocus: investorProfileData.investmentFocus,
             typicalCheckSize: investorProfileData.typicalCheckSize,
+            secRulesAccepted: investorProfileData.secRulesAccepted,
+            secRulesAcceptedAt,
             memberUid: memberUid,
           },
         });
