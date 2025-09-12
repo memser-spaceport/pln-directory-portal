@@ -1,0 +1,480 @@
+{
+  "events": [],
+  "projects": [],
+  "teams": [],
+  "members": [],
+  "forumThreads": [
+    {
+      "uid": "35",
+      "name": "[[TEST] Search via comments #2] <em>TestComment</em> #11",
+      "image": "",
+      "index": "forumThreads",
+      "matches": [
+        {
+          "field": "replies.content",
+          "content": "<em>TestComment</em> #11",
+          "pid": 110,
+          "uidAuthor": 12
+        },
+        {
+          "field": "replies.content",
+          "content": "<em>TestComment</em> #12",
+          "pid": 111,
+          "uidAuthor": 12
+        }
+      ],
+      "source": {
+        "uid": "35",
+        "tid": 35,
+        "cid": "7",
+        "topicTitle": "[TEST] Search via comments #2",
+        "topicSlug": "35/test-search-via-comments-2",
+        "topicUrl": "https://dev-forum.plnetwork.io//topic/35/test-search-via-comments-2",
+        "categorySlug": "7/general",
+        "categoryUrl": "https://dev-forum.plnetwork.io//category/7/general",
+        "rootPost": {
+          "pid": 109,
+          "uidAuthor": 12,
+          "author": {
+            "name": "Nick",
+            "username": "nick",
+            "slug": "nick",
+            "image": null
+          },
+          "timestamp": "2025-09-11T18:34:27.358Z",
+          "url": "https://dev-forum.plnetwork.io//topic/35/test-search-via-comments-2",
+          "content": "This is just for testing",
+          "cid": "7"
+        },
+        "replies": [
+          {
+            "pid": 110,
+            "uidAuthor": 12,
+            "author": {
+              "name": "Nick",
+              "username": "nick",
+              "slug": "nick",
+              "image": null
+            },
+            "timestamp": "2025-09-11T18:34:44.071Z",
+            "url": "https://dev-forum.plnetwork.io//topic/35/test-search-via-comments-2#pid110",
+            "content": "TestComment #11",
+            "cid": "7"
+          },
+          {
+            "pid": 111,
+            "uidAuthor": 12,
+            "author": {
+              "name": "Nick",
+              "username": "nick",
+              "slug": "nick",
+              "image": null
+            },
+            "timestamp": "2025-09-11T18:35:09.783Z",
+            "url": "https://dev-forum.plnetwork.io//topic/35/test-search-via-comments-2#pid111",
+            "content": "TestComment #12",
+            "cid": "7"
+          },
+          {
+            "pid": 113,
+            "uidAuthor": 12,
+            "author": {
+              "name": "Nick",
+              "username": "nick",
+              "slug": "nick",
+              "image": null
+            },
+            "timestamp": "2025-09-11T18:56:30.728Z",
+            "url": "https://dev-forum.plnetwork.io//topic/35/test-search-via-comments-2#pid113",
+            "content": "Nothing #10",
+            "cid": "7"
+          }
+        ],
+        "replyCount": 3,
+        "lastReplyAt": "2025-09-11T18:56:30.728Z",
+        "name": "[TEST] Search via comments #2",
+        "image": null,
+        "name_suggest": {
+          "input": [
+            "[TEST] Search via comments #2",
+            "[TEST]",
+            "Search",
+            "via",
+            "comments",
+            "#2"
+          ]
+        }
+      },
+      "kind": "forum_thread",
+      "topicTitle": "[TEST] Search via comments #2",
+      "topicSlug": "35/test-search-via-comments-2",
+      "topicUrl": "https://dev-forum.plnetwork.io//topic/35/test-search-via-comments-2",
+      "replyCount": 3,
+      "lastReplyAt": "2025-09-11T18:56:30.728Z"
+    },
+    {
+      "uid": "34",
+      "name": "[[TEST] Search via comments] <em>TestComment</em> #1",
+      "image": "",
+      "index": "forumThreads",
+      "matches": [
+        {
+          "field": "replies.content",
+          "content": "<em>TestComment</em> #1",
+          "pid": 106,
+          "uidAuthor": 12
+        },
+        {
+          "field": "replies.content",
+          "content": "<em>TestComment</em> #2",
+          "pid": 107,
+          "uidAuthor": 12
+        },
+        {
+          "field": "replies.content",
+          "content": "<em>TestComment</em> #3",
+          "pid": 108,
+          "uidAuthor": 12
+        }
+      ],
+      "source": {
+        "uid": "34",
+        "tid": 34,
+        "cid": 7,
+        "topicTitle": "[TEST] Search via comments",
+        "topicSlug": "34/test-search-via-comments",
+        "topicUrl": "https://dev-forum.plnetwork.io//topic/34/test-search-via-comments",
+        "categorySlug": "7/general",
+        "categoryUrl": "https://dev-forum.plnetwork.io//category/7/general",
+        "rootPost": {
+          "pid": 105,
+          "uidAuthor": 12,
+          "author": {
+            "name": "Nick",
+            "username": "nick",
+            "slug": "nick",
+            "image": null
+          },
+          "timestamp": "2025-09-11T17:05:54.520Z",
+          "url": "https://dev-forum.plnetwork.io//topic/34/test-search-via-comments",
+          "content": "This is just for testing",
+          "cid": 7
+        },
+        "replies": [
+          {
+            "pid": 106,
+            "uidAuthor": 12,
+            "author": {
+              "name": "Nick",
+              "username": "nick",
+              "slug": "nick",
+              "image": null
+            },
+            "timestamp": "2025-09-11T17:06:57.290Z",
+            "url": "https://dev-forum.plnetwork.io//topic/34/test-search-via-comments#pid106",
+            "content": "TestComment #1",
+            "cid": 7
+          },
+          {
+            "pid": 107,
+            "uidAuthor": 12,
+            "author": {
+              "name": "Nick",
+              "username": "nick",
+              "slug": "nick",
+              "image": null
+            },
+            "timestamp": "2025-09-11T17:07:08.394Z",
+            "url": "https://dev-forum.plnetwork.io//topic/34/test-search-via-comments#pid107",
+            "content": "TestComment #2",
+            "cid": 7
+          },
+          {
+            "pid": 108,
+            "uidAuthor": 12,
+            "author": {
+              "name": "Nick",
+              "username": "nick",
+              "slug": "nick",
+              "image": null
+            },
+            "timestamp": "2025-09-11T17:07:21.891Z",
+            "url": "https://dev-forum.plnetwork.io//topic/34/test-search-via-comments#pid108",
+            "content": "TestComment #3",
+            "cid": 7
+          },
+          {
+            "pid": 112,
+            "uidAuthor": 12,
+            "author": {
+              "name": "Nick",
+              "username": "nick",
+              "slug": "nick",
+              "image": null
+            },
+            "timestamp": "2025-09-11T18:47:52.286Z",
+            "url": "https://dev-forum.plnetwork.io//topic/34/test-search-via-comments#pid112",
+            "content": "Nothing #1",
+            "cid": 7
+          }
+        ],
+        "replyCount": 4,
+        "lastReplyAt": "2025-09-11T18:47:52.286Z",
+        "name": "[TEST] Search via comments",
+        "image": null,
+        "name_suggest": {
+          "input": [
+            "[TEST] Search via comments",
+            "[TEST]",
+            "Search",
+            "via",
+            "comments"
+          ]
+        }
+      },
+      "kind": "forum_thread",
+      "topicTitle": "[TEST] Search via comments",
+      "topicSlug": "34/test-search-via-comments",
+      "topicUrl": "https://dev-forum.plnetwork.io//topic/34/test-search-via-comments",
+      "replyCount": 4,
+      "lastReplyAt": "2025-09-11T18:47:52.286Z"
+    }
+  ],
+  "top": [
+    {
+      "uid": "35",
+      "name": "[[TEST] Search via comments #2] <em>TestComment</em> #11",
+      "image": "",
+      "index": "forumThreads",
+      "matches": [
+        {
+          "field": "replies.content",
+          "content": "<em>TestComment</em> #11",
+          "pid": 110,
+          "uidAuthor": 12
+        },
+        {
+          "field": "replies.content",
+          "content": "<em>TestComment</em> #12",
+          "pid": 111,
+          "uidAuthor": 12
+        }
+      ],
+      "source": {
+        "uid": "35",
+        "tid": 35,
+        "cid": "7",
+        "topicTitle": "[TEST] Search via comments #2",
+        "topicSlug": "35/test-search-via-comments-2",
+        "topicUrl": "https://dev-forum.plnetwork.io//topic/35/test-search-via-comments-2",
+        "categorySlug": "7/general",
+        "categoryUrl": "https://dev-forum.plnetwork.io//category/7/general",
+        "rootPost": {
+          "pid": 109,
+          "uidAuthor": 12,
+          "author": {
+            "name": "Nick",
+            "username": "nick",
+            "slug": "nick",
+            "image": null
+          },
+          "timestamp": "2025-09-11T18:34:27.358Z",
+          "url": "https://dev-forum.plnetwork.io//topic/35/test-search-via-comments-2",
+          "content": "This is just for testing",
+          "cid": "7"
+        },
+        "replies": [
+          {
+            "pid": 110,
+            "uidAuthor": 12,
+            "author": {
+              "name": "Nick",
+              "username": "nick",
+              "slug": "nick",
+              "image": null
+            },
+            "timestamp": "2025-09-11T18:34:44.071Z",
+            "url": "https://dev-forum.plnetwork.io//topic/35/test-search-via-comments-2#pid110",
+            "content": "TestComment #11",
+            "cid": "7"
+          },
+          {
+            "pid": 111,
+            "uidAuthor": 12,
+            "author": {
+              "name": "Nick",
+              "username": "nick",
+              "slug": "nick",
+              "image": null
+            },
+            "timestamp": "2025-09-11T18:35:09.783Z",
+            "url": "https://dev-forum.plnetwork.io//topic/35/test-search-via-comments-2#pid111",
+            "content": "TestComment #12",
+            "cid": "7"
+          },
+          {
+            "pid": 113,
+            "uidAuthor": 12,
+            "author": {
+              "name": "Nick",
+              "username": "nick",
+              "slug": "nick",
+              "image": null
+            },
+            "timestamp": "2025-09-11T18:56:30.728Z",
+            "url": "https://dev-forum.plnetwork.io//topic/35/test-search-via-comments-2#pid113",
+            "content": "Nothing #10",
+            "cid": "7"
+          }
+        ],
+        "replyCount": 3,
+        "lastReplyAt": "2025-09-11T18:56:30.728Z",
+        "name": "[TEST] Search via comments #2",
+        "image": null,
+        "name_suggest": {
+          "input": [
+            "[TEST] Search via comments #2",
+            "[TEST]",
+            "Search",
+            "via",
+            "comments",
+            "#2"
+          ]
+        }
+      },
+      "kind": "forum_thread",
+      "topicTitle": "[TEST] Search via comments #2",
+      "topicSlug": "35/test-search-via-comments-2",
+      "topicUrl": "https://dev-forum.plnetwork.io//topic/35/test-search-via-comments-2",
+      "replyCount": 3,
+      "lastReplyAt": "2025-09-11T18:56:30.728Z"
+    },
+    {
+      "uid": "34",
+      "name": "[[TEST] Search via comments] <em>TestComment</em> #1",
+      "image": "",
+      "index": "forumThreads",
+      "matches": [
+        {
+          "field": "replies.content",
+          "content": "<em>TestComment</em> #1",
+          "pid": 106,
+          "uidAuthor": 12
+        },
+        {
+          "field": "replies.content",
+          "content": "<em>TestComment</em> #2",
+          "pid": 107,
+          "uidAuthor": 12
+        },
+        {
+          "field": "replies.content",
+          "content": "<em>TestComment</em> #3",
+          "pid": 108,
+          "uidAuthor": 12
+        }
+      ],
+      "source": {
+        "uid": "34",
+        "tid": 34,
+        "cid": 7,
+        "topicTitle": "[TEST] Search via comments",
+        "topicSlug": "34/test-search-via-comments",
+        "topicUrl": "https://dev-forum.plnetwork.io//topic/34/test-search-via-comments",
+        "categorySlug": "7/general",
+        "categoryUrl": "https://dev-forum.plnetwork.io//category/7/general",
+        "rootPost": {
+          "pid": 105,
+          "uidAuthor": 12,
+          "author": {
+            "name": "Nick",
+            "username": "nick",
+            "slug": "nick",
+            "image": null
+          },
+          "timestamp": "2025-09-11T17:05:54.520Z",
+          "url": "https://dev-forum.plnetwork.io//topic/34/test-search-via-comments",
+          "content": "This is just for testing",
+          "cid": 7
+        },
+        "replies": [
+          {
+            "pid": 106,
+            "uidAuthor": 12,
+            "author": {
+              "name": "Nick",
+              "username": "nick",
+              "slug": "nick",
+              "image": null
+            },
+            "timestamp": "2025-09-11T17:06:57.290Z",
+            "url": "https://dev-forum.plnetwork.io//topic/34/test-search-via-comments#pid106",
+            "content": "TestComment #1",
+            "cid": 7
+          },
+          {
+            "pid": 107,
+            "uidAuthor": 12,
+            "author": {
+              "name": "Nick",
+              "username": "nick",
+              "slug": "nick",
+              "image": null
+            },
+            "timestamp": "2025-09-11T17:07:08.394Z",
+            "url": "https://dev-forum.plnetwork.io//topic/34/test-search-via-comments#pid107",
+            "content": "TestComment #2",
+            "cid": 7
+          },
+          {
+            "pid": 108,
+            "uidAuthor": 12,
+            "author": {
+              "name": "Nick",
+              "username": "nick",
+              "slug": "nick",
+              "image": null
+            },
+            "timestamp": "2025-09-11T17:07:21.891Z",
+            "url": "https://dev-forum.plnetwork.io//topic/34/test-search-via-comments#pid108",
+            "content": "TestComment #3",
+            "cid": 7
+          },
+          {
+            "pid": 112,
+            "uidAuthor": 12,
+            "author": {
+              "name": "Nick",
+              "username": "nick",
+              "slug": "nick",
+              "image": null
+            },
+            "timestamp": "2025-09-11T18:47:52.286Z",
+            "url": "https://dev-forum.plnetwork.io//topic/34/test-search-via-comments#pid112",
+            "content": "Nothing #1",
+            "cid": 7
+          }
+        ],
+        "replyCount": 4,
+        "lastReplyAt": "2025-09-11T18:47:52.286Z",
+        "name": "[TEST] Search via comments",
+        "image": null,
+        "name_suggest": {
+          "input": [
+            "[TEST] Search via comments",
+            "[TEST]",
+            "Search",
+            "via",
+            "comments"
+          ]
+        }
+      },
+      "kind": "forum_thread",
+      "topicTitle": "[TEST] Search via comments",
+      "topicSlug": "34/test-search-via-comments",
+      "topicUrl": "https://dev-forum.plnetwork.io//topic/34/test-search-via-comments",
+      "replyCount": 4,
+      "lastReplyAt": "2025-09-11T18:47:52.286Z"
+    }
+  ]
+}

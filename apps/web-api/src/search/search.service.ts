@@ -126,9 +126,14 @@ export class SearchService {
     const short = new Set(['name', 'topicTitle', 'tagline', 'shortDescription', 'location']);
     const cfg: Record<string, any> = {};
     for (const f of fields) {
-      cfg[f] = short.has(f)
-        ? { number_of_fragments: 0 }
-        : { fragment_size: 140, number_of_fragments: 1, no_match_size: 0 };
+      // For replies.content, allow multiple fragments to capture all matched comments
+      if (f === 'replies.content') {
+        cfg[f] = { fragment_size: 140, number_of_fragments: 10, no_match_size: 0 };
+      } else {
+        cfg[f] = short.has(f)
+          ? { number_of_fragments: 0 }
+          : { fragment_size: 140, number_of_fragments: 1, no_match_size: 0 };
+      }
     }
 
     return {
@@ -235,8 +240,70 @@ export class SearchService {
             src?.name ||
             '';
 
-          const hlRoot = (Array.isArray(hl['rootPost.content']) && hl['rootPost.content'][0]) || '';
-          const hlReply = (Array.isArray(hl['replies.content']) && hl['replies.content'][0]) || '';
+          const hlRootArray = Array.isArray(hl['rootPost.content']) ? hl['rootPost.content'] : [];
+          const hlRoot = hlRootArray[0] || '';
+
+          // Collect all matched reply content
+          const hlReplies = Array.isArray(hl['replies.content']) ? hl['replies.content'] : [];
+          const hlReply = hlReplies[0] || '';
+
+          // Update matches to include pid for root post content
+          if (hlRootArray.length > 0) {
+            // Remove any existing rootPost.content match
+            item.matches = item.matches.filter((m) => m.field !== 'rootPost.content');
+
+            // Add root post matches with pid
+            hlRootArray.forEach((rootContent) => {
+              const match: any = {
+                field: 'rootPost.content',
+                content: rootContent,
+              };
+
+              // Add pid for root post
+              if (src?.rootPost?.pid) {
+                match.pid = src.rootPost.pid;
+              }
+              if (src?.rootPost?.uidAuthor) {
+                match.uidAuthor = src.rootPost.uidAuthor;
+              }
+
+              item.matches.push(match);
+            });
+          }
+
+          // Update matches to include all reply highlights with their pids
+          if (hlReplies.length > 0) {
+            // Remove any existing replies.content match (it only had the first one)
+            item.matches = item.matches.filter((m) => m.field !== 'replies.content');
+
+            // Add all reply matches with their corresponding pid
+            hlReplies.forEach((replyContent) => {
+              // Try to find the corresponding reply by matching the highlighted content
+              // Remove HTML tags from highlighted content for comparison
+              const cleanContent = replyContent.replace(/<\/?em>/g, '');
+
+              // Find the reply that contains this content
+              const matchingReply = src?.replies?.find((reply: any) => {
+                const replyText = String(reply.content || '');
+                return replyText.includes(cleanContent) || cleanContent.includes(replyText.substring(0, 100));
+              });
+
+              const match: any = {
+                field: 'replies.content',
+                content: replyContent,
+              };
+
+              // Add pid if we found the matching reply
+              if (matchingReply?.pid) {
+                match.pid = matchingReply.pid;
+              }
+              if (matchingReply?.uidAuthor) {
+                match.uidAuthor = matchingReply.uidAuthor;
+              }
+
+              item.matches.push(match);
+            });
+          }
 
           const summary =
             hlRoot || hlReply || (src?.rootPost?.content ? String(src.rootPost.content).slice(0, 120) : '');
