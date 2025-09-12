@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { generateText, LanguageModel } from 'ai';
 import { openai } from '@ai-sdk/openai';
+import * as countries from 'i18n-iso-countries';
 
 import {
   HUSKY_AUTO_BIO_SYSTEM_PROMPT,
@@ -14,7 +15,12 @@ import { MemberWithRelations, RecommendationFactors } from '../recommendations/r
 
 @Injectable()
 export class HuskyGenerationService {
-  constructor(private logger: LogService, private prisma: PrismaService) {}
+  constructor(private logger: LogService, private prisma: PrismaService) {
+    // Load country data for English
+    import('i18n-iso-countries/langs/en.json').then((en) => {
+      countries.registerLocale(en);
+    });
+  }
 
   async generateMemberBio(memberEmail: string): Promise<{ bio: string }> {
     this.logger.info(`Generating bio for member ${memberEmail}`);
@@ -88,19 +94,7 @@ export class HuskyGenerationService {
     if (hasEnoughIdentifyingInfo) {
       // Use web search with strict verification
       generateTextOptions.system = HUSKY_AUTO_BIO_SYSTEM_PROMPT;
-      generateTextOptions.tools = {
-        web_search_preview: openai.tools.webSearchPreview({
-          searchContextSize: 'high',
-          userLocation:
-            member.location?.city && member.location?.country
-              ? {
-                  type: 'approximate',
-                  city: member.location.city,
-                  country: member.location.country,
-                }
-              : undefined,
-        }),
-      };
+      generateTextOptions.tools = this.buildUserLocation(member);
       generateTextOptions.toolChoice = { type: 'tool', toolName: 'web_search_preview' };
     } else {
       // Use database-only prompt without web search
@@ -192,19 +186,7 @@ export class HuskyGenerationService {
 
     if (hasEnoughIdentifyingInfo) {
       // Use web search with strict verification
-      generateTextOptions.tools = {
-        web_search_preview: openai.tools.webSearchPreview({
-          searchContextSize: 'high',
-          userLocation:
-            member.location?.city && member.location?.country
-              ? {
-                  type: 'approximate',
-                  city: member.location.city,
-                  country: member.location.country,
-                }
-              : undefined,
-        }),
-      };
+      generateTextOptions.tools = this.buildUserLocation(member);
       generateTextOptions.toolChoice = { type: 'tool', toolName: 'web_search_preview' };
     }
 
@@ -291,5 +273,37 @@ export class HuskyGenerationService {
     const identifyingFactors = [hasUniqueName, hasSocialMedia, hasTeamInfo, hasLocation, hasExperience].filter(Boolean);
 
     return identifyingFactors.length >= 3;
+  }
+
+  private buildUserLocation(member: any) {
+    let countryCode: string | undefined = undefined;
+    if (member.location?.country) {
+      // Check if it's already a 2-letter Alpha-2 code
+      if (member.location.country.length === 2 && countries.isValid(member.location.country)) {
+        countryCode = member.location.country.toUpperCase();
+      } else {
+        // Try to convert country name to Alpha-2 code
+        countryCode = countries.getAlpha2Code(member.location.country, 'en');
+      }
+    }
+
+    return {
+      web_search_preview: openai.tools.webSearchPreview({
+        searchContextSize: 'high',
+        userLocation:
+          member.location?.city && countryCode
+            ? {
+                type: 'approximate',
+                city: member.location.city,
+                country: countryCode,
+              }
+            : member.location?.city
+            ? {
+                type: 'approximate',
+                city: member.location.city,
+              }
+            : undefined,
+      }),
+    };
   }
 }

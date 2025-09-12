@@ -95,6 +95,7 @@
     "framer-motion": "4.1.18-rc.26",
     "handlebars": "^4.7.8",
     "helmet": "^6.0.0",
+    "i18n-iso-countries": "^7.14.0",
     "install": "^0.13.0",
     "ioredis": "^5.4.2",
     "ip": "^1.1.8",
