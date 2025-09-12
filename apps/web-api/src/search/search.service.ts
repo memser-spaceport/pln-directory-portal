@@ -60,40 +60,40 @@ export class SearchService {
 
     const bestFields = textFields.length
       ? {
-          multi_match: {
-            query: text,
-            type: 'best_fields',
-            fields: weightedText,
-            operator: 'and',
-            tie_breaker: 0.2,
-            boost: 1.2,
-          },
-        }
+        multi_match: {
+          query: text,
+          type: 'best_fields',
+          fields: weightedText,
+          operator: 'and',
+          tie_breaker: 0.2,
+          boost: 1.2,
+        },
+      }
       : undefined;
 
     const exactPhrase = textFields.length
       ? {
-          multi_match: {
-            query: text,
-            type: 'phrase',
-            fields: weightedText,
-            slop: 0,
-            boost: 3.0,
-          },
-        }
+        multi_match: {
+          query: text,
+          type: 'phrase',
+          fields: weightedText,
+          slop: 0,
+          boost: 3.0,
+        },
+      }
       : undefined;
 
     const phrasePrefix = textFields.length
       ? {
-          multi_match: {
-            query: text,
-            type: 'phrase_prefix',
-            fields: weightedText,
-            slop: 0,
-            max_expansions: 50,
-            boost: 3.0,
-          },
-        }
+        multi_match: {
+          query: text,
+          type: 'phrase_prefix',
+          fields: weightedText,
+          slop: 0,
+          max_expansions: 50,
+          boost: 3.0,
+        },
+      }
       : undefined;
 
     const keywordClauses: any[] = [
@@ -130,9 +130,14 @@ export class SearchService {
     const short = new Set(['name', 'topicTitle', 'tagline', 'shortDescription', 'location']);
     const cfg: Record<string, any> = {};
     for (const f of fields) {
-      cfg[f] = short.has(f)
-        ? { number_of_fragments: 0 }
-        : { fragment_size: 140, number_of_fragments: 1, no_match_size: 0 };
+      // For replies.content, allow multiple fragments to capture all matched comments
+      if (f === 'replies.content') {
+        cfg[f] = { fragment_size: 140, number_of_fragments: 10, no_match_size: 0 };
+      } else {
+        cfg[f] = short.has(f)
+          ? { number_of_fragments: 0 }
+          : { fragment_size: 140, number_of_fragments: 1, no_match_size: 0 };
+      }
     }
 
     return {
@@ -251,10 +256,53 @@ export class SearchService {
               src?.topicTitle ||
               src?.name ||
               '';
-            const hlRoot = (Array.isArray(hl['rootPost.content']) && hl['rootPost.content'][0]) || '';
-            const hlReply = (Array.isArray(hl['replies.content']) && hl['replies.content'][0]) || '';
-            const summary = hlRoot || hlReply || (src?.rootPost?.content ? String(src.rootPost.content).slice(0, 120) : '');
+
+            const hlRootArray = Array.isArray(hl['rootPost.content']) ? hl['rootPost.content'] : [];
+            const hlRoot = hlRootArray[0] || '';
+
+            const hlReplies = Array.isArray(hl['replies.content']) ? hl['replies.content'] : [];
+            const hlReply = hlReplies[0] || '';
+
+            // Update matches to include pid/uid for root post content
+            if (hlRootArray.length > 0) {
+              item.matches = item.matches.filter((m) => m.field !== 'rootPost.content');
+              hlRootArray.forEach((rootContent) => {
+                const match: any = {
+                  field: 'rootPost.content',
+                  content: rootContent,
+                };
+                if (src?.rootPost?.pid) match.pid = src.rootPost.pid;
+                if (src?.rootPost?.uidAuthor) match.uidAuthor = src.rootPost.uidAuthor;
+                item.matches.push(match);
+              });
+            }
+
+            // Update matches to include all reply highlights with their pids/uids
+            if (hlReplies.length > 0) {
+              item.matches = item.matches.filter((m) => m.field !== 'replies.content');
+              hlReplies.forEach((replyContent) => {
+                const cleanContent = replyContent.replace(/<\/?em>/g, '');
+                const matchingReply = src?.replies?.find((reply: any) => {
+                  const replyText = String(reply.content || '');
+                  return replyText.includes(cleanContent) || cleanContent.includes(replyText.substring(0, 100));
+                });
+
+                const match: any = {
+                  field: 'replies.content',
+                  content: replyContent,
+                };
+                if (matchingReply?.pid) match.pid = matchingReply.pid;
+                if (matchingReply?.uidAuthor) match.uidAuthor = matchingReply.uidAuthor;
+
+                item.matches.push(match);
+              });
+            }
+
+            const summary =
+              hlRoot || hlReply || (src?.rootPost?.content ? String(src.rootPost.content).slice(0, 120) : '');
+
             item.name = hlTitle ? `[${hlTitle}] ${summary}` : src?.name ?? summary;
+
             item.topicTitle = src?.topicTitle;
             item.topicSlug = src?.topicSlug;
             item.topicUrl = src?.topicUrl;
