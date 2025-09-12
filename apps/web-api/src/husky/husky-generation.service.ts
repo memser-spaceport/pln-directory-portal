@@ -276,7 +276,17 @@ export class HuskyGenerationService {
   }
 
   private buildUserLocation(member: any) {
-    const countryCode = member.location?.country ? countries.getAlpha2Code(member.location.country, 'en') : null;
+    let countryCode: string | undefined = undefined;
+    if (member.location?.country) {
+      // Check if it's already a 2-letter Alpha-2 code
+      if (member.location.country.length === 2 && countries.isValid(member.location.country)) {
+        countryCode = member.location.country.toUpperCase();
+      } else {
+        // Try to convert country name to Alpha-2 code
+        countryCode = countries.getAlpha2Code(member.location.country, 'en');
+      }
+    }
+
     return {
       web_search_preview: openai.tools.webSearchPreview({
         searchContextSize: 'high',
