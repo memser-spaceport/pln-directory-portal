@@ -1,6 +1,6 @@
 {
   "name": "protocol-labs-network",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
