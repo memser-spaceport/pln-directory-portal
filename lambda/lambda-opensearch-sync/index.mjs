@@ -21,6 +21,7 @@ const FORUM_BASE_URL = process.env.FORUM_BASE_URL || 'https://forum.example.com'
 const MONGO_URI = process.env.MONGO_URI;
 const MONGO_URI_PARAM = process.env.MONGO_URI_PARAM;
 const MONGO_DB_NAME = process.env.MONGO_DB_NAME || 'nodebb_forum';
+const EVENTS_PUBLIC_BASE_URL = process.env.EVENTS_PUBLIC_BASE_URL || 'https://events.plnetwork.io';
 
 let pgPool;
 let pgClient;
@@ -351,30 +352,44 @@ async function indexProjects(lastCheckpoint) {
 }
 async function indexEvents(lastCheckpoint) {
   const r = await pgClient.query(`
-    SELECT e.uid, e.name, e.description, e."additionalInfo", e."shortDescription", el.location, i.url
+    SELECT e.uid, e.name, e.description, e."additionalInfo", e."shortDescription", e."slugURL", el.location, i.url
     FROM "PLEvent" e
            LEFT JOIN "PLEventLocation" el ON e."locationUid" = el.uid
            LEFT JOIN "Image" i ON e."logoUid" = i.uid
     WHERE e."createdAt" > $1 OR e."updatedAt" > $1
   `, [lastCheckpoint]);
-  console.log('Got data from PLEvent table:', r.rows.length);
   if (!r.rows.length) return 0;
 
-  const body = r.rows.flatMap(row => [
-    { index: { _index: 'event', _id: row.uid } },
-    {
-      uid: row.uid,
-      name: row.name,
-      image: row.url,
-      description: purifyHtml(row.description),
-      additionalInfo: row.additionalInfo ? JSON.stringify(row.additionalInfo) : null,
-      shortDescription: row.shortDescription,
-      location: row.location,
-      name_suggest: { input: generateSuggestInput(row.name) },
-      shortDescription_suggest: { input: generateSuggestInput(row.shortDescription) },
-      location_suggest: { input: generateSuggestInput(row.location) }
-    }
-  ]);
+  const body = r.rows.flatMap(row => {
+    const cleanName = (row.name || '').trim();
+
+    // NEW: canonical slug from name; fallback to DB slug or uid
+    const canonicalSlug = makeCanonicalSlug(cleanName, row.slugURL || row.uid);
+
+    // NEW: build URL from canonical slug (NOT from DB slug)
+    const eventUrl = buildEventUrl(canonicalSlug, EVENTS_PUBLIC_BASE_URL);
+
+    return [
+      { index: { _index: 'event', _id: row.uid } },
+      {
+        uid: row.uid,
+        name: cleanName,
+        image: row.url,
+        description: purifyHtml(row.description),
+        additionalInfo: row.additionalInfo ? JSON.stringify(row.additionalInfo) : null,
+        shortDescription: row.shortDescription,
+        location: row.location,
+        slug: row.slugURL || null,
+        slugCanonical: canonicalSlug,
+        eventUrl,
+
+        name_suggest: { input: generateSuggestInput(cleanName) },
+        shortDescription_suggest: { input: generateSuggestInput(row.shortDescription) },
+        location_suggest: { input: generateSuggestInput(row.location) }
+      }
+    ];
+  });
+
   const resp = await osClient.bulk({ body });
   if (resp.body?.errors) {
     const failed = resp.body.items.filter(x => x.index && x.index.error);
@@ -630,3 +645,42 @@ export const handler = async () => {
     mongoDb = null;
   }
 };
+/**
+ * Create a canonical, URL-safe slug from an event name.
+ * - NFKD normalize + strip diacritics (á → a, ü → u)
+ * - Replace "&" → " and ", "+" → " plus "
+ * - Strip apostrophes
+ * - Non [a-z0-9] → "-"
+ * - Collapse multiple "-" and trim edges
+ * - Fallback to provided value (e.g., DB slug or uid) if empty
+ */
+function makeCanonicalSlug(name, fallback) {
+  if (!name) return fallback || null;
+
+  // Normalize and remove diacritics (works in Node 18+)
+  let s = name.normalize('NFKD')
+    // Remove combining marks (safe across engines)
+    .replace(/[\u0300-\u036f]/g, '');
+
+  s = s
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/\+/g, ' plus ')
+    .replace(/['’`]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  return s || (fallback || null);
+}
+
+/**
+ * Build public event URL from canonical slug.
+ * Example: buildEventUrl('my-event', 'https://dev.events.plnetwork.io')
+ * → 'https://dev.events.plnetwork.io/program/#my-event'
+ */
+function buildEventUrl(canonicalSlug, base) {
+  if (!canonicalSlug) return null;
+  const b = (base || '').replace(/\/+$/, '');
+  return `${b}/program/#${canonicalSlug}`;
+}
