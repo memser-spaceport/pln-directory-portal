@@ -79,7 +79,7 @@ const options = [
     ),
     name: 'L6',
     value: 'L6',
-    desc: '- Investor and Member',
+    desc: '- Investor + Other Role',
   },
   {
     icon: (

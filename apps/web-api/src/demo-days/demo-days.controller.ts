@@ -9,15 +9,18 @@ import {
   Body,
   UseInterceptors,
   UploadedFiles,
+  UsePipes,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiTags } from '@nestjs/swagger';
+import { ZodValidationPipe } from '@abitia/zod-dto';
 import { DemoDaysService } from './demo-days.service';
 import { DemoDayFundraisingProfilesService } from './demo-day-fundraising-profiles.service';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { UploadsService } from '../uploads/uploads.service';
 import { UploadKind, UploadScopeType } from '@prisma/client';
 import { NoCache } from '../decorators/no-cache.decorator';
+import { UpdateFundraisingTeamDto } from 'libs/contracts/src/schema';
 
 @ApiTags('Demo Days')
 @Controller('v1/demo-days')
@@ -96,18 +99,9 @@ export class DemoDaysController {
 
   @Patch('current/fundraising-profile/team')
   @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
   @NoCache()
-  async updateTeam(
-    @Req() req,
-    @Body()
-    body: {
-      name?: string;
-      shortDescription?: string;
-      industryTags?: string[];
-      fundingStage?: string;
-      logo?: string;
-    }
-  ) {
+  async updateTeam(@Req() req, @Body() body: UpdateFundraisingTeamDto) {
     return this.demoDayFundraisingProfilesService.updateFundraisingTeam(req.userEmail, body);
   }
 }

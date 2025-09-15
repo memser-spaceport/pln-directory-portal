@@ -163,7 +163,8 @@ export class AppModule {
       .exclude(
         { path: 'v1/images', method: RequestMethod.POST },
         { path: 'v1/uploads', method: RequestMethod.POST },
-        { path: 'v1/demo-days/current/fundraising-profile/(.*)', method: RequestMethod.ALL }
+        { path: 'v1/demo-days/current/fundraising-profile/one-pager', method: RequestMethod.PUT },
+        { path: 'v1/demo-days/current/fundraising-profile/video', method: RequestMethod.PUT }
       )
       .forRoutes(
         { path: '*', method: RequestMethod.POST },
