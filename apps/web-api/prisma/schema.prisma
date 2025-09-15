@@ -51,9 +51,10 @@ model Team {
   teamFocusAreasVersionHistory TeamFocusAreaVersionHistory[]
   relatedQuestions             DiscoveryQuestion[]           @relation("TeamRelatedDiscoveryQuestions")
   asks                         Ask[]
-  fundraisingProfile           TeamFundraisingProfile?
+  fundraisingProfiles          TeamFundraisingProfile[]
   investorProfile              InvestorProfile?              @relation("TeamInvestorProfile", fields: [investorProfileId], references: [uid])
   investorProfileId            String?                       @unique
+  demoDayParticipants          DemoDayParticipant[]
 }
 
 enum AskStatus {
@@ -153,6 +154,7 @@ model Member {
   uploads                      Upload[]                      @relation("MemberUploads")
   investorProfile              InvestorProfile?              @relation("MemberInvestorProfile", fields: [investorProfileId], references: [uid])
   investorProfileId            String?                       @unique
+  demoDayParticipants          DemoDayParticipant[]
 }
 
 model MemberRole {
@@ -297,13 +299,12 @@ model IndustryTag {
 }
 
 model FundingStage {
-  id                  Int                      @id @default(autoincrement())
-  uid                 String                   @unique @default(cuid())
-  title               String                   @unique
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
-  teams               Team[]
-  fundraisingProfiles TeamFundraisingProfile[] @relation("TfpFundingStage")
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  title     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  teams     Team[]
 }
 
 model MembershipSource {
@@ -536,7 +537,6 @@ model FocusArea {
   focusAreas                  FocusAreaHierarchy[]          @relation("focusAreas")
   subFocusAreas               FocusAreaHierarchy[]          @relation("subfocusAreas")
   TeamFocusAreaVersionHistory TeamFocusAreaVersionHistory[]
-  fundraisingProfiles         TeamFundraisingProfile[]      @relation("TfpFocusArea")
 }
 
 model TeamFocusArea {
@@ -850,14 +850,11 @@ model TeamFundraisingProfile {
   id  Int    @id @default(autoincrement())
   uid String @unique @default(cuid())
 
-  teamUid String @unique
+  teamUid String
   team    Team   @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
 
-  focusAreaUid String?
-  focusArea    FocusArea? @relation("TfpFocusArea", fields: [focusAreaUid], references: [uid])
-
-  fundingStageUid String?
-  fundingStage    FundingStage? @relation("TfpFundingStage", fields: [fundingStageUid], references: [uid])
+  demoDayUid String
+  demoDay    DemoDay @relation(fields: [demoDayUid], references: [uid], onDelete: Cascade)
 
   onePagerUploadUid String?
   onePagerUpload    Upload? @relation("TFP_onePagerUpload", fields: [onePagerUploadUid], references: [uid])
@@ -872,6 +869,7 @@ model TeamFundraisingProfile {
   lastModifiedBy String?
   lastModifier   Member?  @relation("TfpLastModifiedBy", fields: [lastModifiedBy], references: [uid])
 
+  @@unique([teamUid, demoDayUid])
   @@index([status])
 }
 
@@ -951,4 +949,57 @@ model InvestorProfile {
 
   @@unique([teamUid])
   @@unique([memberUid])
+}
+
+enum DemoDayStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum DemoDayParticipantType {
+  INVESTOR
+  FOUNDER
+}
+
+enum DemoDayParticipantStatus {
+  INVITED
+  ENABLED
+  DISABLED
+}
+
+model DemoDay {
+  id                  Int                      @id @default(autoincrement())
+  uid                 String                   @unique @default(cuid())
+  startDate           DateTime
+  title               String
+  description         String
+  status              DemoDayStatus            @default(PENDING)
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  isDeleted           Boolean                  @default(false)
+  deletedAt           DateTime?
+  participants        DemoDayParticipant[]
+  fundraisingProfiles TeamFundraisingProfile[]
+}
+
+model DemoDayParticipant {
+  id              Int                      @id @default(autoincrement())
+  uid             String                   @unique @default(cuid())
+  demoDayUid      String
+  demoDay         DemoDay                  @relation(fields: [demoDayUid], references: [uid], onDelete: Cascade)
+  memberUid       String
+  member          Member                   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  type            DemoDayParticipantType
+  status          DemoDayParticipantStatus @default(INVITED)
+  teamUid         String?
+  team            Team?                    @relation(fields: [teamUid], references: [uid])
+  statusUpdatedAt DateTime                 @default(now())
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  isDeleted       Boolean                  @default(false)
+  deletedAt       DateTime?
+
+  @@unique([demoDayUid, memberUid])
 }

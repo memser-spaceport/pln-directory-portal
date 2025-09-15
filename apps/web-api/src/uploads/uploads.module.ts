@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { UploadsService } from './uploads.service';
 import { UploadsController } from './uploads.controller';
@@ -10,7 +10,7 @@ import { MembersModule } from '../members/members.module'; // <-- must export Me
 
 @Module({
   imports: [
-    MembersModule,
+    forwardRef(() => MembersModule),
     MulterModule.register({
       limits: { fileSize: 50 * 1024 * 1024 }, // 50MB example
     }),
