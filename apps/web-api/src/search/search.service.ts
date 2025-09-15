@@ -247,6 +247,10 @@ export class SearchService {
             if (typeof src.availableToConnect === 'boolean') item.availableToConnect = src.availableToConnect;
           }
 
+          if (key === 'events') {
+            (item as any).eventUrl = src?.eventUrl;
+          }
+
           // Forum threads: decorate title & snippet
           if (key === 'forumThreads') {
             item.kind = 'forum_thread';
@@ -479,6 +483,10 @@ export class SearchService {
             const src = doc?._source || {};
             const item = found[String(doc?._id)];
             if (!item) continue;
+
+            if (key === 'events') {
+              (item as any).eventUrl = src?.eventUrl;
+            }
 
             if (key === 'forumThreads') {
               item.kind = 'forum_thread';
