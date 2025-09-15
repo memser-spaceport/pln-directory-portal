@@ -52,9 +52,9 @@ import { ProfileModule } from './profile/profile.module';
 import { ForumModule } from './forum/forum.module';
 import { MetricsController } from './metrics/metrics.controller';
 import { MetricsMiddleware } from './metrics/metrics.interceptor';
-import { TeamFundraisingModule } from './team-fundraising/team-fundraising.module';
 import { UploadsService } from './uploads/uploads.service';
 import { UploadsModule } from './uploads/uploads.module';
+import { DemoDaysModule } from './demo-days/demo-days.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -129,8 +129,8 @@ import { UploadsModule } from './uploads/uploads.module';
     NotificationSettingsModule,
     ProfileModule,
     ForumModule,
-    TeamFundraisingModule,
     UploadsModule,
+    DemoDaysModule,
   ],
   providers: [
     {
@@ -163,7 +163,7 @@ export class AppModule {
       .exclude(
         { path: 'v1/images', method: RequestMethod.POST },
         { path: 'v1/uploads', method: RequestMethod.POST },
-        { path: 'v1/teams/(.*)/fundraising-profile', method: RequestMethod.ALL },
+        { path: 'v1/teams/(.*)/fundraising-profile', method: RequestMethod.ALL }
       )
       .forRoutes(
         { path: '*', method: RequestMethod.POST },
