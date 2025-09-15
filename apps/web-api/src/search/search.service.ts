@@ -302,6 +302,42 @@ export class SearchService {
               });
             }
 
+            // Author name matches -> attach pid/uidAuthor
+            const hlRootAuthorArr = Array.isArray(hl['rootPost.author.name']) ? hl['rootPost.author.name'] : [];
+            if (hlRootAuthorArr.length > 0) {
+              item.matches = item.matches.filter((m) => m.field !== 'rootPost.author.name');
+              hlRootAuthorArr.forEach((authorName) => {
+                const match: any = { field: 'rootPost.author.name', content: authorName };
+                if (src?.rootPost?.pid) match.pid = src.rootPost.pid;
+                if (src?.rootPost?.uidAuthor) match.uidAuthor = src.rootPost.uidAuthor;
+                item.matches.push(match);
+              });
+            }
+
+            const hlReplyAuthorArr = Array.isArray(hl['replies.author.name']) ? hl['replies.author.name'] : [];
+            if (hlReplyAuthorArr.length > 0) {
+              item.matches = item.matches.filter((m) => m.field !== 'replies.author.name');
+              hlReplyAuthorArr.forEach((authorName) => {
+                const cleanName = String(authorName).replace(/<\/?em>/g, '').toLowerCase();
+                const matchingReplies =
+                  Array.isArray(src?.replies)
+                    ? src.replies.filter((r: any) =>
+                      String(r?.author?.name || '').toLowerCase().includes(cleanName),
+                    )
+                    : [];
+                if (matchingReplies.length === 0) {
+                  item.matches.push({ field: 'replies.author.name', content: authorName });
+                } else {
+                  matchingReplies.forEach((r: any) => {
+                    const match: any = { field: 'replies.author.name', content: authorName };
+                    if (r?.pid) match.pid = r.pid;
+                    if (r?.uidAuthor) match.uidAuthor = r.uidAuthor;
+                    item.matches.push(match);
+                  });
+                }
+              });
+            }
+
             const summary =
               hlRoot || hlReply || (src?.rootPost?.content ? String(src.rootPost.content).slice(0, 120) : '');
 
