@@ -101,6 +101,7 @@ export class PLEventLocationsService {
         const locations = await this.prisma.pLEventLocation.findMany({
           ...queryOptions,
           where: {
+            ...queryOptions.where,
             events: {
               some: {
                 isDeleted: false
@@ -114,6 +115,7 @@ export class PLEventLocationsService {
       const locations = await this.prisma.pLEventLocation.findMany({
         ...queryOptions,
         where: {
+          ...queryOptions.where,
           events: {
             some: {
               isDeleted: false
