@@ -17,6 +17,7 @@ import { DemoDayFundraisingProfilesService } from './demo-day-fundraising-profil
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { UploadsService } from '../uploads/uploads.service';
 import { UploadKind, UploadScopeType } from '@prisma/client';
+import { NoCache } from '../decorators/no-cache.decorator';
 
 @ApiTags('Demo Days')
 @Controller('v1/demo-days')
@@ -29,6 +30,7 @@ export class DemoDaysController {
 
   @Get('current')
   @UseGuards(UserTokenValidation)
+  @NoCache()
   async getCurrentDemoDay(@Req() req) {
     return this.demoDaysService.getCurrentDemoDayAccess(req.userEmail);
   }
@@ -37,6 +39,7 @@ export class DemoDaysController {
 
   @Get('current/fundraising-profile')
   @UseGuards(UserTokenValidation)
+  @NoCache()
   async getCurrentDemoDayFundraisingProfile(@Req() req) {
     return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfile(req.userEmail);
   }
@@ -44,6 +47,7 @@ export class DemoDaysController {
   @Put('current/fundraising-profile/one-pager')
   @UseGuards(UserTokenValidation)
   @UseInterceptors(FileFieldsInterceptor([{ name: 'onePagerFile', maxCount: 1 }]))
+  @NoCache()
   async updateOnePager(@Req() req, @UploadedFiles() files: { onePagerFile?: Express.Multer.File[] }) {
     if (!files.onePagerFile?.[0]) {
       throw new Error('onePagerFile is required');
@@ -60,6 +64,7 @@ export class DemoDaysController {
 
   @Delete('current/fundraising-profile/one-pager')
   @UseGuards(UserTokenValidation)
+  @NoCache()
   async deleteOnePager(@Req() req) {
     return this.demoDayFundraisingProfilesService.deleteFundraisingOnePager(req.userEmail);
   }
@@ -67,6 +72,7 @@ export class DemoDaysController {
   @Put('current/fundraising-profile/video')
   @UseGuards(UserTokenValidation)
   @UseInterceptors(FileFieldsInterceptor([{ name: 'videoFile', maxCount: 1 }]))
+  @NoCache()
   async updateVideo(@Req() req, @UploadedFiles() files: { videoFile?: Express.Multer.File[] }) {
     if (!files.videoFile?.[0]) {
       throw new Error('videoFile is required');
@@ -83,12 +89,14 @@ export class DemoDaysController {
 
   @Delete('current/fundraising-profile/video')
   @UseGuards(UserTokenValidation)
+  @NoCache()
   async deleteVideo(@Req() req) {
     return this.demoDayFundraisingProfilesService.deleteFundraisingVideo(req.userEmail);
   }
 
   @Patch('current/fundraising-profile/team')
   @UseGuards(UserTokenValidation)
+  @NoCache()
   async updateTeam(
     @Req() req,
     @Body()
