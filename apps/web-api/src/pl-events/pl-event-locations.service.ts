@@ -665,8 +665,8 @@ export class PLEventLocationsService {
 
       if (existingLocation) {
         // Calculate the deviation between existing and new coordinates
-        const latitudeDeviation = Math.abs(Math.abs(parseFloat(existingLocation.latitude)) - Math.abs(parseFloat(location.latitude)));
-        const longitudeDeviation = Math.abs(Math.abs(parseFloat(existingLocation.longitude)) - Math.abs(parseFloat(location.longitude)));
+        const latitudeDeviation = Math.abs(Math.abs(parseFloat(existingLocation.latitude || '0')) - Math.abs(parseFloat(location.latitude || '0')));
+        const longitudeDeviation = Math.abs(Math.abs(parseFloat(existingLocation.longitude || '0')) - Math.abs(parseFloat(location.longitude || '0')));
 
         // Check if deviation is within provided degrees
         if (latitudeDeviation <= Number(process.env.ALLOWED_LATITUDE_DEVIATION || 2) && longitudeDeviation <= Number(process.env.ALLOWED_LONGITUDE_DEVIATION || 2)) {
