@@ -9,6 +9,7 @@ import {
   HUSKY_SKILLS_GENERATION_SYSTEM_PROMPT,
   HUSKY_AUTO_BIO_DATABASE_ONLY_PROMPT,
   HUSKY_RECOMMENDATION_REASON_SYSTEM_PROMPT,
+  HUSKY_BIO_DISCLAIMER,
 } from '../utils/ai-prompts';
 import { PrismaService } from '../shared/prisma.service';
 import { MemberWithRelations, RecommendationFactors } from '../recommendations/recommendations.engine';
@@ -103,7 +104,10 @@ export class HuskyGenerationService {
 
     const { text: bio } = await generateText(generateTextOptions);
 
-    return { bio };
+    // Append AI disclaimer to the bio
+    const bioWithDisclaimer = `${bio}${HUSKY_BIO_DISCLAIMER}`;
+
+    return { bio: bioWithDisclaimer };
   }
 
   async generateMemberSkills(memberEmail: string): Promise<{ skills: { title: string; uid: string }[] }> {

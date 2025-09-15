@@ -1,3 +1,5 @@
+export const HUSKY_BIO_DISCLAIMER = '<p><em>Bio is AI generated & may not be accurate.</em></p>';
+
 export const HUSKY_NO_INFO_PROMPT = `Create the below JSON object with the content, followUpQuestions, actions and sources. Dont add any other text of information
  Response JSON: {content: 'No information available for the provided question.', followUpQuestions: [], actions: [], sources: []}
 `;
