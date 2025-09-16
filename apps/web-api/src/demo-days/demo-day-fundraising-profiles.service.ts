@@ -110,10 +110,62 @@ export class DemoDayFundraisingProfilesService {
       });
     }
 
+    // Get all enabled founders for this team with their roles
+    const founders = await this.prisma.demoDayParticipant.findMany({
+      where: {
+        demoDayUid: demoDay.uid,
+        teamUid: teamUid,
+        status: 'ENABLED',
+        isDeleted: false,
+      },
+      include: {
+        member: {
+          select: {
+            uid: true,
+            name: true,
+            email: true,
+            image: {
+              select: {
+                uid: true,
+                url: true,
+              },
+            },
+            officeHours: true,
+            skills: {
+              select: {
+                uid: true,
+                title: true,
+              },
+            },
+            teamMemberRoles: {
+              where: {
+                teamUid: teamUid,
+              },
+              select: {
+                role: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Format founders data
+    const foundersWithRoles = founders.map((participant) => ({
+      uid: participant.member.uid,
+      name: participant.member.name,
+      email: participant.member.email,
+      image: participant.member.image,
+      role: participant.member.teamMemberRoles[0]?.role || null,
+      skills: participant.member.skills,
+      officeHours: participant.member.officeHours,
+    }));
+
     return {
       uid: fundraisingProfile.uid,
       teamUid: teamUid,
       team: teamWithDetails,
+      founders: foundersWithRoles,
       onePagerUploadUid: fundraisingProfile.onePagerUploadUid,
       onePagerUpload: fundraisingProfile.onePagerUpload,
       videoUploadUid: fundraisingProfile.videoUploadUid,
