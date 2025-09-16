@@ -455,15 +455,15 @@ export class DemoDayFundraisingProfilesService {
 
   async getCurrentDemoDayFundraisingProfiles(
     memberEmail: string,
-    params?: { stage?: string; industry?: string; search?: string }
+    params?: { stage?: string[]; industry?: string[]; search?: string }
   ): Promise<any[]> {
     const demoDay = await this.demoDaysService.getCurrentDemoDay();
     if (!demoDay) {
       throw new ForbiddenException('No demo day access');
     }
 
-    const hasInvestorAccess = await this.ensureInvestorAccess(memberEmail, demoDay.uid);
-    if (!hasInvestorAccess) {
+    const investorUid = await this.ensureInvestorAccess(memberEmail, demoDay.uid);
+    if (!investorUid) {
       throw new ForbiddenException('No demo day access');
     }
 
@@ -478,10 +478,10 @@ export class DemoDayFundraisingProfilesService {
     if (filtered.length === 0) return [];
 
     // Stable personalized order based on user email
-    return this.sortProfilesForUser(memberEmail, filtered);
+    return this.sortProfilesForUser(investorUid, filtered);
   }
 
-  private async ensureInvestorAccess(memberEmail: string, demoDayUid: string): Promise<boolean> {
+  private async ensureInvestorAccess(memberEmail: string, demoDayUid: string): Promise<string | null> {
     const access = await this.prisma.member.findUnique({
       where: { email: memberEmail },
       select: {
@@ -499,11 +499,11 @@ export class DemoDayFundraisingProfilesService {
       },
     });
 
-    return !!access && access.demoDayParticipants.length > 0;
+    return access && access.demoDayParticipants.length > 0 ? access.uid : null;
   }
 
   private buildProfilesWhere(
-    params: { stage?: string; industry?: string; search?: string } | undefined,
+    params: { stage?: string | string[]; industry?: string | string[]; search?: string } | undefined,
     demoDayUid: string
   ): any {
     const where: any = {
@@ -516,11 +516,22 @@ export class DemoDayFundraisingProfilesService {
     if (params?.stage || params?.industry || params?.search) {
       where.team = { ...(where.team || {}) };
 
+      // filter by funding stage
       if (params.stage) {
-        where.team.fundingStageUid = params.stage;                // filter by funding stage
+        if (Array.isArray(params.stage)) {
+          where.team.fundingStageUid = { in: params.stage };
+        } else {
+          where.team.fundingStageUid = params.stage;
+        }
       }
+
+      // filter by industry tag
       if (params.industry) {
-        where.team.industryTags = { some: { uid: params.industry } }; // filter by industry tag
+        if (Array.isArray(params.industry)) {
+          where.team.industryTags = { some: { uid: { in: params.industry } } };
+        } else {
+          where.team.industryTags = { some: { uid: params.industry } };
+        }
       }
       if (params.search) {
         where.team.name = { contains: params.search, mode: 'insensitive' }; // search by team name
@@ -586,7 +597,7 @@ export class DemoDayFundraisingProfilesService {
     return profiles.filter((p) => allowedSet.has(p.teamUid));
   }
 
-  private sortProfilesForUser(memberEmail: string, profiles: any[]): any[] {
+  private sortProfilesForUser(userSeed: string, profiles: any[]): any[] {
     const hash = (s: string): number => {
       // Simple FNV-1a 32-bit hash
       let h = 0x811c9dc5;
@@ -597,9 +608,9 @@ export class DemoDayFundraisingProfilesService {
       return h >>> 0;
     };
 
-    const email = memberEmail || '';
+    const seed = userSeed || '';
     return profiles
-      .map((p) => ({ key: hash(`${email}|${p.teamUid}`), p }))
+      .map((p) => ({ key: hash(`${seed}|${p.teamUid}`), p }))
       .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
       .map(({ p }) => p);
   }

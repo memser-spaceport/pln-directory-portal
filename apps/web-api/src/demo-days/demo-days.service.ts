@@ -80,7 +80,7 @@ export class DemoDaysService {
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
-        status: demoDay.status.toLowerCase() as 'PENDING' | 'ACTIVE' | 'COMPLETED',
+        status: demoDay.status.toUpperCase() as 'PENDING' | 'ACTIVE' | 'COMPLETED',
       };
     } else if (isDirectoryAdmin) {
       // Member is directory admin but not a participant
@@ -91,7 +91,7 @@ export class DemoDaysService {
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
-        status: demoDay.status.toLowerCase() as 'PENDING' | 'ACTIVE' | 'COMPLETED',
+        status: demoDay.status.toUpperCase() as 'PENDING' | 'ACTIVE' | 'COMPLETED',
       };
     }
 

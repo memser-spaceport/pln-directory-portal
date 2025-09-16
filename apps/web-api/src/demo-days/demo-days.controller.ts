@@ -53,15 +53,16 @@ export class DemoDaysController {
   @NoCache()
   async getCurrentDemoDayFundraisingProfiles(
     @Req() req,
-    @Query('stage') stage?: string,
-    @Query('industry') industry?: string,
+    @Query('stage') stage?: string[] | string,
+    @Query('industry') industry?: string[] | string,
     @Query('search') search?: string
   ) {
+    const normalize = (v: string | string[] | undefined) =>
+      !v ? undefined : Array.isArray(v) ? v : v.split(',');
 
-    let memberEmail = req.userEmail;
-    return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfiles(memberEmail, {
-      stage,
-      industry,
+    return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfiles(req.userEmail, {
+      stage: normalize(stage),
+      industry: normalize(industry),
       search,
     });
   }
