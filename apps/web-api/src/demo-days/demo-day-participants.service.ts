@@ -97,6 +97,21 @@ export class DemoDayParticipantsService {
     let teamUid: string | null = null;
     if (data.type === 'FOUNDER' && member.teamMemberRoles.length > 0) {
       teamUid = member.teamMemberRoles.find((role) => role.mainTeam)?.team.uid || member.teamMemberRoles[0].team.uid;
+
+      // Auto-assign Founder as Team Lead of their main team
+      if (teamUid) {
+        await this.prisma.teamMemberRole.update({
+          where: {
+            memberUid_teamUid: {
+              memberUid: member.uid,
+              teamUid: teamUid,
+            },
+          },
+          data: {
+            teamLead: true,
+          },
+        });
+      }
     }
 
     // Determine status based on whether member was newly created or existing
@@ -155,6 +170,8 @@ export class DemoDayParticipantsService {
       statusUpdatedAt: Date;
     }[] = [];
 
+    const teamLeadUpdates: { memberUid: string; teamUid: string }[] = [];
+
     for (const memberData of data.members) {
       try {
         // Skip if participant already exists
@@ -178,6 +195,10 @@ export class DemoDayParticipantsService {
             teamUid =
               existingMember.teamMemberRoles.find((role) => role.mainTeam)?.team.uid ||
               existingMember.teamMemberRoles[0].team.uid;
+
+            if (teamUid) {
+              teamLeadUpdates.push({ memberUid: existingMember.uid, teamUid });
+            }
           }
 
           participantsToCreate.push({
@@ -237,6 +258,24 @@ export class DemoDayParticipantsService {
         await tx.demoDayParticipant.createMany({
           data: participantsToCreate,
         });
+      }
+
+      // Auto-assign Founder as Team Lead of their main team
+      if (teamLeadUpdates.length > 0) {
+        const unique = new Map<string, { memberUid: string; teamUid: string }>();
+        for (const u of teamLeadUpdates) {
+          unique.set(`${u.memberUid}|${u.teamUid}`, u);
+        }
+        for (const { memberUid, teamUid } of unique.values()) {
+          await tx.teamMemberRole.update({
+            where: {
+              memberUid_teamUid: { memberUid, teamUid },
+            },
+            data: {
+              teamLead: true,
+            },
+          });
+        }
       }
     });
 
