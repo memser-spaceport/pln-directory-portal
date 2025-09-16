@@ -421,19 +421,23 @@ export class DemoDayFundraisingProfilesService {
 
     const updateData: any = {};
 
-    if (data.name !== undefined) {
+    if (data.name) {
       updateData.name = data.name;
     }
-    if (data.shortDescription !== undefined) {
+
+    if (data.shortDescription) {
       updateData.shortDescription = data.shortDescription;
     }
-    if (data.logo !== undefined) {
+
+    if (data.logo) {
       updateData.logoUid = data.logo;
     }
-    if (data.fundingStage !== undefined) {
+
+    if (data.fundingStage) {
       updateData.fundingStageUid = data.fundingStage;
     }
-    if (data.industryTags !== undefined) {
+
+    if (data.industryTags) {
       updateData.industryTags = {
         set: data.industryTags.map((uid) => ({ uid })),
       };

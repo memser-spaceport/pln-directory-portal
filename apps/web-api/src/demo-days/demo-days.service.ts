@@ -66,6 +66,11 @@ export class DemoDaysService {
 
     // Check demo day participant
     const participant = member.demoDayParticipants[0];
+
+    if (participant.status !== 'ENABLED') {
+      return { access: 'NONE' };
+    }
+
     if (participant && participant.status === 'ENABLED') {
       // Member is an enabled participant
       const access = participant.type === 'INVESTOR' ? 'INVESTOR' : 'FOUNDER';
