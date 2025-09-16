@@ -3,7 +3,7 @@ export interface DemoDay {
   title: string;
   description: string;
   startDate: string;
-  status: 'PENDING' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
+  status: 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
   createdAt: string;
   updatedAt: string;
 }
@@ -12,14 +12,14 @@ export interface CreateDemoDayDto {
   title: string;
   description: string;
   startDate: string;
-  status: 'PENDING' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
+  status: 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
 }
 
 export interface UpdateDemoDayDto {
   title?: string;
   description?: string;
   startDate?: string;
-  status?: 'PENDING' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
+  status?: 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
 }
 
 export interface DemoDayParticipant {

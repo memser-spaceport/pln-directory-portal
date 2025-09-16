@@ -230,10 +230,9 @@ const DemoDayDetailPage = () => {
                     onChange={(e) => handleEditFormChange('status', e.target.value)}
                     className={s.fieldInput}
                   >
-                    <option value="PENDING">Pending</option>
+                    <option value="UPCOMING">Upcoming</option>
                     <option value="ACTIVE">Active</option>
                     <option value="COMPLETED">Completed</option>
-                    <option value="ARCHIVED">Archived</option>
                   </select>
                 ) : (
                   <div className={s.fieldValue}>{demoDay.status}</div>
