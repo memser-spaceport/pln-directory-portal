@@ -18,6 +18,7 @@ import { LogService } from '../shared/log.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
 import { PrismaService } from '../shared/prisma.service';
+import { AuthMetrics, extractErrorCode, statusClassOf } from '../metrics/auth.metrics';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -35,12 +36,29 @@ export class AuthService implements OnModuleInit {
     this.membersService = this.moduleRef.get(MembersService, { strict: false });
   }
 
-  async createAuthRequest(authRequest) {
-    const output = await axios.post(`${process.env.AUTH_API_URL}/auth`, {
-      state: authRequest.state,
-      client_id: process.env.AUTH_APP_CLIENT_ID,
-    });
+  private async authCall(op: string, fn: () => Promise<any>) {
+    AuthMetrics.requests.inc({ op });
+    const end = AuthMetrics.duration.startTimer({ op });
+    try {
+      return await fn();
+    } catch (e) {
+      const httpStatus = e?.response?.status ?? e?.status ?? e?.statusCode ?? 0;
+      const statusClass = statusClassOf(httpStatus);
+      const errorCode = extractErrorCode(e);
+      AuthMetrics.errors.inc({ op, status_class: statusClass, http_status: String(httpStatus), error_code: String(errorCode) });
+      throw e;
+    } finally {
+      end();
+    }
+  }
 
+  async createAuthRequest(authRequest) {
+    const output = await this.authCall('create_auth_request', () =>
+      axios.post(`${process.env.AUTH_API_URL}/auth`, {
+        state: authRequest.state,
+        client_id: process.env.AUTH_APP_CLIENT_ID,
+      })
+    );
     return output.data.uid;
   }
 
@@ -52,12 +70,12 @@ export class AuthService implements OnModuleInit {
    */
   async deleteUserAccount(externalAuthToken: string, externalAuthId: string) {
     const clientToken = await this.getAuthClientToken();
-    await axios.delete(`${process.env.AUTH_API_URL}/accounts/external/${externalAuthId}`, {
-      headers: {
-        Authorization: `Bearer ${clientToken}`,
-      },
-      data: { token: externalAuthToken },
-    });
+    await this.authCall('delete_external_account', () =>
+      axios.delete(`${process.env.AUTH_API_URL}/accounts/external/${externalAuthId}`, {
+        headers: { Authorization: `Bearer ${clientToken}` },
+        data: { token: externalAuthToken },
+      })
+    );
     return true;
   }
 
@@ -208,19 +226,21 @@ export class AuthService implements OnModuleInit {
     const clientToken = await this.getAuthClientToken();
     let linkResult;
     try {
-      linkResult = await this.getAuthApi().patch(
-        `/admin/accounts/email`,
-        {
-          email: newEmail.toLowerCase().trim(),
-          existingEmail: oldEmail.toLowerCase().trim(),
-          userId: externalId,
-          deleteAndReplace: true,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${clientToken}`,
+      linkResult = await this.authCall('update_email', () =>
+        this.getAuthApi().patch(
+          `/admin/accounts/email`,
+          {
+            email: newEmail.toLowerCase().trim(),
+            existingEmail: oldEmail.toLowerCase().trim(),
+            userId: externalId,
+            deleteAndReplace: true,
           },
-        }
+          {
+            headers: {
+              Authorization: `Bearer ${clientToken}`,
+            },
+          }
+        )
       );
     } catch (error) {
       this.handleAuthErrors(error);
@@ -243,7 +263,9 @@ export class AuthService implements OnModuleInit {
   }
 
   validateToken = async (request, token) => {
-    const validationResult: any = await axios.post(`${process.env.AUTH_API_URL}/auth/introspect`, { token: token });
+    const validationResult: any = await this.authCall('introspect', () =>
+      axios.post(`${process.env.AUTH_API_URL}/auth/introspect`, { token: token })
+    );
     if (validationResult?.data?.active && validationResult?.data?.email) {
       request['userEmail'] = validationResult.data.email;
       return request;
@@ -271,13 +293,14 @@ export class AuthService implements OnModuleInit {
   }
 
   private async getClientToken() {
-    const response = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
-      client_id: process.env.AUTH_APP_CLIENT_ID,
-      client_secret: process.env.AUTH_APP_CLIENT_SECRET,
-      grant_type: 'client_credentials',
-      grantTypes: ['client_credentials', 'authorization_code', 'refresh_token'],
-    });
-
+    const response = await this.authCall('client_token', () =>
+      axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
+        client_id: process.env.AUTH_APP_CLIENT_ID,
+        client_secret: process.env.AUTH_APP_CLIENT_SECRET,
+        grant_type: 'client_credentials',
+        grantTypes: ['client_credentials', 'authorization_code', 'refresh_token'],
+      })
+    );
     return response.data.access_token;
   }
 
@@ -285,14 +308,16 @@ export class AuthService implements OnModuleInit {
     const clientToken = await this.getAuthClientToken();
     let linkResult;
     try {
-      linkResult = await this.getAuthApi().put(
-        `/admin/accounts`,
-        { token: userIdToken, email: email?.toLowerCase().trim() },
-        {
-          headers: {
-            Authorization: `Bearer ${clientToken}`,
-          },
-        }
+      linkResult = await this.authCall('link_account', () =>
+        this.getAuthApi().put(
+          `/admin/accounts`,
+          { token: userIdToken, email: email?.toLowerCase().trim() },
+          {
+            headers: {
+              Authorization: `Bearer ${clientToken}`,
+            },
+          }
+        )
       );
     } catch (error) {
       this.handleAuthErrors(error);
@@ -319,7 +344,9 @@ export class AuthService implements OnModuleInit {
     }
 
     try {
-      result = await axios.post(`${process.env.AUTH_API_URL}/auth/token`, payload);
+      result = await this.authCall(`get_tokens.${grantType}`, () =>
+        axios.post(`${process.env.AUTH_API_URL}/auth/token`, payload)
+      );
       return result.data;
     } catch (error) {
       this.handleAuthErrors(error);
