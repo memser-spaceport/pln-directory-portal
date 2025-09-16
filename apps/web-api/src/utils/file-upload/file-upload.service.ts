@@ -65,10 +65,11 @@ export class FileUploadService {
   // New: single-file store that returns a secure URL (worker URL for IPFS or presigned GET for S3).
   async storeOneAndGetSecureUrl(
     file: Express.Multer.File,
-    opts?: { prefix?: string; signed?: boolean },
-  ): Promise<{ url: string; storage: 'ipfs' | 's3'; keyOrPath: string }> {
+    opts?: { prefix?: string; signed?: boolean; ttlSec?: number },
+  ): Promise<{ url: string; storage: 'ipfs' | 's3'; keyOrPath: string; bucket?: string }> {
     const prefix = opts?.prefix ?? 'uploads';
     const signed = opts?.signed ?? true;
+    const ttlSec = Math.max(30, Number(opts?.ttlSec ?? 3600)); // default 1h for this helper
 
     if (process.env.FILE_STORAGE === IPFS) {
       const client = this.makeStorageClient();
@@ -79,14 +80,32 @@ export class FileUploadService {
       return { url, storage: 'ipfs', keyOrPath: `${cid}/${file.originalname}` };
     }
 
+    // Resolve ONE bucket consistently for S3 uploads
+    const bucket =
+      process.env.AWS_S3_UPLOAD_BUCKET_NAME ||
+      process.env.AWS_S3_BUCKET_NAME;
+
+    if (!bucket) {
+      throw new Error('No S3 bucket configured (AWS_S3_UPLOAD_BUCKET_NAME or AWS_S3_BUCKET_NAME)');
+    }
+
     const safeName = `${hashName(file.originalname)}${fileExt(file.originalname)}`;
     const key = `${prefix}/${safeName}`;
-    const resp = await this.awsService.uploadFileToS3(file, process.env.AWS_S3_BUCKET_NAME, key);
 
+    // Upload the file
+    const resp = await this.awsService.uploadFileToS3(file, bucket, key);
+
+    // Optionally return a short-lived GET URL (convenient for immediate preview)
     if (signed) {
-      const signedUrl = await this.awsService.getPresignedGetUrl(process.env.AWS_S3_BUCKET_NAME, key, 60 * 60);
-      return { url: signedUrl, storage: 's3', keyOrPath: key };
+      const signedUrl = await this.awsService.getSignedGetUrl(bucket, key, ttlSec, {
+        disposition: 'inline',
+        filename: file.originalname,
+        contentType: file.mimetype,
+      });
+      return { url: signedUrl, storage: 's3', keyOrPath: key, bucket };
     }
-    return { url: resp.Location, storage: 's3', keyOrPath: key };
+
+    // Otherwise, return the S3 object location
+    return { url: resp.Location, storage: 's3', keyOrPath: key, bucket };
   }
 }

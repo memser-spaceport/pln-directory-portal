@@ -74,9 +74,15 @@ export class UploadsController {
   }
 
   @Get(':uid')
-  async getOne(@Param('uid') uid: string) {
-    const row = await this.prisma.upload.findUnique({ where: { uid } });
-    if (!row) throw new BadRequestException('Upload not found');
-    return row;
+  @Header('Cache-Control', 'no-store')
+  async getOne(
+    @Param('uid') uid: string,
+    @Query('disposition') disposition?: 'inline' | 'attachment',
+    @Query('ttlSec') ttlSec?: string,
+  ) {
+    return this.uploads.getOneWithFreshUrl(uid, {
+      disposition: disposition ?? 'inline',
+      ttlSec: ttlSec ? Number(ttlSec) : 86400,
+    });
   }
 }
