@@ -10,7 +10,7 @@ export class DemoDaysService {
     const demoDay = await this.prisma.demoDay.findFirst({
       where: {
         status: {
-          in: [DemoDayStatus.PENDING, DemoDayStatus.ACTIVE, DemoDayStatus.COMPLETED],
+          in: [DemoDayStatus.UPCOMING, DemoDayStatus.ACTIVE, DemoDayStatus.COMPLETED],
         },
         isDeleted: false,
       },

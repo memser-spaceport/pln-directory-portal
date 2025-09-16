@@ -22,12 +22,10 @@ const DemoDaysPage = () => {
     switch (status) {
       case 'ACTIVE':
         return 'text-green-600 bg-green-100';
-      case 'PENDING':
+      case 'UPCOMING':
         return 'text-yellow-600 bg-yellow-100';
       case 'COMPLETED':
         return 'text-blue-600 bg-blue-100';
-      case 'ARCHIVED':
-        return 'text-gray-600 bg-gray-100';
       default:
         return 'text-gray-600 bg-gray-100';
     }

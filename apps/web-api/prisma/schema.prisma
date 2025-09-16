@@ -952,10 +952,9 @@ model InvestorProfile {
 }
 
 enum DemoDayStatus {
-  PENDING
+  UPCOMING
   ACTIVE
   COMPLETED
-  ARCHIVED
 }
 
 enum DemoDayParticipantType {
@@ -975,7 +974,7 @@ model DemoDay {
   startDate           DateTime
   title               String
   description         String
-  status              DemoDayStatus            @default(PENDING)
+  status              DemoDayStatus            @default(UPCOMING)
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
   isDeleted           Boolean                  @default(false)
