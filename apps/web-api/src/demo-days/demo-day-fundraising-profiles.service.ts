@@ -452,4 +452,156 @@ export class DemoDayFundraisingProfilesService {
     await this.updateFundraisingProfileStatus(team.uid, demoDay.uid);
     return this.getCurrentDemoDayFundraisingProfile(memberEmail);
   }
+
+  async getCurrentDemoDayFundraisingProfiles(
+    memberEmail: string,
+    params?: { stage?: string; industry?: string; search?: string }
+  ): Promise<any[]> {
+    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day access');
+    }
+
+    const hasInvestorAccess = await this.ensureInvestorAccess(memberEmail, demoDay.uid);
+    if (!hasInvestorAccess) {
+      throw new ForbiddenException('No demo day access');
+    }
+
+    // Only include PUBLISHED profiles that have both uploads present
+    const where = this.buildProfilesWhere(params, demoDay.uid);
+
+    const profiles = await this.fetchProfiles(where);
+    if (profiles.length === 0) return [];
+
+    // Condition #2: fundraising profile must have at least one ENABLED FOUNDER participant in the demo day
+    const filtered = await this.filterProfilesByEnabledFounders(demoDay.uid, profiles);
+    if (filtered.length === 0) return [];
+
+    // Stable personalized order based on user email
+    return this.sortProfilesForUser(memberEmail, filtered);
+  }
+
+  private async ensureInvestorAccess(memberEmail: string, demoDayUid: string): Promise<boolean> {
+    const access = await this.prisma.member.findUnique({
+      where: { email: memberEmail },
+      select: {
+        uid: true,
+        demoDayParticipants: {
+          where: {
+            demoDayUid: demoDayUid,
+            isDeleted: false,
+            status: 'ENABLED',
+            type: 'INVESTOR',
+          },
+          select: { uid: true },
+          take: 1,
+        },
+      },
+    });
+
+    return !!access && access.demoDayParticipants.length > 0;
+  }
+
+  private buildProfilesWhere(
+    params: { stage?: string; industry?: string; search?: string } | undefined,
+    demoDayUid: string
+  ): any {
+    const where: any = {
+      demoDayUid: demoDayUid,
+      status: 'PUBLISHED',              // Condition #1: exclude DISABLED or DRAFT
+      onePagerUploadUid: { not: null }, // Condition #1: onePager must be uploaded
+      videoUploadUid: { not: null },    // Condition #1: video must be uploaded
+    };
+
+    if (params?.stage || params?.industry || params?.search) {
+      where.team = { ...(where.team || {}) };
+
+      if (params.stage) {
+        where.team.fundingStageUid = params.stage;                // filter by funding stage
+      }
+      if (params.industry) {
+        where.team.industryTags = { some: { uid: params.industry } }; // filter by industry tag
+      }
+      if (params.search) {
+        where.team.name = { contains: params.search, mode: 'insensitive' }; // search by team name
+      }
+    }
+
+    return where;
+  }
+
+  private async fetchProfiles(where: any): Promise<any[]> {
+    return this.prisma.teamFundraisingProfile.findMany({
+      where,
+      include: {
+        team: {
+          select: {
+            uid: true,
+            name: true,
+            shortDescription: true,
+            industryTags: {
+              select: {
+                uid: true,
+                title: true,
+              },
+            },
+            fundingStage: {
+              select: {
+                uid: true,
+                title: true,
+              },
+            },
+            logo: {
+              select: {
+                uid: true,
+                url: true,
+              },
+            },
+          },
+        },
+        onePagerUpload: true,
+        videoUpload: true,
+      },
+    });
+  }
+
+  private async filterProfilesByEnabledFounders(demoDayUid: string, profiles: any[]): Promise<any[]> {
+    // Collect teamUids from all candidate profiles
+    const teamUids = profiles.map((p) => p.teamUid);
+
+    // Find all teams that have at least one ENABLED FOUNDER participant in this demo day
+    const founderTeams = await this.prisma.demoDayParticipant.findMany({
+      where: {
+        demoDayUid: demoDayUid,
+        isDeleted: false,
+        status: 'ENABLED',
+        type: 'FOUNDER',
+        teamUid: { in: teamUids },
+      },
+      select: { teamUid: true },
+    });
+
+    const allowedSet = new Set((founderTeams.map((t) => t.teamUid) as (string | null)[]).filter(Boolean) as string[]);
+    // Exclude profiles where no ENABLED FOUNDER participants exist
+    return profiles.filter((p) => allowedSet.has(p.teamUid));
+  }
+
+  private sortProfilesForUser(memberEmail: string, profiles: any[]): any[] {
+    const hash = (s: string): number => {
+      // Simple FNV-1a 32-bit hash
+      let h = 0x811c9dc5;
+      for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = (h * 0x01000193) >>> 0;
+      }
+      return h >>> 0;
+    };
+
+    const email = memberEmail || '';
+    return profiles
+      .map((p) => ({ key: hash(`${email}|${p.teamUid}`), p }))
+      .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+      .map(({ p }) => p);
+  }
+
 }
