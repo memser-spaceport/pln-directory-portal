@@ -1813,7 +1813,7 @@ export class MembersService {
 
       // Add OR condition to match any of the three sources
       whereConditions.push({
-        AND: rolesConditions,
+        OR: rolesConditions,
       });
     }
 
