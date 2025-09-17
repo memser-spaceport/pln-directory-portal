@@ -77,12 +77,7 @@ export class UploadsController {
   @Header('Cache-Control', 'no-store')
   async getOne(
     @Param('uid') uid: string,
-    @Query('disposition') disposition?: 'inline' | 'attachment',
-    @Query('ttlSec') ttlSec?: string,
   ) {
-    return this.uploads.getOneWithFreshUrl(uid, {
-      disposition: disposition ?? 'inline',
-      ttlSec: ttlSec ? Number(ttlSec) : 86400,
-    });
+    return this.uploads.getOne(uid);
   }
 }
