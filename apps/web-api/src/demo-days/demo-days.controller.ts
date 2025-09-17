@@ -10,7 +10,7 @@ import {
   UseInterceptors,
   UploadedFiles,
   UsePipes,
-  Query
+  Query,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiTags } from '@nestjs/swagger';
@@ -57,8 +57,7 @@ export class DemoDaysController {
     @Query('industry') industry?: string[] | string,
     @Query('search') search?: string
   ) {
-    const normalize = (v: string | string[] | undefined) =>
-      !v ? undefined : Array.isArray(v) ? v : v.split(',');
+    const normalize = (v: string | string[] | undefined) => (!v ? undefined : Array.isArray(v) ? v : v.split(','));
 
     return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfiles(req.userEmail, {
       stage: normalize(stage),

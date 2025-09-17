@@ -462,8 +462,8 @@ export class DemoDayFundraisingProfilesService {
       throw new ForbiddenException('No demo day access');
     }
 
-    const investorUid = await this.ensureInvestorAccess(memberEmail, demoDay.uid);
-    if (!investorUid) {
+    const participantUid = await this.ensureParticipantAccess(memberEmail, demoDay.uid);
+    if (!participantUid) {
       throw new ForbiddenException('No demo day access');
     }
 
@@ -478,10 +478,10 @@ export class DemoDayFundraisingProfilesService {
     if (filtered.length === 0) return [];
 
     // Stable personalized order based on user email
-    return this.sortProfilesForUser(investorUid, filtered);
+    return this.sortProfilesForUser(participantUid, filtered);
   }
 
-  private async ensureInvestorAccess(memberEmail: string, demoDayUid: string): Promise<string | null> {
+  private async ensureParticipantAccess(memberEmail: string, demoDayUid: string): Promise<string | null> {
     const access = await this.prisma.member.findUnique({
       where: { email: memberEmail },
       select: {
@@ -491,7 +491,6 @@ export class DemoDayFundraisingProfilesService {
             demoDayUid: demoDayUid,
             isDeleted: false,
             status: 'ENABLED',
-            type: 'INVESTOR',
           },
           select: { uid: true },
           take: 1,
@@ -508,9 +507,9 @@ export class DemoDayFundraisingProfilesService {
   ): any {
     const where: any = {
       demoDayUid: demoDayUid,
-      status: 'PUBLISHED',              // Condition #1: exclude DISABLED or DRAFT
+      status: 'PUBLISHED', // Condition #1: exclude DISABLED or DRAFT
       onePagerUploadUid: { not: null }, // Condition #1: onePager must be uploaded
-      videoUploadUid: { not: null },    // Condition #1: video must be uploaded
+      videoUploadUid: { not: null }, // Condition #1: video must be uploaded
     };
 
     if (params?.stage || params?.industry || params?.search) {
@@ -614,5 +613,4 @@ export class DemoDayFundraisingProfilesService {
       .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
       .map(({ p }) => p);
   }
-
 }
