@@ -155,4 +155,18 @@ export class AwsService {
       throw error;
     }
   }
+  
+  /**
+   * Updates an record in DynamoDB table
+   * 
+   * @param params - DynamoDB update parameters
+   * @returns Promise with the update result
+   */
+  async updateRecordInDynamoDB(params: AWS.DynamoDB.DocumentClient.UpdateItemInput): Promise<any> {
+    if (!params.TableName) {
+      throw new Error('DynamoDB table name is required');
+    }
+    const dynamoDb = new AWS.DynamoDB.DocumentClient(CONFIG);
+    return await dynamoDb.update(params).promise();
+  }
 }
