@@ -10,6 +10,7 @@ import {
   UseInterceptors,
   UploadedFiles,
   UsePipes,
+  Query
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiTags } from '@nestjs/swagger';
@@ -45,6 +46,25 @@ export class DemoDaysController {
   @NoCache()
   async getCurrentDemoDayFundraisingProfile(@Req() req) {
     return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfile(req.userEmail);
+  }
+
+  @Get('current/fundraising-profiles')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async getCurrentDemoDayFundraisingProfiles(
+    @Req() req,
+    @Query('stage') stage?: string[] | string,
+    @Query('industry') industry?: string[] | string,
+    @Query('search') search?: string
+  ) {
+    const normalize = (v: string | string[] | undefined) =>
+      !v ? undefined : Array.isArray(v) ? v : v.split(',');
+
+    return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfiles(req.userEmail, {
+      stage: normalize(stage),
+      industry: normalize(industry),
+      search,
+    });
   }
 
   @Put('current/fundraising-profile/one-pager')
