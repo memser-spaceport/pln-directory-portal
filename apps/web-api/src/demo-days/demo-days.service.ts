@@ -26,11 +26,45 @@ export class DemoDaysService {
     title?: string;
     description?: string;
     status?: 'PENDING' | 'ACTIVE' | 'COMPLETED';
+    teamsCount?: number;
+    investorsCount?: number;
   }> {
     const demoDay = await this.getCurrentDemoDay();
     if (!demoDay) {
-      return { access: 'NONE' };
+      return { access: 'NONE', teamsCount: 0, investorsCount: 0 };
     }
+
+    const investorsCount = await this.prisma.demoDayParticipant.count({
+      where: {
+        demoDayUid: demoDay.uid,
+        isDeleted: false,
+        status: 'ENABLED',
+        type: 'INVESTOR',
+      },
+    });
+
+    // Count teams using fundraising profile logic:
+    // - profile must be PUBLISHED
+    // - must have onePager and video uploaded
+    // - team must have at least one ENABLED FOUNDER participant in this demo day
+    const teamsCount = await this.prisma.teamFundraisingProfile.count({
+      where: {
+        demoDayUid: demoDay.uid,
+        status: 'PUBLISHED',
+        onePagerUploadUid: { not: null },
+        videoUploadUid: { not: null },
+        team: {
+          demoDayParticipants: {
+            some: {
+              demoDayUid: demoDay.uid,
+              isDeleted: false,
+              status: 'ENABLED',
+              type: 'FOUNDER',
+            },
+          },
+        },
+      },
+    });
 
     // Get member by email
     const member = await this.prisma.member.findUnique({
@@ -57,7 +91,7 @@ export class DemoDaysService {
     });
 
     if (!member) {
-      return { access: 'NONE' };
+      return { access: 'NONE', teamsCount, investorsCount };
     }
 
     // Check if member is directory admin
@@ -66,9 +100,8 @@ export class DemoDaysService {
 
     // Check demo day participant
     const participant = member.demoDayParticipants[0];
-
-    if (participant.status !== 'ENABLED') {
-      return { access: 'NONE' };
+    if (participant && participant.status !== 'ENABLED') {
+      return { access: 'NONE', teamsCount, investorsCount };
     }
 
     if (participant && participant.status === 'ENABLED') {
@@ -81,6 +114,8 @@ export class DemoDaysService {
         title: demoDay.title,
         description: demoDay.description,
         status: demoDay.status.toUpperCase() as 'PENDING' | 'ACTIVE' | 'COMPLETED',
+        teamsCount,
+        investorsCount,
       };
     } else if (isDirectoryAdmin) {
       // Member is directory admin but not a participant
@@ -92,10 +127,12 @@ export class DemoDaysService {
         title: demoDay.title,
         description: demoDay.description,
         status: demoDay.status.toUpperCase() as 'PENDING' | 'ACTIVE' | 'COMPLETED',
+        teamsCount,
+        investorsCount,
       };
     }
 
-    return { access: 'NONE' };
+    return { access: 'NONE', teamsCount, investorsCount };
   }
 
   // Admin methods
