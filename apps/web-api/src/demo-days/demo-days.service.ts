@@ -19,19 +19,24 @@ export class DemoDaysService {
     return demoDay;
   }
 
-  async getCurrentDemoDayAccess(memberEmail: string): Promise<{
-    access: 'NONE' | 'INVESTOR' | 'FOUNDER';
+  async getCurrentDemoDayAccess(memberEmail: string | null): Promise<{
+    access: 'none' | 'INVESTOR' | 'FOUNDER';
+    status: 'NONE' | 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
     uid?: string;
     date?: string;
     title?: string;
     description?: string;
-    status?: 'PENDING' | 'ACTIVE' | 'COMPLETED';
     teamsCount?: number;
     investorsCount?: number;
   }> {
     const demoDay = await this.getCurrentDemoDay();
     if (!demoDay) {
-      return { access: 'NONE', teamsCount: 0, investorsCount: 0 };
+      return {
+        access: 'none',
+        status: 'NONE',
+        teamsCount: 0,
+        investorsCount: 0,
+      };
     }
 
     const investorsCount = await this.prisma.demoDayParticipant.count({
@@ -66,6 +71,14 @@ export class DemoDaysService {
       },
     });
 
+    // Handle unauthorized users
+    if (!memberEmail) {
+      return {
+        access: 'none',
+        status: demoDay.status.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED',
+      };
+    }
+
     // Get member by email
     const member = await this.prisma.member.findUnique({
       where: { email: memberEmail },
@@ -91,7 +104,10 @@ export class DemoDaysService {
     });
 
     if (!member) {
-      return { access: 'NONE', teamsCount, investorsCount };
+      return {
+        access: 'none',
+        status: demoDay.status.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED',
+      };
     }
 
     // Check if member is directory admin
@@ -101,7 +117,10 @@ export class DemoDaysService {
     // Check demo day participant
     const participant = member.demoDayParticipants[0];
     if (participant && participant.status !== 'ENABLED') {
-      return { access: 'NONE', teamsCount, investorsCount };
+      return {
+        access: 'none',
+        status: demoDay.status.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED',
+      };
     }
 
     if (participant && participant.status === 'ENABLED') {
@@ -113,7 +132,7 @@ export class DemoDaysService {
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
-        status: demoDay.status.toUpperCase() as 'PENDING' | 'ACTIVE' | 'COMPLETED',
+        status: demoDay.status.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED',
         teamsCount,
         investorsCount,
       };
@@ -126,13 +145,16 @@ export class DemoDaysService {
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
-        status: demoDay.status.toUpperCase() as 'PENDING' | 'ACTIVE' | 'COMPLETED',
+        status: demoDay.status.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED',
         teamsCount,
         investorsCount,
       };
     }
 
-    return { access: 'NONE', teamsCount, investorsCount };
+    return {
+      access: 'none',
+      status: demoDay.status.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED',
+    };
   }
 
   // Admin methods

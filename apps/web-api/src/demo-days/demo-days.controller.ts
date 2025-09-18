@@ -17,6 +17,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { DemoDaysService } from './demo-days.service';
 import { DemoDayFundraisingProfilesService } from './demo-day-fundraising-profiles.service';
+import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { UploadsService } from '../uploads/uploads.service';
 import { UploadKind, UploadScopeType } from '@prisma/client';
@@ -33,10 +34,10 @@ export class DemoDaysController {
   ) {}
 
   @Get('current')
-  @UseGuards(UserTokenValidation)
+  @UseGuards(UserTokenCheckGuard)
   @NoCache()
   async getCurrentDemoDay(@Req() req) {
-    return this.demoDaysService.getCurrentDemoDayAccess(req.userEmail);
+    return this.demoDaysService.getCurrentDemoDayAccess(req.userEmail || null);
   }
 
   // Fundraising endpoints
