@@ -1121,6 +1121,9 @@ export class MembersService {
     await this.deleteTeamMemberRoles(tx, rolesToDelete, memberUid);
     await this.modifyTeamMemberRoles(tx, rolesToUpdate, memberUid);
     await this.createTeamMemberRoles(tx, rolesToCreate, memberUid);
+
+    // Keep all FOUNDER Demo Day participants in sync with the member's current team
+    await this.syncFounderParticipantsTeamForMember(memberUid, tx);
   }
 
   /**
@@ -1818,13 +1821,13 @@ export class MembersService {
       if (topicsArray.length > 0) {
         const [ohInterestMemberIds, ohHelpWithMemberIds] = await Promise.all([
           this.prisma.$queryRaw<{ id: number }[]>`
-            SELECT DISTINCT id FROM "Member" 
+            SELECT DISTINCT id FROM "Member"
             WHERE ${Prisma.raw(
               topicsArray
                 .map(
                   (topic) => `
                   EXISTS (
-                    SELECT 1 FROM unnest("ohInterest") AS interest_item 
+                    SELECT 1 FROM unnest("ohInterest") AS interest_item
                     WHERE LOWER(interest_item) LIKE LOWER('%${topic.replace(/'/g, "''")}%')
                   )
                 `
@@ -1833,13 +1836,13 @@ export class MembersService {
             )}
           `,
           this.prisma.$queryRaw<{ id: number }[]>`
-            SELECT DISTINCT id FROM "Member" 
+            SELECT DISTINCT id FROM "Member"
             WHERE ${Prisma.raw(
               topicsArray
                 .map(
                   (topic) => `
                   EXISTS (
-                    SELECT 1 FROM unnest("ohHelpWith") AS help_item 
+                    SELECT 1 FROM unnest("ohHelpWith") AS help_item
                     WHERE LOWER(help_item) LIKE LOWER('%${topic.replace(/'/g, "''")}%')
                   )
                 `
@@ -1966,7 +1969,7 @@ export class MembersService {
             .map(
               (focus) => `
               EXISTS (
-                SELECT 1 FROM unnest(ip."investmentFocus") AS focus_item 
+                SELECT 1 FROM unnest(ip."investmentFocus") AS focus_item
                 WHERE LOWER(focus_item) LIKE LOWER('%${focus.replace(/'/g, "''")}%')
               )
             `
@@ -2162,16 +2165,16 @@ export class MembersService {
         // Get member IDs that match the search query in ohInterest or ohHelpWith
         const [ohInterestIds, ohHelpWithIds] = await Promise.all([
           this.prisma.$queryRaw<{ id: number }[]>`
-            SELECT DISTINCT id FROM "Member" 
+            SELECT DISTINCT id FROM "Member"
             WHERE EXISTS (
-              SELECT 1 FROM unnest("ohInterest") AS interest_item 
+              SELECT 1 FROM unnest("ohInterest") AS interest_item
               WHERE LOWER(interest_item) LIKE LOWER(${`%${searchQuery}%`})
             )
           `,
           this.prisma.$queryRaw<{ id: number }[]>`
-            SELECT DISTINCT id FROM "Member" 
+            SELECT DISTINCT id FROM "Member"
             WHERE EXISTS (
-              SELECT 1 FROM unnest("ohHelpWith") AS help_item 
+              SELECT 1 FROM unnest("ohHelpWith") AS help_item
               WHERE LOWER(help_item) LIKE LOWER(${`%${searchQuery}%`})
             )
           `,
@@ -2633,4 +2636,98 @@ export class MembersService {
       return this.handleErrors(error);
     }
   }
+
+
+  private async syncFounderParticipantsTeamForMember(
+    memberUid: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<{ changed: boolean; oldTeamUid: string | null; newTeamUid: string | null }> {
+    this.logger.info(`[FounderSync] start memberUid=${memberUid}`);
+    // 1) Get all roles for the member (we'll decide the "current team" in code)
+    const roles = await tx.teamMemberRole.findMany({
+      where: { memberUid },
+      select: { teamUid: true, mainTeam: true, startDate: true, id: true },
+      // No createdAt in schema -> sort by startDate asc, then by id asc to get stable "first"
+      orderBy: [{ startDate: 'asc' }, { id: 'asc' }],
+    });
+
+    // 2) Decide the target team:
+    //    - prefer role with mainTeam === true
+    //    - otherwise take the first role (by startDate/id)
+    const preferred = roles.find(r => r.mainTeam === true);
+    const newTeamUid = preferred?.teamUid ?? roles[0]?.teamUid ?? null;
+     console.log("newTeamUid" , newTeamUid)
+    // 3) Load current Demo Day founder participants' team mapping
+    const founderParticipants = await tx.demoDayParticipant.findMany({
+      where: { memberUid, type: 'FOUNDER', isDeleted: false },
+      select: { uid: true, teamUid: true },
+    });
+    this.logger.info(
+      `[FounderSync] resolved team memberUid=${memberUid} preferredMain=${Boolean(preferred)} newTeamUid=${newTeamUid ?? 'null'}`
+    );
+    // If there are no FOUNDER participants, nothing to do
+    if (founderParticipants.length === 0) {
+      this.logger.info(`[FounderSync] no FOUNDER participants — nothing to do memberUid=${memberUid}`);
+      return { changed: false, oldTeamUid: null, newTeamUid };
+    }
+
+    // 4) Check whether anything actually needs to change
+    //    - If newTeamUid is null: we should clear any non-null teamUid
+    //    - If newTeamUid is non-null: every participant must have exactly that teamUid
+    const allAlreadyCorrect = founderParticipants.every(fp => fp.teamUid === newTeamUid);
+
+    if (allAlreadyCorrect) {
+      this.logger.info(
+        `[FounderSync] already in sync memberUid=${memberUid} teamUid=${newTeamUid ?? 'null'}`
+      );
+      return {
+        changed: false,
+        oldTeamUid: founderParticipants[0]?.teamUid ?? null,
+        newTeamUid,
+      };
+    }
+
+    // 5) Perform minimal update:
+    if (newTeamUid) {
+
+      // Set new teamUid for any that are null or different
+      const res = await tx.demoDayParticipant.updateMany({
+        where: {
+          memberUid,
+          type: 'FOUNDER',
+          isDeleted: false,
+          OR: [{ teamUid: null }, { teamUid: { not: newTeamUid } }],
+        },
+        data: { teamUid: newTeamUid },
+      });
+      this.logger.info(
+        `[FounderSync] updated teamUid for founders memberUid=${memberUid} updatedRows=${res.count} to=${newTeamUid}`
+      );
+      return {
+        changed: res.count > 0,
+        oldTeamUid: founderParticipants[0]?.teamUid ?? null,
+        newTeamUid,
+      };
+    } else {
+      // No teams now -> clear teamUid on all FOUNDER participants that currently have a value
+      const res = await tx.demoDayParticipant.updateMany({
+        where: {
+          memberUid,
+          type: 'FOUNDER',
+          isDeleted: false,
+          teamUid: { not: null },
+        },
+        data: { teamUid: null },
+      });
+      this.logger.info(
+        `[FounderSync] cleared teamUid for founders memberUid=${memberUid} clearedRows=${res.count}`
+      );
+      return {
+        changed: res.count > 0,
+        oldTeamUid: founderParticipants[0]?.teamUid ?? null,
+        newTeamUid: null,
+      };
+    }
+  }
+
 }
