@@ -71,7 +71,10 @@ export interface IFormValues {
   accessLevel: string;
   investorProfile: {
     investmentFocus: string[];
+    investInStartupStages: string[];
+    investInFundTypes: string[];
     typicalCheckSize: number;
     secRulesAccepted: boolean;
+    isInvestViaFund: boolean;
   };
 }

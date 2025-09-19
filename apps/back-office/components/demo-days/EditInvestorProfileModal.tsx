@@ -21,6 +21,7 @@ export const EditInvestorProfileModal: React.FC<{
   const [fundTypes, setFundTypes] = useState<string[]>(initial?.investInFundTypes || []);
   const [checkSize, setCheckSize] = useState<string>(initial?.typicalCheckSize?.toString() || '');
   const [sec, setSec] = useState<boolean>(initial?.secRulesAccepted || false);
+  const [isInvestViaFund, setIsInvestViaFund] = useState<boolean>(initial?.isInvestViaFund || false);
 
   // hydrate when initial changes
   useEffect(() => {
@@ -29,6 +30,7 @@ export const EditInvestorProfileModal: React.FC<{
     setFundTypes(initial?.investInFundTypes || []);
     setCheckSize(initial?.typicalCheckSize != null ? String(initial.typicalCheckSize) : '');
     setSec(!!initial?.secRulesAccepted);
+    setIsInvestViaFund(!!initial?.isInvestViaFund);
   }, [initial, isOpen]);
 
   const toggleFromArray = (arr: string[], setter: (v: string[]) => void, value: string) => {
@@ -49,6 +51,7 @@ export const EditInvestorProfileModal: React.FC<{
       investInFundTypes: fundTypes,
       typicalCheckSize: checkSize ? Number(checkSize) : undefined,
       secRulesAccepted: sec,
+      isInvestViaFund: isInvestViaFund,
     };
     await upsert.mutateAsync({ authToken, memberUid, data: payload });
     onClose();
@@ -72,7 +75,9 @@ export const EditInvestorProfileModal: React.FC<{
             onChange={(e) => setFocusRaw(e.target.value)}
             placeholder="Comma-separated (e.g. AI, Infra, Fintech)"
           />
-          <p className="mt-1 text-xs text-gray-500">Example: <em>AI, Infra, Fintech</em></p>
+          <p className="mt-1 text-xs text-gray-500">
+            Example: <em>AI, Infra, Fintech</em>
+          </p>
         </div>
 
         {/* Startup stages */}
@@ -139,9 +144,24 @@ export const EditInvestorProfileModal: React.FC<{
           </label>
         </div>
 
+        {/* Invest via fund */}
+        <div className="mb-6">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={isInvestViaFund}
+              onChange={(e) => setIsInvestViaFund(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            I invest via a fund
+          </label>
+        </div>
+
         {/* Footer */}
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="rounded border px-4 py-2">Cancel</button>
+          <button onClick={onClose} className="rounded border px-4 py-2">
+            Cancel
+          </button>
           <button
             onClick={onSave}
             disabled={upsert.isPending || !focusIsValid}

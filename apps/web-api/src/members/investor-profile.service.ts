@@ -25,6 +25,7 @@ export class InvestorProfileService {
       investInStartupStages?: string[];
       investInFundTypes?: string[];
       teamUid?: string;
+      isInvestViaFund?: boolean;
     }
   ) {
     try {
@@ -52,7 +53,8 @@ export class InvestorProfileService {
             investmentFocus: investorProfileData.investmentFocus,
             typicalCheckSize: investorProfileData.typicalCheckSize,
             secRulesAccepted: investorProfileData.secRulesAccepted,
-            investInStartupStages: investorProfileData.investInStartupStages ??  ([] as string[]),
+            investInStartupStages: investorProfileData.investInStartupStages ?? ([] as string[]),
+            isInvestViaFund: investorProfileData.isInvestViaFund,
             investInFundTypes: investorProfileData.investInFundTypes ?? ([] as string[]),
             teamUid: investorProfileData.teamUid,
             secRulesAcceptedAt,
@@ -65,11 +67,12 @@ export class InvestorProfileService {
             investmentFocus: investorProfileData.investmentFocus,
             typicalCheckSize: investorProfileData.typicalCheckSize,
             secRulesAccepted: investorProfileData.secRulesAccepted,
-            investInStartupStages: investorProfileData.investInStartupStages ??  [],
+            investInStartupStages: investorProfileData.investInStartupStages ?? [],
+            isInvestViaFund: investorProfileData.isInvestViaFund,
             investInFundTypes: investorProfileData.investInFundTypes ?? ([] as string[]),
             secRulesAcceptedAt,
             memberUid: memberUid,
-            teamUid: investorProfileData.teamUid
+            teamUid: investorProfileData.teamUid,
           },
         });
 

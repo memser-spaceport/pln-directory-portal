@@ -73,6 +73,9 @@ export const CreateMemberSchema = z.object({
       secRulesAccepted: z.boolean().optional(),
       investmentFocus: z.array(z.string()),
       typicalCheckSize: z.number().nullable(),
+      isInvestViaFund: z.boolean().optional(),
+      investInStartupStages: z.array(z.string()).optional(),
+      investInFundTypes: z.array(z.string()).optional(),
     })
     .optional(),
 });
@@ -116,6 +119,9 @@ export const UpdateMemberSchema = z.object({
       secRulesAccepted: z.boolean().optional(),
       investmentFocus: z.array(z.string()),
       typicalCheckSize: z.number().nullable(),
+      isInvestViaFund: z.boolean().optional(),
+      investInStartupStages: z.array(z.string()).optional(),
+      investInFundTypes: z.array(z.string()).optional(),
     })
     .optional(),
 });

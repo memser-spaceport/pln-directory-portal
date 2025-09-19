@@ -9,13 +9,10 @@ export type InvestorProfileInput = {
   investInStartupStages?: string[];
   investInFundTypes?: string[];
   teamUid?: string;
+  isInvestViaFund?: boolean;
 };
 
-async function upsertInvestorProfile(params: {
-  authToken: string;
-  memberUid: string;
-  data: InvestorProfileInput;
-}) {
+async function upsertInvestorProfile(params: { authToken: string; memberUid: string; data: InvestorProfileInput }) {
   const { authToken, memberUid, data } = params;
   const { data: resp } = await api.put(
     `${API_ROUTE.MEMBERS}/${memberUid}/investor-profile`,

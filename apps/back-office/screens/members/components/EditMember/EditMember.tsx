@@ -69,7 +69,14 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
           telegramHandler: string;
           officeHours: string;
           githubHandler: string;
-          investorProfile?: { investmentFocus: string[]; typicalCheckSize: number; secRulesAccepted: boolean };
+          investorProfile?: {
+            investmentFocus: string[];
+            typicalCheckSize: number;
+            secRulesAccepted: boolean;
+            investInStartupStages: string[];
+            investInFundTypes: string[];
+            isInvestViaFund: boolean;
+          };
         } = {
           imageUid: image || '', // Use empty string if no new image
           name: formData.name,
@@ -104,6 +111,13 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
             ),
             typicalCheckSize: Number(formData.investorProfile.typicalCheckSize),
             secRulesAccepted: !!formData.investorProfile.secRulesAccepted,
+            investInStartupStages: formData.investorProfile.investInStartupStages.map(
+              (item: { label: string; value: string }) => item.value
+            ),
+            investInFundTypes: formData.investorProfile.investInFundTypes.map(
+              (item: { label: string; value: string }) => item.value
+            ),
+            isInvestViaFund: !!formData.investorProfile.isInvestViaFund,
           };
         }
 
@@ -129,6 +143,8 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
     if (!data || !formOptions) {
       return null;
     }
+
+    console.log('data.investorProfile?.investInStartupStages ', data.investorProfile?.investInStartupStages);
 
     return {
       accessLevel: options.find((option) => option.value === data.accessLevel) ?? null,
@@ -162,6 +178,15 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
             })),
             typicalCheckSize: data.investorProfile?.typicalCheckSize ?? null,
             secRulesAccepted: !!data.investorProfile?.secRulesAccepted,
+            investInStartupStages: (data.investorProfile?.investInStartupStages ?? []).map((stage: string) => ({
+              label: stage,
+              value: stage,
+            })),
+            investInFundTypes: (data.investorProfile?.investInFundTypes ?? []).map((fundType: string) => ({
+              label: fundType,
+              value: fundType,
+            })),
+            isInvestViaFund: !!data.investorProfile?.isInvestViaFund,
           }
         : undefined,
     };

@@ -98,101 +98,155 @@ export default function TeamStepTwo(props) {
       </div>
 
       <div className="pt-5">
-        <span className="mr-2 text-sm font-bold">Investor Profile</span>
-        <br />
-        <br />
-        <div className="mb-4">
-          <label className="mb-2 block text-sm font-bold">Investment Focus</label>
-          <CreatableSelect
-            isMulti
-            isDisabled={!props.isEditEnabled}
-            placeholder="Type and press enter to add investment focus areas"
-            formatCreateLabel={(inputValue) => `Add "${inputValue}"`}
-            value={values.investmentFocus || []}
-            onChange={(selectedOptions) => {
-              handleDropDownChange(selectedOptions, 'investmentFocus');
-            }}
-            styles={{
-              control: (baseStyles) => ({
-                ...baseStyles,
-                borderRadius: '8px',
-                border: '1px solid rgba(203, 213, 225, 0.50)',
-                background: '#fff',
-                fontSize: '14px',
-                minHeight: '40px',
-                '&:hover': {
-                  border: '1px solid #5E718D',
-                },
-                '&:focus-within': {
-                  borderColor: '#5E718D',
-                  boxShadow: '0 0 0 4px rgba(27, 56, 96, 0.12)',
-                },
-              }),
-              multiValue: (base) => ({
-                ...base,
-                backgroundColor: '#f1f5f9',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                padding: '2px 6px',
-              }),
-              multiValueLabel: (base) => ({
-                ...base,
-                color: '#455468',
-                fontSize: '14px',
-              }),
-              multiValueRemove: (base) => ({
-                ...base,
-                color: '#455468',
-                '&:hover': {
-                  backgroundColor: 'transparent',
-                  color: '#d21a0e',
-                },
-              }),
-              input: (base) => ({
-                ...base,
-                fontSize: '14px',
-              }),
-              placeholder: (base) => ({
-                ...base,
-                fontSize: '14px',
-                color: '#455468a0',
-              }),
-            }}
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            name="isFund"
+            checked={values.isFund}
+            onChange={handleInputChange}
+            disabled={!props.isEditEnabled}
+            className="mr-2"
           />
-        </div>
-        <div className="flex pt-3">
-          <div>
-            <InformationCircleIcon />
-          </div>
-          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            What are your primary investment focus areas?
-          </span>
-        </div>
+          <span className="text-sm font-bold">This is a fund</span>
+        </label>
       </div>
 
-      <div className="pt-5">
-        <label htmlFor="typicalCheckSize" className="mb-2 block text-sm font-bold">
-          Typical Check Size
-        </label>
-        <input
-          type="number"
-          id="typicalCheckSize"
-          name="typicalCheckSize"
-          value={values.typicalCheckSize}
-          onChange={handleInputChange}
-          placeholder="e.g., $50,000"
-          disabled={!props.isEditEnabled}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-        />
-        <div className="flex pt-3">
-          <div>
-            <InformationCircleIcon />
+      {values.isFund && (
+        <>
+          <div className="pt-5">
+            <span className="mr-2 text-sm font-bold">Investor Profile</span>
+            <br />
+            <br />
+            <div className="mb-4">
+              <label className="mb-2 block text-sm font-bold">Investment Focus</label>
+              <CreatableSelect
+                isMulti
+                isDisabled={!props.isEditEnabled}
+                placeholder="Type and press enter to add investment focus areas"
+                formatCreateLabel={(inputValue) => `Add "${inputValue}"`}
+                value={values.investmentFocus || []}
+                onChange={(selectedOptions) => {
+                  handleDropDownChange(selectedOptions, 'investmentFocus');
+                }}
+                styles={{
+                  control: (baseStyles) => ({
+                    ...baseStyles,
+                    borderRadius: '8px',
+                    border: '1px solid rgba(203, 213, 225, 0.50)',
+                    background: '#fff',
+                    fontSize: '14px',
+                    minHeight: '40px',
+                    '&:hover': {
+                      border: '1px solid #5E718D',
+                    },
+                    '&:focus-within': {
+                      borderColor: '#5E718D',
+                      boxShadow: '0 0 0 4px rgba(27, 56, 96, 0.12)',
+                    },
+                  }),
+                  multiValue: (base) => ({
+                    ...base,
+                    backgroundColor: '#f1f5f9',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    padding: '2px 6px',
+                  }),
+                  multiValueLabel: (base) => ({
+                    ...base,
+                    color: '#455468',
+                    fontSize: '14px',
+                  }),
+                  multiValueRemove: (base) => ({
+                    ...base,
+                    color: '#455468',
+                    '&:hover': {
+                      backgroundColor: 'transparent',
+                      color: '#d21a0e',
+                    },
+                  }),
+                  input: (base) => ({
+                    ...base,
+                    fontSize: '14px',
+                  }),
+                  placeholder: (base) => ({
+                    ...base,
+                    fontSize: '14px',
+                    color: '#455468a0',
+                  }),
+                }}
+              />
+            </div>
+            <div className="flex pt-3">
+              <div>
+                <InformationCircleIcon />
+              </div>
+              <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
+                What are your primary investment focus areas?
+              </span>
+            </div>
           </div>
-          <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            What is your typical investment check size range?
-          </span>
-        </div>
-      </div>
+
+          <div className="pt-5">
+            <label htmlFor="typicalCheckSize" className="mb-2 block text-sm font-bold">
+              Typical Check Size
+            </label>
+            <input
+              type="number"
+              id="typicalCheckSize"
+              name="typicalCheckSize"
+              value={values.typicalCheckSize}
+              onChange={handleInputChange}
+              placeholder="e.g., $50,000"
+              disabled={!props.isEditEnabled}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+            />
+            <div className="flex pt-3">
+              <div>
+                <InformationCircleIcon />
+              </div>
+              <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
+                What is your typical investment check size range?
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-5">
+            <MultiSelect
+              options={[
+                { value: 'Pre-seed', label: 'Pre-seed' },
+                { value: 'Seed', label: 'Seed' },
+                { value: 'Series A', label: 'Series A' },
+                { value: 'Series B', label: 'Series B' },
+                { value: 'Series C', label: 'Series C' },
+                { value: 'Series D and later', label: 'Series D and later' },
+              ]}
+              name="investInStartupStages"
+              selectedValues={values.investInStartupStages || []}
+              onChange={handleDropDownChange}
+              placeholder="Select startup stages"
+              disabled={!props.isEditEnabled}
+              label="Invest in Startup Stages"
+            />
+          </div>
+
+          <div className="pt-5">
+            <MultiSelect
+              options={[
+                { value: "I don't invest in VC Funds", label: "I don't invest in VC Funds" },
+                { value: 'Early stage', label: 'Early stage' },
+                { value: 'Late stage', label: 'Late stage' },
+                { value: 'Fund-of-funds', label: 'Fund-of-funds' },
+              ]}
+              name="investInFundTypes"
+              selectedValues={values.investInFundTypes || []}
+              onChange={handleDropDownChange}
+              placeholder="Select fund types"
+              disabled={!props.isEditEnabled}
+              label="Invest in Fund Types"
+            />
+          </div>
+        </>
+      )}
 
       {isRequired && (
         <div style={{ pointerEvents: props?.isEditEnabled ? 'auto' : 'none' }}>

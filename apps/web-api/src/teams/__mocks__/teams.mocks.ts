@@ -5,14 +5,12 @@ import { prisma } from '../../../prisma/__mocks__/index';
 import { TestFactorySeederParams } from '../../utils/factory-interfaces';
 
 async function createFundingStage() {
-  const fundingStageFactory = Factory.define<Omit<FundingStage, 'id'>>(
-    ({ sequence }) => ({
-      uid: `funding-stage-${sequence}`,
-      title: 'Funding Stage Title',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })
-  );
+  const fundingStageFactory = Factory.define<Omit<FundingStage, 'id'>>(({ sequence }) => ({
+    uid: `funding-stage-${sequence}`,
+    title: 'Funding Stage Title',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }));
 
   const fundingStage = await fundingStageFactory.build();
   await prisma.fundingStage.create({ data: fundingStage });
@@ -46,6 +44,7 @@ export async function createTeam({ amount }: TestFactorySeederParams) {
       fundingStageUid: fundingStage.uid,
       lastModifiedBy: null,
       investorProfileId: null,
+      isFund: false,
     };
 
     return team;

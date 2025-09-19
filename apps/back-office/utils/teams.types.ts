@@ -44,6 +44,9 @@ export interface IFormValues {
   focusAreas?: TFocusArea[];
   investmentFocus: DropDownProps[];
   typicalCheckSize: number;
+  isFund: boolean;
+  investInStartupStages: DropDownProps[];
+  investInFundTypes: DropDownProps[];
 }
 
 export type TFocusArea = {

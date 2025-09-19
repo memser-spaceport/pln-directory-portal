@@ -391,6 +391,8 @@ export class TeamsService {
       investorProfile?: {
         investmentFocus?: string[];
         typicalCheckSize?: string;
+        investInStartupStages?: string[];
+        investInFundTypes?: string[];
       };
     },
     tx: Prisma.TransactionClient,
@@ -411,6 +413,7 @@ export class TeamsService {
       'airtableRecId',
       'longDescription',
       'moreDetails',
+      'isFund',
     ];
     copyObj(teamData, team, directFields);
     // Handle one-to-one or one-to-many mappings
@@ -441,6 +444,8 @@ export class TeamsService {
           create: {
             investmentFocus: teamData.investorProfile.investmentFocus || [],
             typicalCheckSize: teamData.investorProfile.typicalCheckSize,
+            investInStartupStages: teamData.investorProfile.investInStartupStages || [],
+            investInFundTypes: teamData.investorProfile.investInFundTypes || [],
           },
         };
         this.logger.info(`Added investor profile to team object for creation`);
@@ -500,6 +505,8 @@ export class TeamsService {
         data: {
           investmentFocus: investorProfileData.investmentFocus || [],
           typicalCheckSize: investorProfileData.typicalCheckSize,
+          investInStartupStages: investorProfileData.investInStartupStages || [],
+          investInFundTypes: investorProfileData.investInFundTypes || [],
         },
       });
     } else {
@@ -508,6 +515,8 @@ export class TeamsService {
         data: {
           investmentFocus: investorProfileData.investmentFocus || [],
           typicalCheckSize: investorProfileData.typicalCheckSize,
+          investInStartupStages: investorProfileData.investInStartupStages || [],
+          investInFundTypes: investorProfileData.investInFundTypes || [],
           teamUid: teamUid,
         },
       });
