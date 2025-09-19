@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useRouter } from 'next/router';
 import { useCookie } from 'react-use';
@@ -13,6 +13,9 @@ import clsx from 'clsx';
 
 import s from './styles.module.scss';
 
+import { EditInvestorProfileModal } from '../../components/demo-days/EditInvestorProfileModal';
+import { useGetInvestorProfile } from '../../hooks/demo-days/useGetInvestorProfile';
+
 const DemoDayDetailPage = () => {
   const router = useRouter();
   const { uid } = router.query;
@@ -24,6 +27,7 @@ const DemoDayDetailPage = () => {
   const [editFormData, setEditFormData] = useState<UpdateDemoDayDto>({});
   const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [editingMemberUid, setEditingMemberUid] = useState<string | null>(null);
 
   const updateDemoDayMutation = useUpdateDemoDay();
   const updateParticipantMutation = useUpdateParticipant();
@@ -44,6 +48,24 @@ const DemoDayDetailPage = () => {
       limit: 50,
     },
   });
+
+  const { data: editingInvestorProfile, isLoading: isProfileLoading } = useGetInvestorProfile(
+    authToken,
+    editingMemberUid ?? undefined,
+    !!editingMemberUid
+  );
+
+  const editingInitial = useMemo(() => {
+    if (!editingInvestorProfile) return undefined;
+    return {
+      investmentFocus: editingInvestorProfile.investmentFocus ?? [],
+      investInStartupStages: editingInvestorProfile.investInStartupStages ?? [],
+      investInFundTypes: editingInvestorProfile.investInFundTypes ?? [],
+      typicalCheckSize: editingInvestorProfile.typicalCheckSize ?? undefined,
+      secRulesAccepted: !!editingInvestorProfile.secRulesAccepted,
+      teamUid: editingInvestorProfile.teamUid ?? undefined,
+    };
+  }, [editingInvestorProfile]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -339,6 +361,9 @@ const DemoDayDetailPage = () => {
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                     Status
                   </div>
+                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 120 }}>
+                    Actions
+                  </div>
                 </div>
 
                 {/* Body */}
@@ -383,6 +408,36 @@ const DemoDayDetailPage = () => {
                         <option value="DISABLED">Disabled</option>
                       </select>
                     </div>
+
+                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 120 }}>
+                      {(participant.type === 'INVESTOR') ? (
+                        <button
+                          onClick={() => {
+                            const targetUid =
+                              participant.member?.uid ||
+                              (participant as any)?.memberUid || // some APIs return this at root
+                              (participant as any)?.member?.uid; // extra safety
+
+                            if (targetUid) {
+                              setEditingMemberUid(targetUid);
+                            } else {
+                              console.warn('No memberUid found for investor; cannot open editor');
+                              alert('This investor has no member account yet, so the profile cannot be edited.');
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-blue-700 hover:bg-blue-50"
+                          title="Edit investor profile"
+                        >
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                  d="M15.232 5.232l3.536 3.536M4 20h4.586a1 1 0 00.707-.293l9.414-9.414a2 2 0 00-2.828-2.828L6.465 16.465A1 1 0 006.172 17H4v3z" />
+                          </svg>
+                          Edit
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -402,6 +457,15 @@ const DemoDayDetailPage = () => {
           onClose={() => setShowUploadModal(false)}
           demoDayUid={uid as string}
         />
+
+        {editingMemberUid && (
+          <EditInvestorProfileModal
+            isOpen={!!editingMemberUid}
+            onClose={() => setEditingMemberUid(null)}
+            memberUid={editingMemberUid}
+            initial={editingInitial}
+          />
+        )}
       </div>
     </ApprovalLayout>
   );

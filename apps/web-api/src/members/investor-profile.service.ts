@@ -22,6 +22,9 @@ export class InvestorProfileService {
       investmentFocus: string[];
       typicalCheckSize?: number;
       secRulesAccepted?: boolean;
+      investInStartupStages?: string[];
+      investInFundTypes?: string[];
+      teamUid?: string;
     }
   ) {
     try {
@@ -49,6 +52,9 @@ export class InvestorProfileService {
             investmentFocus: investorProfileData.investmentFocus,
             typicalCheckSize: investorProfileData.typicalCheckSize,
             secRulesAccepted: investorProfileData.secRulesAccepted,
+            investInStartupStages: investorProfileData.investInStartupStages ??  ([] as string[]),
+            investInFundTypes: investorProfileData.investInFundTypes ?? ([] as string[]),
+            teamUid: investorProfileData.teamUid,
             secRulesAcceptedAt,
           },
         });
@@ -59,8 +65,11 @@ export class InvestorProfileService {
             investmentFocus: investorProfileData.investmentFocus,
             typicalCheckSize: investorProfileData.typicalCheckSize,
             secRulesAccepted: investorProfileData.secRulesAccepted,
+            investInStartupStages: investorProfileData.investInStartupStages ??  [],
+            investInFundTypes: investorProfileData.investInFundTypes ?? ([] as string[]),
             secRulesAcceptedAt,
             memberUid: memberUid,
+            teamUid: investorProfileData.teamUid
           },
         });
 
