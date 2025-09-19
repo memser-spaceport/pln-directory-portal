@@ -109,4 +109,20 @@ export class AwsService {
     };
     return await s3.upload(params).promise();
   }
+
+  async sendSqsMessage(queueUrl: string, payload: any) {
+    try {
+      if (!queueUrl) {
+        return;
+      }
+      const sqs = new AWS.SQS(CONFIG);
+      const params = {
+        QueueUrl: queueUrl,
+        MessageBody: JSON.stringify(payload),
+      };
+      await sqs.sendMessage(params).promise();
+    } catch (e) {
+      console.error(e);
+    }
+  }
 }

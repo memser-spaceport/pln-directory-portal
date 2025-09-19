@@ -1,8 +1,12 @@
 import { INestApplication, Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { QueueService } from './queue.service';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
+  constructor(private queueService: QueueService) {
+    super();
+  }
   async onModuleInit() {
     await this.$connect();
     // Setting up Prisma Middleware for handling Team updates
@@ -10,6 +14,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
       const result = await next(params);
       if (params.model === 'Team' && params.action === 'update') {
         await this.createTeamFocusAreaVersionHistory(params);
+      }
+      // Emit CUD events to Queue for selected entities
+      try {
+        await this.emitCUDEvents(params, result);
+      } catch (e) {
+        // swallow to not block db operation
+        // eslint-disable-next-line no-console
+        console.error('Error occured in emitting CUD events to Queue', e);
       }
       return result;
     });
@@ -134,5 +146,22 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
       return result.filter(focusArea=> focusArea.version === recentVersion); 
     }
     return [];
+  }
+
+  private async emitCUDEvents(params, result) {
+    const models = process.env.TRACKED_DB_ENTITIES 
+      ? process.env.TRACKED_DB_ENTITIES.split(',').map(model => model.trim())
+      : ['Member', 'Team', 'PLEvent', 'Project'];
+    const actions = ['create', 'update', 'delete'];
+    const { action, model } = params;
+    const { uid } = result;
+    if (!(model && models.includes(model) && action && actions.includes(action) && uid)) {
+      return;
+    }
+    await this.queueService.sendMessage(process.env.DB_EVENTS_QUEUE_URL || '', {
+      entity: model,
+      action,
+      data: { uid }
+    });
   }
 }
