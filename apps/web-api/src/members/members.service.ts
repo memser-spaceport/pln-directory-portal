@@ -959,8 +959,11 @@ export class MembersService {
         member['investorProfile'] = {
           create: {
             investmentFocus: memberData.investorProfile.investmentFocus || [],
+            investInStartupStages: memberData.investorProfile.investInStartupStages || [],
+            investInFundTypes: memberData.investorProfile.investInFundTypes || [],
             typicalCheckSize: memberData.investorProfile.typicalCheckSize,
             secRulesAccepted: memberData.investorProfile.secRulesAccepted,
+            isInvestViaFund: memberData.investorProfile.isInvestViaFund,
           },
         };
       } else {
@@ -1015,6 +1018,9 @@ export class MembersService {
           typicalCheckSize: investorProfileData.typicalCheckSize,
           secRulesAccepted: investorProfileData.secRulesAccepted,
           secRulesAcceptedAt,
+          isInvestViaFund: investorProfileData.isInvestViaFund,
+          investInStartupStages: investorProfileData.investInStartupStages || [],
+          investInFundTypes: investorProfileData.investInFundTypes || [],
         },
       });
     } else {
@@ -1025,6 +1031,9 @@ export class MembersService {
           typicalCheckSize: investorProfileData.typicalCheckSize,
           secRulesAccepted: investorProfileData.secRulesAccepted,
           secRulesAcceptedAt,
+          isInvestViaFund: investorProfileData.isInvestViaFund,
+          investInStartupStages: investorProfileData.investInStartupStages || [],
+          investInFundTypes: investorProfileData.investInFundTypes || [],
           member: { connect: { uid: memberUid } },
         },
       });
@@ -1925,9 +1934,18 @@ export class MembersService {
             },
           },
           {
-            investorProfile: {
-              secRulesAccepted: true,
-            },
+            OR: [
+              {
+                investorProfile: {
+                  secRulesAccepted: true,
+                },
+              },
+              {
+                investorProfile: {
+                  isInvestViaFund: true,
+                },
+              },
+            ],
           },
         ],
       });
@@ -2056,6 +2074,9 @@ export class MembersService {
             investorProfile: {
               select: {
                 investmentFocus: true,
+                investInStartupStages: true,
+                investInFundTypes: true,
+                isInvestViaFund: true,
                 typicalCheckSize: true,
                 secRulesAccepted: true,
                 secRulesAcceptedAt: true,
@@ -2617,6 +2638,8 @@ export class MembersService {
           investorProfile: {
             select: {
               investmentFocus: true,
+              investInStartupStages: true,
+              investInFundTypes: true,
               typicalCheckSize: true,
               secRulesAccepted: true,
               secRulesAcceptedAt: true,
@@ -2637,10 +2660,9 @@ export class MembersService {
     }
   }
 
-
   private async syncFounderParticipantsTeamForMember(
     memberUid: string,
-    tx: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient
   ): Promise<{ changed: boolean; oldTeamUid: string | null; newTeamUid: string | null }> {
     this.logger.info(`[FounderSync] start memberUid=${memberUid}`);
     // 1) Get all roles for the member (we'll decide the "current team" in code)
@@ -2654,16 +2676,18 @@ export class MembersService {
     // 2) Decide the target team:
     //    - prefer role with mainTeam === true
     //    - otherwise take the first role (by startDate/id)
-    const preferred = roles.find(r => r.mainTeam === true);
+    const preferred = roles.find((r) => r.mainTeam === true);
     const newTeamUid = preferred?.teamUid ?? roles[0]?.teamUid ?? null;
-     console.log("newTeamUid" , newTeamUid)
+    console.log('newTeamUid', newTeamUid);
     // 3) Load current Demo Day founder participants' team mapping
     const founderParticipants = await tx.demoDayParticipant.findMany({
       where: { memberUid, type: 'FOUNDER', isDeleted: false },
       select: { uid: true, teamUid: true },
     });
     this.logger.info(
-      `[FounderSync] resolved team memberUid=${memberUid} preferredMain=${Boolean(preferred)} newTeamUid=${newTeamUid ?? 'null'}`
+      `[FounderSync] resolved team memberUid=${memberUid} preferredMain=${Boolean(preferred)} newTeamUid=${
+        newTeamUid ?? 'null'
+      }`
     );
     // If there are no FOUNDER participants, nothing to do
     if (founderParticipants.length === 0) {
@@ -2674,12 +2698,10 @@ export class MembersService {
     // 4) Check whether anything actually needs to change
     //    - If newTeamUid is null: we should clear any non-null teamUid
     //    - If newTeamUid is non-null: every participant must have exactly that teamUid
-    const allAlreadyCorrect = founderParticipants.every(fp => fp.teamUid === newTeamUid);
+    const allAlreadyCorrect = founderParticipants.every((fp) => fp.teamUid === newTeamUid);
 
     if (allAlreadyCorrect) {
-      this.logger.info(
-        `[FounderSync] already in sync memberUid=${memberUid} teamUid=${newTeamUid ?? 'null'}`
-      );
+      this.logger.info(`[FounderSync] already in sync memberUid=${memberUid} teamUid=${newTeamUid ?? 'null'}`);
       return {
         changed: false,
         oldTeamUid: founderParticipants[0]?.teamUid ?? null,
@@ -2689,7 +2711,6 @@ export class MembersService {
 
     // 5) Perform minimal update:
     if (newTeamUid) {
-
       // Set new teamUid for any that are null or different
       const res = await tx.demoDayParticipant.updateMany({
         where: {
@@ -2719,9 +2740,7 @@ export class MembersService {
         },
         data: { teamUid: null },
       });
-      this.logger.info(
-        `[FounderSync] cleared teamUid for founders memberUid=${memberUid} clearedRows=${res.count}`
-      );
+      this.logger.info(`[FounderSync] cleared teamUid for founders memberUid=${memberUid} clearedRows=${res.count}`);
       return {
         changed: res.count > 0,
         oldTeamUid: founderParticipants[0]?.teamUid ?? null,
@@ -2729,5 +2748,4 @@ export class MembersService {
       };
     }
   }
-
 }

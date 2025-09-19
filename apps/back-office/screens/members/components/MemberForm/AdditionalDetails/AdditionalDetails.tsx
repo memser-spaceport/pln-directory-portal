@@ -47,6 +47,7 @@ export const AdditionalDetails = () => {
             name="investorProfile.secRulesAccepted"
             label="I'm an accredited investor under SEC rules"
           />
+          <FormCheckboxField name="investorProfile.isInvestViaFund" label="I invest via a fund" />
           <FormTagInput
             name="investorProfile.investmentFocus"
             placeholder="Type and press enter to add investment focus areas"
@@ -54,6 +55,30 @@ export const AdditionalDetails = () => {
             description="Add custom investment focus areas (e.g., AI, Web3, DeFi)"
           />
           <FormField name="investorProfile.typicalCheckSize" label="Typical Check Size" placeholder="e.g., $50,000" />
+          <FormMultiselectField
+            name="investorProfile.investInStartupStages"
+            placeholder="Select startup stages"
+            label="Invest in Startup Stages"
+            options={[
+              { value: 'Pre-seed', label: 'Pre-seed' },
+              { value: 'Seed', label: 'Seed' },
+              { value: 'Series A', label: 'Series A' },
+              { value: 'Series B', label: 'Series B' },
+              { value: 'Series C', label: 'Series C' },
+              { value: 'Series D and later', label: 'Series D and later' },
+            ]}
+          />
+          <FormMultiselectField
+            name="investorProfile.investInFundTypes"
+            placeholder="Select fund types"
+            label="Invest in Fund Types"
+            options={[
+              { value: "I don't invest in VC Funds", label: "I don't invest in VC Funds" },
+              { value: 'Early stage', label: 'Early stage' },
+              { value: 'Late stage', label: 'Late stage' },
+              { value: 'Fund-of-funds', label: 'Fund-of-funds' },
+            ]}
+          />
         </div>
       )}
 

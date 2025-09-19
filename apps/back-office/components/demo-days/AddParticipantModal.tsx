@@ -5,8 +5,7 @@ import { useCookie } from 'react-use';
 import { useAddParticipant } from '../../hooks/demo-days/useAddParticipant';
 import { AddParticipantDto } from '../../screens/demo-days/types/demo-day';
 import clsx from 'clsx';
-import {useUpsertInvestorProfile} from "../../hooks/demo-days/useUpsertInvestorProfile";
-
+import { useUpsertInvestorProfile } from '../../hooks/demo-days/useUpsertInvestorProfile';
 
 interface AddParticipantModalProps {
   isOpen: boolean;
@@ -33,7 +32,7 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
   const [invFundTypes, setInvFundTypes] = useState<string[]>([]);
   const [invCheck, setInvCheck] = useState<string>(''); // number as text
   const [invSecAccepted, setInvSecAccepted] = useState(false);
-
+  const [isInvestViaFund, setIsInvestViaFund] = useState(false);
   const { data: members } = useMembersList({
     authToken,
     accessLevel: ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L0', 'Rejected'],
@@ -58,8 +57,7 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
     [invFocusRaw]
   );
 
-  const investorProfileValid =
-    participantType !== 'INVESTOR' || investmentFocus.length > 0;
+  const investorProfileValid = participantType !== 'INVESTOR' || investmentFocus.length > 0;
 
   const submitDisabled =
     addParticipantMutation.isPending ||
@@ -76,6 +74,7 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
     setInvFundTypes([]);
     setInvCheck('');
     setInvSecAccepted(false);
+    setIsInvestViaFund(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -101,17 +100,12 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
         data: participantData,
       });
 
-
       if (participantType === 'INVESTOR') {
         const createdMemberUid =
           (addMethod === 'existing' ? selectedMemberUid : undefined) ||
           (created as any)?.memberUid ||
           (created as any)?.member?.uid;
 
-
-        const currentMember = members?.data?.find((m) => m.uid === createdMemberUid);
-        const teamUid = currentMember?.teamMemberRoles?.[0]?.team?.uid ?? undefined;
-        console.log("teamUid", teamUid);
         if (!createdMemberUid) {
           throw new Error('memberUid is missing for investor profile upsert');
         }
@@ -125,7 +119,7 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
               investInFundTypes: invFundTypes,
               typicalCheckSize: invCheck ? Number(invCheck) : undefined,
               secRulesAccepted: invSecAccepted,
-              teamUid: teamUid,
+              isInvestViaFund: isInvestViaFund,
             },
           });
         }
@@ -245,8 +239,12 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
                       {addMethod === 'existing' && <div className="h-2 w-2 rounded-full bg-current"></div>}
                     </div>
                     <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      />
                     </svg>
                     Existing Member
                   </div>
@@ -271,8 +269,12 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
                       {addMethod === 'email' && <div className="h-2 w-2 rounded-full bg-current"></div>}
                     </div>
                     <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                      />
                     </svg>
                     Add by Email
                   </div>
@@ -289,8 +291,12 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
                 <div className="relative">
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                     <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
                     </svg>
                   </div>
                   <input
@@ -346,9 +352,18 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
                       </div>
                     ) : (
                       <div className="p-4 text-center text-gray-500">
-                        <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        <svg
+                          className="mx-auto h-12 w-12 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                          />
                         </svg>
                         <p className="mt-2 text-sm">No members found</p>
                         <p className="text-xs text-gray-400">Try adjusting your search terms</p>
@@ -369,8 +384,12 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
                   <div className="relative">
                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                       <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                              d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                        />
                       </svg>
                     </div>
                     <input
@@ -390,8 +409,12 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
                   <div className="relative">
                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                       <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                        />
                       </svg>
                     </div>
                     <input
@@ -412,8 +435,12 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
               <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    />
                   </svg>
                   <h4 className="font-medium text-gray-900">Investor details</h4>
                 </div>
@@ -487,6 +514,17 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
                     className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   I confirm the SEC/eligibility rules
+                </label>
+
+                {/* Invest via fund */}
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={isInvestViaFund}
+                    onChange={(e) => setIsInvestViaFund(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  I invest via a fund
                 </label>
               </div>
             )}

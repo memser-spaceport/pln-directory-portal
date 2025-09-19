@@ -77,6 +77,12 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
             ),
             typicalCheckSize: Number(formData.investorProfile.typicalCheckSize),
             secRulesAccepted: !!formData.investorProfile.secRulesAccepted,
+            investInStartupStages: formData.investorProfile.investInStartupStages.map(
+              (item: { label: string; value: string }) => item.value
+            ),
+            investInFundTypes: formData.investorProfile.investInFundTypes.map(
+              (item: { label: string; value: string }) => item.value
+            ),
           },
         };
 

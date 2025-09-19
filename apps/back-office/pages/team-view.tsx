@@ -128,15 +128,21 @@ export default function TeamView(props) {
       telegramHandler: formValues.telegramHandler?.trim(),
       blog: formValues.blog?.trim(),
       officeHours: formValues.officeHours?.trim(),
+      isFund: Boolean(formValues.isFund),
       fundingStage: formattedFundingStage,
       fundingStageUid: formattedFundingStage.uid,
       industryTags: formattedTags,
       membershipSources: formattedMembershipSource,
       technologies: formattedtechnologies,
       investorProfile:
-        formValues.investmentFocus?.length > 0 || formValues.typicalCheckSize
+        formValues.investmentFocus?.length > 0 ||
+        formValues.typicalCheckSize ||
+        formValues.investInStartupStages?.length > 0 ||
+        formValues.investInFundTypes?.length > 0
           ? {
               investmentFocus: formValues.investmentFocus?.map((item) => item.value) ?? [],
+              investInStartupStages: formValues.investInStartupStages?.map((item) => item.value) ?? [],
+              investInFundTypes: formValues.investInFundTypes?.map((item) => item.value) ?? [],
               typicalCheckSize: Number(formValues.typicalCheckSize) ?? null,
             }
           : undefined,
@@ -436,8 +442,19 @@ export const getServerSideProps = async (context) => {
       telegramHandler: team.telegramHandler ?? '',
       blog: team.blog ?? '',
       officeHours: team.officeHours ?? '',
+      isFund: Boolean(team?.isFund),
       investmentFocus:
         team?.investorProfile?.investmentFocus?.map((item: string) => ({
+          value: item,
+          label: item,
+        })) ?? [],
+      investInStartupStages:
+        team?.investorProfile?.investInStartupStages?.map((item: string) => ({
+          value: item,
+          label: item,
+        })) ?? [],
+      investInFundTypes:
+        team?.investorProfile?.investInFundTypes?.map((item: string) => ({
           value: item,
           label: item,
         })) ?? [],

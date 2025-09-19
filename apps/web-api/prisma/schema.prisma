@@ -32,6 +32,7 @@ model Team {
   longDescription              String?
   plnFriend                    Boolean                       @default(false)
   isFeatured                   Boolean?                      @default(false)
+  isFund                       Boolean                       @default(false)
   airtableRecId                String?                       @unique
   createdAt                    DateTime                      @default(now())
   updatedAt                    DateTime                      @updatedAt
@@ -914,6 +915,7 @@ model InvestorProfile {
   investInStartupStages String[]  @default([])
   investInFundTypes     String[]  @default([])
   typicalCheckSize      Float?
+  isInvestViaFund       Boolean?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
   teamUid               String?

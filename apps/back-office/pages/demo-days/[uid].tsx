@@ -64,6 +64,7 @@ const DemoDayDetailPage = () => {
       typicalCheckSize: editingInvestorProfile.typicalCheckSize ?? undefined,
       secRulesAccepted: !!editingInvestorProfile.secRulesAccepted,
       teamUid: editingInvestorProfile.teamUid ?? undefined,
+      isInvestViaFund: !!editingInvestorProfile.isInvestViaFund,
     };
   }, [editingInvestorProfile]);
 
@@ -410,7 +411,7 @@ const DemoDayDetailPage = () => {
                     </div>
 
                     <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 120 }}>
-                      {(participant.type === 'INVESTOR') ? (
+                      {participant.type === 'INVESTOR' ? (
                         <button
                           onClick={() => {
                             const targetUid =
@@ -429,8 +430,12 @@ const DemoDayDetailPage = () => {
                           title="Edit investor profile"
                         >
                           <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                  d="M15.232 5.232l3.536 3.536M4 20h4.586a1 1 0 00.707-.293l9.414-9.414a2 2 0 00-2.828-2.828L6.465 16.465A1 1 0 006.172 17H4v3z" />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15.232 5.232l3.536 3.536M4 20h4.586a1 1 0 00.707-.293l9.414-9.414a2 2 0 00-2.828-2.828L6.465 16.465A1 1 0 006.172 17H4v3z"
+                            />
                           </svg>
                           Edit
                         </button>

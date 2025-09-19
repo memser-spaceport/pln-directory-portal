@@ -262,9 +262,12 @@ export class MemberService {
         member['investorProfile'] = {
           create: {
             investmentFocus: memberData.investorProfile.investmentFocus || [],
+            investInStartupStages: memberData.investorProfile.investInStartupStages || [],
+            investInFundTypes: memberData.investorProfile.investInFundTypes || [],
             typicalCheckSize: memberData.investorProfile.typicalCheckSize,
             secRulesAccepted: memberData.investorProfile.secRulesAccepted,
             secRulesAcceptedAt: memberData.investorProfile.secRulesAccepted ? new Date() : null,
+            isInvestViaFund: memberData.investorProfile.isInvestViaFund,
           },
         };
       } else {
@@ -316,9 +319,12 @@ export class MemberService {
         where: { uid: existingMember.investorProfileId },
         data: {
           investmentFocus: investorProfileData.investmentFocus || [],
+          investInStartupStages: investorProfileData.investInStartupStages || [],
+          investInFundTypes: investorProfileData.investInFundTypes || [],
           typicalCheckSize: investorProfileData.typicalCheckSize,
           secRulesAccepted: investorProfileData.secRulesAccepted,
           secRulesAcceptedAt,
+          isInvestViaFund: investorProfileData.isInvestViaFund,
         },
       });
     } else {
@@ -326,9 +332,12 @@ export class MemberService {
       const newInvestorProfile = await tx.investorProfile.create({
         data: {
           investmentFocus: investorProfileData.investmentFocus || [],
+          investInStartupStages: investorProfileData.investInStartupStages || [],
+          investInFundTypes: investorProfileData.investInFundTypes || [],
           typicalCheckSize: investorProfileData.typicalCheckSize,
           secRulesAccepted: investorProfileData.secRulesAccepted,
           secRulesAcceptedAt,
+          isInvestViaFund: investorProfileData.isInvestViaFund,
           member: { connect: { uid: memberUid } },
         },
       });
@@ -856,7 +865,10 @@ export class MemberService {
           select: {
             uid: true,
             investmentFocus: true,
+            investInStartupStages: true,
+            investInFundTypes: true,
             typicalCheckSize: true,
+            isInvestViaFund: true,
           },
         },
       },
@@ -1008,8 +1020,11 @@ export class MemberService {
         const investorProfile = await tx.investorProfile.create({
           data: {
             investmentFocus: memberData.investorProfile.investmentFocus,
+            investInStartupStages: memberData.investorProfile.investInStartupStages,
+            investInFundTypes: memberData.investorProfile.investInFundTypes,
             typicalCheckSize: memberData.investorProfile.typicalCheckSize,
             secRulesAccepted: memberData.investorProfile.secRulesAccepted,
+            isInvestViaFund: memberData.investorProfile.isInvestViaFund,
             secRulesAcceptedAt: memberData.investorProfile.secRulesAccepted ? new Date() : null,
           },
         });
@@ -1148,6 +1163,9 @@ export class MemberService {
               typicalCheckSize: investorProfile.typicalCheckSize,
               secRulesAccepted: investorProfile.secRulesAccepted,
               secRulesAcceptedAt,
+              investInStartupStages: investorProfile.investInStartupStages,
+              investInFundTypes: investorProfile.investInFundTypes,
+              isInvestViaFund: investorProfile.isInvestViaFund,
             },
           });
         } else {
@@ -1158,6 +1176,9 @@ export class MemberService {
               typicalCheckSize: investorProfile.typicalCheckSize,
               secRulesAccepted: investorProfile.secRulesAccepted,
               secRulesAcceptedAt,
+              investInStartupStages: investorProfile.investInStartupStages,
+              investInFundTypes: investorProfile.investInFundTypes,
+              isInvestViaFund: investorProfile.isInvestViaFund,
               memberUid: uid,
             },
           });
