@@ -3,7 +3,11 @@ import {
   InternalUpdateMemberDto,
   PLEventGuestQueryParams,
   ResponseMemberSchema,
-  ResponsePLEventGuestSchemaWithRelationsSchema
+  ResponsePLEventGuestSchemaWithRelationsSchema,
+  ResponseMemberWithRelationsSchema,
+  ResponseTeamWithRelationsSchema,
+  ResponseProjectWithRelationsSchema,
+  ResponsePLEventSchemaWithRelationsSchema
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -27,5 +31,37 @@ export const apiInternals = contract.router({
       200: ResponseMemberSchema
     },
     summary: 'Update the telegram uid for a member'
+  },
+  getMemberDetails: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/internals/members/:uid`,
+    responses: {
+      200: ResponseMemberWithRelationsSchema,
+    },
+    summary: 'Get detailed member information by UID',
+  },
+  getTeamDetails: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/internals/teams/:uid`,
+    responses: {
+      200: ResponseTeamWithRelationsSchema,
+    },
+    summary: 'Get detailed team information by UID',
+  },
+  getProjectDetails: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/internals/projects/:uid`,
+    responses: {
+      200: ResponseProjectWithRelationsSchema,
+    },
+    summary: 'Get detailed project information by UID',
+  },
+  getIrlEventDetails: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/internals/irl/events/:uid`,
+    responses: {
+      200: ResponsePLEventSchemaWithRelationsSchema,
+    },
+    summary: 'Get detailed IRL event information by UID',
   }
 });
