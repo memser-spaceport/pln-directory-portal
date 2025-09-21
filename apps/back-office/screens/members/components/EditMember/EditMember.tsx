@@ -13,6 +13,7 @@ import { options } from '../MemberForm/StatusSelector';
 import { useMemberFormOptions } from '../../../../hooks/members/useMemberFormOptions';
 import { toast } from 'react-toastify';
 import { useUpdateMember } from '../../../../hooks/members/useUpdateMember';
+import { INVESTOR_PROFILE_CONSTANTS } from '../../../../utils/constants';
 
 const fade = {
   hidden: { opacity: 0 },
@@ -75,7 +76,7 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
             secRulesAccepted: boolean;
             investInStartupStages: string[];
             investInFundTypes: string[];
-            isInvestViaFund: boolean;
+            type: string;
           };
         } = {
           imageUid: image || '', // Use empty string if no new image
@@ -117,7 +118,7 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
             investInFundTypes: formData.investorProfile.investInFundTypes.map(
               (item: { label: string; value: string }) => item.value
             ),
-            isInvestViaFund: !!formData.investorProfile.isInvestViaFund,
+            type: formData.investorProfile.type?.value || '',
           };
         }
 
@@ -186,7 +187,11 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
               label: fundType,
               value: fundType,
             })),
-            isInvestViaFund: !!data.investorProfile?.isInvestViaFund,
+            type: data.investorProfile?.type
+              ? INVESTOR_PROFILE_CONSTANTS.INVESTOR_TYPES.find(
+                  (option) => option.value === data.investorProfile.type
+                ) || null
+              : null,
           }
         : undefined,
     };

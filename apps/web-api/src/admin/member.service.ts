@@ -8,7 +8,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import axios from 'axios';
-import { Location, Member, ParticipantsRequest, Prisma } from '@prisma/client';
+import { InvestorProfileType, Location, Member, ParticipantsRequest, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
@@ -267,7 +267,7 @@ export class MemberService {
             typicalCheckSize: memberData.investorProfile.typicalCheckSize,
             secRulesAccepted: memberData.investorProfile.secRulesAccepted,
             secRulesAcceptedAt: memberData.investorProfile.secRulesAccepted ? new Date() : null,
-            isInvestViaFund: memberData.investorProfile.isInvestViaFund,
+            type: memberData.investorProfile.type,
           },
         };
       } else {
@@ -324,7 +324,7 @@ export class MemberService {
           typicalCheckSize: investorProfileData.typicalCheckSize,
           secRulesAccepted: investorProfileData.secRulesAccepted,
           secRulesAcceptedAt,
-          isInvestViaFund: investorProfileData.isInvestViaFund,
+          type: investorProfileData.type,
         },
       });
     } else {
@@ -337,7 +337,7 @@ export class MemberService {
           typicalCheckSize: investorProfileData.typicalCheckSize,
           secRulesAccepted: investorProfileData.secRulesAccepted,
           secRulesAcceptedAt,
-          isInvestViaFund: investorProfileData.isInvestViaFund,
+          type: investorProfileData.type,
           member: { connect: { uid: memberUid } },
         },
       });
@@ -868,7 +868,7 @@ export class MemberService {
             investInStartupStages: true,
             investInFundTypes: true,
             typicalCheckSize: true,
-            isInvestViaFund: true,
+            type: true,
           },
         },
       },
@@ -1024,7 +1024,7 @@ export class MemberService {
             investInFundTypes: memberData.investorProfile.investInFundTypes,
             typicalCheckSize: memberData.investorProfile.typicalCheckSize,
             secRulesAccepted: memberData.investorProfile.secRulesAccepted,
-            isInvestViaFund: memberData.investorProfile.isInvestViaFund,
+            type: memberData.investorProfile.type as InvestorProfileType,
             secRulesAcceptedAt: memberData.investorProfile.secRulesAccepted ? new Date() : null,
           },
         });
@@ -1165,7 +1165,7 @@ export class MemberService {
               secRulesAcceptedAt,
               investInStartupStages: investorProfile.investInStartupStages,
               investInFundTypes: investorProfile.investInFundTypes,
-              isInvestViaFund: investorProfile.isInvestViaFund,
+              type: investorProfile.type as InvestorProfileType,
             },
           });
         } else {
@@ -1178,7 +1178,7 @@ export class MemberService {
               secRulesAcceptedAt,
               investInStartupStages: investorProfile.investInStartupStages,
               investInFundTypes: investorProfile.investInFundTypes,
-              isInvestViaFund: investorProfile.isInvestViaFund,
+              type: investorProfile.type as InvestorProfileType,
               memberUid: uid,
             },
           });

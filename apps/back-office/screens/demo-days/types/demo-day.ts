@@ -38,6 +38,24 @@ export interface DemoDayParticipant {
     name: string;
     email: string;
     profilePicture?: string;
+    accessLevel?: string;
+    teamMemberRoles?: {
+      mainTeam: boolean;
+      teamLead: boolean;
+      role: string;
+      team: {
+        uid: string;
+        name: string;
+      };
+    }[];
+    investorProfile?: {
+      type?: 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND';
+      investmentFocus?: string[];
+      typicalCheckSize?: number;
+      secRulesAccepted?: boolean;
+      investInStartupStages?: string[];
+      investInFundTypes?: string[];
+    };
   };
   team?: {
     uid: string;
@@ -53,18 +71,40 @@ export interface AddParticipantDto {
 }
 
 export interface AddParticipantsBulkDto {
-  members: Array<{
+  participants: Array<{
     email: string;
-    name?: string;
+    name: string;
+    organization?: string;
+    twitterHandler?: string;
+    linkedinHandler?: string;
+    makeTeamLead?: boolean;
   }>;
   type: 'INVESTOR' | 'FOUNDER';
 }
 
 export interface BulkParticipantsResponse {
-  status: 'SUCCESS' | 'FAIL';
-  failedMembers: Array<{
+  summary: {
+    total: number;
+    createdUsers: number;
+    updatedUsers: number;
+    createdTeams: number;
+    updatedMemberships: number;
+    promotedToLead: number;
+    errors: number;
+  };
+  rows: Array<{
     email: string;
-    name?: string;
+    name: string;
+    organization?: string;
+    twitterHandler?: string;
+    linkedinHandler?: string;
+    makeTeamLead?: boolean;
+    willBeTeamLead: boolean;
+    status: 'success' | 'error';
+    message?: string;
+    userId?: string;
+    teamId?: string;
+    membershipRole?: 'LEAD' | 'MEMBER' | 'NONE';
   }>;
 }
 

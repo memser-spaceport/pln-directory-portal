@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { InvestorProfileType } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
 import { CacheService } from '../utils/cache/cache.service';
@@ -25,7 +26,7 @@ export class InvestorProfileService {
       investInStartupStages?: string[];
       investInFundTypes?: string[];
       teamUid?: string;
-      isInvestViaFund?: boolean;
+      type?: InvestorProfileType;
     }
   ) {
     try {
@@ -54,7 +55,7 @@ export class InvestorProfileService {
             typicalCheckSize: investorProfileData.typicalCheckSize,
             secRulesAccepted: investorProfileData.secRulesAccepted,
             investInStartupStages: investorProfileData.investInStartupStages ?? ([] as string[]),
-            isInvestViaFund: investorProfileData.isInvestViaFund,
+            type: investorProfileData.type || null,
             investInFundTypes: investorProfileData.investInFundTypes ?? ([] as string[]),
             teamUid: investorProfileData.teamUid,
             secRulesAcceptedAt,
@@ -68,7 +69,7 @@ export class InvestorProfileService {
             typicalCheckSize: investorProfileData.typicalCheckSize,
             secRulesAccepted: investorProfileData.secRulesAccepted,
             investInStartupStages: investorProfileData.investInStartupStages ?? [],
-            isInvestViaFund: investorProfileData.isInvestViaFund,
+            type: investorProfileData.type || null,
             investInFundTypes: investorProfileData.investInFundTypes ?? ([] as string[]),
             secRulesAcceptedAt,
             memberUid: memberUid,

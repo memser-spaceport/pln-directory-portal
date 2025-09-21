@@ -1,10 +1,10 @@
 import { useState } from 'react';
+import CreatableSelect from 'react-select/creatable';
 import { ReactComponent as InformationCircleIcon } from '../../public/assets/icons/info_icon.svg';
 import { Dropdown, MultiSelect } from '@protocol-labs-network/ui';
 import FocusAreasList from '../focus-areas-popup/focus-areas-list';
 import FocusAreasPopup from '../focus-areas-popup/focus-areas-popup';
-import { ABOUT_PLN_LINK } from '../../utils/constants';
-import CreatableSelect from 'react-select/creatable';
+import { ABOUT_PLN_LINK, INVESTOR_PROFILE_CONSTANTS } from '../../utils/constants';
 
 export default function TeamStepTwo(props) {
   const values = props?.formValues;
@@ -212,14 +212,7 @@ export default function TeamStepTwo(props) {
 
           <div className="pt-5">
             <MultiSelect
-              options={[
-                { value: 'Pre-seed', label: 'Pre-seed' },
-                { value: 'Seed', label: 'Seed' },
-                { value: 'Series A', label: 'Series A' },
-                { value: 'Series B', label: 'Series B' },
-                { value: 'Series C', label: 'Series C' },
-                { value: 'Series D and later', label: 'Series D and later' },
-              ]}
+              options={INVESTOR_PROFILE_CONSTANTS.STAGES}
               name="investInStartupStages"
               selectedValues={values.investInStartupStages || []}
               onChange={handleDropDownChange}
@@ -231,12 +224,7 @@ export default function TeamStepTwo(props) {
 
           <div className="pt-5">
             <MultiSelect
-              options={[
-                { value: "I don't invest in VC Funds", label: "I don't invest in VC Funds" },
-                { value: 'Early stage', label: 'Early stage' },
-                { value: 'Late stage', label: 'Late stage' },
-                { value: 'Fund-of-funds', label: 'Fund-of-funds' },
-              ]}
+              options={INVESTOR_PROFILE_CONSTANTS.FUND_TYPES}
               name="investInFundTypes"
               selectedValues={values.investInFundTypes || []}
               onChange={handleDropDownChange}

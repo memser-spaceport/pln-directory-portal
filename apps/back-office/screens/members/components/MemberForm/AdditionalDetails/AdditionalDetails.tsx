@@ -1,4 +1,5 @@
 import React from 'react';
+import { useWatch } from 'react-hook-form';
 import { FormMultiselectField } from '../../../../../components/FormMultiselectField';
 import { FormTagInput } from '../../../../../components/FormTagInput';
 import { useMemberFormOptions } from '../../../../../hooks/members/useMemberFormOptions';
@@ -7,7 +8,7 @@ import { FormCheckboxField } from '../../../../../components/FormCheckboxField';
 import { FormSelectField } from '../../../../../components/FormSelectField';
 import { useFieldArray, useFormContext } from 'react-hook-form';
 import { TMemberForm } from '../../../types/member';
-import { useWatch } from 'react-hook-form';
+import { INVESTOR_PROFILE_CONSTANTS } from '../../../../../utils/constants';
 
 export const AdditionalDetails = () => {
   const { data } = useMemberFormOptions();
@@ -21,6 +22,11 @@ export const AdditionalDetails = () => {
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'teamsAndRoles',
+  });
+
+  const investorType = useWatch({
+    control,
+    name: 'investorProfile.type',
   });
 
   const isInvestor = accessLevel?.value === 'L5' || accessLevel?.value === 'L6';
@@ -43,11 +49,18 @@ export const AdditionalDetails = () => {
       {isInvestor && (
         <div className="flex flex-col gap-4">
           <h3 className="text-lg font-semibold text-gray-900">Investor Profile</h3>
-          <FormCheckboxField
-            name="investorProfile.secRulesAccepted"
-            label="I'm an accredited investor under SEC rules"
+          <FormSelectField
+            name="investorProfile.type"
+            placeholder="Select investment type"
+            label="Do you angel invest or invest through fund(s)?"
+            options={INVESTOR_PROFILE_CONSTANTS.INVESTOR_TYPES}
           />
-          <FormCheckboxField name="investorProfile.isInvestViaFund" label="I invest via a fund" />
+          {!!investorType?.value && investorType?.value !== 'FUND' && (
+            <FormCheckboxField
+              name="investorProfile.secRulesAccepted"
+              label="I'm an accredited investor under SEC rules"
+            />
+          )}
           <FormTagInput
             name="investorProfile.investmentFocus"
             placeholder="Type and press enter to add investment focus areas"
@@ -59,25 +72,13 @@ export const AdditionalDetails = () => {
             name="investorProfile.investInStartupStages"
             placeholder="Select startup stages"
             label="Invest in Startup Stages"
-            options={[
-              { value: 'Pre-seed', label: 'Pre-seed' },
-              { value: 'Seed', label: 'Seed' },
-              { value: 'Series A', label: 'Series A' },
-              { value: 'Series B', label: 'Series B' },
-              { value: 'Series C', label: 'Series C' },
-              { value: 'Series D and later', label: 'Series D and later' },
-            ]}
+            options={INVESTOR_PROFILE_CONSTANTS.STAGES}
           />
           <FormMultiselectField
             name="investorProfile.investInFundTypes"
             placeholder="Select fund types"
             label="Invest in Fund Types"
-            options={[
-              { value: "I don't invest in VC Funds", label: "I don't invest in VC Funds" },
-              { value: 'Early stage', label: 'Early stage' },
-              { value: 'Late stage', label: 'Late stage' },
-              { value: 'Fund-of-funds', label: 'Fund-of-funds' },
-            ]}
+            options={INVESTOR_PROFILE_CONSTANTS.FUND_TYPES}
           />
         </div>
       )}

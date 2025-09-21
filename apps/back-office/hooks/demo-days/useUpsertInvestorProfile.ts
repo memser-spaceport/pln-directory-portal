@@ -9,7 +9,7 @@ export type InvestorProfileInput = {
   investInStartupStages?: string[];
   investInFundTypes?: string[];
   teamUid?: string;
-  isInvestViaFund?: boolean;
+  type?: string;
 };
 
 async function upsertInvestorProfile(params: { authToken: string; memberUid: string; data: InvestorProfileInput }) {

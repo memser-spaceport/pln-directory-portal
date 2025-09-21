@@ -906,22 +906,29 @@ model Upload {
   @@index([uploaderUid])
 }
 
+enum InvestorProfileType {
+  ANGEL
+  FUND
+  ANGEL_AND_FUND
+}
+
 model InvestorProfile {
-  id                    Int       @id @default(autoincrement())
-  uid                   String    @unique @default(cuid())
-  secRulesAccepted      Boolean   @default(false)
+  id                    Int                  @id @default(autoincrement())
+  uid                   String               @unique @default(cuid())
+  secRulesAccepted      Boolean              @default(false)
   secRulesAcceptedAt    DateTime?
   investmentFocus       String[]
-  investInStartupStages String[]  @default([])
-  investInFundTypes     String[]  @default([])
+  investInStartupStages String[]             @default([])
+  investInFundTypes     String[]             @default([])
   typicalCheckSize      Float?
   isInvestViaFund       Boolean?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  type                  InvestorProfileType?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
   teamUid               String?
-  team                  Team?     @relation("TeamInvestorProfile")
+  team                  Team?                @relation("TeamInvestorProfile")
   memberUid             String?
-  member                Member?   @relation("MemberInvestorProfile")
+  member                Member?              @relation("MemberInvestorProfile")
 
   @@unique([teamUid])
   @@unique([memberUid])

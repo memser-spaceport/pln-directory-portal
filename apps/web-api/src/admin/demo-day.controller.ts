@@ -86,7 +86,7 @@ export class AdminDemoDaysController {
     @Body() body: AddParticipantsBulkDto
   ): Promise<ResponseBulkParticipantsDto> {
     return this.demoDayParticipantsService.addParticipantsBulk(demoDayUid, {
-      members: body.members,
+      participants: body.participants,
       type: body.type.toUpperCase() as 'INVESTOR' | 'FOUNDER',
     });
   }

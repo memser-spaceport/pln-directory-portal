@@ -963,7 +963,7 @@ export class MembersService {
             investInFundTypes: memberData.investorProfile.investInFundTypes || [],
             typicalCheckSize: memberData.investorProfile.typicalCheckSize,
             secRulesAccepted: memberData.investorProfile.secRulesAccepted,
-            isInvestViaFund: memberData.investorProfile.isInvestViaFund,
+            type: memberData.investorProfile.type,
           },
         };
       } else {
@@ -1018,7 +1018,7 @@ export class MembersService {
           typicalCheckSize: investorProfileData.typicalCheckSize,
           secRulesAccepted: investorProfileData.secRulesAccepted,
           secRulesAcceptedAt,
-          isInvestViaFund: investorProfileData.isInvestViaFund,
+          type: investorProfileData.type,
           investInStartupStages: investorProfileData.investInStartupStages || [],
           investInFundTypes: investorProfileData.investInFundTypes || [],
         },
@@ -1031,7 +1031,7 @@ export class MembersService {
           typicalCheckSize: investorProfileData.typicalCheckSize,
           secRulesAccepted: investorProfileData.secRulesAccepted,
           secRulesAcceptedAt,
-          isInvestViaFund: investorProfileData.isInvestViaFund,
+          type: investorProfileData.type,
           investInStartupStages: investorProfileData.investInStartupStages || [],
           investInFundTypes: investorProfileData.investInFundTypes || [],
           member: { connect: { uid: memberUid } },
@@ -1942,7 +1942,7 @@ export class MembersService {
               },
               {
                 investorProfile: {
-                  isInvestViaFund: true,
+                  type: { not: null },
                 },
               },
             ],
@@ -2076,7 +2076,7 @@ export class MembersService {
                 investmentFocus: true,
                 investInStartupStages: true,
                 investInFundTypes: true,
-                isInvestViaFund: true,
+                type: true,
                 typicalCheckSize: true,
                 secRulesAccepted: true,
                 secRulesAcceptedAt: true,
@@ -2640,6 +2640,7 @@ export class MembersService {
               investmentFocus: true,
               investInStartupStages: true,
               investInFundTypes: true,
+              type: true,
               typicalCheckSize: true,
               secRulesAccepted: true,
               secRulesAcceptedAt: true,

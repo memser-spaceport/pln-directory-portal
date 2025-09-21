@@ -83,6 +83,7 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
             investInFundTypes: formData.investorProfile.investInFundTypes.map(
               (item: { label: string; value: string }) => item.value
             ),
+            type: formData.investorProfile.type?.value || '',
           },
         };
 

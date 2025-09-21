@@ -32,6 +32,8 @@ export class DemoDayFundraisingProfilesService {
       },
     });
 
+    console.log(member);
+
     if (!member || member.demoDayParticipants.length === 0) {
       throw new ForbiddenException('No demo day access');
     }
@@ -40,7 +42,7 @@ export class DemoDayFundraisingProfilesService {
     const teamUid =
       demoDayParticipant.teamUid ||
       member.teamMemberRoles.find((role) => role.mainTeam)?.team.uid ||
-      member.teamMemberRoles[0].team.uid;
+      member.teamMemberRoles[0]?.team.uid;
 
     if (!teamUid) {
       throw new BadRequestException('Member must be part of a team to access fundraising profile');

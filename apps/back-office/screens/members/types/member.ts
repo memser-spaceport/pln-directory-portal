@@ -35,7 +35,7 @@ export type TMemberForm = {
     investmentFocus: { label: string; value: string }[];
     typicalCheckSize: number;
     secRulesAccepted: boolean;
-    isInvestViaFund?: boolean;
+    type?: { label: string; value: string } | null;
     investInStartupStages: { label: string; value: string }[];
     investInFundTypes: { label: string; value: string }[];
   };

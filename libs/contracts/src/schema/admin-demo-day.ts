@@ -37,14 +37,18 @@ export class AddParticipantDto extends createZodDto(AddParticipantSchema) {}
 
 // Add Bulk Participants Schema
 export const AddParticipantsBulkSchema = z.object({
-  members: z
+  participants: z
     .array(
       z.object({
         email: z.string().email(),
-        name: z.string().optional(),
+        name: z.string().min(1, 'Name is required'),
+        organization: z.string().optional().nullable(),
+        twitterHandler: z.string().optional().nullable(),
+        linkedinHandler: z.string().optional().nullable(),
+        makeTeamLead: z.boolean().optional(),
       })
     )
-    .min(1, 'At least one member is required'),
+    .min(1, 'At least one participant is required'),
   type: z.enum(['INVESTOR', 'FOUNDER']),
 });
 
@@ -105,11 +109,29 @@ export const ResponseParticipantSchema = z.object({
 export class ResponseParticipantDto extends createZodDto(ResponseParticipantSchema) {}
 
 export const ResponseBulkParticipantsSchema = z.object({
-  status: z.enum(['SUCCESS', 'FAIL']),
-  failedMembers: z.array(
+  summary: z.object({
+    total: z.number(),
+    createdUsers: z.number(),
+    updatedUsers: z.number(),
+    createdTeams: z.number(),
+    updatedMemberships: z.number(),
+    promotedToLead: z.number(),
+    errors: z.number(),
+  }),
+  rows: z.array(
     z.object({
       email: z.string(),
-      name: z.string().optional(),
+      name: z.string(),
+      organization: z.string().optional().nullable(),
+      twitterHandler: z.string().optional().nullable(),
+      linkedinHandler: z.string().optional().nullable(),
+      makeTeamLead: z.boolean().optional(),
+      willBeTeamLead: z.boolean(),
+      status: z.enum(['success', 'error']),
+      message: z.string().optional().nullable(),
+      userId: z.string().optional().nullable(),
+      teamId: z.string().optional().nullable(),
+      membershipRole: z.enum(['LEAD', 'MEMBER', 'NONE']).optional(),
     })
   ),
 });

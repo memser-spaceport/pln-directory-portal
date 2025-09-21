@@ -44,7 +44,7 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
         investmentFocus: [],
         typicalCheckSize: null,
         secRulesAccepted: false,
-        isInvestViaFund: false,
+        type: null,
         investInStartupStages: [],
         investInFundTypes: [],
       },

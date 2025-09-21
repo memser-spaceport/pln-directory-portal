@@ -2,9 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Modal from '../modal/modal';
 import { useCookie } from 'react-use';
 import { InvestorProfileInput, useUpsertInvestorProfile } from '../../hooks/demo-days/useUpsertInvestorProfile';
-
-const STAGES = ['Pre-seed', 'Seed', 'Series A', 'Series B+'];
-const FUND_TYPES = ['Angel', 'Syndicate', 'Venture', 'Family Office', 'Corporate'];
+import { INVESTOR_PROFILE_CONSTANTS } from '../../utils/constants';
 
 export const EditInvestorProfileModal: React.FC<{
   isOpen: boolean;
@@ -21,7 +19,7 @@ export const EditInvestorProfileModal: React.FC<{
   const [fundTypes, setFundTypes] = useState<string[]>(initial?.investInFundTypes || []);
   const [checkSize, setCheckSize] = useState<string>(initial?.typicalCheckSize?.toString() || '');
   const [sec, setSec] = useState<boolean>(initial?.secRulesAccepted || false);
-  const [isInvestViaFund, setIsInvestViaFund] = useState<boolean>(initial?.isInvestViaFund || false);
+  const [investorType, setInvestorType] = useState<string>(initial?.type || '');
 
   // hydrate when initial changes
   useEffect(() => {
@@ -30,7 +28,7 @@ export const EditInvestorProfileModal: React.FC<{
     setFundTypes(initial?.investInFundTypes || []);
     setCheckSize(initial?.typicalCheckSize != null ? String(initial.typicalCheckSize) : '');
     setSec(!!initial?.secRulesAccepted);
-    setIsInvestViaFund(!!initial?.isInvestViaFund);
+    setInvestorType(initial?.type || '');
   }, [initial, isOpen]);
 
   const toggleFromArray = (arr: string[], setter: (v: string[]) => void, value: string) => {
@@ -51,7 +49,7 @@ export const EditInvestorProfileModal: React.FC<{
       investInFundTypes: fundTypes,
       typicalCheckSize: checkSize ? Number(checkSize) : undefined,
       secRulesAccepted: sec,
-      isInvestViaFund: isInvestViaFund,
+      type: investorType,
     };
     await upsert.mutateAsync({ authToken, memberUid, data: payload });
     onClose();
@@ -84,15 +82,15 @@ export const EditInvestorProfileModal: React.FC<{
         <div className="mb-4">
           <label className="mb-2 block text-sm font-medium">Startup stages</label>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-            {STAGES.map((s) => (
-              <label key={s} className="flex items-center gap-2 text-sm">
+            {INVESTOR_PROFILE_CONSTANTS.STAGES.map((s) => (
+              <label key={s.value} className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
-                  checked={stages.includes(s)}
-                  onChange={() => toggleFromArray(stages, setStages, s)}
+                  checked={stages.includes(s.value)}
+                  onChange={() => toggleFromArray(stages, setStages, s.value)}
                   className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                {s}
+                {s.label}
               </label>
             ))}
           </div>
@@ -102,15 +100,15 @@ export const EditInvestorProfileModal: React.FC<{
         <div className="mb-4">
           <label className="mb-2 block text-sm font-medium">Fund types</label>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-            {FUND_TYPES.map((f) => (
-              <label key={f} className="flex items-center gap-2 text-sm">
+            {INVESTOR_PROFILE_CONSTANTS.FUND_TYPES.map((f) => (
+              <label key={f.value} className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
-                  checked={fundTypes.includes(f)}
-                  onChange={() => toggleFromArray(fundTypes, setFundTypes, f)}
+                  checked={fundTypes.includes(f.value)}
+                  onChange={() => toggleFromArray(fundTypes, setFundTypes, f.value)}
                   className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                {f}
+                {f.label}
               </label>
             ))}
           </div>
@@ -144,17 +142,21 @@ export const EditInvestorProfileModal: React.FC<{
           </label>
         </div>
 
-        {/* Invest via fund */}
+        {/* Investor Type */}
         <div className="mb-6">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={isInvestViaFund}
-              onChange={(e) => setIsInvestViaFund(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            I invest via a fund
-          </label>
+          <label className="mb-1 block text-sm font-medium">Do you angel invest or invest through fund(s)?</label>
+          <select
+            value={investorType}
+            onChange={(e) => setInvestorType(e.target.value)}
+            className="w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Select investment type</option>
+            {INVESTOR_PROFILE_CONSTANTS.INVESTOR_TYPES.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Footer */}

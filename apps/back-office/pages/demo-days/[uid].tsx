@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useRouter } from 'next/router';
 import { useCookie } from 'react-use';
@@ -9,12 +9,10 @@ import { useUpdateParticipant } from '../../hooks/demo-days/useUpdateParticipant
 import { AddParticipantModal } from '../../components/demo-days/AddParticipantModal';
 import { UploadParticipantsModal } from '../../components/demo-days/UploadParticipantsModal';
 import { UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
+import { WEB_UI_BASE_URL } from '../../utils/constants';
 import clsx from 'clsx';
 
 import s from './styles.module.scss';
-
-import { EditInvestorProfileModal } from '../../components/demo-days/EditInvestorProfileModal';
-import { useGetInvestorProfile } from '../../hooks/demo-days/useGetInvestorProfile';
 
 const DemoDayDetailPage = () => {
   const router = useRouter();
@@ -27,7 +25,6 @@ const DemoDayDetailPage = () => {
   const [editFormData, setEditFormData] = useState<UpdateDemoDayDto>({});
   const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [editingMemberUid, setEditingMemberUid] = useState<string | null>(null);
 
   const updateDemoDayMutation = useUpdateDemoDay();
   const updateParticipantMutation = useUpdateParticipant();
@@ -48,25 +45,6 @@ const DemoDayDetailPage = () => {
       limit: 50,
     },
   });
-
-  const { data: editingInvestorProfile, isLoading: isProfileLoading } = useGetInvestorProfile(
-    authToken,
-    editingMemberUid ?? undefined,
-    !!editingMemberUid
-  );
-
-  const editingInitial = useMemo(() => {
-    if (!editingInvestorProfile) return undefined;
-    return {
-      investmentFocus: editingInvestorProfile.investmentFocus ?? [],
-      investInStartupStages: editingInvestorProfile.investInStartupStages ?? [],
-      investInFundTypes: editingInvestorProfile.investInFundTypes ?? [],
-      typicalCheckSize: editingInvestorProfile.typicalCheckSize ?? undefined,
-      secRulesAccepted: !!editingInvestorProfile.secRulesAccepted,
-      teamUid: editingInvestorProfile.teamUid ?? undefined,
-      isInvestViaFund: !!editingInvestorProfile.isInvestViaFund,
-    };
-  }, [editingInvestorProfile]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -359,11 +337,12 @@ const DemoDayDetailPage = () => {
                 <div className={clsx(s.tableRow, s.tableHeader)}>
                   <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
                   <div className={clsx(s.headerCell, s.flexible)}>Team</div>
+                  {activeTab === 'investors' && <div className={clsx(s.headerCell, s.flexible)}>Investor Type</div>}
+                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                    Invite Accepted
+                  </div>
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                     Status
-                  </div>
-                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 120 }}>
-                    Actions
                   </div>
                 </div>
 
@@ -384,12 +363,97 @@ const DemoDayDetailPage = () => {
                       </div>
                     </div>
                     <div className={clsx(s.bodyCell, s.flexible)}>
-                      {participant.team ? (
-                        <div className="text-sm text-gray-900">{participant.team.name}</div>
+                      {(() => {
+                        // For founders, use participant.team
+                        // For investors, use member.teamMemberRoles[0].team
+                        let team;
+
+                        if (activeTab === 'founders') {
+                          team = participant.team;
+                        } else {
+                          team =
+                            participant.member?.teamMemberRoles.find((role) => role.mainTeam)?.team ||
+                            participant.member?.teamMemberRoles[0]?.team;
+                        }
+
+                        return team ? (
+                          <a
+                            href={`${WEB_UI_BASE_URL}/teams/${team.uid}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+                          >
+                            {team.name}
+                            <svg className="ml-1 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+                              <path
+                                d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
+                                fill="currentColor"
+                              />
+                            </svg>
+                          </a>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        );
+                      })()}
+                    </div>
+                    {activeTab === 'investors' && (
+                      <div className={clsx(s.bodyCell, s.flexible)}>
+                        {(() => {
+                          const profileType = participant.member?.investorProfile?.type;
+                          if (!profileType) {
+                            return (
+                              <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
+                                not provided
+                              </span>
+                            );
+                          }
+
+                          const typeConfig = {
+                            ANGEL: { label: 'Angel', bgColor: 'bg-blue-100', textColor: 'text-blue-800' },
+                            FUND: { label: 'Fund', bgColor: 'bg-green-100', textColor: 'text-green-800' },
+                            ANGEL_AND_FUND: {
+                              label: 'Angel + Fund',
+                              bgColor: 'bg-purple-100',
+                              textColor: 'text-purple-800',
+                            },
+                          };
+
+                          const config = typeConfig[profileType as keyof typeof typeConfig];
+
+                          return (
+                            <span
+                              className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                                config?.bgColor || 'bg-gray-100'
+                              } ${config?.textColor || 'text-gray-600'}`}
+                            >
+                              {config?.label || profileType}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    )}
+                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                      {participant.member?.accessLevel === 'L0' ? (
+                        <svg
+                          className="mx-auto h-5 w-5 text-red-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <svg
+                          className="mx-auto h-5 w-5 text-green-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
                       )}
                     </div>
+
                     <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
                       <select
                         value={participant.status}
@@ -408,40 +472,6 @@ const DemoDayDetailPage = () => {
                         <option value="ENABLED">Enabled</option>
                         <option value="DISABLED">Disabled</option>
                       </select>
-                    </div>
-
-                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 120 }}>
-                      {participant.type === 'INVESTOR' ? (
-                        <button
-                          onClick={() => {
-                            const targetUid =
-                              participant.member?.uid ||
-                              (participant as any)?.memberUid || // some APIs return this at root
-                              (participant as any)?.member?.uid; // extra safety
-
-                            if (targetUid) {
-                              setEditingMemberUid(targetUid);
-                            } else {
-                              console.warn('No memberUid found for investor; cannot open editor');
-                              alert('This investor has no member account yet, so the profile cannot be edited.');
-                            }
-                          }}
-                          className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-blue-700 hover:bg-blue-50"
-                          title="Edit investor profile"
-                        >
-                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15.232 5.232l3.536 3.536M4 20h4.586a1 1 0 00.707-.293l9.414-9.414a2 2 0 00-2.828-2.828L6.465 16.465A1 1 0 006.172 17H4v3z"
-                            />
-                          </svg>
-                          Edit
-                        </button>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
                     </div>
                   </div>
                 ))}
@@ -462,15 +492,6 @@ const DemoDayDetailPage = () => {
           onClose={() => setShowUploadModal(false)}
           demoDayUid={uid as string}
         />
-
-        {editingMemberUid && (
-          <EditInvestorProfileModal
-            isOpen={!!editingMemberUid}
-            onClose={() => setEditingMemberUid(null)}
-            memberUid={editingMemberUid}
-            initial={editingInitial}
-          />
-        )}
       </div>
     </ApprovalLayout>
   );

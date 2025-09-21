@@ -75,6 +75,6 @@ export interface IFormValues {
     investInFundTypes: string[];
     typicalCheckSize: number;
     secRulesAccepted: boolean;
-    isInvestViaFund: boolean;
+    type: string;
   };
 }

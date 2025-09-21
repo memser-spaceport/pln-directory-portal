@@ -129,18 +129,102 @@ export class DemoDayParticipantsService {
     });
   }
 
+  private normalizeTwitterHandler(handler?: string): string | undefined {
+    if (!handler) return undefined;
+
+    // Remove @ prefix if present
+    let normalized = handler.trim().replace(/^@/, '');
+
+    // Extract handle from Twitter URLs
+    const twitterUrlMatch = normalized.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/([a-zA-Z0-9_]+)/);
+    if (twitterUrlMatch) {
+      normalized = twitterUrlMatch[1];
+    }
+
+    return normalized || undefined;
+  }
+
+  private normalizeLinkedinHandler(handler?: string): string | undefined {
+    if (!handler) return undefined;
+
+    const trimmed = handler.trim();
+
+    // Extract handle from LinkedIn URLs
+    const linkedinUrlMatch = trimmed.match(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/([a-zA-Z0-9-]+)/);
+    if (linkedinUrlMatch) {
+      return linkedinUrlMatch[1];
+    }
+
+    return trimmed || undefined;
+  }
+
   async addParticipantsBulk(
     demoDayUid: string,
     data: {
-      members: { email: string; name?: string }[];
+      participants: Array<{
+        email: string;
+        name: string;
+        organization?: string | null;
+        twitterHandler?: string | null;
+        linkedinHandler?: string | null;
+        makeTeamLead?: boolean;
+      }>;
       type: 'INVESTOR' | 'FOUNDER';
     }
-  ): Promise<{ status: 'SUCCESS' | 'FAIL'; failedMembers: { email: string; name?: string }[] }> {
+  ): Promise<{
+    summary: {
+      total: number;
+      createdUsers: number;
+      updatedUsers: number;
+      createdTeams: number;
+      updatedMemberships: number;
+      promotedToLead: number;
+      errors: number;
+    };
+    rows: Array<{
+      email: string;
+      name: string;
+      organization?: string | null;
+      twitterHandler?: string | null;
+      linkedinHandler?: string | null;
+      makeTeamLead?: boolean;
+      willBeTeamLead: boolean;
+      status: 'success' | 'error';
+      message?: string;
+      userId?: string;
+      teamId?: string;
+      membershipRole?: 'LEAD' | 'MEMBER' | 'NONE';
+    }>;
+  }> {
     await this.demoDaysService.getDemoDayByUid(demoDayUid);
-    const failedMembers: { email: string; name?: string }[] = [];
+
+    const summary = {
+      total: data.participants.length,
+      createdUsers: 0,
+      updatedUsers: 0,
+      createdTeams: 0,
+      updatedMemberships: 0,
+      promotedToLead: 0,
+      errors: 0,
+    };
+
+    const rows: Array<{
+      email: string;
+      name: string;
+      organization?: string | null;
+      twitterHandler?: string | null;
+      linkedinHandler?: string | null;
+      makeTeamLead?: boolean;
+      willBeTeamLead: boolean;
+      status: 'success' | 'error';
+      message?: string;
+      userId?: string;
+      teamId?: string;
+      membershipRole?: 'LEAD' | 'MEMBER' | 'NONE';
+    }> = [];
 
     // Get all emails to check existing members and participants
-    const emails = data.members.map((m) => m.email);
+    const emails = data.participants.map((p) => p.email);
 
     // Load existing members
     const existingMembers = await this.prisma.member.findMany({
@@ -155,134 +239,217 @@ export class DemoDayParticipantsService {
       },
     });
 
-    // Load existing participants for this demo day
+    // Create maps for quick lookups
+    const existingMembersByEmail = new Map(existingMembers.map((m) => [m.email, m]));
     const existingParticipantEmails = new Set(
       existingMembers.filter((m) => m.demoDayParticipants.length > 0).map((m) => m.email)
     );
 
-    const membersToCreate: { name: string; email: string; accessLevel: string }[] = [];
-    const participantsToCreate: {
-      demoDayUid: string;
-      memberUid: string;
-      type: 'INVESTOR' | 'FOUNDER';
-      status: 'INVITED' | 'ENABLED';
-      teamUid?: string;
-      statusUpdatedAt: Date;
-    }[] = [];
+    // Team cache to avoid duplicate team creation
+    const teamCache = new Map<string, any>();
 
-    const teamLeadUpdates: { memberUid: string; teamUid: string }[] = [];
+    // Process each participant in a transaction
+    await this.prisma.$transaction(async (tx) => {
+      for (const participantData of data.participants) {
+        try {
+          // Normalize social media handles
+          const normalizedTwitter = this.normalizeTwitterHandler(participantData.twitterHandler || undefined);
+          const normalizedLinkedin = this.normalizeLinkedinHandler(participantData.linkedinHandler || undefined);
 
-    for (const memberData of data.members) {
-      try {
-        // Skip if participant already exists
-        if (existingParticipantEmails.has(memberData.email)) {
-          failedMembers.push(memberData);
-          continue;
-        }
+          let willBeTeamLead = false;
 
-        const existingMember = existingMembers.find((m) => m.email === memberData.email);
+          if (participantData.organization) {
+            willBeTeamLead = typeof participantData.makeTeamLead === 'boolean' ? participantData.makeTeamLead : true;
+          }
 
-        if (existingMember) {
-          // Check access level
-          if (['L0', 'L1', 'Rejected'].includes(existingMember.accessLevel || '')) {
-            failedMembers.push(memberData);
+          const rowResult: {
+            email: string;
+            name: string;
+            organization?: string | null;
+            twitterHandler?: string;
+            linkedinHandler?: string;
+            makeTeamLead?: boolean;
+            willBeTeamLead: boolean;
+            status: 'success' | 'error';
+            message?: string;
+            userId?: string;
+            teamId?: string;
+            membershipRole?: 'LEAD' | 'MEMBER' | 'NONE';
+          } = {
+            email: participantData.email,
+            name: participantData.name,
+            organization: participantData.organization,
+            twitterHandler: normalizedTwitter,
+            linkedinHandler: normalizedLinkedin,
+            makeTeamLead: participantData.makeTeamLead,
+            willBeTeamLead,
+            status: 'success',
+            membershipRole: 'NONE',
+          };
+
+          // Check if participant already exists for this demo day
+          if (existingParticipantEmails.has(participantData.email)) {
+            rowResult.status = 'error';
+            rowResult.message = 'Participant already exists for this demo day';
+            rows.push(rowResult);
+            summary.errors++;
             continue;
           }
 
-          // Determine team for founder type
-          let teamUid: string | undefined;
-          if (data.type === 'FOUNDER' && existingMember.teamMemberRoles.length > 0) {
-            teamUid =
-              existingMember.teamMemberRoles.find((role) => role.mainTeam)?.team.uid ||
-              existingMember.teamMemberRoles[0].team.uid;
+          const existingMember = existingMembersByEmail.get(participantData.email);
+          let memberUid: string;
+          let isNewUser = false;
 
+          if (existingMember) {
+            // Update existing member
+            memberUid = existingMember.uid;
+            await tx.member.update({
+              where: { uid: memberUid },
+              data: {
+                name: participantData.name,
+                twitterHandler: normalizedTwitter,
+                linkedinHandler: normalizedLinkedin,
+              },
+            });
+            summary.updatedUsers++;
+          } else {
+            // Create new member
+            const newMember = await tx.member.create({
+              data: {
+                name: participantData.name,
+                email: participantData.email,
+                twitterHandler: normalizedTwitter,
+                linkedinHandler: normalizedLinkedin,
+                accessLevel: 'L0',
+              },
+            });
+            memberUid = newMember.uid;
+            isNewUser = true;
+            summary.createdUsers++;
+          }
+
+          rowResult.userId = memberUid;
+
+          // Handle team logic if organization is provided
+          let teamUid: string | undefined;
+          if (participantData.organization) {
+            const orgName = participantData.organization.trim();
+
+            // Check cache first
+            let team = teamCache.get(orgName.toLowerCase());
+
+            if (!team) {
+              // Try to find existing team (case-insensitive)
+              team = await tx.team.findFirst({
+                where: {
+                  name: {
+                    equals: orgName,
+                    mode: 'insensitive',
+                  },
+                },
+              });
+
+              if (!team) {
+                // Create new team
+                team = await tx.team.create({
+                  data: {
+                    name: orgName,
+                  },
+                });
+                summary.createdTeams++;
+              }
+
+              // Cache the team
+              teamCache.set(orgName.toLowerCase(), team);
+            }
+
+            teamUid = team.uid;
+            rowResult.teamId = teamUid;
+
+            // Upsert TeamMemberRole - teamUid is guaranteed to exist here
             if (teamUid) {
-              teamLeadUpdates.push({ memberUid: existingMember.uid, teamUid });
+              const existingRole = await tx.teamMemberRole.findUnique({
+                where: {
+                  memberUid_teamUid: { memberUid, teamUid },
+                },
+              });
+
+              if (existingRole) {
+                // Update existing role - only promote to lead, never downgrade
+                if (willBeTeamLead && !existingRole.teamLead) {
+                  await tx.teamMemberRole.update({
+                    where: {
+                      memberUid_teamUid: { memberUid, teamUid },
+                    },
+                    data: {
+                      teamLead: true,
+                    },
+                  });
+                  summary.promotedToLead++;
+                  rowResult.membershipRole = 'LEAD';
+                } else {
+                  rowResult.membershipRole = existingRole.teamLead ? 'LEAD' : 'MEMBER';
+                }
+              } else {
+                // Create new team membership
+                await tx.teamMemberRole.create({
+                  data: {
+                    memberUid,
+                    teamUid,
+                    teamLead: willBeTeamLead,
+                    role: 'MEMBER',
+                  },
+                });
+                summary.updatedMemberships++;
+                rowResult.membershipRole = willBeTeamLead ? 'LEAD' : 'MEMBER';
+
+                if (willBeTeamLead) {
+                  summary.promotedToLead++;
+                }
+              }
             }
           }
 
-          participantsToCreate.push({
-            demoDayUid,
-            memberUid: existingMember.uid,
-            type: data.type,
-            status: 'ENABLED',
-            teamUid,
-            statusUpdatedAt: new Date(),
-          });
-        } else {
-          // Member doesn't exist, will create new one
-          const memberUid = `temp_${memberData.email}_${Date.now()}`;
-          membersToCreate.push({
-            name: memberData.name || memberData.email,
-            email: memberData.email,
-            accessLevel: 'L0',
-          });
-
-          participantsToCreate.push({
-            demoDayUid,
-            memberUid, // This will be replaced with actual uid after creation
-            type: data.type,
-            status: 'INVITED',
-            statusUpdatedAt: new Date(),
-          });
-        }
-      } catch (error) {
-        failedMembers.push(memberData);
-      }
-    }
-
-    // Create members and participants in transaction
-    await this.prisma.$transaction(async (tx) => {
-      // Create new members
-      if (membersToCreate.length > 0) {
-        const createdMembers = await Promise.all(
-          membersToCreate.map((memberData) =>
-            tx.member.create({
-              data: memberData,
-            })
-          )
-        );
-
-        // Update participant data with actual member uids
-        let createdMemberIndex = 0;
-        for (let i = 0; i < participantsToCreate.length; i++) {
-          if (participantsToCreate[i].memberUid.startsWith('temp_')) {
-            participantsToCreate[i].memberUid = createdMembers[createdMemberIndex].uid;
-            createdMemberIndex++;
-          }
-        }
-      }
-
-      // Create participants
-      if (participantsToCreate.length > 0) {
-        await tx.demoDayParticipant.createMany({
-          data: participantsToCreate,
-        });
-      }
-
-      // Auto-assign Founder as Team Lead of their main team
-      if (teamLeadUpdates.length > 0) {
-        const unique = new Map<string, { memberUid: string; teamUid: string }>();
-        for (const u of teamLeadUpdates) {
-          unique.set(`${u.memberUid}|${u.teamUid}`, u);
-        }
-        for (const { memberUid, teamUid } of unique.values()) {
-          await tx.teamMemberRole.update({
+          // Create/update DemoDayParticipant
+          await tx.demoDayParticipant.upsert({
             where: {
-              memberUid_teamUid: { memberUid, teamUid },
+              demoDayUid_memberUid: { demoDayUid, memberUid },
             },
-            data: {
-              teamLead: true,
+            update: {
+              type: data.type,
+              teamUid,
+              statusUpdatedAt: new Date(),
             },
+            create: {
+              demoDayUid,
+              memberUid,
+              type: data.type,
+              status: isNewUser ? 'INVITED' : 'ENABLED',
+              teamUid,
+              statusUpdatedAt: new Date(),
+            },
+          });
+
+          rows.push(rowResult);
+        } catch (error) {
+          summary.errors++;
+          rows.push({
+            email: participantData.email,
+            name: participantData.name,
+            organization: participantData.organization,
+            twitterHandler: participantData.twitterHandler || undefined,
+            linkedinHandler: participantData.linkedinHandler || undefined,
+            makeTeamLead: participantData.makeTeamLead,
+            willBeTeamLead: participantData.organization ? true : participantData.makeTeamLead || false,
+            status: 'error',
+            message: error instanceof Error ? error.message : 'Unknown error occurred',
+            membershipRole: 'NONE',
           });
         }
       }
     });
 
-    return {
-      status: failedMembers.length === 0 ? 'SUCCESS' : 'FAIL',
-      failedMembers,
-    };
+    return { summary, rows };
   }
 
   async getParticipants(
@@ -388,6 +555,9 @@ export class DemoDayParticipantsService {
               accessLevelUpdatedAt: true,
               teamMemberRoles: {
                 select: {
+                  mainTeam: true,
+                  teamLead: true,
+                  role: true,
                   team: {
                     select: {
                       uid: true,
@@ -396,6 +566,7 @@ export class DemoDayParticipantsService {
                   },
                 },
               },
+              investorProfile: true,
             },
           },
           team: {

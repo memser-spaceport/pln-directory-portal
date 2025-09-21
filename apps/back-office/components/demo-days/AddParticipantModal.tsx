@@ -6,15 +6,13 @@ import { useAddParticipant } from '../../hooks/demo-days/useAddParticipant';
 import { AddParticipantDto } from '../../screens/demo-days/types/demo-day';
 import clsx from 'clsx';
 import { useUpsertInvestorProfile } from '../../hooks/demo-days/useUpsertInvestorProfile';
+import { INVESTOR_PROFILE_CONSTANTS } from '../../utils/constants';
 
 interface AddParticipantModalProps {
   isOpen: boolean;
   onClose: () => void;
   demoDayUid: string;
 }
-
-const STAGES = ['Pre-seed', 'Seed', 'Series A', 'Series B+'];
-const FUND_TYPES = ['Angel', 'Syndicate', 'Venture', 'Family Office', 'Corporate'];
 
 export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen, onClose, demoDayUid }) => {
   const [authToken] = useCookie('plnadmin');
@@ -32,7 +30,7 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
   const [invFundTypes, setInvFundTypes] = useState<string[]>([]);
   const [invCheck, setInvCheck] = useState<string>(''); // number as text
   const [invSecAccepted, setInvSecAccepted] = useState(false);
-  const [isInvestViaFund, setIsInvestViaFund] = useState(false);
+  const [investorType, setInvestorType] = useState('');
   const { data: members } = useMembersList({
     authToken,
     accessLevel: ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L0', 'Rejected'],
@@ -74,7 +72,7 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
     setInvFundTypes([]);
     setInvCheck('');
     setInvSecAccepted(false);
-    setIsInvestViaFund(false);
+    setInvestorType('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -119,7 +117,7 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
               investInFundTypes: invFundTypes,
               typicalCheckSize: invCheck ? Number(invCheck) : undefined,
               secRulesAccepted: invSecAccepted,
-              isInvestViaFund: isInvestViaFund,
+              type: investorType,
             },
           });
         }
@@ -427,105 +425,6 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
                     />
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* Investor details */}
-            {participantType === 'INVESTOR' && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-4">
-                <div className="mb-3 flex items-center gap-2">
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                  <h4 className="font-medium text-gray-900">Investor details</h4>
-                </div>
-
-                {/* Investment Focus */}
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Investment Focus <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={invFocusRaw}
-                  onChange={(e) => setInvFocusRaw(e.target.value)}
-                  placeholder="Comma-separated (e.g. AI, Infra, Fintech)"
-                  className={clsx(
-                    'mb-3 w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500',
-                    investmentFocus.length === 0 ? 'border-red-300' : 'border-gray-300'
-                  )}
-                />
-
-                {/* Stages */}
-                <label className="mb-1 block text-sm font-medium text-gray-700">Startup Stages</label>
-                <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-                  {STAGES.map((s) => (
-                    <label key={s} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={invStages.includes(s)}
-                        onChange={() => toggleFromArray(invStages, setInvStages, s)}
-                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      {s}
-                    </label>
-                  ))}
-                </div>
-
-                {/* Fund Types */}
-                <label className="mb-1 block text-sm font-medium text-gray-700">Fund Types</label>
-                <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-3">
-                  {FUND_TYPES.map((f) => (
-                    <label key={f} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={invFundTypes.includes(f)}
-                        onChange={() => toggleFromArray(invFundTypes, setInvFundTypes, f)}
-                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      {f}
-                    </label>
-                  ))}
-                </div>
-
-                {/* Typical Check Size */}
-                <label className="mb-1 block text-sm font-medium text-gray-700">Typical Check Size (USD)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1000"
-                  inputMode="numeric"
-                  value={invCheck}
-                  onChange={(e) => setInvCheck(e.target.value)}
-                  className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g. 250000"
-                />
-
-                {/* SEC rules */}
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={invSecAccepted}
-                    onChange={(e) => setInvSecAccepted(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  I confirm the SEC/eligibility rules
-                </label>
-
-                {/* Invest via fund */}
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={isInvestViaFund}
-                    onChange={(e) => setIsInvestViaFund(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  I invest via a fund
-                </label>
               </div>
             )}
           </form>
