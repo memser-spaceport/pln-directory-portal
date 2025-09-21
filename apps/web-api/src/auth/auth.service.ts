@@ -15,7 +15,7 @@ import { MembersService } from '../members/members.service';
 import { EmailOtpService } from '../otp/email-otp.service';
 import { ModuleRef } from '@nestjs/core';
 import { LogService } from '../shared/log.service';
-import { AnalyticsService } from '../analytics/analytics.service';
+import { AnalyticsService } from '../analytics/service/analytics.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
 import { PrismaService } from '../shared/prisma.service';
 import { AuthMetrics, extractErrorCode, statusClassOf } from '../metrics/auth.metrics';
@@ -465,6 +465,11 @@ export class AuthService implements OnModuleInit {
           statusUpdatedAt: new Date(),
         },
       });
+
+      if (invitedParticipant.type === 'INVESTOR') {
+        // This is an additive analytics call; no changes to existing logs/comments
+        await this.trackInvestorSign(member, invitedParticipant, newAccessLevel);
+      }
     });
 
     this.logger.info(
@@ -478,4 +483,24 @@ export class AuthService implements OnModuleInit {
       accessLevelUpdatedAt: new Date(),
     };
   }
+
+  /**
+   * Track "investor sign" event once investor is enabled/upgraded
+   * (This is additive only; no changes to existing code paths)
+   */
+  private async trackInvestorSign(member: any, invitedParticipant: any, newAccessLevel: string) {
+    await this.analyticsService.trackEvent({
+      name: 'investor_sign',
+      distinctId: member.uid,
+      properties: {
+        uid: member.uid,
+        email: member.email,
+        name: member.name,
+        demoDayUid: invitedParticipant.demoDayUid,
+        participantUid: invitedParticipant.uid,
+        newAccessLevel,
+      },
+    });
+  }
+
 }
