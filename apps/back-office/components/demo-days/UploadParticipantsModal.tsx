@@ -92,7 +92,7 @@ const normalizeLinkedInHandle = (value: string): string => {
 
 const parseBoolean = (value: string): boolean => {
   if (!value) return false;
-  const normalized = value.toLowerCase().trim();
+  const normalized = String(value).toLowerCase().trim();
   return ['true', '1', 'yes', 'y'].includes(normalized);
 };
 
@@ -325,7 +325,7 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
           const errors: string[] = [];
 
           if (field === 'email' || !updated.email) {
-            const email = typeof value === 'string' && field === 'email' ? value.trim().toLowerCase() : updated.email;
+            const email = typeof value === 'string' && field === 'email' ? value.trim()?.toLowerCase() : updated.email;
             if (!email) {
               errors.push('Email is required');
             } else if (!validateEmail(email)) {

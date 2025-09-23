@@ -42,8 +42,8 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
   const filteredMembers =
     members?.data?.filter(
       (member) =>
-        member.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
-        member.email.toLowerCase().includes(memberSearch.toLowerCase())
+        member.name?.toLowerCase().includes(memberSearch?.toLowerCase()) ||
+        member.email?.toLowerCase().includes(memberSearch?.toLowerCase())
     ) || [];
 
   const investmentFocus = useMemo(
