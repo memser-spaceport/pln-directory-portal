@@ -239,20 +239,34 @@ export class PLEventLocationsService {
 
 
   /**
+   * This method computes the time window for segregating events based on environment configuration.
+   * @param timezone The timezone of the location
+   * @returns An object containing the cutoff date for past events
+   */
+  private computeEventTimeWindow(timezone: string): { pastEventsCutoff: moment.Moment } {
+    const currentDateTimeInZone = moment().tz(timezone);
+    const numberOfDays = parseInt(process.env.IRL_CURRENT_EVENT_WINDOW_IN_DAYS || '90', 10);
+    const pastEventsCutoff = currentDateTimeInZone.clone().subtract(numberOfDays, 'days');
+    
+    return { pastEventsCutoff };
+  }
+
+  /**
    * This method separates the events of a location into past and upcoming based on the timezone.
    * @param events An array of event objects associated with the location
    * @param timezone The timezone of the location
    * @returns An object containing two arrays: pastEvents and upcomingEvents
-   *   - Events are classified as past or upcoming depending on whether their start date is before or after the current time.
+   *   - Past events: events that ended before the configured number of days from current time
+   *   - Upcoming events: events that start from the configured number of days from current time + all future events
    */
   private segregateEventsByTime(events: PLEvent[], timezone: string): { pastEvents: PLEvent[], upcomingEvents: PLEvent[] } {
-    const currentDateTimeInZone = moment().tz(timezone);
+    const { pastEventsCutoff } = this.computeEventTimeWindow(timezone);
     const pastEvents: any = [];
     const upcomingEvents: any = [];
     events.forEach((event) => {
       const eventStartDateInZone = moment.utc(event.startDate).tz(timezone);
       const eventEndDateInZone = moment.utc(event.endDate).tz(timezone);
-      if (eventEndDateInZone.isBefore(currentDateTimeInZone)) {
+      if (eventEndDateInZone.isBefore(pastEventsCutoff)) {
         pastEvents.push({
           ...event,
           startDate: eventStartDateInZone.format(),
