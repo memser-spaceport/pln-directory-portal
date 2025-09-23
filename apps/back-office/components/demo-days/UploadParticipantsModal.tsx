@@ -17,6 +17,7 @@ interface ParsedParticipant {
   email: string;
   name: string;
   organization?: string;
+  organizationEmail?: string;
   twitterHandler?: string | null;
   linkedinHandler?: string | null;
   makeTeamLead?: boolean;
@@ -28,6 +29,8 @@ interface ParsedParticipant {
 const headerAliases = {
   email: ['email', 'e-mail', 'email_address'],
   name: ['name', 'full_name', 'investor_name', 'participant_name'],
+  twitter_handler: ['x', 'x_handle', 'twitter', 'twitter_handle', 'x_username', 'twitter_handler'],
+  linkedin_handler: ['linkedin', 'linkedin_handle', 'linkedin_url', 'linkedin_profile', 'linkedin_handler'],
   organization: [
     'organization_fund_name',
     'organization/fund_name',
@@ -42,8 +45,18 @@ const headerAliases = {
     'fund_name',
     'company',
   ],
-  twitter_handler: ['x', 'x_handle', 'twitter', 'twitter_handle', 'x_username', 'twitter_handler'],
-  linkedin_handler: ['linkedin', 'linkedin_handle', 'linkedin_url', 'linkedin_profile', 'linkedin_handler'],
+  organization_email: [
+    'organization_email',
+    'organization_fund_email',
+    'organization/fund_email',
+    'organization_/_fund_email',
+    'fund_email',
+    'fundemail',
+    'org_email',
+    'team_email',
+    'contact_email',
+    'organizationemail',
+  ],
   make_team_lead: ['make_team_lead', 'is_team_lead', 'team_lead', 'lead', 'add_as_team_lead'],
 };
 
@@ -116,6 +129,7 @@ const parseCSV = (csvContent: string): { participants: ParsedParticipant[]; erro
   // Get column indices
   const nameIndex = normalizedHeaders.indexOf('name');
   const organizationIndex = normalizedHeaders.indexOf('organization');
+  const organizationEmailIndex = normalizedHeaders.indexOf('organization_email');
   const twitterHandlerIndex = normalizedHeaders.indexOf('twitter_handler');
   const linkedinHandlerIndex = normalizedHeaders.indexOf('linkedin_handler');
   const makeTeamLeadIndex = normalizedHeaders.indexOf('make_team_lead');
@@ -142,6 +156,7 @@ const parseCSV = (csvContent: string): { participants: ParsedParticipant[]; erro
 
     // Parse optional fields
     const organization = values[organizationIndex]?.trim() || undefined;
+    const organizationEmail = values[organizationEmailIndex]?.trim() || undefined;
     const twitterHandler =
       twitterHandlerIndex >= 0 ? normalizeXHandle(values[twitterHandlerIndex] || '') || undefined : undefined;
     const linkedinHandler =
@@ -163,6 +178,7 @@ const parseCSV = (csvContent: string): { participants: ParsedParticipant[]; erro
         email,
         name,
         organization,
+        organizationEmail,
         twitterHandler,
         linkedinHandler,
         makeTeamLead,
@@ -216,8 +232,24 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
   });
 
   const downloadCSVTemplate = () => {
-    const headers = ['email', 'name', 'organization', 'x_handle', 'linkedin_handle', 'make_team_lead'];
-    const exampleRow = ['investor@example.com', 'John Doe', 'Example Fund', 'johndoe', 'johndoe', 'true'];
+    const headers = [
+      'email',
+      'name',
+      'organization',
+      'organization_email',
+      'x_handle',
+      'linkedin_handle',
+      'make_team_lead',
+    ];
+    const exampleRow = [
+      'investor@example.com',
+      'John Doe',
+      'Example Fund',
+      'contact@examplefund.com',
+      'johndoe',
+      'johndoe',
+      'true',
+    ];
     const csvContent = [headers.join(','), exampleRow.join(',')].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -287,7 +319,11 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
     setParsedParticipants((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const updateParticipant = (index: number, field: keyof ParsedParticipant, value: string | boolean) => {
+  const updateParticipant = (
+    index: number,
+    field: keyof Omit<ParsedParticipant, 'errors' | 'willBeTeamLead'>,
+    value: string | boolean
+  ) => {
     setParsedParticipants((prev) =>
       prev.map((p, i) => {
         if (i === index) {
@@ -448,7 +484,10 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                             />
                           </svg>
-                          <span>CSV files only • Required: email, name • Optional: organization, social handles</span>
+                          <span>
+                            CSV files only • Required: email, name • Optional: organization, organization email, social
+                            handles
+                          </span>
                         </div>
                         <button
                           type="button"
@@ -582,13 +621,16 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                               Name
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                              Organization
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                               X Handle
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                               LinkedIn
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              Organization
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              Org Email
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                               Team Lead
@@ -651,15 +693,6 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                               <td className="px-4 py-3">
                                 <input
                                   type="text"
-                                  value={participant.organization || ''}
-                                  onChange={(e) => updateParticipant(index, 'organization', e.target.value)}
-                                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                  placeholder="Organization"
-                                />
-                              </td>
-                              <td className="px-4 py-3">
-                                <input
-                                  type="text"
                                   value={participant.twitterHandler || ''}
                                   onChange={(e) => updateParticipant(index, 'twitterHandler', e.target.value)}
                                   className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -673,6 +706,24 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                                   onChange={(e) => updateParticipant(index, 'linkedinHandler', e.target.value)}
                                   className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                   placeholder="username"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="text"
+                                  value={participant.organization || ''}
+                                  onChange={(e) => updateParticipant(index, 'organization', e.target.value)}
+                                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  placeholder="Organization"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="email"
+                                  value={participant.organizationEmail || ''}
+                                  onChange={(e) => updateParticipant(index, 'organizationEmail', e.target.value)}
+                                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  placeholder="contact@org.com"
                                 />
                               </td>
                               <td className="px-4 py-3 text-center">

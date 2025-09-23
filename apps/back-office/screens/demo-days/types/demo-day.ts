@@ -60,6 +60,20 @@ export interface DemoDayParticipant {
   team?: {
     uid: string;
     name: string;
+    fundraisingProfiles?: Array<{
+      uid: string;
+      status: string;
+      onePagerUpload?: {
+        uid: string;
+        url: string;
+        filename: string;
+      };
+      videoUpload?: {
+        uid: string;
+        url: string;
+        filename: string;
+      };
+    }>;
   };
 }
 
@@ -75,6 +89,7 @@ export interface AddParticipantsBulkDto {
     email: string;
     name: string;
     organization?: string;
+    organizationEmail?: string;
     twitterHandler?: string;
     linkedinHandler?: string;
     makeTeamLead?: boolean;
@@ -96,6 +111,7 @@ export interface BulkParticipantsResponse {
     email: string;
     name: string;
     organization?: string;
+    organizationEmail?: string;
     twitterHandler?: string;
     linkedinHandler?: string;
     makeTeamLead?: boolean;

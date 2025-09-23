@@ -165,6 +165,7 @@ export class DemoDayParticipantsService {
         email: string;
         name: string;
         organization?: string | null;
+        organizationEmail?: string | null;
         twitterHandler?: string | null;
         linkedinHandler?: string | null;
         makeTeamLead?: boolean;
@@ -185,6 +186,7 @@ export class DemoDayParticipantsService {
       email: string;
       name: string;
       organization?: string | null;
+      organizationEmail?: string | null;
       twitterHandler?: string | null;
       linkedinHandler?: string | null;
       makeTeamLead?: boolean;
@@ -212,6 +214,7 @@ export class DemoDayParticipantsService {
       email: string;
       name: string;
       organization?: string | null;
+      organizationEmail?: string | null;
       twitterHandler?: string | null;
       linkedinHandler?: string | null;
       makeTeamLead?: boolean;
@@ -266,6 +269,7 @@ export class DemoDayParticipantsService {
             email: string;
             name: string;
             organization?: string | null;
+            organizationEmail?: string | null;
             twitterHandler?: string;
             linkedinHandler?: string;
             makeTeamLead?: boolean;
@@ -279,6 +283,7 @@ export class DemoDayParticipantsService {
             email: participantData.email,
             name: participantData.name,
             organization: participantData.organization,
+            organizationEmail: participantData.organizationEmail,
             twitterHandler: normalizedTwitter,
             linkedinHandler: normalizedLinkedin,
             makeTeamLead: participantData.makeTeamLead,
@@ -321,6 +326,14 @@ export class DemoDayParticipantsService {
                 twitterHandler: normalizedTwitter,
                 linkedinHandler: normalizedLinkedin,
                 accessLevel: 'L0',
+                investorProfile:
+                  data.type === 'INVESTOR'
+                    ? {
+                        create: {
+                          type: participantData.organization ? 'FUND' : 'ANGEL',
+                        },
+                      }
+                    : undefined,
               },
             });
             memberUid = newMember.uid;
@@ -354,9 +367,21 @@ export class DemoDayParticipantsService {
                 team = await tx.team.create({
                   data: {
                     name: orgName,
+                    contactMethod: participantData.organizationEmail || undefined,
+                    isFund: data.type === 'INVESTOR',
                   },
                 });
                 summary.createdTeams++;
+              } else {
+                // Update existing team if it has no contactMethod and organizationEmail is provided
+                if (participantData.organizationEmail && (!team.contactMethod || team.contactMethod.trim() === '')) {
+                  team = await tx.team.update({
+                    where: { uid: team.uid },
+                    data: {
+                      contactMethod: participantData.organizationEmail,
+                    },
+                  });
+                }
               }
 
               // Cache the team
@@ -437,6 +462,7 @@ export class DemoDayParticipantsService {
             email: participantData.email,
             name: participantData.name,
             organization: participantData.organization,
+            organizationEmail: participantData.organizationEmail,
             twitterHandler: participantData.twitterHandler || undefined,
             linkedinHandler: participantData.linkedinHandler || undefined,
             makeTeamLead: participantData.makeTeamLead,
@@ -577,6 +603,29 @@ export class DemoDayParticipantsService {
                 select: {
                   uid: true,
                   url: true,
+                },
+              },
+              fundraisingProfiles: {
+                where: {
+                  demoDayUid,
+                },
+                select: {
+                  uid: true,
+                  status: true,
+                  onePagerUpload: {
+                    select: {
+                      uid: true,
+                      url: true,
+                      filename: true,
+                    },
+                  },
+                  videoUpload: {
+                    select: {
+                      uid: true,
+                      url: true,
+                      filename: true,
+                    },
+                  },
                 },
               },
             },

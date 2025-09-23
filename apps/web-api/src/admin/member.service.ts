@@ -1024,7 +1024,11 @@ export class MemberService {
             investInFundTypes: memberData.investorProfile.investInFundTypes,
             typicalCheckSize: memberData.investorProfile.typicalCheckSize,
             secRulesAccepted: memberData.investorProfile.secRulesAccepted,
-            type: memberData.investorProfile.type as InvestorProfileType,
+            type: (memberData.investorProfile.type
+              ? memberData.investorProfile.type
+              : memberData.teamMemberRoles?.length > 0
+              ? 'FUND'
+              : 'ANGEL') as InvestorProfileType,
             secRulesAcceptedAt: memberData.investorProfile.secRulesAccepted ? new Date() : null,
           },
         });

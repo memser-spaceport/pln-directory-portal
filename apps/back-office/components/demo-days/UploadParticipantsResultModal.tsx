@@ -105,6 +105,11 @@ export default function UploadParticipantsResultModal({ isOpen, onClose, result,
                           )}
                           {participantType === 'FOUNDER' && (
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              Org Email
+                            </th>
+                          )}
+                          {participantType === 'FOUNDER' && (
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                               Team Role
                             </th>
                           )}
@@ -120,6 +125,9 @@ export default function UploadParticipantsResultModal({ isOpen, onClose, result,
                             <td className="px-4 py-3 text-sm text-gray-900">{row.name}</td>
                             {participantType === 'FOUNDER' && (
                               <td className="px-4 py-3 text-sm text-gray-900">{row.organization || '-'}</td>
+                            )}
+                            {participantType === 'FOUNDER' && (
+                              <td className="px-4 py-3 text-sm text-gray-900">{row.organizationEmail || '-'}</td>
                             )}
                             {participantType === 'FOUNDER' && (
                               <td className="px-4 py-3 text-sm">
@@ -170,6 +178,11 @@ export default function UploadParticipantsResultModal({ isOpen, onClose, result,
                               Organization
                             </th>
                           )}
+                          {participantType === 'FOUNDER' && (
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              Org Email
+                            </th>
+                          )}
                           <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                             Error Message
                           </th>
@@ -182,6 +195,9 @@ export default function UploadParticipantsResultModal({ isOpen, onClose, result,
                             <td className="px-4 py-3 text-sm text-gray-900">{row.name}</td>
                             {participantType === 'FOUNDER' && (
                               <td className="px-4 py-3 text-sm text-gray-900">{row.organization || '-'}</td>
+                            )}
+                            {participantType === 'FOUNDER' && (
+                              <td className="px-4 py-3 text-sm text-gray-900">{row.organizationEmail || '-'}</td>
                             )}
                             <td className="px-4 py-3 text-sm">
                               <span className="text-red-600">{row.message || 'Unknown error'}</span>

@@ -338,6 +338,7 @@ const DemoDayDetailPage = () => {
                   <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
                   <div className={clsx(s.headerCell, s.flexible)}>Team</div>
                   {activeTab === 'investors' && <div className={clsx(s.headerCell, s.flexible)}>Investor Type</div>}
+                  {activeTab === 'founders' && <div className={clsx(s.headerCell, s.flexible)}>Pitch Materials</div>}
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                     Invite Accepted
                   </div>
@@ -396,6 +397,56 @@ const DemoDayDetailPage = () => {
                         );
                       })()}
                     </div>
+                    {activeTab === 'founders' && (
+                      <div className={clsx(s.bodyCell, s.flexible)}>
+                        {(() => {
+                          const team = participant.team;
+                          if (!team) {
+                            return <span className="text-gray-400">-</span>;
+                          }
+
+                          const fundraisingProfile = team.fundraisingProfiles?.[0];
+                          if (!fundraisingProfile) {
+                            return (
+                              <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
+                                not provided
+                              </span>
+                            );
+                          }
+
+                          const hasOnePager = !!fundraisingProfile.onePagerUpload;
+                          const hasVideo = !!fundraisingProfile.videoUpload;
+
+                          let label = '';
+                          let bgColor = 'bg-gray-100';
+                          let textColor = 'text-gray-600';
+
+                          if (hasOnePager && hasVideo) {
+                            label = 'pitch deck, pitch video';
+                            bgColor = 'bg-green-100';
+                            textColor = 'text-green-800';
+                          } else if (hasOnePager) {
+                            label = 'pitch deck';
+                            bgColor = 'bg-blue-100';
+                            textColor = 'text-blue-800';
+                          } else if (hasVideo) {
+                            label = 'pitch video';
+                            bgColor = 'bg-purple-100';
+                            textColor = 'text-purple-800';
+                          } else {
+                            label = 'not provided';
+                          }
+
+                          return (
+                            <span
+                              className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${bgColor} ${textColor}`}
+                            >
+                              {label}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    )}
                     {activeTab === 'investors' && (
                       <div className={clsx(s.bodyCell, s.flexible)}>
                         {(() => {
