@@ -985,3 +985,27 @@ model DemoDayParticipant {
 
   @@unique([demoDayUid, memberUid])
 }
+
+model Event {
+  id          String   @id @default(cuid())
+  eventId     String?  @unique
+  eventType   String
+  userId      String?
+  userEmail   String?
+  anonymousId String?
+  sessionId   String?
+  source      String?
+  path        String?
+  referrer    String?
+  userAgent   String?
+  requestIp   String?
+  ts          DateTime
+  receivedAt  DateTime @default(now())
+  props       Json?
+
+  @@index([eventType, ts])
+  @@index([userId, ts])
+  @@index([anonymousId, ts])
+  @@index([sessionId, ts])
+  @@index([ts])
+}
