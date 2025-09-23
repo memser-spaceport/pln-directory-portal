@@ -57,7 +57,7 @@ const headerAliases = {
     'contact_email',
     'organizationemail',
   ],
-  make_team_lead: ['make_team_lead', 'is_team_lead', 'team_lead', 'lead', 'add_as_team_lead'],
+  team_lead: ['make_team_lead', 'is_team_lead', 'team_lead', 'lead', 'add_as_team_lead'],
 };
 
 const normalizeHeader = (header: string): string => {
@@ -132,7 +132,7 @@ const parseCSV = (csvContent: string): { participants: ParsedParticipant[]; erro
   const organizationEmailIndex = normalizedHeaders.indexOf('organization_email');
   const twitterHandlerIndex = normalizedHeaders.indexOf('twitter_handler');
   const linkedinHandlerIndex = normalizedHeaders.indexOf('linkedin_handler');
-  const makeTeamLeadIndex = normalizedHeaders.indexOf('make_team_lead');
+  const makeTeamLeadIndex = normalizedHeaders.indexOf('team_lead');
 
   const participants: ParsedParticipant[] = [];
 
@@ -232,15 +232,7 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
   });
 
   const downloadCSVTemplate = () => {
-    const headers = [
-      'email',
-      'name',
-      'organization',
-      'organization_email',
-      'x_handle',
-      'linkedin_handle',
-      'make_team_lead',
-    ];
+    const headers = ['email', 'name', 'organization', 'organization_email', 'x_handle', 'linkedin_handle', 'team_lead'];
     const exampleRow = [
       'investor@example.com',
       'John Doe',
