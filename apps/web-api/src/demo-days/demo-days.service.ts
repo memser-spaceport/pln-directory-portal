@@ -136,19 +136,6 @@ export class DemoDaysService {
         teamsCount,
         investorsCount,
       };
-    } else if (isDirectoryAdmin) {
-      // Member is directory admin but not a participant
-      const access = ['L5', 'L6'].includes(member.accessLevel || '') ? 'INVESTOR' : 'FOUNDER';
-      return {
-        access,
-        uid: demoDay.uid,
-        date: demoDay.startDate.toISOString(),
-        title: demoDay.title,
-        description: demoDay.description,
-        status: demoDay.status.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED',
-        teamsCount,
-        investorsCount,
-      };
     }
 
     return {
