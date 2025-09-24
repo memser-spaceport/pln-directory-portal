@@ -32,8 +32,6 @@ export class DemoDayFundraisingProfilesService {
       },
     });
 
-    console.log(member);
-
     if (!member || member.demoDayParticipants.length === 0) {
       throw new ForbiddenException('No demo day access');
     }
@@ -543,38 +541,106 @@ export class DemoDayFundraisingProfilesService {
   }
 
   private async fetchProfiles(where: any): Promise<any[]> {
-    return this.prisma.teamFundraisingProfile.findMany({
-      where,
-      include: {
-        team: {
-          select: {
-            uid: true,
-            name: true,
-            shortDescription: true,
-            industryTags: {
-              select: {
-                uid: true,
-                title: true,
+    const [profiles, founders] = await Promise.all([
+      this.prisma.teamFundraisingProfile.findMany({
+        where,
+        include: {
+          team: {
+            select: {
+              uid: true,
+              name: true,
+              shortDescription: true,
+              industryTags: {
+                select: {
+                  uid: true,
+                  title: true,
+                },
+              },
+              fundingStage: {
+                select: {
+                  uid: true,
+                  title: true,
+                },
+              },
+              logo: {
+                select: {
+                  uid: true,
+                  url: true,
+                },
               },
             },
-            fundingStage: {
-              select: {
-                uid: true,
-                title: true,
+          },
+          onePagerUpload: true,
+          videoUpload: true,
+        },
+      }),
+      this.prisma.demoDayParticipant.findMany({
+        where: {
+          demoDayUid: where.demoDayUid,
+          status: 'ENABLED',
+          isDeleted: false,
+        },
+        include: {
+          member: {
+            select: {
+              uid: true,
+              name: true,
+              email: true,
+              image: {
+                select: {
+                  uid: true,
+                  url: true,
+                },
               },
-            },
-            logo: {
-              select: {
-                uid: true,
-                url: true,
+              officeHours: true,
+              skills: {
+                select: {
+                  uid: true,
+                  title: true,
+                },
+              },
+              teamMemberRoles: {
+                select: {
+                  role: true,
+                  teamUid: true,
+                },
               },
             },
           },
         },
-        onePagerUpload: true,
-        videoUpload: true,
-      },
-    });
+      }),
+    ]);
+
+    // Group founders by teamUid
+    const foundersByTeam = founders.reduce((acc, participant) => {
+      const teamUid = participant.teamUid;
+      if (!teamUid) return acc; // Skip if teamUid is null
+
+      if (!acc[teamUid]) {
+        acc[teamUid] = [];
+      }
+
+      // Find the role for this specific team
+      const teamRole = participant.member.teamMemberRoles.find((role) => role.teamUid === teamUid);
+
+      acc[teamUid].push({
+        uid: participant.member.uid,
+        name: participant.member.name,
+        email: participant.member.email,
+        image: participant.member.image,
+        role: teamRole?.role || null,
+        skills: participant.member.skills,
+        officeHours: participant.member.officeHours,
+      });
+
+      return acc;
+    }, {} as Record<string, any[]>);
+
+    // Add founders to each profile
+    return profiles.map((profile) => ({
+      ...profile,
+      founders: foundersByTeam[profile.teamUid] || [],
+    }));
   }
 
   private async filterProfilesByEnabledFounders(demoDayUid: string, profiles: any[]): Promise<any[]> {
