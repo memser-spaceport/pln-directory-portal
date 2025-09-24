@@ -1,3 +1,7 @@
+// ⚠️ This import MUST come first!
+// It sets up instrumentation and telemetry before anything else is loaded.
+// Do NOT move this import below others — doing so may break logging, metrics, or tracing!
+import './instrumentation';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as Sentry from '@sentry/node';
@@ -31,7 +35,7 @@ export async function bootstrap() {
     environment: process.env.ENVIRONMENT,
     enabled: process.env.ENVIRONMENT === APP_ENV.PRODUCTION || process.env.ENVIRONMENT === APP_ENV.STAGING,
   });
- 
+
 
 
   // Create forest admin agent if the secret is set
