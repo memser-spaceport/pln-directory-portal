@@ -1880,11 +1880,14 @@ export class MembersService {
       });
     }
 
-    // Roles filter - search in current team roles
+    // Roles filter - search in team roles, experiences, and project contributions
     if (filters.roles && filters.roles.length > 0) {
       // Ensure roles is always an array (query params might come as string)
       const rolesArray = Array.isArray(filters.roles) ? filters.roles : [filters.roles];
-      whereConditions.push({
+      const rolesConditions: Prisma.MemberWhereInput[] = [];
+
+      // Search in team member roles
+      rolesConditions.push({
         teamMemberRoles: {
           some: {
             mainTeam: true,
@@ -1894,6 +1897,35 @@ export class MembersService {
             },
           },
         },
+      });
+
+      // Search in member experiences (title field)
+      rolesConditions.push({
+        experiences: {
+          some: {
+            title: {
+              in: rolesArray,
+              mode: 'insensitive',
+            },
+          },
+        },
+      });
+
+      // Search in project contributions (role field)
+      rolesConditions.push({
+        projectContributions: {
+          some: {
+            role: {
+              in: rolesArray,
+              mode: 'insensitive',
+            },
+          },
+        },
+      });
+
+      // Add OR condition to match any of the three sources
+      whereConditions.push({
+        OR: rolesConditions,
       });
     }
 
@@ -2340,7 +2372,8 @@ export class MembersService {
         }),
       };
 
-      const roles = await this.prisma.teamMemberRole.groupBy({
+      // Search in teamMemberRoles
+      const teamRoles = await this.prisma.teamMemberRole.groupBy({
         by: ['role'],
         where: {
           role: {
@@ -2363,12 +2396,81 @@ export class MembersService {
         },
       });
 
-      const results = roles
+      // Search in experiences (title field)
+      const experiences = await this.prisma.memberExperience.groupBy({
+        by: ['title'],
+        where: {
+          ...(query.trim() && {
+            title: {
+              contains: query,
+              mode: 'insensitive' as const,
+            },
+          }),
+          member: memberFilter,
+        },
+        _count: true,
+        orderBy: {
+          _count: {
+            title: 'desc',
+          },
+        },
+      });
+
+      // Search in projectContributions (role field)
+      const projectRoles = await this.prisma.projectContribution.groupBy({
+        by: ['role'],
+        where: {
+          role: {
+            not: null,
+            ...(query.trim() && {
+              contains: query,
+              mode: 'insensitive' as const,
+            }),
+          },
+          member: memberFilter,
+        },
+        _count: true,
+        orderBy: {
+          _count: {
+            role: 'desc',
+          },
+        },
+      });
+
+      // Combine and deduplicate results
+      const roleMap = new Map<string, number>();
+
+      // Add team roles
+      teamRoles
         .filter((role) => role.role !== null)
-        .map((role) => ({
-          role: role.role as string,
-          count: role._count.memberUid,
-        }));
+        .forEach((role) => {
+          const roleStr = role.role as string;
+          roleMap.set(roleStr, (roleMap.get(roleStr) || 0) + role._count.memberUid);
+        });
+
+      // Add experience titles
+      experiences
+        .filter((exp) => exp.title !== null)
+        .forEach((exp) => {
+          const title = exp.title as string;
+          roleMap.set(title, (roleMap.get(title) || 0) + (exp._count as number));
+        });
+
+      // Add project contribution roles
+      projectRoles
+        .filter((proj) => proj.role !== null)
+        .forEach((proj) => {
+          const role = proj.role as string;
+          roleMap.set(role, (roleMap.get(role) || 0) + (proj._count as number));
+        });
+
+      // Convert map to array and sort by count
+      const results = Array.from(roleMap.entries())
+        .map(([role, count]) => ({
+          role,
+          count,
+        }))
+        .sort((a, b) => b.count - a.count);
 
       const paginatedResults = results.slice(skip, skip + limit);
 

@@ -10,6 +10,7 @@
         "outputPath": "dist/apps/web-api",
         "main": "apps/web-api/src/main.ts",
         "tsConfig": "apps/web-api/tsconfig.build.json",
+        "externalDependencies": "all",
         "tsPlugins": ["@nestjs/swagger/plugin"],
         "assets": [
           "apps/web-api/src/shared/contactUs.hbs",
