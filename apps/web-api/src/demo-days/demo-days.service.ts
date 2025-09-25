@@ -14,6 +14,7 @@ export class DemoDaysService {
         },
         isDeleted: false,
       },
+      orderBy: { createdAt: 'desc' },
     });
 
     return demoDay;
