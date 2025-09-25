@@ -1,12 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import Modal from '../modal/modal';
 import { useMembersList } from '../../hooks/members/useMembersList';
 import { useCookie } from 'react-use';
 import { useAddParticipant } from '../../hooks/demo-days/useAddParticipant';
 import { AddParticipantDto } from '../../screens/demo-days/types/demo-day';
 import clsx from 'clsx';
-import { useUpsertInvestorProfile } from '../../hooks/demo-days/useUpsertInvestorProfile';
-import { INVESTOR_PROFILE_CONSTANTS } from '../../utils/constants';
 
 interface AddParticipantModalProps {
   isOpen: boolean;
@@ -24,55 +22,28 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
   const [name, setName] = useState('');
   const [memberSearch, setMemberSearch] = useState('');
 
-  // investor profile local fields
-  const [invFocusRaw, setInvFocusRaw] = useState(''); // comma-separated
-  const [invStages, setInvStages] = useState<string[]>([]);
-  const [invFundTypes, setInvFundTypes] = useState<string[]>([]);
-  const [invCheck, setInvCheck] = useState<string>(''); // number as text
-  const [invSecAccepted, setInvSecAccepted] = useState(false);
-  const [investorType, setInvestorType] = useState('');
   const { data: members } = useMembersList({
     authToken,
-    accessLevel: ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L0', 'Rejected'],
+    accessLevel: ['L2', 'L3', 'L4', 'L5', 'L6'],
   });
 
   const addParticipantMutation = useAddParticipant();
-  const upsertInvestorProfile = useUpsertInvestorProfile();
 
   const filteredMembers =
     members?.data?.filter(
       (member) =>
-        member.name?.toLowerCase().includes(memberSearch?.toLowerCase()) ||
-        member.email?.toLowerCase().includes(memberSearch?.toLowerCase())
+        (member.name?.toLowerCase().includes(memberSearch?.toLowerCase()) ||
+          member.email?.toLowerCase().includes(memberSearch?.toLowerCase())) &&
+        (participantType !== 'INVESTOR' || member.accessLevel === 'L5' || member.accessLevel === 'L6')
     ) || [];
 
-  const investmentFocus = useMemo(
-    () =>
-      invFocusRaw
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean),
-    [invFocusRaw]
-  );
-
-  const investorProfileValid = participantType !== 'INVESTOR' || investmentFocus.length > 0;
-
-  const submitDisabled =
-    addParticipantMutation.isPending ||
-    (addMethod === 'existing' && !selectedMemberUid) ||
-    (participantType === 'INVESTOR' && !investorProfileValid);
+  const submitDisabled = addParticipantMutation.isPending || (addMethod === 'existing' && !selectedMemberUid);
 
   const resetAll = () => {
     setSelectedMemberUid('');
     setEmail('');
     setName('');
     setMemberSearch('');
-    setInvFocusRaw('');
-    setInvStages([]);
-    setInvFundTypes([]);
-    setInvCheck('');
-    setInvSecAccepted(false);
-    setInvestorType('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -107,20 +78,6 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
         if (!createdMemberUid) {
           throw new Error('memberUid is missing for investor profile upsert');
         }
-        if (createdMemberUid) {
-          await upsertInvestorProfile.mutateAsync({
-            authToken,
-            memberUid: createdMemberUid,
-            data: {
-              investmentFocus,
-              investInStartupStages: invStages,
-              investInFundTypes: invFundTypes,
-              typicalCheckSize: invCheck ? Number(invCheck) : undefined,
-              secRulesAccepted: invSecAccepted,
-              type: investorType,
-            },
-          });
-        }
       }
 
       resetAll();
@@ -134,10 +91,6 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
   const handleClose = () => {
     resetAll();
     onClose();
-  };
-
-  const toggleFromArray = (arr: string[], setter: (v: string[]) => void, value: string) => {
-    setter(arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value]);
   };
 
   return (
@@ -449,7 +402,7 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
                 submitDisabled ? 'cursor-not-allowed bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
               )}
             >
-              {addParticipantMutation.isPending || upsertInvestorProfile.isPending ? (
+              {addParticipantMutation.isPending ? (
                 <>
                   <svg className="-ml-1 mr-2 h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
