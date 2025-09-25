@@ -1772,58 +1772,48 @@ export class MembersService {
     if (filters.roles && filters.roles.length > 0) {
       // Ensure roles is always an array (query params might come as string)
       const rolesArray = Array.isArray(filters.roles) ? filters.roles : [filters.roles];
+      const rolesConditions: Prisma.MemberWhereInput[] = [];
 
-      // For each role, create OR conditions to match partial roles containing the search term
-      const roleOrConditions: Prisma.MemberWhereInput[] = [];
-
-      rolesArray.forEach((role) => {
-        const singleRoleConditions: Prisma.MemberWhereInput[] = [];
-
-        // Search in team member roles with partial matching
-        singleRoleConditions.push({
-          teamMemberRoles: {
-            some: {
-              role: {
-                contains: role,
-                mode: 'insensitive',
-              },
+      // Search in team member roles
+      rolesConditions.push({
+        teamMemberRoles: {
+          some: {
+            mainTeam: true,
+            role: {
+              in: rolesArray,
+              mode: 'insensitive',
             },
           },
-        });
-
-        // Search in member experiences (title field) with partial matching
-        singleRoleConditions.push({
-          experiences: {
-            some: {
-              title: {
-                contains: role,
-                mode: 'insensitive',
-              },
-            },
-          },
-        });
-
-        // Search in project contributions (role field) with partial matching
-        singleRoleConditions.push({
-          projectContributions: {
-            some: {
-              role: {
-                contains: role,
-                mode: 'insensitive',
-              },
-            },
-          },
-        });
-
-        // Add OR condition for this specific role across all sources
-        roleOrConditions.push({
-          OR: singleRoleConditions,
-        });
+        },
       });
 
-      // Add OR condition to match any of the roles
+      // Search in member experiences (title field)
+      rolesConditions.push({
+        experiences: {
+          some: {
+            title: {
+              in: rolesArray,
+              mode: 'insensitive',
+            },
+          },
+        },
+      });
+
+      // Search in project contributions (role field)
+      rolesConditions.push({
+        projectContributions: {
+          some: {
+            role: {
+              in: rolesArray,
+              mode: 'insensitive',
+            },
+          },
+        },
+      });
+
+      // Add OR condition to match any of the three sources
       whereConditions.push({
-        OR: roleOrConditions,
+        OR: rolesConditions,
       });
     }
 
@@ -2174,6 +2164,7 @@ export class MembersService {
               mode: 'insensitive' as const,
             }),
           },
+          mainTeam: true,
           member: memberFilter,
         },
         _count: {
@@ -2227,85 +2218,40 @@ export class MembersService {
         },
       });
 
-      // Combine all roles first
-      const allRoles: { role: string; count: number }[] = [];
+      // Combine and deduplicate results
+      const roleMap = new Map<string, number>();
 
       // Add team roles
       teamRoles
         .filter((role) => role.role !== null)
         .forEach((role) => {
-          allRoles.push({ role: role.role as string, count: role._count.memberUid });
+          const roleStr = role.role as string;
+          roleMap.set(roleStr, (roleMap.get(roleStr) || 0) + role._count.memberUid);
         });
 
       // Add experience titles
       experiences
         .filter((exp) => exp.title !== null)
         .forEach((exp) => {
-          allRoles.push({ role: exp.title as string, count: exp._count as number });
+          const title = exp.title as string;
+          roleMap.set(title, (roleMap.get(title) || 0) + (exp._count as number));
         });
 
       // Add project contribution roles
       projectRoles
         .filter((proj) => proj.role !== null)
         .forEach((proj) => {
-          allRoles.push({ role: proj.role as string, count: proj._count as number });
+          const role = proj.role as string;
+          roleMap.set(role, (roleMap.get(role) || 0) + (proj._count as number));
         });
-
-      // Create aggregated results - combine counts for roles
-      const aggregatedResults = new Map<string, number>();
-
-      if (query.trim()) {
-        const queryLower = query.toLowerCase();
-
-        // Find exact matches and partial matches
-        const exactMatches = allRoles.filter(({ role }) => role.toLowerCase() === queryLower);
-        const partialMatches = allRoles.filter(
-          ({ role }) => role.toLowerCase() !== queryLower && role.toLowerCase().includes(queryLower)
-        );
-
-        // If we have exact matches, aggregate all matching roles under the exact match
-        if (exactMatches.length > 0) {
-          const exactMatchRole = exactMatches[0].role; // Use the first exact match as the key
-          const totalCount = [...exactMatches, ...partialMatches].reduce((sum, { count }) => sum + count, 0);
-          aggregatedResults.set(exactMatchRole, totalCount);
-
-          // Add remaining partial matches that weren't aggregated
-          partialMatches.forEach(({ role, count }) => {
-            if (!aggregatedResults.has(role)) {
-              aggregatedResults.set(role, count);
-            }
-          });
-        } else {
-          // No exact matches, just add partial matches
-          partialMatches.forEach(({ role, count }) => {
-            aggregatedResults.set(role, (aggregatedResults.get(role) || 0) + count);
-          });
-        }
-      } else {
-        // No query: just deduplicate by combining exact matches
-        allRoles.forEach(({ role, count }) => {
-          aggregatedResults.set(role, (aggregatedResults.get(role) || 0) + count);
-        });
-      }
 
       // Convert map to array and sort by count
-      const results = Array.from(aggregatedResults.entries())
+      const results = Array.from(roleMap.entries())
         .map(([role, count]) => ({
           role,
           count,
         }))
-        .sort((a, b) => {
-          // Prioritize exact matches
-          if (query.trim()) {
-            const queryLower = query.toLowerCase();
-            const aExact = a.role.toLowerCase() === queryLower;
-            const bExact = b.role.toLowerCase() === queryLower;
-            if (aExact && !bExact) return -1;
-            if (!aExact && bExact) return 1;
-          }
-          // Then sort by count
-          return b.count - a.count;
-        });
+        .sort((a, b) => b.count - a.count);
 
       const paginatedResults = results.slice(skip, skip + limit);
 
