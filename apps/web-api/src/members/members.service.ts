@@ -1778,7 +1778,6 @@ export class MembersService {
       rolesConditions.push({
         teamMemberRoles: {
           some: {
-            mainTeam: true,
             role: {
               in: rolesArray,
               mode: 'insensitive',
@@ -2164,7 +2163,6 @@ export class MembersService {
               mode: 'insensitive' as const,
             }),
           },
-          mainTeam: true,
           member: memberFilter,
         },
         _count: {
