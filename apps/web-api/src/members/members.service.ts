@@ -1783,7 +1783,6 @@ export class MembersService {
         singleRoleConditions.push({
           teamMemberRoles: {
             some: {
-              mainTeam: true,
               role: {
                 contains: role,
                 mode: 'insensitive',
@@ -2175,7 +2174,6 @@ export class MembersService {
               mode: 'insensitive' as const,
             }),
           },
-          mainTeam: true,
           member: memberFilter,
         },
         _count: {
