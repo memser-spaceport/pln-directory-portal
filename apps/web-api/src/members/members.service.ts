@@ -1772,48 +1772,59 @@ export class MembersService {
     if (filters.roles && filters.roles.length > 0) {
       // Ensure roles is always an array (query params might come as string)
       const rolesArray = Array.isArray(filters.roles) ? filters.roles : [filters.roles];
-      const rolesConditions: Prisma.MemberWhereInput[] = [];
 
-      // Search in team member roles
-      rolesConditions.push({
-        teamMemberRoles: {
-          some: {
-            mainTeam: true,
-            role: {
-              in: rolesArray,
-              mode: 'insensitive',
+      // For each role, create OR conditions to match partial roles containing the search term
+      const roleOrConditions: Prisma.MemberWhereInput[] = [];
+
+      rolesArray.forEach((role) => {
+        const singleRoleConditions: Prisma.MemberWhereInput[] = [];
+
+        // Search in team member roles with partial matching
+        singleRoleConditions.push({
+          teamMemberRoles: {
+            some: {
+              mainTeam: true,
+              role: {
+                contains: role,
+                mode: 'insensitive',
+              },
             },
           },
-        },
-      });
+        });
 
-      // Search in member experiences (title field)
-      rolesConditions.push({
-        experiences: {
-          some: {
-            title: {
-              in: rolesArray,
-              mode: 'insensitive',
+        // Search in member experiences (title field) with partial matching
+        singleRoleConditions.push({
+          experiences: {
+            some: {
+              title: {
+                contains: role,
+                mode: 'insensitive',
+              },
             },
           },
-        },
-      });
+        });
 
-      // Search in project contributions (role field)
-      rolesConditions.push({
-        projectContributions: {
-          some: {
-            role: {
-              in: rolesArray,
-              mode: 'insensitive',
+        // Search in project contributions (role field) with partial matching
+        singleRoleConditions.push({
+          projectContributions: {
+            some: {
+              role: {
+                contains: role,
+                mode: 'insensitive',
+              },
             },
           },
-        },
+        });
+
+        // Add OR condition for this specific role across all sources
+        roleOrConditions.push({
+          OR: singleRoleConditions,
+        });
       });
 
-      // Add OR condition to match any of the three sources
+      // Add OR condition to match any of the roles
       whereConditions.push({
-        OR: rolesConditions,
+        OR: roleOrConditions,
       });
     }
 
