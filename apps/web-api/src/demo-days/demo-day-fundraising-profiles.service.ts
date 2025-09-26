@@ -240,14 +240,7 @@ export class DemoDayFundraisingProfilesService {
     if (!profile) return;
 
     // Check if all required fields are provided
-    const hasAllFields =
-      profile.team.name &&
-      profile.team.shortDescription &&
-      profile.team.industryTags.length > 0 &&
-      profile.team.fundingStage &&
-      profile.team.logo &&
-      profile.onePagerUploadUid &&
-      profile.videoUploadUid;
+    const hasAllFields = profile.team.name && profile.onePagerUploadUid && profile.videoUploadUid;
 
     const newStatus = hasAllFields ? 'PUBLISHED' : 'DRAFT';
 
