@@ -2140,6 +2140,7 @@ export class MembersService {
 
   /**
    * Autocomplete roles from team member roles
+   * Uses exact matching to ensure consistency with searchMembers endpoint
    * @param query - Search query string
    * @param page - Page number for pagination
    * @param limit - Results per page
@@ -2181,7 +2182,7 @@ export class MembersService {
           role: {
             not: null,
             ...(query.trim() && {
-              contains: query,
+              equals: query,
               mode: 'insensitive' as const,
             }),
           },
@@ -2212,7 +2213,7 @@ export class MembersService {
         where: {
           ...(query.trim() && {
             title: {
-              contains: query,
+              equals: query,
               mode: 'insensitive' as const,
             },
           }),
@@ -2244,7 +2245,7 @@ export class MembersService {
           role: {
             not: null,
             ...(query.trim() && {
-              contains: query,
+              equals: query,
               mode: 'insensitive' as const,
             }),
           },
