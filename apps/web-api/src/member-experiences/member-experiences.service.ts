@@ -34,9 +34,17 @@ export class MemberExperiencesService {
   async create(experienceDto: CreateMemberExperienceDto) {
     try {
       const { memberUid, ...data } = experienceDto;
+
+      // Trim title and company fields
+      const trimmedData = {
+        ...data,
+        ...(data.title && { title: data.title.trim() }),
+        ...(data.company && { company: data.company.trim() }),
+      };
+
       const experience = await this.prisma.memberExperience.create({
         data: {
-          ...data,
+          ...trimmedData,
           member: {
             connect: { uid: memberUid }
           }
@@ -89,8 +97,15 @@ export class MemberExperiencesService {
       const existingExperience = await this.findOne(uid);
       const { memberUid, ...experienceData } = updateMemberExperiencedto;
 
-      const updateData: Prisma.MemberExperienceUpdateInput = {
+      // Trim title and company fields if they exist
+      const trimmedExperienceData = {
         ...experienceData,
+        ...(experienceData.title && { title: experienceData.title.trim() }),
+        ...(experienceData.company && { company: experienceData.company.trim() }),
+      };
+
+      const updateData: Prisma.MemberExperienceUpdateInput = {
+        ...trimmedExperienceData,
         userUpdatedAt: new Date(),
         isModifiedByUser: true,
       };
@@ -98,7 +113,7 @@ export class MemberExperiencesService {
       const experience = await this.prisma.$transaction(async (tx) => {
         const updatedExperience = await tx.memberExperience.update({
           where: { uid },
-          data: updateData
+          data: updateData,
         });
 
         //logging into participant request

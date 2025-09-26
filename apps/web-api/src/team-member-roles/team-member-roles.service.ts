@@ -66,7 +66,7 @@ export class TeamMemberRolesService {
               },
               update: {
                 ...(airtableMember.fields?.['Role']?.split(', ')[index] && {
-                  role: airtableMember.fields['Role'].split(', ')[index],
+                  role: airtableMember.fields['Role'].split(', ')[index].trim(),
                 }),
                 teamLead: airtableMember.fields['Team lead'] || false,
                 ...(airtableMember.fields?.['PLN Start Date'] && {
@@ -78,7 +78,7 @@ export class TeamMemberRolesService {
               },
               create: {
                 ...(airtableMember.fields?.['Role']?.split(', ')?.[index] && {
-                  role: airtableMember.fields['Role'].split(', ')[index],
+                  role: airtableMember.fields['Role'].split(', ')[index].trim(),
                 }),
                 mainTeam: false,
                 teamLead: airtableMember.fields['Team lead'] || false,
