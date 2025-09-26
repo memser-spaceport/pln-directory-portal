@@ -1039,7 +1039,7 @@ export class MembersService {
   async createTeamMemberRoles(tx: Prisma.TransactionClient, rolesToCreate: any[], memberUid: string) {
     if (rolesToCreate.length > 0) {
       const rolesToCreateData = rolesToCreate.map((t: any) => ({
-        role: t.role,
+        role: t.role?.trim(),
         mainTeam: false, // Set your default values here if needed
         teamLead: false, // Set your default values here if needed
         teamUid: t.teamUid,
@@ -1090,7 +1090,7 @@ export class MembersService {
               memberUid,
             },
           },
-          data: { role: roleToUpdate.role, roleTags: roleToUpdate.roleTags },
+          data: { role: roleToUpdate.role?.trim(), roleTags: roleToUpdate.roleTags },
         })
       );
       await Promise.all(updatePromises);
@@ -1106,7 +1106,7 @@ export class MembersService {
     return {
       createMany: {
         data: memberData.teamAndRoles.map((t) => ({
-          role: t.role,
+          role: t.role?.trim(),
           mainTeam: false,
           teamLead: false,
           teamUid: t.teamUid,
@@ -1157,18 +1157,26 @@ export class MembersService {
       });
     }
     if (contributionIdsToUpdate.length > 0) {
-      const updatePromises = contributionIdsToUpdate.map((contribution: any) =>
-        tx.projectContribution.update({
+      const updatePromises = contributionIdsToUpdate.map((contribution: any) => {
+        // Trim the role field if it exists
+        const trimmedContribution = {
+          ...contribution,
+          ...(contribution.role && { role: contribution.role.trim() }),
+        };
+
+        return tx.projectContribution.update({
           where: { uid: contribution.uid },
-          data: { ...contribution },
-        })
-      );
+          data: { ...trimmedContribution },
+        });
+      });
       await Promise.all(updatePromises);
     }
     if (contributionsToCreate.length > 0) {
       const contributionsToCreateData = contributionsToCreate.map((contribution: any) => ({
         ...contribution,
         memberUid,
+        // Trim the role field if it exists
+        ...(contribution.role && { role: contribution.role.trim() }),
       }));
       await tx.projectContribution.createMany({
         data: contributionsToCreateData,
@@ -1778,7 +1786,6 @@ export class MembersService {
       rolesConditions.push({
         teamMemberRoles: {
           some: {
-            mainTeam: true,
             role: {
               in: rolesArray,
               mode: 'insensitive',
@@ -2061,7 +2068,10 @@ export class MembersService {
           topicMemberSets.set(topic, new Set());
         }
         skill.members.forEach((member) => {
-          topicMemberSets.get(topic)!.add(member.uid);
+          const memberSet = topicMemberSets.get(topic);
+          if (memberSet) {
+            memberSet.add(member.uid);
+          }
         });
       });
 
@@ -2071,7 +2081,10 @@ export class MembersService {
         if (!topicMemberSets.has(topic)) {
           topicMemberSets.set(topic, new Set());
         }
-        topicMemberSets.get(topic)!.add(exp.memberUid);
+        const memberSet = topicMemberSets.get(topic);
+        if (memberSet) {
+          memberSet.add(exp.memberUid);
+        }
       });
 
       // Process ohInterest and ohHelpWith
@@ -2083,7 +2096,10 @@ export class MembersService {
             if (!topicMemberSets.has(topic)) {
               topicMemberSets.set(topic, new Set());
             }
-            topicMemberSets.get(topic)!.add(member.uid);
+            const memberSet = topicMemberSets.get(topic);
+            if (memberSet) {
+              memberSet.add(member.uid);
+            }
           }
         });
         member.ohHelpWith.forEach((help) => {
@@ -2093,7 +2109,10 @@ export class MembersService {
             if (!topicMemberSets.has(topic)) {
               topicMemberSets.set(topic, new Set());
             }
-            topicMemberSets.get(topic)!.add(member.uid);
+            const memberSet = topicMemberSets.get(topic);
+            if (memberSet) {
+              memberSet.add(member.uid);
+            }
           }
         });
       });
@@ -2121,6 +2140,7 @@ export class MembersService {
 
   /**
    * Autocomplete roles from team member roles
+   * Uses exact matching to ensure consistency with searchMembers endpoint
    * @param query - Search query string
    * @param page - Page number for pagination
    * @param limit - Results per page
@@ -2153,103 +2173,109 @@ export class MembersService {
         }),
       };
 
+      // Get all unique member UIDs that match each role from different sources
+      const roleToMembersMap = new Map<string, Set<string>>();
+
       // Search in teamMemberRoles
-      const teamRoles = await this.prisma.teamMemberRole.groupBy({
-        by: ['role'],
+      const teamRoles = await this.prisma.teamMemberRole.findMany({
         where: {
           role: {
             not: null,
             ...(query.trim() && {
-              contains: query,
+              equals: query,
               mode: 'insensitive' as const,
             }),
           },
-          mainTeam: true,
           member: memberFilter,
         },
-        _count: {
+        select: {
+          role: true,
           memberUid: true,
         },
-        orderBy: {
-          _count: {
-            memberUid: 'desc',
-          },
-        },
       });
-
-      // Search in experiences (title field)
-      const experiences = await this.prisma.memberExperience.groupBy({
-        by: ['title'],
-        where: {
-          ...(query.trim() && {
-            title: {
-              contains: query,
-              mode: 'insensitive' as const,
-            },
-          }),
-          member: memberFilter,
-        },
-        _count: true,
-        orderBy: {
-          _count: {
-            title: 'desc',
-          },
-        },
-      });
-
-      // Search in projectContributions (role field)
-      const projectRoles = await this.prisma.projectContribution.groupBy({
-        by: ['role'],
-        where: {
-          role: {
-            not: null,
-            ...(query.trim() && {
-              contains: query,
-              mode: 'insensitive' as const,
-            }),
-          },
-          member: memberFilter,
-        },
-        _count: true,
-        orderBy: {
-          _count: {
-            role: 'desc',
-          },
-        },
-      });
-
-      // Combine and deduplicate results
-      const roleMap = new Map<string, number>();
 
       // Add team roles
       teamRoles
         .filter((role) => role.role !== null)
         .forEach((role) => {
           const roleStr = role.role as string;
-          roleMap.set(roleStr, (roleMap.get(roleStr) || 0) + role._count.memberUid);
+          if (!roleToMembersMap.has(roleStr)) {
+            roleToMembersMap.set(roleStr, new Set());
+          }
+          const memberSet = roleToMembersMap.get(roleStr);
+          if (memberSet) {
+            memberSet.add(role.memberUid);
+          }
         });
+
+      // Search in experiences (title field)
+      const experiences = await this.prisma.memberExperience.findMany({
+        where: {
+          ...(query.trim() && {
+            title: {
+              equals: query,
+              mode: 'insensitive' as const,
+            },
+          }),
+          member: memberFilter,
+        },
+        select: {
+          title: true,
+          memberUid: true,
+        },
+      });
 
       // Add experience titles
       experiences
         .filter((exp) => exp.title !== null)
         .forEach((exp) => {
           const title = exp.title as string;
-          roleMap.set(title, (roleMap.get(title) || 0) + (exp._count as number));
+          if (!roleToMembersMap.has(title)) {
+            roleToMembersMap.set(title, new Set());
+          }
+          const memberSet = roleToMembersMap.get(title);
+          if (memberSet) {
+            memberSet.add(exp.memberUid);
+          }
         });
+
+      // Search in projectContributions (role field)
+      const projectRoles = await this.prisma.projectContribution.findMany({
+        where: {
+          role: {
+            not: null,
+            ...(query.trim() && {
+              equals: query,
+              mode: 'insensitive' as const,
+            }),
+          },
+          member: memberFilter,
+        },
+        select: {
+          role: true,
+          memberUid: true,
+        },
+      });
 
       // Add project contribution roles
       projectRoles
         .filter((proj) => proj.role !== null)
         .forEach((proj) => {
           const role = proj.role as string;
-          roleMap.set(role, (roleMap.get(role) || 0) + (proj._count as number));
+          if (!roleToMembersMap.has(role)) {
+            roleToMembersMap.set(role, new Set());
+          }
+          const memberSet = roleToMembersMap.get(role);
+          if (memberSet) {
+            memberSet.add(proj.memberUid);
+          }
         });
 
-      // Convert map to array and sort by count
-      const results = Array.from(roleMap.entries())
-        .map(([role, count]) => ({
+      // Convert map to array and sort by count of unique members
+      const results = Array.from(roleToMembersMap.entries())
+        .map(([role, memberSet]) => ({
           role,
-          count,
+          count: memberSet.size,
         }))
         .sort((a, b) => b.count - a.count);
 

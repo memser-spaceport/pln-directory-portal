@@ -60,40 +60,40 @@ export class SearchService {
 
     const bestFields = textFields.length
       ? {
-        multi_match: {
-          query: text,
-          type: 'best_fields',
-          fields: weightedText,
-          operator: 'and',
-          tie_breaker: 0.2,
-          boost: 1.2,
-        },
-      }
+          multi_match: {
+            query: text,
+            type: 'best_fields',
+            fields: weightedText,
+            operator: 'and',
+            tie_breaker: 0.2,
+            boost: 1.2,
+          },
+        }
       : undefined;
 
     const exactPhrase = textFields.length
       ? {
-        multi_match: {
-          query: text,
-          type: 'phrase',
-          fields: weightedText,
-          slop: 0,
-          boost: 3.0,
-        },
-      }
+          multi_match: {
+            query: text,
+            type: 'phrase',
+            fields: weightedText,
+            slop: 0,
+            boost: 3.0,
+          },
+        }
       : undefined;
 
     const phrasePrefix = textFields.length
       ? {
-        multi_match: {
-          query: text,
-          type: 'phrase_prefix',
-          fields: weightedText,
-          slop: 0,
-          max_expansions: 50,
-          boost: 3.0,
-        },
-      }
+          multi_match: {
+            query: text,
+            type: 'phrase_prefix',
+            fields: weightedText,
+            slop: 0,
+            max_expansions: 50,
+            boost: 3.0,
+          },
+        }
       : undefined;
 
     const keywordClauses: any[] = [
@@ -167,12 +167,20 @@ export class SearchService {
       // Unified forum threads index: each doc is a whole thread
       forumThreads: [
         'forum_thread',
-        ['name', 'topicTitle', 'topicSlug', 'topicUrl', 'rootPost.content', 'replies.content', 'rootPost.author.name', 'replies.author.name'],
+        [
+          'name',
+          'topicTitle',
+          'topicSlug',
+          'topicUrl',
+          'rootPost.content',
+          'replies.content',
+          'rootPost.author.name',
+          'replies.author.name',
+        ],
       ],
     };
 
     const perIndexSize = options?.perIndexSize ?? MAX_SEARCH_RESULTS_PER_INDEX;
-    const topN = options?.topN ?? 50;
     const strict = strictLabel(options?.strict);
     const source: SourceType = 'full';
 
@@ -318,13 +326,16 @@ export class SearchService {
             if (hlReplyAuthorArr.length > 0) {
               item.matches = item.matches.filter((m) => m.field !== 'replies.author.name');
               hlReplyAuthorArr.forEach((authorName) => {
-                const cleanName = String(authorName).replace(/<\/?em>/g, '').toLowerCase();
-                const matchingReplies =
-                  Array.isArray(src?.replies)
-                    ? src.replies.filter((r: any) =>
-                      String(r?.author?.name || '').toLowerCase().includes(cleanName),
+                const cleanName = String(authorName)
+                  .replace(/<\/?em>/g, '')
+                  .toLowerCase();
+                const matchingReplies = Array.isArray(src?.replies)
+                  ? src.replies.filter((r: any) =>
+                      String(r?.author?.name || '')
+                        .toLowerCase()
+                        .includes(cleanName)
                     )
-                    : [];
+                  : [];
                 if (matchingReplies.length === 0) {
                   item.matches.push({ field: 'replies.author.name', content: authorName });
                 } else {
@@ -364,12 +375,21 @@ export class SearchService {
       allHits.sort((a, b) => b.score - a.score);
 
       // Combined pagination (optional)
-      if (options?.page && options?.pageSize) {
-        const start = (options.page - 1) * options.pageSize;
-        result.top = allHits.slice(start, start + options.pageSize).map(({ score, ...rest }) => rest);
-      } else {
-        result.top = allHits.slice(0, topN).map(({ score, ...rest }) => rest);
-      }
+      // const topN = options?.topN ?? 50;
+      // if (options?.page && options?.pageSize) {
+      //   const start = (options.page - 1) * options.pageSize;
+      //   result.top = allHits.slice(start, start + options.pageSize).map(({ score, ...rest }) => rest);
+      // } else {
+      //   result.top = allHits.slice(0, topN).map(({ score, ...rest }) => rest);
+      // }
+      // Take top 5 from each index (or fewer if less available)
+      result.top = [
+        ...result.members.slice(0, 5),
+        ...result.teams.slice(0, 5),
+        ...result.projects.slice(0, 5),
+        ...result.events.slice(0, 5),
+        ...result.forumThreads.slice(0, 5),
+      ];
 
       return result;
     } catch (e) {
