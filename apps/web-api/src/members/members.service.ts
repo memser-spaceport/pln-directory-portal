@@ -1039,7 +1039,7 @@ export class MembersService {
   async createTeamMemberRoles(tx: Prisma.TransactionClient, rolesToCreate: any[], memberUid: string) {
     if (rolesToCreate.length > 0) {
       const rolesToCreateData = rolesToCreate.map((t: any) => ({
-        role: t.role,
+        role: t.role?.trim(),
         mainTeam: false, // Set your default values here if needed
         teamLead: false, // Set your default values here if needed
         teamUid: t.teamUid,
@@ -1090,7 +1090,7 @@ export class MembersService {
               memberUid,
             },
           },
-          data: { role: roleToUpdate.role, roleTags: roleToUpdate.roleTags },
+          data: { role: roleToUpdate.role?.trim(), roleTags: roleToUpdate.roleTags },
         })
       );
       await Promise.all(updatePromises);
@@ -1106,7 +1106,7 @@ export class MembersService {
     return {
       createMany: {
         data: memberData.teamAndRoles.map((t) => ({
-          role: t.role,
+          role: t.role?.trim(),
           mainTeam: false,
           teamLead: false,
           teamUid: t.teamUid,
@@ -1157,18 +1157,26 @@ export class MembersService {
       });
     }
     if (contributionIdsToUpdate.length > 0) {
-      const updatePromises = contributionIdsToUpdate.map((contribution: any) =>
-        tx.projectContribution.update({
+      const updatePromises = contributionIdsToUpdate.map((contribution: any) => {
+        // Trim the role field if it exists
+        const trimmedContribution = {
+          ...contribution,
+          ...(contribution.role && { role: contribution.role.trim() }),
+        };
+
+        return tx.projectContribution.update({
           where: { uid: contribution.uid },
-          data: { ...contribution },
-        })
-      );
+          data: { ...trimmedContribution },
+        });
+      });
       await Promise.all(updatePromises);
     }
     if (contributionsToCreate.length > 0) {
       const contributionsToCreateData = contributionsToCreate.map((contribution: any) => ({
         ...contribution,
         memberUid,
+        // Trim the role field if it exists
+        ...(contribution.role && { role: contribution.role.trim() }),
       }));
       await tx.projectContribution.createMany({
         data: contributionsToCreateData,
