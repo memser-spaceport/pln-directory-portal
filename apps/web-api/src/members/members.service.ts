@@ -2060,7 +2060,10 @@ export class MembersService {
           topicMemberSets.set(topic, new Set());
         }
         skill.members.forEach((member) => {
-          topicMemberSets.get(topic)!.add(member.uid);
+          const memberSet = topicMemberSets.get(topic);
+          if (memberSet) {
+            memberSet.add(member.uid);
+          }
         });
       });
 
@@ -2070,7 +2073,10 @@ export class MembersService {
         if (!topicMemberSets.has(topic)) {
           topicMemberSets.set(topic, new Set());
         }
-        topicMemberSets.get(topic)!.add(exp.memberUid);
+        const memberSet = topicMemberSets.get(topic);
+        if (memberSet) {
+          memberSet.add(exp.memberUid);
+        }
       });
 
       // Process ohInterest and ohHelpWith
@@ -2082,7 +2088,10 @@ export class MembersService {
             if (!topicMemberSets.has(topic)) {
               topicMemberSets.set(topic, new Set());
             }
-            topicMemberSets.get(topic)!.add(member.uid);
+            const memberSet = topicMemberSets.get(topic);
+            if (memberSet) {
+              memberSet.add(member.uid);
+            }
           }
         });
         member.ohHelpWith.forEach((help) => {
@@ -2092,7 +2101,10 @@ export class MembersService {
             if (!topicMemberSets.has(topic)) {
               topicMemberSets.set(topic, new Set());
             }
-            topicMemberSets.get(topic)!.add(member.uid);
+            const memberSet = topicMemberSets.get(topic);
+            if (memberSet) {
+              memberSet.add(member.uid);
+            }
           }
         });
       });
@@ -2152,9 +2164,11 @@ export class MembersService {
         }),
       };
 
+      // Get all unique member UIDs that match each role from different sources
+      const roleToMembersMap = new Map<string, Set<string>>();
+
       // Search in teamMemberRoles
-      const teamRoles = await this.prisma.teamMemberRole.groupBy({
-        by: ['role'],
+      const teamRoles = await this.prisma.teamMemberRole.findMany({
         where: {
           role: {
             not: null,
@@ -2165,19 +2179,28 @@ export class MembersService {
           },
           member: memberFilter,
         },
-        _count: {
+        select: {
+          role: true,
           memberUid: true,
-        },
-        orderBy: {
-          _count: {
-            memberUid: 'desc',
-          },
         },
       });
 
+      // Add team roles
+      teamRoles
+        .filter((role) => role.role !== null)
+        .forEach((role) => {
+          const roleStr = role.role as string;
+          if (!roleToMembersMap.has(roleStr)) {
+            roleToMembersMap.set(roleStr, new Set());
+          }
+          const memberSet = roleToMembersMap.get(roleStr);
+          if (memberSet) {
+            memberSet.add(role.memberUid);
+          }
+        });
+
       // Search in experiences (title field)
-      const experiences = await this.prisma.memberExperience.groupBy({
-        by: ['title'],
+      const experiences = await this.prisma.memberExperience.findMany({
         where: {
           ...(query.trim() && {
             title: {
@@ -2187,17 +2210,28 @@ export class MembersService {
           }),
           member: memberFilter,
         },
-        _count: true,
-        orderBy: {
-          _count: {
-            title: 'desc',
-          },
+        select: {
+          title: true,
+          memberUid: true,
         },
       });
 
+      // Add experience titles
+      experiences
+        .filter((exp) => exp.title !== null)
+        .forEach((exp) => {
+          const title = exp.title as string;
+          if (!roleToMembersMap.has(title)) {
+            roleToMembersMap.set(title, new Set());
+          }
+          const memberSet = roleToMembersMap.get(title);
+          if (memberSet) {
+            memberSet.add(exp.memberUid);
+          }
+        });
+
       // Search in projectContributions (role field)
-      const projectRoles = await this.prisma.projectContribution.groupBy({
-        by: ['role'],
+      const projectRoles = await this.prisma.projectContribution.findMany({
         where: {
           role: {
             not: null,
@@ -2208,46 +2242,31 @@ export class MembersService {
           },
           member: memberFilter,
         },
-        _count: true,
-        orderBy: {
-          _count: {
-            role: 'desc',
-          },
+        select: {
+          role: true,
+          memberUid: true,
         },
       });
-
-      // Combine and deduplicate results
-      const roleMap = new Map<string, number>();
-
-      // Add team roles
-      teamRoles
-        .filter((role) => role.role !== null)
-        .forEach((role) => {
-          const roleStr = role.role as string;
-          roleMap.set(roleStr, (roleMap.get(roleStr) || 0) + role._count.memberUid);
-        });
-
-      // Add experience titles
-      experiences
-        .filter((exp) => exp.title !== null)
-        .forEach((exp) => {
-          const title = exp.title as string;
-          roleMap.set(title, (roleMap.get(title) || 0) + (exp._count as number));
-        });
 
       // Add project contribution roles
       projectRoles
         .filter((proj) => proj.role !== null)
         .forEach((proj) => {
           const role = proj.role as string;
-          roleMap.set(role, (roleMap.get(role) || 0) + (proj._count as number));
+          if (!roleToMembersMap.has(role)) {
+            roleToMembersMap.set(role, new Set());
+          }
+          const memberSet = roleToMembersMap.get(role);
+          if (memberSet) {
+            memberSet.add(proj.memberUid);
+          }
         });
 
-      // Convert map to array and sort by count
-      const results = Array.from(roleMap.entries())
-        .map(([role, count]) => ({
+      // Convert map to array and sort by count of unique members
+      const results = Array.from(roleToMembersMap.entries())
+        .map(([role, memberSet]) => ({
           role,
-          count,
+          count: memberSet.size,
         }))
         .sort((a, b) => b.count - a.count);
 
