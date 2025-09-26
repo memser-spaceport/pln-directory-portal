@@ -2182,7 +2182,7 @@ export class MembersService {
           role: {
             not: null,
             ...(query.trim() && {
-              equals: query,
+              contains: query,
               mode: 'insensitive' as const,
             }),
           },
@@ -2213,7 +2213,7 @@ export class MembersService {
         where: {
           ...(query.trim() && {
             title: {
-              equals: query,
+              contains: query,
               mode: 'insensitive' as const,
             },
           }),
@@ -2245,7 +2245,7 @@ export class MembersService {
           role: {
             not: null,
             ...(query.trim() && {
-              equals: query,
+              contains: query,
               mode: 'insensitive' as const,
             }),
           },
