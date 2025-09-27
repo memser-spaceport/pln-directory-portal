@@ -35,6 +35,9 @@ const headerAliases = {
     'organization_fund_name',
     'organization/fund_name',
     'organization_/_fund_name',
+    'org_fund_name',
+    'org/fund_name',
+    'org_/_fund_name',
     'organization',
     'organization_name',
     'org',
@@ -57,7 +60,7 @@ const headerAliases = {
     'contact_email',
     'organizationemail',
   ],
-  team_lead: ['make_team_lead', 'is_team_lead', 'team_lead', 'lead', 'add_as_team_lead'],
+  team_lead: ['make_team_lead', 'is_team_lead', 'team_lead', 'lead', 'add_as_team_lead', 'team_lead_flag'],
 };
 
 const normalizeHeader = (header: string): string => {
