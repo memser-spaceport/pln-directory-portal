@@ -16,6 +16,7 @@ import { HuskyModule } from '../husky/husky.module';
 import { NotificationSettingsModule } from '../notification-settings/notification-settings.module';
 import { AdminDemoDaysController } from './demo-day.controller';
 import { DemoDaysModule } from '../demo-days/demo-days.module';
+import {AnalyticsModule} from "../analytics/analytics.module";
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { DemoDaysModule } from '../demo-days/demo-days.module';
     NotificationSettingsModule,
     forwardRef(() => MembersModule),
     DemoDaysModule,
+    AnalyticsModule
   ],
   controllers: [
     AdminParticipantsRequestController,

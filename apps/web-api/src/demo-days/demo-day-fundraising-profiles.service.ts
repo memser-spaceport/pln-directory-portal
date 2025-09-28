@@ -2,10 +2,11 @@ import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/com
 import { DemoDay, UploadKind } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { DemoDaysService } from './demo-days.service';
+import { AnalyticsService } from '../analytics/service/analytics.service';
 
 @Injectable()
 export class DemoDayFundraisingProfilesService {
-  constructor(private readonly prisma: PrismaService, private readonly demoDaysService: DemoDaysService) {}
+  constructor(private readonly prisma: PrismaService, private readonly demoDaysService: DemoDaysService, private readonly analyticsService: AnalyticsService) {}
 
   async getCurrentDemoDayFundraisingProfile(memberEmail: string): Promise<any> {
     const demoDay = await this.demoDaysService.getCurrentDemoDay();
@@ -239,10 +240,12 @@ export class DemoDayFundraisingProfilesService {
 
     if (!profile) return;
 
-    // Check if all required fields are provided
-    const hasAllFields = profile.team.name && profile.onePagerUploadUid && profile.videoUploadUid;
+    // Check if required materials exist
+    const hasMaterials = Boolean(profile.onePagerUploadUid && profile.videoUploadUid);
+    const newStatus = profile.team.name && hasMaterials ? 'PUBLISHED' : 'DRAFT';
 
-    const newStatus = hasAllFields ? 'PUBLISHED' : 'DRAFT';
+    // Remember previous status to detect transition
+    const prevStatus = profile.status;
 
     await this.prisma.teamFundraisingProfile.update({
       where: {
@@ -256,6 +259,55 @@ export class DemoDayFundraisingProfilesService {
         lastModifiedBy: profile.lastModifiedBy,
       },
     });
+
+    // Check "at least one ENABLED FOUNDER has access" condition
+    const foundersCount = await this.prisma.demoDayParticipant.count({
+      where: {
+        demoDayUid,
+        teamUid,
+        isDeleted: false,
+        status: 'ENABLED',
+        type: 'FOUNDER',
+      },
+    });
+
+    // Determine whether profile "qualifies" for being listed in Demo Day
+    const qualifiesNow = newStatus === 'PUBLISHED' && hasMaterials && foundersCount > 0;
+    const qualifiedBefore = prevStatus === 'PUBLISHED' && Boolean(profile.onePagerUploadUid && profile.videoUploadUid) && foundersCount > 0;
+
+    // Fire analytics events on transition edges only
+    if (!qualifiedBefore && qualifiesNow) {
+      // Team Fundraising Profile added to demo day
+      await this.analyticsService.trackEvent({
+        name: 'demo-day-team-profile-added',
+        distinctId: teamUid,
+        properties: {
+          teamUid,
+          demoDayUid,
+          profileUid: profile.uid,
+          status: newStatus,
+          foundersCount,
+          hasOnePager: Boolean(profile.onePagerUploadUid),
+          hasVideo: Boolean(profile.videoUploadUid),
+        },
+      });
+    } else if (qualifiedBefore && !qualifiesNow) {
+      // Team Fundraising Profile removed from demo day
+      await this.analyticsService.trackEvent({
+        name: 'demo-day-team-profile-removed',
+        distinctId: teamUid,
+        properties: {
+          teamUid,
+          demoDayUid,
+          profileUid: profile.uid,
+          fromStatus: prevStatus,
+          toStatus: newStatus,
+          foundersCount,
+          hasOnePager: Boolean(profile.onePagerUploadUid),
+          hasVideo: Boolean(profile.videoUploadUid),
+        },
+      });
+    }
   }
 
   async updateFundraisingOnePager(memberEmail: string, onePagerUploadUid: string): Promise<any> {

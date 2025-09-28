@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Patch, UseGuards, UsePipes } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Patch, UseGuards, UsePipes, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
@@ -31,13 +31,16 @@ export class AdminDemoDaysController {
   @Post()
   @UsePipes(ZodValidationPipe)
   @NoCache()
-  async createDemoDay(@Body() body: CreateDemoDayDto): Promise<ResponseDemoDayDto> {
-    return this.demoDaysService.createDemoDay({
-      startDate: new Date(body.startDate),
-      title: body.title,
-      description: body.description,
-      status: body.status.toUpperCase() as DemoDayStatus,
-    });
+  async createDemoDay(@Req() req, @Body() body: CreateDemoDayDto): Promise<ResponseDemoDayDto> {
+    return this.demoDaysService.createDemoDay(
+      {
+        startDate: new Date(body.startDate),
+        title: body.title,
+        description: body.description,
+        status: body.status.toUpperCase() as DemoDayStatus,
+      },
+      req.userEmail
+    );
   }
 
   @Get()
@@ -55,40 +58,54 @@ export class AdminDemoDaysController {
   @Patch(':uid')
   @UsePipes(ZodValidationPipe)
   @NoCache()
-  async updateDemoDay(@Param('uid') uid: string, @Body() body: UpdateDemoDayDto): Promise<ResponseDemoDayDto> {
-    return this.demoDaysService.updateDemoDay(uid, {
-      startDate: body.startDate ? new Date(body.startDate) : undefined,
-      title: body.title,
-      description: body.description,
-      status: body.status?.toUpperCase() as DemoDayStatus,
-    });
+  async updateDemoDay(@Req() req, @Param('uid') uid: string, @Body() body: UpdateDemoDayDto): Promise<ResponseDemoDayDto> {
+    return this.demoDaysService.updateDemoDay(
+      uid,
+      {
+        startDate: body.startDate ? new Date(body.startDate) : undefined,
+        title: body.title,
+        description: body.description,
+        status: body.status?.toUpperCase() as DemoDayStatus,
+      },
+      req.userEmail
+    );
   }
 
   @Post(':uid/participants')
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async addParticipant(
+    @Req() req,
     @Param('uid') demoDayUid: string,
     @Body() body: AddParticipantDto
   ): Promise<ResponseParticipantDto> {
-    return this.demoDayParticipantsService.addParticipant(demoDayUid, {
-      memberUid: body.memberUid,
-      email: body.email,
-      name: body.name,
-      type: body.type.toUpperCase() as 'INVESTOR' | 'FOUNDER',
-    });
+    return this.demoDayParticipantsService.addParticipant(
+      demoDayUid,
+      {
+        memberUid: body.memberUid,
+        email: body.email,
+        name: body.name,
+        type: body.type.toUpperCase() as 'INVESTOR' | 'FOUNDER',
+      },
+      req.userEmail
+    );
   }
 
   @Post(':uid/participants-bulk')
   @UsePipes(ZodValidationPipe)
   async addParticipantsBulk(
+    @Req() req,
     @Param('uid') demoDayUid: string,
     @Body() body: AddParticipantsBulkDto
   ): Promise<ResponseBulkParticipantsDto> {
-    return this.demoDayParticipantsService.addParticipantsBulk(demoDayUid, {
-      participants: body.participants,
-      type: body.type.toUpperCase() as 'INVESTOR' | 'FOUNDER',
-    });
+    return this.demoDayParticipantsService.addParticipantsBulk(
+      demoDayUid,
+      {
+        participants: body.participants,
+        type: body.type.toUpperCase() as 'INVESTOR' | 'FOUNDER',
+      },
+      req.userEmail
+    );
   }
 
   @Get(':uid/participants')
@@ -113,13 +130,19 @@ export class AdminDemoDaysController {
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async updateParticipant(
+    @Req() req,
     @Param('demoDayUid') demoDayUid: string,
     @Param('participantUid') participantUid: string,
     @Body() body: UpdateParticipantDto
   ): Promise<ResponseParticipantDto> {
-    return this.demoDayParticipantsService.updateParticipant(demoDayUid, participantUid, {
-      status: body.status?.toUpperCase() as 'INVITED' | 'ENABLED' | 'DISABLED',
-      teamUid: body.teamUid,
-    });
+    return this.demoDayParticipantsService.updateParticipant(
+      demoDayUid,
+      participantUid,
+      {
+        status: body.status?.toUpperCase() as 'INVITED' | 'ENABLED' | 'DISABLED',
+        teamUid: body.teamUid,
+      },
+      req.userEmail
+    );
   }
 }
