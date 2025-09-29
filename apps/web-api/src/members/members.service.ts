@@ -2148,6 +2148,10 @@ export class MembersService {
    * @returns Paginated autocomplete results with counts
    */
   async autocompleteRoles(query: string, page = 1, limit = 20, hasOfficeHours?: boolean) {
+    // Define priority roles that should appear at the top (should be in lower case)
+    const priorityRoles = ['founder', 'ceo', 'cto', 'software engineer', 'product'];
+    const priorityRolesSet = new Set(priorityRoles);
+
     limit = Math.min(limit, 50);
     const skip = (page - 1) * limit;
 
@@ -2286,13 +2290,44 @@ export class MembersService {
           }
         });
 
-      // Convert map to array and sort by count of unique members
-      const results = Array.from(roleToMembersMap.entries())
-        .map(([normalizedRole, memberSet]) => ({
-          role: roleDisplayNames.get(normalizedRole) || normalizedRole, // Use original case for display
-          count: memberSet.size,
-        }))
-        .sort((a, b) => b.count - a.count);
+      // Convert map to array and categorize results
+      const allResults = Array.from(roleToMembersMap.entries()).map(([normalizedRole, memberSet]) => ({
+        role: roleDisplayNames.get(normalizedRole) || normalizedRole, // Use original case for display
+        count: memberSet.size,
+        normalizedRole: normalizedRole,
+      }));
+
+      // Separate priority roles from other results
+      const priorityResults: Array<{ role: string; count: number; normalizedRole: string }> = [];
+      const otherResults: Array<{ role: string; count: number; normalizedRole: string }> = [];
+
+      allResults.forEach((result) => {
+        if (priorityRolesSet.has(result.normalizedRole)) {
+          priorityResults.push(result);
+        } else {
+          otherResults.push(result);
+        }
+      });
+
+      // Sort priority results by the predefined order, other results by count
+      priorityResults.sort((a, b) => {
+        return priorityRoles.indexOf(a.normalizedRole) - priorityRoles.indexOf(b.normalizedRole);
+      });
+      otherResults.sort((a, b) => b.count - a.count);
+
+      // Ensure all priority roles are included even if they don't exist in the data yet
+      const finalPriorityResults: Array<{ role: string; count: number }> = [];
+
+      // Add priority roles that exist with count > 0
+      priorityRoles.forEach((priorityRole) => {
+        const found = priorityResults.find((r) => r.normalizedRole === priorityRole);
+        if (found && found.count > 0) {
+          finalPriorityResults.push({ role: found.role, count: found.count });
+        }
+      });
+
+      // Combine results: priority roles first, then others
+      const results = [...finalPriorityResults, ...otherResults.map(({ role, count }) => ({ role, count }))];
 
       const paginatedResults = results.slice(skip, skip + limit);
 
