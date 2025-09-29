@@ -2148,6 +2148,10 @@ export class MembersService {
    * @returns Paginated autocomplete results with counts
    */
   async autocompleteRoles(query: string, page = 1, limit = 20, hasOfficeHours?: boolean) {
+    // Define priority roles that should appear at the top (should be in lower case)
+    const priorityRoles = ['founder', 'ceo', 'cto', 'software engineer', 'product'];
+    const priorityRolesSet = new Set(priorityRoles);
+
     limit = Math.min(limit, 50);
     const skip = (page - 1) * limit;
 
@@ -2174,7 +2178,9 @@ export class MembersService {
       };
 
       // Get all unique member UIDs that match each role from different sources
+      // Use normalized role names as keys, but track original case for display
       const roleToMembersMap = new Map<string, Set<string>>();
+      const roleDisplayNames = new Map<string, string>(); // normalized -> original case
 
       // Search in teamMemberRoles
       const teamRoles = await this.prisma.teamMemberRole.findMany({
@@ -2194,15 +2200,20 @@ export class MembersService {
         },
       });
 
-      // Add team roles
+      // Add team roles (normalize case for grouping)
       teamRoles
         .filter((role) => role.role !== null)
         .forEach((role) => {
+          // Normalize the role name for consistent grouping
           const roleStr = role.role as string;
-          if (!roleToMembersMap.has(roleStr)) {
-            roleToMembersMap.set(roleStr, new Set());
+          const normalizedRole = roleStr.toLowerCase();
+
+          // Store the original case for display (first occurrence wins)
+          if (!roleToMembersMap.has(normalizedRole)) {
+            roleToMembersMap.set(normalizedRole, new Set());
+            roleDisplayNames.set(normalizedRole, roleStr);
           }
-          const memberSet = roleToMembersMap.get(roleStr);
+          const memberSet = roleToMembersMap.get(normalizedRole);
           if (memberSet) {
             memberSet.add(role.memberUid);
           }
@@ -2225,15 +2236,19 @@ export class MembersService {
         },
       });
 
-      // Add experience titles
+      // Add experience titles (normalize case for grouping)
       experiences
         .filter((exp) => exp.title !== null)
         .forEach((exp) => {
+          // Normalize the title for consistent grouping
           const title = exp.title as string;
-          if (!roleToMembersMap.has(title)) {
-            roleToMembersMap.set(title, new Set());
+          const normalizedTitle = title.toLowerCase();
+
+          if (!roleToMembersMap.has(normalizedTitle)) {
+            roleToMembersMap.set(normalizedTitle, new Set());
+            roleDisplayNames.set(normalizedTitle, title);
           }
-          const memberSet = roleToMembersMap.get(title);
+          const memberSet = roleToMembersMap.get(normalizedTitle);
           if (memberSet) {
             memberSet.add(exp.memberUid);
           }
@@ -2257,27 +2272,62 @@ export class MembersService {
         },
       });
 
-      // Add project contribution roles
+      // Add project contribution roles (normalize case for grouping)
       projectRoles
         .filter((proj) => proj.role !== null)
         .forEach((proj) => {
+          // Normalize the role for consistent grouping
           const role = proj.role as string;
-          if (!roleToMembersMap.has(role)) {
-            roleToMembersMap.set(role, new Set());
+          const normalizedRole = role.toLowerCase();
+
+          if (!roleToMembersMap.has(normalizedRole)) {
+            roleToMembersMap.set(normalizedRole, new Set());
+            roleDisplayNames.set(normalizedRole, role);
           }
-          const memberSet = roleToMembersMap.get(role);
+          const memberSet = roleToMembersMap.get(normalizedRole);
           if (memberSet) {
             memberSet.add(proj.memberUid);
           }
         });
 
-      // Convert map to array and sort by count of unique members
-      const results = Array.from(roleToMembersMap.entries())
-        .map(([role, memberSet]) => ({
-          role,
-          count: memberSet.size,
-        }))
-        .sort((a, b) => b.count - a.count);
+      // Convert map to array and categorize results
+      const allResults = Array.from(roleToMembersMap.entries()).map(([normalizedRole, memberSet]) => ({
+        role: roleDisplayNames.get(normalizedRole) || normalizedRole, // Use original case for display
+        count: memberSet.size,
+        normalizedRole: normalizedRole,
+      }));
+
+      // Separate priority roles from other results
+      const priorityResults: Array<{ role: string; count: number; normalizedRole: string }> = [];
+      const otherResults: Array<{ role: string; count: number; normalizedRole: string }> = [];
+
+      allResults.forEach((result) => {
+        if (priorityRolesSet.has(result.normalizedRole)) {
+          priorityResults.push(result);
+        } else {
+          otherResults.push(result);
+        }
+      });
+
+      // Sort priority results by the predefined order, other results by count
+      priorityResults.sort((a, b) => {
+        return priorityRoles.indexOf(a.normalizedRole) - priorityRoles.indexOf(b.normalizedRole);
+      });
+      otherResults.sort((a, b) => b.count - a.count);
+
+      // Ensure all priority roles are included even if they don't exist in the data yet
+      const finalPriorityResults: Array<{ role: string; count: number }> = [];
+
+      // Add priority roles that exist with count > 0
+      priorityRoles.forEach((priorityRole) => {
+        const found = priorityResults.find((r) => r.normalizedRole === priorityRole);
+        if (found && found.count > 0) {
+          finalPriorityResults.push({ role: found.role, count: found.count });
+        }
+      });
+
+      // Combine results: priority roles first, then others
+      const results = [...finalPriorityResults, ...otherResults.map(({ role, count }) => ({ role, count }))];
 
       const paginatedResults = results.slice(skip, skip + limit);
 
