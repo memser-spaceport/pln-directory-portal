@@ -5,9 +5,11 @@ import { DemoDayFundraisingProfilesService } from './demo-day-fundraising-profil
 import { DemoDaysController } from './demo-days.controller';
 import { SharedModule } from '../shared/shared.module';
 import { UploadsModule } from '../uploads/uploads.module';
+import {AnalyticsService} from "../analytics/service/analytics.service";
+import {AnalyticsModule} from "../analytics/analytics.module";
 
 @Module({
-  imports: [SharedModule, UploadsModule],
+  imports: [SharedModule, UploadsModule, AnalyticsModule],
   controllers: [DemoDaysController],
   providers: [DemoDaysService, DemoDayParticipantsService, DemoDayFundraisingProfilesService],
   exports: [DemoDaysService, DemoDayParticipantsService, DemoDayFundraisingProfilesService],

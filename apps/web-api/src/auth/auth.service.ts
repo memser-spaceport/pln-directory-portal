@@ -457,8 +457,11 @@ export class AuthService implements OnModuleInit {
         },
       });
 
+      // Save previous status for analytics
+      const prevStatus = invitedParticipant.status;
+
       // Update participant status to enabled
-      await tx.demoDayParticipant.update({
+      const updatedParticipant = await tx.demoDayParticipant.update({
         where: { uid: invitedParticipant.uid },
         data: {
           status: 'ENABLED',
@@ -470,6 +473,22 @@ export class AuthService implements OnModuleInit {
         // This is an additive analytics call; no changes to existing logs/comments
         await this.trackInvestorSign(member, invitedParticipant, newAccessLevel);
       }
+
+      // Track participant status change (INVITED -> ENABLED)
+      // Note: using plain string for event name to avoid touching constants
+      await this.analyticsService.trackEvent({
+        name: 'demo-day-participant-status-changed',
+        distinctId: member.uid,
+        properties: {
+          memberUid: member.uid,
+          email: member.email,
+          demoDayUid: invitedParticipant.demoDayUid,
+          participantUid: invitedParticipant.uid,
+          type: invitedParticipant.type,
+          fromStatus: prevStatus,
+          toStatus: updatedParticipant.status,
+        },
+      });
     });
 
     this.logger.info(
@@ -490,7 +509,7 @@ export class AuthService implements OnModuleInit {
    */
   private async trackInvestorSign(member: any, invitedParticipant: any, newAccessLevel: string) {
     await this.analyticsService.trackEvent({
-      name: 'investor_sign',
+      name: 'investor-sign',
       distinctId: member.uid,
       properties: {
         uid: member.uid,
