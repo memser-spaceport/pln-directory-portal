@@ -78,6 +78,11 @@ export class DemoDaysService {
       return {
         access: 'none',
         status: demoDay.status.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED',
+        date: demoDay.startDate.toISOString(),
+        title: demoDay.title,
+        description: demoDay.description,
+        teamsCount,
+        investorsCount,
       };
     }
 
@@ -122,6 +127,11 @@ export class DemoDaysService {
       return {
         access: 'none',
         status: demoDay.status.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED',
+        date: demoDay.startDate.toISOString(),
+        title: demoDay.title,
+        description: demoDay.description,
+        teamsCount,
+        investorsCount,
       };
     }
 
@@ -143,17 +153,25 @@ export class DemoDaysService {
     return {
       access: 'none',
       status: demoDay.status.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED',
+      date: demoDay.startDate.toISOString(),
+      title: demoDay.title,
+      description: demoDay.description,
+      teamsCount,
+      investorsCount,
     };
   }
 
   // Admin methods
 
-  async createDemoDay(data: {
-    startDate: Date;
-    title: string;
-    description: string;
-    status: DemoDayStatus;
-  }, actorEmail?: string): Promise<DemoDay> {
+  async createDemoDay(
+    data: {
+      startDate: Date;
+      title: string;
+      description: string;
+      status: DemoDayStatus;
+    },
+    actorEmail?: string
+  ): Promise<DemoDay> {
     // resolve actor (optional)
     let actorUid: string | undefined;
     if (actorEmail) {
@@ -286,8 +304,10 @@ export class DemoDaysService {
     // Track "details updated" (name/description/startDate) only if any changed
     const detailsChanged: string[] = [];
     if (updateData.title !== undefined && before.title !== updated.title) detailsChanged.push('title');
-    if (updateData.description !== undefined && before.description !== updated.description) detailsChanged.push('description');
-    if (updateData.startDate !== undefined && (before.startDate?.toISOString?.() !== updated.startDate?.toISOString?.())) detailsChanged.push('startDate');
+    if (updateData.description !== undefined && before.description !== updated.description)
+      detailsChanged.push('description');
+    if (updateData.startDate !== undefined && before.startDate?.toISOString?.() !== updated.startDate?.toISOString?.())
+      detailsChanged.push('startDate');
 
     if (detailsChanged.length > 0) {
       await this.analyticsService.trackEvent({
