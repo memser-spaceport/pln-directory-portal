@@ -16,7 +16,7 @@ export class HybridConsoleDbProvider implements IAnalyticsProvider {
   async trackEvent(event: IAnalyticsEvent): Promise<void> {
     const errors: any[] = [];
     await Promise.all([
-      this.consoleProvider.trackEvent(event).catch(e => errors.push({ provider: 'ConsoleProvider', error: e })),
+     // this.consoleProvider.trackEvent(event).catch(e => errors.push({ provider: 'ConsoleProvider', error: e })),
       this.dbProvider.trackEvent(event).catch(e => errors.push({ provider: 'DbProvider', error: e })),
     ]);
     if (errors.length) {

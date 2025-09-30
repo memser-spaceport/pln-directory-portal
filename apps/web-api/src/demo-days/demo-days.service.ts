@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DemoDay, DemoDayStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
+import { AnalyticsService } from '../analytics/service/analytics.service';
 
 @Injectable()
 export class DemoDaysService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly analyticsService: AnalyticsService) {}
 
   async getCurrentDemoDay(): Promise<DemoDay | null> {
     const demoDay = await this.prisma.demoDay.findFirst({
@@ -152,8 +153,15 @@ export class DemoDaysService {
     title: string;
     description: string;
     status: DemoDayStatus;
-  }): Promise<DemoDay> {
-    return this.prisma.demoDay.create({
+  }, actorEmail?: string): Promise<DemoDay> {
+    // resolve actor (optional)
+    let actorUid: string | undefined;
+    if (actorEmail) {
+      const actor = await this.prisma.member.findUnique({ where: { email: actorEmail }, select: { uid: true } });
+      actorUid = actor?.uid;
+    }
+
+    const created = await this.prisma.demoDay.create({
       data: {
         startDate: data.startDate,
         title: data.title,
@@ -161,6 +169,23 @@ export class DemoDaysService {
         status: data.status,
       },
     });
+
+    // Track "Demo Day created"
+    await this.analyticsService.trackEvent({
+      name: 'demo-day-created',
+      distinctId: created.uid,
+      properties: {
+        demoDayUid: created.uid,
+        title: created.title,
+        description: created.description,
+        startDate: created.startDate?.toISOString?.() || null,
+        status: created.status,
+        actorUid: actorUid || null,
+        actorEmail: actorEmail || null,
+      },
+    });
+
+    return created;
   }
 
   async getAllDemoDays(): Promise<DemoDay[]> {
@@ -213,10 +238,18 @@ export class DemoDaysService {
       title?: string;
       description?: string;
       status?: DemoDayStatus;
-    }
+    },
+    actorEmail?: string
   ): Promise<DemoDay> {
     // First check if demo day exists
-    await this.getDemoDayByUid(uid);
+    const before = await this.getDemoDayByUid(uid);
+
+    // resolve actor (optional)
+    let actorUid: string | undefined;
+    if (actorEmail) {
+      const actor = await this.prisma.member.findUnique({ where: { email: actorEmail }, select: { uid: true } });
+      actorUid = actor?.uid;
+    }
 
     const updateData: any = {};
 
@@ -233,7 +266,7 @@ export class DemoDaysService {
       updateData.status = data.status;
     }
 
-    return this.prisma.demoDay.update({
+    const updated = await this.prisma.demoDay.update({
       where: { uid },
       data: updateData,
       select: {
@@ -249,5 +282,44 @@ export class DemoDaysService {
         deletedAt: true,
       },
     });
+
+    // Track "details updated" (name/description/startDate) only if any changed
+    const detailsChanged: string[] = [];
+    if (updateData.title !== undefined && before.title !== updated.title) detailsChanged.push('title');
+    if (updateData.description !== undefined && before.description !== updated.description) detailsChanged.push('description');
+    if (updateData.startDate !== undefined && (before.startDate?.toISOString?.() !== updated.startDate?.toISOString?.())) detailsChanged.push('startDate');
+
+    if (detailsChanged.length > 0) {
+      await this.analyticsService.trackEvent({
+        name: 'demo-day-details-updated',
+        distinctId: updated.uid,
+        properties: {
+          demoDayUid: updated.uid,
+          changedFields: detailsChanged,
+          title: updated.title,
+          description: updated.description,
+          startDate: updated.startDate?.toISOString?.() || null,
+          actorUid: actorUid || null,
+          actorEmail: actorEmail || null,
+        },
+      });
+    }
+
+    // Track "status updated" if changed
+    if (updateData.status !== undefined && before.status !== updated.status) {
+      await this.analyticsService.trackEvent({
+        name: 'demo-day-status-updated',
+        distinctId: updated.uid,
+        properties: {
+          demoDayUid: updated.uid,
+          fromStatus: before.status,
+          toStatus: updated.status,
+          actorUid: actorUid || null,
+          actorEmail: actorEmail || null,
+        },
+      });
+    }
+
+    return updated;
   }
 }

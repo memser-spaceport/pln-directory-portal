@@ -2,10 +2,11 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { DemoDayParticipant, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { DemoDaysService } from './demo-days.service';
+import { AnalyticsService } from '../analytics/service/analytics.service';
 
 @Injectable()
 export class DemoDayParticipantsService {
-  constructor(private readonly prisma: PrismaService, private readonly demoDaysService: DemoDaysService) {}
+  constructor(private readonly prisma: PrismaService, private readonly demoDaysService: DemoDaysService, private readonly analyticsService: AnalyticsService) {}
 
   async addParticipant(
     demoDayUid: string,
@@ -14,9 +15,17 @@ export class DemoDayParticipantsService {
       email?: string;
       name?: string;
       type: 'INVESTOR' | 'FOUNDER';
-    }
+    },
+    actorEmail?: string
   ): Promise<DemoDayParticipant> {
     await this.demoDaysService.getDemoDayByUid(demoDayUid);
+
+    // resolve actor (optional)
+    let actorUid: string | undefined;
+    if (actorEmail) {
+      const actor = await this.prisma.member.findUnique({ where: { email: actorEmail }, select: { uid: true } });
+      actorUid = actor?.uid;
+    }
 
     let member: any;
     let isNewMember = false;
@@ -117,7 +126,8 @@ export class DemoDayParticipantsService {
     // Determine status based on whether member was newly created or existing
     const status = isNewMember ? 'INVITED' : 'ENABLED';
 
-    return this.prisma.demoDayParticipant.create({
+    // Create participant
+    const created = await this.prisma.demoDayParticipant.create({
       data: {
         demoDayUid,
         memberUid: member.uid,
@@ -127,6 +137,25 @@ export class DemoDayParticipantsService {
         statusUpdatedAt: new Date(),
       },
     });
+
+    // Track "participant added"
+    await this.analyticsService.trackEvent({
+      name: 'demo-day-participant-added',
+      distinctId: member.uid,
+      properties: {
+        demoDayUid,
+        participantUid: created.uid,
+        memberUid: member.uid,
+        type: created.type,
+        status: created.status,
+        teamUid: created.teamUid || null,
+        isNewMember,
+        actorUid: actorUid || null,
+        actorEmail: actorEmail || null,
+      },
+    });
+
+    return created;
   }
 
   private normalizeTwitterHandler(handler?: string): string | undefined {
@@ -171,7 +200,8 @@ export class DemoDayParticipantsService {
         makeTeamLead?: boolean;
       }>;
       type: 'INVESTOR' | 'FOUNDER';
-    }
+    },
+    actorEmail?: string
   ): Promise<{
     summary: {
       total: number;
@@ -200,6 +230,13 @@ export class DemoDayParticipantsService {
   }> {
     await this.demoDaysService.getDemoDayByUid(demoDayUid);
 
+    // resolve actor (optional)
+    let actorUid: string | undefined;
+    if (actorEmail) {
+      const actor = await this.prisma.member.findUnique({ where: { email: actorEmail }, select: { uid: true } });
+      actorUid = actor?.uid;
+    }
+
     const summary = {
       total: data.participants.length,
       createdUsers: 0,
@@ -225,6 +262,9 @@ export class DemoDayParticipantsService {
       teamId?: string;
       membershipRole?: 'LEAD' | 'MEMBER' | 'NONE';
     }> = [];
+
+    // Pending analytics events to emit after transaction commit
+    const pendingEvents: Array<{ name: string; payload: any }> = [];
 
     // Get all emails to check existing members and participants
     const emails = data.participants.map((p) => p.email);
@@ -329,10 +369,10 @@ export class DemoDayParticipantsService {
                 investorProfile:
                   data.type === 'INVESTOR'
                     ? {
-                        create: {
-                          type: participantData.organization ? 'FUND' : 'ANGEL',
-                        },
-                      }
+                      create: {
+                        type: participantData.organization ? 'FUND' : 'ANGEL',
+                      },
+                    }
                     : undefined,
               },
             });
@@ -435,8 +475,14 @@ export class DemoDayParticipantsService {
             }
           }
 
+          // Determine if participant existed before
+          const existedBefore = await tx.demoDayParticipant.findUnique({
+            where: { demoDayUid_memberUid: { demoDayUid, memberUid } },
+            select: { uid: true },
+          });
+
           // Create/update DemoDayParticipant
-          await tx.demoDayParticipant.upsert({
+          const upserted = await tx.demoDayParticipant.upsert({
             where: {
               demoDayUid_memberUid: { demoDayUid, memberUid },
             },
@@ -454,6 +500,27 @@ export class DemoDayParticipantsService {
               statusUpdatedAt: new Date(),
             },
           });
+
+          // If it did not exist before, track "participant added" after commit
+          if (!existedBefore) {
+            pendingEvents.push({
+              name: 'demo_day_participant_added',
+              payload: {
+                distinctId: memberUid,
+                properties: {
+                  demoDayUid,
+                  participantUid: upserted.uid,
+                  memberUid,
+                  type: upserted.type,
+                  status: upserted.status,
+                  teamUid: upserted.teamUid || null,
+                  isNewMember: isNewUser,
+                  actorUid: actorUid || null,
+                  actorEmail: actorEmail || null,
+                },
+              },
+            });
+          }
 
           rows.push(rowResult);
         } catch (error) {
@@ -474,6 +541,15 @@ export class DemoDayParticipantsService {
         }
       }
     });
+
+    // Emit pending analytics events *after* successful transaction commit
+    for (const ev of pendingEvents) {
+      await this.analyticsService.trackEvent({
+        name: ev.name,
+        distinctId: ev.payload.distinctId,
+        properties: ev.payload.properties,
+      });
+    }
 
     return { summary, rows };
   }
@@ -653,9 +729,17 @@ export class DemoDayParticipantsService {
     data: {
       status?: 'INVITED' | 'ENABLED' | 'DISABLED';
       teamUid?: string;
-    }
+    },
+    actorEmail?: string
   ): Promise<DemoDayParticipant> {
     await this.demoDaysService.getDemoDayByUid(demoDayUid);
+
+    // resolve actor (optional)
+    let actorUid: string | undefined;
+    if (actorEmail) {
+      const actor = await this.prisma.member.findUnique({ where: { email: actorEmail }, select: { uid: true } });
+      actorUid = actor?.uid;
+    }
 
     const participant = await this.prisma.demoDayParticipant.findUnique({
       where: { uid: participantUid },
@@ -672,6 +756,9 @@ export class DemoDayParticipantsService {
 
     const updateData: Prisma.DemoDayParticipantUpdateInput = {};
 
+    // Keep previous status for analytics
+    const prevStatus = participant.status;
+
     if (data.status) {
       updateData.status = data.status;
       updateData.statusUpdatedAt = new Date();
@@ -681,9 +768,29 @@ export class DemoDayParticipantsService {
       updateData.team = data.teamUid ? { connect: { uid: data.teamUid } } : { disconnect: true };
     }
 
-    return this.prisma.demoDayParticipant.update({
+    const updated = await this.prisma.demoDayParticipant.update({
       where: { uid: participantUid },
       data: updateData,
     });
+
+    // Track status change only when it actually changed
+    if (data.status && prevStatus !== updated.status) {
+      await this.analyticsService.trackEvent({
+        name: 'demo-day-participant-status-changed',
+        distinctId: updated.memberUid,
+        properties: {
+          demoDayUid,
+          participantUid: updated.uid,
+          memberUid: updated.memberUid,
+          type: updated.type,
+          fromStatus: prevStatus,
+          toStatus: updated.status,
+          actorUid: actorUid || null,
+          actorEmail: actorEmail || null,
+        },
+      });
+    }
+
+    return updated;
   }
 }
