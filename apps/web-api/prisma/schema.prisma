@@ -1003,6 +1003,7 @@ model Event {
   receivedAt  DateTime @default(now())
   props       Json?
 
+  @@unique([eventId, userId])
   @@index([eventType, ts])
   @@index([userId, ts])
   @@index([anonymousId, ts])
