@@ -45,7 +45,12 @@ export class AuthService implements OnModuleInit {
       const httpStatus = e?.response?.status ?? e?.status ?? e?.statusCode ?? 0;
       const statusClass = statusClassOf(httpStatus);
       const errorCode = extractErrorCode(e);
-      AuthMetrics.errors.inc({ op, status_class: statusClass, http_status: String(httpStatus), error_code: String(errorCode) });
+      AuthMetrics.errors.inc({
+        op,
+        status_class: statusClass,
+        http_status: String(httpStatus),
+        error_code: String(errorCode),
+      });
       throw e;
     } finally {
       end();
@@ -359,6 +364,7 @@ export class AuthService implements OnModuleInit {
   }
 
   private memberToUserInfo(memberInfo) {
+    const team = memberInfo.teamMemberRoles?.find((role) => role.mainTeam)?.team || memberInfo.teamMemberRoles[0]?.team;
     return {
       isFirstTimeLogin: memberInfo?.externalId ? false : true,
       name: memberInfo.name,
@@ -367,6 +373,7 @@ export class AuthService implements OnModuleInit {
       uid: memberInfo.uid,
       roles: memberInfo.memberRoles?.map((r) => r.name),
       leadingTeams: memberInfo.teamMemberRoles?.filter((role) => role.teamLead).map((role) => role.teamUid),
+      mainTeamName: team?.name,
       accessLevel: memberInfo.accessLevel,
     };
   }
@@ -521,5 +528,4 @@ export class AuthService implements OnModuleInit {
       },
     });
   }
-
 }

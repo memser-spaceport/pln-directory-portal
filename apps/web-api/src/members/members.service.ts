@@ -453,7 +453,11 @@ export class MembersService {
         include: {
           image: true,
           memberRoles: true,
-          teamMemberRoles: true,
+          teamMemberRoles: {
+            include: {
+              team: true,
+            },
+          },
           projectContributions: true,
         },
       });
@@ -522,7 +526,11 @@ export class MembersService {
         include: {
           image: true,
           memberRoles: true,
-          teamMemberRoles: true,
+          teamMemberRoles: {
+            include: {
+              team: true,
+            },
+          },
           projectContributions: true,
         },
       });
