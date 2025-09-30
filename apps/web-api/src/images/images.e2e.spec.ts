@@ -35,7 +35,7 @@ describe('Images', () => {
     // Load main app config:
     mainConfig(app);
     const fileUploadService = app.get(FileUploadService);
-    fileUploadService.storeFiles = jest.fn().mockResolvedValue('cid');
+    fileUploadService.storeImageFiles = jest.fn().mockResolvedValue('cid');
     await app.init();
     await cacheManager.reset();
     await createImage({ amount: 5 });

@@ -21,8 +21,7 @@ export const FormMultiselectField = ({ name, placeholder, label, description, op
     setValue,
     watch,
   } = useFormContext();
-  const values = watch();
-  const val = values[name];
+  const val = watch(name);
 
   return (
     <div className={s.field}>

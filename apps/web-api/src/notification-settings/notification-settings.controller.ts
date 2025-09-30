@@ -21,6 +21,7 @@ import {
   UpdateParticipationDto,
   UpdateForumSettingsDto,
   CreateNotificationSettingItemDto,
+  UpdateInvestorSettingsDto, InvestorSettingsResponse,
 } from 'libs/contracts/src/schema/notification-settings';
 import { MembersService } from '../members/members.service';
 import { ZodValidationPipe } from '@abitia/zod-dto';
@@ -143,6 +144,54 @@ export class NotificationSettingsController {
     }
     return this.notificationServiceClient.upsertItem(memberUid, type, {
       ...dto,
+      memberExternalId: authenticatedUser.externalId,
+    });
+  }
+
+  @Get(':memberUid/investor')
+  @NoCache()
+  @UsePipes(ZodValidationPipe)
+  async getInvestorSettings(
+    @Param('memberUid') memberUid: string,
+    @Req() request: Request
+  ): Promise<InvestorSettingsResponse> {
+    const userEmail = request['userEmail'];
+    const authenticatedUser = await this.memberService.findMemberFromEmail(userEmail);
+
+    if (authenticatedUser.uid !== memberUid && !this.memberService.checkIfAdminUser(authenticatedUser)) {
+      throw new ForbiddenException(`User isn't authorized to get the investor settings`);
+    }
+
+    const settings = await this.notificationServiceClient.getNotificationSetting(memberUid);
+
+    return {
+      memberUid,
+      investorInvitesEnabled: !!settings?.investorInvitesEnabled,
+      investorDealflowEnabled: !!settings?.investorDealflowEnabled,
+    };
+  }
+
+  @Put(':memberUid/investor')
+  @UsePipes(ZodValidationPipe)
+  async updateInvestorSettings(
+    @Param('memberUid') memberUid: string,
+    @Body() body: UpdateInvestorSettingsDto,
+    @Req() request: Request
+  ) {
+    const userEmail = request['userEmail'];
+    const authenticatedUser = await this.memberService.findMemberFromEmail(userEmail);
+
+    const isSelf = authenticatedUser.uid === memberUid;
+    const isAdmin = this.memberService.checkIfAdminUser(authenticatedUser);
+    const isInvestor = authenticatedUser?.accessLevel && (authenticatedUser.accessLevel === 'L5' || authenticatedUser.accessLevel === 'L6')
+
+    if (!((isSelf && isInvestor) || isAdmin)) {
+      throw new ForbiddenException(`User isn't authorized to update the investor settings`);
+    }
+
+    return this.notificationServiceClient.upsertNotificationSetting(memberUid, {
+      ...body,
+      memberUid,
       memberExternalId: authenticatedUser.externalId,
     });
   }

@@ -17,70 +17,53 @@ const getUidsFrom = async (model, where = {}) => {
   });
 };
 
-const teamsFactory = Factory.define<Omit<Team, 'id'>>(
-  ({ sequence, onCreate }) => {
-    onCreate(async (team) => {
-      const fundingStageUids = await (
-        await getUidsFrom(Prisma.ModelName.FundingStage)
-      ).map((result) => result.uid);
-      team.fundingStageUid = sample(fundingStageUids) || '';
-      const imageUids = await (
-        await getUidsFrom(Prisma.ModelName.Image, { thumbnailToUid: null })
-      ).map((result) => result.uid);
-      team.logoUid = sample(imageUids) || '';
-      return team;
-    });
+const teamsFactory = Factory.define<Omit<Team, 'id'>>(({ sequence, onCreate }) => {
+  onCreate(async (team) => {
+    const fundingStageUids = await (await getUidsFrom(Prisma.ModelName.FundingStage)).map((result) => result.uid);
+    team.fundingStageUid = sample(fundingStageUids) || '';
+    const imageUids = await (
+      await getUidsFrom(Prisma.ModelName.Image, { thumbnailToUid: null })
+    ).map((result) => result.uid);
+    team.logoUid = sample(imageUids) || '';
+    return team;
+  });
 
-    const companyName = faker.helpers.unique(faker.company.name);
-    return {
-      uid: faker.helpers.slugify(`uid-${companyName.toLowerCase()}`),
-      name: companyName,
-      logoUid: null,
-      blog: faker.internet.url(),
-      website: faker.internet.url(),
-      contactMethod: faker.helpers.arrayElement([
-        null,
-        faker.internet.url(),
-        faker.internet.email(),
-      ]),
-      twitterHandler: faker.name.firstName(),
-      officeHours: faker.name.firstName(),
-      linkedinHandler: faker.name.firstName(),
-      telegramHandler: faker.name.firstName(),
-      isFeatured: faker.datatype.boolean(),
-      shortDescription: faker.helpers.arrayElement([
-        null,
-        faker.lorem.sentence(),
-      ]),
-      longDescription: faker.helpers.arrayElement([
-        null,
-        faker.lorem.paragraph(),
-      ]),
-      moreDetails: faker.helpers.arrayElement([null, faker.lorem.paragraph()]),
-      plnFriend: faker.datatype.boolean(),
-      airtableRecId: `airtable-rec-id-${sequence}`,
-      createdAt: faker.date.past(),
-      updatedAt: faker.date.recent(),
-      fundingStageUid: null,
-      lastModifiedBy: null
-    };
-  }
-);
+  const companyName = faker.helpers.unique(faker.company.name);
+  return {
+    uid: faker.helpers.slugify(`uid-${companyName.toLowerCase()}`),
+    name: companyName,
+    logoUid: null,
+    blog: faker.internet.url(),
+    website: faker.internet.url(),
+    contactMethod: faker.helpers.arrayElement([null, faker.internet.url(), faker.internet.email()]),
+    twitterHandler: faker.name.firstName(),
+    officeHours: faker.name.firstName(),
+    linkedinHandler: faker.name.firstName(),
+    telegramHandler: faker.name.firstName(),
+    isFeatured: faker.datatype.boolean(),
+    shortDescription: faker.helpers.arrayElement([null, faker.lorem.sentence()]),
+    longDescription: faker.helpers.arrayElement([null, faker.lorem.paragraph()]),
+    moreDetails: faker.helpers.arrayElement([null, faker.lorem.paragraph()]),
+    plnFriend: faker.datatype.boolean(),
+    airtableRecId: `airtable-rec-id-${sequence}`,
+    createdAt: faker.date.past(),
+    updatedAt: faker.date.recent(),
+    fundingStageUid: null,
+    lastModifiedBy: null,
+    investorProfileId: null,
+    isFund: faker.datatype.boolean(),
+  };
+});
 
 export const teams = async () => await teamsFactory.createList(40);
 
 export const teamRelations = async (teams) => {
   const industryTagUids = await getUidsFrom(Prisma.ModelName.IndustryTag);
-  const membershipSourceUids = await getUidsFrom(
-    Prisma.ModelName.MembershipSource
-  );
+  const membershipSourceUids = await getUidsFrom(Prisma.ModelName.MembershipSource);
   const technologyUids = await getUidsFrom(Prisma.ModelName.Technology);
 
   return teams.map((team) => {
-    const randomTechnologies = sampleSize(
-      technologyUids,
-      random(0, technologyUids.length)
-    );
+    const randomTechnologies = sampleSize(technologyUids, random(0, technologyUids.length));
 
     return {
       where: {

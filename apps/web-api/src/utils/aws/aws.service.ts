@@ -109,4 +109,28 @@ export class AwsService {
     };
     return await s3.upload(params).promise();
   }
+
+
+  async getPresignedGetUrl(bucket?: string, key?: string, expiresInSeconds = 3600) {
+    const s3 = new AWS.S3(CONFIG);
+    return s3.getSignedUrl('getObject', { Bucket: bucket, Key: key, Expires: expiresInSeconds });
+  }
+
+  async getSignedGetUrl(
+    bucket: string,
+    key: string,
+    ttlSec: number,
+    opts?: { disposition?: 'inline' | 'attachment'; filename?: string; contentType?: string },
+  ) {
+    const s3 = new AWS.S3(CONFIG);
+    return s3.getSignedUrlPromise('getObject', {
+      Bucket: bucket,
+      Key: key,
+      Expires: ttlSec,
+      ResponseContentDisposition: opts?.disposition
+        ? `${opts.disposition}; filename="${encodeURIComponent(opts.filename || key.split('/').pop()!)}"`
+        : undefined,
+      ResponseContentType: opts?.contentType,
+    });
+  }
 }

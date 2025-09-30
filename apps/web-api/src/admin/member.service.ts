@@ -1,13 +1,14 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   forwardRef,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import axios from 'axios';
-import { Location, Member, ParticipantsRequest, Prisma } from '@prisma/client';
+import { InvestorProfileType, Location, Member, ParticipantsRequest, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
@@ -132,7 +133,7 @@ export class MemberService {
       this.logger.info(
         `Member update request - Initiaing update for member uid - ${existingMember.uid}, requestId -> ${memberUid}`
       );
-      const member = await this.prepareMemberFromParticipantRequest(
+      const { member, investorProfileData } = await this.prepareMemberFromParticipantRequest(
         memberUid,
         memberData,
         existingMember,
@@ -150,6 +151,12 @@ export class MemberService {
       );
       await this.updateMemberEmailChange(memberUid, isEmailChanged, isExternalIdAvailable, memberData, existingMember);
       await this.logParticipantRequest(requestorEmail, memberData, existingMember.uid, tx);
+
+      // Handle investor profile updates
+      if (investorProfileData) {
+        await this.updateMemberInvestorProfile(memberUid, investorProfileData, tx, existingMember.accessLevel);
+      }
+
       if (isEmailChanged && isDirectoryAdmin) {
         this.notificationService.notifyForMemberChangesByAdmin(
           memberData.name,
@@ -200,8 +207,9 @@ export class MemberService {
     existingMember,
     tx: Prisma.TransactionClient,
     type = 'Create'
-  ) {
+  ): Promise<{ member: any; investorProfileData: any }> {
     const member: any = {};
+    let investorProfileData: any = null;
     const directFields = [
       'name',
       'email',
@@ -247,7 +255,99 @@ export class MemberService {
       await this.updateProjectContributions(memberData, existingMember, memberUid, tx);
       await this.updateTeamMemberRoles(memberData, existingMember, memberUid, tx);
     }
-    return member;
+
+    // Handle investor profile
+    if (memberData.investorProfile && Object.keys(memberData.investorProfile).length > 0) {
+      if (type === 'Create') {
+        member['investorProfile'] = {
+          create: {
+            investmentFocus: memberData.investorProfile.investmentFocus || [],
+            investInStartupStages: memberData.investorProfile.investInStartupStages || [],
+            investInFundTypes: memberData.investorProfile.investInFundTypes || [],
+            typicalCheckSize: memberData.investorProfile.typicalCheckSize,
+            secRulesAccepted: memberData.investorProfile.secRulesAccepted,
+            secRulesAcceptedAt: memberData.investorProfile.secRulesAccepted ? new Date() : null,
+            type: memberData.investorProfile.type,
+          },
+        };
+      } else {
+        // For updates, we'll handle this separately after member creation/update
+        investorProfileData = memberData.investorProfile;
+      }
+    }
+
+    return { member, investorProfileData };
+  }
+
+  /**
+   * Handles investor profile updates for a member
+   *
+   * @param memberUid - The unique identifier of the member
+   * @param investorProfileData - The investor profile data to update
+   * @param tx - Transaction client for atomic operations
+   * @param memberAccessLevel - The access level of the member to check permissions
+   */
+  async updateMemberInvestorProfile(
+    memberUid: string,
+    investorProfileData: any,
+    tx: Prisma.TransactionClient,
+    memberAccessLevel?: string
+  ) {
+    // Check if member has permission to update investor profile (L5 or L6)
+    if (memberAccessLevel && !['L5', 'L6'].includes(memberAccessLevel)) {
+      throw new ForbiddenException('Insufficient permissions to update investor profile');
+    }
+
+    const existingMember = await tx.member.findUnique({
+      where: { uid: memberUid },
+      select: { investorProfileId: true, investorProfile: true },
+    });
+
+    if (!existingMember) {
+      throw new NotFoundException('Member not found');
+    }
+
+    const secRulesAcceptedAt =
+      investorProfileData.secRulesAccepted &&
+      existingMember.investorProfile?.secRulesAccepted !== investorProfileData.secRulesAccepted
+        ? new Date()
+        : existingMember.investorProfile?.secRulesAcceptedAt;
+
+    if (existingMember.investorProfileId) {
+      // Update existing investor profile
+      await tx.investorProfile.update({
+        where: { uid: existingMember.investorProfileId },
+        data: {
+          investmentFocus: investorProfileData.investmentFocus || [],
+          investInStartupStages: investorProfileData.investInStartupStages || [],
+          investInFundTypes: investorProfileData.investInFundTypes || [],
+          typicalCheckSize: investorProfileData.typicalCheckSize,
+          secRulesAccepted: investorProfileData.secRulesAccepted,
+          secRulesAcceptedAt,
+          type: investorProfileData.type,
+        },
+      });
+    } else {
+      // Create new investor profile
+      const newInvestorProfile = await tx.investorProfile.create({
+        data: {
+          investmentFocus: investorProfileData.investmentFocus || [],
+          investInStartupStages: investorProfileData.investInStartupStages || [],
+          investInFundTypes: investorProfileData.investInFundTypes || [],
+          typicalCheckSize: investorProfileData.typicalCheckSize,
+          secRulesAccepted: investorProfileData.secRulesAccepted,
+          secRulesAcceptedAt,
+          type: investorProfileData.type,
+          member: { connect: { uid: memberUid } },
+        },
+      });
+
+      // Link the investor profile to the member
+      await tx.member.update({
+        where: { uid: memberUid },
+        data: { investorProfileId: newInvestorProfile.uid },
+      });
+    }
   }
 
   /**
@@ -761,6 +861,16 @@ export class MemberService {
           },
         },
         accessLevelUpdatedAt: true,
+        investorProfile: {
+          select: {
+            uid: true,
+            investmentFocus: true,
+            investInStartupStages: true,
+            investInFundTypes: true,
+            typicalCheckSize: true,
+            type: true,
+          },
+        },
       },
       skip: (page - 1) * limit,
       take: limit,
@@ -903,6 +1013,28 @@ export class MemberService {
 
       const { isVerified, plnFriend } = this.resolveFlagsFromAccessLevel(memberData.accessLevel as AccessLevel);
 
+      let investorProfileId: string | null = null;
+
+      if (memberData.investorProfile) {
+        // Create investorProfile first and get its id
+        const investorProfile = await tx.investorProfile.create({
+          data: {
+            investmentFocus: memberData.investorProfile.investmentFocus,
+            investInStartupStages: memberData.investorProfile.investInStartupStages,
+            investInFundTypes: memberData.investorProfile.investInFundTypes,
+            typicalCheckSize: memberData.investorProfile.typicalCheckSize,
+            secRulesAccepted: memberData.investorProfile.secRulesAccepted,
+            type: (memberData.investorProfile.type
+              ? memberData.investorProfile.type
+              : memberData.teamMemberRoles?.length > 0
+              ? 'FUND'
+              : 'ANGEL') as InvestorProfileType,
+            secRulesAcceptedAt: memberData.investorProfile.secRulesAccepted ? new Date() : null,
+          },
+        });
+        investorProfileId = investorProfile.uid;
+      }
+
       const newMember = {
         name: memberData.name,
         email: memberData.email.toLowerCase().trim(),
@@ -945,23 +1077,27 @@ export class MemberService {
             recommendationsEnabled: memberData.accessLevel === AccessLevel.L4,
           },
         },
+        ...(investorProfileId && { investorProfileId }),
       };
 
       createdMember = await this.createMember(newMember, tx);
 
-      await this.notificationService.notifyForMemberCreationApproval(
-        createdMember.name,
-        createdMember.uid,
-        createdMember.email,
-        memberData.accessLevel === AccessLevel.L4
-      );
+      if ([AccessLevel.L2, AccessLevel.L3, AccessLevel.L4].includes(memberData.accessLevel as AccessLevel)) {
+        await this.notificationService.notifyForMemberCreationApproval(
+          createdMember.name,
+          createdMember.uid,
+          createdMember.email,
+          memberData.accessLevel === AccessLevel.L4
+        );
+      }
+
       await this.membersHooksService.postCreateActions(createdMember, memberData.email);
     });
     return createdMember;
   }
 
   async updateMemberByAdmin(uid: string, dto: UpdateMemberDto): Promise<string> {
-    const { country, region, city, skills, teamMemberRoles, joinDate, ...rest } = dto;
+    const { country, region, city, skills, teamMemberRoles, joinDate, investorProfile, ...rest } = dto;
 
     const data: any = {
       ...rest,
@@ -1007,6 +1143,53 @@ export class MemberService {
             },
           })),
         };
+      }
+
+      // Handle investor profile updates
+      if (investorProfile) {
+        const existingMember = await tx.member.findUnique({
+          where: { uid },
+          select: { investorProfileId: true, investorProfile: true },
+        });
+
+        const secRulesAcceptedAt =
+          investorProfile.secRulesAccepted &&
+          existingMember?.investorProfile?.secRulesAccepted !== investorProfile.secRulesAccepted
+            ? new Date()
+            : existingMember?.investorProfile?.secRulesAcceptedAt;
+
+        if (existingMember?.investorProfileId) {
+          // Update existing investor profile
+          await tx.investorProfile.update({
+            where: { uid: existingMember.investorProfileId },
+            data: {
+              investmentFocus: investorProfile.investmentFocus,
+              typicalCheckSize: investorProfile.typicalCheckSize,
+              secRulesAccepted: investorProfile.secRulesAccepted,
+              secRulesAcceptedAt,
+              investInStartupStages: investorProfile.investInStartupStages,
+              investInFundTypes: investorProfile.investInFundTypes,
+              type: investorProfile.type as InvestorProfileType,
+            },
+          });
+        } else {
+          // Create new investor profile
+          const newInvestorProfile = await tx.investorProfile.create({
+            data: {
+              investmentFocus: investorProfile.investmentFocus,
+              typicalCheckSize: investorProfile.typicalCheckSize,
+              secRulesAccepted: investorProfile.secRulesAccepted,
+              secRulesAcceptedAt,
+              investInStartupStages: investorProfile.investInStartupStages,
+              investInFundTypes: investorProfile.investInFundTypes,
+              type: investorProfile.type as InvestorProfileType,
+              memberUid: uid,
+            },
+          });
+
+          // Link the investor profile to the member
+          data.investorProfileId = newInvestorProfile.uid;
+        }
       }
 
       updatedMember = await tx.member.update({
@@ -1057,6 +1240,8 @@ export class MemberService {
   private resolveFlagsFromAccessLevel(accessLevel: AccessLevel): { isVerified: boolean; plnFriend: boolean } {
     switch (accessLevel) {
       case AccessLevel.L4:
+      case AccessLevel.L5:
+      case AccessLevel.L6:
         return { isVerified: true, plnFriend: false };
       case AccessLevel.L3:
         return { isVerified: true, plnFriend: true };

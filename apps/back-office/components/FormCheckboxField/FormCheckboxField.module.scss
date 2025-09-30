@@ -1,0 +1,104 @@
+@use '../../styles/mixins';
+@use '../../styles/media';
+
+.field {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.label {
+  color: #475569;
+  font-feature-settings: 'liga' off, 'clig' off;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 166.667% */
+
+  &.required::after {
+    content: '*';
+    color: #dc2626;
+    margin-left: 4px;
+  }
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  position: relative;
+  user-select: none;
+
+  .checkbox {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+  }
+
+  .checkmark {
+    height: 18px;
+    width: 18px;
+    background-color: #fff;
+    border: 1px solid rgba(203, 213, 225, 0.5);
+    border-radius: 4px;
+    position: relative;
+    transition: all 0.2s ease;
+
+    &::after {
+      content: '';
+      position: absolute;
+      display: none;
+      left: 5px;
+      top: 1px;
+      width: 6px;
+      height: 12px;
+      border: solid #1b4dff;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+  }
+
+  &:hover .checkmark {
+    border-color: #5e718d;
+  }
+
+  .checkbox:checked ~ .checkmark {
+    background-color: #fff;
+    border-color: #1b4dff;
+  }
+
+  .checkbox:checked ~ .checkmark::after {
+    display: block;
+  }
+
+  .checkbox:focus ~ .checkmark {
+    box-shadow: 0 0 0 4px rgba(27, 56, 96, 0.12);
+  }
+}
+
+.errorMsg {
+  font-size: 10px;
+  color: darkred;
+  font-feature-settings: 'liga' off, 'clig' off;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 200% */
+}
+
+.fieldDescription {
+  font-feature-settings: 'liga' off, 'clig' off;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 200% */
+  color: #878b94;
+
+  &[data-focused] {
+    color: #a0beff;
+  }
+}

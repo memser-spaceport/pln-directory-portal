@@ -31,4 +31,12 @@ export type TMemberForm = {
   github: string;
   telegram: string;
   officeHours: string;
+  investorProfile?: {
+    investmentFocus: { label: string; value: string }[];
+    typicalCheckSize: number;
+    secRulesAccepted: boolean;
+    type?: { label: string; value: string } | null;
+    investInStartupStages: { label: string; value: string }[];
+    investInFundTypes: { label: string; value: string }[];
+  };
 };
