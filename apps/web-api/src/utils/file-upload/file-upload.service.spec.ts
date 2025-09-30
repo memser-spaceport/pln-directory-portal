@@ -51,7 +51,7 @@ describe('FileUploadService', () => {
         path: '',
         stream: new Readable(),
       };
-      const cid = await fileUploadService.storeFiles([file]);
+      const cid = await fileUploadService.storeImageFiles([file]);
       expect(fileEncryptionService.getEncryptedFile).toBeCalledTimes(1);
       expect(cid).toEqual(TEST_FILE_STORED_CID);
     });

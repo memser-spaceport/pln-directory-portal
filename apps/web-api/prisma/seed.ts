@@ -26,16 +26,14 @@ import {
   focusAreas,
   teamFocusAreas,
   projectFocusAreas,
-  discoveryQuestions
+  discoveryQuestions,
 } from './fixtures';
 
 /**
- * IMPORTANT: This is a quick & dirty solution until
- * we find the proper time to build a robust seeding mechanism.
- *
- * @param fixtures
+ * Truncate all public tables (except _prisma_migrations) and reset identities.
+ * Uses CASCADE to handle FK dependencies.
  */
-async function load(fixtures) {
+async function resetAllTables() {
   await prisma.$executeRawUnsafe(`
     DO
     $func$
@@ -50,92 +48,88 @@ async function load(fixtures) {
     END
     $func$;
   `);
-  console.log(`🔄 Reset all tables`);
-  console.log('\r');
+  console.log('🔄 Reset all tables\n');
+}
 
+/**
+ * Generic loader for fixtures with optional relation updates.
+ * - Creates many (skipDuplicates)
+ * - Then applies relation updates one-by-one (Prisma limitation)
+ */
+async function load(fixtures: Array<Record<string, any>>) {
   for (const fixture of fixtures) {
-    const model = Object.keys(fixture)[0];
-    const fixturesValue = fixture[model]?.fixtures || fixture[model];
+    const model = Object.keys(fixture)[0]; // e.g., 'MemberRole', 'Team', etc.
+    const modelBlock = fixture[model];
+
+    const fixturesValue = modelBlock?.fixtures ?? modelBlock;
     const fixturesToCreate =
       typeof fixturesValue === 'function'
-        ? await fixturesValue().then((data) => Promise.all(data))
+        ? await fixturesValue().then((data: any[]) => Promise.all(data))
         : fixturesValue;
-    const relationsToConnect = fixture[model]?.relations
-      ? await fixture[model]
-          .relations(fixturesToCreate)
-          .then((data) => Promise.all(data))
+
+    const relationsToConnect = modelBlock?.relations
+      ? await modelBlock.relations(fixturesToCreate).then((data: any[]) => Promise.all(data))
       : null;
+
     await prisma[model].createMany({
       data: fixturesToCreate,
       skipDuplicates: true,
     });
-    console.log(`✅ Added ${model} data`);
-    console.log('\r');
+    console.log(`✅ Added ${model} data\n`);
 
-    // Due to Prisma limitation:
-    // https://www.prisma.io/docs/concepts/components/prisma-client/relation-queries#create-multiple-records-and-multiple-related-records
+    // Relation updates must be sent one-by-one
     if (!relationsToConnect) continue;
     for (const relation of relationsToConnect) {
       await prisma[camelCase(model)].update(relation);
     }
-    console.log(`✅ Updated ${model} with its relations`);
-    console.log('\r');
+    console.log(`✅ Updated ${model} with its relations\n`);
   }
 }
 
-load([
-  { [Prisma.ModelName.MemberRole]: memberRoles },
-  { [Prisma.ModelName.Skill]: skills },
-  { [Prisma.ModelName.FundingStage]: fundingStages },
-  { [Prisma.ModelName.MembershipSource]: membershipSources },
-  { [Prisma.ModelName.IndustryCategory]: industryCategories },
-  { [Prisma.ModelName.IndustryTag]: industryTags },
-  { [Prisma.ModelName.Location]: locations },
-  { [Prisma.ModelName.Technology]: technologies },
-  {
-    [Prisma.ModelName.Image]: {
-      fixtures: originalImages,
-      relations: imageRelations,
+async function main() {
+  await resetAllTables();
+
+  // Load core fixtures in a FK-safe order
+  await load([
+    { [Prisma.ModelName.MemberRole]: memberRoles },
+    { [Prisma.ModelName.Skill]: skills },
+    { [Prisma.ModelName.FundingStage]: fundingStages },
+    { [Prisma.ModelName.MembershipSource]: membershipSources },
+    { [Prisma.ModelName.IndustryCategory]: industryCategories },
+    { [Prisma.ModelName.IndustryTag]: industryTags },
+    { [Prisma.ModelName.Location]: locations },
+    { [Prisma.ModelName.Technology]: technologies },
+    {
+      [Prisma.ModelName.Image]: {
+        fixtures: originalImages,
+        relations: imageRelations,
+      },
     },
-  },
-  { [Prisma.ModelName.Team]: { fixtures: teams, relations: teamRelations } },
-  {
-    [Prisma.ModelName.Member]: {
-      fixtures: members,
-      relations: memberRelations,
+    { [Prisma.ModelName.Team]: { fixtures: teams, relations: teamRelations } }, // Teams FIRST
+    {
+      [Prisma.ModelName.Member]: {
+        fixtures: members,
+        relations: memberRelations,
+      },
     },
-  },
-  { [Prisma.ModelName.TeamMemberRole]: teamMemberRoles },
-  { [Prisma.ModelName.Project]: {
-    fixtures: projects,
-    relations: projectRelations
-  }},
-  { [Prisma.ModelName.PLEventLocation]: {
-    fixtures: eventLocations
-  } },
-  { [Prisma.ModelName.PLEvent]: {
-    fixtures: events
-  }},
-  { [Prisma.ModelName.PLEventGuest]: {
-    fixtures: eventGuests
-  }},
-  { [Prisma.ModelName.FocusArea]: focusAreas },
-  {
-    [Prisma.ModelName.TeamFocusArea]: {
-      fixtures: teamFocusAreas
-    }
-  },
-  {
-    [Prisma.ModelName.ProjectFocusArea]: {
-      fixtures: projectFocusAreas
-    }
-  },
-  {
-    [Prisma.ModelName.DiscoveryQuestion]: {
-      fixtures: discoveryQuestions
-    }
-  }
-])
+    { [Prisma.ModelName.TeamMemberRole]: teamMemberRoles },
+    {
+      [Prisma.ModelName.Project]: {
+        fixtures: projects,
+        relations: projectRelations,
+      },
+    },
+    { [Prisma.ModelName.PLEventLocation]: { fixtures: eventLocations } },
+    { [Prisma.ModelName.PLEvent]: { fixtures: events } },
+    { [Prisma.ModelName.PLEventGuest]: { fixtures: eventGuests } },
+    { [Prisma.ModelName.FocusArea]: focusAreas },
+    { [Prisma.ModelName.TeamFocusArea]: { fixtures: teamFocusAreas } },
+    { [Prisma.ModelName.ProjectFocusArea]: { fixtures: projectFocusAreas } },
+    { [Prisma.ModelName.DiscoveryQuestion]: { fixtures: discoveryQuestions } },
+  ]);
+}
+
+main()
   .then(async () => {
     await prisma.$disconnect();
   })

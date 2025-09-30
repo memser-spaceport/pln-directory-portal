@@ -53,8 +53,23 @@ export const CreateNotificationSettingItemSchema = z.object({
   memberExternalId: z.string().optional(),
 });
 
+export const UpdateInvestorSettingsSchema = z.object({
+  investorInvitesEnabled: z.boolean(),
+  investorDealflowEnabled: z.boolean(),
+});
+
+export class UpdateInvestorSettingsDto extends createZodDto(UpdateInvestorSettingsSchema) {}
+
+export const InvestorSettingsResponseSchema = z.object({
+  memberUid: z.string(),
+  investorInvitesEnabled: z.boolean(),
+  investorDealflowEnabled: z.boolean(),
+});
+
+
 export class NotificationSettingsResponse extends createZodDto(NotificationSettingsResponseSchema) {}
 export class UpdateNotificationSettingsDto extends createZodDto(UpdateNotificationSettingsSchema) {}
 export class UpdateParticipationDto extends createZodDto(UpdateParticipationSchema) {}
 export class UpdateForumSettingsDto extends createZodDto(UpdateForumSettingsSchema) {}
 export class CreateNotificationSettingItemDto extends createZodDto(CreateNotificationSettingItemSchema) {}
+export class InvestorSettingsResponse extends createZodDto(InvestorSettingsResponseSchema) {}

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Team } from '@prisma/client';
-import { AnalyticsService } from '../analytics/analytics.service';
+import { AnalyticsService } from '../analytics/service/analytics.service';
 import { CacheService } from '../utils/cache/cache.service';
 import { HuskyRevalidationService } from '../husky/husky-revalidation.service';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
@@ -30,7 +30,7 @@ export class TeamsHooksService {
 
     // Trigger Airtable sync
     await this.forestadminService.triggerAirtableSync();
-    
+
     // Track team creation event with analytics
     await this.analyticsService.trackEvent({
       name: ANALYTICS_EVENTS.TEAM.TEAM_CREATE,
@@ -51,13 +51,13 @@ export class TeamsHooksService {
   async postUpdateActions(team: Team, requestorEmail: string): Promise<void> {
     // Reset cache for teams
     await this.cacheService.reset({ service: 'teams' });
-    
+
     // Trigger husky revalidation for teams
     this.huskyRevalidationService.triggerHuskyRevalidation('teams', team.uid, UPDATE);
-    
+
     // Trigger Airtable sync
     await this.forestadminService.triggerAirtableSync();
-    
+
     // Track team update event with analytics
     await this.analyticsService.trackEvent({
       name: ANALYTICS_EVENTS.TEAM.TEAM_UPDATE,
@@ -69,4 +69,4 @@ export class TeamsHooksService {
       }
     });
   }
-} 
+}

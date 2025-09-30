@@ -71,6 +71,20 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
           telegramHandler: formData.telegram,
           officeHours: formData.officeHours,
           githubHandler: formData.github,
+          investorProfile: {
+            investmentFocus: formData.investorProfile.investmentFocus.map(
+              (item: { label: string; value: string }) => item.value
+            ),
+            typicalCheckSize: Number(formData.investorProfile.typicalCheckSize),
+            secRulesAccepted: !!formData.investorProfile.secRulesAccepted,
+            investInStartupStages: formData.investorProfile.investInStartupStages.map(
+              (item: { label: string; value: string }) => item.value
+            ),
+            investInFundTypes: formData.investorProfile.investInFundTypes.map(
+              (item: { label: string; value: string }) => item.value
+            ),
+            type: formData.investorProfile.type?.value || '',
+          },
         };
 
         const res = await mutateAsync({ payload, authToken });

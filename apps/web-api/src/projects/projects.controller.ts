@@ -51,7 +51,7 @@ export class ProjectsController {
   @Api(server.route.createProject)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
   async create(@Body() body: CreateProjectDto, @Req() request): Promise<any> {
     return await this.projectsService.createProject(body as any, request.userEmail);
   }
@@ -59,7 +59,7 @@ export class ProjectsController {
   @Api(server.route.modifyProject)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
   update(@Param('uid') uid: string, @Body() body: UpdateProjectDto, @Req() request) {
     return this.projectsService.updateProjectByUid(uid, body as any, request.userEmail);
   }
@@ -103,14 +103,14 @@ export class ProjectsController {
   @Api(server.route.removeProject)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
   remove(@Param('uid') uid: string, @Req() request) {
     return this.projectsService.removeProjectByUid(uid, request.userEmail);
   }
 
   @Api(server.route.patchAskProject)
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4)
+  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
   async addEditAsk(@Param('uid') projectUid, @Body() body, @Req() req) {
     return await this.projectsService.addEditProjectAsk(projectUid, req.userEmail, body);
   }

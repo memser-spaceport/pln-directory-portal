@@ -15,8 +15,9 @@ import { MembersService } from '../members/members.service';
 import { EmailOtpService } from '../otp/email-otp.service';
 import { ModuleRef } from '@nestjs/core';
 import { LogService } from '../shared/log.service';
-import { AnalyticsService } from '../analytics/analytics.service';
+import { AnalyticsService } from '../analytics/service/analytics.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
+import { PrismaService } from '../shared/prisma.service';
 import { AuthMetrics, extractErrorCode, statusClassOf } from '../metrics/auth.metrics';
 
 @Injectable()
@@ -27,7 +28,8 @@ export class AuthService implements OnModuleInit {
     private emailOtpService: EmailOtpService,
     private logger: LogService,
     @Inject(CACHE_MANAGER) private cacheService: Cache,
-    private analyticsService: AnalyticsService
+    private analyticsService: AnalyticsService,
+    private prisma: PrismaService
   ) {}
 
   onModuleInit() {
@@ -94,16 +96,20 @@ export class AuthService implements OnModuleInit {
       // Check soft delete
       if (foundUser.deletedAt) {
         this.logger.error(
-          `Login attempt for deleted member [uid=${foundUser.uid}, email=${foundUser.email}]. Reason: ${foundUser.deletionReason || 'not specified'}`
+          `Login attempt for deleted member [uid=${foundUser.uid}, email=${foundUser.email}]. Reason: ${
+            foundUser.deletionReason || 'not specified'
+          }`
         );
         throw new ForbiddenException(foundUser.deletionReason || 'Your account has been deactivated.');
       }
 
       if (foundUser.email === email) {
+        // Check and upgrade demo day participant if needed
+        const upgradedUser = await this.checkAndUpgradeDemoDayParticipant(foundUser);
         // Track login event
-        await this.trackLoginEvent(foundUser);
+        await this.trackLoginEvent(upgradedUser);
         return {
-          userInfo: this.memberToUserInfo(foundUser),
+          userInfo: this.memberToUserInfo(upgradedUser),
           refreshToken: refresh_token,
           idToken: id_token,
           accessToken: access_token,
@@ -122,7 +128,9 @@ export class AuthService implements OnModuleInit {
       // Check soft delete
       if (foundUser.deletedAt) {
         this.logger.error(
-          `Login attempt for deleted member [uid=${foundUser.uid}, email=${foundUser.email}]. Reason: ${foundUser.deletionReason || 'not specified'}`
+          `Login attempt for deleted member [uid=${foundUser.uid}, email=${foundUser.email}]. Reason: ${
+            foundUser.deletionReason || 'not specified'
+          }`
         );
         throw new ForbiddenException(foundUser.deletionReason || 'Your account has been deactivated.');
       }
@@ -134,10 +142,13 @@ export class AuthService implements OnModuleInit {
       } else {
         await this.membersService.updateExternalIdByEmail(email, externalId);
         this.logger.info(`Updated externalId - ${externalId} for emailId - ${email}`);
+
+        // Check and upgrade demo day participant if needed
+        const upgradedUser = await this.checkAndUpgradeDemoDayParticipant(foundUser);
         // Track login event
-        await this.trackLoginEvent(foundUser);
+        await this.trackLoginEvent(upgradedUser);
         return {
-          userInfo: this.memberToUserInfo(foundUser),
+          userInfo: this.memberToUserInfo(upgradedUser),
           refreshToken: refresh_token,
           idToken: id_token,
           accessToken: access_token,
@@ -412,4 +423,103 @@ export class AuthService implements OnModuleInit {
     await this.cacheService.store.set('authserviceClientToken', newClientToken, { ttl: 3600 });
     return newClientToken;
   }
+
+  private async checkAndUpgradeDemoDayParticipant(member: any): Promise<any> {
+    // Only process L0 members
+    if (member.accessLevel !== 'L0') {
+      return member;
+    }
+
+    // Check if member has invited demo day participants
+    const invitedParticipant = await this.prisma.demoDayParticipant.findFirst({
+      where: {
+        memberUid: member.uid,
+        status: 'INVITED',
+        isDeleted: false,
+      },
+    });
+
+    if (!invitedParticipant) {
+      return member;
+    }
+
+    // Determine new access level based on participant type
+    const newAccessLevel = invitedParticipant.type === 'INVESTOR' ? 'L5' : 'L3';
+
+    // Update member access level and participant status in transaction
+    await this.prisma.$transaction(async (tx) => {
+      // Update member access level
+      await tx.member.update({
+        where: { uid: member.uid },
+        data: {
+          accessLevel: newAccessLevel,
+          accessLevelUpdatedAt: new Date(),
+        },
+      });
+
+      // Save previous status for analytics
+      const prevStatus = invitedParticipant.status;
+
+      // Update participant status to enabled
+      const updatedParticipant = await tx.demoDayParticipant.update({
+        where: { uid: invitedParticipant.uid },
+        data: {
+          status: 'ENABLED',
+          statusUpdatedAt: new Date(),
+        },
+      });
+
+      if (invitedParticipant.type === 'INVESTOR') {
+        // This is an additive analytics call; no changes to existing logs/comments
+        await this.trackInvestorSign(member, invitedParticipant, newAccessLevel);
+      }
+
+      // Track participant status change (INVITED -> ENABLED)
+      // Note: using plain string for event name to avoid touching constants
+      await this.analyticsService.trackEvent({
+        name: 'demo-day-participant-status-changed',
+        distinctId: member.uid,
+        properties: {
+          memberUid: member.uid,
+          email: member.email,
+          demoDayUid: invitedParticipant.demoDayUid,
+          participantUid: invitedParticipant.uid,
+          type: invitedParticipant.type,
+          fromStatus: prevStatus,
+          toStatus: updatedParticipant.status,
+        },
+      });
+    });
+
+    this.logger.info(
+      `Upgraded demo day participant: member=${member.uid}, type=${invitedParticipant.type}, accessLevel=${newAccessLevel}`
+    );
+
+    // Return updated member
+    return {
+      ...member,
+      accessLevel: newAccessLevel,
+      accessLevelUpdatedAt: new Date(),
+    };
+  }
+
+  /**
+   * Track "investor sign" event once investor is enabled/upgraded
+   * (This is additive only; no changes to existing code paths)
+   */
+  private async trackInvestorSign(member: any, invitedParticipant: any, newAccessLevel: string) {
+    await this.analyticsService.trackEvent({
+      name: 'investor-sign',
+      distinctId: member.uid,
+      properties: {
+        uid: member.uid,
+        email: member.email,
+        name: member.name,
+        demoDayUid: invitedParticipant.demoDayUid,
+        participantUid: invitedParticipant.uid,
+        newAccessLevel,
+      },
+    });
+  }
+
 }

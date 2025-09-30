@@ -63,6 +63,26 @@ const options = [
   },
   {
     icon: (
+      <span className={s.purple}>
+        <Level2Icon />
+      </span>
+    ),
+    name: 'L5',
+    value: 'L5',
+    desc: '- Investor Only',
+  },
+  {
+    icon: (
+      <span className={s.purple}>
+        <Level2Icon />
+      </span>
+    ),
+    name: 'L6',
+    value: 'L6',
+    desc: '- Investor + Other Role',
+  },
+  {
+    icon: (
       <span className={s.red}>
         <Level2Icon />
       </span>

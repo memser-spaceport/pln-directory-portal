@@ -173,7 +173,7 @@ export const HUSKY_POSTGRES_ERROR_CODES = {
   CANNOT_CONNECT_NOW: '57P03',
   MESSAGE: 'Connection terminated',
   CONNECTION_TIMEOUT_MESSAGE: 'connection timeout',
-  
+
 }
 
 
@@ -236,4 +236,6 @@ export const ANALYTICS_SOURCE = 'directory-backend';
 export const ANALYTICS_PROVIDER = {
   POSTHOG: 'posthog',
   CONSOLE: 'console',
+  HYBRID: 'hybrid',
+  DB: 'db'
 }

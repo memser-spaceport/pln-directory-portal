@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   forwardRef,
   Inject,
   Injectable,
@@ -369,6 +370,7 @@ export class MembersService {
           skills: true,
           memberRoles: true,
           linkedinProfile: true,
+          investorProfile: true,
           teamMemberRoles: {
             include: {
               team: {
@@ -425,9 +427,13 @@ export class MembersService {
         },
       });
 
-      return {
-        ...(member as any),
-      };
+      // Only return investor profile for L5 and L6 members
+      const memberData = { ...(member as any) };
+      if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
+        delete memberData.investorProfile;
+      }
+
+      return memberData;
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -792,7 +798,7 @@ export class MembersService {
     tx: Prisma.TransactionClient = this.prisma
   ): Promise<Member> {
     const memberData: any = memberParticipantRequest.newData;
-    const member = await this.prepareMemberFromParticipantRequest(null, memberData, null, tx);
+    const { member } = await this.prepareMemberFromParticipantRequest(null, memberData, null, tx);
     await this.mapLocationToMember(memberData, null, member, tx);
     const createdMember = await this.createMember(member, tx);
     await this.membersHooksService.postCreateActions(createdMember, memberParticipantRequest.requesterEmailId);
@@ -802,7 +808,7 @@ export class MembersService {
   async createMemberFromSignUpData(memberData: any): Promise<Member> {
     let createdMember: any;
     await this.prisma.$transaction(async (tx) => {
-      const member = await this.prepareMemberFromParticipantRequest(null, memberData, null, tx);
+      const { member } = await this.prepareMemberFromParticipantRequest(null, memberData, null, tx);
       member.accessLevel = AccessLevel.L0;
       await this.mapLocationToMember(memberData, null, member, tx);
       createdMember = await this.createMember(member, tx);
@@ -826,7 +832,7 @@ export class MembersService {
       this.logger.info(
         `Member update request - Initiaing update for member uid - ${existingMember.uid}, requestId -> ${memberUid}`
       );
-      const member = await this.prepareMemberFromParticipantRequest(
+      const { member, investorProfileData } = await this.prepareMemberFromParticipantRequest(
         memberUid,
         memberData,
         existingMember,
@@ -844,6 +850,12 @@ export class MembersService {
       );
       await this.updateMemberEmailChange(memberUid, isEmailChanged, isExternalIdAvailable, memberData, existingMember);
       await this.logParticipantRequest(requestorEmail, memberData, existingMember.uid, tx);
+
+      // Handle investor profile updates
+      if (investorProfileData) {
+        await this.updateMemberInvestorProfile(memberUid, investorProfileData, tx, existingMember.accessLevel);
+      }
+
       if (isEmailChanged && isDirectoryAdmin) {
         this.notificationService.notifyForMemberChangesByAdmin(
           memberData.name,
@@ -894,8 +906,9 @@ export class MembersService {
     existingMember,
     tx: Prisma.TransactionClient,
     type = 'Create'
-  ) {
+  ): Promise<{ member: any; investorProfileData: any }> {
     const member: any = {};
+    let investorProfileData: any = null;
     const directFields = [
       'name',
       'email',
@@ -939,7 +952,98 @@ export class MembersService {
       await this.updateProjectContributions(memberData, existingMember, memberUid, tx);
       await this.updateTeamMemberRoles(memberData, existingMember, memberUid, tx);
     }
-    return member;
+
+    // Handle investor profile
+    if (memberData.investorProfile && Object.keys(memberData.investorProfile).length > 0) {
+      if (type === 'Create') {
+        member['investorProfile'] = {
+          create: {
+            investmentFocus: memberData.investorProfile.investmentFocus || [],
+            investInStartupStages: memberData.investorProfile.investInStartupStages || [],
+            investInFundTypes: memberData.investorProfile.investInFundTypes || [],
+            typicalCheckSize: memberData.investorProfile.typicalCheckSize,
+            secRulesAccepted: memberData.investorProfile.secRulesAccepted,
+            type: memberData.investorProfile.type,
+          },
+        };
+      } else {
+        // For updates, we'll handle this separately after member creation/update
+        investorProfileData = memberData.investorProfile;
+      }
+    }
+
+    return { member, investorProfileData };
+  }
+
+  /**
+   * Handles investor profile updates for a member
+   *
+   * @param memberUid - The unique identifier of the member
+   * @param investorProfileData - The investor profile data to update
+   * @param tx - Transaction client for atomic operations
+   * @param memberAccessLevel - The access level of the member to check permissions
+   */
+  async updateMemberInvestorProfile(
+    memberUid: string,
+    investorProfileData: any,
+    tx: Prisma.TransactionClient,
+    memberAccessLevel?: string
+  ) {
+    // Check if member has permission to update investor profile (L5 or L6)
+    if (memberAccessLevel && !['L5', 'L6'].includes(memberAccessLevel)) {
+      throw new ForbiddenException('Insufficient permissions to update investor profile');
+    }
+
+    const existingMember = await tx.member.findUnique({
+      where: { uid: memberUid },
+      select: { investorProfileId: true, investorProfile: true },
+    });
+
+    if (!existingMember) {
+      throw new NotFoundException('Member not found');
+    }
+
+    const secRulesAcceptedAt =
+      investorProfileData.secRulesAccepted &&
+      existingMember.investorProfile?.secRulesAccepted !== investorProfileData.secRulesAccepted
+        ? new Date()
+        : existingMember.investorProfile?.secRulesAcceptedAt;
+
+    if (existingMember.investorProfileId) {
+      // Update existing investor profile
+      await tx.investorProfile.update({
+        where: { uid: existingMember.investorProfileId },
+        data: {
+          investmentFocus: investorProfileData.investmentFocus || [],
+          typicalCheckSize: investorProfileData.typicalCheckSize,
+          secRulesAccepted: investorProfileData.secRulesAccepted,
+          secRulesAcceptedAt,
+          type: investorProfileData.type,
+          investInStartupStages: investorProfileData.investInStartupStages || [],
+          investInFundTypes: investorProfileData.investInFundTypes || [],
+        },
+      });
+    } else {
+      // Create new investor profile
+      const newInvestorProfile = await tx.investorProfile.create({
+        data: {
+          investmentFocus: investorProfileData.investmentFocus || [],
+          typicalCheckSize: investorProfileData.typicalCheckSize,
+          secRulesAccepted: investorProfileData.secRulesAccepted,
+          secRulesAcceptedAt,
+          type: investorProfileData.type,
+          investInStartupStages: investorProfileData.investInStartupStages || [],
+          investInFundTypes: investorProfileData.investInFundTypes || [],
+          member: { connect: { uid: memberUid } },
+        },
+      });
+
+      // Link the investor profile to the member
+      await tx.member.update({
+        where: { uid: memberUid },
+        data: { investorProfileId: newInvestorProfile.uid },
+      });
+    }
   }
 
   /**
@@ -1026,6 +1130,9 @@ export class MembersService {
     await this.deleteTeamMemberRoles(tx, rolesToDelete, memberUid);
     await this.modifyTeamMemberRoles(tx, rolesToUpdate, memberUid);
     await this.createTeamMemberRoles(tx, rolesToCreate, memberUid);
+
+    // Keep all FOUNDER Demo Day participants in sync with the member's current team
+    await this.syncFounderParticipantsTeamForMember(memberUid, tx);
   }
 
   /**
@@ -1649,7 +1756,7 @@ export class MembersService {
 
   /**
    * Advanced member search with filtering
-   * @param filters - Filter parameters including office hours, topics, roles, and sorting
+   * @param filters - Filter parameters including office hours, topics, roles, investor filters, and sorting
    * @returns Paginated search results with members and metadata
    */
   async searchMembers(filters: {
@@ -1660,6 +1767,11 @@ export class MembersService {
     sort?: 'name:asc' | 'name:desc';
     page?: number;
     limit?: number;
+    // Investor-related filters
+    isInvestor?: boolean;
+    minTypicalCheckSize?: number;
+    maxTypicalCheckSize?: number;
+    investmentFocus?: string[];
   }) {
     const page = filters.page || 1;
     const limit = Math.min(filters.limit || 20, 100);
@@ -1851,6 +1963,94 @@ export class MembersService {
       });
     }
 
+    // Investor filters
+    if (filters.isInvestor) {
+      whereConditions.push({
+        AND: [
+          {
+            accessLevel: {
+              in: ['L5', 'L6'],
+            },
+          },
+          {
+            OR: [
+              {
+                investorProfile: {
+                  secRulesAccepted: true,
+                },
+              },
+              {
+                investorProfile: {
+                  type: { not: null },
+                },
+              },
+            ],
+          },
+        ],
+      });
+    }
+
+    // Typical check size filters
+    if (
+      (filters.minTypicalCheckSize && Number(filters.minTypicalCheckSize) > 0) ||
+      (filters.maxTypicalCheckSize && Number(filters.maxTypicalCheckSize) > 0)
+    ) {
+      const checkSizeFilter: any = {};
+
+      if (filters.minTypicalCheckSize && Number(filters.minTypicalCheckSize) > 0) {
+        checkSizeFilter.gte = Number(filters.minTypicalCheckSize);
+      }
+
+      if (filters.maxTypicalCheckSize && Number(filters.maxTypicalCheckSize) > 0) {
+        checkSizeFilter.lte = Number(filters.maxTypicalCheckSize);
+      }
+
+      whereConditions.push({
+        investorProfile: {
+          typicalCheckSize: checkSizeFilter,
+        },
+      });
+    }
+
+    // Investment focus filter - using substring matching
+    if (filters.investmentFocus && filters.investmentFocus.length > 0) {
+      // Ensure investmentFocus is always an array (query params might come as string)
+      const focusArray = Array.isArray(filters.investmentFocus) ? filters.investmentFocus : [filters.investmentFocus];
+
+      // Get member IDs that match investment focus using substring matching
+      const matchingMemberIds = await this.prisma.$queryRaw<{ id: number }[]>`
+        SELECT DISTINCT m.id FROM "Member" m
+        INNER JOIN "InvestorProfile" ip ON m."investorProfileId" = ip.uid
+        WHERE ${Prisma.raw(
+          focusArray
+            .map(
+              (focus) => `
+              EXISTS (
+                SELECT 1 FROM unnest(ip."investmentFocus") AS focus_item
+                WHERE LOWER(focus_item) LIKE LOWER('%${focus.replace(/'/g, "''")}%')
+              )
+            `
+            )
+            .join(' OR ')
+        )}
+      `;
+
+      if (matchingMemberIds.length > 0) {
+        whereConditions.push({
+          id: {
+            in: matchingMemberIds.map((row) => row.id),
+          },
+        });
+      } else {
+        // If no members match, add an impossible condition to return no results
+        whereConditions.push({
+          id: {
+            in: [],
+          },
+        });
+      }
+    }
+
     const where: Prisma.MemberWhereInput = {
       AND: whereConditions,
     };
@@ -1910,13 +2110,32 @@ export class MembersService {
                 title: true,
               },
             },
+            investorProfile: {
+              select: {
+                investmentFocus: true,
+                investInStartupStages: true,
+                investInFundTypes: true,
+                type: true,
+                typicalCheckSize: true,
+                secRulesAccepted: true,
+                secRulesAcceptedAt: true,
+              },
+            },
           },
         }),
         this.prisma.member.count({ where }),
       ]);
 
+      // Filter investorProfile based on access level (only show for L5 and L6 members)
+      const filteredMembers = members.map((member) => {
+        if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
+          return { ...member, investorProfile: null };
+        }
+        return member;
+      });
+
       return {
-        members,
+        members: filteredMembers,
         total,
         page: Number(page),
         hasMore: page * limit < total,
@@ -2494,7 +2713,7 @@ export class MembersService {
   }
 
   async findByExternalId(externalId: string) {
-    return this.prisma.member.findFirst({
+    const member = await this.prisma.member.findFirst({
       where: { externalId },
       include: {
         image: true,
@@ -2504,8 +2723,19 @@ export class MembersService {
             team: { include: { logo: true } },
           },
         },
+        investorProfile: true,
       },
     });
+
+    if (member) {
+      // Only return investor profile for L5 and L6 members
+      if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
+        return { ...member, investorProfile: null };
+      }
+      return member;
+    }
+
+    return member;
   }
 
   /**
@@ -2583,12 +2813,118 @@ export class MembersService {
               },
             },
           },
+          investorProfile: {
+            select: {
+              investmentFocus: true,
+              investInStartupStages: true,
+              investInFundTypes: true,
+              type: true,
+              typicalCheckSize: true,
+              secRulesAccepted: true,
+              secRulesAcceptedAt: true,
+            },
+          },
         },
       });
 
-      return members;
+      // Apply conditional logic to only return investor profile for L5 and L6 members
+      return members.map((member) => {
+        if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
+          return { ...member, investorProfile: null };
+        }
+        return member;
+      });
     } catch (error) {
       return this.handleErrors(error);
+    }
+  }
+
+  private async syncFounderParticipantsTeamForMember(
+    memberUid: string,
+    tx: Prisma.TransactionClient
+  ): Promise<{ changed: boolean; oldTeamUid: string | null; newTeamUid: string | null }> {
+    this.logger.info(`[FounderSync] start memberUid=${memberUid}`);
+    // 1) Get all roles for the member (we'll decide the "current team" in code)
+    const roles = await tx.teamMemberRole.findMany({
+      where: { memberUid },
+      select: { teamUid: true, mainTeam: true, startDate: true, id: true },
+      // No createdAt in schema -> sort by startDate asc, then by id asc to get stable "first"
+      orderBy: [{ startDate: 'asc' }, { id: 'asc' }],
+    });
+
+    // 2) Decide the target team:
+    //    - prefer role with mainTeam === true
+    //    - otherwise take the first role (by startDate/id)
+    const preferred = roles.find((r) => r.mainTeam === true);
+    const newTeamUid = preferred?.teamUid ?? roles[0]?.teamUid ?? null;
+    console.log('newTeamUid', newTeamUid);
+    // 3) Load current Demo Day founder participants' team mapping
+    const founderParticipants = await tx.demoDayParticipant.findMany({
+      where: { memberUid, type: 'FOUNDER', isDeleted: false },
+      select: { uid: true, teamUid: true },
+    });
+    this.logger.info(
+      `[FounderSync] resolved team memberUid=${memberUid} preferredMain=${Boolean(preferred)} newTeamUid=${
+        newTeamUid ?? 'null'
+      }`
+    );
+    // If there are no FOUNDER participants, nothing to do
+    if (founderParticipants.length === 0) {
+      this.logger.info(`[FounderSync] no FOUNDER participants — nothing to do memberUid=${memberUid}`);
+      return { changed: false, oldTeamUid: null, newTeamUid };
+    }
+
+    // 4) Check whether anything actually needs to change
+    //    - If newTeamUid is null: we should clear any non-null teamUid
+    //    - If newTeamUid is non-null: every participant must have exactly that teamUid
+    const allAlreadyCorrect = founderParticipants.every((fp) => fp.teamUid === newTeamUid);
+
+    if (allAlreadyCorrect) {
+      this.logger.info(`[FounderSync] already in sync memberUid=${memberUid} teamUid=${newTeamUid ?? 'null'}`);
+      return {
+        changed: false,
+        oldTeamUid: founderParticipants[0]?.teamUid ?? null,
+        newTeamUid,
+      };
+    }
+
+    // 5) Perform minimal update:
+    if (newTeamUid) {
+      // Set new teamUid for any that are null or different
+      const res = await tx.demoDayParticipant.updateMany({
+        where: {
+          memberUid,
+          type: 'FOUNDER',
+          isDeleted: false,
+          OR: [{ teamUid: null }, { teamUid: { not: newTeamUid } }],
+        },
+        data: { teamUid: newTeamUid },
+      });
+      this.logger.info(
+        `[FounderSync] updated teamUid for founders memberUid=${memberUid} updatedRows=${res.count} to=${newTeamUid}`
+      );
+      return {
+        changed: res.count > 0,
+        oldTeamUid: founderParticipants[0]?.teamUid ?? null,
+        newTeamUid,
+      };
+    } else {
+      // No teams now -> clear teamUid on all FOUNDER participants that currently have a value
+      const res = await tx.demoDayParticipant.updateMany({
+        where: {
+          memberUid,
+          type: 'FOUNDER',
+          isDeleted: false,
+          teamUid: { not: null },
+        },
+        data: { teamUid: null },
+      });
+      this.logger.info(`[FounderSync] cleared teamUid for founders memberUid=${memberUid} clearedRows=${res.count}`);
+      return {
+        changed: res.count > 0,
+        oldTeamUid: founderParticipants[0]?.teamUid ?? null,
+        newTeamUid: null,
+      };
     }
   }
 }

@@ -81,6 +81,15 @@ const newDataTeamSchema = z.object({
   officeHours: z.string().optional().nullable(),
   logoUid: z.string().optional().nullable(),
   moreDetails: z.string().optional().nullable(),
+  isFund: z.boolean().optional().default(false),
+  investorProfile: z
+    .object({
+      investmentFocus: z.array(z.string()).optional(),
+      typicalCheckSize: z.number().nullable().optional(),
+      investInStartupStages: z.array(z.string()).optional(),
+      investInFundTypes: z.array(z.string()).optional(),
+    })
+    .optional(),
 });
 
 export const ParticipantRequestMemberSchema = z.object({

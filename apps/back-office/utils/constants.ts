@@ -64,6 +64,7 @@ export const API_ROUTE = {
   ADMIN_APPROVAL: APP_CONSTANTS.V1 + 'admin/members',
   ADMIN_RECOMMENDATIONS: APP_CONSTANTS.V1 + 'admin/recommendations',
   ADMIN_MEMBERS: `${APP_CONSTANTS.V1}admin/members`,
+  ADMIN_DEMO_DAYS: `${APP_CONSTANTS.V1}admin/demo-days`,
 };
 
 export const TOKEN = 'plnetwork@1';
@@ -78,3 +79,25 @@ export const ABOUT_PLN_LINK =
 export default APP_CONSTANTS;
 
 export const WEB_UI_BASE_URL = process.env.WEB_UI_BASE_URL || 'https://directory.plnetwork.io';
+
+export const INVESTOR_PROFILE_CONSTANTS = {
+  STAGES: [
+    { label: 'Pre-seed', value: 'pre-seed' },
+    { label: 'Seed', value: 'seed' },
+    { label: 'Series A', value: 'series-a' },
+    { label: 'Series B', value: 'series-b' },
+    { label: 'Series C', value: 'series-c' },
+    { label: 'Series D and later', value: 'series-d-and-later' },
+  ],
+  FUND_TYPES: [
+    { label: "I don't invest in VC Funds", value: 'do-not-invest' },
+    { label: 'Early stage', value: 'early-stage' },
+    { label: 'Late stage', value: 'late-stage' },
+    { label: 'Fund-of-funds', value: 'fund-of-funds' },
+  ],
+  INVESTOR_TYPES: [
+    { label: 'I angel invest', value: 'ANGEL' },
+    { label: 'I invest through fund(s)', value: 'FUND' },
+    { label: 'I angel invest + invest through fund(s)', value: 'ANGEL_AND_FUND' },
+  ],
+};
