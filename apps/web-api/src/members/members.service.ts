@@ -2368,7 +2368,7 @@ export class MembersService {
    */
   async autocompleteRoles(query: string, page = 1, limit = 20, hasOfficeHours?: boolean) {
     // Define priority roles that should appear at the top (should be in lower case)
-    const priorityRoles = ['founder', 'ceo', 'cto', 'software engineer', 'product'];
+    const priorityRoles = ['founder', 'ceo', 'cto', 'coo'];
     const priorityRolesSet = new Set(priorityRoles);
 
     limit = Math.min(limit, 50);
