@@ -39,6 +39,13 @@ const MembersPage = () => {
         activeColor: '#0A9952',
       },
       {
+        id: 'level56',
+        icon: <Level2Icon />,
+        label: 'L5-L6 (Investors)',
+        count: (counts?.L5 ?? 0) + (counts?.L6 ?? 0),
+        activeColor: '#7C3AED',
+      },
+      {
         id: 'level0',
         icon: <Level0Icon />,
         label: 'L0',
@@ -240,6 +247,8 @@ function getAccessLevel(filter: string | undefined) {
       return ['L1'];
     case 'level2':
       return ['L2', 'L3', 'L4'];
+    case 'level56':
+      return ['L5', 'L6'];
     case 'level0':
       return ['L0'];
     case 'rejected':

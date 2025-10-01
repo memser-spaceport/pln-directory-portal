@@ -52,6 +52,9 @@ import { ProfileModule } from './profile/profile.module';
 import { ForumModule } from './forum/forum.module';
 import { MetricsController } from './metrics/metrics.controller';
 import { MetricsMiddleware } from './metrics/metrics.interceptor';
+import { UploadsService } from './uploads/uploads.service';
+import { UploadsModule } from './uploads/uploads.module';
+import { DemoDaysModule } from './demo-days/demo-days.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -126,6 +129,8 @@ import { MetricsMiddleware } from './metrics/metrics.interceptor';
     NotificationSettingsModule,
     ProfileModule,
     ForumModule,
+    UploadsModule,
+    DemoDaysModule,
   ],
   providers: [
     {
@@ -148,13 +153,19 @@ import { MetricsMiddleware } from './metrics/metrics.interceptor';
       provide: APP_FILTER,
       useClass: LogException,
     },
+    UploadsService,
   ],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(ContentTypeMiddleware)
-      .exclude({ path: 'v1/images', method: RequestMethod.POST })
+      .exclude(
+        { path: 'v1/images', method: RequestMethod.POST },
+        { path: 'v1/uploads', method: RequestMethod.POST },
+        { path: 'v1/demo-days/current/fundraising-profile/one-pager', method: RequestMethod.PUT },
+        { path: 'v1/demo-days/current/fundraising-profile/video', method: RequestMethod.PUT }
+      )
       .forRoutes(
         { path: '*', method: RequestMethod.POST },
         { path: '*', method: RequestMethod.PUT },

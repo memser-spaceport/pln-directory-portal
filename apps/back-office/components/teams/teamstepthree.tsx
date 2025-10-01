@@ -24,9 +24,8 @@ export default function TeamStepThree(props) {
             <InformationCircleIcon />
           </div>
           <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            What is the best way for people to connect with your team? (e.g.,
-            team Slack channel, team email address, team Discord server/channel,
-            etc.)
+            What is the best way for people to connect with your team? (e.g., team Slack channel, team email address,
+            team Discord server/channel, etc.)
           </span>
         </div>
       </div>
@@ -48,8 +47,8 @@ export default function TeamStepThree(props) {
             <InformationCircleIcon />
           </div>
           <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            Let us check out what you and your team do! If you have more than
-            one primary website (i.e a docs site), list one per line.
+            Let us check out what you and your team do! If you have more than one primary website (i.e a docs site),
+            list one per line.
           </span>
         </div>
       </div>
@@ -107,8 +106,7 @@ export default function TeamStepThree(props) {
             <InformationCircleIcon />
           </div>
           <span className="pl-1.5 text-[13px] leading-[18px] text-[#0F172A] opacity-40">
-            Sharing your blog link allows us to stay up to date with you, your
-            team, and the direction you are going!
+            Sharing your blog link allows us to stay up to date with you, your team, and the direction you are going!
           </span>
         </div>
       </div>

@@ -32,6 +32,7 @@ model Team {
   longDescription              String?
   plnFriend                    Boolean                       @default(false)
   isFeatured                   Boolean?                      @default(false)
+  isFund                       Boolean                       @default(false)
   airtableRecId                String?                       @unique
   createdAt                    DateTime                      @default(now())
   updatedAt                    DateTime                      @updatedAt
@@ -51,6 +52,10 @@ model Team {
   teamFocusAreasVersionHistory TeamFocusAreaVersionHistory[]
   relatedQuestions             DiscoveryQuestion[]           @relation("TeamRelatedDiscoveryQuestions")
   asks                         Ask[]
+  fundraisingProfiles          TeamFundraisingProfile[]
+  investorProfile              InvestorProfile?              @relation("TeamInvestorProfile", fields: [investorProfileId], references: [uid])
+  investorProfileId            String?                       @unique
+  demoDayParticipants          DemoDayParticipant[]
 }
 
 enum AskStatus {
@@ -145,6 +150,11 @@ model Member {
   accessLevelUpdatedAt         DateTime                      @default(now())
   deletedAt                    DateTime? // soft delete timestamp
   deletionReason               String? // reason for deletion
+  modifiedFundraisingProfiles  TeamFundraisingProfile[]      @relation("TfpLastModifiedBy")
+  uploads                      Upload[]                      @relation("MemberUploads")
+  investorProfile              InvestorProfile?              @relation("MemberInvestorProfile", fields: [investorProfileId], references: [uid])
+  investorProfileId            String?                       @unique
+  demoDayParticipants          DemoDayParticipant[]
 }
 
 model MemberRole {
@@ -801,4 +811,202 @@ model MemberInteractionAdjustment {
   createdByUser Member?           @relation("AdjustmentCreatedBy", fields: [createdBy], references: [uid], onDelete: SetNull, onUpdate: Cascade)
 
   @@unique([interactionUid, reason], name: "MemberInteractionAdjustment_interaction_reason_unique")
+}
+
+enum TeamFundraisingProfileStatus {
+  DISABLED
+  DRAFT
+  PUBLISHED
+}
+
+model TeamFundraisingProfile {
+  id  Int    @id @default(autoincrement())
+  uid String @unique @default(cuid())
+
+  teamUid String
+  team    Team   @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+
+  demoDayUid String
+  demoDay    DemoDay @relation(fields: [demoDayUid], references: [uid], onDelete: Cascade)
+
+  onePagerUploadUid String?
+  onePagerUpload    Upload? @relation("TFP_onePagerUpload", fields: [onePagerUploadUid], references: [uid])
+
+  videoUploadUid String?
+  videoUpload    Upload? @relation("TFP_videoUpload", fields: [videoUploadUid], references: [uid])
+
+  status TeamFundraisingProfileStatus @default(DRAFT)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  lastModifiedBy String?
+  lastModifier   Member?  @relation("TfpLastModifiedBy", fields: [lastModifiedBy], references: [uid])
+
+  @@unique([teamUid, demoDayUid])
+  @@index([status])
+}
+
+enum UploadStorage {
+  IPFS
+  S3
+}
+
+enum UploadKind {
+  IMAGE
+  SLIDE
+  VIDEO
+  OTHER
+}
+
+enum UploadScopeType {
+  NONE
+  TEAM
+  MEMBER
+  PROJECT
+}
+
+enum UploadStatus {
+  UPLOADED
+  PROCESSING
+  READY
+  FAILED
+}
+
+model Upload {
+  id      Int           @id @default(autoincrement())
+  uid     String        @unique @default(cuid())
+  storage UploadStorage
+  kind    UploadKind
+  status  UploadStatus  @default(READY)
+
+  scopeType UploadScopeType @default(NONE)
+  scopeUid  String?
+
+  uploaderUid String?
+  uploader    Member? @relation("MemberUploads", fields: [uploaderUid], references: [uid])
+
+  bucket   String?
+  key      String?
+  cid      String?
+  url      String
+  filename String
+  mimetype String
+  size     Int
+  checksum String?
+  meta     Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teamFundraisingProfilesAsOnePager TeamFundraisingProfile[] @relation("TFP_onePagerUpload")
+  teamFundraisingProfilesAsVideo    TeamFundraisingProfile[] @relation("TFP_videoUpload")
+
+  @@index([scopeType, scopeUid])
+  @@index([kind])
+  @@index([uploaderUid])
+}
+
+enum InvestorProfileType {
+  ANGEL
+  FUND
+  ANGEL_AND_FUND
+}
+
+model InvestorProfile {
+  id                    Int                  @id @default(autoincrement())
+  uid                   String               @unique @default(cuid())
+  secRulesAccepted      Boolean              @default(false)
+  secRulesAcceptedAt    DateTime?
+  investmentFocus       String[]
+  investInStartupStages String[]             @default([])
+  investInFundTypes     String[]             @default([])
+  typicalCheckSize      Float?
+  isInvestViaFund       Boolean?
+  type                  InvestorProfileType?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  teamUid               String?
+  team                  Team?                @relation("TeamInvestorProfile")
+  memberUid             String?
+  member                Member?              @relation("MemberInvestorProfile")
+
+  @@unique([teamUid])
+  @@unique([memberUid])
+}
+
+enum DemoDayStatus {
+  UPCOMING
+  ACTIVE
+  COMPLETED
+}
+
+enum DemoDayParticipantType {
+  INVESTOR
+  FOUNDER
+}
+
+enum DemoDayParticipantStatus {
+  INVITED
+  ENABLED
+  DISABLED
+}
+
+model DemoDay {
+  id                  Int                      @id @default(autoincrement())
+  uid                 String                   @unique @default(cuid())
+  startDate           DateTime
+  title               String
+  description         String
+  status              DemoDayStatus            @default(UPCOMING)
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  isDeleted           Boolean                  @default(false)
+  deletedAt           DateTime?
+  participants        DemoDayParticipant[]
+  fundraisingProfiles TeamFundraisingProfile[]
+}
+
+model DemoDayParticipant {
+  id              Int                      @id @default(autoincrement())
+  uid             String                   @unique @default(cuid())
+  demoDayUid      String
+  demoDay         DemoDay                  @relation(fields: [demoDayUid], references: [uid], onDelete: Cascade)
+  memberUid       String
+  member          Member                   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  type            DemoDayParticipantType
+  status          DemoDayParticipantStatus @default(INVITED)
+  teamUid         String?
+  team            Team?                    @relation(fields: [teamUid], references: [uid])
+  statusUpdatedAt DateTime                 @default(now())
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  isDeleted       Boolean                  @default(false)
+  deletedAt       DateTime?
+
+  @@unique([demoDayUid, memberUid])
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  eventId     String?  @unique
+  eventType   String
+  userId      String?
+  userEmail   String?
+  anonymousId String?
+  sessionId   String?
+  source      String?
+  path        String?
+  referrer    String?
+  userAgent   String?
+  requestIp   String?
+  ts          DateTime
+  receivedAt  DateTime @default(now())
+  props       Json?
+
+  @@unique([eventId, userId])
+  @@index([eventType, ts])
+  @@index([userId, ts])
+  @@index([anonymousId, ts])
+  @@index([sessionId, ts])
+  @@index([ts])
 }

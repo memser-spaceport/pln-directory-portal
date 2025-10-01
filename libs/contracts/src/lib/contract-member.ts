@@ -177,4 +177,19 @@ export const apiMembers = contract.router({
     },
     summary: 'Get members in bulk by UIDs or external IDs',
   },
+  createOrUpdateInvestorProfile: {
+    method: 'PUT',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/investor-profile`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+    },
+  },
+  getInvestorProfile: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/investor-profile`,
+    responses: {
+      200: contract.response<unknown>(),
+    },
+  },
 });

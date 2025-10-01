@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PostHogProvider } from './providers/posthog.provider';
-import { ConsoleProvider } from './providers/console.provider';
-import { IAnalyticsProvider, IAnalyticsEvent } from './analytics.interface';
-import { ANALYTICS_PROVIDER } from '../utils/constants';
+import { PostHogProvider } from '../provider/posthog.provider';
+import { ConsoleProvider } from '../provider/console.provider';
+import { IAnalyticsProvider, IAnalyticsEvent } from '../analytics.interface';
+import { ANALYTICS_PROVIDER } from '../../utils/constants';
+import { DbProvider } from '../provider/db.provider';
+import {HybridConsoleDbProvider} from "../provider/hybrid.provider";
 
 /**
  * Main analytics service that wraps different analytics providers
@@ -16,6 +18,8 @@ export class AnalyticsService {
   constructor(
     private readonly postHogProvider: PostHogProvider,
     private readonly consoleProvider: ConsoleProvider,
+    private readonly dbProvider: DbProvider,
+    private readonly hybridConsoleDbProvider: HybridConsoleDbProvider,
   ) {
     this.provider = this.selectProvider();
     this.logger.log(`Analytics provider initialized: ${this.provider.constructor.name}`);
@@ -23,7 +27,7 @@ export class AnalyticsService {
 
   private selectProvider(): IAnalyticsProvider {
     const analyticsProvider = process.env.ANALYTICS_PROVIDER;
-    
+
     // Explicit provider selection
     if (analyticsProvider === ANALYTICS_PROVIDER.POSTHOG) {
       return this.postHogProvider;
@@ -31,11 +35,17 @@ export class AnalyticsService {
     if (analyticsProvider === ANALYTICS_PROVIDER.CONSOLE) {
       return this.consoleProvider;
     }
+    if (analyticsProvider === ANALYTICS_PROVIDER.DB) {
+      return this.dbProvider;
+    }
+    if (analyticsProvider === ANALYTICS_PROVIDER.HYBRID) {
+      return this.hybridConsoleDbProvider; // HYBRID = Console + DB
+    }
 
     // Auto-detection based on PostHog config
     const postHogApiKey = process.env.POSTHOG_API_KEY;
     const postHogHost = process.env.POSTHOG_HOST;
-    
+
     if (postHogApiKey && postHogHost) {
       return this.postHogProvider;
     }
@@ -65,4 +75,4 @@ export class AnalyticsService {
   getActiveProvider(): string {
     return this.provider.constructor.name;
   }
-} 
+}
