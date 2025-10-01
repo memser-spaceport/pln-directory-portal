@@ -466,7 +466,7 @@ export class DemoDayParticipantsService {
                     memberUid,
                     teamUid,
                     teamLead: willBeTeamLead,
-                    role: 'MEMBER',
+                    role: willBeTeamLead ? 'Lead' : 'Contributor',
                   },
                 });
                 summary.updatedMemberships++;
