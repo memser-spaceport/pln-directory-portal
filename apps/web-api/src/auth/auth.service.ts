@@ -441,7 +441,7 @@ export class AuthService implements OnModuleInit {
     const invitedParticipant = await this.prisma.demoDayParticipant.findFirst({
       where: {
         memberUid: member.uid,
-        status: 'INVITED',
+        status: { in: ['INVITED', 'ENABLED'] },
         isDeleted: false,
       },
     });
@@ -516,7 +516,7 @@ export class AuthService implements OnModuleInit {
    */
   private async trackInvestorSign(member: any, invitedParticipant: any, newAccessLevel: string) {
     await this.analyticsService.trackEvent({
-      name: 'investor-sign',
+      name: 'investor-invitation-accepted',
       distinctId: member.uid,
       properties: {
         uid: member.uid,

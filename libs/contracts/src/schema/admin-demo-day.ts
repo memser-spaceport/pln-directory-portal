@@ -133,7 +133,7 @@ export const ResponseBulkParticipantsSchema = z.object({
       message: z.string().optional().nullable(),
       userId: z.string().optional().nullable(),
       teamId: z.string().optional().nullable(),
-      membershipRole: z.enum(['LEAD', 'MEMBER', 'NONE']).optional(),
+      membershipRole: z.enum(['Lead', 'Contributor']).optional(),
     })
   ),
 });

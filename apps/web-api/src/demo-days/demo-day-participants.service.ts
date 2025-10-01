@@ -6,7 +6,11 @@ import { AnalyticsService } from '../analytics/service/analytics.service';
 
 @Injectable()
 export class DemoDayParticipantsService {
-  constructor(private readonly prisma: PrismaService, private readonly demoDaysService: DemoDaysService, private readonly analyticsService: AnalyticsService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly demoDaysService: DemoDaysService,
+    private readonly analyticsService: AnalyticsService
+  ) {}
 
   async addParticipant(
     demoDayUid: string,
@@ -225,7 +229,7 @@ export class DemoDayParticipantsService {
       message?: string;
       userId?: string;
       teamId?: string;
-      membershipRole?: 'LEAD' | 'MEMBER' | 'NONE';
+      membershipRole?: 'Lead' | 'Contributor';
     }>;
   }> {
     await this.demoDaysService.getDemoDayByUid(demoDayUid);
@@ -260,7 +264,7 @@ export class DemoDayParticipantsService {
       message?: string;
       userId?: string;
       teamId?: string;
-      membershipRole?: 'LEAD' | 'MEMBER' | 'NONE';
+      membershipRole?: 'Lead' | 'Contributor';
     }> = [];
 
     // Pending analytics events to emit after transaction commit
@@ -318,7 +322,7 @@ export class DemoDayParticipantsService {
             message?: string;
             userId?: string;
             teamId?: string;
-            membershipRole?: 'LEAD' | 'MEMBER' | 'NONE';
+            membershipRole?: 'Lead' | 'Contributor';
           } = {
             email: participantData.email,
             name: participantData.name,
@@ -329,7 +333,7 @@ export class DemoDayParticipantsService {
             makeTeamLead: participantData.makeTeamLead,
             willBeTeamLead,
             status: 'success',
-            membershipRole: 'NONE',
+            membershipRole: willBeTeamLead ? 'Lead' : 'Contributor',
           };
 
           // Check if participant already exists for this demo day
@@ -369,10 +373,10 @@ export class DemoDayParticipantsService {
                 investorProfile:
                   data.type === 'INVESTOR'
                     ? {
-                      create: {
-                        type: participantData.organization ? 'FUND' : 'ANGEL',
-                      },
-                    }
+                        create: {
+                          type: participantData.organization ? 'FUND' : 'ANGEL',
+                        },
+                      }
                     : undefined,
               },
             });
@@ -451,9 +455,9 @@ export class DemoDayParticipantsService {
                     },
                   });
                   summary.promotedToLead++;
-                  rowResult.membershipRole = 'LEAD';
+                  rowResult.membershipRole = 'Lead';
                 } else {
-                  rowResult.membershipRole = existingRole.teamLead ? 'LEAD' : 'MEMBER';
+                  rowResult.membershipRole = existingRole.teamLead ? 'Lead' : 'Contributor';
                 }
               } else {
                 // Create new team membership
@@ -466,7 +470,7 @@ export class DemoDayParticipantsService {
                   },
                 });
                 summary.updatedMemberships++;
-                rowResult.membershipRole = willBeTeamLead ? 'LEAD' : 'MEMBER';
+                rowResult.membershipRole = willBeTeamLead ? 'Lead' : 'Contributor';
 
                 if (willBeTeamLead) {
                   summary.promotedToLead++;
@@ -504,7 +508,7 @@ export class DemoDayParticipantsService {
           // If it did not exist before, track "participant added" after commit
           if (!existedBefore) {
             pendingEvents.push({
-              name: 'demo_day_participant_added',
+              name: 'demo-day-participant-added',
               payload: {
                 distinctId: memberUid,
                 properties: {
@@ -536,7 +540,7 @@ export class DemoDayParticipantsService {
             willBeTeamLead: participantData.organization ? true : participantData.makeTeamLead || false,
             status: 'error',
             message: error instanceof Error ? error.message : 'Unknown error occurred',
-            membershipRole: 'NONE',
+            membershipRole: 'Contributor',
           });
         }
       }

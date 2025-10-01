@@ -1,6 +1,7 @@
 import React from 'react';
 import Modal from '../modal/modal';
 import { BulkParticipantsResponse } from '../../screens/demo-days/types/demo-day';
+import { mapDemoDayParticipantError } from '../../utils/error-messages';
 
 interface Props {
   isOpen: boolean;
@@ -131,13 +132,13 @@ export default function UploadParticipantsResultModal({ isOpen, onClose, result,
                             )}
                             {participantType === 'FOUNDER' && (
                               <td className="px-4 py-3 text-sm">
-                                {row.membershipRole === 'LEAD' ? (
+                                {row.membershipRole === 'Lead' ? (
                                   <span className="inline-flex rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-800">
-                                    Team Lead
+                                    Lead
                                   </span>
-                                ) : row.membershipRole === 'MEMBER' ? (
+                                ) : row.membershipRole === 'Contributor' ? (
                                   <span className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
-                                    Member
+                                    Contributor
                                   </span>
                                 ) : (
                                   '-'
@@ -200,7 +201,7 @@ export default function UploadParticipantsResultModal({ isOpen, onClose, result,
                               <td className="px-4 py-3 text-sm text-gray-900">{row.organizationEmail || '-'}</td>
                             )}
                             <td className="px-4 py-3 text-sm">
-                              <span className="text-red-600">{row.message || 'Unknown error'}</span>
+                              <span className="text-red-600">{mapDemoDayParticipantError(row.message || '')}</span>
                             </td>
                           </tr>
                         ))}
