@@ -959,6 +959,9 @@ export class MemberService {
       data: updateData,
     });
 
+    // Create investor profiles for L5/L6 members who don't have one
+    await this.createInvestorProfileForHighLevelMembers(memberUids, this.prisma);
+
     // Notify users based on the new access level
     if (result.count > 0) {
       // Send approval emails for L2, L3, L4
@@ -1090,6 +1093,9 @@ export class MemberService {
           memberData.accessLevel === AccessLevel.L4
         );
       }
+
+      // Create investor profile for L5/L6 members if they don't have one
+      await this.createInvestorProfileForHighLevelMembers([createdMember.uid], tx);
 
       await this.membersHooksService.postCreateActions(createdMember, memberData.email);
     });
@@ -1234,6 +1240,52 @@ export class MemberService {
       return member?.accessLevel ?? null;
     } catch (error) {
       return this.handleErrors(error);
+    }
+  }
+
+  /**
+   * Automatically create investor profile for L5/L6 members if they don't have one.
+   *
+   * @param memberUids - Array of member UIDs to check and potentially create profiles for
+   * @param tx - Transaction client for atomic operations
+   */
+  private async createInvestorProfileForHighLevelMembers(
+    memberUids: string[],
+    tx: Prisma.TransactionClient
+  ): Promise<void> {
+    const membersWithoutInvestorProfile = await tx.member.findMany({
+      where: {
+        uid: { in: memberUids },
+        investorProfileId: null,
+        accessLevel: { in: ['L5', 'L6'] },
+      },
+      select: {
+        uid: true,
+        _count: {
+          select: {
+            teamMemberRoles: true,
+          },
+        },
+      },
+    });
+
+    for (const member of membersWithoutInvestorProfile) {
+      const investorType = member._count.teamMemberRoles > 0 ? InvestorProfileType.FUND : InvestorProfileType.ANGEL;
+
+      const newInvestorProfile = await tx.investorProfile.create({
+        data: {
+          investmentFocus: [],
+          investInStartupStages: [],
+          investInFundTypes: [],
+          type: investorType,
+          member: { connect: { uid: member.uid } },
+        },
+      });
+
+      await tx.member.update({
+        where: { uid: member.uid },
+        data: { investorProfileId: newInvestorProfile.uid },
+      });
     }
   }
 

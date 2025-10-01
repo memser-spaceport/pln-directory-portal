@@ -519,7 +519,7 @@ const DemoDayDetailPage = () => {
                           participant.status
                         )} disabled:opacity-50`}
                       >
-                        <option value="INVITED">Invited</option>
+                        {participant.member?.accessLevel === 'L0' && <option value="INVITED">Invited</option>}
                         <option value="ENABLED">Enabled</option>
                         <option value="DISABLED">Disabled</option>
                       </select>

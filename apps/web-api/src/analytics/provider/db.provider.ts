@@ -46,7 +46,7 @@ export class DbProvider implements IAnalyticsProvider {
     if (row.eventId) {
       await this.prisma.event.upsert({
         where: { eventId: row.eventId },
-        update: {},
+        update: row,
         create: row,
       });
     } else {

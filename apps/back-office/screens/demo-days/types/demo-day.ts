@@ -120,7 +120,7 @@ export interface BulkParticipantsResponse {
     message?: string;
     userId?: string;
     teamId?: string;
-    membershipRole?: 'LEAD' | 'MEMBER' | 'NONE';
+    membershipRole?: 'Lead' | 'Contributor';
   }>;
 }
 
