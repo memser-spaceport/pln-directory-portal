@@ -52,14 +52,52 @@ export class TeamsService {
    */
   async findAll(queryOptions: Prisma.TeamFindManyArgs): Promise<{ count: number; teams: Team[] }> {
     try {
+      const whereClause = {
+        ...queryOptions.where,
+        accessLevel: {
+          not: 'L0',
+        },
+      };
+
       const [teams, teamsCount] = await Promise.all([
-        this.prisma.team.findMany(queryOptions),
-        this.prisma.team.count({ where: queryOptions.where }),
+        this.prisma.team.findMany({ ...queryOptions, where: whereClause }),
+        this.prisma.team.count({ where: whereClause }),
       ]);
       return { count: teamsCount, teams: teams };
     } catch (err) {
       return this.handleErrors(err);
     }
+  }
+
+  /**
+   * Updates a team's access level based on whether it has active members.
+   * L0 teams have no active members (no one has logged in).
+   * L1 teams have at least one active member.
+   *
+   * @param teamUid - Unique identifier for the team
+   * @param tx - Optional transaction client
+   * @returns The updated team
+   */
+  async updateTeamAccessLevel(teamUid: string, tx?: Prisma.TransactionClient): Promise<Team> {
+    const prisma = tx || this.prisma;
+    const activeMemberCount = await prisma.teamMemberRole.count({
+      where: {
+        teamUid,
+        member: {
+          externalId: {
+            not: null, // Member has authenticated at least once
+          },
+        },
+      },
+    });
+
+    return await prisma.team.update({
+      where: { uid: teamUid },
+      data: {
+        accessLevel: activeMemberCount > 0 ? 'L1' : undefined,
+        accessLevelUpdatedAt: new Date(),
+      },
+    });
   }
 
   /**
@@ -160,6 +198,9 @@ export class TeamsService {
           investorProfile: true,
         },
       });
+      if (team.accessLevel === 'L0') {
+        throw new ForbiddenException('Team is inactive');
+      }
       team.teamFocusAreas = this.removeDuplicateFocusAreas(team.teamFocusAreas);
       return team;
     } catch (err) {
@@ -197,8 +238,15 @@ export class TeamsService {
     requestorEmail: string
   ): Promise<Team> {
     try {
+      // Set default access level to L0 for new teams (inactive until they have active members)
+      const teamData = {
+        ...team,
+        accessLevel: team.accessLevel || 'L1',
+        accessLevelUpdatedAt: new Date(),
+      };
+
       const createdTeam = await tx.team.create({
-        data: team,
+        data: teamData,
       });
       await this.teamsHooksService.postCreateActions(createdTeam, requestorEmail);
       return createdTeam;

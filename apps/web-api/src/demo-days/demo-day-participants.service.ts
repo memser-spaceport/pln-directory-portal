@@ -517,6 +517,8 @@ export class DemoDayParticipantsService {
                     name: orgName,
                     contactMethod: participantData.organizationEmail || undefined,
                     isFund,
+                    accessLevel: 'L0',
+                    accessLevelUpdatedAt: new Date(),
                   },
                 });
                 summary.createdTeams++;

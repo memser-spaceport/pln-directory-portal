@@ -52,6 +52,8 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(({ sequence, onCreate }) =
     lastModifiedBy: null,
     investorProfileId: null,
     isFund: faker.datatype.boolean(),
+    accessLevel: 'L1',
+    accessLevelUpdatedAt: faker.date.past(),
   };
 });
 
