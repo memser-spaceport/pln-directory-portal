@@ -358,6 +358,9 @@ export class DemoDayParticipantsService {
                 name: participantData.name,
                 twitterHandler: normalizedTwitter,
                 linkedinHandler: normalizedLinkedin,
+                accessLevel: ['L2', 'L3', 'L4'].includes(String(existingMember.accessLevel))
+                  ? 'L6'
+                  : existingMember.accessLevel,
               },
             });
             summary.updatedUsers++;
@@ -546,14 +549,15 @@ export class DemoDayParticipantsService {
       }
     });
 
-    // Emit pending analytics events *after* successful transaction commit
-    for (const ev of pendingEvents) {
-      await this.analyticsService.trackEvent({
-        name: ev.name,
-        distinctId: ev.payload.distinctId,
-        properties: ev.payload.properties,
-      });
-    }
+    setTimeout(async () => {
+      for (const ev of pendingEvents) {
+        await this.analyticsService.trackEvent({
+          name: ev.name,
+          distinctId: ev.payload.distinctId,
+          properties: ev.payload.properties,
+        });
+      }
+    }, 1000);
 
     return { summary, rows };
   }

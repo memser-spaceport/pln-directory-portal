@@ -206,28 +206,62 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
   const [uploadResult, setUploadResult] = useState<BulkParticipantsResponse | null>(null);
   const [showResultModal, setShowResultModal] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+  const maxParticipants = 15000;
+
+  // Upload progress state
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+
   const addParticipantsBulkMutation = useAddParticipantsBulk();
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    const file = acceptedFiles[0];
-    if (!file) return;
+  // Pagination calculations
+  const totalPages = Math.ceil(parsedParticipants.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentParticipants = parsedParticipants.slice(startIndex, endIndex);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const csvContent = e.target?.result as string;
-        const { participants, errors } = parseCSV(csvContent);
-        setParsedParticipants(participants);
-        setParseErrors(errors);
-        setError('');
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to parse CSV');
-        setParsedParticipants([]);
-        setParseErrors([]);
-      }
-    };
-    reader.readAsText(file);
-  }, []);
+  // Reset pagination when participants change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [parsedParticipants]);
+
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      const file = acceptedFiles[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const csvContent = e.target?.result as string;
+          const { participants, errors } = parseCSV(csvContent);
+
+          // Check participant limit
+          if (participants.length > maxParticipants) {
+            setError(
+              `Maximum ${maxParticipants} participants allowed. Your file contains ${participants.length} participants.`
+            );
+            setParsedParticipants([]);
+            setParseErrors([]);
+            return;
+          }
+
+          setParsedParticipants(participants);
+          setParseErrors(errors);
+          setError('');
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to parse CSV');
+          setParsedParticipants([]);
+          setParseErrors([]);
+        }
+      };
+      reader.readAsText(file);
+    },
+    [maxParticipants]
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -264,6 +298,12 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
   const handleSubmit = async () => {
     if (!authToken || parsedParticipants.length === 0) return;
 
+    // Check participant limit
+    if (parsedParticipants.length > maxParticipants) {
+      setError(`Maximum ${maxParticipants} participants allowed. You have ${parsedParticipants.length} participants.`);
+      return;
+    }
+
     // Check for validation errors
     const hasErrors = parsedParticipants.some((p) => p.errors && p.errors.length > 0);
     if (hasErrors) {
@@ -271,30 +311,73 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
       return;
     }
 
+    setIsUploading(true);
+    setUploadProgress({ current: 0, total: parsedParticipants.length });
+
     try {
       // Transform participants to match API schema (remove computed fields)
       const participantsForAPI = parsedParticipants.map(({ willBeTeamLead, errors, ...participant }) => participant);
 
-      const result = await addParticipantsBulkMutation.mutateAsync({
-        authToken,
-        demoDayUid,
-        data: {
-          participants: participantsForAPI,
-          type: participantType,
+      // Split participants into chunks of 100
+      const chunkSize = 100;
+      const chunks = [];
+      for (let i = 0; i < participantsForAPI.length; i += chunkSize) {
+        chunks.push(participantsForAPI.slice(i, i + chunkSize));
+      }
+
+      const allResults: BulkParticipantsResponse[] = [];
+
+      // Process each chunk sequentially
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const currentProcessed = i * chunkSize;
+        const nextProcessed = Math.min(currentProcessed + chunkSize, participantsForAPI.length);
+
+        setUploadProgress({ current: nextProcessed, total: participantsForAPI.length });
+
+        const result = await addParticipantsBulkMutation.mutateAsync({
+          authToken,
+          demoDayUid,
+          data: {
+            participants: chunk,
+            type: participantType,
+          },
+        });
+
+        allResults.push(result);
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+
+      // Combine all results for the final modal
+      const finalResult: BulkParticipantsResponse = {
+        summary: {
+          total: allResults.reduce((sum, result) => sum + (result.summary?.total || 0), 0),
+          createdUsers: allResults.reduce((sum, result) => sum + (result.summary?.createdUsers || 0), 0),
+          updatedUsers: allResults.reduce((sum, result) => sum + (result.summary?.updatedUsers || 0), 0),
+          createdTeams: allResults.reduce((sum, result) => sum + (result.summary?.createdTeams || 0), 0),
+          updatedMemberships: allResults.reduce((sum, result) => sum + (result.summary?.updatedMemberships || 0), 0),
+          promotedToLead: allResults.reduce((sum, result) => sum + (result.summary?.promotedToLead || 0), 0),
+          errors: allResults.reduce((sum, result) => sum + (result.summary?.errors || 0), 0),
         },
-      });
+        rows: allResults.flatMap((result) => result.rows || []),
+      };
 
       // Show results modal
-      setUploadResult(result);
+      setUploadResult(finalResult);
       setShowResultModal(true);
 
       // Reset form
       setParsedParticipants([]);
       setError('');
       setParseErrors([]);
+      setCurrentPage(1);
     } catch (error) {
       console.error('Error uploading participants:', error);
-      alert('Failed to upload participants. Please try again.');
+      setError('Failed to upload participants. Please try again.');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress({ current: 0, total: 0 });
     }
   };
 
@@ -304,6 +387,9 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
     setParseErrors([]);
     setUploadResult(null);
     setShowResultModal(false);
+    setIsUploading(false);
+    setUploadProgress({ current: 0, total: 0 });
+    setCurrentPage(1);
     onClose();
   };
 
@@ -484,7 +570,7 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                           </svg>
                           <span>
                             CSV files only • Required: email, name • Optional: organization, organization email, social
-                            handles
+                            handles • Max {maxParticipants} participants
                           </span>
                         </div>
                         <button
@@ -548,7 +634,48 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                         <span className="text-sm text-red-600">{parseError}</span>
                       </div>
                     ))}
-                    \n{' '}
+                  </div>
+                </div>
+              )}
+
+              {/* Upload Progress Indicator */}
+              {isUploading && (
+                <div className="mb-6 rounded-lg bg-blue-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <svg className="mr-3 h-5 w-5 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24">
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      <div>
+                        <p className="text-sm font-medium text-blue-900">Uploading participants...</p>
+                        <p className="text-sm text-blue-700">
+                          {uploadProgress.current} of {uploadProgress.total} participants uploaded
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold text-blue-900">
+                        {Math.round((uploadProgress.current / uploadProgress.total) * 100)}%
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3 h-2 w-full rounded-full bg-blue-200">
+                    <div
+                      className="h-2 rounded-full bg-blue-600 transition-all duration-300 ease-out"
+                      style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                    ></div>
                   </div>
                 </div>
               )}
@@ -560,6 +687,7 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                     <div>
                       <h4 className="text-lg font-medium text-gray-900">Participants Preview</h4>
                       <p className="text-sm text-gray-500">
+                        Showing {startIndex + 1}-{Math.min(endIndex, parsedParticipants.length)} of{' '}
                         {parsedParticipants.length} participant{parsedParticipants.length !== 1 ? 's' : ''} found
                         {parsedParticipants.some((p) => p.errors) && (
                           <span className="ml-2 text-red-500">• Some rows have errors</span>
@@ -639,9 +767,14 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 bg-white">
-                          {parsedParticipants.map((participant, index) => (
-                            <tr key={index} className={clsx('hover:bg-gray-50', participant.errors ? 'bg-red-50' : '')}>
-                              <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">{index + 1}</td>
+                          {currentParticipants.map((participant, index) => (
+                            <tr
+                              key={startIndex + index}
+                              className={clsx('hover:bg-gray-50', participant.errors ? 'bg-red-50' : '')}
+                            >
+                              <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                                {startIndex + index + 1}
+                              </td>
                               <td className="px-4 py-3">
                                 <div className="space-y-1">
                                   <input
@@ -770,6 +903,91 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                         </tbody>
                       </table>
                     </div>
+
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                      <div className="mt-4 flex items-center justify-between border-t border-gray-200 bg-gray-50 px-4 py-3">
+                        <div className="flex flex-1 justify-between sm:hidden">
+                          <button
+                            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                            className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Previous
+                          </button>
+                          <button
+                            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage === totalPages}
+                            className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Next
+                          </button>
+                        </div>
+                        <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm text-gray-700">
+                              Page <span className="font-medium">{currentPage}</span> of{' '}
+                              <span className="font-medium">{totalPages}</span>
+                            </p>
+                          </div>
+                          <div>
+                            <nav
+                              className="isolate inline-flex -space-x-px rounded-md shadow-sm"
+                              aria-label="Pagination"
+                            >
+                              <button
+                                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                                disabled={currentPage === 1}
+                                className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <span className="sr-only">Previous</span>
+                                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              </button>
+
+                              {/* Page numbers */}
+                              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                const pageNumber = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                                return (
+                                  <button
+                                    key={pageNumber}
+                                    onClick={() => setCurrentPage(pageNumber)}
+                                    className={clsx(
+                                      'relative inline-flex items-center px-4 py-2 text-sm font-semibold',
+                                      pageNumber === currentPage
+                                        ? 'z-10 bg-blue-600 text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600'
+                                        : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'
+                                    )}
+                                  >
+                                    {pageNumber}
+                                  </button>
+                                );
+                              })}
+
+                              <button
+                                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                                disabled={currentPage === totalPages}
+                                className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <span className="sr-only">Next</span>
+                                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              </button>
+                            </nav>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -789,20 +1007,20 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
               <button
                 onClick={handleSubmit}
                 disabled={
-                  addParticipantsBulkMutation.isPending ||
+                  isUploading ||
                   parsedParticipants.length === 0 ||
                   parsedParticipants.some((p) => p.errors && p.errors.length > 0)
                 }
                 className={clsx(
                   'inline-flex items-center rounded-lg border border-transparent px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
-                  addParticipantsBulkMutation.isPending ||
+                  isUploading ||
                     parsedParticipants.length === 0 ||
                     parsedParticipants.some((p) => p.errors && p.errors.length > 0)
                     ? 'cursor-not-allowed bg-gray-400'
                     : 'bg-green-600 hover:bg-green-700'
                 )}
               >
-                {addParticipantsBulkMutation.isPending ? (
+                {isUploading ? (
                   <>
                     <svg className="-ml-1 mr-2 h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
                       <circle
@@ -819,7 +1037,7 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       ></path>
                     </svg>
-                    Uploading...
+                    Uploading {uploadProgress.current}/{uploadProgress.total}...
                   </>
                 ) : (
                   <>
@@ -831,7 +1049,9 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                         d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
                       />
                     </svg>
-                    Upload {parsedParticipants.length} Participant{parsedParticipants.length !== 1 ? 's' : ''}
+                    Upload {parsedParticipants.length} Participant{parsedParticipants.length !== 1 ? 's' : ''} (
+                    {Math.ceil(parsedParticipants.length / itemsPerPage)} page
+                    {Math.ceil(parsedParticipants.length / itemsPerPage) !== 1 ? 's' : ''})
                   </>
                 )}
               </button>

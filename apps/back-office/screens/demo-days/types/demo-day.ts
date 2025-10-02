@@ -136,12 +136,10 @@ export interface GetParticipantsQueryDto {
 
 export interface ParticipantsListResponse {
   participants: DemoDayParticipant[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    pages: number;
-  };
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface UpdateParticipantDto {
