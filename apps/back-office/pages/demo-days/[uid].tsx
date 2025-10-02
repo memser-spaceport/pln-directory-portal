@@ -300,7 +300,7 @@ const DemoDayDetailPage = () => {
                     onClick={() => setShowUploadModal(true)}
                     className="rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
                   >
-                    Upload CSV
+                    Upload Investors CSV
                   </button>
                 </div>
               </div>

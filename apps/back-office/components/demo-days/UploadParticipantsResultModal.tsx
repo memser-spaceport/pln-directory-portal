@@ -160,21 +160,6 @@ export default function UploadParticipantsResultModal({ isOpen, onClose, result,
                             {participantType === 'FOUNDER' && (
                               <td className="px-4 py-3 text-sm text-gray-900">{row.organizationEmail || '-'}</td>
                             )}
-                            {participantType === 'FOUNDER' && (
-                              <td className="px-4 py-3 text-sm">
-                                {row.membershipRole === 'Lead' ? (
-                                  <span className="inline-flex rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-800">
-                                    Lead
-                                  </span>
-                                ) : row.membershipRole === 'Contributor' ? (
-                                  <span className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
-                                    Contributor
-                                  </span>
-                                ) : (
-                                  '-'
-                                )}
-                              </td>
-                            )}
                             <td className="px-4 py-3 text-sm">
                               <span className="inline-flex rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
                                 Success

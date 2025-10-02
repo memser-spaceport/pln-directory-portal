@@ -94,7 +94,6 @@ export interface AddParticipantsBulkDto {
     linkedinHandler?: string;
     makeTeamLead?: boolean;
   }>;
-  type: 'INVESTOR' | 'FOUNDER';
 }
 
 export interface BulkParticipantsResponse {
@@ -120,7 +119,6 @@ export interface BulkParticipantsResponse {
     message?: string;
     userId?: string;
     teamId?: string;
-    membershipRole?: 'Lead' | 'Contributor';
   }>;
 }
 

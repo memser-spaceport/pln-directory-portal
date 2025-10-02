@@ -99,16 +99,15 @@ export class AdminDemoDaysController {
 
   @Post(':uid/participants-bulk')
   @UsePipes(ZodValidationPipe)
-  async addParticipantsBulk(
+  async addInvestorParticipantsBulk(
     @Req() req,
     @Param('uid') demoDayUid: string,
     @Body() body: AddParticipantsBulkDto
   ): Promise<ResponseBulkParticipantsDto> {
-    return this.demoDayParticipantsService.addParticipantsBulk(
+    return this.demoDayParticipantsService.addInvestorParticipantsBulk(
       demoDayUid,
       {
         participants: body.participants,
-        type: body.type.toUpperCase() as 'INVESTOR' | 'FOUNDER',
       },
       req.userEmail
     );

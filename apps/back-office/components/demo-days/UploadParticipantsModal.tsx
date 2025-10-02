@@ -1,10 +1,12 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { useQueryClient } from '@tanstack/react-query';
 import Modal from '../modal/modal';
 import { useCookie } from 'react-use';
-import { useAddParticipantsBulk } from '../../hooks/demo-days/useAddParticipantsBulk';
+import { useAddInvestorParticipantsBulk } from '../../hooks/demo-days/useAddInvestorParticipantsBulk';
 import { BulkParticipantsResponse } from '../../screens/demo-days/types/demo-day';
 import UploadParticipantsResultModal from './UploadParticipantsResultModal';
+import { DemoDaysQueryKeys } from '../../hooks/demo-days/constants/queryKeys';
 import clsx from 'clsx';
 
 interface UploadParticipantsModalProps {
@@ -20,6 +22,12 @@ interface ParsedParticipant {
   organizationEmail?: string;
   twitterHandler?: string | null;
   linkedinHandler?: string | null;
+  telegramHandler?: string | null;
+  role?: string | null;
+  investmentType?: 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null;
+  typicalCheckSize?: number | null;
+  investInStartupStages?: string[] | null;
+  secRulesAccepted?: boolean | null;
   makeTeamLead?: boolean;
   willBeTeamLead?: boolean; // computed field for preview
   errors?: string[];
@@ -31,6 +39,12 @@ const headerAliases = {
   name: ['name', 'full_name', 'investor_name', 'participant_name'],
   twitter_handler: ['x', 'x_handle', 'twitter', 'twitter_handle', 'x_username', 'twitter_handler'],
   linkedin_handler: ['linkedin', 'linkedin_handle', 'linkedin_url', 'linkedin_profile', 'linkedin_handler'],
+  telegram_handler: ['telegram_handler', 'telegram', 'telegram_handle', 'tg'],
+  role: ['role', 'organization_role', 'fund_role', 'organization/fund_role', 'team_role'],
+  investment_type: ['type', 'investment_type', 'invest_type', 'investor_type'],
+  typical_check_size: ['typical_check_size', 'check_size'],
+  invest_in_startup_stages: ['investment_stages', 'invest_in_startup_stages'],
+  sec_rules_accepted: ['sec_rules_accepted'],
   organization: [
     'organization_fund_name',
     'organization/fund_name',
@@ -102,6 +116,51 @@ const parseBoolean = (value: string): boolean => {
   return ['true', '1', 'yes', 'y'].includes(normalized);
 };
 
+const normalizeTelegramHandle = (value: string): string => {
+  if (!value) return '';
+  // Extract username from @user, user, or https://t.me/user → store "user"
+  const match = value.match(/@?([a-zA-Z0-9_]+)/) || value.match(/t\.me\/([a-zA-Z0-9_]+)/);
+  return match ? match[1] : value.trim();
+};
+
+const parseInvestmentType = (value: string): 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null => {
+  if (!value) return null;
+  const normalized = String(value).toLowerCase().trim();
+
+  // ANGEL mappings
+  if (['angel', 'i angel invest', 'angel invest'].includes(normalized)) {
+    return 'ANGEL';
+  }
+
+  // FUND mappings
+  if (['fund', 'i invest through fund(s)'].includes(normalized)) {
+    return 'FUND';
+  }
+
+  // ANGEL_AND_FUND mappings
+  if (
+    ['angel_and_fund', 'angel and fund', 'angel+fund', 'i angel invest + invest through fund(s)'].includes(normalized)
+  ) {
+    return 'ANGEL_AND_FUND';
+  }
+
+  return null;
+};
+
+const parseNumber = (value: string): number | null => {
+  if (!value) return null;
+  const parsed = parseFloat(String(value).trim());
+  return isNaN(parsed) ? null : parsed;
+};
+
+const parseArrayFromPipe = (value: string): string[] | null => {
+  if (!value) return null;
+  return String(value)
+    .split('|')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+};
+
 const validateEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
@@ -138,6 +197,12 @@ const parseCSV = (csvContent: string): { participants: ParsedParticipant[]; erro
   const organizationEmailIndex = normalizedHeaders.indexOf('organization_email');
   const twitterHandlerIndex = normalizedHeaders.indexOf('twitter_handler');
   const linkedinHandlerIndex = normalizedHeaders.indexOf('linkedin_handler');
+  const telegramHandlerIndex = normalizedHeaders.indexOf('telegram_handler');
+  const roleIndex = normalizedHeaders.indexOf('role');
+  const investmentTypeIndex = normalizedHeaders.indexOf('investment_type');
+  const typicalCheckSizeIndex = normalizedHeaders.indexOf('typical_check_size');
+  const investInStartupStagesIndex = normalizedHeaders.indexOf('invest_in_startup_stages');
+  const secRulesAcceptedIndex = normalizedHeaders.indexOf('sec_rules_accepted');
   const makeTeamLeadIndex = normalizedHeaders.indexOf('team_lead');
 
   const participants: ParsedParticipant[] = [];
@@ -167,6 +232,15 @@ const parseCSV = (csvContent: string): { participants: ParsedParticipant[]; erro
       twitterHandlerIndex >= 0 ? normalizeXHandle(values[twitterHandlerIndex] || '') || undefined : undefined;
     const linkedinHandler =
       linkedinHandlerIndex >= 0 ? normalizeLinkedInHandle(values[linkedinHandlerIndex] || '') || undefined : undefined;
+    const telegramHandler =
+      telegramHandlerIndex >= 0 ? normalizeTelegramHandle(values[telegramHandlerIndex] || '') || undefined : undefined;
+    const role = values[roleIndex]?.trim() || undefined;
+    const investmentType =
+      investmentTypeIndex >= 0 ? parseInvestmentType(values[investmentTypeIndex] || '') : undefined;
+    const typicalCheckSize = typicalCheckSizeIndex >= 0 ? parseNumber(values[typicalCheckSizeIndex] || '') : undefined;
+    const investInStartupStages =
+      investInStartupStagesIndex >= 0 ? parseArrayFromPipe(values[investInStartupStagesIndex] || '') : undefined;
+    const secRulesAccepted = secRulesAcceptedIndex >= 0 ? parseBoolean(values[secRulesAcceptedIndex] || '') : undefined;
 
     const makeTeamLead =
       makeTeamLeadIndex >= 0
@@ -187,6 +261,12 @@ const parseCSV = (csvContent: string): { participants: ParsedParticipant[]; erro
         organizationEmail,
         twitterHandler,
         linkedinHandler,
+        telegramHandler,
+        role,
+        investmentType,
+        typicalCheckSize,
+        investInStartupStages,
+        secRulesAccepted,
         makeTeamLead,
         willBeTeamLead,
         errors: rowErrors.length > 0 ? rowErrors : undefined,
@@ -198,8 +278,8 @@ const parseCSV = (csvContent: string): { participants: ParsedParticipant[]; erro
 };
 
 export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = ({ isOpen, onClose, demoDayUid }) => {
+  const queryClient = useQueryClient();
   const [authToken] = useCookie('plnadmin');
-  const [participantType, setParticipantType] = useState<'INVESTOR' | 'FOUNDER'>('INVESTOR');
   const [parsedParticipants, setParsedParticipants] = useState<ParsedParticipant[]>([]);
   const [error, setError] = useState<string>('');
   const [parseErrors, setParseErrors] = useState<string[]>([]);
@@ -215,7 +295,7 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
 
-  const addParticipantsBulkMutation = useAddParticipantsBulk();
+  const addInvestorParticipantsBulkMutation = useAddInvestorParticipantsBulk();
 
   // Pagination calculations
   const totalPages = Math.ceil(parsedParticipants.length / itemsPerPage);
@@ -272,7 +352,21 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
   });
 
   const downloadCSVTemplate = () => {
-    const headers = ['email', 'name', 'organization', 'organization_email', 'x_handle', 'linkedin_handle', 'team_lead'];
+    const headers = [
+      'email',
+      'name',
+      'organization',
+      'organization_email',
+      'x_handle',
+      'linkedin_handle',
+      'telegram_handler',
+      'role',
+      'investment_type',
+      'typical_check_size',
+      'investment_stages',
+      'sec_rules_accepted',
+      'team_lead',
+    ];
     const exampleRow = [
       'investor@example.com',
       'John Doe',
@@ -280,6 +374,12 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
       'contact@examplefund.com',
       'johndoe',
       'johndoe',
+      'johndoe',
+      'Lead',
+      'FUND',
+      '50000',
+      'Pre-seed|Seed',
+      'true',
       'true',
     ];
     const csvContent = [headers.join(','), exampleRow.join(',')].join('\n');
@@ -318,8 +418,8 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
       // Transform participants to match API schema (remove computed fields)
       const participantsForAPI = parsedParticipants.map(({ willBeTeamLead, errors, ...participant }) => participant);
 
-      // Split participants into chunks of 100
-      const chunkSize = 100;
+      // Split participants into chunks of 50
+      const chunkSize = 50;
       const chunks = [];
       for (let i = 0; i < participantsForAPI.length; i += chunkSize) {
         chunks.push(participantsForAPI.slice(i, i + chunkSize));
@@ -335,18 +435,17 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
 
         setUploadProgress({ current: nextProcessed, total: participantsForAPI.length });
 
-        const result = await addParticipantsBulkMutation.mutateAsync({
+        const result = await addInvestorParticipantsBulkMutation.mutateAsync({
           authToken,
           demoDayUid,
           data: {
             participants: chunk,
-            type: participantType,
           },
         });
 
         allResults.push(result);
 
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
 
       // Combine all results for the final modal
@@ -362,6 +461,11 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
         },
         rows: allResults.flatMap((result) => result.rows || []),
       };
+
+      // Invalidate participants query only after all chunks are processed
+      queryClient.invalidateQueries({
+        queryKey: [DemoDaysQueryKeys.GET_DEMO_DAY_PARTICIPANTS, authToken, demoDayUid],
+      });
 
       // Show results modal
       setUploadResult(finalResult);
@@ -406,7 +510,7 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
   const updateParticipant = (
     index: number,
     field: keyof Omit<ParsedParticipant, 'errors' | 'willBeTeamLead'>,
-    value: string | boolean
+    value: string | boolean | number | string[] | null
   ) => {
     setParsedParticipants((prev) =>
       prev.map((p, i) => {
@@ -455,8 +559,8 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
           <div className="border-b border-gray-200 px-6 py-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Upload Participants CSV</h3>
-                <p className="mt-1 text-sm text-gray-500">Bulk upload participants from a CSV file</p>
+                <h3 className="text-lg font-semibold text-gray-900">Upload Investors CSV</h3>
+                <p className="mt-1 text-sm text-gray-500">Bulk upload investors from a CSV file</p>
               </div>
               <button onClick={handleClose} className="text-gray-400 transition-colors hover:text-gray-600">
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -469,59 +573,6 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
           {/* Body */}
           <div className="px-6 py-6">
             <div className="space-y-6">
-              {/* Participant Type */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Participant Type <span className="text-red-500">*</span>
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <label
-                    className={clsx(
-                      'flex cursor-pointer items-center justify-center rounded-lg border px-4 py-3 transition-all',
-                      participantType === 'INVESTOR'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-300 text-gray-700 hover:border-gray-400'
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      value="INVESTOR"
-                      checked={participantType === 'INVESTOR'}
-                      onChange={(e) => setParticipantType(e.target.value as 'INVESTOR' | 'FOUNDER')}
-                      className="sr-only"
-                    />
-                    <div className="flex items-center">
-                      <div className="mr-2 flex h-4 w-4 items-center justify-center rounded-full border-2 border-current">
-                        {participantType === 'INVESTOR' && <div className="h-2 w-2 rounded-full bg-current"></div>}
-                      </div>
-                      Investor
-                    </div>
-                  </label>
-                  <label
-                    className={clsx(
-                      'flex cursor-pointer items-center justify-center rounded-lg border px-4 py-3 transition-all',
-                      participantType === 'FOUNDER'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-300 text-gray-700 hover:border-gray-400'
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      value="FOUNDER"
-                      checked={participantType === 'FOUNDER'}
-                      onChange={(e) => setParticipantType(e.target.value as 'INVESTOR' | 'FOUNDER')}
-                      className="sr-only"
-                    />
-                    <div className="flex items-center">
-                      <div className="mr-2 flex h-4 w-4 items-center justify-center rounded-full border-2 border-current">
-                        {participantType === 'FOUNDER' && <div className="h-2 w-2 rounded-full bg-current"></div>}
-                      </div>
-                      Founder
-                    </div>
-                  </label>
-                </div>
-              </div>
-
               {/* File Upload */}
               {!parsedParticipants.length && (
                 <div>
@@ -570,7 +621,8 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                           </svg>
                           <span>
                             CSV files only • Required: email, name • Optional: organization, organization email, social
-                            handles • Max {maxParticipants} participants
+                            handles, role, investment type, check size, investment stages, SEC rules • Max{' '}
+                            {maxParticipants} participants
                           </span>
                         </div>
                         <button
@@ -733,8 +785,8 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                   </div>
 
                   <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-                    <div className="max-h-96 overflow-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
+                    <div className="max-h-96 overflow-auto" style={{ maxWidth: '90vw' }}>
+                      <table className="divide-y divide-gray-200" style={{ minWidth: 2000 }}>
                         <thead className="sticky top-0 bg-gray-50">
                           <tr>
                             <th className="w-8 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
@@ -751,6 +803,24 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                               LinkedIn
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              Telegram
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              Role
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              Invest Type
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              Check Size
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              Stages
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              SEC Rules
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                               Organization
@@ -838,6 +908,89 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                                   className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                   placeholder="username"
                                 />
+                              </td>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="text"
+                                  value={participant.telegramHandler || ''}
+                                  onChange={(e) => updateParticipant(index, 'telegramHandler', e.target.value)}
+                                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  placeholder="username"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="text"
+                                  value={participant.role || ''}
+                                  onChange={(e) => updateParticipant(index, 'role', e.target.value)}
+                                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  placeholder="Lead, Contributor"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <select
+                                  value={participant.investmentType || ''}
+                                  onChange={(e) =>
+                                    updateParticipant(
+                                      index,
+                                      'investmentType',
+                                      e.target.value as 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null
+                                    )
+                                  }
+                                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                >
+                                  <option value="">Select type</option>
+                                  <option value="ANGEL">Angel</option>
+                                  <option value="FUND">Fund</option>
+                                  <option value="ANGEL_AND_FUND">Angel + Fund</option>
+                                </select>
+                              </td>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="number"
+                                  value={participant.typicalCheckSize || ''}
+                                  onChange={(e) =>
+                                    updateParticipant(
+                                      index,
+                                      'typicalCheckSize',
+                                      e.target.value ? parseFloat(e.target.value) : null
+                                    )
+                                  }
+                                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  placeholder="50000"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="text"
+                                  value={participant.investInStartupStages?.join('|') || ''}
+                                  onChange={(e) =>
+                                    updateParticipant(
+                                      index,
+                                      'investInStartupStages',
+                                      e.target.value
+                                        ? e.target.value
+                                            .split('|')
+                                            .map((s) => s.trim())
+                                            .filter((s) => s)
+                                        : null
+                                    )
+                                  }
+                                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  placeholder="Pre-seed|Seed"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <select
+                                  value={participant.secRulesAccepted ? 'true' : 'false'}
+                                  onChange={(e) =>
+                                    updateParticipant(index, 'secRulesAccepted', e.target.value === 'true')
+                                  }
+                                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                >
+                                  <option value="false">No</option>
+                                  <option value="true">Yes</option>
+                                </select>
                               </td>
                               <td className="px-4 py-3">
                                 <input
@@ -1066,7 +1219,7 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
           isOpen={showResultModal}
           onClose={handleResultModalClose}
           result={uploadResult}
-          participantType={participantType}
+          participantType="INVESTOR"
         />
       )}
     </>
