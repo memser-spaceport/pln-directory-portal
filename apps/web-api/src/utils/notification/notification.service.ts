@@ -154,16 +154,23 @@ export class NotificationService {
    * @param requesterEmailId The email address of the person who requested the team creation
    * @returns Sends an email notifying approval and posts a notification to Slack.
    */
-  async notifyForTeamCreationApproval(teamName: string, teamUid: string, requesterEmailId: string) {
+  async notifyForTeamCreationApproval(
+    teamName: string,
+    teamUid: string,
+    requesterEmailId: string,
+    skipSuccessNotification = false
+  ) {
     const teamUrl = `${
       process.env.WEB_UI_BASE_URL
     }/teams/${teamUid}?utm_source=notification&utm_medium=email&utm_code=${getRandomId()}`;
     const slackConfig = { requestLabel: 'New Team Added', url: teamUrl, name: teamName };
     await this.awsService.sendEmail('TeamCreated', true, [], { teamName, teamUid, adminSiteUrl: teamUrl });
-    await this.awsService.sendEmail('NewTeamSuccess', false, [requesterEmailId], {
-      teamName,
-      teamProfileLink: teamUrl,
-    });
+    if (!skipSuccessNotification) {
+      await this.awsService.sendEmail('NewTeamSuccess', false, [requesterEmailId], {
+        teamName,
+        teamProfileLink: teamUrl,
+      });
+    }
     await this.slackService.notifyToChannel(slackConfig);
   }
 

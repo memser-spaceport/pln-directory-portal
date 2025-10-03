@@ -608,6 +608,7 @@ export class MembersService {
               email: newEmail,
             },
           },
+          null,
           false,
           tx
         );
