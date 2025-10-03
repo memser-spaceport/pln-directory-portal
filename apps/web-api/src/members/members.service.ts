@@ -96,7 +96,7 @@ export class MembersService {
       const filteredMembers = members.map((member: any) => {
         return {
           ...member,
-          teamMemberRoles: member.teamMemberRoles.filter((role) => role.team.accessLevel !== 'L0'),
+          teamMemberRoles: member.teamMemberRoles?.filter((role) => role?.team?.accessLevel !== 'L0'),
         };
       });
 
