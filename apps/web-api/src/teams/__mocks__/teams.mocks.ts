@@ -45,6 +45,8 @@ export async function createTeam({ amount }: TestFactorySeederParams) {
       lastModifiedBy: null,
       investorProfileId: null,
       isFund: false,
+      accessLevel: 'L1',
+      accessLevelUpdatedAt: new Date(),
     };
 
     return team;

@@ -191,7 +191,22 @@ export class DemoDayParticipantsService {
     return trimmed || undefined;
   }
 
-  async addParticipantsBulk(
+  private normalizeTelegramHandler(handler?: string): string | undefined {
+    if (!handler) return undefined;
+
+    // Remove @ prefix if present
+    let normalized = handler.trim().replace(/^@/, '');
+
+    // Extract handle from Telegram URLs
+    const telegramUrlMatch = normalized.match(/(?:https?:\/\/)?(?:www\.)?(?:telegram\.org|t\.me)\/([a-zA-Z0-9_]+)/);
+    if (telegramUrlMatch) {
+      normalized = telegramUrlMatch[1];
+    }
+
+    return normalized || undefined;
+  }
+
+  async addInvestorParticipantsBulk(
     demoDayUid: string,
     data: {
       participants: Array<{
@@ -201,9 +216,14 @@ export class DemoDayParticipantsService {
         organizationEmail?: string | null;
         twitterHandler?: string | null;
         linkedinHandler?: string | null;
+        telegramHandler?: string | null;
+        role?: string | null;
+        investmentType?: 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null;
+        typicalCheckSize?: number | null;
+        investInStartupStages?: string[] | null;
+        secRulesAccepted?: boolean | null;
         makeTeamLead?: boolean;
       }>;
-      type: 'INVESTOR' | 'FOUNDER';
     },
     actorEmail?: string
   ): Promise<{
@@ -223,13 +243,18 @@ export class DemoDayParticipantsService {
       organizationEmail?: string | null;
       twitterHandler?: string | null;
       linkedinHandler?: string | null;
+      telegramHandler?: string | null;
+      role?: string | null;
+      investmentType?: 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null;
+      typicalCheckSize?: number | null;
+      investInStartupStages?: string[] | null;
+      secRulesAccepted?: boolean | null;
       makeTeamLead?: boolean;
       willBeTeamLead: boolean;
       status: 'success' | 'error';
       message?: string;
       userId?: string;
       teamId?: string;
-      membershipRole?: 'Lead' | 'Contributor';
     }>;
   }> {
     await this.demoDaysService.getDemoDayByUid(demoDayUid);
@@ -258,13 +283,18 @@ export class DemoDayParticipantsService {
       organizationEmail?: string | null;
       twitterHandler?: string | null;
       linkedinHandler?: string | null;
+      telegramHandler?: string | null;
+      role?: string | null;
+      investmentType?: 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null;
+      typicalCheckSize?: number | null;
+      investInStartupStages?: string[] | null;
+      secRulesAccepted?: boolean | null;
       makeTeamLead?: boolean;
       willBeTeamLead: boolean;
       status: 'success' | 'error';
       message?: string;
       userId?: string;
       teamId?: string;
-      membershipRole?: 'Lead' | 'Contributor';
     }> = [];
 
     // Pending analytics events to emit after transaction commit
@@ -277,6 +307,7 @@ export class DemoDayParticipantsService {
     const existingMembers = await this.prisma.member.findMany({
       where: { email: { in: emails } },
       include: {
+        investorProfile: true,
         teamMemberRoles: {
           include: { team: true },
         },
@@ -294,6 +325,8 @@ export class DemoDayParticipantsService {
 
     // Team cache to avoid duplicate team creation
     const teamCache = new Map<string, any>();
+    // Cache for telegram handler ownership to avoid repeated lookups
+    const telegramOwnerCache = new Map<string, string | null>();
 
     // Process each participant in a transaction
     await this.prisma.$transaction(async (tx) => {
@@ -302,6 +335,22 @@ export class DemoDayParticipantsService {
           // Normalize social media handles
           const normalizedTwitter = this.normalizeTwitterHandler(participantData.twitterHandler || undefined);
           const normalizedLinkedin = this.normalizeLinkedinHandler(participantData.linkedinHandler || undefined);
+          const normalizedTelegram = this.normalizeTelegramHandler(participantData.telegramHandler || undefined);
+
+          // Determine if telegram handle is already used by another member
+          let telegramOwnerUid: string | null = null;
+          if (normalizedTelegram) {
+            if (telegramOwnerCache.has(normalizedTelegram)) {
+              telegramOwnerUid = telegramOwnerCache.get(normalizedTelegram) || null;
+            } else {
+              const owner = await tx.member.findFirst({
+                where: { telegramHandler: normalizedTelegram },
+                select: { uid: true },
+              });
+              telegramOwnerUid = owner?.uid || null;
+              telegramOwnerCache.set(normalizedTelegram, telegramOwnerUid);
+            }
+          }
 
           let willBeTeamLead = false;
 
@@ -316,13 +365,18 @@ export class DemoDayParticipantsService {
             organizationEmail?: string | null;
             twitterHandler?: string;
             linkedinHandler?: string;
+            telegramHandler?: string;
+            role?: string | null;
+            investmentType?: 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null;
+            typicalCheckSize?: number | null;
+            investInStartupStages?: string[] | null;
+            secRulesAccepted?: boolean | null;
             makeTeamLead?: boolean;
             willBeTeamLead: boolean;
             status: 'success' | 'error';
             message?: string;
             userId?: string;
             teamId?: string;
-            membershipRole?: 'Lead' | 'Contributor';
           } = {
             email: participantData.email,
             name: participantData.name,
@@ -330,10 +384,15 @@ export class DemoDayParticipantsService {
             organizationEmail: participantData.organizationEmail,
             twitterHandler: normalizedTwitter,
             linkedinHandler: normalizedLinkedin,
+            telegramHandler: normalizedTelegram,
+            role: participantData.role,
+            investmentType: participantData.investmentType,
+            typicalCheckSize: participantData.typicalCheckSize,
+            investInStartupStages: participantData.investInStartupStages,
+            secRulesAccepted: participantData.secRulesAccepted,
             makeTeamLead: participantData.makeTeamLead,
             willBeTeamLead,
             status: 'success',
-            membershipRole: willBeTeamLead ? 'Lead' : 'Contributor',
           };
 
           // Check if participant already exists for this demo day
@@ -352,33 +411,75 @@ export class DemoDayParticipantsService {
           if (existingMember) {
             // Update existing member
             memberUid = existingMember.uid;
+
+            // Update member data
+            const updateData: any = {
+              name: participantData.name,
+              twitterHandler: normalizedTwitter,
+              linkedinHandler: normalizedLinkedin,
+              accessLevel: ['L2', 'L3', 'L4'].includes(String(existingMember.accessLevel))
+                ? 'L6'
+                : existingMember.accessLevel,
+            };
+
+            // Only set telegramHandler if it's not used by a different member
+            if (normalizedTelegram && (!telegramOwnerUid || telegramOwnerUid === existingMember.uid)) {
+              updateData.telegramHandler = normalizedTelegram;
+            }
+
+            // Update investor profile if it exists
+            if (existingMember.investorProfile) {
+              updateData.investorProfile = {
+                update: {
+                  type: participantData.investmentType || existingMember.investorProfile.type,
+                  typicalCheckSize:
+                    participantData.typicalCheckSize !== undefined
+                      ? participantData.typicalCheckSize
+                      : existingMember.investorProfile.typicalCheckSize,
+                  investInStartupStages:
+                    participantData.investInStartupStages !== undefined
+                      ? participantData.investInStartupStages
+                      : existingMember.investorProfile.investInStartupStages,
+                  secRulesAccepted:
+                    participantData.secRulesAccepted !== undefined
+                      ? participantData.secRulesAccepted
+                      : existingMember.investorProfile.secRulesAccepted,
+                },
+              };
+            }
+
             await tx.member.update({
               where: { uid: memberUid },
-              data: {
-                name: participantData.name,
-                twitterHandler: normalizedTwitter,
-                linkedinHandler: normalizedLinkedin,
-              },
+              data: updateData,
             });
             summary.updatedUsers++;
           } else {
             // Create new member
-            const newMember = await tx.member.create({
-              data: {
-                name: participantData.name,
-                email: participantData.email,
-                twitterHandler: normalizedTwitter,
-                linkedinHandler: normalizedLinkedin,
-                accessLevel: 'L0',
-                investorProfile:
-                  data.type === 'INVESTOR'
-                    ? {
-                        create: {
-                          type: participantData.organization ? 'FUND' : 'ANGEL',
-                        },
-                      }
-                    : undefined,
+            const investorType = participantData.investmentType || (participantData.organization ? 'FUND' : 'ANGEL');
+
+            const createData: any = {
+              name: participantData.name,
+              email: participantData.email,
+              twitterHandler: normalizedTwitter,
+              linkedinHandler: normalizedLinkedin,
+              accessLevel: 'L0',
+              investorProfile: {
+                create: {
+                  type: investorType,
+                  typicalCheckSize: participantData.typicalCheckSize || undefined,
+                  investInStartupStages: participantData.investInStartupStages || undefined,
+                  secRulesAccepted: participantData.secRulesAccepted || false,
+                },
               },
+            };
+
+            // Only set telegramHandler if it's not used by another member
+            if (normalizedTelegram && !telegramOwnerUid) {
+              createData.telegramHandler = normalizedTelegram;
+            }
+
+            const newMember = await tx.member.create({
+              data: createData,
             });
             memberUid = newMember.uid;
             isNewUser = true;
@@ -408,11 +509,16 @@ export class DemoDayParticipantsService {
 
               if (!team) {
                 // Create new team
+                const isFund =
+                  participantData.investmentType === 'FUND' || participantData.investmentType === 'ANGEL_AND_FUND';
+
                 team = await tx.team.create({
                   data: {
                     name: orgName,
                     contactMethod: participantData.organizationEmail || undefined,
-                    isFund: data.type === 'INVESTOR',
+                    isFund,
+                    accessLevel: 'L0',
+                    accessLevelUpdatedAt: new Date(),
                   },
                 });
                 summary.createdTeams++;
@@ -444,35 +550,45 @@ export class DemoDayParticipantsService {
               });
 
               if (existingRole) {
-                // Update existing role - only promote to lead, never downgrade
-                if (willBeTeamLead && !existingRole.teamLead) {
+                // Determine if we should update the role based on provided role or teamLead status
+                const shouldBeTeamLead = willBeTeamLead || participantData.role === 'Lead';
+                const shouldUpdateRole =
+                  participantData.role && participantData.role !== (existingRole.teamLead ? 'Lead' : 'Contributor');
+
+                if ((shouldBeTeamLead && !existingRole.teamLead) || shouldUpdateRole) {
+                  const newRole = participantData.role || (shouldBeTeamLead ? 'Lead' : 'Contributor');
+                  const newTeamLead = shouldBeTeamLead || participantData.role === 'Lead';
+
                   await tx.teamMemberRole.update({
                     where: {
                       memberUid_teamUid: { memberUid, teamUid },
                     },
                     data: {
-                      teamLead: true,
+                      teamLead: newTeamLead,
+                      role: newRole,
                     },
                   });
-                  summary.promotedToLead++;
-                  rowResult.membershipRole = 'Lead';
-                } else {
-                  rowResult.membershipRole = existingRole.teamLead ? 'Lead' : 'Contributor';
+
+                  if (!existingRole.teamLead && newTeamLead) {
+                    summary.promotedToLead++;
+                  }
                 }
               } else {
                 // Create new team membership
+                const isTeamLead = willBeTeamLead || participantData.role === 'Lead';
+
                 await tx.teamMemberRole.create({
                   data: {
                     memberUid,
                     teamUid,
-                    teamLead: willBeTeamLead,
-                    role: willBeTeamLead ? 'Lead' : 'Contributor',
+                    teamLead: isTeamLead,
+                    role: participantData.role || (willBeTeamLead ? 'Lead' : 'Contributor'),
+                    mainTeam: !existingMember?.teamMemberRoles.find((r) => r.mainTeam),
                   },
                 });
                 summary.updatedMemberships++;
-                rowResult.membershipRole = willBeTeamLead ? 'Lead' : 'Contributor';
 
-                if (willBeTeamLead) {
+                if (isTeamLead) {
                   summary.promotedToLead++;
                 }
               }
@@ -491,14 +607,14 @@ export class DemoDayParticipantsService {
               demoDayUid_memberUid: { demoDayUid, memberUid },
             },
             update: {
-              type: data.type,
+              type: 'INVESTOR',
               teamUid,
               statusUpdatedAt: new Date(),
             },
             create: {
               demoDayUid,
               memberUid,
-              type: data.type,
+              type: 'INVESTOR',
               status: isNewUser ? 'INVITED' : 'ENABLED',
               teamUid,
               statusUpdatedAt: new Date(),
@@ -536,24 +652,30 @@ export class DemoDayParticipantsService {
             organizationEmail: participantData.organizationEmail,
             twitterHandler: participantData.twitterHandler || undefined,
             linkedinHandler: participantData.linkedinHandler || undefined,
+            telegramHandler: this.normalizeTelegramHandler(participantData.telegramHandler || undefined),
+            role: participantData.role,
+            investmentType: participantData.investmentType,
+            typicalCheckSize: participantData.typicalCheckSize,
+            investInStartupStages: participantData.investInStartupStages,
+            secRulesAccepted: participantData.secRulesAccepted,
             makeTeamLead: participantData.makeTeamLead,
             willBeTeamLead: participantData.organization ? true : participantData.makeTeamLead || false,
             status: 'error',
             message: error instanceof Error ? error.message : 'Unknown error occurred',
-            membershipRole: 'Contributor',
           });
         }
       }
     });
 
-    // Emit pending analytics events *after* successful transaction commit
-    for (const ev of pendingEvents) {
-      await this.analyticsService.trackEvent({
-        name: ev.name,
-        distinctId: ev.payload.distinctId,
-        properties: ev.payload.properties,
-      });
-    }
+    setTimeout(async () => {
+      for (const ev of pendingEvents) {
+        await this.analyticsService.trackEvent({
+          name: ev.name,
+          distinctId: ev.payload.distinctId,
+          properties: ev.payload.properties,
+        });
+      }
+    }, 1000);
 
     return { summary, rows };
   }

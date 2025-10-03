@@ -19,10 +19,12 @@ import { AnalyticsService } from '../analytics/service/analytics.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
 import { PrismaService } from '../shared/prisma.service';
 import { AuthMetrics, extractErrorCode, statusClassOf } from '../metrics/auth.metrics';
+import { TeamsService } from '../teams/teams.service';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
   private membersService: MembersService;
+  private teamsService: TeamsService;
   constructor(
     private moduleRef: ModuleRef,
     private emailOtpService: EmailOtpService,
@@ -34,6 +36,7 @@ export class AuthService implements OnModuleInit {
 
   onModuleInit() {
     this.membersService = this.moduleRef.get(MembersService, { strict: false });
+    this.teamsService = this.moduleRef.get(TeamsService, { strict: false });
   }
 
   private async authCall(op: string, fn: () => Promise<any>) {
@@ -475,6 +478,17 @@ export class AuthService implements OnModuleInit {
           statusUpdatedAt: new Date(),
         },
       });
+
+      // Update access levels for all teams the member belongs to
+      const memberTeams = await tx.teamMemberRole.findMany({
+        where: { memberUid: member.uid },
+        select: { teamUid: true },
+      });
+
+      // Update each team's access level if they were previously L0
+      for (const teamRole of memberTeams) {
+        await this.teamsService.updateTeamAccessLevel(teamRole.teamUid, tx);
+      }
 
       if (invitedParticipant.type === 'INVESTOR') {
         // This is an additive analytics call; no changes to existing logs/comments
