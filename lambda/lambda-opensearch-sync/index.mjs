@@ -293,7 +293,7 @@ async function indexTeams(lastCheckpoint) {
     SELECT t.uid, t.name, t."shortDescription", t."longDescription", i.url
     FROM "Team" t
            LEFT JOIN "Image" i ON t."logoUid" = i.uid
-    WHERE t."createdAt" > $1 OR t."updatedAt" > $1
+    WHERE (t."createdAt" > $1 OR t."updatedAt" > $1) AND t."accessLevel" NOT IN ('L0', 'Rejected')
   `, [lastCheckpoint]);
   console.log('Got data from Team table:', r.rows.length);
   if (!r.rows.length) return 0;
