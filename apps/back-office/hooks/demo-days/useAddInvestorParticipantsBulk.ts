@@ -1,5 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { DemoDaysQueryKeys } from './constants/queryKeys';
+import { useMutation } from '@tanstack/react-query';
 import api from '../../utils/api';
 import { API_ROUTE } from '../../utils/constants';
 import { AddParticipantsBulkDto, BulkParticipantsResponse } from '../../screens/demo-days/types/demo-day';
@@ -26,14 +25,7 @@ async function addInvestorParticipantsBulk(params: MutationParams): Promise<Bulk
 }
 
 export function useAddInvestorParticipantsBulk() {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: addInvestorParticipantsBulk,
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: [DemoDaysQueryKeys.GET_DEMO_DAY_PARTICIPANTS, variables.authToken, variables.demoDayUid],
-      });
-    },
   });
 }

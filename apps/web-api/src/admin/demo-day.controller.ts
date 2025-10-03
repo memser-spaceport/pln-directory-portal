@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Patch, UseGuards, UsePipes, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Patch, UseGuards, UsePipes, Req, CacheTTL } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
@@ -18,6 +18,7 @@ import {
   ResponseParticipantsListDto,
 } from 'libs/contracts/src/schema/admin-demo-day';
 import { NoCache } from '../decorators/no-cache.decorator';
+import { QueryCache } from '../decorators/query-cache.decorator';
 
 @ApiTags('Admin Demo Days')
 @Controller('v1/admin/demo-days')
@@ -30,7 +31,8 @@ export class AdminDemoDaysController {
 
   @Post()
   @UsePipes(ZodValidationPipe)
-  @NoCache()
+  @QueryCache()
+  @CacheTTL(120) // 2 minutes
   async createDemoDay(@Req() req, @Body() body: CreateDemoDayDto): Promise<ResponseDemoDayDto> {
     return this.demoDaysService.createDemoDay(
       {
@@ -58,7 +60,11 @@ export class AdminDemoDaysController {
   @Patch(':uid')
   @UsePipes(ZodValidationPipe)
   @NoCache()
-  async updateDemoDay(@Req() req, @Param('uid') uid: string, @Body() body: UpdateDemoDayDto): Promise<ResponseDemoDayDto> {
+  async updateDemoDay(
+    @Req() req,
+    @Param('uid') uid: string,
+    @Body() body: UpdateDemoDayDto
+  ): Promise<ResponseDemoDayDto> {
     return this.demoDaysService.updateDemoDay(
       uid,
       {
@@ -93,16 +99,15 @@ export class AdminDemoDaysController {
 
   @Post(':uid/participants-bulk')
   @UsePipes(ZodValidationPipe)
-  async addParticipantsBulk(
+  async addInvestorParticipantsBulk(
     @Req() req,
     @Param('uid') demoDayUid: string,
     @Body() body: AddParticipantsBulkDto
   ): Promise<ResponseBulkParticipantsDto> {
-    return this.demoDayParticipantsService.addParticipantsBulk(
+    return this.demoDayParticipantsService.addInvestorParticipantsBulk(
       demoDayUid,
       {
         participants: body.participants,
-        type: body.type.toUpperCase() as 'INVESTOR' | 'FOUNDER',
       },
       req.userEmail
     );

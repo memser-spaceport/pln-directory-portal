@@ -43,6 +43,11 @@ export class DbProvider implements IAnalyticsProvider {
       props: rest && Object.keys(rest).length ? rest : {},
     };
 
+    // Skip time-on-page events if they don't have an eventId
+    if (row.eventType?.includes('time-on-page') && !row.eventId) {
+      return;
+    }
+
     if (row.eventId) {
       await this.prisma.event.upsert({
         where: { eventId: row.eventId },

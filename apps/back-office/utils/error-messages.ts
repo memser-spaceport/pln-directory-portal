@@ -12,7 +12,7 @@ export function mapDemoDayParticipantError(errorMessage: string): string {
 
   // Common error patterns and their user-friendly equivalents
   if (message.includes('participant already exists for this demo day')) {
-    return 'This person is already registered for this demo day';
+    return 'This member is already added for this demo day';
   }
 
   if (message.includes('member not found') || message.includes('invalid access level')) {
