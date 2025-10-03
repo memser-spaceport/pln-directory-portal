@@ -20,6 +20,7 @@ interface MutationParams {
     teamMemberRoles: {
       teamUid: string;
       role: string;
+      investmentTeam?: boolean;
     }[];
     linkedinHandler: string;
     discordHandler: string;
