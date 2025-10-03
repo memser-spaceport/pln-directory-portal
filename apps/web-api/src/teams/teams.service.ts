@@ -238,7 +238,6 @@ export class TeamsService {
     requestorEmail: string
   ): Promise<Team> {
     try {
-      // Set default access level to L0 for new teams (inactive until they have active members)
       const teamData = {
         ...team,
         accessLevel: team.accessLevel || 'L1',
