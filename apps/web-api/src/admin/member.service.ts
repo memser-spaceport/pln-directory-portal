@@ -411,7 +411,8 @@ export class MemberService {
       const foundIndex = existingMember.teamMemberRoles.findIndex((v: any) => v.teamUid === t.teamUid);
       if (foundIndex > -1) {
         const foundValue = existingMember.teamMemberRoles[foundIndex];
-        if (foundValue.role !== t.role) {
+        // Check if a role or investmentTeam has changed
+        if (foundValue.role !== t.role || foundValue.investmentTeam !== t.investmentTeam) {
           let foundDefaultRoleTag = false;
           // Check if there's a default member role tag
           foundValue.roleTags?.some((tag: any) => {
@@ -424,6 +425,10 @@ export class MemberService {
           memberData.teamAndRoles[index].roleTags = foundDefaultRoleTag
             ? foundValue.roleTags
             : t.role?.split(',').map((item: string) => item.trim());
+          // Preserve investmentTeam if not explicitly provided
+          if (t.investmentTeam === undefined) {
+            memberData.teamAndRoles[index].investmentTeam = foundValue.investmentTeam;
+          }
           return true;
         }
       }
@@ -450,6 +455,7 @@ export class MemberService {
         role: t.role,
         mainTeam: false, // Set your default values here if needed
         teamLead: false, // Set your default values here if needed
+        investmentTeam: t.investmentTeam || false,
         teamUid: t.teamUid,
         memberUid,
         roleTags: t.role?.split(',').map((item: string) => item.trim()), // Properly format roleTags
@@ -498,7 +504,11 @@ export class MemberService {
               memberUid,
             },
           },
-          data: { role: roleToUpdate.role, roleTags: roleToUpdate.roleTags },
+          data: {
+            role: roleToUpdate.role,
+            roleTags: roleToUpdate.roleTags,
+            investmentTeam: roleToUpdate.investmentTeam || false,
+          },
         })
       );
       await Promise.all(updatePromises);
@@ -517,6 +527,7 @@ export class MemberService {
           role: t.role,
           mainTeam: false,
           teamLead: false,
+          investmentTeam: t.investmentTeam || false, // Add investmentTeam field
           teamUid: t.teamUid,
           roleTags: t.role?.split(',')?.map((item) => item.trim()),
         })),
