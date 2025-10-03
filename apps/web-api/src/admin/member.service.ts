@@ -527,7 +527,7 @@ export class MemberService {
           role: t.role,
           mainTeam: false,
           teamLead: false,
-          investmentTeam: t.investmentTeam || false, // Add investmentTeam field
+          investmentTeam: t.investmentTeam || false,
           teamUid: t.teamUid,
           roleTags: t.role?.split(',')?.map((item) => item.trim()),
         })),
@@ -846,6 +846,7 @@ export class MemberService {
         },
         teamMemberRoles: {
           select: {
+            investmentTeam: true,
             team: {
               select: {
                 uid: true,
