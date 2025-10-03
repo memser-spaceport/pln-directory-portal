@@ -93,8 +93,14 @@ export class MembersService {
         this.prisma.member.findMany({ ...queryOptions, where }),
         this.prisma.member.count({ where }),
       ]);
+      const filteredMembers = members.map((member: any) => {
+        return {
+          ...member,
+          teamMemberRoles: member.teamMemberRoles.filter((role) => role.team.accessLevel !== 'L0'),
+        };
+      });
 
-      return { count: membersCount, members };
+      return { count: membersCount, members: filteredMembers };
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -376,6 +382,13 @@ export class MembersService {
               team: {
                 include: {
                   logo: true,
+                },
+              },
+            },
+            where: {
+              team: {
+                accessLevel: {
+                  not: 'L0',
                 },
               },
             },
@@ -2112,6 +2125,13 @@ export class MembersService {
                   },
                 },
               },
+              where: {
+                team: {
+                  accessLevel: {
+                    not: 'L0',
+                  },
+                },
+              },
             },
             skills: {
               select: {
@@ -2728,7 +2748,16 @@ export class MembersService {
         memberRoles: true,
         teamMemberRoles: {
           include: {
-            team: { include: { logo: true } },
+            team: {
+              include: { logo: true },
+            },
+          },
+          where: {
+            team: {
+              accessLevel: {
+                not: 'L0',
+              },
+            },
           },
         },
         investorProfile: true,
@@ -2817,6 +2846,13 @@ export class MembersService {
                       filename: true,
                     },
                   },
+                },
+              },
+            },
+            where: {
+              team: {
+                accessLevel: {
+                  not: 'L0',
                 },
               },
             },

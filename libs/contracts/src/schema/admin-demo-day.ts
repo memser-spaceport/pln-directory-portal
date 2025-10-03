@@ -46,11 +46,16 @@ export const AddParticipantsBulkSchema = z.object({
         organizationEmail: z.string().optional().nullable(),
         twitterHandler: z.string().optional().nullable(),
         linkedinHandler: z.string().optional().nullable(),
+        telegramHandler: z.string().optional().nullable(),
+        role: z.string().optional().nullable(),
+        investmentType: z.enum(['ANGEL', 'FUND', 'ANGEL_AND_FUND']).optional().nullable(),
+        typicalCheckSize: z.number().optional().nullable(),
+        investInStartupStages: z.array(z.string()).optional().nullable(),
+        secRulesAccepted: z.boolean().optional().nullable(),
         makeTeamLead: z.boolean().optional(),
       })
     )
     .min(1, 'At least one participant is required'),
-  type: z.enum(['INVESTOR', 'FOUNDER']),
 });
 
 export class AddParticipantsBulkDto extends createZodDto(AddParticipantsBulkSchema) {}
@@ -127,6 +132,12 @@ export const ResponseBulkParticipantsSchema = z.object({
       organizationEmail: z.string().optional().nullable(),
       twitterHandler: z.string().optional().nullable(),
       linkedinHandler: z.string().optional().nullable(),
+      telegramHandler: z.string().optional().nullable(),
+      role: z.string().optional().nullable(),
+      investmentType: z.enum(['ANGEL', 'FUND', 'ANGEL_AND_FUND']).optional().nullable(),
+      typicalCheckSize: z.number().optional().nullable(),
+      investInStartupStages: z.array(z.string()).optional().nullable(),
+      secRulesAccepted: z.boolean().optional().nullable(),
       makeTeamLead: z.boolean().optional(),
       willBeTeamLead: z.boolean(),
       status: z.enum(['success', 'error']),

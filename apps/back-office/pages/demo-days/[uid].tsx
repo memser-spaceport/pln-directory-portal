@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useRouter } from 'next/router';
 import { useCookie } from 'react-use';
+import Image from 'next/image';
 import { useDemoDayDetails } from '../../hooks/demo-days/useDemoDayDetails';
 import { useDemoDayParticipants } from '../../hooks/demo-days/useDemoDayParticipants';
 import { useUpdateDemoDay } from '../../hooks/demo-days/useUpdateDemoDay';
@@ -22,6 +23,7 @@ const DemoDayDetailPage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [editFormData, setEditFormData] = useState<UpdateDemoDayDto>({});
   const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -41,7 +43,7 @@ const DemoDayDetailPage = () => {
       type: activeTab === 'investors' ? 'INVESTOR' : 'FOUNDER',
       search: searchTerm || undefined,
       status: (statusFilter as 'INVITED' | 'ENABLED' | 'DISABLED') || undefined,
-      page: 1,
+      page: currentPage,
       limit: 50,
     },
   });
@@ -139,6 +141,23 @@ const DemoDayDetailPage = () => {
       [field]: value,
     }));
   };
+
+  const handleNextPage = () => {
+    if (participants?.totalPages && currentPage < participants.totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchTerm, statusFilter]);
 
   if (demoDayLoading) {
     return (
@@ -281,7 +300,7 @@ const DemoDayDetailPage = () => {
                     onClick={() => setShowUploadModal(true)}
                     className="rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
                   >
-                    Upload CSV
+                    Upload Investors CSV
                   </button>
                 </div>
               </div>
@@ -353,7 +372,13 @@ const DemoDayDetailPage = () => {
                     <div className={clsx(s.bodyCell, s.first, s.flexible)}>
                       <div className="flex items-center">
                         {participant.member?.profilePicture && (
-                          <img className="mr-3 h-8 w-8 rounded-full" src={participant.member.profilePicture} alt="" />
+                          <Image
+                            className="mr-3 h-8 w-8 rounded-full"
+                            src={participant.member.profilePicture}
+                            alt=""
+                            width={32}
+                            height={32}
+                          />
                         )}
                         <div>
                           <div className="text-sm font-medium text-gray-900">
@@ -529,6 +554,36 @@ const DemoDayDetailPage = () => {
               </div>
             )}
           </div>
+
+          {/* Pagination Controls */}
+          {participants?.totalPages && participants.totalPages > 1 && (
+            <div className={s.pagination}>
+              <div className={s.paginationInfo}>
+                Showing {(participants.page - 1) * participants.limit + 1} to{' '}
+                {Math.min(participants.page * participants.limit, participants.total)} of {participants.total}{' '}
+                {activeTab === 'investors' ? 'investors' : 'founders'}
+              </div>
+              <div className={s.paginationControls}>
+                <button
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 1}
+                  className={clsx(s.paginationButton, currentPage === 1 ? s.disabled : '')}
+                >
+                  Previous
+                </button>
+                <span className={s.paginationCurrent}>
+                  Page {participants.page} of {participants.totalPages}
+                </span>
+                <button
+                  onClick={handleNextPage}
+                  disabled={participants.page >= participants.totalPages}
+                  className={clsx(s.paginationButton, participants.page >= participants.totalPages ? s.disabled : '')}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Modals */}
