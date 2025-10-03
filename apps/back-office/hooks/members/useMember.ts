@@ -22,6 +22,7 @@ interface IMemberResponse {
     region?: string;
   };
   teamMemberRoles: Array<{
+    investmentTeam?: boolean;
     team: {
       uid: string;
       name: string;
@@ -54,6 +55,7 @@ export const getMemberInfo = async (memberUid: string) => {
       teamTitle: tm.team.name,
       teamUid: tm.teamUid,
       role: tm.role,
+      investmentTeam: tm.investmentTeam || false,
     };
   });
 
