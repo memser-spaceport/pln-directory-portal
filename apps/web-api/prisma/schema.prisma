@@ -257,17 +257,18 @@ model Location {
 }
 
 model TeamMemberRole {
-  id        Int       @id @default(autoincrement())
-  mainTeam  Boolean   @default(false)
-  teamLead  Boolean   @default(false)
-  startDate DateTime?
-  endDate   DateTime?
-  role      String?
-  member    Member    @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
-  memberUid String
-  team      Team      @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
-  teamUid   String
-  roleTags  String[]
+  id             Int       @id @default(autoincrement())
+  mainTeam       Boolean   @default(false)
+  teamLead       Boolean   @default(false)
+  investmentTeam Boolean   @default(false)
+  startDate      DateTime?
+  endDate        DateTime?
+  role           String?
+  member         Member    @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  memberUid      String
+  team           Team      @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  teamUid        String
+  roleTags       String[]
 
   // One member can only have one role per team
   @@unique([memberUid, teamUid])
