@@ -219,7 +219,8 @@ export class DemoDayParticipantsService {
         telegramHandler?: string | null;
         role?: string | null;
         investmentType?: 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null;
-        typicalCheckSize?: number | null;
+        minTypicalCheckSize?: number | null;
+        maxTypicalCheckSize?: number | null;
         investInStartupStages?: string[] | null;
         secRulesAccepted?: boolean | null;
         makeTeamLead?: boolean;
@@ -286,7 +287,8 @@ export class DemoDayParticipantsService {
       telegramHandler?: string | null;
       role?: string | null;
       investmentType?: 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null;
-      typicalCheckSize?: number | null;
+      minTypicalCheckSize?: number | null;
+      maxTypicalCheckSize?: number | null;
       investInStartupStages?: string[] | null;
       secRulesAccepted?: boolean | null;
       makeTeamLead?: boolean;
@@ -368,7 +370,8 @@ export class DemoDayParticipantsService {
             telegramHandler?: string;
             role?: string | null;
             investmentType?: 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null;
-            typicalCheckSize?: number | null;
+            minTypicalCheckSize?: number | null;
+            maxTypicalCheckSize?: number | null;
             investInStartupStages?: string[] | null;
             secRulesAccepted?: boolean | null;
             makeTeamLead?: boolean;
@@ -387,7 +390,8 @@ export class DemoDayParticipantsService {
             telegramHandler: normalizedTelegram,
             role: participantData.role,
             investmentType: participantData.investmentType,
-            typicalCheckSize: participantData.typicalCheckSize,
+            minTypicalCheckSize: participantData.minTypicalCheckSize,
+            maxTypicalCheckSize: participantData.maxTypicalCheckSize,
             investInStartupStages: participantData.investInStartupStages,
             secRulesAccepted: participantData.secRulesAccepted,
             makeTeamLead: participantData.makeTeamLead,
@@ -432,10 +436,14 @@ export class DemoDayParticipantsService {
               updateData.investorProfile = {
                 update: {
                   type: participantData.investmentType || existingMember.investorProfile.type,
-                  typicalCheckSize:
-                    participantData.typicalCheckSize !== undefined
-                      ? participantData.typicalCheckSize
-                      : existingMember.investorProfile.typicalCheckSize,
+                  minTypicalCheckSize:
+                    participantData.minTypicalCheckSize !== undefined
+                      ? participantData.minTypicalCheckSize
+                      : existingMember.investorProfile.minTypicalCheckSize,
+                  maxTypicalCheckSize:
+                    participantData.maxTypicalCheckSize !== undefined
+                      ? participantData.maxTypicalCheckSize
+                      : existingMember.investorProfile.maxTypicalCheckSize,
                   investInStartupStages:
                     participantData.investInStartupStages !== undefined
                       ? participantData.investInStartupStages
@@ -466,7 +474,8 @@ export class DemoDayParticipantsService {
               investorProfile: {
                 create: {
                   type: investorType,
-                  typicalCheckSize: participantData.typicalCheckSize || undefined,
+                  minTypicalCheckSize: participantData.minTypicalCheckSize || undefined,
+                  maxTypicalCheckSize: participantData.maxTypicalCheckSize || undefined,
                   investInStartupStages: participantData.investInStartupStages || undefined,
                   secRulesAccepted: participantData.secRulesAccepted || false,
                 },
@@ -655,7 +664,8 @@ export class DemoDayParticipantsService {
             telegramHandler: this.normalizeTelegramHandler(participantData.telegramHandler || undefined),
             role: participantData.role,
             investmentType: participantData.investmentType,
-            typicalCheckSize: participantData.typicalCheckSize,
+            minTypicalCheckSize: participantData.minTypicalCheckSize,
+            maxTypicalCheckSize: participantData.maxTypicalCheckSize,
             investInStartupStages: participantData.investInStartupStages,
             secRulesAccepted: participantData.secRulesAccepted,
             makeTeamLead: participantData.makeTeamLead,

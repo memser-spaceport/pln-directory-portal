@@ -67,7 +67,18 @@ export const AdditionalDetails = () => {
             label="Investment Focus"
             description="Add custom investment focus areas (e.g., AI, Web3, DeFi)"
           />
-          <FormField name="investorProfile.typicalCheckSize" label="Typical Check Size" placeholder="e.g., $50,000" />
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              name="investorProfile.minTypicalCheckSize"
+              label="Min Check Size"
+              placeholder="e.g., $25,000"
+            />
+            <FormField
+              name="investorProfile.maxTypicalCheckSize"
+              label="Max Check Size"
+              placeholder="e.g., $100,000"
+            />
+          </div>
           <FormMultiselectField
             name="investorProfile.investInStartupStages"
             placeholder="Select startup stages"

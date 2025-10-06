@@ -925,7 +925,8 @@ model InvestorProfile {
   investmentFocus       String[]
   investInStartupStages String[]             @default([])
   investInFundTypes     String[]             @default([])
-  typicalCheckSize      Float?
+  minTypicalCheckSize   Float?
+  maxTypicalCheckSize   Float?
   isInvestViaFund       Boolean?
   type                  InvestorProfileType?
   createdAt             DateTime             @default(now())

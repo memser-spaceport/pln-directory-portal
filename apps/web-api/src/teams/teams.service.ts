@@ -437,7 +437,8 @@ export class TeamsService {
     teamData: Partial<Team> & {
       investorProfile?: {
         investmentFocus?: string[];
-        typicalCheckSize?: string;
+        minTypicalCheckSize?: number;
+        maxTypicalCheckSize?: number;
         investInStartupStages?: string[];
         investInFundTypes?: string[];
       };
@@ -490,7 +491,8 @@ export class TeamsService {
         team['investorProfile'] = {
           create: {
             investmentFocus: teamData.investorProfile.investmentFocus || [],
-            typicalCheckSize: teamData.investorProfile.typicalCheckSize,
+            minTypicalCheckSize: teamData.investorProfile.minTypicalCheckSize,
+            maxTypicalCheckSize: teamData.investorProfile.maxTypicalCheckSize,
             investInStartupStages: teamData.investorProfile.investInStartupStages || [],
             investInFundTypes: teamData.investorProfile.investInFundTypes || [],
           },
@@ -551,7 +553,8 @@ export class TeamsService {
         where: { uid: team.investorProfileId },
         data: {
           investmentFocus: investorProfileData.investmentFocus || [],
-          typicalCheckSize: investorProfileData.typicalCheckSize,
+          minTypicalCheckSize: investorProfileData.minTypicalCheckSize,
+          maxTypicalCheckSize: investorProfileData.maxTypicalCheckSize,
           investInStartupStages: investorProfileData.investInStartupStages || [],
           investInFundTypes: investorProfileData.investInFundTypes || [],
         },
@@ -561,7 +564,8 @@ export class TeamsService {
       const newInvestorProfile = await tx.investorProfile.create({
         data: {
           investmentFocus: investorProfileData.investmentFocus || [],
-          typicalCheckSize: investorProfileData.typicalCheckSize,
+          minTypicalCheckSize: investorProfileData.minTypicalCheckSize,
+          maxTypicalCheckSize: investorProfileData.maxTypicalCheckSize,
           investInStartupStages: investorProfileData.investInStartupStages || [],
           investInFundTypes: investorProfileData.investInFundTypes || [],
           teamUid: teamUid,
@@ -1364,7 +1368,8 @@ export class TeamsService {
       investmentFocus?: string[];
       investInStartupStages?: string[];
       investInFundTypes?: string[];
-      typicalCheckSize?: number | null;
+      minTypicalCheckSize?: number | null;
+      maxTypicalCheckSize?: number | null;
     }
   ) {
     // Fetch team to check existence and current investorProfileId link
@@ -1380,13 +1385,15 @@ export class TeamsService {
       create: {
         teamUid,
         investmentFocus: investorProfileData.investmentFocus ?? [],
-        typicalCheckSize: investorProfileData.typicalCheckSize ?? null,
+        minTypicalCheckSize: investorProfileData.minTypicalCheckSize ?? null,
+        maxTypicalCheckSize: investorProfileData.maxTypicalCheckSize ?? null,
         investInStartupStages: investorProfileData.investInStartupStages ?? [],
         investInFundTypes: investorProfileData.investInFundTypes ?? [],
       },
       update: {
         investmentFocus: investorProfileData.investmentFocus ?? [],
-        typicalCheckSize: investorProfileData.typicalCheckSize ?? null,
+        minTypicalCheckSize: investorProfileData.minTypicalCheckSize ?? null,
+        maxTypicalCheckSize: investorProfileData.maxTypicalCheckSize ?? null,
         investInStartupStages: investorProfileData.investInStartupStages ?? [],
         investInFundTypes: investorProfileData.investInFundTypes ?? [],
       },

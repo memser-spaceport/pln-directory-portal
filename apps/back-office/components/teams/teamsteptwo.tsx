@@ -187,19 +187,41 @@ export default function TeamStepTwo(props) {
           </div>
 
           <div className="pt-5">
-            <label htmlFor="typicalCheckSize" className="mb-2 block text-sm font-bold">
-              Typical Check Size
+            <label className="mb-2 block text-sm font-bold">
+              Typical Check Size Range
             </label>
-            <input
-              type="number"
-              id="typicalCheckSize"
-              name="typicalCheckSize"
-              value={values.typicalCheckSize}
-              onChange={handleInputChange}
-              placeholder="e.g., $50,000"
-              disabled={!props.isEditEnabled}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="minTypicalCheckSize" className="mb-1 block text-xs text-gray-600">
+                  Minimum
+                </label>
+                <input
+                  type="number"
+                  id="minTypicalCheckSize"
+                  name="minTypicalCheckSize"
+                  value={values.minTypicalCheckSize}
+                  onChange={handleInputChange}
+                  placeholder="e.g., $25,000"
+                  disabled={!props.isEditEnabled}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                />
+              </div>
+              <div>
+                <label htmlFor="maxTypicalCheckSize" className="mb-1 block text-xs text-gray-600">
+                  Maximum
+                </label>
+                <input
+                  type="number"
+                  id="maxTypicalCheckSize"
+                  name="maxTypicalCheckSize"
+                  value={values.maxTypicalCheckSize}
+                  onChange={handleInputChange}
+                  placeholder="e.g., $100,000"
+                  disabled={!props.isEditEnabled}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                />
+              </div>
+            </div>
             <div className="flex pt-3">
               <div>
                 <InformationCircleIcon />

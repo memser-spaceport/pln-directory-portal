@@ -72,7 +72,8 @@ export const CreateMemberSchema = z.object({
     .object({
       secRulesAccepted: z.boolean().optional(),
       investmentFocus: z.array(z.string()),
-      typicalCheckSize: z.number().nullable(),
+      minTypicalCheckSize: z.number().nullable().optional(),
+      maxTypicalCheckSize: z.number().nullable().optional(),
       type: z.string().optional().nullable(),
       investInStartupStages: z.array(z.string()).optional(),
       investInFundTypes: z.array(z.string()).optional(),
@@ -118,7 +119,8 @@ export const UpdateMemberSchema = z.object({
     .object({
       secRulesAccepted: z.boolean().optional(),
       investmentFocus: z.array(z.string()),
-      typicalCheckSize: z.number().nullable(),
+      minTypicalCheckSize: z.number().nullable().optional(),
+      maxTypicalCheckSize: z.number().nullable().optional(),
       type: z.string().optional().nullable(),
       investInStartupStages: z.array(z.string()).optional(),
       investInFundTypes: z.array(z.string()).optional(),

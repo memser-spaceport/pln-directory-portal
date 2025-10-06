@@ -43,7 +43,8 @@ export interface IFormValues {
   officeHours: string;
   focusAreas?: TFocusArea[];
   investmentFocus: DropDownProps[];
-  typicalCheckSize: number;
+  minTypicalCheckSize: number;
+  maxTypicalCheckSize: number;
   isFund: boolean;
   investInStartupStages: DropDownProps[];
   investInFundTypes: DropDownProps[];

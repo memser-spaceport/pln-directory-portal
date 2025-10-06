@@ -21,7 +21,8 @@ export class InvestorProfileService {
     memberUid: string,
     investorProfileData: {
       investmentFocus: string[];
-      typicalCheckSize?: number;
+      minTypicalCheckSize?: number;
+      maxTypicalCheckSize?: number;
       secRulesAccepted?: boolean;
       investInStartupStages?: string[];
       investInFundTypes?: string[];
@@ -52,7 +53,8 @@ export class InvestorProfileService {
           where: { uid: member.investorProfileId },
           data: {
             investmentFocus: investorProfileData.investmentFocus,
-            typicalCheckSize: investorProfileData.typicalCheckSize,
+            minTypicalCheckSize: investorProfileData.minTypicalCheckSize,
+            maxTypicalCheckSize: investorProfileData.maxTypicalCheckSize,
             secRulesAccepted: investorProfileData.secRulesAccepted,
             investInStartupStages: investorProfileData.investInStartupStages ?? ([] as string[]),
             type: investorProfileData.type || null,
@@ -66,7 +68,8 @@ export class InvestorProfileService {
         result = await this.prisma.investorProfile.create({
           data: {
             investmentFocus: investorProfileData.investmentFocus,
-            typicalCheckSize: investorProfileData.typicalCheckSize,
+            minTypicalCheckSize: investorProfileData.minTypicalCheckSize,
+            maxTypicalCheckSize: investorProfileData.maxTypicalCheckSize,
             secRulesAccepted: investorProfileData.secRulesAccepted,
             investInStartupStages: investorProfileData.investInStartupStages ?? [],
             type: investorProfileData.type || null,
