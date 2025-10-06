@@ -10,3 +10,9 @@ export const UpdateFundraisingTeamSchema = z.object({
 });
 
 export class UpdateFundraisingTeamDto extends createZodDto(UpdateFundraisingTeamSchema) {}
+
+export const UpdateFundraisingDescriptionSchema = z.object({
+  description: z.string(),
+});
+
+export class UpdateFundraisingDescriptionDto extends createZodDto(UpdateFundraisingDescriptionSchema) {}
