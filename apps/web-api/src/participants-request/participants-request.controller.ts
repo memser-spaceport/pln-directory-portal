@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards, UsePipes } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common';
 import { ParticipantsRequestService } from './participants-request.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
@@ -26,12 +26,16 @@ export class ParticipantsRequestController {
   @UsePipes(new ParticipantsReqValidationPipe())
   @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
   @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
-  async addRequest(@Body() body) {
+  async addRequest(@Body() body, @Req() request: Request) {
     const uniqueIdentifier = this.participantsRequestService.getUniqueIdentifier(body);
     // Validate unique identifier existence
     await this.participantsRequestService.validateUniqueIdentifier(body.participantType, uniqueIdentifier);
     await this.participantsRequestService.validateParticipantRequest(body);
-    return await this.participantsRequestService.addRequest(body);
+
+    // Load requester user
+    const requesterUser = await this.memberService.findMemberByEmail(request['userEmail']);
+
+    return await this.participantsRequestService.addRequest(body, requesterUser);
   }
 
   /**
