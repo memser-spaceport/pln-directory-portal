@@ -838,6 +838,8 @@ model TeamFundraisingProfile {
   videoUploadUid String?
   videoUpload    Upload? @relation("TFP_videoUpload", fields: [videoUploadUid], references: [uid])
 
+  description String?
+
   status TeamFundraisingProfileStatus @default(DRAFT)
 
   createdAt      DateTime @default(now())
