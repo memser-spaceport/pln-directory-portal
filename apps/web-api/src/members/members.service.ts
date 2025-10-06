@@ -382,6 +382,7 @@ export class MembersService {
               team: {
                 include: {
                   logo: true,
+                  investorProfile: true,
                 },
               },
             },
