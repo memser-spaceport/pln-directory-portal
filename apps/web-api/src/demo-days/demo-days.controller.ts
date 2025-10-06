@@ -22,7 +22,7 @@ import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { UploadsService } from '../uploads/uploads.service';
 import { UploadKind, UploadScopeType } from '@prisma/client';
 import { NoCache } from '../decorators/no-cache.decorator';
-import { UpdateFundraisingTeamDto } from 'libs/contracts/src/schema';
+import { UpdateFundraisingTeamDto, UpdateFundraisingDescriptionDto } from 'libs/contracts/src/schema';
 
 @ApiTags('Demo Days')
 @Controller('v1/demo-days')
@@ -108,6 +108,17 @@ export class DemoDaysController {
     });
 
     return this.demoDayFundraisingProfilesService.updateFundraisingVideo(req.userEmail, upload.uid);
+  }
+
+  @Put('current/fundraising-profile/description')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async updateDescription(@Req() req, @Body() body: UpdateFundraisingDescriptionDto) {
+    if (!body.description || body.description.trim() === '') {
+      throw new Error('description is required');
+    }
+
+    return this.demoDayFundraisingProfilesService.updateFundraisingDescription(req.userEmail, body.description);
   }
 
   @Delete('current/fundraising-profile/video')

@@ -171,6 +171,7 @@ export class DemoDayFundraisingProfilesService {
       onePagerUpload: fundraisingProfile.onePagerUpload,
       videoUploadUid: fundraisingProfile.videoUploadUid,
       videoUpload: fundraisingProfile.videoUpload,
+      description: fundraisingProfile.description,
     };
   }
 
@@ -409,6 +410,32 @@ export class DemoDayFundraisingProfilesService {
         teamUid: team.uid,
         demoDayUid: demoDay.uid,
         videoUploadUid,
+        status: 'DRAFT',
+      },
+    });
+
+    await this.updateFundraisingProfileStatus(team.uid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfile(memberEmail);
+  }
+
+  async updateFundraisingDescription(memberEmail: string, description: string): Promise<any> {
+    const { team, demoDay } = await this.validateDemoDayFounderAccess(memberEmail);
+
+    // Update or create profile
+    await this.prisma.teamFundraisingProfile.upsert({
+      where: {
+        teamUid_demoDayUid: {
+          teamUid: team.uid,
+          demoDayUid: demoDay.uid,
+        },
+      },
+      update: {
+        description,
+      },
+      create: {
+        teamUid: team.uid,
+        demoDayUid: demoDay.uid,
+        description,
         status: 'DRAFT',
       },
     });
