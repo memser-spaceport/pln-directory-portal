@@ -73,7 +73,8 @@ export interface IFormValues {
     investmentFocus: string[];
     investInStartupStages: string[];
     investInFundTypes: string[];
-    typicalCheckSize: number;
+    minTypicalCheckSize: number;
+    maxTypicalCheckSize: number;
     secRulesAccepted: boolean;
     type: string;
   };

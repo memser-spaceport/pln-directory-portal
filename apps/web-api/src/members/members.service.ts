@@ -984,7 +984,8 @@ export class MembersService {
             investmentFocus: memberData.investorProfile.investmentFocus || [],
             investInStartupStages: memberData.investorProfile.investInStartupStages || [],
             investInFundTypes: memberData.investorProfile.investInFundTypes || [],
-            typicalCheckSize: memberData.investorProfile.typicalCheckSize,
+            minTypicalCheckSize: memberData.investorProfile.minTypicalCheckSize,
+            maxTypicalCheckSize: memberData.investorProfile.maxTypicalCheckSize,
             secRulesAccepted: memberData.investorProfile.secRulesAccepted,
             type: memberData.investorProfile.type,
           },
@@ -1038,7 +1039,8 @@ export class MembersService {
         where: { uid: existingMember.investorProfileId },
         data: {
           investmentFocus: investorProfileData.investmentFocus || [],
-          typicalCheckSize: investorProfileData.typicalCheckSize,
+          minTypicalCheckSize: investorProfileData.minTypicalCheckSize,
+          maxTypicalCheckSize: investorProfileData.maxTypicalCheckSize,
           secRulesAccepted: investorProfileData.secRulesAccepted,
           secRulesAcceptedAt,
           type: investorProfileData.type,
@@ -1051,7 +1053,8 @@ export class MembersService {
       const newInvestorProfile = await tx.investorProfile.create({
         data: {
           investmentFocus: investorProfileData.investmentFocus || [],
-          typicalCheckSize: investorProfileData.typicalCheckSize,
+          minTypicalCheckSize: investorProfileData.minTypicalCheckSize,
+          maxTypicalCheckSize: investorProfileData.maxTypicalCheckSize,
           secRulesAccepted: investorProfileData.secRulesAccepted,
           secRulesAcceptedAt,
           type: investorProfileData.type,
@@ -2013,25 +2016,24 @@ export class MembersService {
       });
     }
 
-    // Typical check size filters
+    // Typical check size range filters
     if (
       (filters.minTypicalCheckSize && Number(filters.minTypicalCheckSize) > 0) ||
       (filters.maxTypicalCheckSize && Number(filters.maxTypicalCheckSize) > 0)
     ) {
-      const checkSizeFilter: any = {};
+      const investorProfileConditions: any = {};
 
       if (filters.minTypicalCheckSize && Number(filters.minTypicalCheckSize) > 0) {
-        checkSizeFilter.gte = Number(filters.minTypicalCheckSize);
+        investorProfileConditions.minTypicalCheckSize = { gte: Number(filters.minTypicalCheckSize) };
       }
 
       if (filters.maxTypicalCheckSize && Number(filters.maxTypicalCheckSize) > 0) {
-        checkSizeFilter.lte = Number(filters.maxTypicalCheckSize);
+        investorProfileConditions.maxTypicalCheckSize = { lte: Number(filters.maxTypicalCheckSize) };
       }
 
+      // Add as a single condition to ensure both checks happen together
       whereConditions.push({
-        investorProfile: {
-          typicalCheckSize: checkSizeFilter,
-        },
+        investorProfile: investorProfileConditions,
       });
     }
 
@@ -2146,7 +2148,8 @@ export class MembersService {
                 investInStartupStages: true,
                 investInFundTypes: true,
                 type: true,
-                typicalCheckSize: true,
+                minTypicalCheckSize: true,
+                maxTypicalCheckSize: true,
                 secRulesAccepted: true,
                 secRulesAcceptedAt: true,
               },
@@ -2865,7 +2868,8 @@ export class MembersService {
               investInStartupStages: true,
               investInFundTypes: true,
               type: true,
-              typicalCheckSize: true,
+              minTypicalCheckSize: true,
+              maxTypicalCheckSize: true,
               secRulesAccepted: true,
               secRulesAcceptedAt: true,
             },

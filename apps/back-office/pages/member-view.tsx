@@ -471,7 +471,8 @@ export const getServerSideProps = async (context) => {
         accessLevel: requestData?.accessLevel ?? '',
         investorProfile: requestData?.investorProfile ?? {
           investmentFocus: [],
-          typicalCheckSize: null,
+          minTypicalCheckSize: null,
+          maxTypicalCheckSize: null,
           secRulesAccepted: false,
         },
       };
@@ -552,7 +553,8 @@ export const getServerSideProps = async (context) => {
         accessLevel: requestData?.accessLevel ?? '',
         investorProfile: requestData?.investorProfile ?? {
           investmentFocus: [],
-          typicalCheckSize: null,
+          minTypicalCheckSize: null,
+          maxTypicalCheckSize: null,
           secRulesAccepted: false,
         },
       };

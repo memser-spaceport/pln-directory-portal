@@ -51,7 +51,8 @@ export interface DemoDayParticipant {
     investorProfile?: {
       type?: 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND';
       investmentFocus?: string[];
-      typicalCheckSize?: number;
+      minTypicalCheckSize?: number;
+      maxTypicalCheckSize?: number;
       secRulesAccepted?: boolean;
       investInStartupStages?: string[];
       investInFundTypes?: string[];

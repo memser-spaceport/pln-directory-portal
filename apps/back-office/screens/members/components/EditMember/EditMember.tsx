@@ -72,7 +72,8 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
           githubHandler: string;
           investorProfile?: {
             investmentFocus: string[];
-            typicalCheckSize: number;
+            minTypicalCheckSize: number;
+            maxTypicalCheckSize: number;
             secRulesAccepted: boolean;
             investInStartupStages: string[];
             investInFundTypes: string[];
@@ -110,7 +111,8 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
             investmentFocus: formData.investorProfile.investmentFocus.map(
               (item: { label: string; value: string }) => item.value
             ),
-            typicalCheckSize: Number(formData.investorProfile.typicalCheckSize),
+            minTypicalCheckSize: Number(formData.investorProfile.minTypicalCheckSize),
+            maxTypicalCheckSize: Number(formData.investorProfile.maxTypicalCheckSize),
             secRulesAccepted: !!formData.investorProfile.secRulesAccepted,
             investInStartupStages: formData.investorProfile.investInStartupStages.map(
               (item: { label: string; value: string }) => item.value
@@ -177,7 +179,8 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
               label: focus,
               value: focus,
             })),
-            typicalCheckSize: data.investorProfile?.typicalCheckSize ?? null,
+            minTypicalCheckSize: data.investorProfile?.minTypicalCheckSize ?? null,
+            maxTypicalCheckSize: data.investorProfile?.maxTypicalCheckSize ?? null,
             secRulesAccepted: !!data.investorProfile?.secRulesAccepted,
             investInStartupStages: (data.investorProfile?.investInStartupStages ?? []).map((stage: string) => ({
               label: stage,

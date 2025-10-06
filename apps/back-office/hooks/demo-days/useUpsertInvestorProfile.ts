@@ -4,7 +4,8 @@ import { API_ROUTE } from '../../utils/constants';
 
 export type InvestorProfileInput = {
   investmentFocus: string[];
-  typicalCheckSize?: number;
+  minTypicalCheckSize?: number;
+  maxTypicalCheckSize?: number;
   secRulesAccepted?: boolean;
   investInStartupStages?: string[];
   investInFundTypes?: string[];

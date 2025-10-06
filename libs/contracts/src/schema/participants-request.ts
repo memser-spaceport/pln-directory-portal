@@ -85,7 +85,8 @@ const newDataTeamSchema = z.object({
   investorProfile: z
     .object({
       investmentFocus: z.array(z.string()).optional(),
-      typicalCheckSize: z.number().nullable().optional(),
+      minTypicalCheckSize: z.number().nullable().optional(),
+      maxTypicalCheckSize: z.number().nullable().optional(),
       investInStartupStages: z.array(z.string()).optional(),
       investInFundTypes: z.array(z.string()).optional(),
     })

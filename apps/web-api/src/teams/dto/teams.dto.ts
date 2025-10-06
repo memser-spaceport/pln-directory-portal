@@ -9,7 +9,8 @@ type SelfUpdatePayload = {
     investmentFocus?: string[];
     investInStartupStages?: string[];
     investInFundTypes?: string[];
-    typicalCheckSize?: number | null;
+    minTypicalCheckSize?: number | null;
+    maxTypicalCheckSize?: number | null;
   } | null;
 };
 

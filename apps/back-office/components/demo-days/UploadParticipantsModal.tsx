@@ -25,7 +25,8 @@ interface ParsedParticipant {
   telegramHandler?: string | null;
   role?: string | null;
   investmentType?: 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null;
-  typicalCheckSize?: number | null;
+  minTypicalCheckSize?: number | null;
+  maxTypicalCheckSize?: number | null;
   investInStartupStages?: string[] | null;
   secRulesAccepted?: boolean | null;
   makeTeamLead?: boolean;
@@ -200,7 +201,8 @@ const parseCSV = (csvContent: string): { participants: ParsedParticipant[]; erro
   const telegramHandlerIndex = normalizedHeaders.indexOf('telegram_handler');
   const roleIndex = normalizedHeaders.indexOf('role');
   const investmentTypeIndex = normalizedHeaders.indexOf('investment_type');
-  const typicalCheckSizeIndex = normalizedHeaders.indexOf('typical_check_size');
+  const minTypicalCheckSizeIndex = normalizedHeaders.indexOf('min_check_size');
+  const maxTypicalCheckSizeIndex = normalizedHeaders.indexOf('max_check_size');
   const investInStartupStagesIndex = normalizedHeaders.indexOf('invest_in_startup_stages');
   const secRulesAcceptedIndex = normalizedHeaders.indexOf('sec_rules_accepted');
   const makeTeamLeadIndex = normalizedHeaders.indexOf('team_lead');
@@ -237,7 +239,8 @@ const parseCSV = (csvContent: string): { participants: ParsedParticipant[]; erro
     const role = values[roleIndex]?.trim() || undefined;
     const investmentType =
       investmentTypeIndex >= 0 ? parseInvestmentType(values[investmentTypeIndex] || '') : undefined;
-    const typicalCheckSize = typicalCheckSizeIndex >= 0 ? parseNumber(values[typicalCheckSizeIndex] || '') : undefined;
+    const minTypicalCheckSize = minTypicalCheckSizeIndex >= 0 ? parseNumber(values[minTypicalCheckSizeIndex] || '') : undefined;
+    const maxTypicalCheckSize = maxTypicalCheckSizeIndex >= 0 ? parseNumber(values[maxTypicalCheckSizeIndex] || '') : undefined;
     const investInStartupStages =
       investInStartupStagesIndex >= 0 ? parseArrayFromPipe(values[investInStartupStagesIndex] || '') : undefined;
     const secRulesAccepted = secRulesAcceptedIndex >= 0 ? parseBoolean(values[secRulesAcceptedIndex] || '') : undefined;
@@ -264,7 +267,8 @@ const parseCSV = (csvContent: string): { participants: ParsedParticipant[]; erro
         telegramHandler,
         role,
         investmentType,
-        typicalCheckSize,
+        minTypicalCheckSize,
+        maxTypicalCheckSize,
         investInStartupStages,
         secRulesAccepted,
         makeTeamLead,
@@ -814,7 +818,10 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                               Invest Type
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                              Check Size
+                              Min Check
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              Max Check
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                               Stages
@@ -948,16 +955,31 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                               <td className="px-4 py-3">
                                 <input
                                   type="number"
-                                  value={participant.typicalCheckSize || ''}
+                                  value={participant.minTypicalCheckSize || ''}
                                   onChange={(e) =>
                                     updateParticipant(
                                       index,
-                                      'typicalCheckSize',
+                                      'minTypicalCheckSize',
                                       e.target.value ? parseFloat(e.target.value) : null
                                     )
                                   }
                                   className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                  placeholder="50000"
+                                  placeholder="Min"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="number"
+                                  value={participant.maxTypicalCheckSize || ''}
+                                  onChange={(e) =>
+                                    updateParticipant(
+                                      index,
+                                      'maxTypicalCheckSize',
+                                      e.target.value ? parseFloat(e.target.value) : null
+                                    )
+                                  }
+                                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  placeholder="Max"
                                 />
                               </td>
                               <td className="px-4 py-3">

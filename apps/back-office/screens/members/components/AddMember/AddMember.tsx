@@ -75,7 +75,8 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
             investmentFocus: formData.investorProfile.investmentFocus.map(
               (item: { label: string; value: string }) => item.value
             ),
-            typicalCheckSize: Number(formData.investorProfile.typicalCheckSize),
+            minTypicalCheckSize: Number(formData.investorProfile.minTypicalCheckSize),
+            maxTypicalCheckSize: Number(formData.investorProfile.maxTypicalCheckSize),
             secRulesAccepted: !!formData.investorProfile.secRulesAccepted,
             investInStartupStages: formData.investorProfile.investInStartupStages.map(
               (item: { label: string; value: string }) => item.value

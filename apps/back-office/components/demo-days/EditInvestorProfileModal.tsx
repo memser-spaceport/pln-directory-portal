@@ -17,7 +17,8 @@ export const EditInvestorProfileModal: React.FC<{
   const [focusRaw, setFocusRaw] = useState<string>('');
   const [stages, setStages] = useState<string[]>(initial?.investInStartupStages || []);
   const [fundTypes, setFundTypes] = useState<string[]>(initial?.investInFundTypes || []);
-  const [checkSize, setCheckSize] = useState<string>(initial?.typicalCheckSize?.toString() || '');
+  const [minCheckSize, setMinCheckSize] = useState<string>(initial?.minTypicalCheckSize?.toString() || '');
+  const [maxCheckSize, setMaxCheckSize] = useState<string>(initial?.maxTypicalCheckSize?.toString() || '');
   const [sec, setSec] = useState<boolean>(initial?.secRulesAccepted || false);
   const [investorType, setInvestorType] = useState<string>(initial?.type || '');
 
@@ -26,7 +27,8 @@ export const EditInvestorProfileModal: React.FC<{
     setFocusRaw((initial?.investmentFocus || []).join(', '));
     setStages(initial?.investInStartupStages || []);
     setFundTypes(initial?.investInFundTypes || []);
-    setCheckSize(initial?.typicalCheckSize != null ? String(initial.typicalCheckSize) : '');
+    setMinCheckSize(initial?.minTypicalCheckSize != null ? String(initial.minTypicalCheckSize) : '');
+    setMaxCheckSize(initial?.maxTypicalCheckSize != null ? String(initial.maxTypicalCheckSize) : '');
     setSec(!!initial?.secRulesAccepted);
     setInvestorType(initial?.type || '');
   }, [initial, isOpen]);
@@ -47,7 +49,8 @@ export const EditInvestorProfileModal: React.FC<{
       investmentFocus: parsedFocus(),
       investInStartupStages: stages,
       investInFundTypes: fundTypes,
-      typicalCheckSize: checkSize ? Number(checkSize) : undefined,
+      minTypicalCheckSize: minCheckSize ? Number(minCheckSize) : undefined,
+      maxTypicalCheckSize: maxCheckSize ? Number(maxCheckSize) : undefined,
       secRulesAccepted: sec,
       type: investorType,
     };
@@ -114,19 +117,37 @@ export const EditInvestorProfileModal: React.FC<{
           </div>
         </div>
 
-        {/* Typical check size */}
+        {/* Typical check size range */}
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium">Typical check size (USD)</label>
-          <input
-            type="number"
-            min="0"
-            step="1000"
-            inputMode="numeric"
-            value={checkSize}
-            onChange={(e) => setCheckSize(e.target.value)}
-            placeholder="e.g. 250000"
-            className="w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-          />
+          <label className="mb-2 block text-sm font-medium">Typical check size range (USD)</label>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-xs text-gray-600">Minimum</label>
+              <input
+                type="number"
+                min="0"
+                step="1000"
+                inputMode="numeric"
+                value={minCheckSize}
+                onChange={(e) => setMinCheckSize(e.target.value)}
+                placeholder="e.g. 100000"
+                className="w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-600">Maximum</label>
+              <input
+                type="number"
+                min="0"
+                step="1000"
+                inputMode="numeric"
+                value={maxCheckSize}
+                onChange={(e) => setMaxCheckSize(e.target.value)}
+                placeholder="e.g. 500000"
+                className="w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
         </div>
 
         {/* SEC rules */}
