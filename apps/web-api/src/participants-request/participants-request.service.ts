@@ -320,7 +320,8 @@ export class ParticipantsRequestService {
       // Define callback to add requester as team member
       const addTeamMemberCallback = async (createdTeam: any, tx: Prisma.TransactionClient) => {
         const role = (requestData.newData as any).role || 'Lead';
-        await this.addRequesterAsTeamMember(createdTeam.uid, requesterUser.uid, role, true, tx);
+        const investmentTeam = (requestData.newData as any).investmentTeam || false;
+        await this.addRequesterAsTeamMember(createdTeam.uid, requesterUser.uid, role, true, investmentTeam, tx);
       };
 
       await this.approveRequestByUid(result.uid, result, true, addTeamMemberCallback, true);
@@ -464,6 +465,7 @@ export class ParticipantsRequestService {
     requesterUid: string,
     role: string,
     teamLead: boolean,
+    investmentTeam: boolean,
     tx: Prisma.TransactionClient
   ): Promise<void> {
     await tx.teamMemberRole.create({
@@ -472,6 +474,7 @@ export class ParticipantsRequestService {
         memberUid: requesterUid,
         role,
         teamLead,
+        investmentTeam,
       },
     });
   }
