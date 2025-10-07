@@ -1294,6 +1294,14 @@ export class TeamsService {
       if (!teamExists) {
         throw new NotFoundException('Team not found');
       }
+
+      await tx.teamMemberRole.updateMany({
+        where: { memberUid: member.uid, teamUid: { not: teamUid } },
+        data: {
+          investmentTeam: false,
+        },
+      });
+
       // 1) Upsert caller's TeamMemberRole (open to any authenticated member)
       if (role !== undefined || investmentTeam !== undefined) {
         await tx.teamMemberRole.upsert({
