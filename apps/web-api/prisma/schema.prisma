@@ -157,6 +157,7 @@ model Member {
   investorProfile              InvestorProfile?              @relation("MemberInvestorProfile", fields: [investorProfileId], references: [uid])
   investorProfileId            String?                       @unique
   demoDayParticipants          DemoDayParticipant[]
+  demoDayEngagements           DemoDayEngagement[]
 }
 
 model MemberRole {
@@ -969,6 +970,7 @@ model DemoDay {
   deletedAt           DateTime?
   participants        DemoDayParticipant[]
   fundraisingProfiles TeamFundraisingProfile[]
+  engagements         DemoDayEngagement[]
 }
 
 model DemoDayParticipant {
@@ -1014,4 +1016,22 @@ model Event {
   @@index([anonymousId, ts])
   @@index([sessionId, ts])
   @@index([ts])
+}
+
+model DemoDayEngagement {
+  id  Int    @id @default(autoincrement())
+  uid String @unique @default(cuid())
+
+  demoDayUid String
+  demoDay    DemoDay @relation(fields: [demoDayUid], references: [uid], onDelete: Cascade)
+
+  memberUid String
+  member    Member @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+
+  calendarAddedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([demoDayUid, memberUid])
 }

@@ -39,3 +39,4 @@
   - [Dev](DEPLOYMENT_DEV.md)
   - [Staging](DEPLOYMENT_STAGING.md)
   - [Production](DEPLOYMENT_PRODUCTION.md)
+  - [Web API Deployment Guide](../apps/web-api/docs/DEPLOYMENT-GUIDE.md)

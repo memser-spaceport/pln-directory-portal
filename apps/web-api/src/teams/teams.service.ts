@@ -60,7 +60,10 @@ export class TeamsService {
       };
 
       const [teams, teamsCount] = await Promise.all([
-        this.prisma.team.findMany({ ...queryOptions, where: whereClause }),
+        this.prisma.team.findMany({
+          ...queryOptions,
+          where: whereClause,
+        }),
         this.prisma.team.count({ where: whereClause }),
       ]);
       return { count: teamsCount, teams: teams };
@@ -1291,6 +1294,14 @@ export class TeamsService {
       if (!teamExists) {
         throw new NotFoundException('Team not found');
       }
+
+      await tx.teamMemberRole.updateMany({
+        where: { memberUid: member.uid, teamUid: { not: teamUid } },
+        data: {
+          investmentTeam: false,
+        },
+      });
+
       // 1) Upsert caller's TeamMemberRole (open to any authenticated member)
       if (role !== undefined || investmentTeam !== undefined) {
         await tx.teamMemberRole.upsert({
@@ -1309,8 +1320,7 @@ export class TeamsService {
       }
 
       // 2) Privileged fields require team lead
-      const wantsPrivileged =
-        isFund !== undefined || (investorProfile && Object.keys(investorProfile).length > 0);
+      const wantsPrivileged = isFund !== undefined || (investorProfile && Object.keys(investorProfile).length > 0);
 
       if (wantsPrivileged) {
         // Check caller's role in this team: must be teamLead === true
@@ -1350,7 +1360,6 @@ export class TeamsService {
       };
     });
   }
-
 
   /* Creates or updates team's investor profile.
      PRECONDITION: caller is already verified as a team lead for this team.
@@ -1400,6 +1409,4 @@ export class TeamsService {
       });
     }
   }
-
-
 }

@@ -351,7 +351,9 @@ export class DemoDayParticipantsService {
               telegramOwnerCache.set(normalizedTelegram, telegramOwnerUid);
             }
           }
-
+          const isTeamInvestorProfile =
+            (participantData.investmentType === 'FUND' || participantData.investmentType === 'ANGEL_AND_FUND') &&
+            participantData.organization;
           let willBeTeamLead = false;
 
           if (participantData.organization) {
@@ -428,7 +430,7 @@ export class DemoDayParticipantsService {
             }
 
             // Update investor profile if it exists
-            if (existingMember.investorProfile) {
+            if (existingMember.investorProfile && !isTeamInvestorProfile) {
               updateData.investorProfile = {
                 update: {
                   type: participantData.investmentType || existingMember.investorProfile.type,
@@ -463,14 +465,16 @@ export class DemoDayParticipantsService {
               twitterHandler: normalizedTwitter,
               linkedinHandler: normalizedLinkedin,
               accessLevel: 'L0',
-              investorProfile: {
-                create: {
-                  type: investorType,
-                  typicalCheckSize: participantData.typicalCheckSize || undefined,
-                  investInStartupStages: participantData.investInStartupStages || undefined,
-                  secRulesAccepted: participantData.secRulesAccepted || false,
-                },
-              },
+              investorProfile: isTeamInvestorProfile
+                ? undefined
+                : {
+                    create: {
+                      type: investorType,
+                      typicalCheckSize: participantData.typicalCheckSize || undefined,
+                      investInStartupStages: participantData.investInStartupStages || undefined,
+                      secRulesAccepted: participantData.secRulesAccepted || false,
+                    },
+                  },
             };
 
             // Only set telegramHandler if it's not used by another member
@@ -536,6 +540,30 @@ export class DemoDayParticipantsService {
 
               // Cache the team
               teamCache.set(orgName.toLowerCase(), team);
+            }
+
+            if (isTeamInvestorProfile) {
+              if (team.investorProfileId) {
+                await tx.investorProfile.update({
+                  where: { uid: team.investorProfileId },
+                  data: {
+                    typicalCheckSize: participantData.typicalCheckSize || undefined,
+                    investInStartupStages: participantData.investInStartupStages || undefined,
+                  },
+                });
+              } else {
+                const newInvestorProfile = await tx.investorProfile.create({
+                  data: {
+                    teamUid: team.uid,
+                    typicalCheckSize: participantData.typicalCheckSize || undefined,
+                    investInStartupStages: participantData.investInStartupStages || undefined,
+                  },
+                });
+                await tx.team.update({
+                  where: { uid: team.uid },
+                  data: { investorProfileId: newInvestorProfile.uid },
+                });
+              }
             }
 
             teamUid = team.uid;

@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import {Controller, Req, UseGuards, Body, Param, UsePipes, Patch} from '@nestjs/common';
+import { Controller, Req, UseGuards, Body, Param, UsePipes, Patch } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
@@ -97,6 +97,15 @@ export class TeamsController {
       }
       builtQuery.orderBy = order;
     }
+
+    if (builtQuery.select) {
+      builtQuery.select.investorProfile = true;
+    } else if (builtQuery.include) {
+      builtQuery.include.investorProfile = true;
+    } else {
+      builtQuery.include = { investorProfile: true };
+    }
+
     return this.teamsService.findAll(builtQuery);
   }
 
