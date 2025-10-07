@@ -58,13 +58,12 @@ export class TeamsService {
           not: 'L0',
         },
       };
-      const select = {
-        ...(queryOptions.select || {}),
-        investorProfile: true,
-      };
 
       const [teams, teamsCount] = await Promise.all([
-        this.prisma.team.findMany({ ...queryOptions, where: whereClause, select }),
+        this.prisma.team.findMany({
+          ...queryOptions,
+          where: whereClause,
+        }),
         this.prisma.team.count({ where: whereClause }),
       ]);
       return { count: teamsCount, teams: teams };
