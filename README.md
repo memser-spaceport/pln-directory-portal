@@ -201,6 +201,16 @@ The folder structure of this project is organized as follows:
 - **apps/web-api/prisma**: Contains the database schema and migration files
 - **libs/contracts**: Contains the API contracts
 
+## Deployment
+
+For comprehensive deployment information, refer to the [Web API Deployment Guide](./apps/web-api/docs/DEPLOYMENT-GUIDE.md) which covers:
+
+- **Multi-Environment Deployment**: Development, UAT, and Production environments
+- **Infrastructure Integration**: pl-infra-pipeline repository integration
+- **Automated CI/CD**: GitHub Actions workflows for all environments
+- **Secrets Management**: AWS SSM Parameter Store configuration
+- **Troubleshooting**: Common issues and debugging procedures
+
 ---
 
 ## Prerequisites
