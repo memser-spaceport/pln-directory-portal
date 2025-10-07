@@ -6,11 +6,12 @@ import {DemoDaysController} from './demo-days.controller';
 import {SharedModule} from '../shared/shared.module';
 import {UploadsModule} from '../uploads/uploads.module';
 import {AnalyticsModule} from "../analytics/analytics.module";
+import {DemoDayEngagementService} from "./demo-day-engagement.service";
 
 @Module({
   imports: [SharedModule, UploadsModule, AnalyticsModule],
   controllers: [DemoDaysController],
-  providers: [DemoDaysService, DemoDayParticipantsService, DemoDayFundraisingProfilesService],
+  providers: [DemoDaysService, DemoDayParticipantsService, DemoDayFundraisingProfilesService, DemoDayEngagementService],
   exports: [DemoDaysService, DemoDayParticipantsService, DemoDayFundraisingProfilesService],
 })
 export class DemoDaysModule {}
