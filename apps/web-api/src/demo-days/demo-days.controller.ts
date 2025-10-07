@@ -12,6 +12,8 @@ import {
   UsePipes,
   Query,
   Post,
+  Param,
+  ForbiddenException,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiTags } from '@nestjs/swagger';
@@ -25,6 +27,7 @@ import { UploadsService } from '../uploads/uploads.service';
 import { UploadKind, UploadScopeType } from '@prisma/client';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UpdateFundraisingTeamDto, UpdateFundraisingDescriptionDto } from 'libs/contracts/src/schema';
+import { MembersService } from '../members/members.service';
 
 @ApiTags('Demo Days')
 @Controller('v1/demo-days')
@@ -33,7 +36,8 @@ export class DemoDaysController {
     private readonly demoDaysService: DemoDaysService,
     private readonly demoDayFundraisingProfilesService: DemoDayFundraisingProfilesService,
     private readonly uploadsService: UploadsService,
-    private readonly demoDayEngagementService: DemoDayEngagementService
+    private readonly demoDayEngagementService: DemoDayEngagementService,
+    private readonly memberService: MembersService
   ) {}
 
   @Get('current')
@@ -137,6 +141,19 @@ export class DemoDaysController {
   @NoCache()
   async updateTeam(@Req() req, @Body() body: UpdateFundraisingTeamDto) {
     return this.demoDayFundraisingProfilesService.updateFundraisingTeam(req.userEmail, body);
+  }
+
+  @Patch('current/teams/:teamUid/fundraising-profile/admin')
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async updateTeamByUid(@Req() req, @Param('teamUid') teamUid: string, @Body() body: UpdateFundraisingTeamDto) {
+    const requestor = await this.memberService.findMemberByEmail(req.userEmail);
+    const isAdmin = await this.memberService.checkIfAdminUser(requestor);
+    if (!isAdmin) {
+      throw new ForbiddenException(`Member with email ${req.userEmail} isn't admin`);
+    }
+    return this.demoDayFundraisingProfilesService.updateFundraisingTeamByUid(teamUid, body);
   }
 
   // Engagement endpoints

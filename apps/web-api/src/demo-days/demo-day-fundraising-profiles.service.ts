@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { DemoDay, UploadKind } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { DemoDaysService } from './demo-days.service';
@@ -6,47 +6,13 @@ import { AnalyticsService } from '../analytics/service/analytics.service';
 
 @Injectable()
 export class DemoDayFundraisingProfilesService {
-  constructor(private readonly prisma: PrismaService, private readonly demoDaysService: DemoDaysService, private readonly analyticsService: AnalyticsService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly demoDaysService: DemoDaysService,
+    private readonly analyticsService: AnalyticsService
+  ) {}
 
-  async getCurrentDemoDayFundraisingProfile(memberEmail: string): Promise<any> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
-    if (!demoDay) {
-      throw new ForbiddenException('No demo day access');
-    }
-
-    // Get member and check if they are an enabled founder participant
-    const member = await this.prisma.member.findUnique({
-      where: { email: memberEmail },
-      include: {
-        demoDayParticipants: {
-          where: {
-            demoDayUid: demoDay.uid,
-            isDeleted: false,
-            status: 'ENABLED',
-            type: 'FOUNDER',
-          },
-          take: 1,
-        },
-        teamMemberRoles: {
-          include: { team: true },
-        },
-      },
-    });
-
-    if (!member || member.demoDayParticipants.length === 0) {
-      throw new ForbiddenException('No demo day access');
-    }
-
-    const demoDayParticipant = member.demoDayParticipants[0];
-    const teamUid =
-      demoDayParticipant.teamUid ||
-      member.teamMemberRoles.find((role) => role.mainTeam)?.team.uid ||
-      member.teamMemberRoles[0]?.team.uid;
-
-    if (!teamUid) {
-      throw new BadRequestException('Member must be part of a team to access fundraising profile');
-    }
-
+  private async getCurrentDemoDayFundraisingProfileByTeamUid(teamUid: string, demoDayUid: string): Promise<any> {
     // Get team details with required fields
     const teamWithDetails = await this.prisma.team.findUnique({
       where: { uid: teamUid },
@@ -80,7 +46,7 @@ export class DemoDayFundraisingProfilesService {
       where: {
         teamUid_demoDayUid: {
           teamUid: teamUid,
-          demoDayUid: demoDay.uid,
+          demoDayUid: demoDayUid,
         },
       },
       include: {
@@ -93,7 +59,7 @@ export class DemoDayFundraisingProfilesService {
       fundraisingProfile = await this.prisma.teamFundraisingProfile.create({
         data: {
           teamUid: teamUid,
-          demoDayUid: demoDay.uid,
+          demoDayUid: demoDayUid,
           status: 'DRAFT',
         },
         include: {
@@ -103,18 +69,10 @@ export class DemoDayFundraisingProfilesService {
       });
     }
 
-    // If teamUid is not set, set it
-    if (!demoDayParticipant.teamUid) {
-      await this.prisma.demoDayParticipant.update({
-        where: { uid: demoDayParticipant.uid },
-        data: { teamUid: teamUid },
-      });
-    }
-
     // Get all enabled founders for this team with their roles
     const founders = await this.prisma.demoDayParticipant.findMany({
       where: {
-        demoDayUid: demoDay.uid,
+        demoDayUid: demoDayUid,
         teamUid: teamUid,
         status: 'ENABLED',
         isDeleted: false,
@@ -173,6 +131,56 @@ export class DemoDayFundraisingProfilesService {
       videoUpload: fundraisingProfile.videoUpload,
       description: fundraisingProfile.description,
     };
+  }
+
+  async getCurrentDemoDayFundraisingProfile(memberEmail: string): Promise<any> {
+    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day access');
+    }
+
+    // Get member and check if they are an enabled founder participant
+    const member = await this.prisma.member.findUnique({
+      where: { email: memberEmail },
+      include: {
+        demoDayParticipants: {
+          where: {
+            demoDayUid: demoDay.uid,
+            isDeleted: false,
+            status: 'ENABLED',
+            type: 'FOUNDER',
+          },
+          take: 1,
+        },
+        teamMemberRoles: {
+          include: { team: true },
+        },
+      },
+    });
+
+    if (!member || member.demoDayParticipants.length === 0) {
+      throw new ForbiddenException('No demo day access');
+    }
+
+    const demoDayParticipant = member.demoDayParticipants[0];
+    const teamUid =
+      demoDayParticipant.teamUid ||
+      member.teamMemberRoles.find((role) => role.mainTeam)?.team.uid ||
+      member.teamMemberRoles[0]?.team.uid;
+
+    if (!teamUid) {
+      throw new BadRequestException('Member must be part of a team to access fundraising profile');
+    }
+
+    // If teamUid is not set, set it
+    if (!demoDayParticipant.teamUid) {
+      await this.prisma.demoDayParticipant.update({
+        where: { uid: demoDayParticipant.uid },
+        data: { teamUid: teamUid },
+      });
+    }
+
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 
   private async validateDemoDayFounderAccess(
@@ -491,6 +499,60 @@ export class DemoDayFundraisingProfilesService {
   ): Promise<any> {
     const { team, demoDay } = await this.validateDemoDayFounderAccess(memberEmail);
 
+    // Update team
+    await this.prisma.team.update({
+      where: { uid: team.uid },
+      data: this.updateFundraisingTeamData(data),
+    });
+
+    await this.updateFundraisingProfileStatus(team.uid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(team.uid, demoDay.uid);
+  }
+
+  async updateFundraisingTeamByUid(
+    teamUid: string,
+    data: {
+      name?: string;
+      shortDescription?: string;
+      industryTags?: string[];
+      fundingStage?: string;
+      logo?: string;
+    }
+  ): Promise<any> {
+    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day access');
+    }
+
+    // Verify the team exists and has a fundraising profile for the current demo day
+    const team = await this.prisma.team.findUnique({
+      where: { uid: teamUid },
+      include: {
+        fundraisingProfiles: {
+          where: { demoDayUid: demoDay.uid },
+        },
+      },
+    });
+
+    if (!team) {
+      throw new NotFoundException('Team not found');
+    }
+
+    if (team.fundraisingProfiles.length === 0) {
+      throw new ForbiddenException('Team does not have a fundraising profile for the current demo day');
+    }
+
+    // Update team
+    await this.prisma.team.update({
+      where: { uid: teamUid },
+      data: this.updateFundraisingTeamData(data),
+    });
+
+    await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
+  }
+
+  private updateFundraisingTeamData(data: any): any {
     const updateData: any = {};
 
     if (data.name) {
@@ -511,18 +573,11 @@ export class DemoDayFundraisingProfilesService {
 
     if (data.industryTags) {
       updateData.industryTags = {
-        set: data.industryTags.map((uid) => ({ uid })),
+        set: data.industryTags.map((uid: any) => ({ uid })),
       };
     }
 
-    // Update team
-    await this.prisma.team.update({
-      where: { uid: team.uid },
-      data: updateData,
-    });
-
-    await this.updateFundraisingProfileStatus(team.uid, demoDay.uid);
-    return this.getCurrentDemoDayFundraisingProfile(memberEmail);
+    return updateData;
   }
 
   async getCurrentDemoDayFundraisingProfiles(
