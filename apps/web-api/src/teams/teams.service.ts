@@ -58,9 +58,13 @@ export class TeamsService {
           not: 'L0',
         },
       };
+      const select = {
+        ...(queryOptions.select || {}),
+        investorProfile: true,
+      };
 
       const [teams, teamsCount] = await Promise.all([
-        this.prisma.team.findMany({ ...queryOptions, where: whereClause }),
+        this.prisma.team.findMany({ ...queryOptions, where: whereClause, select }),
         this.prisma.team.count({ where: whereClause }),
       ]);
       return { count: teamsCount, teams: teams };
@@ -1309,8 +1313,7 @@ export class TeamsService {
       }
 
       // 2) Privileged fields require team lead
-      const wantsPrivileged =
-        isFund !== undefined || (investorProfile && Object.keys(investorProfile).length > 0);
+      const wantsPrivileged = isFund !== undefined || (investorProfile && Object.keys(investorProfile).length > 0);
 
       if (wantsPrivileged) {
         // Check caller's role in this team: must be teamLead === true
@@ -1350,7 +1353,6 @@ export class TeamsService {
       };
     });
   }
-
 
   /* Creates or updates team's investor profile.
      PRECONDITION: caller is already verified as a team lead for this team.
@@ -1400,6 +1402,4 @@ export class TeamsService {
       });
     }
   }
-
-
 }

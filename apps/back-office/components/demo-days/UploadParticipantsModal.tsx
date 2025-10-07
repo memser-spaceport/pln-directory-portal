@@ -41,7 +41,7 @@ const headerAliases = {
   linkedin_handler: ['linkedin', 'linkedin_handle', 'linkedin_url', 'linkedin_profile', 'linkedin_handler'],
   telegram_handler: ['telegram_handler', 'telegram', 'telegram_handle', 'tg'],
   role: ['role', 'organization_role', 'fund_role', 'organization/fund_role', 'team_role'],
-  investment_type: ['type', 'investment_type', 'invest_type', 'investor_type'],
+  investment_type: ['type', 'investment_type', 'invest_type', 'investor_type', 'how_do_you_invest'],
   typical_check_size: ['typical_check_size', 'check_size'],
   invest_in_startup_stages: ['investment_stages', 'invest_in_startup_stages'],
   sec_rules_accepted: ['sec_rules_accepted'],
@@ -133,13 +133,19 @@ const parseInvestmentType = (value: string): 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND'
   }
 
   // FUND mappings
-  if (['fund', 'i invest through fund(s)'].includes(normalized)) {
+  if (['fund', 'i invest through fund(s)', 'i invest thru fund(s)'].includes(normalized)) {
     return 'FUND';
   }
 
   // ANGEL_AND_FUND mappings
   if (
-    ['angel_and_fund', 'angel and fund', 'angel+fund', 'i angel invest + invest through fund(s)'].includes(normalized)
+    [
+      'angel_and_fund',
+      'angel and fund',
+      'angel+fund',
+      'i angel invest + invest through fund(s)',
+      'i angel invest + i invest thru fund(s)',
+    ].includes(normalized)
   ) {
     return 'ANGEL_AND_FUND';
   }
@@ -376,7 +382,7 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
       'johndoe',
       'johndoe',
       'Lead',
-      'FUND',
+      'I invest through fund(s)',
       '50000',
       'Pre-seed|Seed',
       'true',
