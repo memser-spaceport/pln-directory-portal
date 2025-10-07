@@ -44,7 +44,14 @@ const headerAliases = {
   investment_type: ['type', 'investment_type', 'invest_type', 'investor_type', 'how_do_you_invest'],
   typical_check_size: ['typical_check_size', 'check_size'],
   invest_in_startup_stages: ['investment_stages', 'invest_in_startup_stages'],
-  sec_rules_accepted: ['sec_rules_accepted'],
+  sec_rules_accepted: [
+    'sec_rules_accepted',
+    't&c',
+    't_&_c',
+    'terms_and_conditions',
+    'terms_&_conditions',
+    'terms&conditions',
+  ],
   organization: [
     'organization_fund_name',
     'organization/fund_name',
@@ -162,7 +169,7 @@ const parseNumber = (value: string): number | null => {
 const parseArrayFromPipe = (value: string): string[] | null => {
   if (!value) return null;
   return String(value)
-    .split('|')
+    .split(',')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 };
