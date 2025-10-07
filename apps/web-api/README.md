@@ -192,3 +192,15 @@ $ yarn nx run web-api:lint```
 ### Full type safety endpoint development
 
 For more information on this access the contracts lib documentation [here](./libs/contracts/README.md).
+
+## Deployment
+
+For comprehensive deployment information including all environments (Development, UAT, Production), infrastructure setup, and troubleshooting, refer to the [Deployment Guide](./docs/DEPLOYMENT-GUIDE.md).
+
+The deployment guide covers:
+- **Automated CI/CD**: GitHub Actions workflows for all environments
+- **Infrastructure Integration**: pl-infra-pipeline repository integration
+- **Secrets Management**: AWS SSM Parameter Store configuration
+- **Manual Deployment**: Step-by-step manual deployment procedures
+- **Troubleshooting**: Common issues and debugging commands
+- **Monitoring**: Health checks and maintenance procedures
