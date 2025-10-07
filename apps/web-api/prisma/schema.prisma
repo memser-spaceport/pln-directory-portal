@@ -157,6 +157,7 @@ model Member {
   investorProfile              InvestorProfile?              @relation("MemberInvestorProfile", fields: [investorProfileId], references: [uid])
   investorProfileId            String?                       @unique
   demoDayParticipants          DemoDayParticipant[]
+  demoDayEngagements           DemoDayEngagement[]
 }
 
 model MemberRole {
@@ -257,17 +258,18 @@ model Location {
 }
 
 model TeamMemberRole {
-  id        Int       @id @default(autoincrement())
-  mainTeam  Boolean   @default(false)
-  teamLead  Boolean   @default(false)
-  startDate DateTime?
-  endDate   DateTime?
-  role      String?
-  member    Member    @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
-  memberUid String
-  team      Team      @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
-  teamUid   String
-  roleTags  String[]
+  id             Int       @id @default(autoincrement())
+  mainTeam       Boolean   @default(false)
+  teamLead       Boolean   @default(false)
+  investmentTeam Boolean   @default(false)
+  startDate      DateTime?
+  endDate        DateTime?
+  role           String?
+  member         Member    @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  memberUid      String
+  team           Team      @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  teamUid        String
+  roleTags       String[]
 
   // One member can only have one role per team
   @@unique([memberUid, teamUid])
@@ -837,6 +839,8 @@ model TeamFundraisingProfile {
   videoUploadUid String?
   videoUpload    Upload? @relation("TFP_videoUpload", fields: [videoUploadUid], references: [uid])
 
+  description String?
+
   status TeamFundraisingProfileStatus @default(DRAFT)
 
   createdAt      DateTime @default(now())
@@ -966,6 +970,7 @@ model DemoDay {
   deletedAt           DateTime?
   participants        DemoDayParticipant[]
   fundraisingProfiles TeamFundraisingProfile[]
+  engagements         DemoDayEngagement[]
 }
 
 model DemoDayParticipant {
@@ -1011,4 +1016,22 @@ model Event {
   @@index([anonymousId, ts])
   @@index([sessionId, ts])
   @@index([ts])
+}
+
+model DemoDayEngagement {
+  id  Int    @id @default(autoincrement())
+  uid String @unique @default(cuid())
+
+  demoDayUid String
+  demoDay    DemoDay @relation(fields: [demoDayUid], references: [uid], onDelete: Cascade)
+
+  memberUid String
+  member    Member @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+
+  calendarAddedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([demoDayUid, memberUid])
 }

@@ -41,14 +41,24 @@ const headerAliases = {
   linkedin_handler: ['linkedin', 'linkedin_handle', 'linkedin_url', 'linkedin_profile', 'linkedin_handler'],
   telegram_handler: ['telegram_handler', 'telegram', 'telegram_handle', 'tg'],
   role: ['role', 'organization_role', 'fund_role', 'organization/fund_role', 'team_role'],
-  investment_type: ['type', 'investment_type', 'invest_type', 'investor_type'],
+  investment_type: ['type', 'investment_type', 'invest_type', 'investor_type', 'how_do_you_invest'],
   typical_check_size: ['typical_check_size', 'check_size'],
   invest_in_startup_stages: ['investment_stages', 'invest_in_startup_stages'],
-  sec_rules_accepted: ['sec_rules_accepted'],
+  sec_rules_accepted: [
+    'sec_rules_accepted',
+    't&c',
+    't_&_c',
+    'terms_and_conditions',
+    'terms_&_conditions',
+    'terms&conditions',
+  ],
   organization: [
     'organization_fund_name',
     'organization/fund_name',
     'organization_/_fund_name',
+    'organisation_/_fund_name',
+    'organisation/fund_name',
+    'organisation_fund_name',
     'org_fund_name',
     'org/fund_name',
     'org_/_fund_name',
@@ -133,13 +143,19 @@ const parseInvestmentType = (value: string): 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND'
   }
 
   // FUND mappings
-  if (['fund', 'i invest through fund(s)'].includes(normalized)) {
+  if (['fund', 'i invest through fund(s)', 'i invest thru fund(s)'].includes(normalized)) {
     return 'FUND';
   }
 
   // ANGEL_AND_FUND mappings
   if (
-    ['angel_and_fund', 'angel and fund', 'angel+fund', 'i angel invest + invest through fund(s)'].includes(normalized)
+    [
+      'angel_and_fund',
+      'angel and fund',
+      'angel+fund',
+      'i angel invest + invest through fund(s)',
+      'i angel invest + i invest thru fund(s)',
+    ].includes(normalized)
   ) {
     return 'ANGEL_AND_FUND';
   }
@@ -156,7 +172,7 @@ const parseNumber = (value: string): number | null => {
 const parseArrayFromPipe = (value: string): string[] | null => {
   if (!value) return null;
   return String(value)
-    .split('|')
+    .split(',')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 };
@@ -164,6 +180,44 @@ const parseArrayFromPipe = (value: string): string[] | null => {
 const validateEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
+};
+
+// Proper CSV parser that handles quoted values and commas within quotes
+const parseCSVLine = (line: string): string[] => {
+  const fields: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  let i = 0;
+
+  while (i < line.length) {
+    const char = line[i];
+    const nextChar = line[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        // Escaped quote - add single quote and skip next character
+        current += '"';
+        i += 2;
+      } else {
+        // Toggle quote state
+        inQuotes = !inQuotes;
+        i++;
+      }
+    } else if (char === ',' && !inQuotes) {
+      // Field separator outside of quotes
+      fields.push(current);
+      current = '';
+      i++;
+    } else {
+      current += char;
+      i++;
+    }
+  }
+
+  // Add the last field
+  fields.push(current);
+
+  return fields;
 };
 
 const parseCSV = (csvContent: string): { participants: ParsedParticipant[]; errors: string[] } => {
@@ -180,8 +234,8 @@ const parseCSV = (csvContent: string): { participants: ParsedParticipant[]; erro
     return { participants: [], errors };
   }
 
-  // Parse headers
-  const rawHeaders = lines[0].split(',').map((h) => h.trim().replace(/"/g, ''));
+  // Parse headers using proper CSV parser
+  const rawHeaders = parseCSVLine(lines[0]).map((h) => h.trim().replace(/"/g, ''));
   const normalizedHeaders = rawHeaders.map(normalizeHeader);
 
   // Check for required email column
@@ -208,7 +262,7 @@ const parseCSV = (csvContent: string): { participants: ParsedParticipant[]; erro
   const participants: ParsedParticipant[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map((v) => v.trim().replace(/"/g, ''));
+    const values = parseCSVLine(lines[i]).map((v) => v.trim().replace(/"/g, ''));
     const rowErrors: string[] = [];
 
     // Parse email (required)
@@ -376,7 +430,7 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
       'johndoe',
       'johndoe',
       'Lead',
-      'FUND',
+      'I invest through fund(s)',
       '50000',
       'Pre-seed|Seed',
       'true',
@@ -963,14 +1017,14 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                               <td className="px-4 py-3">
                                 <input
                                   type="text"
-                                  value={participant.investInStartupStages?.join('|') || ''}
+                                  value={participant.investInStartupStages?.join(',') || ''}
                                   onChange={(e) =>
                                     updateParticipant(
                                       index,
                                       'investInStartupStages',
                                       e.target.value
                                         ? e.target.value
-                                            .split('|')
+                                            .split(',')
                                             .map((s) => s.trim())
                                             .filter((s) => s)
                                         : null

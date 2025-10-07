@@ -60,7 +60,10 @@ export class TeamsService {
       };
 
       const [teams, teamsCount] = await Promise.all([
-        this.prisma.team.findMany({ ...queryOptions, where: whereClause }),
+        this.prisma.team.findMany({
+          ...queryOptions,
+          where: whereClause,
+        }),
         this.prisma.team.count({ where: whereClause }),
       ]);
       return { count: teamsCount, teams: teams };
@@ -1267,6 +1270,143 @@ export class TeamsService {
     } catch (error) {
       this.logger.error(`error occured while fetching event contributors`, error);
       this.handleErrors(error);
+    }
+  }
+
+  /*
+     Creates/updates member's TeamMemberRole for the given team,
+     and (if caller is team lead) updates team.isFund and investor profile.
+     - Any user: can set role/investmentTeam (upsert their TeamMemberRole)
+     - Team lead only: can set team.isFund and team.investorProfile (create if missing)
+   */
+  async updateTeamMemberRoleAndInvestorProfile(teamUid: string, body: SelfUpdatePayload, requestorEmail: string) {
+    // Resolve the calling member by email
+    const member = await this.membersService.findMemberByEmail(requestorEmail);
+    if (!member) throw new NotFoundException('Member not found');
+
+    const { role, investmentTeam, isFund, investorProfile } = body ?? {};
+
+    return await this.prisma.$transaction(async (tx) => {
+      const teamExists = await tx.team.findUnique({
+        where: { uid: teamUid },
+        select: { uid: true },
+      });
+      if (!teamExists) {
+        throw new NotFoundException('Team not found');
+      }
+
+      await tx.teamMemberRole.updateMany({
+        where: { memberUid: member.uid, teamUid: { not: teamUid } },
+        data: {
+          investmentTeam: false,
+        },
+      });
+
+      // 1) Upsert caller's TeamMemberRole (open to any authenticated member)
+      if (role !== undefined || investmentTeam !== undefined) {
+        await tx.teamMemberRole.upsert({
+          where: { memberUid_teamUid: { memberUid: member.uid, teamUid } },
+          create: {
+            memberUid: member.uid,
+            teamUid,
+            ...(role !== undefined ? { role } : {}),
+            ...(investmentTeam !== undefined ? { investmentTeam } : {}),
+          },
+          update: {
+            ...(role !== undefined ? { role } : {}),
+            ...(investmentTeam !== undefined ? { investmentTeam } : {}),
+          },
+        });
+      }
+
+      // 2) Privileged fields require team lead
+      const wantsPrivileged = isFund !== undefined || (investorProfile && Object.keys(investorProfile).length > 0);
+
+      if (wantsPrivileged) {
+        // Check caller's role in this team: must be teamLead === true
+        const myRole = await tx.teamMemberRole.findUnique({
+          where: { memberUid_teamUid: { memberUid: member.uid, teamUid } },
+          select: { teamLead: true },
+        });
+        if (!myRole?.teamLead) {
+          throw new ForbiddenException('Only team lead can update investor settings');
+        }
+
+        // Update team.isFund if requested
+        if (isFund !== undefined) {
+          await tx.team.update({ where: { uid: teamUid }, data: { isFund } });
+        }
+
+        // Create/update investor profile (no global ACLs here; team lead is enough)
+        if (investorProfile) {
+          await this.upsertInvestorProfileAsTeamLead(tx, teamUid, investorProfile);
+        }
+      }
+
+      // Return a minimal, fresh snapshot after mutations
+      const [team, tmRole] = await Promise.all([
+        tx.team.findUnique({ where: { uid: teamUid }, include: { investorProfile: true } }),
+        tx.teamMemberRole.findUnique({ where: { memberUid_teamUid: { memberUid: member.uid, teamUid } } }),
+      ]);
+
+      return {
+        teamUid,
+        memberUid: member.uid,
+        team: {
+          isFund: team?.isFund ?? null,
+          investorProfile: team?.investorProfile ?? null,
+        },
+        teamMemberRole: tmRole,
+      };
+    });
+  }
+
+  /* Creates or updates team's investor profile.
+     PRECONDITION: caller is already verified as a team lead for this team.
+     - If investorProfile exists -> update it
+     - If not -> create it and link to the team
+   */
+  private async upsertInvestorProfileAsTeamLead(
+    tx: Prisma.TransactionClient,
+    teamUid: string,
+    investorProfileData: {
+      investmentFocus?: string[];
+      investInStartupStages?: string[];
+      investInFundTypes?: string[];
+      typicalCheckSize?: number | null;
+    }
+  ) {
+    // Fetch team to check existence and current investorProfileId link
+    const team = await tx.team.findUnique({
+      where: { uid: teamUid },
+      select: { uid: true, name: true, investorProfileId: true },
+    });
+    if (!team) throw new NotFoundException('Team not found');
+
+    // Always upsert investor profile — avoids duplicate key error
+    const investorProfile = await tx.investorProfile.upsert({
+      where: { teamUid: teamUid },
+      create: {
+        teamUid,
+        investmentFocus: investorProfileData.investmentFocus ?? [],
+        typicalCheckSize: investorProfileData.typicalCheckSize ?? null,
+        investInStartupStages: investorProfileData.investInStartupStages ?? [],
+        investInFundTypes: investorProfileData.investInFundTypes ?? [],
+      },
+      update: {
+        investmentFocus: investorProfileData.investmentFocus ?? [],
+        typicalCheckSize: investorProfileData.typicalCheckSize ?? null,
+        investInStartupStages: investorProfileData.investInStartupStages ?? [],
+        investInFundTypes: investorProfileData.investInFundTypes ?? [],
+      },
+    });
+
+    // Link the profile to the team if missing
+    if (!team.investorProfileId) {
+      await tx.team.update({
+        where: { uid: teamUid },
+        data: { investorProfileId: investorProfile.uid },
+      });
     }
   }
 }

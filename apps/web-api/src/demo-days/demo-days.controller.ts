@@ -11,18 +11,20 @@ import {
   UploadedFiles,
   UsePipes,
   Query,
+  Post,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { DemoDaysService } from './demo-days.service';
 import { DemoDayFundraisingProfilesService } from './demo-day-fundraising-profiles.service';
+import { DemoDayEngagementService } from './demo-day-engagement.service';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { UploadsService } from '../uploads/uploads.service';
 import { UploadKind, UploadScopeType } from '@prisma/client';
 import { NoCache } from '../decorators/no-cache.decorator';
-import { UpdateFundraisingTeamDto } from 'libs/contracts/src/schema';
+import { UpdateFundraisingTeamDto, UpdateFundraisingDescriptionDto } from 'libs/contracts/src/schema';
 
 @ApiTags('Demo Days')
 @Controller('v1/demo-days')
@@ -30,7 +32,8 @@ export class DemoDaysController {
   constructor(
     private readonly demoDaysService: DemoDaysService,
     private readonly demoDayFundraisingProfilesService: DemoDayFundraisingProfilesService,
-    private readonly uploadsService: UploadsService
+    private readonly uploadsService: UploadsService,
+    private readonly demoDayEngagementService: DemoDayEngagementService
   ) {}
 
   @Get('current')
@@ -110,6 +113,17 @@ export class DemoDaysController {
     return this.demoDayFundraisingProfilesService.updateFundraisingVideo(req.userEmail, upload.uid);
   }
 
+  @Put('current/fundraising-profile/description')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async updateDescription(@Req() req, @Body() body: UpdateFundraisingDescriptionDto) {
+    if (!body.description || body.description.trim() === '') {
+      throw new Error('description is required');
+    }
+
+    return this.demoDayFundraisingProfilesService.updateFundraisingDescription(req.userEmail, body.description);
+  }
+
   @Delete('current/fundraising-profile/video')
   @UseGuards(UserTokenValidation)
   @NoCache()
@@ -123,5 +137,23 @@ export class DemoDaysController {
   @NoCache()
   async updateTeam(@Req() req, @Body() body: UpdateFundraisingTeamDto) {
     return this.demoDayFundraisingProfilesService.updateFundraisingTeam(req.userEmail, body);
+  }
+
+  // Engagement endpoints
+
+  @Get('current/engagement')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async getCurrentEngagement(@Req() req) {
+    // Returns minimal engagement state for the UI
+    return this.demoDayEngagementService.getCurrentEngagement(req.userEmail);
+  }
+
+  @Post('current/engagement/calendar-added')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async markCalendarAdded(@Req() req) {
+    // Tracks the "Add to Calendar" click (.ics button)
+    return this.demoDayEngagementService.markCalendarAdded(req.userEmail);
   }
 }

@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { Controller, Req, UseGuards, Body, Param, UsePipes } from '@nestjs/common';
+import { Controller, Req, UseGuards, Body, Param, UsePipes, Patch } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
@@ -97,6 +97,15 @@ export class TeamsController {
       }
       builtQuery.orderBy = order;
     }
+
+    if (builtQuery.select) {
+      builtQuery.select.investorProfile = true;
+    } else if (builtQuery.include) {
+      builtQuery.include.investorProfile = true;
+    } else {
+      builtQuery.include = { investorProfile: true };
+    }
+
     return this.teamsService.findAll(builtQuery);
   }
 
@@ -130,5 +139,15 @@ export class TeamsController {
     await this.teamsService.isTeamMemberOrAdmin(req.userEmail, teamUid);
     const res = await this.teamsService.addEditTeamAsk(teamUid, body.teamName, req.userEmail, body.ask);
     return res;
+  }
+
+  /* Allows a team member to self-update their role within a team.
+    - Any authenticated user: can upsert their TeamMemberRole (role, investmentTeam).
+    - Team lead only: can also update team.isFund and team investor profile.*/
+  @Patch('v1/teams/:uid/profile-update')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async memberSelfUpdate(@Param('uid') teamUid: string, @Body() body: any, @Req() req: Request) {
+    return this.teamsService.updateTeamMemberRoleAndInvestorProfile(teamUid, body, req['userEmail']);
   }
 }
