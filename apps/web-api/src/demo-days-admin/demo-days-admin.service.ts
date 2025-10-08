@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { DemoDaysService } from '../demo-days/demo-days.service';
 import { DemoDayFundraisingProfilesService } from '../demo-days/demo-day-fundraising-profiles.service';
@@ -56,6 +56,45 @@ export class DemoDaysAdminService {
     return this.fetchProfiles(where, demoDay.uid);
   }
 
+  async updateFundraisingOnePager(teamUid: string, onePagerUploadUid: string): Promise<any> {
+    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    // Validate upload
+    if (onePagerUploadUid) {
+      const upload = await this.prisma.upload.findUnique({
+        where: { uid: onePagerUploadUid },
+      });
+      if (!upload || (upload.kind !== 'IMAGE' && upload.kind !== 'SLIDE')) {
+        throw new ForbiddenException('Invalid one-pager upload');
+      }
+    }
+
+    // Update or create profile
+    await this.prisma.teamFundraisingProfile.upsert({
+      where: {
+        teamUid_demoDayUid: {
+          teamUid: teamUid,
+          demoDayUid: demoDay.uid,
+        },
+      },
+      update: {
+        onePagerUploadUid,
+      },
+      create: {
+        teamUid: teamUid,
+        demoDayUid: demoDay.uid,
+        onePagerUploadUid,
+        status: 'DRAFT',
+      },
+    });
+
+    await this.demoDayFundraisingProfilesService.updateFundraisingProfileStatus(teamUid, demoDay.uid);
+    return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
+  }
+
   async deleteFundraisingOnePager(teamUid: string): Promise<any> {
     const demoDay = await this.demoDaysService.getCurrentDemoDay();
     if (!demoDay) {
@@ -93,6 +132,74 @@ export class DemoDaysAdminService {
         },
       });
     }
+
+    await this.demoDayFundraisingProfilesService.updateFundraisingProfileStatus(teamUid, demoDay.uid);
+    return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
+  }
+
+  async updateFundraisingDescription(teamUid: string, description: string): Promise<any> {
+    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    // Update or create profile
+    await this.prisma.teamFundraisingProfile.upsert({
+      where: {
+        teamUid_demoDayUid: {
+          teamUid: teamUid,
+          demoDayUid: demoDay.uid,
+        },
+      },
+      update: {
+        description,
+      },
+      create: {
+        teamUid: teamUid,
+        demoDayUid: demoDay.uid,
+        description,
+        status: 'DRAFT',
+      },
+    });
+
+    await this.demoDayFundraisingProfilesService.updateFundraisingProfileStatus(teamUid, demoDay.uid);
+    return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
+  }
+
+  async updateFundraisingVideo(teamUid: string, videoUploadUid: string): Promise<any> {
+    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    // Validate upload
+    if (videoUploadUid) {
+      const upload = await this.prisma.upload.findUnique({
+        where: { uid: videoUploadUid },
+      });
+      if (!upload || upload.kind !== 'VIDEO') {
+        throw new ForbiddenException('Invalid video upload');
+      }
+    }
+
+    // Update or create profile
+    await this.prisma.teamFundraisingProfile.upsert({
+      where: {
+        teamUid_demoDayUid: {
+          teamUid: teamUid,
+          demoDayUid: demoDay.uid,
+        },
+      },
+      update: {
+        videoUploadUid,
+      },
+      create: {
+        teamUid: teamUid,
+        demoDayUid: demoDay.uid,
+        videoUploadUid,
+        status: 'DRAFT',
+      },
+    });
 
     await this.demoDayFundraisingProfilesService.updateFundraisingProfileStatus(teamUid, demoDay.uid);
     return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
