@@ -409,7 +409,7 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
     const headers = [
       'email',
       'name',
-      'organization',
+      'organization_name',
       'organization_email',
       'x_handle',
       'linkedin_handle',
@@ -418,7 +418,7 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
       'investment_type',
       'typical_check_size',
       'investment_stages',
-      'sec_rules_accepted',
+      't&c',
       'team_lead',
     ];
     const exampleRow = [
@@ -432,7 +432,7 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
       'Lead',
       'I invest through fund(s)',
       '50000',
-      'Pre-seed|Seed',
+      '"Pre-seed,Seed"',
       'true',
       'true',
     ];
