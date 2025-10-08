@@ -12,7 +12,7 @@ export class DemoDayFundraisingProfilesService {
     private readonly analyticsService: AnalyticsService
   ) {}
 
-  private async getCurrentDemoDayFundraisingProfileByTeamUid(teamUid: string, demoDayUid: string): Promise<any> {
+  async getCurrentDemoDayFundraisingProfileByTeamUid(teamUid: string, demoDayUid: string): Promise<any> {
     // Get team details with required fields
     const teamWithDetails = await this.prisma.team.findUnique({
       where: { uid: teamUid },
@@ -226,7 +226,7 @@ export class DemoDayFundraisingProfilesService {
     return { member, team, demoDay };
   }
 
-  private async updateFundraisingProfileStatus(teamUid: string, demoDayUid: string): Promise<void> {
+  async updateFundraisingProfileStatus(teamUid: string, demoDayUid: string): Promise<void> {
     const profile = await this.prisma.teamFundraisingProfile.findUnique({
       where: {
         teamUid_demoDayUid: {
@@ -282,8 +282,7 @@ export class DemoDayFundraisingProfilesService {
 
     // Determine whether profile "qualifies" for being listed in Demo Day
     const qualifiesNow = newStatus === 'PUBLISHED' && hasMaterials && foundersCount > 0;
-    const qualifiedBefore =
-      prevStatus === 'PUBLISHED' && Boolean(profile.onePagerUploadUid && profile.videoUploadUid) && foundersCount > 0;
+    const qualifiedBefore = prevStatus === 'PUBLISHED' && Boolean(profile.onePagerUploadUid && profile.videoUploadUid) && foundersCount > 0;
 
     // Fire analytics events on transition edges only
     if (!qualifiedBefore && qualifiesNow) {
@@ -500,60 +499,6 @@ export class DemoDayFundraisingProfilesService {
   ): Promise<any> {
     const { team, demoDay } = await this.validateDemoDayFounderAccess(memberEmail);
 
-    // Update team
-    await this.prisma.team.update({
-      where: { uid: team.uid },
-      data: this.updateFundraisingTeamData(data),
-    });
-
-    await this.updateFundraisingProfileStatus(team.uid, demoDay.uid);
-    return this.getCurrentDemoDayFundraisingProfileByTeamUid(team.uid, demoDay.uid);
-  }
-
-  async updateFundraisingTeamByUid(
-    teamUid: string,
-    data: {
-      name?: string;
-      shortDescription?: string;
-      industryTags?: string[];
-      fundingStage?: string;
-      logo?: string;
-    }
-  ): Promise<any> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
-    if (!demoDay) {
-      throw new ForbiddenException('No demo day access');
-    }
-
-    // Verify the team exists and has a fundraising profile for the current demo day
-    const team = await this.prisma.team.findUnique({
-      where: { uid: teamUid },
-      include: {
-        fundraisingProfiles: {
-          where: { demoDayUid: demoDay.uid },
-        },
-      },
-    });
-
-    if (!team) {
-      throw new NotFoundException('Team not found');
-    }
-
-    if (team.fundraisingProfiles.length === 0) {
-      throw new ForbiddenException('Team does not have a fundraising profile for the current demo day');
-    }
-
-    // Update team
-    await this.prisma.team.update({
-      where: { uid: teamUid },
-      data: this.updateFundraisingTeamData(data),
-    });
-
-    await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
-    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
-  }
-
-  private updateFundraisingTeamData(data: any): any {
     const updateData: any = {};
 
     if (data.name) {
@@ -574,11 +519,18 @@ export class DemoDayFundraisingProfilesService {
 
     if (data.industryTags) {
       updateData.industryTags = {
-        set: data.industryTags.map((uid: any) => ({ uid })),
+        set: data.industryTags.map((uid) => ({ uid })),
       };
     }
 
-    return updateData;
+    // Update team
+    await this.prisma.team.update({
+      where: { uid: team.uid },
+      data: updateData,
+    });
+
+    await this.updateFundraisingProfileStatus(team.uid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfile(memberEmail);
   }
 
   async getCurrentDemoDayFundraisingProfiles(
@@ -607,50 +559,6 @@ export class DemoDayFundraisingProfilesService {
 
     // Stable personalized order based on user email
     return this.sortProfilesForUser(participantUid, filtered);
-  }
-
-  async getCurrentDemoDayFundraisingProfilesAdmin(params?: {
-    stage?: string[];
-    industry?: string[];
-    search?: string;
-  }): Promise<any[]> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
-    if (!demoDay) {
-      throw new ForbiddenException('No demo day found');
-    }
-
-    // Build where clause without status/upload restrictions
-    const where: any = {
-      demoDayUid: demoDay.uid,
-    };
-
-    if (params?.stage || params?.industry || params?.search) {
-      where.team = { ...(where.team || {}) };
-
-      // filter by funding stage
-      if (params.stage) {
-        if (Array.isArray(params.stage)) {
-          where.team.fundingStageUid = { in: params.stage };
-        } else {
-          where.team.fundingStageUid = params.stage;
-        }
-      }
-
-      // filter by industry tag
-      if (params.industry) {
-        if (Array.isArray(params.industry)) {
-          where.team.industryTags = { some: { uid: { in: params.industry } } };
-        } else {
-          where.team.industryTags = { some: { uid: params.industry } };
-        }
-      }
-
-      if (params.search) {
-        where.team.name = { contains: params.search, mode: 'insensitive' };
-      }
-    }
-
-    return this.fetchProfiles(where);
   }
 
   private async ensureParticipantAccess(memberEmail: string, demoDayUid: string): Promise<string | null> {
