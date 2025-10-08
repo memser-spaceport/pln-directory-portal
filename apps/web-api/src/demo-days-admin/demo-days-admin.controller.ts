@@ -105,6 +105,7 @@ export class DemoDaysAdminController {
 
   @Put('current/teams/:teamUid/fundraising-profile/video')
   @UseGuards(UserTokenValidation)
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'videoFile', maxCount: 1 }]))
   @NoCache()
   async updateVideoByTeamUid(
     @Req() req,
