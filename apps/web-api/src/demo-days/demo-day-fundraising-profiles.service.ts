@@ -282,7 +282,8 @@ export class DemoDayFundraisingProfilesService {
 
     // Determine whether profile "qualifies" for being listed in Demo Day
     const qualifiesNow = newStatus === 'PUBLISHED' && hasMaterials && foundersCount > 0;
-    const qualifiedBefore = prevStatus === 'PUBLISHED' && Boolean(profile.onePagerUploadUid && profile.videoUploadUid) && foundersCount > 0;
+    const qualifiedBefore =
+      prevStatus === 'PUBLISHED' && Boolean(profile.onePagerUploadUid && profile.videoUploadUid) && foundersCount > 0;
 
     // Fire analytics events on transition edges only
     if (!qualifiedBefore && qualifiesNow) {
@@ -606,6 +607,50 @@ export class DemoDayFundraisingProfilesService {
 
     // Stable personalized order based on user email
     return this.sortProfilesForUser(participantUid, filtered);
+  }
+
+  async getCurrentDemoDayFundraisingProfilesAdmin(params?: {
+    stage?: string[];
+    industry?: string[];
+    search?: string;
+  }): Promise<any[]> {
+    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    // Build where clause without status/upload restrictions
+    const where: any = {
+      demoDayUid: demoDay.uid,
+    };
+
+    if (params?.stage || params?.industry || params?.search) {
+      where.team = { ...(where.team || {}) };
+
+      // filter by funding stage
+      if (params.stage) {
+        if (Array.isArray(params.stage)) {
+          where.team.fundingStageUid = { in: params.stage };
+        } else {
+          where.team.fundingStageUid = params.stage;
+        }
+      }
+
+      // filter by industry tag
+      if (params.industry) {
+        if (Array.isArray(params.industry)) {
+          where.team.industryTags = { some: { uid: { in: params.industry } } };
+        } else {
+          where.team.industryTags = { some: { uid: params.industry } };
+        }
+      }
+
+      if (params.search) {
+        where.team.name = { contains: params.search, mode: 'insensitive' };
+      }
+    }
+
+    return this.fetchProfiles(where);
   }
 
   private async ensureParticipantAccess(memberEmail: string, demoDayUid: string): Promise<string | null> {

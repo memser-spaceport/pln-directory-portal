@@ -74,6 +74,30 @@ export class DemoDaysController {
     });
   }
 
+  @Get('current/fundraising-profiles/admin')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async getCurrentDemoDayFundraisingProfilesAdmin(
+    @Req() req,
+    @Query('stage') stage?: string[] | string,
+    @Query('industry') industry?: string[] | string,
+    @Query('search') search?: string
+  ) {
+    const requestor = await this.memberService.findMemberByEmail(req.userEmail);
+    const isAdmin = await this.memberService.checkIfAdminUser(requestor);
+    if (!isAdmin) {
+      throw new ForbiddenException(`Member with email ${req.userEmail} isn't admin`);
+    }
+
+    const normalize = (v: string | string[] | undefined) => (!v ? undefined : Array.isArray(v) ? v : v.split(','));
+
+    return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfilesAdmin({
+      stage: normalize(stage),
+      industry: normalize(industry),
+      search,
+    });
+  }
+
   @Put('current/fundraising-profile/one-pager')
   @UseGuards(UserTokenValidation)
   @UseInterceptors(FileFieldsInterceptor([{ name: 'onePagerFile', maxCount: 1 }]))
