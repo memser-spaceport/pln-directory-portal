@@ -566,7 +566,7 @@ export class PLEventGuestsService {
               'additionalInfo', pg."additionalInfo"
                ${selectLocation}
             )
-          ) AS events,
+          ) FILTER (WHERE e.uid = ANY($${eventPosition})) AS events,
           json_object_agg(
             'member',
             json_build_object(

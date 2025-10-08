@@ -321,6 +321,11 @@ export class ParticipantsRequestService {
       const addTeamMemberCallback = async (createdTeam: any, tx: Prisma.TransactionClient) => {
         const role = (requestData.newData as any).role || 'Lead';
         const investmentTeam = (requestData.newData as any).investmentTeam || false;
+
+        if (result.newData) {
+          (result.newData as any).uid = createdTeam.uid;
+        }
+
         await this.addRequesterAsTeamMember(createdTeam.uid, requesterUser.uid, role, true, investmentTeam, tx);
       };
 
