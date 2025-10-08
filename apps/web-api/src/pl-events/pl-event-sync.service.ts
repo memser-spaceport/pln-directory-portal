@@ -197,7 +197,7 @@ export class PLEventSyncService {
       endDate: new Date(event.end_date),
       createdAt: event.createdAt,
       syncedAt: event.updatedAt,
-      slugURL: event.event_id,
+      slugURL: `${event.event_name.substring(0, 4)}-${event.event_id}`,
       locationUid: event.locationUid,
       logoUid: logo?.uid,
       resources,
