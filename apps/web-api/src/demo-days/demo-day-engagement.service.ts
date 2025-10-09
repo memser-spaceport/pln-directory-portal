@@ -203,12 +203,6 @@ export class DemoDayEngagementService {
       member.teamMemberRoles?.[0];
 
     const investorTeam = investorTeamRole?.team;
-    const investorTeamName = investorTeam?.name || '';
-
-    // Determine teamsSubject based on whether investor has a team
-    const teamsSubject = investorTeam
-      ? `${fundraisingProfile.team.name} <> ${investorTeam.name}`
-      : fundraisingProfile.team.name;
 
     // Map interest type to template name
     const templateMap = {
@@ -228,6 +222,22 @@ export class DemoDayEngagementService {
 
     const template = templateMap[interestType];
 
+    const teamsSubject = investorTeam
+      ? `${fundraisingProfile.team.name} <> ${investorTeam.name}`
+      : fundraisingProfile.team.name;
+    const investorLink = `${process.env.WEB_UI_BASE_URL}/members/${member.uid}`;
+    const investorTeamLink = investorTeam ? `${process.env.WEB_UI_BASE_URL}/teams/${investorTeam?.uid}` : '';
+    const founderTeamLink = fundraisingProfile.team
+      ? `${process.env.WEB_UI_BASE_URL}/teams/${fundraisingProfile.team?.uid}`
+      : '';
+    const founderTeamName = fundraisingProfile.team
+      ? `<a href="${founderTeamLink}" target="_blank">${fundraisingProfile.team.name}</a>`
+      : '';
+    const investorTeamName = investorTeam
+      ? `<a href="${investorTeamLink}" target="_blank">${investorTeam?.name}</a>`
+      : '';
+    const investorName = member.name ? `<a href="${investorLink}" target="_blank">${member.name}</a>` : '';
+
     // Send notification
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
@@ -237,15 +247,17 @@ export class DemoDayEngagementService {
         from: process.env.DEMO_DAY_EMAIL,
         to: founderEmails,
         cc: [member.email],
+        bcc: [process.env.DEMO_DAY_EMAIL],
       },
       deliveryPayload: {
         body: {
           demoDayName: demoDay.title || 'PL F25 Demo Day',
           teamsSubject: teamsSubject,
           founderNames: founders.map((f) => f.member.name).join(', '),
-          founderTeamName: fundraisingProfile.team.name,
-          investorName: member.name,
+          founderTeamName: founderTeamName,
+          investorName: investorName,
           investorTeamName: investorTeamName,
+          fromInvestorTeamName: investorTeamName ? `from ${investorTeamName}` : '',
         },
       },
       entityType: 'DEMO_DAY',
