@@ -160,8 +160,6 @@ export class LocationTransferService {
       )}&key=${process.env.GOOGLE_PLACES_API_KEY}`
     );
 
-    console.log(result);
-
     if (result.data.status === 'ZERO_RESULTS') {
       return [];
     }
