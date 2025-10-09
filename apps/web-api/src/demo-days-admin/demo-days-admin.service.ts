@@ -361,6 +361,7 @@ export class DemoDaysAdminService {
         where: {
           demoDayUid: demoDayUid,
           status: 'ENABLED',
+          type: 'FOUNDER',
           isDeleted: false,
         },
         include: {
