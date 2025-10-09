@@ -12,11 +12,11 @@ export class ConsoleProvider implements IAnalyticsProvider {
       name: event.name,
       distinctId: event.distinctId,
       properties: event.properties,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 
   async shutdown(): Promise<void> {
     console.log('📊 Analytics Service Shutdown');
   }
-} 
+}
