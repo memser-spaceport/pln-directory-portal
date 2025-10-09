@@ -1282,7 +1282,6 @@ export class MemberService {
           investmentFocus: [],
           investInStartupStages: [],
           investInFundTypes: [],
-          type: InvestorProfileType.ANGEL,
           member: { connect: { uid: member.uid } },
         },
       });
