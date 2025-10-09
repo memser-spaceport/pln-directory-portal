@@ -2903,7 +2903,7 @@ export class MembersService {
     //    - otherwise take the first role (by startDate/id)
     const preferred = roles.find((r) => r.mainTeam === true);
     const newTeamUid = preferred?.teamUid ?? roles[0]?.teamUid ?? null;
-    console.log('newTeamUid', newTeamUid);
+
     // 3) Load current Demo Day founder participants' team mapping
     const founderParticipants = await tx.demoDayParticipant.findMany({
       where: { memberUid, type: 'FOUNDER', isDeleted: false },
