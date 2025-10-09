@@ -24,7 +24,11 @@ import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { UploadsService } from '../uploads/uploads.service';
 import { UploadKind, UploadScopeType } from '@prisma/client';
 import { NoCache } from '../decorators/no-cache.decorator';
-import { UpdateFundraisingTeamDto, UpdateFundraisingDescriptionDto } from 'libs/contracts/src/schema';
+import {
+  UpdateFundraisingTeamDto,
+  UpdateFundraisingDescriptionDto,
+  ExpressInterestDto,
+} from 'libs/contracts/src/schema';
 
 @ApiTags('Demo Days')
 @Controller('v1/demo-days')
@@ -155,5 +159,17 @@ export class DemoDaysController {
   async markCalendarAdded(@Req() req) {
     // Tracks the "Add to Calendar" click (.ics button)
     return this.demoDayEngagementService.markCalendarAdded(req.userEmail);
+  }
+
+  @Post('current/express-interest')
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async expressInterest(@Req() req, @Body() body: ExpressInterestDto) {
+    return this.demoDayEngagementService.expressInterest(
+      req.userEmail,
+      body.teamFundraisingProfileUid,
+      body.interestType
+    );
   }
 }
