@@ -1273,23 +1273,16 @@ export class MemberService {
       },
       select: {
         uid: true,
-        _count: {
-          select: {
-            teamMemberRoles: true,
-          },
-        },
       },
     });
 
     for (const member of membersWithoutInvestorProfile) {
-      const investorType = member._count.teamMemberRoles > 0 ? InvestorProfileType.FUND : InvestorProfileType.ANGEL;
-
       const newInvestorProfile = await tx.investorProfile.create({
         data: {
           investmentFocus: [],
           investInStartupStages: [],
           investInFundTypes: [],
-          type: investorType,
+          type: InvestorProfileType.ANGEL,
           member: { connect: { uid: member.uid } },
         },
       });
