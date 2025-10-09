@@ -417,10 +417,12 @@ export class DemoDaysAdminService {
     }, {} as Record<string, any[]>);
 
     // Add founders to each profile
-    return profiles.map((profile) => ({
-      ...profile,
-      founders: foundersByTeam[profile.teamUid] || [],
-    }));
+    return profiles
+      .map((profile) => ({
+        ...profile,
+        founders: foundersByTeam[profile.teamUid] || [],
+      }))
+      .filter((profile) => profile.founders.length > 0);
   }
 
   async checkViewOnlyAccess(memberUid: string): Promise<boolean> {
