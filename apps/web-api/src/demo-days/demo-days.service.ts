@@ -30,6 +30,7 @@ export class DemoDaysService {
     description?: string;
     teamsCount?: number;
     investorsCount?: number;
+    isDemoDayAdmin?: boolean;
   }> {
     const demoDay = await this.getCurrentDemoDay();
     if (!demoDay) {
@@ -105,6 +106,7 @@ export class DemoDaysService {
           select: {
             status: true,
             type: true,
+            isDemoDayAdmin: true,
           },
         },
       },
@@ -145,6 +147,7 @@ export class DemoDaysService {
         title: demoDay.title,
         description: demoDay.description,
         status: demoDay.status.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED',
+        isDemoDayAdmin: participant.isDemoDayAdmin || isDirectoryAdmin,
         teamsCount,
         investorsCount,
       };

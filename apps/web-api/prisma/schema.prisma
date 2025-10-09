@@ -982,6 +982,7 @@ model DemoDayParticipant {
   member          Member                   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
   type            DemoDayParticipantType
   status          DemoDayParticipantStatus @default(INVITED)
+  isDemoDayAdmin  Boolean                  @default(false)
   teamUid         String?
   team            Team?                    @relation(fields: [teamUid], references: [uid])
   statusUpdatedAt DateTime                 @default(now())
