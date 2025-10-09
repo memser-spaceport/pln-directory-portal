@@ -275,6 +275,25 @@ export class DemoDayEngagementService {
       },
     });
 
+    // use setTimeout to not block the response
+    setTimeout(async () => {
+      await this.analyticsService.trackEvent({
+        name: 'demo-day-express-interest',
+        distinctId: member.uid,
+        properties: {
+          demoDayUid: demoDay.uid,
+          userId: member.uid,
+          userName: member.name,
+          userEmail: member.email,
+          founderNames: founders.map((f) => f.member.name).join(','),
+          founderEmails: founders.map((f) => f.member.email).join(','),
+          teamUid: fundraisingProfile.teamUid,
+          teamName: fundraisingProfile.team.name,
+          interestType,
+        },
+      });
+    }, 500);
+
     return { success: true };
   }
 }
