@@ -324,6 +324,9 @@ export class DemoDaysAdminService {
     const [profiles, founders] = await Promise.all([
       this.prisma.teamFundraisingProfile.findMany({
         where,
+        orderBy: {
+          createdAt: 'asc',
+        },
         include: {
           team: {
             select: {
