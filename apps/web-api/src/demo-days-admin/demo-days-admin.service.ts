@@ -438,6 +438,6 @@ export class DemoDaysAdminService {
       },
     });
 
-    return participant?.isDemoDayAdmin || false;
+    return participant?.isDemoDayAdmin || participant?.type === 'FOUNDER' || false;
   }
 }
