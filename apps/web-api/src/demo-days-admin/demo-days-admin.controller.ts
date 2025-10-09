@@ -24,11 +24,13 @@ import { UpdateFundraisingTeamDto } from 'libs/contracts/src/schema';
 import { MembersService } from '../members/members.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { UploadKind, UploadScopeType } from '@prisma/client';
+import { DemoDaysService } from '../demo-days/demo-days.service';
 
 @ApiTags('Demo Days Admin')
 @Controller('v1/admin/demo-days')
 export class DemoDaysAdminController {
   constructor(
+    private readonly demoDaysService: DemoDaysService,
     private readonly demoDaysAdminService: DemoDaysAdminService,
     private readonly memberService: MembersService,
     private readonly uploadsService: UploadsService
@@ -43,7 +45,7 @@ export class DemoDaysAdminController {
     @Query('industry') industry?: string[] | string,
     @Query('search') search?: string
   ) {
-    await this.checkAdminAccess(req.userEmail);
+    await this.checkAdminAccess(req.userEmail, true);
 
     const normalize = (v: string | string[] | undefined) => (!v ? undefined : Array.isArray(v) ? v : v.split(','));
 
@@ -144,11 +146,24 @@ export class DemoDaysAdminController {
     return this.demoDaysAdminService.updateFundraisingTeam(teamUid, body);
   }
 
-  private async checkAdminAccess(userEmail: string) {
+  private async checkAdminAccess(userEmail: string, viewOnlyAccess = false) {
     const requestor = await this.memberService.findMemberByEmail(userEmail);
-    const isAdmin = this.memberService.checkIfAdminUser(requestor);
-    if (!isAdmin) {
-      throw new ForbiddenException(`Member with email ${userEmail} isn't admin`);
+
+    if (!requestor) {
+      throw new ForbiddenException(`Member with email ${userEmail} not found`);
+    }
+
+    const isDirectoryAdmin = this.memberService.checkIfAdminUser(requestor);
+
+    if (!isDirectoryAdmin) {
+      if (!viewOnlyAccess) {
+        throw new ForbiddenException(`Member with email ${userEmail} isn't admin`);
+      }
+
+      const hasViewOnlyAdminAccess = await this.demoDaysAdminService.checkViewOnlyAccess(requestor.uid);
+      if (!hasViewOnlyAdminAccess) {
+        throw new ForbiddenException(`Member with email ${userEmail} isn't admin`);
+      }
     }
   }
 }

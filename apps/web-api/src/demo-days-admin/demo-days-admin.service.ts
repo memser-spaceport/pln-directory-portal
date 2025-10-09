@@ -422,4 +422,22 @@ export class DemoDaysAdminService {
       founders: foundersByTeam[profile.teamUid] || [],
     }));
   }
+
+  async checkViewOnlyAccess(memberUid: string): Promise<boolean> {
+    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    if (!demoDay) {
+      return false;
+    }
+
+    const participant = await this.prisma.demoDayParticipant.findFirst({
+      where: {
+        demoDayUid: demoDay.uid,
+        memberUid: memberUid,
+        status: 'ENABLED',
+        isDeleted: false,
+      },
+    });
+
+    return participant?.isDemoDayAdmin || false;
+  }
 }
