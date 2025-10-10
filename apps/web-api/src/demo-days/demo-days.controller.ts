@@ -169,7 +169,8 @@ export class DemoDaysController {
     return this.demoDayEngagementService.expressInterest(
       req.userEmail,
       body.teamFundraisingProfileUid,
-      body.interestType
+      body.interestType,
+      body.isPrepDemoDay
     );
   }
 }

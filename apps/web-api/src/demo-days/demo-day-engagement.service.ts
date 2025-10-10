@@ -115,7 +115,8 @@ export class DemoDayEngagementService {
   async expressInterest(
     memberEmail: string,
     teamFundraisingProfileUid: string,
-    interestType: 'like' | 'connect' | 'invest'
+    interestType: 'like' | 'connect' | 'invest',
+    isPrepDemoDay = false
   ) {
     // Validate that the caller is an enabled demo day participant (investor)
     const demoDay = await this.getCurrentDemoDay();
@@ -252,6 +253,7 @@ export class DemoDayEngagementService {
       deliveryPayload: {
         body: {
           demoDayName: demoDay.title || 'PL F25 Demo Day',
+          subjectPrefix: isPrepDemoDay ? '[DEMO DAY PREP - PRACTICE EMAIL] ' : '',
           teamsSubject: teamsSubject,
           founderNames: founders.map((f) => f.member.name).join(', '),
           founderTeamName: founderTeamName,
