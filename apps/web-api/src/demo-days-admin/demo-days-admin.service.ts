@@ -11,11 +11,14 @@ export class DemoDaysAdminService {
     private readonly demoDayFundraisingProfilesService: DemoDayFundraisingProfilesService
   ) {}
 
-  async getCurrentDemoDayFundraisingProfiles(params?: {
-    stage?: string[];
-    industry?: string[];
-    search?: string;
-  }): Promise<any[]> {
+  async getCurrentDemoDayFundraisingProfiles(
+    params?: {
+      stage?: string[];
+      industry?: string[];
+      search?: string;
+    },
+    userId?: string
+  ): Promise<any[]> {
     const demoDay = await this.demoDaysService.getCurrentDemoDay();
     if (!demoDay) {
       throw new ForbiddenException('No demo day found');
@@ -53,7 +56,7 @@ export class DemoDaysAdminService {
     }
 
     // Fetch all profiles without restrictions using the existing service method
-    return this.fetchProfiles(where, demoDay.uid);
+    return this.fetchProfiles(where, demoDay.uid, userId);
   }
 
   async updateFundraisingOnePager(teamUid: string, onePagerUploadUid: string): Promise<any> {
@@ -320,13 +323,10 @@ export class DemoDaysAdminService {
     return updateData;
   }
 
-  private async fetchProfiles(where: any, demoDayUid: string): Promise<any[]> {
+  private async fetchProfiles(where: any, demoDayUid: string, userId?: string): Promise<any[]> {
     const [profiles, founders] = await Promise.all([
       this.prisma.teamFundraisingProfile.findMany({
         where,
-        orderBy: {
-          createdAt: 'asc',
-        },
         include: {
           team: {
             select: {
@@ -361,6 +361,7 @@ export class DemoDaysAdminService {
         where: {
           demoDayUid: demoDayUid,
           status: 'ENABLED',
+          type: 'FOUNDER',
           isDeleted: false,
         },
         include: {
@@ -420,12 +421,37 @@ export class DemoDaysAdminService {
     }, {} as Record<string, any[]>);
 
     // Add founders to each profile
-    return profiles
+    const profilesWithFounders = profiles
       .map((profile) => ({
         ...profile,
         founders: foundersByTeam[profile.teamUid] || [],
       }))
       .filter((profile) => profile.founders.length > 0);
+
+    // Apply consistent random sorting based on userId and teamId if userId is provided
+    if (userId) {
+      return this.sortProfilesForUser(userId, profilesWithFounders);
+    }
+
+    return profilesWithFounders;
+  }
+
+  private sortProfilesForUser(userSeed: string, profiles: any[]): any[] {
+    const hash = (s: string): number => {
+      // Simple FNV-1a 32-bit hash
+      let h = 0x811c9dc5;
+      for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = (h * 0x01000193) >>> 0;
+      }
+      return h >>> 0;
+    };
+
+    const seed = userSeed || '';
+    return profiles
+      .map((p) => ({ key: hash(`${seed}|${p.teamUid}`), p }))
+      .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+      .map(({ p }) => p);
   }
 
   async checkViewOnlyAccess(memberUid: string): Promise<boolean> {

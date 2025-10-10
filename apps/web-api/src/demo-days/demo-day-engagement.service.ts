@@ -115,7 +115,8 @@ export class DemoDayEngagementService {
   async expressInterest(
     memberEmail: string,
     teamFundraisingProfileUid: string,
-    interestType: 'like' | 'connect' | 'invest'
+    interestType: 'like' | 'connect' | 'invest',
+    isPrepDemoDay = false
   ) {
     // Validate that the caller is an enabled demo day participant (investor)
     const demoDay = await this.getCurrentDemoDay();
@@ -252,6 +253,7 @@ export class DemoDayEngagementService {
       deliveryPayload: {
         body: {
           demoDayName: demoDay.title || 'PL F25 Demo Day',
+          subjectPrefix: isPrepDemoDay ? '[DEMO DAY PREP - PRACTICE EMAIL] ' : '',
           teamsSubject: teamsSubject,
           founderNames: founders.map((f) => f.member.name).join(', '),
           founderTeamName: founderTeamName,
@@ -274,6 +276,25 @@ export class DemoDayEngagementService {
         userName: member.name,
       },
     });
+
+    // use setTimeout to not block the response
+    setTimeout(async () => {
+      await this.analyticsService.trackEvent({
+        name: 'demo-day-express-interest',
+        distinctId: member.uid,
+        properties: {
+          demoDayUid: demoDay.uid,
+          userId: member.uid,
+          userName: member.name,
+          userEmail: member.email,
+          founderNames: founders.map((f) => f.member.name).join(','),
+          founderEmails: founders.map((f) => f.member.email).join(','),
+          teamUid: fundraisingProfile.teamUid,
+          teamName: fundraisingProfile.team.name,
+          interestType,
+        },
+      });
+    }, 500);
 
     return { success: true };
   }
