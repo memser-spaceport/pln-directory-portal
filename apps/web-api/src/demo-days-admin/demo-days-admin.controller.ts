@@ -23,7 +23,7 @@ import { NoCache } from '../decorators/no-cache.decorator';
 import { UpdateFundraisingTeamDto } from 'libs/contracts/src/schema';
 import { MembersService } from '../members/members.service';
 import { UploadsService } from '../uploads/uploads.service';
-import { UploadKind, UploadScopeType } from '@prisma/client';
+import { Member, UploadKind, UploadScopeType } from '@prisma/client';
 import { DemoDaysService } from '../demo-days/demo-days.service';
 
 @ApiTags('Demo Days Admin')
@@ -45,15 +45,18 @@ export class DemoDaysAdminController {
     @Query('industry') industry?: string[] | string,
     @Query('search') search?: string
   ) {
-    await this.checkAdminAccess(req.userEmail, true);
+    const requestor = await this.checkAdminAccess(req.userEmail, true);
 
     const normalize = (v: string | string[] | undefined) => (!v ? undefined : Array.isArray(v) ? v : v.split(','));
 
-    return this.demoDaysAdminService.getCurrentDemoDayFundraisingProfiles({
-      stage: normalize(stage),
-      industry: normalize(industry),
-      search,
-    });
+    return this.demoDaysAdminService.getCurrentDemoDayFundraisingProfiles(
+      {
+        stage: normalize(stage),
+        industry: normalize(industry),
+        search,
+      },
+      requestor.uid
+    );
   }
 
   @Put('current/teams/:teamUid/fundraising-profile/one-pager')
@@ -146,7 +149,7 @@ export class DemoDaysAdminController {
     return this.demoDaysAdminService.updateFundraisingTeam(teamUid, body);
   }
 
-  private async checkAdminAccess(userEmail: string, viewOnlyAccess = false) {
+  private async checkAdminAccess(userEmail: string, viewOnlyAccess = false): Promise<Member> {
     const requestor = await this.memberService.findMemberByEmail(userEmail);
 
     if (!requestor) {
@@ -165,5 +168,7 @@ export class DemoDaysAdminController {
         throw new ForbiddenException(`Member with email ${userEmail} isn't admin`);
       }
     }
+
+    return requestor;
   }
 }
