@@ -42,38 +42,6 @@ export class DemoDaysService {
       };
     }
 
-    const investorsCount = await this.prisma.demoDayParticipant.count({
-      where: {
-        demoDayUid: demoDay.uid,
-        isDeleted: false,
-        status: 'ENABLED',
-        type: 'INVESTOR',
-      },
-    });
-
-    // Count teams using fundraising profile logic:
-    // - profile must be PUBLISHED
-    // - must have onePager and video uploaded
-    // - team must have at least one ENABLED FOUNDER participant in this demo day
-    const teamsCount = await this.prisma.teamFundraisingProfile.count({
-      where: {
-        demoDayUid: demoDay.uid,
-        status: 'PUBLISHED',
-        onePagerUploadUid: { not: null },
-        videoUploadUid: { not: null },
-        team: {
-          demoDayParticipants: {
-            some: {
-              demoDayUid: demoDay.uid,
-              isDeleted: false,
-              status: 'ENABLED',
-              type: 'FOUNDER',
-            },
-          },
-        },
-      },
-    });
-
     // Handle unauthorized users
     if (!memberEmail) {
       return {
@@ -82,35 +50,64 @@ export class DemoDaysService {
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
-        teamsCount,
-        investorsCount,
+        teamsCount: 0,
+        investorsCount: 0,
       };
     }
 
-    // Get member by email
-    const member = await this.prisma.member.findUnique({
-      where: { email: memberEmail },
-      select: {
-        uid: true,
-        accessLevel: true,
-        memberRoles: {
-          select: {
-            name: true,
+    const [investorsCount, teamsCount, member] = await Promise.all([
+      this.prisma.member.count({
+        where: {
+          accessLevel: {
+            in: ['L5', 'L6'],
+          },
+          investorProfile: {
+            type: { not: null },
           },
         },
-        demoDayParticipants: {
-          where: {
-            demoDayUid: demoDay.uid,
-            isDeleted: false,
-          },
-          select: {
-            status: true,
-            type: true,
-            isDemoDayAdmin: true,
+      }),
+      this.prisma.teamFundraisingProfile.count({
+        where: {
+          demoDayUid: demoDay.uid,
+          status: 'PUBLISHED',
+          onePagerUploadUid: { not: null },
+          videoUploadUid: { not: null },
+          team: {
+            demoDayParticipants: {
+              some: {
+                demoDayUid: demoDay.uid,
+                isDeleted: false,
+                status: 'ENABLED',
+                type: 'FOUNDER',
+              },
+            },
           },
         },
-      },
-    });
+      }),
+      this.prisma.member.findUnique({
+        where: { email: memberEmail },
+        select: {
+          uid: true,
+          accessLevel: true,
+          memberRoles: {
+            select: {
+              name: true,
+            },
+          },
+          demoDayParticipants: {
+            where: {
+              demoDayUid: demoDay.uid,
+              isDeleted: false,
+            },
+            select: {
+              status: true,
+              type: true,
+              isDemoDayAdmin: true,
+            },
+          },
+        },
+      }),
+    ]);
 
     if (!member) {
       return {
