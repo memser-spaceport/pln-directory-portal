@@ -173,4 +173,59 @@ export class DemoDaysController {
       body.isPrepDemoDay
     );
   }
+
+  // Direct S3 upload endpoints
+  @Post('current/fundraising-profile/video/upload-url')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async getVideoUploadUrl(@Req() req, @Body() body: { filename: string; filesize: number; mimetype: string }) {
+    if (!body.filename || !body.filesize || !body.mimetype) {
+      throw new Error('filename, filesize, and mimetype are required');
+    }
+
+    return this.demoDayFundraisingProfilesService.generateVideoUploadUrl(
+      req.userEmail,
+      body.filename,
+      body.filesize,
+      body.mimetype
+    );
+  }
+
+  @Post('current/fundraising-profile/video/confirm')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async confirmVideoUpload(@Req() req, @Body() body: { uploadUid: string }) {
+    if (!body.uploadUid) {
+      throw new Error('uploadUid is required');
+    }
+
+    return this.demoDayFundraisingProfilesService.confirmVideoUpload(req.userEmail, body.uploadUid);
+  }
+
+  @Post('current/fundraising-profile/one-pager/upload-url')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async getOnePagerUploadUrl(@Req() req, @Body() body: { filename: string; filesize: number; mimetype: string }) {
+    if (!body.filename || !body.filesize || !body.mimetype) {
+      throw new Error('filename, filesize, and mimetype are required');
+    }
+
+    return this.demoDayFundraisingProfilesService.generateOnePagerUploadUrl(
+      req.userEmail,
+      body.filename,
+      body.filesize,
+      body.mimetype
+    );
+  }
+
+  @Post('current/fundraising-profile/one-pager/confirm')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async confirmOnePagerUpload(@Req() req, @Body() body: { uploadUid: string }) {
+    if (!body.uploadUid) {
+      throw new Error('uploadUid is required');
+    }
+
+    return this.demoDayFundraisingProfilesService.confirmOnePagerUpload(req.userEmail, body.uploadUid);
+  }
 }
