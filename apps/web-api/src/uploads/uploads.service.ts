@@ -1,17 +1,18 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
-import { UploadKind, UploadScopeType, UploadStorage } from '@prisma/client';
+import { AwsService } from '../utils/aws/aws.service';
+import { UploadKind, UploadScopeType, UploadStatus, UploadStorage } from '@prisma/client';
 import * as crypto from 'crypto';
-import cuid from "cuid";
+import cuid from 'cuid';
 
-const SLIDE_MIMES = new Set(['application/pdf','image/jpeg','image/png','image/webp']);
-const VIDEO_MIMES = new Set(['video/mp4','video/webm','video/quicktime']);
-const IMAGE_MIMES = new Set(['image/jpeg','image/png','image/webp']);
+const SLIDE_MIMES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
+const VIDEO_MIMES = new Set(['video/mp4', 'video/webm', 'video/quicktime']);
+const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const LIMITS = {
-  IMAGE: 25 * 1024 * 1024,  // 25MB
-  SLIDE: 25 * 1024 * 1024,  // 25MB
+  IMAGE: 25 * 1024 * 1024, // 25MB
+  SLIDE: 25 * 1024 * 1024, // 25MB
   VIDEO: 500 * 1024 * 1024, // 500MB
   OTHER: 50 * 1024 * 1024,
 };
@@ -27,6 +28,7 @@ export class UploadsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly files: FileUploadService,
+    private readonly awsService: AwsService
   ) {}
 
   // Basic mime validation by kind
@@ -46,7 +48,7 @@ export class UploadsService {
   private validateSize(kind: UploadKind, size: number) {
     const max = LIMITS[kind] ?? LIMITS.OTHER;
     if (size > max) {
-      throw new BadRequestException(`File too large. Max for ${kind} is ${Math.round(max/1024/1024)}MB`);
+      throw new BadRequestException(`File too large. Max for ${kind} is ${Math.round(max / 1024 / 1024)}MB`);
     }
   }
 
@@ -78,8 +80,14 @@ export class UploadsService {
     const checksum = checksumSha256(file.buffer);
 
     // Store file; since bucket is public, no signing is required.
-    const { storage, keyOrPath, bucket: usedBucket } = await this.files.storeOneAndGetSecureUrl(file, {
-      prefix: `uploads/${(params.scopeType || 'NONE').toLowerCase()}/${params.scopeUid ?? 'none'}/${kind.toLowerCase()}`,
+    const {
+      storage,
+      keyOrPath,
+      bucket: usedBucket,
+    } = await this.files.storeOneAndGetSecureUrl(file, {
+      prefix: `uploads/${(params.scopeType || 'NONE').toLowerCase()}/${
+        params.scopeUid ?? 'none'
+      }/${kind.toLowerCase()}`,
       signed: true,
     });
 
@@ -91,9 +99,7 @@ export class UploadsService {
 
     // Non-expiring app URL
     const s3Url =
-      storageEnum === 'S3' && usedBucket && keyOrPath
-        ? this.buildS3Url(usedBucket, keyOrPath)
-        : this.buildAppUrl(uid);
+      storageEnum === 'S3' && usedBucket && keyOrPath ? this.buildS3Url(usedBucket, keyOrPath) : this.buildAppUrl(uid);
 
     const created = await this.prisma.upload.create({
       data: {
@@ -104,9 +110,9 @@ export class UploadsService {
         scopeType: params.scopeType ?? 'NONE',
         scopeUid: params.scopeUid ?? null,
         uploaderUid: params.uploaderUid ?? null,
-        bucket: storageEnum === 'S3' ? (usedBucket ?? null) : null,
-        key:    storageEnum === 'S3' ? (keyOrPath ?? null) : null,
-        cid:    storageEnum === 'IPFS' ? (keyOrPath ?? null) : null,
+        bucket: storageEnum === 'S3' ? usedBucket ?? null : null,
+        key: storageEnum === 'S3' ? keyOrPath ?? null : null,
+        cid: storageEnum === 'IPFS' ? keyOrPath ?? null : null,
         url: s3Url,
         filename: file.originalname,
         mimetype: file.mimetype,
@@ -118,11 +124,82 @@ export class UploadsService {
     return created;
   }
 
-
   // Returns an Upload row from DB as-is (no fresh-link generation).
   async getOne(uid: string) {
     const row = await this.prisma.upload.findUnique({ where: { uid } });
     if (!row) throw new BadRequestException('Upload not found');
     return row;
+  }
+
+  async createPendingUpload(params: {
+    kind: UploadKind;
+    scopeType?: UploadScopeType;
+    scopeUid?: string | null;
+    uploaderUid?: string | null;
+    filename: string;
+    mimetype: string;
+    size: number;
+    bucket?: string;
+    key?: string;
+  }) {
+    const uid = cuid();
+
+    const created = await this.prisma.upload.create({
+      data: {
+        uid,
+        storage: 'S3',
+        kind: params.kind,
+        status: UploadStatus.PROCESSING,
+        scopeType: params.scopeType ?? 'NONE',
+        scopeUid: params.scopeUid ?? null,
+        uploaderUid: params.uploaderUid ?? null,
+        bucket: params.bucket ?? null,
+        key: params.key ?? null,
+        cid: null,
+        url: '', // Will be set when confirmed
+        filename: params.filename,
+        mimetype: params.mimetype,
+        size: params.size,
+        checksum: '', // Will be set when confirmed
+      },
+    });
+
+    return created;
+  }
+
+  async confirmUpload(uid: string, actualSize?: number) {
+    const upload = await this.prisma.upload.findUnique({
+      where: { uid },
+    });
+
+    if (!upload) {
+      throw new BadRequestException('Upload not found');
+    }
+
+    if (upload.status !== UploadStatus.PROCESSING) {
+      throw new BadRequestException('Upload is not in PENDING status');
+    }
+
+    if (!upload.bucket || !upload.key) {
+      throw new BadRequestException('Upload missing S3 bucket or key');
+    }
+
+    const exists = await this.awsService.checkObjectExists(upload.bucket, upload.key);
+    if (!exists) {
+      throw new BadRequestException('S3 object not found');
+    }
+
+    const s3Url = this.buildS3Url(upload.bucket, upload.key);
+
+    const updated = await this.prisma.upload.update({
+      where: { uid },
+      data: {
+        status: 'READY',
+        url: s3Url,
+        size: actualSize ?? upload.size,
+      },
+    });
+
+    return updated;
   }
 }
