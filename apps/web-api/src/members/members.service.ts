@@ -2039,6 +2039,42 @@ export class MembersService {
               },
             ],
           },
+          // If InvestorProfile.type = 'ANGEL', at least one field must be filled
+          {
+            OR: [
+              // Allow if not ANGEL type
+              {
+                investorProfile: {
+                  OR: [{ type: { not: 'ANGEL' } }, { type: { equals: null } }],
+                },
+              },
+              // Or if ANGEL type, at least one field must be filled
+              {
+                AND: [
+                  {
+                    investorProfile: {
+                      type: 'ANGEL',
+                    },
+                  },
+                  {
+                    investorProfile: {
+                      OR: [
+                        {
+                          investInStartupStages: { isEmpty: false },
+                        },
+                        {
+                          typicalCheckSize: { not: null, gt: 0 },
+                        },
+                        {
+                          investmentFocus: { isEmpty: false },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
         ],
       });
     }
