@@ -2009,6 +2009,36 @@ export class MembersService {
               },
             ],
           },
+          // If InvestorProfile.type = 'FUND', member must belong to a team with isFund = true
+          {
+            OR: [
+              // Allow if not FUND type
+              {
+                investorProfile: {
+                  OR: [{ type: { not: 'FUND' } }, { type: { equals: null } }],
+                },
+              },
+              // Or if FUND type, require member to be in a team with isFund = true
+              {
+                AND: [
+                  {
+                    investorProfile: {
+                      type: 'FUND',
+                    },
+                  },
+                  {
+                    teamMemberRoles: {
+                      some: {
+                        team: {
+                          isFund: true,
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
         ],
       });
     }

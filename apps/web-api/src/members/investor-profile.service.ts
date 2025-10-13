@@ -27,6 +27,7 @@ export class InvestorProfileService {
       investInFundTypes?: string[];
       teamUid?: string;
       type?: InvestorProfileType;
+      isInvestViaFund?: boolean;
     }
   ) {
     try {
@@ -58,6 +59,7 @@ export class InvestorProfileService {
             type: investorProfileData.type || null,
             investInFundTypes: investorProfileData.investInFundTypes ?? ([] as string[]),
             teamUid: investorProfileData.teamUid,
+            isInvestViaFund: investorProfileData.isInvestViaFund,
             secRulesAcceptedAt,
           },
         });
@@ -71,6 +73,7 @@ export class InvestorProfileService {
             investInStartupStages: investorProfileData.investInStartupStages ?? [],
             type: investorProfileData.type || null,
             investInFundTypes: investorProfileData.investInFundTypes ?? ([] as string[]),
+            isInvestViaFund: investorProfileData.isInvestViaFund,
             secRulesAcceptedAt,
             memberUid: memberUid,
             teamUid: investorProfileData.teamUid,
