@@ -141,6 +141,7 @@ export class DemoDayEngagementService {
               select: {
                 uid: true,
                 name: true,
+                isFund: true,
               },
             },
           },
@@ -198,10 +199,7 @@ export class DemoDayEngagementService {
     const founderEmails = founders.map((f) => f.member.email);
 
     // Get investor team information
-    const investorTeamRole =
-      member.teamMemberRoles?.find((role) => role.investmentTeam) ||
-      member.teamMemberRoles?.find((role) => role.mainTeam) ||
-      member.teamMemberRoles?.[0];
+    const investorTeamRole = member.teamMemberRoles?.find((role) => role.investmentTeam);
 
     const investorTeam = investorTeamRole?.team;
 
@@ -234,10 +232,13 @@ export class DemoDayEngagementService {
     const founderTeamName = fundraisingProfile.team
       ? `<a href="${founderTeamLink}" target="_blank">${fundraisingProfile.team.name}</a>`
       : '';
-    const investorTeamName = investorTeam
+
+    const investorName = member.name || '';
+    const investorTeamName = investorTeam?.name || '';
+    const investorTeamNameLink = investorTeam
       ? `<a href="${investorTeamLink}" target="_blank">${investorTeam?.name}</a>`
       : '';
-    const investorName = member.name ? `<a href="${investorLink}" target="_blank">${member.name}</a>` : '';
+    const investorNameLink = member.name ? `<a href="${investorLink}" target="_blank">${member.name}</a>` : '';
 
     // Send notification
     await this.notificationServiceClient.sendNotification({
@@ -259,7 +260,8 @@ export class DemoDayEngagementService {
           founderTeamName: founderTeamName,
           investorName: investorName,
           investorTeamName: investorTeamName,
-          fromInvestorTeamName: investorTeamName ? `from ${investorTeamName}` : '',
+          fromInvestorTeamName: investorTeamNameLink ? `from ${investorTeamNameLink}` : '',
+          investorNameLink,
         },
       },
       entityType: 'DEMO_DAY',
