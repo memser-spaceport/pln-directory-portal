@@ -6,6 +6,7 @@ import {
   Get,
   Param,
   Patch,
+  Post,
   Put,
   Query,
   Req,
@@ -147,6 +148,67 @@ export class DemoDaysAdminController {
   async updateTeamByUid(@Req() req, @Param('teamUid') teamUid: string, @Body() body: UpdateFundraisingTeamDto) {
     await this.checkAdminAccess(req.userEmail);
     return this.demoDaysAdminService.updateFundraisingTeam(teamUid, body);
+  }
+
+  // Direct S3 upload endpoints
+  @Post('current/teams/:teamUid/fundraising-profile/video/upload-url')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async getVideoUploadUrl(
+    @Req() req,
+    @Param('teamUid') teamUid: string,
+    @Body() body: { filename: string; filesize: number; mimetype: string }
+  ) {
+    await this.checkAdminAccess(req.userEmail);
+
+    if (!body.filename || !body.filesize || !body.mimetype) {
+      throw new Error('filename, filesize, and mimetype are required');
+    }
+
+    return this.demoDaysAdminService.generateVideoUploadUrl(teamUid, body.filename, body.filesize, body.mimetype);
+  }
+
+  @Post('current/teams/:teamUid/fundraising-profile/video/confirm')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async confirmVideoUpload(@Req() req, @Param('teamUid') teamUid: string, @Body() body: { uploadUid: string }) {
+    await this.checkAdminAccess(req.userEmail);
+
+    if (!body.uploadUid) {
+      throw new Error('uploadUid is required');
+    }
+
+    return this.demoDaysAdminService.confirmVideoUpload(teamUid, body.uploadUid);
+  }
+
+  @Post('current/teams/:teamUid/fundraising-profile/one-pager/upload-url')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async getOnePagerUploadUrl(
+    @Req() req,
+    @Param('teamUid') teamUid: string,
+    @Body() body: { filename: string; filesize: number; mimetype: string }
+  ) {
+    await this.checkAdminAccess(req.userEmail);
+
+    if (!body.filename || !body.filesize || !body.mimetype) {
+      throw new Error('filename, filesize, and mimetype are required');
+    }
+
+    return this.demoDaysAdminService.generateOnePagerUploadUrl(teamUid, body.filename, body.filesize, body.mimetype);
+  }
+
+  @Post('current/teams/:teamUid/fundraising-profile/one-pager/confirm')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async confirmOnePagerUpload(@Req() req, @Param('teamUid') teamUid: string, @Body() body: { uploadUid: string }) {
+    await this.checkAdminAccess(req.userEmail);
+
+    if (!body.uploadUid) {
+      throw new Error('uploadUid is required');
+    }
+
+    return this.demoDaysAdminService.confirmOnePagerUpload(teamUid, body.uploadUid);
   }
 
   private async checkAdminAccess(userEmail: string, viewOnlyAccess = false): Promise<Member> {
