@@ -1,14 +1,19 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { DemoDaysService } from '../demo-days/demo-days.service';
 import { DemoDayFundraisingProfilesService } from '../demo-days/demo-day-fundraising-profiles.service';
+import { UploadsService } from '../uploads/uploads.service';
+import { AwsService } from '../utils/aws/aws.service';
+import { UploadKind } from '@prisma/client';
 
 @Injectable()
 export class DemoDaysAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly demoDaysService: DemoDaysService,
-    private readonly demoDayFundraisingProfilesService: DemoDayFundraisingProfilesService
+    private readonly demoDayFundraisingProfilesService: DemoDayFundraisingProfilesService,
+    private readonly uploadsService: UploadsService,
+    private readonly awsService: AwsService
   ) {}
 
   async getCurrentDemoDayFundraisingProfiles(
@@ -470,5 +475,191 @@ export class DemoDaysAdminService {
     });
 
     return participant?.isDemoDayAdmin || participant?.type === 'FOUNDER' || false;
+  }
+
+  async generateVideoUploadUrl(
+    teamUid: string,
+    filename: string,
+    filesize: number,
+    mimetype: string
+  ): Promise<{ uploadUid: string; presignedUrl: string; s3Key: string; expiresAt: string }> {
+    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    const validVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+    if (!validVideoTypes.includes(mimetype)) {
+      throw new BadRequestException('Invalid video type. Allowed: mp4, webm, mov');
+    }
+
+    const maxSize = 500 * 1024 * 1024; // 500MB
+    if (filesize > maxSize) {
+      throw new BadRequestException('File too large. Max size is 500MB');
+    }
+
+    const fileExt = filename.split('.').pop() || '';
+    const hashedFilename = `${Date.now()}-${Math.random().toString(36).substring(2)}`;
+    const s3Key = `uploads/none/none/video/${hashedFilename}.${fileExt}`;
+
+    const bucket = process.env.AWS_S3_UPLOAD_BUCKET_NAME || process.env.AWS_S3_BUCKET_NAME;
+    if (!bucket) {
+      throw new BadRequestException('S3 bucket not configured');
+    }
+
+    const upload = await this.uploadsService.createPendingUpload({
+      kind: UploadKind.VIDEO,
+      scopeType: 'NONE',
+      scopeUid: null,
+      uploaderUid: null,
+      filename,
+      mimetype,
+      size: filesize,
+      bucket,
+      key: s3Key,
+    });
+
+    const presignedUrl = await this.awsService.generatePresignedPutUrl(bucket, s3Key, mimetype, 900);
+
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+    return {
+      uploadUid: upload.uid,
+      presignedUrl,
+      s3Key,
+      expiresAt,
+    };
+  }
+
+  async confirmVideoUpload(teamUid: string, uploadUid: string): Promise<any> {
+    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    const upload = await this.prisma.upload.findUnique({
+      where: { uid: uploadUid },
+    });
+
+    if (!upload) {
+      throw new BadRequestException('Upload not found');
+    }
+
+    const confirmedUpload = await this.uploadsService.confirmUpload(uploadUid);
+
+    await this.prisma.teamFundraisingProfile.upsert({
+      where: {
+        teamUid_demoDayUid: {
+          teamUid: teamUid,
+          demoDayUid: demoDay.uid,
+        },
+      },
+      update: {
+        videoUploadUid: confirmedUpload.uid,
+      },
+      create: {
+        teamUid: teamUid,
+        demoDayUid: demoDay.uid,
+        videoUploadUid: confirmedUpload.uid,
+        status: 'DRAFT',
+      },
+    });
+
+    await this.demoDayFundraisingProfilesService.updateFundraisingProfileStatus(teamUid, demoDay.uid);
+
+    return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
+  }
+
+  async generateOnePagerUploadUrl(
+    teamUid: string,
+    filename: string,
+    filesize: number,
+    mimetype: string
+  ): Promise<{ uploadUid: string; presignedUrl: string; s3Key: string; expiresAt: string }> {
+    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    const validOnePagerTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!validOnePagerTypes.includes(mimetype)) {
+      throw new BadRequestException('Invalid one-pager type. Allowed: pdf, jpg, png, webp');
+    }
+
+    const maxSize = 25 * 1024 * 1024; // 25MB
+    if (filesize > maxSize) {
+      throw new BadRequestException('File too large. Max size is 25MB');
+    }
+
+    const fileExt = filename.split('.').pop() || '';
+    const hashedFilename = `${Date.now()}-${Math.random().toString(36).substring(2)}`;
+    const s3Key = `uploads/none/none/slide/${hashedFilename}.${fileExt}`;
+
+    const bucket = process.env.AWS_S3_UPLOAD_BUCKET_NAME || process.env.AWS_S3_BUCKET_NAME;
+    if (!bucket) {
+      throw new BadRequestException('S3 bucket not configured');
+    }
+
+    const upload = await this.uploadsService.createPendingUpload({
+      kind: UploadKind.SLIDE,
+      scopeType: 'NONE',
+      scopeUid: null,
+      uploaderUid: null,
+      filename,
+      mimetype,
+      size: filesize,
+      bucket,
+      key: s3Key,
+    });
+
+    const presignedUrl = await this.awsService.generatePresignedPutUrl(bucket, s3Key, mimetype, 900);
+
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+    return {
+      uploadUid: upload.uid,
+      presignedUrl,
+      s3Key,
+      expiresAt,
+    };
+  }
+
+  async confirmOnePagerUpload(teamUid: string, uploadUid: string): Promise<any> {
+    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    const upload = await this.prisma.upload.findUnique({
+      where: { uid: uploadUid },
+    });
+
+    if (!upload) {
+      throw new BadRequestException('Upload not found');
+    }
+
+    const confirmedUpload = await this.uploadsService.confirmUpload(uploadUid);
+
+    await this.prisma.teamFundraisingProfile.upsert({
+      where: {
+        teamUid_demoDayUid: {
+          teamUid: teamUid,
+          demoDayUid: demoDay.uid,
+        },
+      },
+      update: {
+        onePagerUploadUid: confirmedUpload.uid,
+      },
+      create: {
+        teamUid: teamUid,
+        demoDayUid: demoDay.uid,
+        onePagerUploadUid: confirmedUpload.uid,
+        status: 'DRAFT',
+      },
+    });
+
+    await this.demoDayFundraisingProfilesService.updateFundraisingProfileStatus(teamUid, demoDay.uid);
+
+    return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 }
