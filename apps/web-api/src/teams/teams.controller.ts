@@ -100,10 +100,12 @@ export class TeamsController {
 
     if (builtQuery.select) {
       builtQuery.select.investorProfile = true;
+      builtQuery.select.logo = { select: { url: true } };
     } else if (builtQuery.include) {
       builtQuery.include.investorProfile = true;
+      builtQuery.include.logo = { select: { url: true } };
     } else {
-      builtQuery.include = { investorProfile: true };
+      builtQuery.include = { investorProfile: true, logo: { select: { url: true } } };
     }
 
     return this.teamsService.findAll(builtQuery);
