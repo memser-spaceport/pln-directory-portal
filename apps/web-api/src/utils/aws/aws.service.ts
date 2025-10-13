@@ -18,8 +18,7 @@ export class AwsService {
   }
   async sendEmail(templateName, includeAdmins, toAddresses, data) {
     try {
-      if (!this.isEmailServiceEnabled())
-        return null;
+      if (!this.isEmailServiceEnabled()) return null;
       const AWS_SES = new AWS.SES(CONFIG);
       const adminEmailIdsFromEnv = process.env.SES_ADMIN_EMAIL_IDS;
       const adminEmailIds = adminEmailIdsFromEnv?.split('|') ?? [];
@@ -50,14 +49,12 @@ export class AwsService {
     replyTo?: string,
     isEmailEnabled = this.isEmailServiceEnabled()
   ) {
-    if (!isEmailEnabled)
-      return null;
-    const emailTemplate = fs.readFileSync(
-      templateName,
-      'utf-8'
-    );
-    Handlebars.registerHelper('eq', (valueOne, valueTwo) => { return valueOne === valueTwo })
-    Handlebars.registerHelper('and', function(...args) {
+    if (!isEmailEnabled) return null;
+    const emailTemplate = fs.readFileSync(templateName, 'utf-8');
+    Handlebars.registerHelper('eq', (valueOne, valueTwo) => {
+      return valueOne === valueTwo;
+    });
+    Handlebars.registerHelper('and', function (...args) {
       return args.every(Boolean);
     });
     const template = Handlebars.compile(emailTemplate);
@@ -70,11 +67,11 @@ export class AwsService {
       subject: subject,
       html: renderedHtml,
       text: textTemplate,
-      replyTo: replyTo
+      replyTo: replyTo,
     };
     const mail = new MailComposer(mailOptions);
     // Compose the email with attachment
-    const rawMessage:any = await new Promise((resolve, reject) => {
+    const rawMessage: any = await new Promise((resolve, reject) => {
       mail.compile().build((err, rawMessage) => {
         if (err) {
           reject(err);
@@ -95,9 +92,12 @@ export class AwsService {
   }
 
   async uploadFileToS3(file, bucketName, fileName: string) {
-    if (process.env.ENVIRONMENT === "development" && (!bucketName || !CONFIG.accessKeyId || !CONFIG.secretAccessKey || !CONFIG.region)) {
+    if (
+      process.env.ENVIRONMENT === 'development' &&
+      (!bucketName || !CONFIG.accessKeyId || !CONFIG.secretAccessKey || !CONFIG.region)
+    ) {
       return {
-        Location: ""
+        Location: '',
       };
     }
     const s3 = new AWS.S3(CONFIG);
@@ -110,7 +110,6 @@ export class AwsService {
     return await s3.upload(params).promise();
   }
 
-
   async getPresignedGetUrl(bucket?: string, key?: string, expiresInSeconds = 3600) {
     const s3 = new AWS.S3(CONFIG);
     return s3.getSignedUrl('getObject', { Bucket: bucket, Key: key, Expires: expiresInSeconds });
@@ -120,7 +119,7 @@ export class AwsService {
     bucket: string,
     key: string,
     ttlSec: number,
-    opts?: { disposition?: 'inline' | 'attachment'; filename?: string; contentType?: string },
+    opts?: { disposition?: 'inline' | 'attachment'; filename?: string; contentType?: string }
   ) {
     const s3 = new AWS.S3(CONFIG);
     return s3.getSignedUrlPromise('getObject', {
@@ -132,5 +131,28 @@ export class AwsService {
         : undefined,
       ResponseContentType: opts?.contentType,
     });
+  }
+
+  async generatePresignedPutUrl(bucket: string, key: string, contentType: string, expiresInSeconds: number = 900) {
+    const s3 = new AWS.S3(CONFIG);
+    return s3.getSignedUrlPromise('putObject', {
+      Bucket: bucket,
+      Key: key,
+      ContentType: contentType,
+      Expires: expiresInSeconds,
+    });
+  }
+
+  async checkObjectExists(bucket: string, key: string): Promise<boolean> {
+    try {
+      const s3 = new AWS.S3(CONFIG);
+      await s3.headObject({ Bucket: bucket, Key: key }).promise();
+      return true;
+    } catch (error) {
+      if (error.statusCode === 404) {
+        return false;
+      }
+      throw error;
+    }
   }
 }
