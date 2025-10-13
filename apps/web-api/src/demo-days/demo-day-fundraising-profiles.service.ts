@@ -562,6 +562,36 @@ export class DemoDayFundraisingProfilesService {
     const filtered = await this.filterProfilesByEnabledFounders(demoDay.uid, profiles);
     if (filtered.length === 0) return [];
 
+    // attach "likedByMe/connectedByMe/investedByMe" flags for the requesting user
+    const interests = await this.prisma.demoDayExpressInterestStatistic.findMany({
+      where: {
+        demoDayUid: demoDay.uid,
+        memberUid: participantUid,
+        teamFundraisingProfileUid: { in: filtered.map((p) => p.uid) },
+        isPrepDemoDay: false,
+      },
+      select: {
+        teamFundraisingProfileUid: true,
+        liked: true,
+        connected: true,
+        invested: true,
+      },
+    });
+    const flagsByProfile = interests.reduce((acc, it) => {
+      acc[it.teamFundraisingProfileUid] = {
+        liked: it.liked,
+        connected: it.connected,
+        invested: it.invested,
+      };
+      return acc;
+    }, {} as Record<string, { liked: boolean; connected: boolean; invested: boolean }>);
+    for (const p of filtered) {
+      const f = flagsByProfile[p.uid] || { liked: false, connected: false, invested: false };
+      (p as any).liked = !!f.liked;
+      (p as any).connected = !!f.connected;
+      (p as any).invested = !!f.invested;
+    }
+
     // Stable personalized order based on user email
     return this.sortProfilesForUser(participantUid, filtered);
   }
