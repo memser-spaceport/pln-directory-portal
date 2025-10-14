@@ -12,6 +12,7 @@ import { UploadParticipantsModal } from '../../components/demo-days/UploadPartic
 import { UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
 import { WEB_UI_BASE_URL } from '../../utils/constants';
 import clsx from 'clsx';
+import { toast } from 'react-toastify';
 
 import s from './styles.module.scss';
 
@@ -132,6 +133,29 @@ const DemoDayDetailPage = () => {
     } catch (error) {
       console.error('Error updating participant status:', error);
       alert('Failed to update participant status. Please try again.');
+    }
+  };
+
+  const handleUpdateParticipantType = async (
+    participantUid: string,
+    participantName: string,
+    newType: 'INVESTOR' | 'FOUNDER'
+  ) => {
+    if (!authToken || !uid) return;
+
+    const newTabName = newType === 'INVESTOR' ? 'Investors' : 'Founders';
+
+    try {
+      await updateParticipantMutation.mutateAsync({
+        authToken,
+        demoDayUid: uid as string,
+        participantUid,
+        data: { type: newType },
+      });
+      toast.success(`Successfully moved ${participantName} to ${newTabName}`);
+    } catch (error) {
+      console.error('Error moving participant:', error);
+      toast.error(`Failed to move ${participantName}. Please try again.`);
     }
   };
 
@@ -364,6 +388,9 @@ const DemoDayDetailPage = () => {
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                     Status
                   </div>
+                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                    Type
+                  </div>
                 </div>
 
                 {/* Body */}
@@ -551,6 +578,28 @@ const DemoDayDetailPage = () => {
                         )}
                         <option value="ENABLED">Enabled</option>
                         <option value="DISABLED">Disabled</option>
+                      </select>
+                    </div>
+
+                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                      <select
+                        value={participant.type}
+                        onChange={(e) =>
+                          handleUpdateParticipantType(
+                            participant.uid,
+                            participant.member?.name || participant.name,
+                            e.target.value as 'INVESTOR' | 'FOUNDER'
+                          )
+                        }
+                        disabled={updateParticipantMutation.isPending}
+                        className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
+                          participant.type === 'INVESTOR'
+                            ? 'bg-purple-100 text-purple-800'
+                            : 'bg-blue-100 text-blue-800'
+                        } disabled:opacity-50`}
+                      >
+                        <option value="INVESTOR">Investor</option>
+                        <option value="FOUNDER">Founder</option>
                       </select>
                     </div>
                   </div>
