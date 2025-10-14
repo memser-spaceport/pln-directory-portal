@@ -39,6 +39,7 @@ export interface DemoDayParticipant {
     email: string;
     profilePicture?: string;
     accessLevel?: string;
+    externalId?: string;
     teamMemberRoles?: {
       mainTeam: boolean;
       teamLead: boolean;

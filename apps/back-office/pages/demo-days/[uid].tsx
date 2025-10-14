@@ -509,7 +509,7 @@ const DemoDayDetailPage = () => {
                       </div>
                     )}
                     <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                      {participant.member?.accessLevel === 'L0' ? (
+                      {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
                         <svg
                           className="mx-auto h-5 w-5 text-red-500"
                           fill="none"
@@ -544,7 +544,11 @@ const DemoDayDetailPage = () => {
                           participant.status
                         )} disabled:opacity-50`}
                       >
-                        {participant.member?.accessLevel === 'L0' && <option value="INVITED">Invited</option>}
+                        {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
+                          <option value="INVITED">Invited</option>
+                        ) : (
+                          ''
+                        )}
                         <option value="ENABLED">Enabled</option>
                         <option value="DISABLED">Disabled</option>
                       </select>

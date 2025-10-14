@@ -100,6 +100,7 @@ export class DemoDaysService {
               isDeleted: false,
             },
             select: {
+              uid: true,
               status: true,
               type: true,
               isDemoDayAdmin: true,
@@ -132,6 +133,14 @@ export class DemoDaysService {
         teamsCount,
         investorsCount,
       };
+    }
+
+    if (participant && participant.status === 'INVITED') {
+      participant.status = 'ENABLED';
+      await this.prisma.demoDayParticipant.update({
+        where: { uid: participant.uid },
+        data: { status: 'ENABLED' },
+      });
     }
 
     if (participant && participant.status === 'ENABLED') {

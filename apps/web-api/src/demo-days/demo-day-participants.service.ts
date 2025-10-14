@@ -800,6 +800,7 @@ export class DemoDayParticipantsService {
               uid: true,
               name: true,
               imageUid: true,
+              externalId: true,
               image: {
                 select: {
                   uid: true,
