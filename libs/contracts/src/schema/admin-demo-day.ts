@@ -6,7 +6,7 @@ export const CreateDemoDaySchema = z.object({
   startDate: z.string(),
   title: z.string().min(1, 'Title is required'),
   description: z.string().min(1, 'Description is required'),
-  status: z.enum(['UPCOMING', 'ACTIVE', 'COMPLETED']),
+  status: z.enum(['UPCOMING', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED']),
 });
 
 export class CreateDemoDayDto extends createZodDto(CreateDemoDaySchema) {}
@@ -16,7 +16,7 @@ export const UpdateDemoDaySchema = z.object({
   startDate: z.string().optional(),
   title: z.string().min(1, 'Title is required').optional(),
   description: z.string().min(1, 'Description is required').optional(),
-  status: z.enum(['UPCOMING', 'ACTIVE', 'COMPLETED']).optional(),
+  status: z.enum(['UPCOMING', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED']).optional(),
 });
 
 export class UpdateDemoDayDto extends createZodDto(UpdateDemoDaySchema) {}
@@ -78,6 +78,7 @@ export const UpdateParticipantSchema = z.object({
   status: z.enum(['INVITED', 'ENABLED', 'DISABLED']).optional(),
   teamUid: z.string().optional(),
   type: z.enum(['INVESTOR', 'FOUNDER']).optional(),
+  hasEarlyAccess: z.boolean().optional(),
 });
 
 export class UpdateParticipantDto extends createZodDto(UpdateParticipantSchema) {}
@@ -89,7 +90,7 @@ export const ResponseDemoDaySchema = z.object({
   startDate: z.date(),
   title: z.string(),
   description: z.string(),
-  status: z.enum(['UPCOMING', 'ACTIVE', 'COMPLETED']),
+  status: z.enum(['UPCOMING', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED']),
   createdAt: z.date(),
   updatedAt: z.date(),
   isDeleted: z.boolean(),
@@ -105,6 +106,7 @@ export const ResponseParticipantSchema = z.object({
   memberUid: z.string(),
   type: z.enum(['INVESTOR', 'FOUNDER']),
   status: z.enum(['INVITED', 'ENABLED', 'DISABLED']),
+  hasEarlyAccess: z.boolean(),
   teamUid: z.string().nullable(),
   statusUpdatedAt: z.date(),
   createdAt: z.date(),

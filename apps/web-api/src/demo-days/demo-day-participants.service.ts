@@ -885,6 +885,7 @@ export class DemoDayParticipantsService {
       status?: 'INVITED' | 'ENABLED' | 'DISABLED';
       teamUid?: string;
       type?: 'INVESTOR' | 'FOUNDER';
+      hasEarlyAccess?: boolean;
     },
     actorEmail?: string
   ): Promise<DemoDayParticipant> {
@@ -956,6 +957,10 @@ export class DemoDayParticipantsService {
 
     if (data.teamUid !== undefined) {
       updateData.team = data.teamUid ? { connect: { uid: data.teamUid } } : { disconnect: true };
+    }
+
+    if (data.hasEarlyAccess !== undefined) {
+      updateData.hasEarlyAccess = data.hasEarlyAccess;
     }
 
     const updated = await this.prisma.demoDayParticipant.update({

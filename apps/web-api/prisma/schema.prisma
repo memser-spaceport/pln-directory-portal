@@ -945,6 +945,7 @@ model InvestorProfile {
 
 enum DemoDayStatus {
   UPCOMING
+  EARLY_ACCESS
   ACTIVE
   COMPLETED
 }
@@ -987,6 +988,7 @@ model DemoDayParticipant {
   type            DemoDayParticipantType
   status          DemoDayParticipantStatus @default(INVITED)
   isDemoDayAdmin  Boolean                  @default(false)
+  hasEarlyAccess  Boolean                  @default(false)
   teamUid         String?
   team            Team?                    @relation(fields: [teamUid], references: [uid])
   statusUpdatedAt DateTime                 @default(now())
