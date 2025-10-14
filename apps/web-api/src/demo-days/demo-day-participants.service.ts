@@ -883,6 +883,7 @@ export class DemoDayParticipantsService {
     data: {
       status?: 'INVITED' | 'ENABLED' | 'DISABLED';
       teamUid?: string;
+      type?: 'INVESTOR' | 'FOUNDER';
     },
     actorEmail?: string
   ): Promise<DemoDayParticipant> {
@@ -903,19 +904,26 @@ export class DemoDayParticipantsService {
       throw new NotFoundException('Participant not found');
     }
 
+    const currentType = data.type || participant.type;
+
     // Validate team assignment for founder type only
-    if (data.teamUid && participant.type !== 'FOUNDER') {
+    if (data.teamUid && currentType !== 'FOUNDER') {
       throw new BadRequestException('Team can only be assigned to founder type participants');
     }
 
     const updateData: Prisma.DemoDayParticipantUpdateInput = {};
 
-    // Keep previous status for analytics
+    // Keep previous status and type for analytics
     const prevStatus = participant.status;
+    const prevType = participant.type;
 
     if (data.status) {
       updateData.status = data.status;
       updateData.statusUpdatedAt = new Date();
+    }
+
+    if (data.type) {
+      updateData.type = data.type;
     }
 
     if (data.teamUid !== undefined) {
@@ -939,6 +947,23 @@ export class DemoDayParticipantsService {
           type: updated.type,
           fromStatus: prevStatus,
           toStatus: updated.status,
+          actorUid: actorUid || null,
+          actorEmail: actorEmail || null,
+        },
+      });
+    }
+
+    // Track type change only when it actually changed
+    if (data.type && prevType !== updated.type) {
+      await this.analyticsService.trackEvent({
+        name: 'demo-day-participant-type-changed',
+        distinctId: updated.memberUid,
+        properties: {
+          demoDayUid,
+          participantUid: updated.uid,
+          memberUid: updated.memberUid,
+          fromType: prevType,
+          toType: updated.type,
           actorUid: actorUid || null,
           actorEmail: actorEmail || null,
         },

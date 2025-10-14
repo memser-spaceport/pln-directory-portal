@@ -12,6 +12,7 @@ import { UploadParticipantsModal } from '../../components/demo-days/UploadPartic
 import { UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
 import { WEB_UI_BASE_URL } from '../../utils/constants';
 import clsx from 'clsx';
+import { toast } from 'react-toastify';
 
 import s from './styles.module.scss';
 
@@ -132,6 +133,30 @@ const DemoDayDetailPage = () => {
     } catch (error) {
       console.error('Error updating participant status:', error);
       alert('Failed to update participant status. Please try again.');
+    }
+  };
+
+  const handleMoveParticipant = async (
+    participantUid: string,
+    participantName: string,
+    currentType: 'INVESTOR' | 'FOUNDER'
+  ) => {
+    if (!authToken || !uid) return;
+
+    const newType = currentType === 'INVESTOR' ? 'FOUNDER' : 'INVESTOR';
+    const newTabName = newType === 'INVESTOR' ? 'Investors' : 'Founders';
+
+    try {
+      await updateParticipantMutation.mutateAsync({
+        authToken,
+        demoDayUid: uid as string,
+        participantUid,
+        data: { type: newType },
+      });
+      toast.success(`Successfully moved ${participantName} to ${newTabName}`);
+    } catch (error) {
+      console.error('Error moving participant:', error);
+      toast.error(`Failed to move ${participantName}. Please try again.`);
     }
   };
 
@@ -364,6 +389,9 @@ const DemoDayDetailPage = () => {
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                     Status
                   </div>
+                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 180 }}>
+                    Action
+                  </div>
                 </div>
 
                 {/* Body */}
@@ -548,6 +576,22 @@ const DemoDayDetailPage = () => {
                         <option value="ENABLED">Enabled</option>
                         <option value="DISABLED">Disabled</option>
                       </select>
+                    </div>
+
+                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 180 }}>
+                      <button
+                        onClick={() =>
+                          handleMoveParticipant(
+                            participant.uid,
+                            participant.member?.name || participant.name,
+                            participant.type
+                          )
+                        }
+                        disabled={updateParticipantMutation.isPending}
+                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        Move to {participant.type === 'INVESTOR' ? 'Founders' : 'Investors'}
+                      </button>
                     </div>
                   </div>
                 ))}

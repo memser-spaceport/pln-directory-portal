@@ -143,4 +143,5 @@ export interface ParticipantsListResponse {
 export interface UpdateParticipantDto {
   status?: 'INVITED' | 'ENABLED' | 'DISABLED';
   teamUid?: string;
+  type?: 'INVESTOR' | 'FOUNDER';
 }

@@ -146,6 +146,7 @@ export class AdminDemoDaysController {
       {
         status: body.status?.toUpperCase() as 'INVITED' | 'ENABLED' | 'DISABLED',
         teamUid: body.teamUid,
+        type: body.type?.toUpperCase() as 'INVESTOR' | 'FOUNDER',
       },
       req.userEmail
     );

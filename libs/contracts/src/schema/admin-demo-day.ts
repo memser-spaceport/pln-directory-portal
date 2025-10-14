@@ -77,6 +77,7 @@ export class GetParticipantsQueryDto extends createZodDto(GetParticipantsQuerySc
 export const UpdateParticipantSchema = z.object({
   status: z.enum(['INVITED', 'ENABLED', 'DISABLED']).optional(),
   teamUid: z.string().optional(),
+  type: z.enum(['INVESTOR', 'FOUNDER']).optional(),
 });
 
 export class UpdateParticipantDto extends createZodDto(UpdateParticipantSchema) {}
