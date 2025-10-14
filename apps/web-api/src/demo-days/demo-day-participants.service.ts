@@ -898,6 +898,17 @@ export class DemoDayParticipantsService {
 
     const participant = await this.prisma.demoDayParticipant.findUnique({
       where: { uid: participantUid },
+      include: {
+        member: {
+          include: {
+            teamMemberRoles: {
+              include: {
+                team: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!participant || participant.demoDayUid !== demoDayUid) {
@@ -922,8 +933,24 @@ export class DemoDayParticipantsService {
       updateData.statusUpdatedAt = new Date();
     }
 
-    if (data.type) {
+    // Handle type change and auto-assign/remove teamUid
+    if (data.type && data.type !== participant.type) {
       updateData.type = data.type;
+
+      // If changing from INVESTOR to FOUNDER, auto-assign main team
+      if (data.type === 'FOUNDER' && participant.type === 'INVESTOR') {
+        const mainTeam = participant.member?.teamMemberRoles.find((role) => role.mainTeam);
+        const teamUid = mainTeam?.team.uid || participant.member?.teamMemberRoles[0]?.team.uid;
+
+        if (teamUid) {
+          updateData.team = { connect: { uid: teamUid } };
+        }
+      }
+
+      // If changing from FOUNDER to INVESTOR, remove team
+      if (data.type === 'INVESTOR' && participant.type === 'FOUNDER') {
+        updateData.team = { disconnect: true };
+      }
     }
 
     if (data.teamUid !== undefined) {
