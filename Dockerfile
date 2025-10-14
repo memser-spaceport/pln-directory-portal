@@ -28,12 +28,7 @@ RUN yarn build
 # ============================
 FROM node:18-bookworm
 
-# Install system dependencies for pdf2pic (GraphicsMagick + Ghostscript)
-RUN apt-get update && \
-    apt-get install -y graphicsmagick ghostscript && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Create a non-root user
+# Create a non-root user for security
 RUN groupadd -r app && useradd -r -g app app
 
 WORKDIR /app
@@ -46,7 +41,8 @@ COPY --from=builder /app/apps/web-api/prisma ./apps/web-api/prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/.forestadmin-schema.json ./
 
-# Fix permissions
+# Ensure /app is owned by the 'app' user and is writable (for Forest Admin schema file)
+# Security note: This grants write access to the app directory for the app user only, not globally
 RUN chown -R app:app /app && chmod -R u+w /app
 
 USER app
