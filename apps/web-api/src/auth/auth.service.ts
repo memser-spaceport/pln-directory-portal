@@ -436,7 +436,7 @@ export class AuthService implements OnModuleInit {
 
   private async checkAndUpgradeDemoDayParticipant(member: any): Promise<any> {
     // Only process L0 members
-    if (member.accessLevel !== 'L0') {
+    if (member.accessLevel !== 'L0' || !member.externalId) {
       return member;
     }
 
