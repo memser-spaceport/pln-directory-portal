@@ -127,6 +127,13 @@ export class DemoDayParticipantsService {
       }
     }
 
+    if (data.type === 'INVESTOR' && !isNewMember && ['L2', 'L3', 'L4'].includes(member.accessLevel || '')) {
+      await this.prisma.member.update({
+        where: { uid: member.uid },
+        data: { accessLevel: 'L6' },
+      });
+    }
+
     // Determine status based on whether member was newly created or existing
     const status = isNewMember ? 'INVITED' : 'ENABLED';
 
