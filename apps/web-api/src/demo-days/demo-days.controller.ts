@@ -9,12 +9,13 @@ import {
   Body,
   UseInterceptors,
   UploadedFiles,
+  UploadedFile,
   UsePipes,
   Query,
   Post,
 } from '@nestjs/common';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { ApiTags } from '@nestjs/swagger';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { DemoDaysService } from './demo-days.service';
 import { DemoDayFundraisingProfilesService } from './demo-day-fundraising-profiles.service';
@@ -227,5 +228,26 @@ export class DemoDaysController {
     }
 
     return this.demoDayFundraisingProfilesService.confirmOnePagerUpload(req.userEmail, body.uploadUid);
+  }
+
+  @Post('current/fundraising-profile/one-pager/preview')
+  @UseGuards(UserTokenValidation)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        previewImage: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('previewImage'))
+  @NoCache()
+  async uploadOnePagerPreview(@Req() req, @UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new Error('previewImage is required');
+    }
+
+    return this.demoDayFundraisingProfilesService.uploadOnePagerPreview(req.userEmail, file);
   }
 }

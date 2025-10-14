@@ -974,4 +974,42 @@ export class DemoDayFundraisingProfilesService {
 
     return this.getCurrentDemoDayFundraisingProfile(memberEmail);
   }
+
+  async uploadOnePagerPreview(memberEmail: string, file: Express.Multer.File): Promise<any> {
+    const { team, demoDay } = await this.validateDemoDayFounderAccess(memberEmail);
+
+    // Get the current fundraising profile
+    const profile = await this.prisma.teamFundraisingProfile.findUnique({
+      where: {
+        teamUid_demoDayUid: {
+          teamUid: team.uid,
+          demoDayUid: demoDay.uid,
+        },
+      },
+      include: {
+        onePagerUpload: true,
+      },
+    });
+
+    if (!profile?.onePagerUpload) {
+      throw new BadRequestException('No one-pager upload found. Please upload a one-pager first.');
+    }
+
+    // Upload the preview image using the uploads service
+    const previewUpload = await this.uploadsService.uploadGeneric({
+      file,
+      kind: UploadKind.IMAGE,
+      scopeType: 'NONE',
+    });
+
+    // Update the one-pager upload with the preview image URL
+    await this.prisma.upload.update({
+      where: { uid: profile.onePagerUpload.uid },
+      data: {
+        previewImageUrl: previewUpload.url,
+      },
+    });
+
+    return this.getCurrentDemoDayFundraisingProfile(memberEmail);
+  }
 }

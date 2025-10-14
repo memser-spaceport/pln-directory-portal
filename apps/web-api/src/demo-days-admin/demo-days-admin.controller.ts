@@ -11,12 +11,13 @@ import {
   Query,
   Req,
   UploadedFiles,
+  UploadedFile,
   UseGuards,
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { ApiTags } from '@nestjs/swagger';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { DemoDaysAdminService } from './demo-days-admin.service';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
@@ -90,6 +91,33 @@ export class DemoDaysAdminController {
   async deleteOnePagerByTeamUid(@Req() req, @Param('teamUid') teamUid: string) {
     await this.checkAdminAccess(req.userEmail);
     return this.demoDaysAdminService.deleteFundraisingOnePager(teamUid);
+  }
+
+  @Post('current/teams/:teamUid/fundraising-profile/one-pager/preview')
+  @UseGuards(UserTokenValidation)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        previewImage: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('previewImage'))
+  @NoCache()
+  async uploadOnePagerPreviewByTeamUid(
+    @Req() req,
+    @Param('teamUid') teamUid: string,
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    await this.checkAdminAccess(req.userEmail);
+
+    if (!file) {
+      throw new Error('previewImage is required');
+    }
+
+    return this.demoDaysAdminService.uploadOnePagerPreview(teamUid, file);
   }
 
   @Put('current/teams/:teamUid/fundraising-profile/description')
