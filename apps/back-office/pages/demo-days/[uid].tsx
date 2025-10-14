@@ -421,13 +421,21 @@ const DemoDayDetailPage = () => {
                 <div className={clsx(s.tableRow, s.tableHeader)}>
                   <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
                   <div className={clsx(s.headerCell, s.flexible)}>Team</div>
-                  {activeTab === 'investors' && <div className={clsx(s.headerCell, s.flexible)}>Investor Type</div>}
+                  {activeTab === 'investors' && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 200 }}>
+                      Investor Type
+                    </div>
+                  )}
                   {activeTab === 'investors' && (
                     <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                       Early Access
                     </div>
                   )}
-                  {activeTab === 'founders' && <div className={clsx(s.headerCell, s.flexible)}>Pitch Materials</div>}
+                  {activeTab === 'founders' && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 200 }}>
+                      Pitch Materials
+                    </div>
+                  )}
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                     Invite Accepted
                   </div>
@@ -546,7 +554,7 @@ const DemoDayDetailPage = () => {
                       )}
                     </div>
                     {activeTab === 'founders' && (
-                      <div className={clsx(s.bodyCell, s.flexible)}>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 200 }}>
                         {(() => {
                           const team = participant.team;
                           if (!team) {
@@ -596,7 +604,7 @@ const DemoDayDetailPage = () => {
                       </div>
                     )}
                     {activeTab === 'investors' && (
-                      <div className={clsx(s.bodyCell, s.flexible)}>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 200 }}>
                         {(() => {
                           const profileType = participant.member?.investorProfile?.type;
                           if (!profileType) {
