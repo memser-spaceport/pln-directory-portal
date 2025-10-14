@@ -63,6 +63,8 @@ const DemoDayDetailPage = () => {
     switch (status) {
       case 'ACTIVE':
         return 'text-green-600 bg-green-100';
+      case 'EARLY_ACCESS':
+        return 'text-orange-600 bg-orange-100';
       case 'PENDING':
         return 'text-yellow-600 bg-yellow-100';
       case 'COMPLETED':
@@ -156,6 +158,22 @@ const DemoDayDetailPage = () => {
     } catch (error) {
       console.error('Error moving participant:', error);
       toast.error(`Failed to move ${participantName}. Please try again.`);
+    }
+  };
+
+  const handleUpdateParticipantEarlyAccess = async (participantUid: string, hasEarlyAccess: boolean) => {
+    if (!authToken || !uid) return;
+
+    try {
+      await updateParticipantMutation.mutateAsync({
+        authToken,
+        demoDayUid: uid as string,
+        participantUid,
+        data: { hasEarlyAccess },
+      });
+    } catch (error) {
+      console.error('Error updating early access:', error);
+      toast.error('Failed to update early access. Please try again.');
     }
   };
 
@@ -275,6 +293,7 @@ const DemoDayDetailPage = () => {
                     className={s.fieldInput}
                   >
                     <option value="UPCOMING">Upcoming</option>
+                    <option value="EARLY_ACCESS">Early Access</option>
                     <option value="ACTIVE">Active</option>
                     <option value="COMPLETED">Completed</option>
                   </select>
@@ -381,6 +400,11 @@ const DemoDayDetailPage = () => {
                   <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
                   <div className={clsx(s.headerCell, s.flexible)}>Team</div>
                   {activeTab === 'investors' && <div className={clsx(s.headerCell, s.flexible)}>Investor Type</div>}
+                  {activeTab === 'investors' && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                      Early Access
+                    </div>
+                  )}
                   {activeTab === 'founders' && <div className={clsx(s.headerCell, s.flexible)}>Pitch Materials</div>}
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                     Invite Accepted
@@ -533,6 +557,24 @@ const DemoDayDetailPage = () => {
                             </span>
                           );
                         })()}
+                      </div>
+                    )}
+                    {activeTab === 'investors' && (
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                        <select
+                          value={participant.hasEarlyAccess ? 'yes' : 'no'}
+                          onChange={(e) =>
+                            handleUpdateParticipantEarlyAccess(participant.uid, e.target.value === 'yes')
+                          }
+                          disabled={updateParticipantMutation.isPending}
+                          className={clsx(
+                            'inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold disabled:opacity-50',
+                            participant.hasEarlyAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          )}
+                        >
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
                       </div>
                     )}
                     <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
