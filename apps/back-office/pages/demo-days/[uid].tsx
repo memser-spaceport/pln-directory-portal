@@ -136,14 +136,13 @@ const DemoDayDetailPage = () => {
     }
   };
 
-  const handleMoveParticipant = async (
+  const handleUpdateParticipantType = async (
     participantUid: string,
     participantName: string,
-    currentType: 'INVESTOR' | 'FOUNDER'
+    newType: 'INVESTOR' | 'FOUNDER'
   ) => {
     if (!authToken || !uid) return;
 
-    const newType = currentType === 'INVESTOR' ? 'FOUNDER' : 'INVESTOR';
     const newTabName = newType === 'INVESTOR' ? 'Investors' : 'Founders';
 
     try {
@@ -389,8 +388,8 @@ const DemoDayDetailPage = () => {
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                     Status
                   </div>
-                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 180 }}>
-                    Action
+                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                    Type
                   </div>
                 </div>
 
@@ -578,20 +577,26 @@ const DemoDayDetailPage = () => {
                       </select>
                     </div>
 
-                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 180 }}>
-                      <button
-                        onClick={() =>
-                          handleMoveParticipant(
+                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                      <select
+                        value={participant.type}
+                        onChange={(e) =>
+                          handleUpdateParticipantType(
                             participant.uid,
                             participant.member?.name || participant.name,
-                            participant.type
+                            e.target.value as 'INVESTOR' | 'FOUNDER'
                           )
                         }
                         disabled={updateParticipantMutation.isPending}
-                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                        className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
+                          participant.type === 'INVESTOR'
+                            ? 'bg-purple-100 text-purple-800'
+                            : 'bg-blue-100 text-blue-800'
+                        } disabled:opacity-50`}
                       >
-                        Move to {participant.type === 'INVESTOR' ? 'Founders' : 'Investors'}
-                      </button>
+                        <option value="INVESTOR">Investor</option>
+                        <option value="FOUNDER">Founder</option>
+                      </select>
                     </div>
                   </div>
                 ))}
