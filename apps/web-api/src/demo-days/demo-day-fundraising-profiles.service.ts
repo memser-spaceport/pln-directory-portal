@@ -562,6 +562,36 @@ export class DemoDayFundraisingProfilesService {
     const filtered = await this.filterProfilesByEnabledFounders(demoDay.uid, profiles);
     if (filtered.length === 0) return [];
 
+    // attach "likedByMe/connectedByMe/investedByMe" flags for the requesting user
+    const interests = await this.prisma.demoDayExpressInterestStatistic.findMany({
+      where: {
+        demoDayUid: demoDay.uid,
+        memberUid: participantUid,
+        teamFundraisingProfileUid: { in: filtered.map((p) => p.uid) },
+        isPrepDemoDay: false,
+      },
+      select: {
+        teamFundraisingProfileUid: true,
+        liked: true,
+        connected: true,
+        invested: true,
+      },
+    });
+    const flagsByProfile = interests.reduce((acc, it) => {
+      acc[it.teamFundraisingProfileUid] = {
+        liked: it.liked,
+        connected: it.connected,
+        invested: it.invested,
+      };
+      return acc;
+    }, {} as Record<string, { liked: boolean; connected: boolean; invested: boolean }>);
+    for (const p of filtered) {
+      const f = flagsByProfile[p.uid] || { liked: false, connected: false, invested: false };
+      (p as any).liked = !!f.liked;
+      (p as any).connected = !!f.connected;
+      (p as any).invested = !!f.invested;
+    }
+
     // Stable personalized order based on user email
     return this.sortProfilesForUser(participantUid, filtered);
   }
@@ -941,6 +971,44 @@ export class DemoDayFundraisingProfilesService {
     });
 
     await this.updateFundraisingProfileStatus(team.uid, demoDay.uid);
+
+    return this.getCurrentDemoDayFundraisingProfile(memberEmail);
+  }
+
+  async uploadOnePagerPreview(memberEmail: string, file: Express.Multer.File): Promise<any> {
+    const { team, demoDay } = await this.validateDemoDayFounderAccess(memberEmail);
+
+    // Get the current fundraising profile
+    const profile = await this.prisma.teamFundraisingProfile.findUnique({
+      where: {
+        teamUid_demoDayUid: {
+          teamUid: team.uid,
+          demoDayUid: demoDay.uid,
+        },
+      },
+      include: {
+        onePagerUpload: true,
+      },
+    });
+
+    if (!profile?.onePagerUpload) {
+      throw new BadRequestException('No one-pager upload found. Please upload a one-pager first.');
+    }
+
+    // Upload the preview image using the uploads service
+    const previewUpload = await this.uploadsService.uploadGeneric({
+      file,
+      kind: UploadKind.IMAGE,
+      scopeType: 'NONE',
+    });
+
+    // Update the one-pager upload with the preview image URL
+    await this.prisma.upload.update({
+      where: { uid: profile.onePagerUpload.uid },
+      data: {
+        previewImageUrl: previewUpload.url,
+      },
+    });
 
     return this.getCurrentDemoDayFundraisingProfile(memberEmail);
   }

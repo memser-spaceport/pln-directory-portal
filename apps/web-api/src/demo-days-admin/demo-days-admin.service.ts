@@ -145,6 +145,51 @@ export class DemoDaysAdminService {
     return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 
+  async uploadOnePagerPreview(teamUid: string, file: Express.Multer.File): Promise<any> {
+    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    // Get the current fundraising profile
+    const profile = await this.prisma.teamFundraisingProfile.findUnique({
+      where: {
+        teamUid_demoDayUid: {
+          teamUid: teamUid,
+          demoDayUid: demoDay.uid,
+        },
+      },
+      include: {
+        onePagerUpload: true,
+      },
+    });
+
+    if (!profile) {
+      throw new NotFoundException('Team fundraising profile not found');
+    }
+
+    if (!profile.onePagerUpload) {
+      throw new BadRequestException('No one-pager upload found. Please upload a one-pager first.');
+    }
+
+    // Upload the preview image using the uploads service
+    const previewUpload = await this.uploadsService.uploadGeneric({
+      file,
+      kind: UploadKind.IMAGE,
+      scopeType: 'NONE',
+    });
+
+    // Update the one-pager upload with the preview image URL
+    await this.prisma.upload.update({
+      where: { uid: profile.onePagerUpload.uid },
+      data: {
+        previewImageUrl: previewUpload.url,
+      },
+    });
+
+    return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
+  }
+
   async updateFundraisingDescription(teamUid: string, description: string): Promise<any> {
     const demoDay = await this.demoDaysService.getCurrentDemoDay();
     if (!demoDay) {
@@ -433,7 +478,39 @@ export class DemoDaysAdminService {
       }))
       .filter((profile) => profile.founders.length > 0);
 
-    // Apply consistent random sorting based on userId and teamId if userId is provided
+    if (userId && profilesWithFounders.length > 0) {
+      const interests = await this.prisma.demoDayExpressInterestStatistic.findMany({
+        where: {
+          demoDayUid: demoDayUid,
+          memberUid: userId,
+          teamFundraisingProfileUid: { in: profilesWithFounders.map((p) => p.uid) },
+          isPrepDemoDay: false,
+        },
+        select: {
+          teamFundraisingProfileUid: true,
+          liked: true,
+          connected: true,
+          invested: true,
+        },
+      });
+
+      const byProfile = interests.reduce((acc, it) => {
+        acc[it.teamFundraisingProfileUid] = {
+          liked: !!it.liked,
+          connected: !!it.connected,
+          invested: !!it.invested,
+        };
+        return acc;
+      }, {} as Record<string, { liked: boolean; connected: boolean; invested: boolean }>);
+
+      for (const p of profilesWithFounders) {
+        const f = byProfile[p.uid] || { liked: false, connected: false, invested: false };
+        (p as any).liked = f.liked;
+        (p as any).connected = f.connected;
+        (p as any).invested = f.invested;
+      }
+    }
+
     if (userId) {
       return this.sortProfilesForUser(userId, profilesWithFounders);
     }

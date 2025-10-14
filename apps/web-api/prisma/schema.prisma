@@ -86,78 +86,79 @@ model Ask {
 }
 
 model Member {
-  id                           Int                           @id @default(autoincrement())
-  uid                          String                        @unique @default(cuid())
-  name                         String
-  email                        String?                       @unique
-  image                        Image?                        @relation(fields: [imageUid], references: [uid])
-  imageUid                     String?
-  githubHandler                String?
-  discordHandler               String?
-  twitterHandler               String?
-  linkedinHandler              String?
-  telegramHandler              String?                       @unique
-  telegramUid                  String?                       @unique
-  officeHours                  String?
-  ohStatus                     String?
-  ohInterest                   String[]                      @default([])
-  ohHelpWith                   String[]                      @default([])
-  moreDetails                  String?
-  bio                          String?
-  plnFriend                    Boolean?                      @default(false)
-  plnStartDate                 DateTime?
-  airtableRecId                String?                       @unique
-  externalId                   String?                       @unique
-  openToWork                   Boolean?                      @default(false)
-  isFeatured                   Boolean?                      @default(false)
-  isVerified                   Boolean?                      @default(false)
-  signUpSource                 String?
-  signUpMedium                 String?
-  signUpCampaign               String?
-  isUserConsent                Boolean?                      @default(false)
-  isSubscribedToNewsletter     Boolean?                      @default(false)
-  teamOrProjectURL             String?
-  createdAt                    DateTime                      @default(now())
-  updatedAt                    DateTime                      @updatedAt
-  approvedAt                   DateTime                      @default(now())
-  skills                       Skill[]
-  location                     Location?                     @relation(fields: [locationUid], references: [uid])
-  locationUid                  String?
-  teamMemberRoles              TeamMemberRole[]
-  memberRoles                  MemberRole[]
-  preferences                  Json?
-  projectContributions         ProjectContribution[]
-  createdProjects              Project[]
-  eventGuests                  PLEventGuest[]
-  teamFocusAreasVersionHistory TeamFocusAreaVersionHistory[]
-  modifiedTeams                Team[]                        @relation("LastModification")
-  interactions                 MemberInteraction[]           @relation("SourceMemberInteractions")
-  targetInteractions           MemberInteraction[]           @relation("TargetMemberInteractions")
-  followUps                    MemberFollowUp[]
-  feedbacks                    MemberFeedback[]
-  createdQuestions             DiscoveryQuestion[]           @relation("MemberCreatedDiscoveryQuestions")
-  modifiedQuestions            DiscoveryQuestion[]           @relation("MemberModifiedDiscoveryQuestions")
-  subscriptions                MemberSubscription[]
-  closedAsks                   Ask[]
-  experiences                  MemberExperience[]
-  linkedInDetails              Json?
-  recommendationRunsAsTarget   RecommendationRun[]
-  recommendationsAsRecommended Recommendation[]
-  recommendationNotifications  RecommendationNotification[]
-  notificationSetting          NotificationSetting?
-  linkedinProfile              LinkedInProfile?
-  accessLevel                  String?
-  scheduleMeetingCount         Int                           @default(0)
-  createdAdjustments           MemberInteractionAdjustment[] @relation("AdjustmentCreatedBy")
-  accessLevelUpdatedAt         DateTime                      @default(now())
-  deletedAt                    DateTime? // soft delete timestamp
-  deletionReason               String? // reason for deletion
-  modifiedFundraisingProfiles  TeamFundraisingProfile[]      @relation("TfpLastModifiedBy")
-  uploads                      Upload[]                      @relation("MemberUploads")
-  investorProfile              InvestorProfile?              @relation("MemberInvestorProfile", fields: [investorProfileId], references: [uid])
-  investorProfileId            String?                       @unique
-  demoDayParticipants          DemoDayParticipant[]
-  demoDayEngagements           DemoDayEngagement[]
+  id                               Int                               @id @default(autoincrement())
+  uid                              String                            @unique @default(cuid())
+  name                             String
+  email                            String?                           @unique
+  image                            Image?                            @relation(fields: [imageUid], references: [uid])
+  imageUid                         String?
+  githubHandler                    String?
+  discordHandler                   String?
+  twitterHandler                   String?
+  linkedinHandler                  String?
+  telegramHandler                  String?                           @unique
+  telegramUid                      String?                           @unique
+  officeHours                      String?
+  ohStatus                         String?
+  ohInterest                       String[]                          @default([])
+  ohHelpWith                       String[]                          @default([])
+  moreDetails                      String?
+  bio                              String?
+  plnFriend                        Boolean?                          @default(false)
+  plnStartDate                     DateTime?
+  airtableRecId                    String?                           @unique
+  externalId                       String?                           @unique
+  openToWork                       Boolean?                          @default(false)
+  isFeatured                       Boolean?                          @default(false)
+  isVerified                       Boolean?                          @default(false)
+  signUpSource                     String?
+  signUpMedium                     String?
+  signUpCampaign                   String?
+  isUserConsent                    Boolean?                          @default(false)
+  isSubscribedToNewsletter         Boolean?                          @default(false)
+  teamOrProjectURL                 String?
+  createdAt                        DateTime                          @default(now())
+  updatedAt                        DateTime                          @updatedAt
+  approvedAt                       DateTime                          @default(now())
+  skills                           Skill[]
+  location                         Location?                         @relation(fields: [locationUid], references: [uid])
+  locationUid                      String?
+  teamMemberRoles                  TeamMemberRole[]
+  memberRoles                      MemberRole[]
+  preferences                      Json?
+  projectContributions             ProjectContribution[]
+  createdProjects                  Project[]
+  eventGuests                      PLEventGuest[]
+  teamFocusAreasVersionHistory     TeamFocusAreaVersionHistory[]
+  modifiedTeams                    Team[]                            @relation("LastModification")
+  interactions                     MemberInteraction[]               @relation("SourceMemberInteractions")
+  targetInteractions               MemberInteraction[]               @relation("TargetMemberInteractions")
+  followUps                        MemberFollowUp[]
+  feedbacks                        MemberFeedback[]
+  createdQuestions                 DiscoveryQuestion[]               @relation("MemberCreatedDiscoveryQuestions")
+  modifiedQuestions                DiscoveryQuestion[]               @relation("MemberModifiedDiscoveryQuestions")
+  subscriptions                    MemberSubscription[]
+  closedAsks                       Ask[]
+  experiences                      MemberExperience[]
+  linkedInDetails                  Json?
+  recommendationRunsAsTarget       RecommendationRun[]
+  recommendationsAsRecommended     Recommendation[]
+  recommendationNotifications      RecommendationNotification[]
+  notificationSetting              NotificationSetting?
+  linkedinProfile                  LinkedInProfile?
+  accessLevel                      String?
+  scheduleMeetingCount             Int                               @default(0)
+  createdAdjustments               MemberInteractionAdjustment[]     @relation("AdjustmentCreatedBy")
+  accessLevelUpdatedAt             DateTime                          @default(now())
+  deletedAt                        DateTime? // soft delete timestamp
+  deletionReason                   String? // reason for deletion
+  modifiedFundraisingProfiles      TeamFundraisingProfile[]          @relation("TfpLastModifiedBy")
+  uploads                          Upload[]                          @relation("MemberUploads")
+  investorProfile                  InvestorProfile?                  @relation("MemberInvestorProfile", fields: [investorProfileId], references: [uid])
+  investorProfileId                String?                           @unique
+  demoDayParticipants              DemoDayParticipant[]
+  demoDayEngagements               DemoDayEngagement[]
+  demoDayExpressInterestStatistics DemoDayExpressInterestStatistic[]
 }
 
 model MemberRole {
@@ -843,10 +844,11 @@ model TeamFundraisingProfile {
 
   status TeamFundraisingProfileStatus @default(DRAFT)
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  lastModifiedBy String?
-  lastModifier   Member?  @relation("TfpLastModifiedBy", fields: [lastModifiedBy], references: [uid])
+  createdAt                 DateTime                          @default(now())
+  updatedAt                 DateTime                          @updatedAt
+  lastModifiedBy            String?
+  lastModifier              Member?                           @relation("TfpLastModifiedBy", fields: [lastModifiedBy], references: [uid])
+  expressInterestStatistics DemoDayExpressInterestStatistic[]
 
   @@unique([teamUid, demoDayUid])
   @@index([status])
@@ -891,15 +893,16 @@ model Upload {
   uploaderUid String?
   uploader    Member? @relation("MemberUploads", fields: [uploaderUid], references: [uid])
 
-  bucket   String?
-  key      String?
-  cid      String?
-  url      String
-  filename String
-  mimetype String
-  size     Int
-  checksum String?
-  meta     Json?
+  bucket          String?
+  key             String?
+  cid             String?
+  url             String
+  filename        String
+  mimetype        String
+  size            Int
+  checksum        String?
+  meta            Json?
+  previewImageUrl String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -958,19 +961,20 @@ enum DemoDayParticipantStatus {
 }
 
 model DemoDay {
-  id                  Int                      @id @default(autoincrement())
-  uid                 String                   @unique @default(cuid())
-  startDate           DateTime
-  title               String
-  description         String
-  status              DemoDayStatus            @default(UPCOMING)
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
-  isDeleted           Boolean                  @default(false)
-  deletedAt           DateTime?
-  participants        DemoDayParticipant[]
-  fundraisingProfiles TeamFundraisingProfile[]
-  engagements         DemoDayEngagement[]
+  id                        Int                               @id @default(autoincrement())
+  uid                       String                            @unique @default(cuid())
+  startDate                 DateTime
+  title                     String
+  description               String
+  status                    DemoDayStatus                     @default(UPCOMING)
+  createdAt                 DateTime                          @default(now())
+  updatedAt                 DateTime                          @updatedAt
+  isDeleted                 Boolean                           @default(false)
+  deletedAt                 DateTime?
+  participants              DemoDayParticipant[]
+  fundraisingProfiles       TeamFundraisingProfile[]
+  engagements               DemoDayEngagement[]
+  expressInterestStatistics DemoDayExpressInterestStatistic[]
 }
 
 model DemoDayParticipant {
@@ -1035,4 +1039,27 @@ model DemoDayEngagement {
   updatedAt DateTime @updatedAt
 
   @@unique([demoDayUid, memberUid])
+}
+
+model DemoDayExpressInterestStatistic {
+  id                        Int                    @id @default(autoincrement())
+  uid                       String                 @unique @default(cuid())
+  demoDayUid                String
+  demoDay                   DemoDay                @relation(fields: [demoDayUid], references: [uid], onDelete: Cascade)
+  memberUid                 String
+  member                    Member                 @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  teamFundraisingProfileUid String
+  teamFundraisingProfile    TeamFundraisingProfile @relation(fields: [teamFundraisingProfileUid], references: [uid], onDelete: Cascade)
+  isPrepDemoDay             Boolean                @default(false)
+
+  liked     Boolean @default(false)
+  connected Boolean @default(false)
+  invested  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([demoDayUid, memberUid, teamFundraisingProfileUid, isPrepDemoDay])
+  @@index([memberUid, teamFundraisingProfileUid])
+  @@index([demoDayUid])
 }

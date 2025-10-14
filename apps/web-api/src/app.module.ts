@@ -168,7 +168,8 @@ export class AppModule {
         { path: 'v1/demo-days/current/fundraising-profile/one-pager', method: RequestMethod.PUT },
         { path: 'v1/demo-days/current/fundraising-profile/video', method: RequestMethod.PUT },
         { path: 'v1/admin/demo-days/current/teams/:teamUid/fundraising-profile/one-pager', method: RequestMethod.PUT },
-        { path: 'v1/admin/demo-days/current/teams/:teamUid/fundraising-profile/video', method: RequestMethod.PUT }
+        { path: 'v1/admin/demo-days/current/teams/:teamUid/fundraising-profile/video', method: RequestMethod.PUT },
+        { path: 'v1/demo-days/current/fundraising-profile/one-pager/preview', method: RequestMethod.POST }
       )
       .forRoutes(
         { path: '*', method: RequestMethod.POST },
