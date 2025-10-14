@@ -3,7 +3,7 @@ export interface DemoDay {
   title: string;
   description: string;
   startDate: string;
-  status: 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
+  status: 'UPCOMING' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED';
   createdAt: string;
   updatedAt: string;
 }
@@ -12,14 +12,14 @@ export interface CreateDemoDayDto {
   title: string;
   description: string;
   startDate: string;
-  status: 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
+  status: 'UPCOMING' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED';
 }
 
 export interface UpdateDemoDayDto {
   title?: string;
   description?: string;
   startDate?: string;
-  status?: 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
+  status?: 'UPCOMING' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED';
 }
 
 export interface DemoDayParticipant {
@@ -30,6 +30,7 @@ export interface DemoDayParticipant {
   name: string;
   type: 'INVESTOR' | 'FOUNDER';
   status: 'INVITED' | 'ENABLED' | 'DISABLED';
+  hasEarlyAccess: boolean;
   teamUid?: string;
   createdAt: string;
   updatedAt: string;

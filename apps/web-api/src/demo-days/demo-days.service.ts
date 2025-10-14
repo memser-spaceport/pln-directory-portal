@@ -11,7 +11,7 @@ export class DemoDaysService {
     const demoDay = await this.prisma.demoDay.findFirst({
       where: {
         status: {
-          in: [DemoDayStatus.UPCOMING, DemoDayStatus.ACTIVE, DemoDayStatus.COMPLETED],
+          in: [DemoDayStatus.UPCOMING, DemoDayStatus.EARLY_ACCESS, DemoDayStatus.ACTIVE, DemoDayStatus.COMPLETED],
         },
         isDeleted: false,
       },
@@ -31,6 +31,7 @@ export class DemoDaysService {
     teamsCount?: number;
     investorsCount?: number;
     isDemoDayAdmin?: boolean;
+    isEarlyAccess?: boolean;
   }> {
     const demoDay = await this.getCurrentDemoDay();
     if (!demoDay) {
@@ -46,7 +47,7 @@ export class DemoDaysService {
     if (!memberEmail) {
       return {
         access: 'none',
-        status: demoDay.status.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED',
+        status: this.getExternalDemoDayStatus(demoDay.status),
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
@@ -104,6 +105,7 @@ export class DemoDaysService {
               status: true,
               type: true,
               isDemoDayAdmin: true,
+              hasEarlyAccess: true,
             },
           },
         },
@@ -113,7 +115,7 @@ export class DemoDaysService {
     if (!member) {
       return {
         access: 'none',
-        status: demoDay.status.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED',
+        status: this.getExternalDemoDayStatus(demoDay.status),
       };
     }
 
@@ -126,7 +128,7 @@ export class DemoDaysService {
     if (participant && participant.status !== 'ENABLED') {
       return {
         access: 'none',
-        status: demoDay.status.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED',
+        status: this.getExternalDemoDayStatus(demoDay.status),
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
@@ -146,13 +148,18 @@ export class DemoDaysService {
     if (participant && participant.status === 'ENABLED') {
       // Member is an enabled participant
       const access = participant.type === 'INVESTOR' ? 'INVESTOR' : 'FOUNDER';
+
       return {
         access,
         uid: demoDay.uid,
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
-        status: demoDay.status.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED',
+        status: this.getExternalDemoDayStatus(
+          demoDay.status,
+          participant.type === 'FOUNDER' || participant.hasEarlyAccess
+        ),
+        isEarlyAccess: demoDay.status === DemoDayStatus.EARLY_ACCESS,
         isDemoDayAdmin: participant.isDemoDayAdmin || isDirectoryAdmin,
         teamsCount,
         investorsCount,
@@ -161,7 +168,7 @@ export class DemoDaysService {
 
     return {
       access: 'none',
-      status: demoDay.status.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED',
+      status: this.getExternalDemoDayStatus(demoDay.status),
       date: demoDay.startDate.toISOString(),
       title: demoDay.title,
       description: demoDay.description,
@@ -350,5 +357,21 @@ export class DemoDaysService {
     }
 
     return updated;
+  }
+
+  private getExternalDemoDayStatus(
+    demoDayStatus: DemoDayStatus,
+    hasEarlyAccess = false
+  ): 'UPCOMING' | 'ACTIVE' | 'COMPLETED' {
+    // Never return EARLY_ACCESS to frontend - if hasEarlyAccess is true, return ACTIVE, otherwise return UPCOMING
+    if (demoDayStatus === DemoDayStatus.EARLY_ACCESS) {
+      if (hasEarlyAccess) {
+        return 'ACTIVE';
+      } else {
+        return 'UPCOMING';
+      }
+    }
+
+    return demoDayStatus.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
   }
 }
