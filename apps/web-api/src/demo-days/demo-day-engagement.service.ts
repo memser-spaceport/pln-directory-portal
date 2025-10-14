@@ -279,6 +279,55 @@ export class DemoDayEngagementService {
       },
     });
 
+    const interestPatch = {
+      liked: interestType === 'like',
+      connected: interestType === 'connect',
+      invested: interestType === 'invest',
+    };
+
+    const existing = await this.prisma.demoDayExpressInterestStatistic.findUnique({
+      where: {
+        demoDayUid_memberUid_teamFundraisingProfileUid_isPrepDemoDay: {
+          demoDayUid: fundraisingProfile.demoDayUid,
+          memberUid: member.uid,
+          teamFundraisingProfileUid,
+          isPrepDemoDay,
+        },
+      },
+      select: {
+        liked: true,
+        connected: true,
+        invested: true,
+      },
+    });
+
+    await this.prisma.demoDayExpressInterestStatistic.upsert({
+      where: {
+        demoDayUid_memberUid_teamFundraisingProfileUid_isPrepDemoDay: {
+          demoDayUid: fundraisingProfile.demoDayUid,
+          memberUid: member.uid,
+          teamFundraisingProfileUid,
+          isPrepDemoDay,
+        },
+      },
+      update: {
+        liked: existing ? existing.liked || interestPatch.liked : interestPatch.liked,
+        connected: existing ? existing.connected || interestPatch.connected : interestPatch.connected,
+        invested: existing ? existing.invested || interestPatch.invested : interestPatch.invested,
+      },
+      create: {
+        uid: cuid(),
+        demoDayUid: fundraisingProfile.demoDayUid,
+        memberUid: member.uid,
+        teamFundraisingProfileUid,
+        isPrepDemoDay,
+        liked: interestPatch.liked,
+        connected: interestPatch.connected,
+        invested: interestPatch.invested,
+      },
+      select: { uid: true },
+    });
+
     // use setTimeout to not block the response
     setTimeout(async () => {
       await this.analyticsService.trackEvent({
