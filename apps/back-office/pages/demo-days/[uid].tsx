@@ -408,10 +408,10 @@ const DemoDayDetailPage = () => {
                     Invite Accepted
                   </div>
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
-                    Status
+                    Type
                   </div>
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
-                    Type
+                    Status
                   </div>
                 </div>
 
@@ -631,6 +631,28 @@ const DemoDayDetailPage = () => {
 
                     <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
                       <select
+                        value={participant.type}
+                        onChange={(e) =>
+                          handleUpdateParticipantType(
+                            participant.uid,
+                            participant.member?.name || participant.name,
+                            e.target.value as 'INVESTOR' | 'FOUNDER'
+                          )
+                        }
+                        disabled={updateParticipantMutation.isPending}
+                        className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
+                          participant.type === 'INVESTOR'
+                            ? 'bg-purple-100 text-purple-800'
+                            : 'bg-blue-100 text-blue-800'
+                        } disabled:opacity-50`}
+                      >
+                        <option value="INVESTOR">Investor</option>
+                        <option value="FOUNDER">Founder</option>
+                      </select>
+                    </div>
+
+                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                      <select
                         value={participant.status}
                         onChange={(e) =>
                           handleUpdateParticipantStatus(
@@ -650,28 +672,6 @@ const DemoDayDetailPage = () => {
                         )}
                         <option value="ENABLED">Enabled</option>
                         <option value="DISABLED">Disabled</option>
-                      </select>
-                    </div>
-
-                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                      <select
-                        value={participant.type}
-                        onChange={(e) =>
-                          handleUpdateParticipantType(
-                            participant.uid,
-                            participant.member?.name || participant.name,
-                            e.target.value as 'INVESTOR' | 'FOUNDER'
-                          )
-                        }
-                        disabled={updateParticipantMutation.isPending}
-                        className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
-                          participant.type === 'INVESTOR'
-                            ? 'bg-purple-100 text-purple-800'
-                            : 'bg-blue-100 text-blue-800'
-                        } disabled:opacity-50`}
-                      >
-                        <option value="INVESTOR">Investor</option>
-                        <option value="FOUNDER">Founder</option>
                       </select>
                     </div>
                   </div>
