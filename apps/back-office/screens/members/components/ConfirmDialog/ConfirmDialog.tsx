@@ -14,9 +14,12 @@ interface Props {
   onSubmit: () => void;
   title: string;
   desc: string;
+  checkboxLabel: string;
+  checkboxChecked: boolean;
+  onCheckboxChange: (checked: boolean) => void;
 }
 
-export const ConfirmDialog = ({ onClose, onSubmit, title, desc }: Props) => {
+export const ConfirmDialog = ({ onClose, onSubmit, title, desc, checkboxLabel, checkboxChecked, onCheckboxChange }: Props) => {
   return (
     <>
       <AnimatePresence>
@@ -38,6 +41,15 @@ export const ConfirmDialog = ({ onClose, onSubmit, title, desc }: Props) => {
                 <div className="m-0 flex flex-col gap-5 p-5">
                   <h4 className="text-xl font-bold">{title}</h4>
                   <p className="whitespace-normal text-sm text-[#455468]">{desc}</p>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={checkboxChecked}
+                      onChange={(e) => onCheckboxChange(e.target.checked)}
+                      className="w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-sm text-[#455468]">{checkboxLabel}</span>
+                  </label>
                 </div>
                 <div className="flex w-full justify-end gap-4 p-5">
                   <button type="button" className={s.secondaryBtn} onClick={onClose}>
