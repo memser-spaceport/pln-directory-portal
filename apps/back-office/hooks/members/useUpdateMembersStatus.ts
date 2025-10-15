@@ -7,16 +7,18 @@ interface MutationParams {
   authToken: string;
   memberUids: string[];
   accessLevel: string;
+  sendRejectEmail?: boolean;
 }
 
 async function mutation(params: MutationParams) {
+  const { authToken, ...body } = params;
   const config = {
     headers: {
-      authorization: `Bearer ${params.authToken}`,
+      authorization: `Bearer ${authToken}`,
     },
   };
 
-  return api.put(`${API_ROUTE.ADMIN_MEMBERS}/access-level`, params, config);
+  return api.put(`${API_ROUTE.ADMIN_MEMBERS}/access-level`, body, config);
 }
 
 export function useUpdateMembersStatus() {

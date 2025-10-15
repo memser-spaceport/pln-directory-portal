@@ -129,6 +129,7 @@ export const UpdateMemberSchema = z.object({
 export const UpdateAccessLevelSchema = z.object({
   memberUids: z.string().array().nonempty({ message: 'memberUids cannot be empty' }),
   accessLevel: z.string().min(1, { message: 'accessLevel must not be empty' }),
+  sendRejectEmail: z.boolean().optional(),
 });
 
 export type AccessLevelCounts = Record<AccessLevel, number>;
