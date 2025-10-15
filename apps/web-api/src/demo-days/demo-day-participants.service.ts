@@ -127,6 +127,13 @@ export class DemoDayParticipantsService {
       }
     }
 
+    if (data.type === 'INVESTOR' && !isNewMember && ['L2', 'L3', 'L4'].includes(member.accessLevel || '')) {
+      await this.prisma.member.update({
+        where: { uid: member.uid },
+        data: { accessLevel: 'L6' },
+      });
+    }
+
     // Determine status based on whether member was newly created or existing
     const status = isNewMember ? 'INVITED' : 'ENABLED';
 
@@ -800,6 +807,7 @@ export class DemoDayParticipantsService {
               uid: true,
               name: true,
               imageUid: true,
+              externalId: true,
               image: {
                 select: {
                   uid: true,
@@ -883,6 +891,8 @@ export class DemoDayParticipantsService {
     data: {
       status?: 'INVITED' | 'ENABLED' | 'DISABLED';
       teamUid?: string;
+      type?: 'INVESTOR' | 'FOUNDER';
+      hasEarlyAccess?: boolean;
     },
     actorEmail?: string
   ): Promise<DemoDayParticipant> {
@@ -897,29 +907,67 @@ export class DemoDayParticipantsService {
 
     const participant = await this.prisma.demoDayParticipant.findUnique({
       where: { uid: participantUid },
+      include: {
+        member: {
+          include: {
+            teamMemberRoles: {
+              include: {
+                team: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!participant || participant.demoDayUid !== demoDayUid) {
       throw new NotFoundException('Participant not found');
     }
 
+    const currentType = data.type || participant.type;
+
     // Validate team assignment for founder type only
-    if (data.teamUid && participant.type !== 'FOUNDER') {
+    if (data.teamUid && currentType !== 'FOUNDER') {
       throw new BadRequestException('Team can only be assigned to founder type participants');
     }
 
     const updateData: Prisma.DemoDayParticipantUpdateInput = {};
 
-    // Keep previous status for analytics
+    // Keep previous status and type for analytics
     const prevStatus = participant.status;
+    const prevType = participant.type;
 
     if (data.status) {
       updateData.status = data.status;
       updateData.statusUpdatedAt = new Date();
     }
 
+    // Handle type change and auto-assign/remove teamUid
+    if (data.type && data.type !== participant.type) {
+      updateData.type = data.type;
+
+      // If changing from INVESTOR to FOUNDER, auto-assign main team
+      if (data.type === 'FOUNDER' && participant.type === 'INVESTOR') {
+        const mainTeam = participant.member?.teamMemberRoles.find((role) => role.mainTeam);
+        const teamUid = mainTeam?.team.uid || participant.member?.teamMemberRoles[0]?.team.uid;
+
+        if (teamUid) {
+          updateData.team = { connect: { uid: teamUid } };
+        }
+      }
+
+      // If changing from FOUNDER to INVESTOR, remove team
+      if (data.type === 'INVESTOR' && participant.type === 'FOUNDER') {
+        updateData.team = { disconnect: true };
+      }
+    }
+
     if (data.teamUid !== undefined) {
       updateData.team = data.teamUid ? { connect: { uid: data.teamUid } } : { disconnect: true };
+    }
+
+    if (data.hasEarlyAccess !== undefined) {
+      updateData.hasEarlyAccess = data.hasEarlyAccess;
     }
 
     const updated = await this.prisma.demoDayParticipant.update({
@@ -939,6 +987,23 @@ export class DemoDayParticipantsService {
           type: updated.type,
           fromStatus: prevStatus,
           toStatus: updated.status,
+          actorUid: actorUid || null,
+          actorEmail: actorEmail || null,
+        },
+      });
+    }
+
+    // Track type change only when it actually changed
+    if (data.type && prevType !== updated.type) {
+      await this.analyticsService.trackEvent({
+        name: 'demo-day-participant-type-changed',
+        distinctId: updated.memberUid,
+        properties: {
+          demoDayUid,
+          participantUid: updated.uid,
+          memberUid: updated.memberUid,
+          fromType: prevType,
+          toType: updated.type,
           actorUid: actorUid || null,
           actorEmail: actorEmail || null,
         },

@@ -32,9 +32,8 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
   const filteredMembers =
     members?.data?.filter(
       (member) =>
-        (member.name?.toLowerCase().includes(memberSearch?.toLowerCase()) ||
-          member.email?.toLowerCase().includes(memberSearch?.toLowerCase())) &&
-        (participantType !== 'INVESTOR' || member.accessLevel === 'L5' || member.accessLevel === 'L6')
+        member.name?.toLowerCase().includes(memberSearch?.toLowerCase()) ||
+        member.email?.toLowerCase().includes(memberSearch?.toLowerCase())
     ) || [];
 
   const submitDisabled = addParticipantMutation.isPending || (addMethod === 'existing' && !selectedMemberUid);

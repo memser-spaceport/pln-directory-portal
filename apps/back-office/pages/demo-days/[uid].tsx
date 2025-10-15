@@ -12,6 +12,7 @@ import { UploadParticipantsModal } from '../../components/demo-days/UploadPartic
 import { UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
 import { WEB_UI_BASE_URL } from '../../utils/constants';
 import clsx from 'clsx';
+import { toast } from 'react-toastify';
 
 import s from './styles.module.scss';
 
@@ -62,6 +63,8 @@ const DemoDayDetailPage = () => {
     switch (status) {
       case 'ACTIVE':
         return 'text-green-600 bg-green-100';
+      case 'EARLY_ACCESS':
+        return 'text-orange-600 bg-orange-100';
       case 'PENDING':
         return 'text-yellow-600 bg-yellow-100';
       case 'COMPLETED':
@@ -132,6 +135,45 @@ const DemoDayDetailPage = () => {
     } catch (error) {
       console.error('Error updating participant status:', error);
       alert('Failed to update participant status. Please try again.');
+    }
+  };
+
+  const handleUpdateParticipantType = async (
+    participantUid: string,
+    participantName: string,
+    newType: 'INVESTOR' | 'FOUNDER'
+  ) => {
+    if (!authToken || !uid) return;
+
+    const newTabName = newType === 'INVESTOR' ? 'Investors' : 'Founders';
+
+    try {
+      await updateParticipantMutation.mutateAsync({
+        authToken,
+        demoDayUid: uid as string,
+        participantUid,
+        data: { type: newType },
+      });
+      toast.success(`Successfully moved ${participantName} to ${newTabName}`);
+    } catch (error) {
+      console.error('Error moving participant:', error);
+      toast.error(`Failed to move ${participantName}. Please try again.`);
+    }
+  };
+
+  const handleUpdateParticipantEarlyAccess = async (participantUid: string, hasEarlyAccess: boolean) => {
+    if (!authToken || !uid) return;
+
+    try {
+      await updateParticipantMutation.mutateAsync({
+        authToken,
+        demoDayUid: uid as string,
+        participantUid,
+        data: { hasEarlyAccess },
+      });
+    } catch (error) {
+      console.error('Error updating early access:', error);
+      toast.error('Failed to update early access. Please try again.');
     }
   };
 
@@ -251,6 +293,7 @@ const DemoDayDetailPage = () => {
                     className={s.fieldInput}
                   >
                     <option value="UPCOMING">Upcoming</option>
+                    <option value="EARLY_ACCESS">Early Access</option>
                     <option value="ACTIVE">Active</option>
                     <option value="COMPLETED">Completed</option>
                   </select>
@@ -357,12 +400,20 @@ const DemoDayDetailPage = () => {
                   <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
                   <div className={clsx(s.headerCell, s.flexible)}>Team</div>
                   {activeTab === 'investors' && <div className={clsx(s.headerCell, s.flexible)}>Investor Type</div>}
+                  {activeTab === 'investors' && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                      Early Access
+                    </div>
+                  )}
                   {activeTab === 'founders' && <div className={clsx(s.headerCell, s.flexible)}>Pitch Materials</div>}
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                     Invite Accepted
                   </div>
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                     Status
+                  </div>
+                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                    Type
                   </div>
                 </div>
 
@@ -508,8 +559,26 @@ const DemoDayDetailPage = () => {
                         })()}
                       </div>
                     )}
+                    {activeTab === 'investors' && (
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                        <select
+                          value={participant.hasEarlyAccess ? 'yes' : 'no'}
+                          onChange={(e) =>
+                            handleUpdateParticipantEarlyAccess(participant.uid, e.target.value === 'yes')
+                          }
+                          disabled={updateParticipantMutation.isPending}
+                          className={clsx(
+                            'inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold disabled:opacity-50',
+                            participant.hasEarlyAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          )}
+                        >
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+                    )}
                     <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                      {participant.member?.accessLevel === 'L0' ? (
+                      {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
                         <svg
                           className="mx-auto h-5 w-5 text-red-500"
                           fill="none"
@@ -544,9 +613,35 @@ const DemoDayDetailPage = () => {
                           participant.status
                         )} disabled:opacity-50`}
                       >
-                        {participant.member?.accessLevel === 'L0' && <option value="INVITED">Invited</option>}
+                        {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
+                          <option value="INVITED">Invited</option>
+                        ) : (
+                          ''
+                        )}
                         <option value="ENABLED">Enabled</option>
                         <option value="DISABLED">Disabled</option>
+                      </select>
+                    </div>
+
+                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                      <select
+                        value={participant.type}
+                        onChange={(e) =>
+                          handleUpdateParticipantType(
+                            participant.uid,
+                            participant.member?.name || participant.name,
+                            e.target.value as 'INVESTOR' | 'FOUNDER'
+                          )
+                        }
+                        disabled={updateParticipantMutation.isPending}
+                        className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
+                          participant.type === 'INVESTOR'
+                            ? 'bg-purple-100 text-purple-800'
+                            : 'bg-blue-100 text-blue-800'
+                        } disabled:opacity-50`}
+                      >
+                        <option value="INVESTOR">Investor</option>
+                        <option value="FOUNDER">Founder</option>
                       </select>
                     </div>
                   </div>
