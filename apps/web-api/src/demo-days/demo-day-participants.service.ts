@@ -442,7 +442,12 @@ export class DemoDayParticipantsService {
                 update: {
                   type: participantData.investmentType || existingMember.investorProfile.type,
                   ...(isTeamInvestorProfile
-                    ? {}
+                    ? {
+                        secRulesAccepted:
+                          participantData.secRulesAccepted !== undefined
+                            ? participantData.secRulesAccepted
+                            : existingMember.investorProfile.secRulesAccepted,
+                      }
                     : {
                         typicalCheckSize:
                           participantData.typicalCheckSize !== undefined
@@ -480,6 +485,7 @@ export class DemoDayParticipantsService {
                 ? {
                     create: {
                       type: investorType,
+                      secRulesAccepted: participantData.secRulesAccepted || false,
                     },
                   }
                 : {
