@@ -7,7 +7,6 @@ import { Level0Icon, Level1Icon, Level2Icon } from '../icons';
 import { useUpdateMembersStatus } from '../../../../hooks/members/useUpdateMembersStatus';
 import { format } from 'date-fns';
 import { ConfirmDialog } from '../ConfirmDialog';
-import { useToggle } from 'react-use';
 import { toast } from 'react-toastify';
 
 const options = [
