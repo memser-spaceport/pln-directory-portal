@@ -11,14 +11,13 @@ interface MutationParams {
 }
 
 async function mutation(params: MutationParams) {
-  const { authToken, ...body } = params;
   const config = {
     headers: {
-      authorization: `Bearer ${authToken}`,
+      authorization: `Bearer ${params.authToken}`,
     },
   };
 
-  return api.put(`${API_ROUTE.ADMIN_MEMBERS}/access-level`, body, config);
+  return api.put(`${API_ROUTE.ADMIN_MEMBERS}/access-level`, params, config);
 }
 
 export function useUpdateMembersStatus() {

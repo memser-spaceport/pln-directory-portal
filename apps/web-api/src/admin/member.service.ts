@@ -1005,8 +1005,7 @@ export class MemberService {
         }
       }
 
-      // Send rejection emails for members marked as Rejected only if sendEmail is true
-      this.logger.info('ForTest sendRejectEmail: ' + sendRejectEmail);
+      // Send rejection emails for members marked as Rejected only if sendRejectEmail is true
       if (sendRejectEmail && accessLevel === AccessLevel.REJECTED) {
         for (const member of notApprovedMembers) {
           if (!member.email) {
@@ -1014,7 +1013,6 @@ export class MemberService {
               `Missing email for member with uid ${member.uid}. Can't send a rejection notification email`
             );
           } else {
-            this.logger.info('ForTest send rejection email ' + member.email);
             await this.notificationService.notifyForRejection(member.name, member.email);
           }
         }
