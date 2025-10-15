@@ -615,6 +615,8 @@ export class DemoDayParticipantsService {
                     data: {
                       teamLead: newTeamLead,
                       role: newRole,
+                      investmentTeam:
+                        !!isTeamInvestorProfile && !existingMember?.teamMemberRoles?.find((r) => r.investmentTeam),
                     },
                   });
 
@@ -632,7 +634,9 @@ export class DemoDayParticipantsService {
                     teamUid,
                     teamLead: isTeamLead,
                     role: participantData.role || (willBeTeamLead ? 'Lead' : 'Contributor'),
-                    mainTeam: !existingMember?.teamMemberRoles.find((r) => r.mainTeam),
+                    mainTeam: !existingMember?.teamMemberRoles?.find((r) => r.mainTeam),
+                    investmentTeam:
+                      !!isTeamInvestorProfile && !existingMember?.teamMemberRoles?.find((r) => r.investmentTeam),
                   },
                 });
                 summary.updatedMemberships++;
