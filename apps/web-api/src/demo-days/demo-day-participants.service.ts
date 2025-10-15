@@ -437,22 +437,26 @@ export class DemoDayParticipantsService {
             }
 
             // Update investor profile if it exists
-            if (existingMember.investorProfile && !isTeamInvestorProfile) {
+            if (existingMember.investorProfile) {
               updateData.investorProfile = {
                 update: {
                   type: participantData.investmentType || existingMember.investorProfile.type,
-                  typicalCheckSize:
-                    participantData.typicalCheckSize !== undefined
-                      ? participantData.typicalCheckSize
-                      : existingMember.investorProfile.typicalCheckSize,
-                  investInStartupStages:
-                    participantData.investInStartupStages !== undefined
-                      ? participantData.investInStartupStages
-                      : existingMember.investorProfile.investInStartupStages,
-                  secRulesAccepted:
-                    participantData.secRulesAccepted !== undefined
-                      ? participantData.secRulesAccepted
-                      : existingMember.investorProfile.secRulesAccepted,
+                  ...(isTeamInvestorProfile
+                    ? {}
+                    : {
+                        typicalCheckSize:
+                          participantData.typicalCheckSize !== undefined
+                            ? participantData.typicalCheckSize
+                            : existingMember.investorProfile.typicalCheckSize,
+                        investInStartupStages:
+                          participantData.investInStartupStages !== undefined
+                            ? participantData.investInStartupStages
+                            : existingMember.investorProfile.investInStartupStages,
+                        secRulesAccepted:
+                          participantData.secRulesAccepted !== undefined
+                            ? participantData.secRulesAccepted
+                            : existingMember.investorProfile.secRulesAccepted,
+                      }),
                 },
               };
             }
@@ -473,7 +477,11 @@ export class DemoDayParticipantsService {
               linkedinHandler: normalizedLinkedin,
               accessLevel: 'L0',
               investorProfile: isTeamInvestorProfile
-                ? undefined
+                ? {
+                    create: {
+                      type: investorType,
+                    },
+                  }
                 : {
                     create: {
                       type: investorType,
