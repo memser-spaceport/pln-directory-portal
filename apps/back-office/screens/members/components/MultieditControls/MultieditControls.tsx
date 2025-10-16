@@ -101,15 +101,18 @@ const options = [
 export const MultieditControls = ({ ids, onReset, authToken }: Props) => {
   const [_value, setValue] = React.useState<any>([]);
   const [openConfirm, toggleConfirm] = useToggle(false);
+  const [sendRejectEmail, setSendRejectEmail] = useState(false);
 
   const { mutateAsync, isPending } = useUpdateMembersStatus();
 
   const handleSubmit = async () => {
     toggleConfirm(false);
+    setSendRejectEmail(false);
     const res = await mutateAsync({
       authToken,
       memberUids: ids,
       accessLevel: _value.value,
+      sendRejectEmail,
     });
 
     if (res.status === 200) {
@@ -267,8 +270,12 @@ export const MultieditControls = ({ ids, onReset, authToken }: Props) => {
           desc="Are you sure you want to change access level of selected users to Rejected? This operation can be reverted later on."
           onClose={() => {
             toggleConfirm(false);
+            setSendRejectEmail(false);
           }}
           onSubmit={handleSubmit}
+          checkboxLabel="Send email"
+          checkboxChecked={sendRejectEmail}
+          onCheckboxChange={setSendRejectEmail}
         />
       )}
     </>

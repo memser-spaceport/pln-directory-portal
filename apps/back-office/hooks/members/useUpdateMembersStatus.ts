@@ -7,6 +7,7 @@ interface MutationParams {
   authToken: string;
   memberUids: string[];
   accessLevel: string;
+  sendRejectEmail?: boolean;
 }
 
 async function mutation(params: MutationParams) {

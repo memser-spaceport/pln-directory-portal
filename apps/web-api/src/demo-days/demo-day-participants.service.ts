@@ -437,22 +437,31 @@ export class DemoDayParticipantsService {
             }
 
             // Update investor profile if it exists
-            if (existingMember.investorProfile && !isTeamInvestorProfile) {
+            if (existingMember.investorProfile) {
               updateData.investorProfile = {
                 update: {
                   type: participantData.investmentType || existingMember.investorProfile.type,
-                  typicalCheckSize:
-                    participantData.typicalCheckSize !== undefined
-                      ? participantData.typicalCheckSize
-                      : existingMember.investorProfile.typicalCheckSize,
-                  investInStartupStages:
-                    participantData.investInStartupStages !== undefined
-                      ? participantData.investInStartupStages
-                      : existingMember.investorProfile.investInStartupStages,
-                  secRulesAccepted:
-                    participantData.secRulesAccepted !== undefined
-                      ? participantData.secRulesAccepted
-                      : existingMember.investorProfile.secRulesAccepted,
+                  ...(isTeamInvestorProfile
+                    ? {
+                        secRulesAccepted:
+                          participantData.secRulesAccepted !== undefined
+                            ? participantData.secRulesAccepted
+                            : existingMember.investorProfile.secRulesAccepted,
+                      }
+                    : {
+                        typicalCheckSize:
+                          participantData.typicalCheckSize !== undefined
+                            ? participantData.typicalCheckSize
+                            : existingMember.investorProfile.typicalCheckSize,
+                        investInStartupStages:
+                          participantData.investInStartupStages !== undefined
+                            ? participantData.investInStartupStages
+                            : existingMember.investorProfile.investInStartupStages,
+                        secRulesAccepted:
+                          participantData.secRulesAccepted !== undefined
+                            ? participantData.secRulesAccepted
+                            : existingMember.investorProfile.secRulesAccepted,
+                      }),
                 },
               };
             }
@@ -473,7 +482,12 @@ export class DemoDayParticipantsService {
               linkedinHandler: normalizedLinkedin,
               accessLevel: 'L0',
               investorProfile: isTeamInvestorProfile
-                ? undefined
+                ? {
+                    create: {
+                      type: investorType,
+                      secRulesAccepted: participantData.secRulesAccepted || false,
+                    },
+                  }
                 : {
                     create: {
                       type: investorType,
@@ -601,6 +615,8 @@ export class DemoDayParticipantsService {
                     data: {
                       teamLead: newTeamLead,
                       role: newRole,
+                      investmentTeam:
+                        !!isTeamInvestorProfile && !existingMember?.teamMemberRoles?.find((r) => r.investmentTeam),
                     },
                   });
 
@@ -618,7 +634,9 @@ export class DemoDayParticipantsService {
                     teamUid,
                     teamLead: isTeamLead,
                     role: participantData.role || (willBeTeamLead ? 'Lead' : 'Contributor'),
-                    mainTeam: !existingMember?.teamMemberRoles.find((r) => r.mainTeam),
+                    mainTeam: !existingMember?.teamMemberRoles?.find((r) => r.mainTeam),
+                    investmentTeam:
+                      !!isTeamInvestorProfile && !existingMember?.teamMemberRoles?.find((r) => r.investmentTeam),
                   },
                 });
                 summary.updatedMemberships++;

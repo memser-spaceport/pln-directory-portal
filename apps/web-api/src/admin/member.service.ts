@@ -926,7 +926,11 @@ export class MemberService {
     return result;
   }
 
-  async updateAccessLevel({ memberUids, accessLevel }: UpdateAccessLevelDto): Promise<{ updatedCount: number }> {
+  async updateAccessLevel({
+    memberUids,
+    accessLevel,
+    sendRejectEmail = false,
+  }: UpdateAccessLevelDto): Promise<{ updatedCount: number }> {
     // Fetch members whose current access level is L0, L1, or Rejected
     const notApprovedMembers = await this.prisma.member.findMany({
       where: {
@@ -1001,8 +1005,8 @@ export class MemberService {
         }
       }
 
-      // Send rejection emails for members marked as Rejected
-      if (accessLevel === AccessLevel.REJECTED) {
+      // Send rejection emails for members marked as Rejected only if sendRejectEmail is true
+      if (sendRejectEmail && accessLevel === AccessLevel.REJECTED) {
         for (const member of notApprovedMembers) {
           if (!member.email) {
             this.logger.error(
