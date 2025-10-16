@@ -2076,6 +2076,58 @@ export class MembersService {
               },
             ],
           },
+          // If InvestorProfile.type = 'ANGEL_AND_FUND', must satisfy at least one of FUND or ANGEL requirements
+          {
+            OR: [
+              // Allow if not ANGEL_AND_FUND type
+              {
+                investorProfile: {
+                  OR: [{ type: { not: 'ANGEL_AND_FUND' } }, { type: { equals: null } }],
+                },
+              },
+              // Or if ANGEL_AND_FUND type, must satisfy at least one requirement
+              {
+                AND: [
+                  {
+                    investorProfile: {
+                      type: 'ANGEL_AND_FUND',
+                    },
+                  },
+                  {
+                    OR: [
+                      // FUND requirement: member must be in a team with isFund = true and investmentTeam = true
+                      {
+                        teamMemberRoles: {
+                          some: {
+                            investmentTeam: true,
+                            team: {
+                              isFund: true,
+                            },
+                          },
+                        },
+                      },
+                      // ANGEL requirement: at least one field must be filled
+                      {
+                        investorProfile: {
+                          OR: [
+                            {
+                              investInStartupStages: { isEmpty: false },
+                            },
+                            {
+                              typicalCheckSize: { not: null, gt: 0 },
+                            },
+                            {
+                              investmentFocus: { isEmpty: false },
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
         ],
       });
     }
