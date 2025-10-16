@@ -27,82 +27,101 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
         const focusAreaVersion: any = [];
         const team = params.args?.data;
         const teamUid = params.args?.where?.uid;
-        const newFocusAreasUids = [...new Set(team.teamFocusAreas?.createMany?.data?.map(area => area.focusAreaUid)||[])];
+
+        // Skip if teamUid is not available (shouldn't happen for updates, but safety check)
+        if (!teamUid) {
+          return;
+        }
+
+        const newFocusAreasUids = [
+          ...new Set(team.teamFocusAreas?.createMany?.data?.map((area) => area.focusAreaUid) || []),
+        ];
+
+        // Skip if no focus areas are being updated
+        if (newFocusAreasUids.length === 0 && !team.teamFocusAreas?.deleteMany) {
+          return;
+        }
+
         const newFocusAreas = await this.findFocusAreas(newFocusAreasUids);
         const existingFocusAreas = await this.findTeamFocusAreasRecentVersion(teamUid);
-        const existingFocusAreasUids:any = existingFocusAreas.map(area=> area.focusAreaUid);
-        const member:any = await this.member.findFirstOrThrow({ where: { uid: team?.lastModifier?.connect?.uid }});
+        const existingFocusAreasUids: any = existingFocusAreas.map((area) => area.focusAreaUid);
+
+        // Skip if no lastModifier is provided
+        if (!team?.lastModifier?.connect?.uid) {
+          return;
+        }
+
+        const member: any = await this.member.findFirstOrThrow({ where: { uid: team?.lastModifier?.connect?.uid } });
         if (
           existingFocusAreas.length === 1 &&
-          existingFocusAreas[0].focusAreaUid === null && 
+          existingFocusAreas[0].focusAreaUid === null &&
           newFocusAreasUids.length === 0
         ) {
-          return ;
-        } else if(existingFocusAreas.length === 0 && newFocusAreasUids.length === 0) {
-          focusAreaVersion.push(
-            {
-              teamUid,
-              teamName: team.name,
-              focusAreaUid: null,
-              focusAreaTitle: null,
-              version: 1,
-              modifiedBy: member.uid,
-              username: member.name
-            }
-          );  
+          return;
+        } else if (existingFocusAreas.length === 0 && newFocusAreasUids.length === 0) {
+          focusAreaVersion.push({
+            teamUid,
+            teamName: team.name,
+            focusAreaUid: null,
+            focusAreaTitle: null,
+            version: 1,
+            modifiedBy: member.uid,
+            username: member.name,
+          });
         } else if (existingFocusAreas.length > 0 && newFocusAreasUids.length === 0) {
-          focusAreaVersion.push(
-            {
-              teamUid, 
-              teamName: team.name, 
-              focusAreaUid: null,
-              focusAreaTitle: null,
-              version: existingFocusAreas[0].version + 1,
-              modifiedBy: member.uid,
-              username: member.name
-            }
-          );  
+          focusAreaVersion.push({
+            teamUid,
+            teamName: team.name,
+            focusAreaUid: null,
+            focusAreaTitle: null,
+            version: existingFocusAreas[0].version + 1,
+            modifiedBy: member.uid,
+            username: member.name,
+          });
         } else if (existingFocusAreas.length > 0) {
           let isFocusAreaUpdated = false;
-          let recentVersion = existingFocusAreas[0]?.version;
+          const recentVersion = existingFocusAreas[0]?.version;
           newFocusAreasUids.forEach((focusAreaUid) => {
             if (!existingFocusAreasUids.includes(focusAreaUid)) {
               isFocusAreaUpdated = true;
             }
           });
           if (isFocusAreaUpdated || existingFocusAreas.length != newFocusAreasUids.length) {
-            newFocusAreasUids.forEach((areaUid, index:number) => {
-              focusAreaVersion.push(
-                {
-                  teamUid,
-                  teamName: team.name,
-                  focusAreaUid: areaUid,
-                  focusAreaTitle: newFocusAreas[index]?.title,
-                  version: recentVersion + 1,
-                  modifiedBy: member.uid,
-                  username: member.name
-                }
-              );  
-            });
-          }
-        } else {
-          newFocusAreasUids.forEach((areaUid, index:number)=>{
-            focusAreaVersion.push(
-              {
+            newFocusAreasUids.forEach((areaUid, index: number) => {
+              focusAreaVersion.push({
                 teamUid,
                 teamName: team.name,
                 focusAreaUid: areaUid,
-                focusAreaTitle: newFocusAreas[index].title,
-                version: 1,
+                focusAreaTitle: newFocusAreas[index]?.title,
+                version: recentVersion + 1,
                 modifiedBy: member.uid,
-                username: member.name
-              }
-            );  
+                username: member.name,
+              });
+            });
+          }
+        } else {
+          newFocusAreasUids.forEach((areaUid, index: number) => {
+            focusAreaVersion.push({
+              teamUid,
+              teamName: team.name,
+              focusAreaUid: areaUid,
+              focusAreaTitle: newFocusAreas[index].title,
+              version: 1,
+              modifiedBy: member.uid,
+              username: member.name,
+            });
           });
         }
-        await this.teamFocusAreaVersionHistory.createMany({ data: focusAreaVersion })
+
+        // Only create version history if there are changes to log
+        if (focusAreaVersion.length > 0) {
+          await this.teamFocusAreaVersionHistory.createMany({ data: focusAreaVersion });
+        }
       } catch (error) {
-        console.error(`Error occured while logging focus area version history to the team ${params.args?.where?.uid}`, error);
+        console.error(
+          `Error occured while logging focus area version history to the team ${params.args?.where?.uid}`,
+          error
+        );
       }
     });
   }
@@ -111,27 +130,27 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
     return await this.focusArea.findMany({
       where: {
         uid: {
-          in: uids
-        }
-      }
+          in: uids,
+        },
+      },
     });
   }
 
   async findTeamFocusAreasRecentVersion(teamUid) {
     const result = await this.teamFocusAreaVersionHistory.findMany({
       where: {
-        teamUid
+        teamUid,
       },
       orderBy: [
         {
-          version: "desc"
-        }
-      ]
+          version: 'desc',
+        },
+      ],
     });
-  
+
     if (result.length > 0) {
       const recentVersion = result[0]?.version;
-      return result.filter(focusArea=> focusArea.version === recentVersion); 
+      return result.filter((focusArea) => focusArea.version === recentVersion);
     }
     return [];
   }
