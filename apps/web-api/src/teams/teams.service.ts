@@ -1328,8 +1328,8 @@ export class TeamsService {
           where: { memberUid_teamUid: { memberUid: member.uid, teamUid } },
           select: { teamLead: true },
         });
-        if (!myRole?.teamLead) {
-          throw new ForbiddenException('Only team lead can update investor settings');
+        if (!myRole?.teamLead && !member.isDirectoryAdmin) {
+          throw new ForbiddenException('Only team lead or directory admin can update investor settings');
         }
 
         // Update team.isFund if requested
