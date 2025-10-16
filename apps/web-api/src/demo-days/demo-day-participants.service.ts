@@ -553,6 +553,7 @@ export class DemoDayParticipantsService {
                   team = await tx.team.update({
                     where: { uid: team.uid },
                     data: {
+                      name: orgName,
                       contactMethod: participantData.organizationEmail,
                     },
                   });
@@ -564,9 +565,13 @@ export class DemoDayParticipantsService {
             }
 
             if (isTeamInvestorProfile) {
-              if (team.investorProfileId) {
+              const teamInvestorProfile = await tx.investorProfile.findUnique({
+                where: { teamUid: team.uid },
+              });
+
+              if (teamInvestorProfile) {
                 await tx.investorProfile.update({
-                  where: { uid: team.investorProfileId },
+                  where: { uid: teamInvestorProfile.uid },
                   data: {
                     typicalCheckSize: participantData.typicalCheckSize || undefined,
                     investInStartupStages: participantData.investInStartupStages || undefined,
@@ -582,7 +587,7 @@ export class DemoDayParticipantsService {
                 });
                 await tx.team.update({
                   where: { uid: team.uid },
-                  data: { investorProfileId: newInvestorProfile.uid },
+                  data: { investorProfileId: newInvestorProfile.uid, name: team.name },
                 });
               }
             }
